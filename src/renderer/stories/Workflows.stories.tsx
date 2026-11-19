@@ -18,6 +18,7 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
@@ -81,6 +82,11 @@ export const ExampleWithCollaborators: Story = {
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {
@@ -171,6 +177,47 @@ export const Prompt: Story = {
       <PromptNode id="filled" text={TASK} />
     </NodeGallery>
   ),
+};
+
+const REFERENCES = [
+  { id: "file-1", name: "launch-hero.png" },
+  { id: "file-2", name: "launch-hero-dark.png" },
+];
+
+const agentWithReferences: StoryWorkflow = {
+  id: "agent-references",
+  title: "Launch illustration",
+  graph: {
+    nodes: [
+      ...REFERENCES.map((file, index) => ({
+        kind: "asset" as const,
+        id: `reference-${index + 1}`,
+        at: { x: 0, y: index * 340 },
+        fields: { fileId: file.id, file: file.name },
+      })),
+      {
+        kind: "agent",
+        id: "illustrate",
+        at: { x: 420, y: 120 },
+        fields: {
+          agentId: AGENT,
+          task: "Make one 4:5 illustration that keeps the character and the style of the two pictures. Do not invent a new character.",
+        },
+      },
+    ],
+    edges: REFERENCES.map((_, index) => ({
+      id: `reference-${index + 1}>illustrate:image`,
+      from: `reference-${index + 1}`,
+      to: "illustrate",
+      type: "image" as const,
+    })),
+    strokes: [],
+  },
+};
+
+export const AgentWithPictures: Story = {
+  name: "Agent with connected pictures",
+  render: () => <WorkflowStory workflows={[agentWithReferences]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Agent: Story = {

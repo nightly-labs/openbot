@@ -420,10 +420,11 @@ export const messages = {
     "Deze server kan geen eigen meldingsniveau voor een agent bewaren. Werk OpenBot bij op de computer waarop hij draait.",
   "mobile.agent.newChat.title": "Nieuwe chat",
   "mobile.agent.newChat.starting": "Nieuwe chat starten…",
-  "mobile.agent.newChat.footer": "De agent vergeet deze chat. Zijn instellingen blijven.",
+  "mobile.agent.newChat.footer":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. Zijn instellingen blijven.",
   "mobile.agent.newChat.confirmTitle": "Een nieuwe chat met {name} starten?",
   "mobile.agent.newChat.confirmBody":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, de herinneringen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, de herinneringen, de werkruimte en de browser veranderen niet.",
   "mobile.agent.newChat.confirm": "Nieuwe chat starten",
   "mobile.agent.newChat.failed": "Kan geen nieuwe chat starten",
   "mobile.agent.newChat.failedBody": "De host kan geen nieuwe chat starten.",

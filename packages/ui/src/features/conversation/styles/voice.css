@@ -221,6 +221,7 @@
   opacity: 0;
   pointer-events: auto;
   transform-origin: top center;
+  --voice-pill-push-share: clamp(0, var(--voice-pill-push, 0), 1);
 }
 
 .voice-pill-avatar {
@@ -291,6 +292,150 @@
   padding-inline: var(--openbot-space-1-5);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
+}
+
+.voice-pill-talk-slot {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 100%;
+  align-items: center;
+  justify-items: center;
+}
+
+.voice-pill-talk-slot > * {
+  grid-area: 1 / 1;
+}
+
+.voice-pill-wave {
+  display: flex;
+  opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2.5, 1);
+  filter: blur(calc(var(--voice-pill-push-share) * 4px));
+  scale: calc(1 - var(--voice-pill-push-share) * 0.2);
+}
+
+.voice-pill .voice-pill-talk {
+  min-width: 0;
+  justify-self: stretch;
+  justify-content: center;
+  overflow: hidden;
+  padding-inline: 0;
+  opacity: clamp(0, var(--voice-pill-push, 0) * 2.5 - 0.25, 1);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+  box-shadow: none;
+  color: var(--openbot-text-secondary);
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition-property: background-color, color, box-shadow;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.voice-pill .voice-pill-talk:is(:hover, :focus-visible):not(:disabled) {
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  color: var(--openbot-text-primary);
+}
+
+.voice-pill .voice-pill-talk[aria-pressed="true"]:not(:disabled) {
+  background: var(--openbot-accent);
+  box-shadow: 0 0 0 4px var(--openbot-accent-soft);
+  color: var(--openbot-text-on-accent);
+}
+
+.voice-pill-talk-face {
+  display: grid;
+  min-width: 196px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding-inline: var(--openbot-space-3);
+  opacity: clamp(0, (var(--voice-pill-push, 0) - 0.4) * 2, 1);
+  filter: blur(calc((1 - var(--voice-pill-push-share)) * 4px));
+  scale: calc(0.92 + var(--voice-pill-push-share) * 0.08);
+}
+
+.voice-pill-talk-face > * {
+  grid-area: 1 / 1;
+}
+
+.voice-pill-talk-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+}
+
+.voice-pill-talk-face:has(> .voice-pill-waveform) > .voice-pill-talk-row {
+  visibility: hidden;
+}
+
+.voice-pill-talk svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+}
+
+.voice-pill-talk[aria-pressed="true"] .voice-pill-waveform {
+  color: inherit;
+}
+
+.voice-pill-talk-hint {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-pill-talk-key {
+  --talk-key-icon-size: var(--openbot-icon-sm);
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--openbot-space-1);
+}
+
+.voice-pill-talk-key .ui-kbd {
+  min-width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  font-size: var(--openbot-text-md);
+}
+
+.talk-key-symbol svg {
+  width: var(--talk-key-icon-size, var(--openbot-icon-xs));
+  height: var(--talk-key-icon-size, var(--openbot-icon-xs));
+}
+
+.voice-pill-mute {
+  display: flex;
+  width: calc(var(--openbot-control-md) * (1 - var(--voice-pill-push-share)));
+  flex: 0 0 auto;
+  justify-content: center;
+  margin-inline-start: calc(var(--openbot-space-2) * -1 * var(--voice-pill-push-share));
+  overflow: hidden;
+  opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2, 1);
+  scale: calc(1 - var(--voice-pill-push-share) * 0.4);
+}
+
+.voice-pill-modes.ui-sliding-tabs {
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.voice-pill-modes .ui-sliding-tabs-pill,
+.voice-pill-modes .voice-pill-mode {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.voice-pill-modes .voice-pill-mode {
+  width: var(--openbot-control-sm);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.voice-pill-mode svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
 }
 
 .voice-pill-error {

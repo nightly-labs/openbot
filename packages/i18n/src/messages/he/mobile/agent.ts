@@ -413,10 +413,10 @@ export const messages = {
     "השרת הזה לא יכול לשמור רמת התראות אישית שלך עבור סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "mobile.agent.newChat.title": "צ'אט חדש",
   "mobile.agent.newChat.starting": "מתחיל צ'אט חדש…",
-  "mobile.agent.newChat.footer": "הסוכן שוכח את הצ'אט הזה. ההגדרות שלו נשארות.",
+  "mobile.agent.newChat.footer": "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההגדרות שלו נשארות.",
   "mobile.agent.newChat.confirmTitle": "להתחיל צ'אט חדש עם {name}?",
   "mobile.agent.newChat.confirmBody":
-    "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההוראות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
+    "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההוראות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "mobile.agent.newChat.confirm": "התחלת צ'אט חדש",
   "mobile.agent.newChat.failed": "לא ניתן להתחיל צ'אט חדש",
   "mobile.agent.newChat.failedBody": "המארח לא הצליח להתחיל צ'אט חדש.",

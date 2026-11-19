@@ -27,6 +27,7 @@ import {
   wrapArchiveKey,
   wrapKeySecret,
 } from "./pool-archive";
+import { hostingCopy, MACHINE_HOSTING, prepareScript, upgradeScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("leaseweb-pool");
 const AUTH_API = resolve(import.meta.dirname, "../../apps/auth-api");
@@ -40,6 +41,15 @@ const isOwnerReference = (reference: string) => {
   return rest.length === 0 && EMAIL_PATTERN.test((email ?? "").toLowerCase()) && /^[0-9a-f]{8}$/u.test(server ?? "");
 };
 const IMAGE = "UBUNTU_26_04_64BIT";
+const OPERATOR_KEYS_HOST_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$/u;
+const OPERATOR_KEY_PATTERN =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+=*( .*)?$/u;
+const keyLines = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+const keyBlob = (line: string) => line.split(/\s+/u)[1] ?? "";
 const REINSTALL_WAIT_MS = 15 * 60_000;
 const VPS_ID_PATTERN = /^\d{1,20}$/u;
 const HOST_ID_PATTERN = /^leaseweb:\d{1,20}$/u;
@@ -58,7 +68,6 @@ const AUTH_API_URL = {
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
 };
 const SANDBOX_MOVE = "/root/openbot-move";
-const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 const RESTORE_WAIT_MS = 30 * 60_000;
@@ -296,6 +305,14 @@ function writeFileCommand(path: string, content: string) {
   return `base64 -d >'${path}' <<'OPENBOT_FILE'\n${Buffer.from(content).toString("base64")}\nOPENBOT_FILE\n`;
 }
 
+function scriptOutput(stdout: string, marker: string, sandbox: string) {
+  const start = stdout.indexOf(`${marker}\n`);
+  if (start === -1) throw new Error(`The output of a command in sandbox ${sandbox} has no start.`);
+  const from = start + marker.length + 1;
+  const end = stdout.lastIndexOf(`\n${marker}`);
+  return end < from - 1 ? stdout.slice(from) : stdout.slice(from, end);
+}
+
 function seconds(milliseconds: number) {
   return Math.round(milliseconds / 1000);
 }
@@ -368,6 +385,8 @@ class Pool {
   readonly #keys: { name: string; key: string }[];
   readonly #found = new Map<string, Vps>();
   readonly #operatorKeysFile: string | undefined;
+  readonly #operatorKeysHost: string | undefined;
+  #operatorKeysBase64: string | undefined;
   readonly #boatKey: string | undefined;
   readonly #claimsToken: string | undefined;
   readonly #environment: NodeJS.ProcessEnv;
@@ -381,6 +400,7 @@ class Pool {
     this.#apply = apply;
     this.#testDatabase = testDatabase;
     this.#operatorKeysFile = operatorKeysFile;
+    this.#operatorKeysHost = environment.OPERATOR_KEYS_HOST || undefined;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
     this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
     this.#environment = environment;
@@ -760,7 +780,7 @@ class Pool {
     const host = literal(row.operator_host, HOST_ID_PATTERN);
     const server = literal(row.server_id, SERVER_ID_PATTERN);
     this.#remote(machine, "bash -s", {
-      input: `${this.#hostingCopy()}
+      input: `${hostingCopy()}
 command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q age >/dev/null
 `,
     });
@@ -995,15 +1015,29 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
   }
 
   #operatorKeys() {
-    if (!this.#operatorKeysFile) throw new Error("Give the public keys of the operators with --keys=<file>.");
-    const text = readFileSync(this.#operatorKeysFile, "utf8");
-    const blobs = (lines: string) =>
-      lines
-        .split("\n")
-        .map((line) => line.trim().split(/\s+/u)[1] ?? "")
-        .filter((blob) => blob !== "");
-    const listed = blobs(text);
-    if (listed.length === 0) throw new Error(`${this.#operatorKeysFile} has no public key.`);
+    this.#operatorKeysBase64 ??= this.#readOperatorKeys();
+    return this.#operatorKeysBase64;
+  }
+
+  #readOperatorKeys() {
+    const host = this.#operatorKeysHost;
+    if (!host) throw new Error("OPERATOR_KEYS_HOST is not in the environment.");
+    if (!OPERATOR_KEYS_HOST_PATTERN.test(host)) throw new Error("OPERATOR_KEYS_HOST is not <user>@<host>.");
+    const fromCore = execFileSync(
+      "ssh",
+      ["-o", "BatchMode=yes", "-o", "ConnectTimeout=20", host, "cat /root/.ssh/authorized_keys"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const coreLines = keyLines(fromCore);
+    if (coreLines.length === 0) throw new Error("The core server of the operators has no public key.");
+    const fileLines = this.#operatorKeysFile ? keyLines(readFileSync(this.#operatorKeysFile, "utf8")) : [];
+    const lines: string[] = [];
+    for (const line of [...coreLines, ...fileLines]) {
+      if (!OPERATOR_KEY_PATTERN.test(line)) {
+        throw new Error(`Operator key ${lines.length + 1} is not a public key with no options.`);
+      }
+      if (!lines.some((listed) => keyBlob(listed) === keyBlob(line))) lines.push(line);
+    }
     let own = "";
     try {
       own += execFileSync("ssh-add", ["-L"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -1014,12 +1048,14 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
         own += `\n${readFileSync(join(home, ".ssh", name), "utf8")}`;
       } catch {}
     }
-    if (!blobs(own).some((blob) => listed.includes(blob))) {
+    const ownBlobs = keyLines(own).map(keyBlob);
+    if (!lines.some((line) => ownBlobs.includes(keyBlob(line)))) {
       throw new Error(
-        `${this.#operatorKeysFile} has no key of this computer, so the script could not sign in after the bootstrap.`,
+        "The operator keys have no key of this computer, so the script could not sign in after the bootstrap.",
       );
     }
-    return Buffer.from(text).toString("base64");
+    logger.info(`The bootstrap installs ${lines.length} operator keys.`);
+    return Buffer.from(`${lines.join("\n")}\n`).toString("base64");
   }
 
   async #rootPassword(machine: Vps) {
@@ -1028,43 +1064,19 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
     return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
   }
 
-  #hostingCopy() {
-    const archive = execFileSync(
-      "tar",
-      ["-czf", "-", "--no-xattrs", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"],
-      {
-        maxBuffer: 16 * 1024 * 1024,
-      },
-    );
-    return `set -euo pipefail
-rm -rf ${MACHINE_HOSTING}
-install -d -m 0700 ${MACHINE_HOSTING}
-base64 -d <<'OPENBOT_HOSTING' | tar -xz --no-same-owner --strip-components=1 -C ${MACHINE_HOSTING}
-${archive.toString("base64")}
-OPENBOT_HOSTING
-`;
-  }
-
   async #prepareMachine(machine: Vps, release: Release) {
     const keys = this.#operatorKeys();
     const password = this.#machineState(machine) === null ? await this.#rootPassword(machine) : undefined;
     if (password !== undefined)
       logger.info(`VPS ${machine.id} has no key of this computer. Sign in one time with the root password.`);
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh prepare lsw-${machine.id} 1000 1000 '${release.url}' ${release.sha256} '${authApi}'
-bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
-`;
-    this.#remote(machine, "bash -s", { input: script, password });
+    this.#remote(machine, "bash -s", { input: prepareScript(machine.id, release, authApi, keys), password });
     await this.#restartMachine(machine);
   }
 
   #upgradeMachine(machine: Vps, release: Release) {
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha256} '${authApi}'
-`;
-    this.#remote(machine, "bash -s", { input: script });
+    this.#remote(machine, "bash -s", { input: upgradeScript(release, authApi) });
   }
 
   async #restartMachine(machine: Vps) {
@@ -1117,7 +1129,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
     if (changes !== 1) throw new Error(`VPS ${machine.id} is not a free machine of the pool any more.`);
     try {
-      this.#remote(machine, "bash -s", { input: this.#hostingCopy() });
+      this.#remote(machine, "bash -s", { input: hostingCopy() });
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh offer leaseweb:${machine.id}`, {
         input: `${token}\n`,
       });
@@ -1441,7 +1453,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     const hostname = `lsw-${id}`;
     const claim = install ? await this.#serverClaim(owner) : "";
     const authApi = this.#testDatabase ? ` --auth-api-url '${AUTH_API_URL.test}'` : "";
-    const script = `${this.#hostingCopy()}
+    const script = `${hostingCopy()}
 hostnamectl set-hostname ${hostname}
 ${
   install
@@ -1523,9 +1535,12 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
   }
 
   async #sandboxRun(sandbox: string, script: string, timeoutSeconds = 120) {
+    const marker = `OPENBOT_OUTPUT_${randomBytes(12).toString("hex")}`;
     const command = `f=$(mktemp)
-${writeFileCommand("$f", script).replace("'$f'", '"$f"')}sudo -n bash "$f"
+${writeFileCommand("$f", script).replace("'$f'", '"$f"')}printf '%s\\n' '${marker}'
+sudo -n bash "$f"
 status=$?
+printf '\\n%s\\n' '${marker}'
 rm -f "$f"
 exit "$status"`;
     const result = commandSchema.parse(
@@ -1541,7 +1556,7 @@ exit "$status"`;
         `A command in sandbox ${sandbox} failed with ${result.exitCode}: ${(result.stderr ?? "").slice(-2000)}`,
       );
     }
-    return result.stdout ?? "";
+    return scriptOutput(result.stdout ?? "", marker, sandbox);
   }
 
   #moveCandidates(product: string, currency: string | null) {
@@ -1654,7 +1669,7 @@ exit "$status"`;
       state = this.#machineState(machine);
     } else {
       this.#remote(machine, "bash -s", {
-        input: `${this.#hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
+        input: `${hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
       });
     }
     if (state?.user !== "user" || state.data || state.enabled === "enabled") {
@@ -1933,7 +1948,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... [--keys=<file>] [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> [--keys=<file>] [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));

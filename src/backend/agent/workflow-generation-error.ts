@@ -5,6 +5,11 @@ import { providerLabel } from "./thread-items";
 
 export function workflowGenerationError(cause: unknown, provider: AgentProvider): string {
   const failure = cause instanceof Error ? cause : null;
+  if (
+    failure?.message === sourceText("error.workflow.modelImageUnsupported") ||
+    failure?.message === sourceText("error.workflow.modelImageType")
+  )
+    return failure.message;
   const providerCause = failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown";
   switch (providerCause === "unknown" ? classifyFailure(failure) : providerCause) {
     case "authentication":

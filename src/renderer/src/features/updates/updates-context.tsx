@@ -30,8 +30,9 @@ const Updates = createSimpleContext({
       const phase = current.phase;
       if (phase === "ready") {
         try {
-          await updatesPort().update.install();
-          analytics.track("update_action", { action: "install", result: "succeeded", phase: "installing" });
+          const next = await updatesPort().update.install();
+          setStatus(next);
+          analytics.track("update_action", { action: "install", result: "succeeded", phase: next.phase });
         } catch (error) {
           analytics.track("update_action", {
             action: "install",

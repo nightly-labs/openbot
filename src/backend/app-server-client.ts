@@ -107,6 +107,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "codex";
   readonly turnContext = true;
+  readonly imageInput = (): boolean => true;
   readonly modelAddressVariable?: string;
   readonly #turnContext: TurnContext;
   readonly #executable: string;

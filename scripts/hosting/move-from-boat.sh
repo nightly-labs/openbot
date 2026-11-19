@@ -542,8 +542,6 @@ export_data() {
     install -d -m 0700 "$MOVED_BIN"
     cp --preserve=mode,timestamps --dereference "/usr/local/bin/$name" "$MOVED_BIN/$name"
   done < <(sed -n 's/^file=//p' <<<"$commands")
-  # `crontab -l`, not the spool file: the file starts with the "DO NOT EDIT" header of cron, and
-  # `crontab` on the VPS would keep those lines as text of the customer (seen on 2026-11-19).
   if [ -s "/var/spool/cron/crontabs/$SERVICE_USER" ]; then
     crontab -u "$SERVICE_USER" -l >"$MOVED_CRONTAB"
   fi

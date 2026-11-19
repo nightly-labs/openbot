@@ -50,8 +50,10 @@ import {
   Square,
   SwitchField,
 } from "@openbot/ui";
+import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
+import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import {
@@ -196,10 +198,12 @@ interface SettingsVoiceTabProps {
   selectMount: HTMLElement | undefined;
   codexLiveAccess?: CodexLiveAccess | undefined;
   onConnectCodex?: (() => void) | undefined;
+  platform?: "darwin" | "win32" | "linux" | undefined;
 }
 
 export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   const { t, format } = useText();
+  const talkKey = useVoiceTalkKey(() => props.platform);
   const settings = () => props.store.state.settings;
   const activeModel = () => VOICE_MODELS.find((model) => model.id === settings()?.modelId);
   const shownModels = createMemo(() =>
@@ -585,6 +589,20 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                 </SelectTrigger>
                 <SelectContent mount={props.selectMount} />
               </Select>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
+      </SettingsSection>
+
+      <SettingsSection title={t("settings.voice.talk.section")}>
+        <ItemGroup class="settings-modal-card">
+          <Item data-settings-row="settings.voice.talkKey.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{t("settings.voice.talkKey.title")}</ItemTitle>
+              <ItemDescription>{t("settings.voice.talkKey.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <TalkKeyRecorder binding={talkKey()} onChange={(key) => setVoiceTalkKey(key, talkKey().platform)} />
             </ItemActions>
           </Item>
         </ItemGroup>

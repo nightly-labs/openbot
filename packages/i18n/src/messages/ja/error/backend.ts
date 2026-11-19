@@ -306,6 +306,10 @@ export const messages = {
     "{provider} は MCP サーバー {name} を起動できませんでした。{provider} はこのサーバーのツールを使えません。{provider} はサーバーを自分で起動するため、OpenBot の接続テストは成功することがあります。新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpServerTimedOutInProvider":
     "サーバーが時間内に応答しなかったため、{provider} は MCP サーバー {name} を起動できませんでした。新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.mcpServerUnavailableInProvider":
+    "サーバーが現在利用できないため、{provider} は MCP サーバー {name} を起動できませんでした。数分待ってから新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} は MCP サーバー {name} に接続できませんでした。マーケットプレイス、アプリで {name} を開き、アドレスが正しいことと、サーバーが動作していることを確認してください。その後、新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":
@@ -376,8 +380,9 @@ export const messages = {
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
-  "error.backend.apiKeyNotAllowed": "API キーを入力できるのはサーバーの所有者か管理者だけです。",
   "error.backend.apiKeySaving": "API キーはすでに保存中です。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot は API キーを読み取れませんでした。8,000 文字以内のキーを入力し、使用できる対象を選択してください。",
   "error.backend.authRequestInactive": "この安全な認証要求はもう有効ではありません。",
   "error.backend.secureAuthUnavailable": "安全な認証を使用できません。",
   "error.backend.browserUrlRequired": "ブラウザーの URL が必要です。",
@@ -420,7 +425,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "ポップアップを読み込めませんでした。元のページからもう一度サインインしてください。",
   "error.backend.browserTabNotFound": "ブラウザーのタブが見つかりません。",
   "error.backend.authActive": "認証はすでに有効です。",
-  "error.backend.authHttpsRequired": "安全な認証には HTTPS が必要です。",
+  "error.backend.authWebPageRequired": "安全な認証には HTTP/HTTPS が必要です。",
   "error.backend.authDigitsRange": "認証コードは 4〜12 桁である必要があります。",
   "error.backend.authExpired": "認証要求の有効期限が切れました。",
   "error.backend.authDigitsRequired": "指定された桁数の数字を入力してください。",

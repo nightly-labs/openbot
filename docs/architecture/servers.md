@@ -491,6 +491,13 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-agent-files-v1` says that the host gives an Agent step the files of the steps that connect
+to it. The host attaches each image and file input to the message for the agent, and the message
+tells the agent to use them together, as given, and not to invent a substitute. The capability adds
+no route. A client shows the connected pictures on the Agent card only on a host that advertises it,
+because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
+them without the note and does not advertise the capability, so its Agent card shows no pictures.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -522,6 +529,24 @@ address. The catalog, the price and the answers of `workflows-sunra-v1` and `wor
 stay on the first account. The capability goes to protocol 10 peers. When a service has more than one
 account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
 shows one credits button for each account, with its name.
+
+`workflows-media-catalog-v2` (protocol 10) adds the other settings of a model and the aspect ratios
+`21:9` and `3:4`. `POST /v1/workflows/media/v2/catalog {}` answers `{ models }` as v1 does, and each
+model can have `options`: a `switch` (values `off` and `on`) or a `choice`, each with its `default`. The
+host reads them from the `parameters` of the service and leaves out a setting that the canvas sets
+another way (prompt, pictures, aspect ratio, length, resolution, background). `POST
+/v1/workflows/media/v2/price` takes the v1 request and `options`, a list of `{ name, value }`. The node
+field `options` is a JSON text of an object, a name to a value; the host sends only the names and values
+that the model has. The v1 routes keep their shape: the v1 catalog leaves out `options`, `21:9` and
+`3:4`, and a model left with no aspect ratio. A client reads the v2 routes when the host advertises the
+capability, and offers the settings and the new aspect ratios only for a model of the v2 catalog.
+
+A v2 video model can also have `inputs`, the files that it takes (`frames`, `references`, `videos`,
+`audios`), and `modes`, a list of `{ value, inputs }` for the values of its `mode` setting. The client
+shows only the input ports of the chosen mode; with no mode, the host chooses it from the inputs. A
+video step has one `file` input port for its video and audio references: the host gives each file its
+role from its type (`video/*` or `audio/*`) and refuses another type. The v1 catalog leaves out `inputs`
+and `modes`.
 
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
@@ -997,6 +1022,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
+| `vault-member-save-v1` | No route or field of its own. The host takes a password save on `browser-secret-vault-v1` and a `request_vault_item` or API key card answer from any member, not only from an owner or admin. The item goes to all agents of the host | `agent` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the

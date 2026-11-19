@@ -173,6 +173,7 @@ import {
   teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
+  VAULT_MEMBER_SAVE_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
@@ -182,6 +183,7 @@ import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOWS_AGENT_FILES_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -189,6 +191,7 @@ import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -2617,6 +2620,7 @@ export class TeamApiServer {
         if (capability === VAULT_V2_CAPABILITY) return this.#options.vault !== undefined;
         if (capability === VAULT_V3_CAPABILITY) return this.#options.vault !== undefined;
         if (capability === VAULT_V4_CAPABILITY) return this.#options.vault !== undefined;
+        if (capability === VAULT_MEMBER_SAVE_CAPABILITY) return this.#options.vault !== undefined;
         if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
         if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
@@ -2759,8 +2763,10 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_HIGGSFIELD_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_CATALOG_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHATS_CAPABILITY)
           return this.#options.workflows !== undefined && this.#options.admin?.routineResults !== undefined;
         if (

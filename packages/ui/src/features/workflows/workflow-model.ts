@@ -9,7 +9,10 @@ import {
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
   type WorkflowMediaAspect,
+  type WorkflowMediaInput,
   type WorkflowMediaKind,
+  type WorkflowMediaMode,
+  type WorkflowMediaOption,
   type WorkflowMediaPrice,
   type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
@@ -81,6 +84,9 @@ export interface WorkflowImageModel {
   durations?: readonly number[];
   resolutions?: readonly string[];
   transparent?: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
   accounts?: readonly ProviderAccountStatus[];
 }
 
@@ -96,6 +102,7 @@ export interface WorkflowCatalogs {
   imageModels: readonly WorkflowImageModel[];
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
   mediaSize?: boolean | undefined;
+  agentFiles?: boolean | undefined;
   files: readonly StoredFileRow[];
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
   mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;

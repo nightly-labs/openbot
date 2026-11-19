@@ -264,6 +264,10 @@ export const messages = {
     "이 모델은 사용할 수 없어요. 이 에이전트에 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 설정에서 사용자 지정 제공자를 열고 이 엔드포인트의 편집을 클릭한 다음 이 모델의 최대 출력을 더 크게 설정하세요. 또는 더 낮은 강도나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":

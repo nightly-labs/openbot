@@ -24,6 +24,7 @@ export const messages = {
   "status.agent.channelTaskCancelled": "{agent} ביטל את המשימה ״{task}״ ואת תתי-המשימות שלה. {person} ביקש זאת.",
   "status.agent.screenCaptureScreen": "צילום המסך הראשי ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureChannel": "התמונה מוצגת בערוץ {channel}, וכל חבר בשרת הזה שקורא את הערוץ יכול לראות אותה.",
+  "status.agent.screenCapturePermissionNext": "לאחר מכן macOS עשוי לבקש ממך לאפשר ל-OpenBot את Screen Recording.",
   "status.agent.screenCaptureDisplay": "צילום התצוגה {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureWindow": "צילום החלון {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureRegion":
@@ -68,6 +69,7 @@ export const messages = {
   "status.agent.browserActing": "משתמש בדף האינטרנט…",
   "status.agent.browserReviewing": "בודק את דף האינטרנט…",
   "status.agent.memoriesSearching": "מחפש בזיכרונות שלו…",
+  "status.agent.chatsSearching": "מחפש בצ'אטים הקודמים שלו…",
   "status.agent.memoriesSearched": {
     one: "חיפש בזיכרונות שלו: נמצא אחד",
     two: "חיפש בזיכרונות שלו: נמצאו שניים",
