@@ -28,8 +28,6 @@ import {
   parseVoiceStreamAudio,
 } from "./voice-inputs";
 
-// Same reason as trusted-ipc.test.ts: electron cannot be imported outside an Electron process, and
-// ipcMain is the only thing the wrappers touch, so registrations are captured rather than performed.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, ...arguments_: unknown[]) => unknown>(),
 }));
@@ -65,9 +63,6 @@ function decodeNote(value: unknown): VoiceTranscriptionInput {
   return { audio: new TextEncoder().encode(String(value)) };
 }
 
-// `voice` is the group under test because it has all three shapes: a request that takes nothing, a
-// request that takes a payload, and an event the main process only ever sends.
-// With `withEvent`, `transcribe` is bound with `eventPayloadHandler` and also gets the invoke event.
 function registerVoice(
   transcribe: (input: VoiceTranscriptionInput, event?: IpcMainInvokeEvent) => VoiceTranscriptionResult,
   withEvent = false,
@@ -107,10 +102,6 @@ function registerVoice(
   });
 }
 
-// The type checker owns which endpoints a group has to be given a handler for; what it cannot show
-// is what `registerIpcGroup` then does with them. Two things have to hold, and neither is visible in
-// the types: the channel a handler ends up on is the one its endpoint declares, and the indirection
-// does not step around the sender check that every handler used to be registered behind directly.
 describe("IPC group registration", () => {
   it("registers each request endpoint on the channel it declares, and no event", () => {
     registerVoice((input) => ({ text: `heard ${new TextDecoder().decode(input.audio)}` }));

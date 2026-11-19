@@ -16,12 +16,6 @@ const ICON_SIZE = 22;
 const ALL = "all";
 const ALL_PHOTOS = "all-photos";
 
-/**
- * Copy, Share and Save for the files of one message, in the message sheet. A message with one file
- * acts on it at once. A message with more files opens a menu that names each file, so the reader
- * sees which file an action takes. Each action runs when the sheet has closed. A file that its card
- * still downloads, such as a video, cannot be copied, shared or saved until it is on the phone.
- */
 export function MessageFileActions({
   serverId,
   attachments,
@@ -31,7 +25,6 @@ export function MessageFileActions({
   serverId: string;
   attachments: readonly AttachmentSummary[];
   iconColor: string;
-  /** Closes the sheet and runs the action after it, so a share sheet or a picker shows over the chat. */
   afterSheet: (action: () => void) => void;
 }) {
   const { t } = useText();
@@ -54,7 +47,6 @@ export function MessageFileActions({
           succeed,
         ),
     );
-  /** One menu entry for each file, under a header. */
   const eachFile = (image: (attachment: AttachmentSummary) => MenuAction["image"]): MenuAction => ({
     title: t("mobile.chat.message.oneFile"),
     displayInline: true,
@@ -147,7 +139,6 @@ export function MessageFileActions({
                   },
                 ]
               : []),
-            // An image goes to Photos and another file to Files, as the icon shows.
             eachFile((attachment) => (savesToPhotos(attachment) ? "photo" : "folder")),
           ]}
           onAction={(id) => {
@@ -180,7 +171,6 @@ function Row({
   );
 }
 
-/** A row that opens a native menu, as Send to channel does. */
 function MenuRow({
   icon,
   label,

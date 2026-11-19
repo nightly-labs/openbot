@@ -14,7 +14,6 @@ import {
 import { API_KEY_NAME_PATTERN } from "./ipc-vault";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/** JSON values accepted from a webhook request. */
 export type EventJsonValue =
   | string
   | number
@@ -23,7 +22,6 @@ export type EventJsonValue =
   | EventJsonValue[]
   | { readonly [key: string]: EventJsonValue };
 
-/** A sender's delivery ID. Senders choose it, so the bound is wider than an ID. */
 export const EVENT_DELIVERY_ID_MAX_LENGTH = 512;
 
 export type EventScalar = string | number | boolean | null;
@@ -34,7 +32,6 @@ export interface EventStatus {
 }
 
 export interface EventFilter {
-  /** A JSON Pointer into the request `data`. The empty pointer selects the complete value. */
   pointer: string;
   value: EventScalar;
 }
@@ -44,14 +41,9 @@ export interface RoutineScheduleTrigger {
   schedule: RoutineSchedule;
 }
 
-/**
- * A webhook trigger belongs to one routine. The host makes its URL and signing secret. The URL is
- * null until the account service registers the route. The secret is never part of a read.
- */
 export interface RoutineWebhookTrigger {
   kind: "webhook";
   url: string | null;
-  /** Null accepts every event type. */
   eventType: string | null;
   filters: EventFilter[];
 }
@@ -73,9 +65,7 @@ export interface EventRoutine {
   trigger: EventRoutineTrigger;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
-  /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
   runIn?: RoutineRunPlace;
-  /** As `RoutineFields.pausedByRun`: a paused agent routine that one of its own scheduled runs paused. */
   pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
@@ -91,14 +81,9 @@ export interface SaveEventRoutineInput {
   trigger: EventRoutineTriggerInput;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
-  /**
-   * Only an agent routine reads it, on this computer's host or on a remote host with
-   * `routine-run-place-v1`. Left out, a save keeps the saved place.
-   */
   runIn?: RoutineRunPlace;
 }
 
-/** `secret` is set only when this save made a new webhook trigger. The host does not show it again. */
 export interface SaveEventRoutineResult {
   routine: EventRoutine;
   secret: string | null;
@@ -108,15 +93,10 @@ export interface WebhookSecret {
   secret: string;
 }
 
-/**
- * The API key of the agent that has the new signing secret of its webhook routine. The host keeps the
- * secret; the agent reads it from the file of the key with this name.
- */
 export interface AgentWebhookSecret {
   name: string;
 }
 
-/** A signing secret that the sender made, such as a Composio or Svix webhook secret. */
 export interface SetWebhookSecretInput extends EventRoutineRef {
   secret: string;
 }
@@ -125,7 +105,6 @@ export interface ListEventRoutinesInput {
   owner: EventRoutineOwner;
 }
 
-/** Names one routine. Routine actions and every per-routine list use it. */
 export interface EventRoutineRef {
   id: string;
   owner: EventRoutineOwner;
@@ -137,23 +116,17 @@ export interface ListEventActivityInput {
   limit?: number;
 }
 
-/** The newest runs of one routine, with the records of the occurrences it missed. */
 export interface ListEventRoutineRunsInput {
   owner: EventRoutineOwner;
   routineId: string;
   limit?: number;
 }
 
-/**
- * One run in the history of an event routine. An agent run names the chat message it posted in
- * `deliveryId`, and a channel run names its channel message in `requestMessageId`.
- */
 export interface EventRoutineRun extends RoutineRunFields {
   deliveryId?: string | null;
   requestMessageId?: string | null;
 }
 
-/** The verified request that starts a webhook routine. Secrets and signature headers are never part of it. */
 export interface EventEnvelope {
   version: 1;
   id: string;
@@ -164,10 +137,8 @@ export interface EventEnvelope {
   data: EventJsonValue;
 }
 
-/** Why a received request did not start a run. */
 export type WebhookReceiptReason = "event-type" | "filter" | "inactive";
 
-/** One request that the webhook of a routine received. */
 export interface EventActivity {
   kind: "received";
   id: string;
@@ -179,12 +150,7 @@ export interface EventActivity {
   occurredAt: string;
 }
 
-/**
- * The answer to a test event. The host makes an event that matches the routine's event type and
- * filters, signs it with the routine secret, and receives it as it receives a relayed request.
- */
 export interface WebhookTestResult {
-  /** The type of the event that the host sent. */
   eventType: string;
   status: "started" | "ignored";
   reason: WebhookReceiptReason | null;

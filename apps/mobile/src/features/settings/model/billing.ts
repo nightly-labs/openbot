@@ -4,10 +4,6 @@ import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-
 import { readBillingState } from "@/features/settings/api/billing";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/**
- * The plans of the account's hosted servers, as Settings > Billing and its row read them. `enabled`
- * is the cloudServers feature flag: with the flag off, the phone does not read billing.
- */
 export function useBillingState(enabled: boolean) {
   const { session, handleSessionError } = useMobileSession();
   const queryScope = useQueryScope();

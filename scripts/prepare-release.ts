@@ -13,9 +13,6 @@ import {
   UNRELEASED,
 } from "./release-notes";
 
-//   bun scripts/prepare-release.ts <major|minor|patch>           the desktop app and the web client
-//   bun scripts/prepare-release.ts <major|minor|patch> --mobile  the iPhone app
-
 const logger = createOpenBotLogger("prepare-release");
 
 type Increment = "major" | "minor" | "patch";
@@ -24,11 +21,8 @@ interface ReleaseTarget {
   name: string;
   changelog: string;
   fragmentDir: string;
-  /** Each file that holds the version. The first one is where the current version is read. */
   versionFiles: readonly string[];
-  /** The workspace whose copy of the version `bun.lock` keeps. Bun does not update that copy. */
   lockWorkspace?: string;
-  /** The new section is `In review` until a store approves the build, so `/changelog` hides it. */
   inReview: boolean;
   next: string;
 }
@@ -52,7 +46,6 @@ const MOBILE: ReleaseTarget = {
   next: "commit the files, merge them to main, then build with bun run mobile:release (step 2). When a store makes the build available, mark it with step 3, and again for the other store. Before the first store, write the Discord highlights in apps/mobile/release-announcement.json (apps/mobile/README.md#discord-announcement)",
 };
 
-/** The first `"version"` in the file, which is the top-level one in each file that this script changes. */
 const VERSION_FIELD = /("version"\s*:\s*")([^"]*)(")/;
 
 const args = process.argv.slice(2);
@@ -74,7 +67,6 @@ const releaseHeading = `## [${nextVersion}] - ${target.inReview ? IN_REVIEW : ne
 if (changelog.includes(`## [${nextVersion}]`)) {
   throw new Error(`${target.changelog} already contains ${nextVersion}`);
 }
-// The publish step dates the current version unless it gets --version, so an older one would stay hidden.
 const waiting = changelog.split("\n").find((line) => line.startsWith("## [") && line.endsWith(`] - ${IN_REVIEW}`));
 if (target.inReview && waiting !== undefined) {
   throw new Error(
@@ -82,8 +74,6 @@ if (target.inReview && waiting !== undefined) {
   );
 }
 
-// The release is the items still written under Unreleased, then each fragment in the order that
-// its pull request merged. Unreleased stays as an empty heading.
 const lines = changelog.split("\n");
 const unreleased = lines.findIndex((line) => line.startsWith(`## [${UNRELEASED}]`));
 if (unreleased === -1) throw new Error(`${target.changelog} has no "## [${UNRELEASED}]" section.`);
@@ -115,7 +105,6 @@ if (problems.length > 0) {
   );
 }
 
-// Every file is ready before the first write, so a version that cannot be set changes nothing.
 const versionWrites = target.versionFiles.map((path, index) => ({
   path,
   text: withVersion(versionSources[index] ?? "", path, nextVersion),
@@ -130,7 +119,6 @@ await Promise.all([
   ...versionWrites.map(({ path, text }) => writeFile(path, text)),
   writeFile(target.changelog, nextChangelog),
 ]);
-// Only after the changelog holds their items.
 await Promise.all(fragments.map((path) => rm(path)));
 
 logger.info(`Prepared ${target.name} v${nextVersion} from ${fragments.length} fragments. Review, then ${target.next}.`);
@@ -138,7 +126,6 @@ logger.info(`Prepared ${target.name} v${nextVersion} from ${fragments.length} fr
 function fileVersion(source: string, path: string): string {
   const version = VERSION_FIELD.exec(source)?.[2];
   const parsed = JSON.parse(source);
-  // `app.json` keeps the version under `expo`. The `expo` key of a `package.json` has none.
   const record = path.endsWith("app.json") && isDynamicRecord(parsed) ? parsed.expo : parsed;
   const expected = isDynamicRecord(record) ? record.version : undefined;
   if (version === undefined || !isString(expected) || version !== expected) {
@@ -147,14 +134,12 @@ function fileVersion(source: string, path: string): string {
   return version;
 }
 
-/** Changes only the version, so the file keeps the layout that Biome gave it. */
 function withVersion(source: string, path: string, version: string): string {
   const next = source.replace(VERSION_FIELD, `$1${version}$3`);
   if (fileVersion(next, path) !== version) throw new Error(`Could not set the version in ${path}.`);
   return next;
 }
 
-/** Sets the version that `bun.lock` keeps for `workspace`, the line after the workspace name. */
 function withLockVersion(lock: string, workspace: string, version: string): string {
   const entry = new RegExp(
     `("${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}": \\{\\s*"name": "[^"]*",\\s*"version": ")[^"]*(")`,

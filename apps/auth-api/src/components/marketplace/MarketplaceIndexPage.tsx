@@ -22,7 +22,6 @@ import { PluginCard } from "../plugins/PluginCard";
 import { PluginTagFilters } from "../plugins/PluginTagFilters";
 import { AgentMark, ListingLink, MarketplaceFrame, SkillIcon, VerifiedMark } from "./MarketplaceParts";
 
-/** One catalog item as the index shows it. */
 interface Listing {
   link: MarketplaceListingLink;
   name: string;
@@ -31,7 +30,6 @@ interface Listing {
   verified: boolean;
   category: SkillCategory | null;
   featured: boolean;
-  /** The avatar or the icon. It fills the box the row or the featured card gives it. */
   media: () => JSX.Element;
 }
 
@@ -61,16 +59,13 @@ function skillListing(skill: MarketplaceSkillSummary): Listing {
   };
 }
 
-/** The rows a category shows when nothing is filtered; "See all" opens the category with every row. */
 const ROWS_PER_GROUP = 4;
 const FEATURED_LIMIT = 3;
 
-/** The catalog's own picks, in catalog order. No count of installs decides what is featured. */
 function featuredListings(listings: readonly Listing[]): Listing[] {
   return listings.filter((listing) => listing.featured).slice(0, FEATURED_LIMIT);
 }
 
-/** The categories that hold a listing: a link to an empty page is a dead end. */
 function filledCategories(listings: readonly Listing[]): SkillCategory[] {
   return SKILL_CATEGORIES.filter((category) => listings.some((listing) => listing.category === category));
 }
@@ -78,7 +73,6 @@ function filledCategories(listings: readonly Listing[]): SkillCategory[] {
 type CatalogTab = Exclude<MarketplaceTab, "apps">;
 type CatalogRoute = (typeof MARKETPLACE_TAB_ROUTES)[CatalogTab];
 
-/** The text that names the agents or the skills. Each key is written out, so the catalog check sees it. */
 interface CatalogText {
   search: string;
   shown: (shown: number, total: number) => string;
@@ -103,7 +97,6 @@ function catalogText(t: AppTranslate, tab: CatalogTab): CatalogText {
   };
 }
 
-/** A featured listing: the avatar large, the name and the creator under it. */
 function FeaturedCard(props: { listing: Listing }) {
   const { t } = useText();
   return (
@@ -122,10 +115,6 @@ function FeaturedCard(props: { listing: Listing }) {
   );
 }
 
-/**
- * One listing as a row: the avatar, "Name by Creator", one line, and Add. The whole row opens the
- * listing's page, because Add is there, after the line that says who checked the listing.
- */
 function ListingRow(props: { listing: Listing }) {
   const { t } = useText();
   return (
@@ -152,7 +141,6 @@ function ListingRow(props: { listing: Listing }) {
   );
 }
 
-/** A heading, "See all" when the group shows only part of its category, and the rows in two columns. */
 function ListingGroup(props: {
   id: string;
   title: string;
@@ -183,10 +171,6 @@ function ListingGroup(props: {
   );
 }
 
-/**
- * The agents or the skills. With no search and no category: Featured, the verified listings, then
- * each category. With a category: every listing in it. With a search: the listings that match.
- */
 function Catalog(props: {
   tab: CatalogTab;
   listings: readonly Listing[];
@@ -266,10 +250,6 @@ function Catalog(props: {
   );
 }
 
-/**
- * "All" and each category that holds a listing. A category link keeps the search, so the address
- * names both and can be shared.
- */
 function CategoryLinks(props: { route: CatalogRoute; listings: readonly Listing[]; query: string | undefined }) {
   const { t } = useText();
   const allSearch = () => ({ q: props.query });
@@ -295,7 +275,6 @@ function CategoryLinks(props: { route: CatalogRoute; listings: readonly Listing[
   );
 }
 
-/** One search field, as wide as the page, under the category links. */
 function SearchField(props: { label: string; value: string; onInput: (value: string) => void }) {
   const { t } = useText();
   return (
@@ -313,7 +292,6 @@ function SearchField(props: { label: string; value: string; onInput: (value: str
   );
 }
 
-/** The plugins that /plugins showed. The tag switches stay on the page; the search is in the address. */
 function AppsList(props: { query: string; search: () => JSX.Element }) {
   const { t } = useText();
   const [selected, setSelected] = createSignal<readonly string[]>([]);
@@ -349,12 +327,10 @@ const TAB_LABELS = {
   apps: "marketplace.tab.apps",
 } as const satisfies Record<MarketplaceTab, AppTextKey>;
 
-/** A tab link is current on its own path, whatever the search and category are. */
 const TAB_ACTIVE = { exact: true, includeSearch: false } as const;
 
 function MarketplaceIndexContent(props: MarketplaceIndexPageProps) {
   const { t } = useText();
-  // The field shows what the visitor types at once; the address follows it (see `onQuery`).
   const [query, setQuery] = createSignal(untrack(() => props.query ?? ""));
   const addressQuery = () => (query().trim() === "" ? undefined : query());
   const type = (value: string) => {
@@ -370,8 +346,6 @@ function MarketplaceIndexContent(props: MarketplaceIndexPageProps) {
     if (isApps()) return t("sitePage.marketplace.searchApps");
     return catalogText(t, catalogTab()).search;
   };
-  // Named functions, not expressions in the props below: on the server-rendered site a conditional
-  // in a component prop moves the hydration keys.
   const search = () => <SearchField label={searchLabel()} value={query()} onInput={type} />;
   const catalogRoute = () => MARKETPLACE_TAB_ROUTES[catalogTab()];
 
@@ -412,19 +386,13 @@ export interface MarketplaceIndexPageProps {
   tab: MarketplaceTab;
   lang: string;
   locale: TranslatedLocale;
-  /** Every approved agent; empty on the other tabs. */
   agents: readonly MarketplaceAgentSummary[];
-  /** Every approved skill; empty on the other tabs. */
   skills: readonly MarketplaceSkillSummary[];
-  /** `?q=` when the page opened. */
   query: string | undefined;
-  /** `?category=`. The Apps tab has none. */
   category: SkillCategory | undefined;
-  /** The search changed. The route puts it in the address, so a filtered list is a link. */
   onQuery: (query: string) => void;
 }
 
-/** `/marketplace`, `/marketplace/skills` and `/marketplace/apps`. */
 export function MarketplaceIndexPage(props: MarketplaceIndexPageProps) {
   return (
     <MarketplaceFrame lang={props.lang} locale={props.locale}>

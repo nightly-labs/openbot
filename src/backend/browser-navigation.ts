@@ -8,11 +8,6 @@ const TAB_CLOSED = "Browser tab was closed during navigation.";
 const ERR_ABORTED = -3;
 const SUCCESSOR_TIMEOUT_MS = 10_000;
 
-/**
- * Starts a navigation and settles when the main frame finishes it. `initiate` returns `false` when
- * there is nowhere to go, `true` when the navigation started synchronously, or the promise of an
- * API such as `loadURL`. With a `null` timeout, the wait has no deadline.
- */
 export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
@@ -21,7 +16,6 @@ export function navigateAndWait(
   return watchNavigation(contents, initiate, timeoutMs);
 }
 
-/** Waits for a load that already started, such as one from CDP `Page.navigate`. */
 export function waitForLoading(contents: WebContents, timeoutMs: number): Effect.Effect<void, BrowserOperationError> {
   return Effect.suspend(() => (contents.isLoading() ? watchNavigation(contents, undefined, timeoutMs) : Effect.void));
 }
@@ -60,7 +54,6 @@ export const stopLoadingAndWait = Effect.fn("Browser.stopLoadingAndWait")((conte
   });
 });
 
-/** Without `initiate`, the load in progress counts as a started cross-document navigation. */
 const watchNavigation = Effect.fn("Browser.watchNavigation")(
   (contents: WebContents, initiate: (() => boolean | Promise<unknown>) | undefined, timeoutMs: number | null) => {
     return Effect.callback<void, BrowserOperationError>((resume) => {
@@ -93,9 +86,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const complete = () => {
         finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
       };
-      // A document that commits and then starts its next page while it loads, as a sign-in redirect
-      // does, aborts its own load with `ERR_ABORTED`. The main frame still loads the next page, so wait
-      // for that load. A wait without a deadline gets one here, so that a redirect loop ends.
       const supersededBy = (code: unknown) => {
         if (code !== ERR_ABORTED || timedOut || !successorStarted || !contents.isLoading()) return false;
         if (timer === undefined) startDeadline(SUCCESSOR_TIMEOUT_MS);
@@ -105,7 +95,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         if (!isMainFrame) return;
         if (committed && !isInPlace) successorStarted = true;
         if (!isInPlace) documentPending = true;
-        // A page that calls `pushState` while it loads must not end the wait for that load.
         inPlace = started ? inPlace && isInPlace : isInPlace;
         started = true;
       };
@@ -121,9 +110,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       };
       const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
         if (!started || !isMainFrame) return;
-        // Electron reports no `did-fail-load` for a navigation that is cancelled before it commits. An
-        // `ERR_ABORTED` while the next document is pending is the load of the document that it replaces,
-        // such as a streaming page that still loads. Wait for the next document.
         if (documentPending && code === ERR_ABORTED) {
           previousDocumentAborted = true;
           supersededBy(code);
@@ -162,15 +148,10 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
           complete();
         } else if (initiation !== true) {
           initiationPending = true;
-          // Electron rejects `loadURL` inside its `did-start-navigation` event when the page starts
-          // another navigation. Code that runs from there and calls `contents.stop()` cancels a
-          // navigation while Chromium starts it, and Chromium then stops the whole process. Settle
-          // in a new task.
           void initiation.then(
             () =>
               setImmediate(() => {
                 initiationPending = false;
-                // A closed tab settled the wait already, and its contents cannot be read.
                 if (!settled && !contents.isLoading()) complete();
               }),
             (error) =>
@@ -178,8 +159,6 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
                 initiationPending = false;
                 const errno = error instanceof Error && "errno" in error ? error.errno : undefined;
                 if (settled || supersededBy(errno)) return;
-                // `loadURL` rejects with the abort of the replaced document, also when the next document
-                // commits. That document's load ends the wait.
                 if (errno === ERR_ABORTED && previousDocumentAborted && committed) {
                   if (!contents.isLoading()) complete();
                   return;

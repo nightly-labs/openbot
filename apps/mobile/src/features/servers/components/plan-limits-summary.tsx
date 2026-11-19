@@ -14,13 +14,8 @@ import { SettingsSection } from "@/features/settings/components/settings-content
 import { useText } from "@/shared/lib/text";
 
 const RING_SIZE = 34;
-/** The space between the ring and the text, as in a settings row. */
 const RING_GAP = 12;
 
-/**
- * The plan limits of a server on its Usage screen: one row for each provider that reports a window, the
- * provider with the least left first. The section is not there when no provider reports a window.
- */
 export function PlanLimitsSummary({ serverId }: { serverId: string }) {
   const { t, format } = useText();
   const { rows, accounts } = usePlanLimits(serverId);
@@ -29,7 +24,6 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
     <SettingsSection title={t("mobile.server.planLimits.title")} footer={t("mobile.server.usage.planLimitsNote")}>
       {lowestPlanLimitsFirst(rows).map((row) => (
         <View key={`${row.provider}-${row.accountId ?? ""}`} className="gap-1 px-4 py-3">
-          {/* The name stands over the windows, so the ring is centred on the window lines. */}
           <Typography.Paragraph
             className="font-semibold"
             numberOfLines={1}

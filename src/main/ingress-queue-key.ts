@@ -1,8 +1,3 @@
-// The queue key of this host (`@openbot/contracts/signal-protocol/ingress-queue`). Signal seals the
-// Slack, Discord and Telegram events that arrive while a hosted server sleeps to its public half, so
-// the private half must stay the same across restarts. It is encrypted at rest by the operating
-// system and registered for redaction.
-
 import { readFile } from "node:fs/promises";
 import {
   createIngressQueueKeyPair,
@@ -24,11 +19,6 @@ export interface IngressQueueKey {
   privateKey: CryptoKey;
 }
 
-/**
- * Reads the key, or makes and saves a new one when there is none or it cannot be read. A key that
- * cannot be read only loses the events that Signal sealed to it. `null` when the operating system
- * cannot encrypt: then Signal keeps nothing for this host.
- */
 export const loadIngressQueueKey = Effect.fn("IngressQueueKey.load")(function* (path: string, cipher: SecretCipher) {
   const saved = yield* Effect.tryPromise(async () => {
     const file = fileSchema.parse(JSON.parse(await readFile(path, "utf8")));

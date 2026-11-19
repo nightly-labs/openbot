@@ -21,10 +21,6 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 import { endProcessTree } from "./windows-process-tree";
 
 const EXIT_REPORT_WAIT_MS = 2_000;
-/**
- * The first line of a crash report. A crash handler such as the one in Google's Gemini server ends its
- * report with `RAW: Raising signal 6`, which does not say why: the reason is in the first line.
- */
 const CRASH_LINE = /^(?:F\d{4} \d\d:\d\d:\d\d|FATAL ERROR:|Fatal Python error:|\*\*\* SIG[A-Z]+ .*received)/u;
 const logger = createOpenBotLogger("acp-connection");
 const execFileAsync = promisify(execFile);
@@ -33,14 +29,12 @@ interface ProcessEnd {
   detail: string | null;
 }
 export interface AcpConnectionOptions {
-  /** The provider id, or a custom agent id. Only the resource monitor reads it. */
   provider: string;
   cli: AgentCliInfo;
   argv: readonly string[];
   env: Record<string, string>;
   extraEnv?: (() => Record<string, string>) | undefined;
   confine?: ((target: SpawnTarget) => SpawnTarget) | undefined;
-  /** A temporary folder of its own for each process, in this root (`provider-temp.ts`). */
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
@@ -49,7 +43,6 @@ export interface AcpConnectionOptions {
   client(): Client;
 }
 
-/** Owns the ACP child process, stream and exit diagnostics. It never owns agent sessions. */
 export class AcpConnection {
   #process: ChildProcessWithoutNullStreams | null = null;
   #connection: ClientSideConnection | null = null;
@@ -64,7 +57,6 @@ export class AcpConnection {
   get ended(): Deferred.Deferred<ProcessEnd> | null {
     return this.#ended;
   }
-  /** `Date.now()` when the process last wrote to its output or its error stream, or when it started. */
   get lastOutputAt(): number {
     return this.#lastOutputAt;
   }
@@ -103,8 +95,6 @@ export class AcpConnection {
     child.stdout.on("data", wrote);
     child.stderr.on("data", wrote);
     registerProviderProcess(child, this.options.provider);
-    // A start that times out says nothing of the process. These lines show whether it ran, how long
-    // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).
     const startedAt = performance.now();
     const elapsedMs = () => Math.round(performance.now() - startedAt);
     const logFields = {
@@ -116,8 +106,6 @@ export class AcpConnection {
     child.stdout.once("data", () =>
       logger.info("An ACP agent process wrote its first output.", { ...logFields, durationMs: elapsedMs() }),
     );
-    // The SDK holds a line until its newline with no limit. At the limit the connection closes with
-    // the error, so each open request fails with it, and the process ends.
     const stdout = child.stdout.pipe(
       limitLineLength(() => {
         const error = new LineTooLongError(this.options.label());
@@ -133,8 +121,6 @@ export class AcpConnection {
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
     this.#connection = new ClientSideConnection(() => this.options.client(), stream);
-    // One record at a time, never one chunk at a time: a chunk can end inside a JSON record, and a
-    // record read in halves keeps the credential in its second half.
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
@@ -146,8 +132,6 @@ export class AcpConnection {
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
-    // Read at `close`, not `exit`: only then is stderr read to its end, and a CLI that fails at start
-    // writes the reason as its last line.
     const ended = Deferred.makeUnsafe<ProcessEnd>();
     this.#ended = ended;
     child.once("close", (code, signal) => {
@@ -174,7 +158,6 @@ export class AcpConnection {
     });
   }
 
-  /** Runs the agent's command once with other arguments, in the environment and confinement of its process. */
   readonly run = Effect.fn("AcpConnection.run")(function* (
     this: AcpConnection,
     argv: readonly string[],
@@ -250,11 +233,6 @@ export class AcpConnection {
   }
 }
 
-/**
- * Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. Its
- * input stays open there: the end of input can end the wrapper first, and `taskkill /T` then finds
- * no children (#6470). Node closes the input when the process exits.
- */
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {
   if (process.platform !== "win32") child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));

@@ -68,7 +68,6 @@ export function ReplyIcon() {
   );
 }
 
-/** Three dots: more actions. The action row fills the dots. */
 export function MoreIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20">
@@ -79,7 +78,6 @@ export function MoreIcon() {
   );
 }
 
-/** A new thread that goes out from a message. */
 export function BranchIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 fill-none stroke-current">

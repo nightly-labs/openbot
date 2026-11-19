@@ -21,18 +21,15 @@ import type { MobileText } from "@/shared/lib/text";
 
 type Translate = MobileText["t"];
 
-/** As on desktop: the host pushes the providers' own sign-ins, and the accounts after the first are read again. */
 const PLAN_LIMITS_REFRESH_MS = 5 * 60_000;
 const SAVED_FILE = "plan-limits-v1.json";
 
-/** The last reading of each server, by account and server. Read on first use. */
 let savedReadings: Map<string, PlanLimits> | null = null;
 
 function savedKey(account: string, serverId: string): string {
   return JSON.stringify([account, serverId]);
 }
 
-/** The reading without the account emails and messages. The labels and the order name the rows. */
 function withoutPersonalData(limits: PlanLimits): PlanLimits {
   return {
     usage: limits.usage,
@@ -44,7 +41,6 @@ function withoutPersonalData(limits: PlanLimits): PlanLimits {
   };
 }
 
-/** The saved entries a later launch can trust. Anything else is dropped. */
 function decodeSavedReadings(value: unknown): [string, PlanLimits][] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry): [string, PlanLimits][] => {
@@ -65,9 +61,7 @@ function loadSavedReadings(): Map<string, PlanLimits> {
   try {
     const file = new File(Paths.cache, SAVED_FILE);
     if (file.exists) savedReadings = new Map(decodeSavedReadings(JSON.parse(file.textSync())));
-  } catch {
-    // A damaged file costs the saved readings only. The next reading replaces it.
-  }
+  } catch {}
   return savedReadings;
 }
 
@@ -79,18 +73,9 @@ function saveReading(account: string, serverId: string, limits: PlanLimits): voi
   saved.set(key, reading);
   try {
     new File(Paths.cache, SAVED_FILE).writeSync(JSON.stringify([...saved]));
-  } catch {
-    // The reading stays in memory for this launch.
-  }
+  } catch {}
 }
 
-/**
- * The limits of the server's providers. An owner or admin also gets the accounts after the first. While
- * the server is offline, the last reading stays, so the header button does not come and go with the
- * connection. The last usage is also kept on this phone, so the button shows at once when the app starts
- * or the server changes. The account emails are not kept: an account without a label shows its number until
- * the next reading.
- */
 export function usePlanLimits(serverId: string) {
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
@@ -99,14 +84,12 @@ export function usePlanLimits(serverId: string) {
   const online = useMobileWorkspaceSelector(
     (current) => current.servers.find((server) => server.id === serverId)?.state === "online",
   );
-  // Not in the key: the role check needs an online server, so the key would change when it goes offline.
   const accounts = useMobileWorkspaceSelector((current) => current.canManageProviderAccounts(serverId));
   const limits = useQuery({
     queryKey: queryKeys.planLimits(queryScope, serverId),
     queryFn: () => workspace.loadPlanLimits(serverId, accounts),
     enabled: online,
     initialData: () => (account ? loadSavedReadings().get(savedKey(account, serverId)) : undefined),
-    // A saved reading is old: the server is read again as soon as it is online.
     initialDataUpdatedAt: 0,
     refetchInterval: PLAN_LIMITS_REFRESH_MS,
     retry: false,
@@ -125,7 +108,6 @@ export function usePlanLimits(serverId: string) {
   };
 }
 
-/** The provider, and the account when the provider has more than one. */
 export function planLimitName(row: PlanLimitRow, accounts: PlanLimits["accounts"], t: Translate): string {
   const provider = agentProviderName(row.provider);
   const list = accounts?.find((entry) => entry.provider === row.provider)?.accounts ?? [];
@@ -144,7 +126,6 @@ export function planLimitName(row: PlanLimitRow, accounts: PlanLimits["accounts"
   return `${provider} · ${name}`;
 }
 
-/** The rows with the least left first, as the header, the sheet and the Usage screen order them. */
 export function lowestPlanLimitsFirst(rows: readonly PlanLimitRow[]): PlanLimitRow[] {
   return [...rows].sort((left, right) => left.remainingPercent - right.remainingPercent);
 }
@@ -156,22 +137,16 @@ export const PLAN_LIMIT_RESET_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-/** When a window resets, or null when the host does not say. */
 export function planLimitResetDate(window: Pick<PlanLimitWindow, "resetsAt">): Date | null {
   if (window.resetsAt === null) return null;
   const date = new Date(window.resetsAt * 1_000);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/**
- * The identity of a window in a reading. Cursor reports two windows of the same length, so the position is
- * part of it. The reset time is not: a window that resets keeps its ring, which fills again in place.
- */
 export function planLimitWindowKey(window: PlanLimitWindow, index: number): string {
   return `${index}-${window.durationMins ?? "limit"}`;
 }
 
-/** The name of a limit window, as desktop names it: Cursor total, models, 5-hour, Weekly. */
 export function planLimitWindowLabel(durationMins: number | null, t: Translate, name?: PlanLimitWindowName): string {
   switch (name) {
     case "total":

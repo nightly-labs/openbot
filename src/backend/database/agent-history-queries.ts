@@ -20,22 +20,16 @@ export interface AgentHistorySelection {
   before?: string;
   messageId?: string;
   author?: string;
-  /**
-   * Also the requests that this agent sent to teammates. The chat keeps them as system messages, so
-   * without this the agent could not read or search what it delegated (#10380).
-   */
   outgoing?: boolean;
   limit: number;
 }
 
-/** A `messageId` or `before` that names no message of the chat after its latest reset. */
 export class HistoryReferenceUnavailable extends Error {
   constructor() {
     super("History reference is unavailable. Read recent history again.");
   }
 }
 
-/** Model history reads use a thread and reset boundary; UI history remains unchanged. */
 export class AgentHistoryQueries {
   readonly #core: DatabaseCore;
   constructor(core: DatabaseCore) {
@@ -61,8 +55,6 @@ export class AgentHistoryQueries {
     const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE];
     const reset = databaseRow(this.#core.connection.prepare(`${cte} SELECT message_id FROM boundary`).get(...bindings));
     const resetMessageId = reset ? requiredStringColumn(reset, "message_id") : null;
-    // An agent knows a teammate request by its "Message ID", which the chat keeps as the exchange's
-    // message: the sender's copy and the recipient's copy have their own ids (#10380).
     const anchorId = selection.messageId ?? selection.before;
     const anchor = anchorId
       ? databaseRow(
@@ -114,10 +106,6 @@ export class AgentHistoryQueries {
     };
   }
 
-  /**
-   * The trace of a turn. Only one message of the turn holds it, and that message can be a thinking
-   * message that `read` leaves out, or on another page.
-   */
   turnTrace(threadId: string, turnId: string): ConversationTurnTrace | null {
     const row = databaseRow(
       this.#core.connection

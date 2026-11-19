@@ -5,8 +5,6 @@ import { runApiResponse } from "../../../server/effect-runtime";
 import { requestSlackApp } from "../../../server/request-auth";
 import { SlackAppError } from "../../../server/slack-app";
 
-// Slack returns here after the OpenBot app's install. The sealed grant goes to `/slack/connect` in
-// the URL fragment, which the browser does not send to any server, and that page opens OpenBot.
 export const Route = createFileRoute("/v2/slack/callback")({
   server: {
     handlers: {
@@ -25,7 +23,6 @@ export const Route = createFileRoute("/v2/slack/callback")({
             }
             const slack = requestSlackApp();
             const result = yield* slack.complete({ code, state, redirectUri: slack.redirectUri(request.url) });
-            // Development only: the dev app's loopback listener takes the grant, not `openbot://`.
             if (result.returnUrl)
               return redirect(
                 new URL(`${result.returnUrl}?${new URLSearchParams({ nonce: result.nonce, grant: result.grant })}`),

@@ -97,7 +97,6 @@ export function ChatQuestionPrompt({
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
-        {/* A closed form keeps what it asked, as on desktop, so the person can still read the draft. */}
         {confirm ? (
           <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
         ) : (
@@ -106,7 +105,6 @@ export function ChatQuestionPrompt({
               <QuestionText question={item.question} variant="secondary" />
               {resolution.status === "answered" ? (
                 <Typography>
-                  {/* The options of a choice with more than one answer come as lines; show them as a list. */}
                   {item.id === UI_CHOICE_QUESTION_ID
                     ? promptAnswerLabel(item, resolution, t).split("\n").filter(Boolean).join(", ")
                     : promptAnswerLabel(item, resolution, t)}
@@ -185,7 +183,6 @@ export function ChatQuestionPrompt({
             </Button>
           </View>
         ) : null}
-        {/* A pill holds only its label, so the bubble keeps what each option means. */}
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (
@@ -201,21 +198,18 @@ export function ChatQuestionPrompt({
           </View>
         ) : null}
         {question.isSecret ? (
-          // The private answer is typed in the masked field that takes the composer's place.
           <Typography type="body-xs" className="text-text-secondary">
             {t("mobile.chat.question.secretBelow")}
           </Typography>
         ) : null}
       </View>
 
-      {/* Answer pills under the bubble, as the quick replies of the chat design. */}
       <View className="flex-row flex-wrap gap-2">
         {question.options?.map((option) => (
           <Button
             key={option.label}
             size="sm"
             variant="tertiary"
-            // An agent can write a long label: the pill grows to more lines, not past the screen.
             className="h-auto min-h-10 max-w-full rounded-full py-2"
             isDisabled={disabled}
             accessibilityLabel={option.label}
@@ -229,8 +223,6 @@ export function ChatQuestionPrompt({
           </Button>
         ))}
         {question.isSecret ? null : (
-          // The composer answers only after this choice, so a message typed meanwhile still goes
-          // to the chat, which matters in a channel where others talk too.
           <Button
             size="sm"
             variant={replyInChat ? "primary" : "tertiary"}

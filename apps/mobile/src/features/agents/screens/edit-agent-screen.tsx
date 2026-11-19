@@ -9,7 +9,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import BookBookmark from "lucide-react-native/icons/book-bookmark";
@@ -25,7 +24,7 @@ import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import Table2 from "lucide-react-native/icons/table-2";
 import Upload from "lucide-react-native/icons/upload";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   AgentAccessFields,
   PERMISSION_LABEL,
@@ -71,11 +70,13 @@ import {
   useMobileWorkspace,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
@@ -118,7 +119,6 @@ export function EditAgentScreen({ page = "info" }: { page?: AgentPage }) {
   const [hostId] = useState(serverId ?? workspace.activeServer.id);
   const agent = workspace.agents.find((candidate) => candidate.id === agentId && candidate.serverId === hostId);
   const host = workspace.servers.find((candidate) => candidate.id === hostId);
-  // Keep the mounted form and its edits if the agent disappears during a reconnect or deletion.
   const lastAgent = useRef(agent);
   if (agent) lastAgent.current = agent;
   const displayed = agent ?? lastAgent.current;
@@ -165,8 +165,6 @@ function AgentForm({
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
-  // The Permissions row shows the access, as on desktop. Its page reads the same host answer. The
-  // Model page reads it to say when the chosen provider does not work with Workspace only.
   const { settings: adminSettings } = useAgentAdminSettings(
     agent,
     host,
@@ -174,10 +172,7 @@ function AgentForm({
   );
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const showFolders = canManageAgentFolders(agent.serverId);
-  // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
-  // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
-  // "Delete history" deletes any message of the chat, so it needs `manage`, as a message delete does.
   const accessLevel = useAgentAccessLevel(agent.serverId, agent.id);
   const showDeleteHistory = canDeleteChatHistory(agent.serverId) && accessLevel === "manage";
   const showBehavior =
@@ -186,8 +181,6 @@ function AgentForm({
     canManageAgentNewChat(agent.serverId) ||
     canManageAgentPlanCard(agent.serverId);
   const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
-  // As on desktop, Compact is in the context sheet of the composer, not here.
-  // The host needs `chat` access for a new chat, as the context sheet checks.
   const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
   const showChatActions = showNewChat || showDeleteHistory;
   const showAdvanced = showBehavior || showWorkspace || showChatActions;
@@ -198,13 +191,10 @@ function AgentForm({
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  // The account is not in the agent summary. Only an owner or admin of a host with
-  // `provider-accounts-v1` reads it.
   const { queryKey: accountsKey, accounts: hostAccounts } = useProviderAccounts(agent, available && page === "runtime");
   const [account, setAccount] = useState<string | undefined>();
   const provider = edits.provider ?? agent.provider;
   const providerAccounts = hostAccounts?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
-  // A provider change returns the agent to the new provider's own sign-in.
   const savedAccount =
     provider === agent.provider
       ? (hostAccounts?.agents.find((entry) => entry.agentId === agent.id)?.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID)
@@ -230,7 +220,6 @@ function AgentForm({
     (edits.reasoningEffort !== undefined && edits.reasoningEffort !== agent.reasoningEffort) ||
     accountChanged;
   const nameMissing = page === "info" && !name.trim();
-  // The name error shows after the first Save, not while the person still edits.
   const [triedSave, setTriedSave] = useState(false);
   const valid =
     page !== "info" ||
@@ -238,28 +227,12 @@ function AgentForm({
       title.length <= INPUT_LIMITS.agentTitle &&
       !instructionsTooLong(description));
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || saving || pickingPhoto), ({ repeat }) => {
-    if (pending.current || pickingPhoto) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty || saving || pickingPhoto, { busy: () => pending.current || pickingPhoto });
 
   function change(value: AgentEdits) {
     setEdits((current) => ({ ...current, ...value }));
     setError(null);
   }
-  // Stable handlers let the memoized face and color choices skip unrelated renders.
   const changeAvatarSeed = useCallback((avatarSeed: string) => {
     setEdits((current) => ({ ...current, avatarSeed }));
     setError(null);
@@ -353,7 +326,6 @@ function AgentForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {/* The server Usage screen opens this page too, so the title names the agent. */}
       {page === "usage" ? (
         <Stack.Screen options={{ title: t("mobile.agent.info.usage.agentTitle", { name: agent.name }) }} />
       ) : null}
@@ -380,7 +352,6 @@ function AgentForm({
                 color={avatarColor}
                 size={112}
               />
-              {/* A photo fills the circle; the generated avatar leaves space around its shape. */}
               <View
                 className={`absolute size-9 items-center justify-center rounded-full border-4 border-sheet bg-grouped ${agent.avatarUrl ? "right-0 bottom-0" : "right-3 bottom-3"}`}
               >
@@ -454,14 +425,12 @@ function AgentForm({
           workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
           onChange={(value) => {
             change(value);
-            // An account belongs to one provider.
             if (value.provider !== undefined) setAccount(undefined);
           }}
           onAccountChange={(value) => {
             setAccount(value);
             setError(null);
           }}
-          // The switch saves at once, for the saved model. An unsaved model change hides it.
           fastMode={
             provider === agent.provider && (edits.model ?? agent.model) === agent.model
               ? { agent, server: host, available }
@@ -481,7 +450,6 @@ function AgentForm({
       ) : null}
       {page === "advanced" ? (
         <>
-          {/* Each field hides itself while it loads and when the host or the role does not serve it. */}
           {showBehavior ? (
             <SettingsSection title={t("mobile.agent.advanced.behavior")} rowsDrawSeparators>
               <AgentBusyMessageField agent={agent} server={host} available={available} />
@@ -528,11 +496,7 @@ function AgentForm({
         <AgentInformation agent={agent} available={available} section={page} />
       ) : null}
       {!available ? <Typography.Paragraph>{t("mobile.agent.edit.unavailable")}</Typography.Paragraph> : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
       {page === "info" || page === "appearance" || page === "runtime" ? (
         <SheetSaveAction
           dirty={dirty}
@@ -541,7 +505,6 @@ function AgentForm({
           onSave={() => void submit()}
         />
       ) : null}
-      {/* The groups and their order follow the desktop agent settings. */}
       {page === "info" ? (
         <>
           <SettingsSection title={t("mobile.agent.groups.brain")}>
@@ -560,7 +523,6 @@ function AgentForm({
             <AgentBackupModelsRow agent={agent} server={host} available={available} />
           </SettingsSection>
           <SettingsSection title={t("mobile.agent.groups.knows")}>
-            {/* First, as in the desktop group. */}
             {canManageAgentInstructions(agent.serverId) ? (
               <SettingsRow
                 leading={<RowIcon icon={FileText} />}

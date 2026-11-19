@@ -6,12 +6,9 @@ import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 
 export const WEBHOOK_EVENT_TYPE_MAX_LENGTH = 256;
 export const WEBHOOK_FILTERS_LIMIT = 128;
-/** The first line of an event that comes from outside the host, framed as data. */
 export const EXTERNAL_EVENT_START = "--- external event input ---";
-/** The last line of an event that comes from outside the host. */
 export const EXTERNAL_EVENT_END = "--- end of external event input ---";
 
-/** Rejects a trigger that the editor or a Team API client could have corrected. */
 export function validateWebhookTrigger(eventType: string | null, filters: readonly EventFilter[]): void {
   if (
     (eventType !== null && (eventType.trim().length === 0 || eventType.length > WEBHOOK_EVENT_TYPE_MAX_LENGTH)) ||
@@ -21,7 +18,6 @@ export function validateWebhookTrigger(eventType: string | null, filters: readon
   }
 }
 
-/** Why a verified request does not start a run, or null when it does. */
 export function webhookMismatch(
   trigger: { eventType: string | null; filters: readonly EventFilter[] },
   event: { type: string; data: EventJsonValue },
@@ -30,10 +26,6 @@ export function webhookMismatch(
   return trigger.filters.every((filter) => readPointer(event.data, filter.pointer) === filter.value) ? null : "filter";
 }
 
-/**
- * The run keeps the event in its instruction, so a restart that resumes the run still has it. The
- * markers tell the agent that the block is data from outside the host.
- */
 export function webhookRunInstruction(instruction: string, envelope: EventEnvelope): string {
   return [
     instruction,

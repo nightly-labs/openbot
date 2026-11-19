@@ -14,7 +14,6 @@ function directory(editId: string): string {
 export function restoredQueueAttachments(editId: string, files: StoredQueueAttachment[]): ChatAttachment[] {
   return files.map(({ fileName, ...file }) => {
     const uri = `${directory(editId)}${fileName}`;
-    // A large file is sent from this copy in parts; a small one is read when it is sent.
     return {
       ...file,
       base64: "",
@@ -46,7 +45,6 @@ export async function writeQueueAttachment(editId: string, file: ChatAttachment)
   return { id: file.id, name: file.name, mimeType: file.mimeType, size: file.size, fileName };
 }
 
-/** The upload of a saved file. A large file is sent from its saved copy in parts, not read into memory. */
 export async function queueAttachmentUpload(
   editId: string,
   stored: StoredQueueAttachment,

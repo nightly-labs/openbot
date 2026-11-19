@@ -32,7 +32,6 @@ import { messages as statusProvider } from "./status/provider";
 import { messages as statusRemote } from "./status/remote";
 import { messages as statusUpdate } from "./status/update";
 
-/** Text the main process, a host or the team client sends as English and a screen translates. */
 export const source = {
   ...errorKind,
   ...errorReference,

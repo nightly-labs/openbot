@@ -128,8 +128,8 @@ controller per concern, each constructed and owned by the service; `openbot-data
 into modules under `database/`, leaving a ~560-line facade that had to keep its class name, instance
 identity, constructor signature and public surface because callers reach past it into `connection`
 and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
-`readonly #` fields, a constructor that only assigns, and a doc comment saying what the class
-**owns** and that it never imports the facade. No barrel file.
+`readonly #` fields, and a constructor that only assigns. Each class **owns** one concern and never
+imports the facade. No barrel file.
 
 Two rules those controllers depend on and a reader cannot infer. They hold the core object and read
 `.connection` at each use — a cached handle survives `initialize()` and then silently addresses a

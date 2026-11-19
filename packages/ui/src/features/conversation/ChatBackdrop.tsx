@@ -3,18 +3,10 @@ import { documentColorScheme } from "../../document-color-scheme";
 import { REDUCED_MOTION_QUERY } from "../../utils";
 import { CHAT_BACKDROP_BASE, type ChatBackdropScene, paintChatBackdrop } from "./chat-backdrop";
 
-/** The side of one mosaic cell, in CSS pixels. The canvas has one pixel for each cell. */
 const CELL = 6;
-/** A mosaic does not need more: 20 frames each second keeps the work small. */
 const FRAME_MS = 50;
-/** The moment that a still frame shows, when the system asks for less motion. */
 const STILL_TIME = 42;
 
-/**
- * An animated scene that fills the window under all of its content. It paints the scene's base color
- * (`CHAT_BACKDROP_BASE`) too. It stops while the window is hidden, and shows one still frame when the
- * system asks for less motion.
- */
 export function ChatBackdrop(props: { scene: ChatBackdropScene }) {
   let host: HTMLDivElement | undefined;
   let canvas: HTMLCanvasElement | undefined;

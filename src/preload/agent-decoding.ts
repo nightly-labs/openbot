@@ -1,25 +1,11 @@
 import {
-  type AgentNotificationLevelsSnapshot,
-  type AgentSessionSettings,
-  type HiddenAgentsSnapshot,
-  isAgentNotificationLevelsSnapshot,
-  isAgentSessionSettings,
-  isHiddenAgentsSnapshot,
-  isSidebarPinsSnapshot,
-  type SidebarPinsSnapshot,
-} from "@openbot/contracts/ipc";
-// What main answers for agents: provider status, models, the agents themselves, memories, routines,
-// shared tables and the sidebar layout.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
-import {
   type AccountUsage,
   type AgentMemory,
   type AgentMemorySelectionState,
+  type AgentNotificationLevelsSnapshot,
   type AgentProviderId,
   type AgentRuntimeSnapshot,
+  type AgentSessionSettings,
   type AgentStatus,
   type ClientAgentModelOption,
   type ClientAgentSummary,
@@ -28,6 +14,7 @@ import {
   decodeOptionalHostAnalytics,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HiddenAgentsSnapshot,
   type HostDefaultProvider,
   type HostProviderAccounts,
   isAccountUsage,
@@ -35,11 +22,14 @@ import {
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentModel,
+  isAgentNotificationLevelsSnapshot,
   isAgentProvider,
   isAgentRuntimeSnapshot,
+  isAgentSessionSettings,
   isAgentStatus,
   isClientAgentModelOption,
   isClientAgentSummary,
+  isHiddenAgentsSnapshot,
   isProviderAccountId,
   isProviderAccountPool,
   isProviderAccountStatus,
@@ -49,6 +39,7 @@ import {
   isRoutineRun,
   isSharedTable,
   isSidebarLayoutSnapshot,
+  isSidebarPinsSnapshot,
   MAX_PROVIDER_ACCOUNTS,
   type ProviderApiKeyState,
   type ProviderCodeLoginStart,
@@ -56,6 +47,7 @@ import {
   type ProviderUsageResets,
   type SharedTable,
   type SidebarLayoutSnapshot,
+  type SidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -70,7 +62,6 @@ export const decodeSideQuestionAnswer = guardedDecoder(isString, "side question 
 export const decodeRoutineCalendar = guardedDecoder(isRoutineCalendar, "routine calendar response");
 export const decodeRoutineFeed = guardedDecoder(isRoutineFeed, "routine feed response");
 
-/** A reply carrying nothing but the provider and a status, so an unexpected field cannot slip in. */
 export function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
   if (
     !isDynamicRecord(value) ||
@@ -82,12 +73,6 @@ export function decodeProviderApiKeyState(value: unknown): ProviderApiKeyState {
   return { provider: value.provider, status: value.status };
 }
 
-/**
- * A started code sign-in, checked field by field before the renderer shows it.
- *
- * The verification URL ends up in a link the user is invited to open, so it is held to https here
- * as well as in the backend: this is the last point before it reaches the screen.
- */
 export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginStart {
   if (!isDynamicRecord(value)) throw new Error("Invalid code login response.");
   if (value.kind === "connected") return { kind: "connected" };
@@ -128,10 +113,8 @@ export function decodeAccountUsageFromMain(value: unknown): AccountUsage {
   return value;
 }
 
-/** Main has already left out the providers that this build does not know, so each one must be known. */
 export function decodeProviderUsageResetsFromMain(value: unknown): ProviderUsageResets[] {
   const resets = decodeProviderUsageResets(value);
-  // The shared decoder leaves an unknown provider out; here that row is invalid.
   if (!Array.isArray(value) || resets.length !== value.length)
     throw new Error("Invalid provider usage resets response.");
   return resets;
@@ -141,7 +124,6 @@ export function decodeProviderUsageResetOutcomeFromMain(value: unknown): Provide
   return decodeProviderUsageResetOutcome(value);
 }
 
-/** Main has already read a provider that this build does not know as none. */
 export function decodeHostDefaultProviderFromMain(value: unknown): HostDefaultProvider {
   const { preferredProvider, preferredModel } = decodeRecord(value, "default provider");
   if (preferredProvider !== null && !isAgentProvider(preferredProvider)) throw new Error("Invalid default provider.");
@@ -149,13 +131,11 @@ export function decodeHostDefaultProviderFromMain(value: unknown): HostDefaultPr
   return { preferredProvider, preferredModel };
 }
 
-/** The off providers of a joined server's host. Main has already left out the ones this build does not know. */
 export function decodeProviderUseFromMain(value: unknown): AgentProviderId[] {
   if (!Array.isArray(value) || !value.every(isAgentProvider)) throw new Error("Invalid provider use.");
   return value;
 }
 
-/** Main has already left out the providers that this build does not know, so each one must be known. */
 export function decodeHostProviderAccountsFromMain(value: unknown): HostProviderAccounts {
   const invalid = () => new Error("Invalid provider accounts response.");
   if (!isDynamicRecord(value) || !Array.isArray(value.providers) || !Array.isArray(value.agents)) throw invalid();
@@ -184,10 +164,6 @@ export function decodeHostProviderAccountsFromMain(value: unknown): HostProvider
   return { providers, pools, agents };
 }
 
-// Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and
-// it is the local half of the same payload: `isAgentModel` gaining square brackets is what stopped a
-// provider CLI's `claude-fable-5-1[1m]` from emptying this app's own model picker, not a decoder
-// willing to hand the renderer a list shorter than the one the main process sent.
 export function decodeAgentModels(value: unknown): ClientAgentModelOption[] {
   if (!Array.isArray(value) || !value.every(isClientAgentModelOption)) {
     throw new Error("Invalid agent model response.");
@@ -207,7 +183,6 @@ export function decodeAgents(value: unknown): ClientAgentSummary[] {
   return value;
 }
 
-/** The agents that the `Cmd + Q` hint names, or null when the hint is hidden. */
 export function decodeQuitShortcutHint(value: unknown): ClientAgentSummary[] | null {
   return value === null ? null : decodeAgents(value);
 }

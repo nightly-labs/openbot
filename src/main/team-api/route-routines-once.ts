@@ -29,12 +29,6 @@ export type RoutinesOnceAgents = Pick<
 
 const ROUTE_PATHS: ReadonlySet<string> = new Set(Object.values(ROUTINES_ONCE_ROUTES));
 
-/**
- * `routines-once-v1`: the one-time routines of an agent or a channel, which the released routine
- * routes leave out. The list gives only the `once` routines; the update changes any schedule routine
- * of the owner, so a routine can go from `once` to a released kind and back. The access is that of the
- * released routes: an agent needs manage access for a save, and a channel needs only to be seen.
- */
 export async function routeRoutinesOnce(
   context: TeamApiRequestContext,
   agents: RoutinesOnceAgents,
@@ -45,7 +39,6 @@ export async function routeRoutinesOnce(
   if (method !== "POST" || !ROUTE_PATHS.has(url.pathname)) return "unmatched";
   if (!capabilities.has(ROUTINES_ONCE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.routinesOnceUnsupported"));
-  // `readJson` has already run the body through the routines-once wire codec.
   const body = await readJson(request);
   const owner = ownerOf(body);
   const path = url.pathname;
@@ -70,11 +63,9 @@ export async function routeRoutinesOnce(
     if (!channels || !capabilities.has(CHANNEL_CHATS_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.channelsUnsupported"));
     const channelId = owner.id;
-    // Owners and admins keep every channel, as on the channel routes.
     requireVisibleChannel(channels, channelId, canAdministerServer(member.role) ? new Set() : hiddenAgentIds);
     if (path === ROUTINES_ONCE_ROUTES.list)
       return json(200, { routines: agents.listChannelRoutines(channelId).filter((routine) => !isReleased(routine)) });
-    // A channel routine has no place: the channel parsers leave `runIn` out.
     if (path === ROUTINES_ONCE_ROUTES.create) {
       const input = parseCreateChannelRoutine({ ...fieldsOf(body), channelId });
       requireOnce(input.schedule);
@@ -86,7 +77,6 @@ export async function routeRoutinesOnce(
       ),
     });
   } catch (error) {
-    // A routine that the owner does not have, or a date that has passed, is the client's problem.
     if (error instanceof RoutineInputError) throw new HttpError(400, error.message);
     throw error;
   }
@@ -99,7 +89,6 @@ function ownerOf(body: DynamicRecord): { kind: "agent" | "channel"; id: string; 
   return { kind: owner.kind, id: owner.id, routineId: isString(body.id) ? body.id : "" };
 }
 
-/** The routine fields of a body, without the owner and the routine id that the route sets itself. */
 function fieldsOf(body: DynamicRecord): DynamicRecord {
   return Object.fromEntries(Object.entries(body).filter(([key]) => key !== "owner" && key !== "id"));
 }
@@ -108,7 +97,6 @@ function isReleased(routine: { trigger: { schedule: unknown } }): boolean {
   return isReleasedRoutineSchedule(routine.trigger.schedule);
 }
 
-/** The create route makes only `once` routines; a released kind goes to the released routes. */
 function requireOnce(schedule: unknown): void {
   if (isReleasedRoutineSchedule(schedule)) throw new HttpError(400, sourceText("error.backend.routineScheduleInvalid"));
 }

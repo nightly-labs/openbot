@@ -7,10 +7,6 @@ import { syncAppearance } from "../../appearance-choice";
 import { I18nProvider } from "../../i18n-context";
 import { browserPort } from "./browser-port";
 
-/**
- * The controls are a 30-pixel overlay view with no toaster, so a failed action is announced in a
- * live region. A visible toast would need the main window.
- */
 function BrowserPictureInPictureControls() {
   const { t, errorMessage } = useText();
   const [failure, setFailure] = createSignal("");

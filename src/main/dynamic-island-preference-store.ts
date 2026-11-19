@@ -37,17 +37,12 @@ export const readDynamicIslandPreference = Effect.fn("readDynamicIslandPreferenc
         hapticsEnabled: parsed.hapticsEnabled,
         idleVisible: parsed.idleVisible,
         additionalDisplaysEnabled: parsed.additionalDisplaysEnabled,
-        // The size is optional so that 0.18.0 and earlier, which refuse any version but 3, still read
-        // this file. A missing or out-of-range size resets only the size, so a bad value cannot make
-        // the island too small to find and does not discard the switches beside it.
         widthPercent: isDynamicIslandSizePercent(parsed.widthPercent, DYNAMIC_ISLAND_SIZE_LIMITS.widthPercent)
           ? parsed.widthPercent
           : defaults.widthPercent,
         heightPercent: isDynamicIslandSizePercent(parsed.heightPercent, DYNAMIC_ISLAND_SIZE_LIMITS.heightPercent)
           ? parsed.heightPercent
           : defaults.heightPercent,
-        // The server choices are optional for the same reason. A bad value resets only the choices,
-        // which shows every server again, as the island did before the choices existed.
         ...(isDynamicIslandServerVisibility(parsed.serverVisibility) && isBoolean(parsed.newServersVisible)
           ? { serverVisibility: { ...parsed.serverVisibility }, newServersVisible: parsed.newServersVisible }
           : { serverVisibility: {}, newServersVisible: defaults.newServersVisible }),

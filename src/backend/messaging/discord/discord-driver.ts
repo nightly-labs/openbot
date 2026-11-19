@@ -43,26 +43,18 @@ import {
 } from "./discord-events";
 import { DiscordTransport } from "./discord-transport";
 
-/** A margin under Discord's limit for the fence that `chunkMarkdown` can add. */
 const CHUNK_CHARACTERS = DISCORD_MESSAGE_TEXT_LIMIT - 40;
-/** How many pages of a channel the context reads after the conversation's first message. */
 const HISTORY_PAGES = 3;
-/** The channel messages before a conversation's first message that are its context: the most, and how old. */
 const PRECEDING_MESSAGES = 10;
 const PRECEDING_WINDOW_MS = 15 * 60_000;
-/** The times the history tool reads a channel from, shortest first: an hour, a day, a week. */
 const RECENT_WINDOWS_MS = [3_600_000, 86_400_000, 604_800_000];
-/** What the history tool says when the longest time has no messages. */
 const NO_RECENT_MESSAGES =
   "This Discord channel has no messages from the last 7 days. OpenBot reads only the last 7 days of a Discord channel.";
-/** The most `listMessages` calls of one history tool call. */
 const RECENT_CALLS = 6;
 const CLOCK_MARGIN_MS = 60_000;
 const DISCORD_EPOCH_MS = 1_420_070_400_000n;
 const RATE_LIMIT_NOTICE_MS = 5_000;
-/** Signal answers a rate limit at once. A call waits and tries again, as a Slack call does. */
 const RATE_LIMIT_RETRIES = 3;
-/** The longest wait for one retry. A longer limit fails the call. */
 const RATE_LIMIT_WAIT_LIMIT_MS = 60_000;
 const REDIRECT_LIMIT = 3;
 const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
@@ -78,11 +70,6 @@ const REACTIONS: Record<StatusReaction, string> = {
 
 const BUTTON_STYLES = { primary: "primary", danger: "danger" } as const;
 
-/**
- * The Discord side of one guild's connection. Every call goes through Signal, which holds the bot
- * token and refuses a call outside this host's guilds. Only a new text post can ping, and only a user. It
- * never logs message text or a response body.
- */
 class DiscordAdapter implements MessagingAdapter {
   readonly platform = "discord" as const;
   readonly #ingress: MessagingIngress;
@@ -101,15 +88,10 @@ class DiscordAdapter implements MessagingAdapter {
     this.#rateLimited = options.rateLimited;
   }
 
-  /**
-   * The guild that the account service linked to this host. Signal checks each call against the
-   * link, and tells this host when OpenBot leaves the guild, so this asks Discord nothing.
-   */
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError> {
     return Effect.succeed({
       workspaceId: this.#guildId,
       workspaceName: this.#guildName,
-      // Discord gives a bot user the id of its application.
       botUserId: this.#appId,
       appId: this.#appId,
       missingScopes: [],
@@ -129,7 +111,6 @@ class DiscordAdapter implements MessagingAdapter {
         content: clip(body.text),
         replyTo: target.replyThreadId,
         buttons: buttons(body),
-        // Only with embeds: an older Signal refuses the key.
         ...(body.embeds?.length ? { embeds: body.embeds } : {}),
       },
       decodeDiscordMessageId,
@@ -155,7 +136,6 @@ class DiscordAdapter implements MessagingAdapter {
     );
   });
 
-  /** Discord has private replies only to a button press. Without one, nothing is posted. */
   readonly postPrivate = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     _target: MessageTarget,
@@ -230,10 +210,6 @@ class DiscordAdapter implements MessagingAdapter {
     return firstId;
   });
 
-  /**
-   * The text in as many posts as it needs, with the embeds on the first one: when Signal or Discord
-   * refuses the embeds, nothing is posted. Returns the id of the first post.
-   */
   readonly postEmbeds = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     target: MessageTarget,
@@ -255,7 +231,6 @@ class DiscordAdapter implements MessagingAdapter {
     for (const file of files) {
       const attempt = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
-          // An attachment can be ten times larger than Discord's limit: it is not read whole.
           const bytes = yield* readAtMost(file.path, DISCORD_UPLOAD_BYTES_LIMIT);
           if (bytes === null || bytes.byteLength === 0) return false;
           yield* this.#call(
@@ -274,19 +249,9 @@ class DiscordAdapter implements MessagingAdapter {
       );
       if (Result.isFailure(attempt) || !attempt.success) skipped.push(file.name);
     }
-    // The Signal upload answer does not give the message id.
     return { skipped, firstId: null };
   });
 
-  /**
-   * The messages of the reply chain that `threadKey` starts, after `afterId` and before `beforeId`.
-   * Discord has no thread of replies, so this reads the channel from the first message on and keeps
-   * the first message, the replies to it and the replies to OpenBot's posts, which all reply to it.
-   * The first message of a conversation has no chain before it: its context is the channel's
-   * messages of the last minutes before it, such as an image that a person posted without a mention.
-   * Without the Message Content intent, Discord gives the text and files only of a message that
-   * mentions OpenBot, so a message without either is left out.
-   */
   readonly history = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     platformChannelId: string,
@@ -306,13 +271,6 @@ class DiscordAdapter implements MessagingAdapter {
     );
   });
 
-  /**
-   * The newest messages of a reply chain or of the channel, OpenBot's posts included, for the agent's
-   * history tool. Discord lists a channel only forward from an id, so the channel is read from a
-   * time: the last hour first, and a longer time when that has too few messages. A message without
-   * text or files is left out, as in `history`. When the result is short, the note says why, so that
-   * the agent can tell the user instead of an empty read.
-   */
   readonly recent = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     platformChannelId: string,
@@ -321,7 +279,6 @@ class DiscordAdapter implements MessagingAdapter {
   ): Effect.fn.Return<RecentMessages, MessagingAdapterError> {
     const now = Date.now();
     if (threadKey) {
-      // A margin past now: this computer's clock can be behind Discord's.
       const chain = yield* this.#chain(platformChannelId, threadKey, snowflakeAt(now + CLOCK_MARGIN_MS));
       return { messages: (yield* this.#entries(chain.filter(hasContent))).slice(-limit) };
     }
@@ -341,8 +298,6 @@ class DiscordAdapter implements MessagingAdapter {
         complete = !last || batch.length < DISCORD_LIST_MESSAGES_LIMIT;
         if (last) cursor = last.id;
       }
-      // A longer time that was not read to its end has only its oldest messages: the shorter time
-      // before it, read to its end, is newer.
       if (!complete && visible) break;
       visible = read.filter(hasContent);
       leftOut = read.length - visible.length;
@@ -357,11 +312,6 @@ class DiscordAdapter implements MessagingAdapter {
     return { messages };
   });
 
-  /**
-   * The messages of the reply chain that `threadKey` starts, before `before`, oldest first. Discord
-   * has no thread of replies, so this reads the channel from the first message on and keeps the first
-   * message, the replies to it, OpenBot's posts that reply to it, and the replies to those posts.
-   */
   readonly #chain = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     platformChannelId: string,
@@ -398,7 +348,6 @@ class DiscordAdapter implements MessagingAdapter {
     return chain;
   });
 
-  /** The newest channel messages before `before`, from the last minutes before it, oldest first. */
   readonly #preceding = Effect.fnUntraced(function* (
     this: DiscordAdapter,
     platformChannelId: string,
@@ -435,7 +384,6 @@ class DiscordAdapter implements MessagingAdapter {
     );
   }
 
-  /** Discord messages as context, with each user mention named. A bot's post names the bot. */
   readonly #entries = Effect.fnUntraced(function* (this: DiscordAdapter, messages: DiscordHistoryMessage[]) {
     const names = yield* mentionNames(
       messages.flatMap((message) => discordMentionIds([message.content, ...message.embeds].join("\n"))),
@@ -455,7 +403,6 @@ class DiscordAdapter implements MessagingAdapter {
     );
   });
 
-  /** A Discord attachment is a signed CDN address: it needs no token. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError> {
     return downloadAttachment(file.url, destination, maxBytes);
   }
@@ -465,8 +412,6 @@ class DiscordAdapter implements MessagingAdapter {
     if (cached) return yield* Deferred.await(cached);
     const name = Deferred.makeUnsafe<string>();
     this.#names.set(userId, name);
-    // Detached, so a caller with a deadline stops waiting at it. The lookup still completes the cache
-    // entry, which a later caller then reads.
     yield* Effect.forkDetach(
       this.#call({ op: "member", guildId: this.#guildId, userId }, decodeDiscordName).pipe(
         Effect.catch(() =>
@@ -487,7 +432,6 @@ class DiscordAdapter implements MessagingAdapter {
     if (cached) return yield* Deferred.await(cached);
     const name = Deferred.makeUnsafe<string>();
     this.#places.set(platformChannelId, name);
-    // Detached for the same reason as `authorName`.
     yield* Effect.forkDetach(
       this.#call({ op: "channel", guildId: this.#guildId, channelId: platformChannelId }, decodeDiscordName).pipe(
         Effect.map((channel) => `#${channel}`),
@@ -504,7 +448,6 @@ class DiscordAdapter implements MessagingAdapter {
     return yield* Deferred.await(name);
   });
 
-  /** A Signal that predates `listChannels` refuses it as an invalid request. */
   places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return this.#call({ op: "listChannels", guildId: this.#guildId }, decodeDiscordChannels).pipe(
       Effect.map(({ channels, omitted }) => ({
@@ -518,12 +461,10 @@ class DiscordAdapter implements MessagingAdapter {
     );
   }
 
-  /** A Signal that predates `listRoles` refuses it as an invalid request. */
   roles(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError> {
     return this.#call({ op: "listRoles", guildId: this.#guildId }, decodeDiscordRoles);
   }
 
-  /** A new text post pings the person; an edit or a private reply shows the person and pings nobody. */
   mention(userId: string): string {
     return /^[0-9]+$/.test(userId) ? `<@${userId}>` : userId;
   }
@@ -548,7 +489,6 @@ class DiscordAdapter implements MessagingAdapter {
   }
 }
 
-/** Each guild installed the OpenBot app. Its events come through the ingress relay, and its calls go through Signal. */
 export function discordDriver(options: { ingress?: MessagingIngress } = {}): MessagingDriver {
   return {
     platform: "discord",
@@ -572,17 +512,14 @@ function buttons(body: MessageBody): DiscordButton[] {
   }));
 }
 
-/** Why a large server lists fewer places than it has. A post goes to any place of the server by its id. */
 function omittedPlaces(count: number): string {
   return `This server has ${count} more places that this list leaves out: the oldest threads first. messaging_post also takes the id of a place that is not listed, such as the last number of its Discord link. messaging_history reads only listed places.`;
 }
 
-/** Status text is written by the host and is short; this keeps it within Discord's limit. */
 function clip(text: string): string {
   return text.length > DISCORD_MESSAGE_TEXT_LIMIT ? `${text.slice(0, DISCORD_MESSAGE_TEXT_LIMIT - 1)}…` : text;
 }
 
-/** The smallest Discord id of a message sent at `milliseconds`. */
 function snowflakeAt(milliseconds: number): bigint {
   return (BigInt(milliseconds) - DISCORD_EPOCH_MS) << 22n;
 }
@@ -591,7 +528,6 @@ function snowflakeTime(id: bigint): bigint {
   return (id >> 22n) + DISCORD_EPOCH_MS;
 }
 
-/** A message that has text, embeds or files for the context, or a forward, which says when it has none. */
 function hasContent(message: DiscordHistoryMessage): boolean {
   return (
     discordPlainText(message.content) !== "" ||
@@ -601,10 +537,6 @@ function hasContent(message: DiscordHistoryMessage): boolean {
   );
 }
 
-/**
- * Why the read left out messages. Without the Message Content intent, Discord gives no text for a
- * message that does not mention OpenBot, and a system message, such as a member join, has none.
- */
 function leftOutNote(count: number): string {
   const messages =
     count === 1
@@ -618,7 +550,6 @@ function compareSnowflakes(left: string, right: string): number {
   return difference < 0n ? -1 : difference > 0n ? 1 : 0;
 }
 
-/** The answer of a call that returns nothing OpenBot reads. */
 function ignoreAnswer(): void {}
 
 function trustedCdnUrl(value: string): boolean {
@@ -630,7 +561,6 @@ function trustedCdnUrl(value: string): boolean {
   }
 }
 
-/** The bytes of a file, or null when it is larger than `limit`. It reads at most one byte more. */
 const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
   return yield* Effect.acquireUseRelease(
     adapterIo(() => open(path, "r")),
@@ -638,7 +568,6 @@ const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
       adapterIo(async () => {
         const { size } = await file.stat();
         if (size > limit) return null;
-        // One byte more than the size, to see a file that grew since `stat`.
         const buffer = Buffer.alloc(Math.min(size, limit) + 1);
         let length = 0;
         for (;;) {
@@ -653,13 +582,8 @@ const readAtMost = Effect.fnUntraced(function* (path: string, limit: number) {
   );
 });
 
-/** One response of the CDN: a redirect to follow, or the value of the body. */
 type CdnStep<A> = { redirect: string } | { value: A };
 
-/**
- * Follows Discord's CDN redirects to the body of one attachment and gives it to `consume`. Each address,
- * the first one too, must be on Discord's CDN, and a file larger than `maxBytes` is refused.
- */
 const withCdnBody = Effect.fnUntraced(function* <A>(
   url: string,
   maxBytes: number,
@@ -696,18 +620,12 @@ const withCdnBody = Effect.fnUntraced(function* <A>(
   }
 });
 
-/** Downloads one attachment from Discord's CDN, and refuses a file larger than `maxBytes`. */
 const downloadAttachment = (url: string, destination: string, maxBytes: number) =>
   withCdnBody(url, maxBytes, (body) => writeBody(body, destination, maxBytes));
 
-/**
- * The bytes of one attachment on Discord's CDN, for a workflow output that copies it elsewhere. A
- * signed CDN address needs no token. A file larger than `maxBytes` is refused.
- */
 export const downloadDiscordAttachment = (url: string, maxBytes: number) =>
   withCdnBody(url, maxBytes, (body) => readBody(body, maxBytes));
 
-/** The whole body in memory, up to `maxBytes`. */
 const readBody = Effect.fnUntraced(function* (body: ReadableStream<Uint8Array>, maxBytes: number) {
   const reader = body.getReader();
   return yield* Effect.gen(function* () {

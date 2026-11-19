@@ -1461,7 +1461,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} を {role} に追加しました",
   "mobile.server.audit.roleMemberRemoved": "{member} を {role} から削除しました",
   "mobile.server.audit.agentLevel": "{role} の {agent}：{change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "エージェントをインポート",
   "mobile.server.route.import": "エージェントをインポート",
   "mobile.server.import.unsupported":
@@ -1539,7 +1538,6 @@ export const messages = {
   "mobile.server.import.channel": "チャンネル",
   "mobile.server.import.notImportedTitle": "インポートされなかった項目",
   "mobile.server.import.resultWarnings": "移行されなかった項目があります",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "移行",
   "mobile.server.route.transfer": "移行",
   "mobile.server.route.transferExport": "エクスポート",

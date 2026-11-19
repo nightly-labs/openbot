@@ -1502,7 +1502,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} ajouté à {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} retiré de {role}",
   "mobile.server.audit.agentLevel": "{agent} pour {role} : {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importer des agents",
   "mobile.server.route.import": "Importer des agents",
   "mobile.server.import.unsupported": "Mettez à jour OpenBot sur ce serveur pour y importer des agents.",
@@ -1576,7 +1575,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Non importés",
   "mobile.server.import.resultWarnings": "Certains éléments n’ont pas été transférés",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transfert",
   "mobile.server.route.transfer": "Transfert",
   "mobile.server.route.transferExport": "Exporter",

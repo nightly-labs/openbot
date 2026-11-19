@@ -15,7 +15,6 @@ import { type AgentDatabaseCheck, type AgentSchemaChange, checkAgentSql, schemaC
 import type { AgentDatabaseSupervisor } from "./agent-database-supervisor";
 
 export interface AgentTablesOptions {
-  /** `~/OpenBot/Shared`. The `Data` directory under it is this class's alone. */
   sharedRoot: string;
   supervisor: AgentDatabaseSupervisor;
 }
@@ -24,7 +23,6 @@ export interface AgentTableSummary {
   name: string;
   ownerAgentId: string | null;
   rowCount: number | null;
-  /** The `CREATE TABLE` statement, so an agent can write correct SQL without a PRAGMA. */
   sql: string;
 }
 
@@ -42,31 +40,12 @@ export interface AgentDatabaseWriteResult {
 const DIRECTORY = "Data";
 const FILE_NAME = "agent-data.db";
 
-/** Tables SQLite reserves for itself, plus our own owner record. */
 const HIDDEN_TABLES = `name NOT LIKE 'sqlite~_%' ESCAPE '~' AND name <> '${AGENT_DATABASE_METADATA_TABLE}'`;
 
-/**
- * Owns the one shared database, `~/OpenBot/Shared/Data/agent-data.db`: the file, its owner record,
- * and the rule that decides who may remove a table.
- *
- * There is one database and many tables rather than a database per subject. An agent that wants to
- * keep people, tasks, and the messages it handled makes three tables, and it can join them, which a
- * file per subject cannot. Every agent may read and write every table -- they are shared on purpose,
- * so an agent leaves something the next agent can use instead of a private JSON file. The owner
- * record decides exactly one thing: who may drop or reshape a table. The user can delete any table
- * from agent settings, because the owner rule binds agents, not the person whose computer this is.
- *
- * This class never opens SQLite. It hands one statement at a time to
- * {@link AgentDatabaseSupervisor}, which owns the child process that does.
- */
 export class AgentTables {
   readonly #directory: string;
   readonly #path: string;
   readonly #supervisor: AgentDatabaseSupervisor;
-  /**
-   * Held from the read of the schema to the owner record of a schema change, so that two agents
-   * never change the schema between the statement and its owner record.
-   */
   readonly #schemaLock = Semaphore.makeUnsafe(1);
   #ready: Effect.Effect<AgentDatabaseCheck<true>, AgentTablesError> | null = null;
 
@@ -75,13 +54,6 @@ export class AgentTables {
     this.#path = join(this.#directory, FILE_NAME);
     this.#supervisor = options.supervisor;
   }
-
-  /**
-   * Every table with its owner and row count, for both the agent tool and agent settings.
-   *
-   * A database that could not be read is a failure, not an empty list: an agent told there are no
-   * tables makes a near-duplicate of one that exists. A missing owner or count is only a detail.
-   */
 
   list(): Effect.Effect<AgentDatabaseCheck<AgentTableSummary[]>, AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<
@@ -116,11 +88,6 @@ export class AgentTables {
     });
   }
 
-  /**
-   * What agent settings renders. The same listing, without the SQL the user has no use for. A
-   * failure gets the user's sentence: the database's own message is advice for an agent's SQL.
-   */
-
   listShared(): Effect.Effect<SharedTable[], AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<SharedTable[], AgentTablesError> {
       const tables = yield* this.list();
@@ -147,16 +114,6 @@ export class AgentTables {
     });
   }
 
-  /**
-   * One write, with the tables this agent did not create protected from `DROP` and `ALTER`.
-   *
-   * The protected list is read only for a statement that changes the schema, so an ordinary insert
-   * costs one round trip rather than two, and the owner record is brought back in step afterwards --
-   * that is how a table an agent creates with `CREATE TABLE` becomes a table it owns, with no
-   * separate call to claim it. A schema change holds the schema lock throughout, so it claims only
-   * the tables its own statement made.
-   */
-
   execute(
     agentId: string,
     sql: string,
@@ -173,8 +130,6 @@ export class AgentTables {
       return yield* this.#schemaLock.withPermit(this.#changeSchema(agentId, change, checked.value, parameters));
     });
   }
-
-  /** The agent-facing delete. Only the agent that created a table may remove it. */
 
   remove(agentId: string, name: string): Effect.Effect<AgentDatabaseCheck<string>, AgentTablesError> {
     const remove = Effect.gen({ self: this }, function* (): Effect.fn.Return<
@@ -196,8 +151,6 @@ export class AgentTables {
     return this.#schemaLock.withPermit(remove);
   }
 
-  /** The user's delete, from agent settings. Not owner-gated: the data is on their computer. */
-
   removeAsUser(name: string): Effect.Effect<void, AgentTablesError> {
     const remove = Effect.gen({ self: this }, function* (): Effect.fn.Return<void, AgentTablesError> {
       const table = yield* this.#find(name);
@@ -208,14 +161,8 @@ export class AgentTables {
     return this.#schemaLock.withPermit(remove);
   }
 
-  /**
-   * Starts the database host in the background, so the first statement of this run does not wait
-   * for it. Only when the shared database exists: a computer whose agents never made a table does
-   * not keep an idle process for it.
-   */
   prewarm(): Effect.Effect<void> {
     return Effect.tryPromise(() => access(this.#path)).pipe(
-      // `try`, not `sync`: a start that throws is then a failure that `ignore` drops, not a defect.
       Effect.andThen(Effect.try(() => this.#supervisor.prewarm())),
       Effect.ignore,
     );
@@ -225,7 +172,6 @@ export class AgentTables {
     this.#supervisor.dispose();
   }
 
-  /** Runs with the schema lock held. */
   #changeSchema(
     agentId: string,
     change: AgentSchemaChange,
@@ -238,8 +184,6 @@ export class AgentTables {
     > {
       const existing = yield* this.#tableNames();
       if (!existing.ok) return existing;
-      // The cap is on the whole store now that there is one file, so it is counted in tables rather
-      // than in databases. It is a guard against a loop that makes a table per row, not a budget.
       if (change === "create" && existing.value.length >= INPUT_LIMITS.sharedTables) {
         return {
           ok: false,
@@ -247,7 +191,6 @@ export class AgentTables {
         };
       }
       const protectedTables = yield* this.#tablesNotOwnedBy(agentId);
-      // Not interruptible: a statement that reached the host runs, so its owner record must follow.
       return yield* Effect.uninterruptible(
         Effect.gen({ self: this }, function* (): Effect.fn.Return<
           AgentDatabaseCheck<AgentDatabaseWriteResult>,
@@ -279,7 +222,6 @@ export class AgentTables {
     });
   }
 
-  /** Runs with the schema lock held. */
   #drop(name: string): Effect.Effect<AgentDatabaseCheck<string>, AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentDatabaseCheck<string>, AgentTablesError> {
       const result = yield* this.#send({ mode: "write", sql: `DROP TABLE "${quote(name)}"`, provision: true });
@@ -311,12 +253,6 @@ export class AgentTables {
     });
   }
 
-  /**
-   * The file and the owner record, made once per run.
-   *
-   * The result is remembered rather than the promise being re-created, so a hundred statements in
-   * one turn do not each pay a `mkdir` and a `CREATE TABLE IF NOT EXISTS`.
-   */
   #ensure(): Effect.Effect<AgentDatabaseCheck<true>, AgentTablesError> {
     return Effect.gen({ self: this }, function* () {
       this.#ready ??= yield* Effect.cached(this.#provision());
@@ -333,22 +269,14 @@ export class AgentTables {
         sql: `CREATE TABLE IF NOT EXISTS ${AGENT_DATABASE_METADATA_TABLE} (table_name TEXT PRIMARY KEY, owner_agent_id TEXT NOT NULL, created_at TEXT NOT NULL)`,
       });
       if (!created.ok) {
-        // A failure here is worth another try on the next call: the host may have been killed mid-run.
         this.#ready = null;
         return { ok: false, message: created.message };
       }
-      // The file exists only once the statement above ran, so the mode is tightened here rather than
-      // at mkdir time.
       yield* tableIO(() => chmod(this.#path, 0o600)).pipe(Effect.catch(() => Effect.void));
       return { ok: true, value: true };
     });
   }
 
-  /**
-   * SQLite itself is what decides a `CREATE TABLE` or `DROP TABLE` worked, so the owner record
-   * follows the schema rather than the SQL. Both this and {@link #claimNewTables} are our
-   * statements, so they run with `provision` set -- nothing an agent writes can reach this table.
-   */
   #forgetRemovedTables(): Effect.Effect<void, AgentTablesError> {
     return Effect.asVoid(
       this.#send({
@@ -359,11 +287,6 @@ export class AgentTables {
     );
   }
 
-  /**
-   * A table that appeared belongs to the agent that ran the statement. Only the tables missing from
-   * `existing`, read under the same schema lock, appeared: a table the user made by hand stays
-   * unowned.
-   */
   #claimNewTables(agentId: string, existing: string[]): Effect.Effect<void, AgentTablesError> {
     return Effect.asVoid(
       this.#send({
@@ -375,7 +298,6 @@ export class AgentTables {
     );
   }
 
-  /** The tables an agent can see, without SQLite's own and the owner record. */
   #tableNames(): Effect.Effect<AgentDatabaseCheck<string[]>, AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentDatabaseCheck<string[]>, AgentTablesError> {
       const result = yield* this.#send({
@@ -394,8 +316,6 @@ export class AgentTables {
         sql: `SELECT table_name, owner_agent_id FROM ${AGENT_DATABASE_METADATA_TABLE}`,
       });
       const owners = new Map<string, string>();
-      // A file the user made by hand with the sqlite3 CLI has no owner record. Those are tables nobody
-      // owns and anybody may remove, not an error.
       if (!result.ok) return owners;
       for (const row of result.value.rows) {
         if (typeof row[0] === "string" && typeof row[1] === "string" && row[1].length > 0) owners.set(row[0], row[1]);
@@ -411,10 +331,6 @@ export class AgentTables {
     });
   }
 
-  /**
-   * Every table's count in one statement. An N+1 of counts would each pay their own deadline, and a
-   * table too large to count inside one reports no count rather than failing the whole listing.
-   */
   #rowCounts(names: string[]): Effect.Effect<Map<string, number>, AgentTablesError> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<Map<string, number>, AgentTablesError> {
       if (names.length === 0) return new Map();
@@ -457,7 +373,6 @@ export class AgentTables {
   }
 }
 
-/** Escapes an identifier for the one place a table name is written into SQL rather than bound. */
 function quote(name: string): string {
   return name.replaceAll('"', '""');
 }

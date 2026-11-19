@@ -8,10 +8,6 @@ import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Drawer > Workflows > a workflow > Version history: the versions that the host keeps, newest first.
- * A version opens its steps, and it can become the current workflow there.
- */
 export function WorkflowVersionsScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId: string }>();

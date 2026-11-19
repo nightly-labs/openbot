@@ -7,22 +7,13 @@ type ModelPhase = "unknown" | "missing" | "downloading" | "ready" | "error";
 
 export interface ModelState {
   phase: ModelPhase;
-  /** 0 to 1 while it downloads. */
   progress: number;
-  /** Why the last download failed: a network failure, a file that did not match, or no room. */
   failure: "download" | "verify" | null;
 }
 
-/**
- * One voice model that the phone downloads: its files, the state of the download, and the actions of
- * Settings > Voice. The model lives where the phone does not clear it when it needs room and does not
- * back it up, so the download stays until the user removes it. A verified file is marked, so the
- * check at startup does not hash the files again. Without the native module there is no model to keep.
- */
 export function createModelDownload(options: {
   directory: string;
   files: readonly SpeechModelFile[];
-  /** Lets go of the model files before they are deleted. */
   unload: () => Promise<void>;
 }) {
   const bytes = options.files.reduce((total, file) => total + file.bytes, 0);
@@ -35,22 +26,18 @@ export function createModelDownload(options: {
 
   const markerOf = (directory: Directory) => new File(directory, ".verified");
 
-  /** Stops a download. The files that finished stay, so the next download goes on from them. */
   function cancel(): void {
     download?.abort();
   }
 
   return {
-    /** The download size of all files of the model. */
     bytes,
     useModel,
 
-    /** The model directory as a file URI, for the native module. Null until the model is ready. */
     uri(): string | null {
       return useModel.getState().phase === "ready" ? (modelDirectory()?.uri ?? null) : null;
     },
 
-    /** Reads whether the model is on the phone, once at startup and after a removal. */
     check(): void {
       const directory = modelDirectory();
       const ready =
@@ -61,11 +48,6 @@ export function createModelDownload(options: {
         useModel.setState({ phase: ready ? "ready" : "missing", progress: ready ? 1 : 0 });
     },
 
-    /**
-     * Downloads the files that are missing or do not match their pinned SHA-256, the same files
-     * desktop downloads. The phone keeps a file that matches, so a download that stopped goes on
-     * from there.
-     */
     async download(): Promise<void> {
       const directory = modelDirectory();
       if (download || !directory) return;
@@ -110,7 +92,6 @@ export function createModelDownload(options: {
 
     cancel,
 
-    /** Deletes the model from the phone. The native module lets go of its files first. */
     async remove(): Promise<void> {
       cancel();
       await options.unload();
