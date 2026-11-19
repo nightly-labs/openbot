@@ -15,6 +15,7 @@ import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { FALLBACK_SERVER_NAME } from "./hosted-server-name";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
 import {
   serverCanAdminister,
@@ -43,8 +44,6 @@ import { serverAdminPort, serversPort } from "./servers-port";
  * latch in each is what keeps a failure *after* the write from being reported as
  * a failed write.
  */
-/** The generated name when the account gives no usable one. Its slug is long enough for a host address. */
-const FALLBACK_SERVER_NAME = "OpenBot";
 
 /**
  * A name for a server that the user publishes before naming it, such as "Ann’s server". The first

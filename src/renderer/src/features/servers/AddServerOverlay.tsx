@@ -46,6 +46,7 @@ import { AddServerDialog, HostedPricingPage } from "../../lazy-views";
 import { holdHostRestartNotice } from "../updates/host-restart-toast";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { PricingPagePlacement } from "../window/window-page-context";
+import { hostedServerDefaultName } from "./hosted-server-name";
 
 type PlansEvent = DesktopAnalyticsProperties<"hosted_server_plans_action">;
 
@@ -457,9 +458,11 @@ function AddServerSession(
 
   function nextName(): string {
     const text = currentText();
-    return state.serverCount === 0
-      ? text.t("server.hosted.defaultName")
-      : text.t("server.hosted.defaultNameNumbered", { number: state.serverCount + 1 });
+    return hostedServerDefaultName(
+      state.serverCount === 0
+        ? text.t("server.hosted.defaultName")
+        : text.t("server.hosted.defaultNameNumbered", { number: state.serverCount + 1 }),
+    );
   }
 
   function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
