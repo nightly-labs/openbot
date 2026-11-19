@@ -25,7 +25,6 @@ interface RemoteDesktopWorkspaceProps {
 }
 
 type ViewerState = "idle" | "connecting" | "connected" | "error";
-// Room for Moonlight's own WebRTC timeout and for the host to start the streams queued before this one.
 const STREAM_READY_TIMEOUT_MS = 60_000;
 type RemoteDisplay = RemoteDesktopSession["displays"][number];
 const viewerMessageSchema = z.object({
@@ -55,9 +54,6 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     if (props.connecting) return "connecting";
     return viewerState();
   });
-  // The host's own word for why it refused, when it gave one. It decides which failure the overlay
-  // describes: a missing screen recording grant is a setup step on the host that no retry reaches on
-  // its own, unlike a connection that failed or a host that is too old to share a screen at all.
   const failureCode = createMemo<RemoteDesktopErrorCode | null>(
     () => props.connectionErrorCode ?? props.session?.errorCode ?? null,
   );
@@ -96,8 +92,6 @@ export function RemoteDesktopWorkspace(props: RemoteDesktopWorkspaceProps) {
     },
   );
 
-  // The viewer says "connected" at the first frame, and "error" only for a fatal Moonlight line. A host
-  // whose Sunshine never sends a stream says nothing more, so a stream that is not ready in time fails.
   createEffect(
     () => (props.session && !props.connecting && viewerState() === "connecting" ? props.session.id : null),
     (sessionId) => {

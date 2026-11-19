@@ -368,6 +368,21 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:team-legacy-clients
 
+      - name: Run the Team API protocol 10 E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-protocol-v10
+
+      - name: Run the Team WebRTC wire parity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-webrtc-wire-parity
+
+      - name: Run the remote viewer proxy E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-viewer-proxy
+      - name: Run the server safe mode E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:server-safe-mode
+
       - name: Run the Team session revoke and reconnect E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-session-revoke
@@ -431,6 +446,10 @@ jobs:
       - name: Run the agent create retry E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-create-retry
+
+      - name: Run the update host takeover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:update-host-takeover
 
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
@@ -771,6 +790,10 @@ jobs:
           name: reverse-actions-e2e
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
+            .openbot-build/team-protocol-v10-e2e/
+            .openbot-build/team-webrtc-wire-parity-e2e/
+            .openbot-build/remote-viewer-proxy-e2e/
+            .openbot-build/server-safe-mode-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
@@ -787,6 +810,7 @@ jobs:
             .openbot-build/agent-waits-tools-e2e/
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
+            .openbot-build/update-host-takeover-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/

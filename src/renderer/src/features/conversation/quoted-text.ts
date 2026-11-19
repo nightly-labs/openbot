@@ -8,15 +8,10 @@ const QUOTE_HIGHLIGHT = "openbot-quote-target";
 let releaseHighlight: AbortController | undefined;
 let stopFileQuoteWatch: (() => void) | undefined;
 
-/** The text blocks of a sent message. A message with a table or a card has more than one. */
 export function messageTextBlocks(root: ParentNode, messageId: string): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(`[data-selection-message-id="${CSS.escape(messageId)}"]`));
 }
 
-/**
- * Marks the first place in the message where the quoted text shows, and returns it. The mark stays
- * until the next pointer press or Escape. Returns null when the message no longer has the text.
- */
 export function highlightQuotedText(blocks: HTMLElement[], text: string): Range | null {
   clearQuotedTextHighlight();
   const row = blocks[0]?.closest<HTMLElement>("[data-chat-search-message]");
@@ -29,12 +24,6 @@ export function highlightQuotedText(blocks: HTMLElement[], text: string): Range 
   return range;
 }
 
-/**
- * The quote id, with no lines, of the file that the side panel shows. The agent can read a workspace
- * file, a shared file and an attachment, so a passage of one can be quoted. A folder cannot.
- * `workspacePath` is set in a channel. A quote id names no agent, so there a workspace file is named
- * by its absolute path, which is in the workspace of one agent only.
- */
 export function filePreviewQuoteId(
   file: SidebarFilePreview | null | undefined,
   workspacePath?: string | undefined,
@@ -56,7 +45,6 @@ function absoluteWorkspacePath(workspacePath: string, path: string): string {
   return `${workspacePath.replace(/[/\\]+$/u, "")}${separator}${path.replace(/^\.[/\\]/u, "")}`;
 }
 
-/** The agent whose workspace holds an absolute path. A workspace inside another one wins. */
 export function workspaceAgentOfPath(agents: readonly AgentProfile[], path: string): string | undefined {
   let found: { id: string; root: string } | undefined;
   for (const agent of agents) {
@@ -67,20 +55,13 @@ export function workspaceAgentOfPath(agents: readonly AgentProfile[], path: stri
   return found?.id;
 }
 
-/**
- * Marks a quoted passage of a file when the side panel shows the file, and scrolls to it. The file
- * loads after the request, and the code highlighter replaces its text after that, so this marks the
- * passage again each time its text changes. It stops at the next pointer press or Escape.
- */
 export function revealFileQuote(document: Document, file: FileQuoteTarget, text: string): void {
   stopFileQuoteWatch?.();
   clearQuotedTextHighlight();
   const selector = `[data-selection-file-quote="${CSS.escape(fileQuoteId({ ...file, lines: undefined }))}"]`;
   let marked: Range | null = null;
   let searched: HTMLElement | null = null;
-  // Other parts of the app change all the time, so the file text is searched again only when it changes.
   const show = (records: MutationRecord[] = []) => {
-    // A replaced text node collapses the range.
     if (marked && !marked.collapsed) return;
     const block = document.querySelector<HTMLElement>(selector);
     if (!block || (block === searched && !records.some((record) => block.contains(record.target)))) return;
@@ -110,12 +91,6 @@ export function stopRevealingFileQuote(): void {
   stopFileQuoteWatch?.();
 }
 
-/**
- * The passage in the shown text of a file. Whitespace is not compared: rendered Markdown joins its
- * blocks without the line breaks that a selection of them has. A passage of Markdown source shows as
- * rendered text when the file opens again, so then only letters and digits are compared. Source text
- * starts at the quoted lines.
- */
 function fileQuoteRange(block: HTMLElement, text: string, lines: FileQuoteTarget["lines"]): Range | null {
   const lineStart =
     lines && block.dataset.selectionFileLines === "true" ? sourceLineOffset(block.textContent ?? "", lines.start) : 0;

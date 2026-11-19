@@ -1,13 +1,3 @@
-// The `openbot-import.json` manifest at the root of an agent import archive.
-//
-// The format is a product contract: the Grok Bot export skill in
-// `resources/agent-import/grok-bot/SKILL.md` writes it, and an export made by an older skill must
-// still import. Add optional fields only; a change of meaning needs a new `version`.
-//
-// Structure errors reject the archive with the agent or channel and field named. A routine, memory,
-// channel member or lead that cannot be kept is dropped with a warning, because the rest is still
-// worth importing. `channels` is optional: an export made before group chats has none.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { AGENT_IMPORT_LIMITS, isAgentImportKey, isRoutineSchedule, type RoutineSchedule } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -31,7 +21,6 @@ export interface ImportAgent {
   name: string;
   title: string;
   description: string;
-  /** Archive paths, each checked to be inside `agents/<key>/`. */
   avatar: string | null;
   skills: string[];
   files: string | null;
@@ -39,7 +28,6 @@ export interface ImportAgent {
   memories: string[];
 }
 
-/** A group chat. Members and lead are agent keys of the same export. */
 export interface ImportChannel {
   key: string;
   name: string;
@@ -222,7 +210,6 @@ function decodeRoutines(values: unknown[], agent: string, warnings: string[], no
       warnings.push(`${agent}: ${label} is skipped because it is invalid.`);
       continue;
     }
-    // The export skill cannot know when the interval should start, so an absent anchor means now.
     const schedule =
       isDynamicRecord(value.schedule) && value.schedule.kind === "interval" && value.schedule.anchorAt === undefined
         ? { ...value.schedule, anchorAt: now().toISOString() }

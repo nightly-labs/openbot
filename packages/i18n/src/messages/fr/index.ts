@@ -53,18 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * French. Written from the English source: read it as a first draft, not as final copy. A key that
- * is missing here renders its English source.
- *
- * Notes for a reviewer. The English source addresses the user directly, so the text uses the
- * vouvoiement (vous) throughout and never the familiar tu. Typography follows French convention:
- * a narrow no-break space is not used here, but the ellipsis is the single character … and the
- * apostrophe is the typographic ’ used by the other catalogs. Product names stay in Latin script:
- * OpenBot is the application name, and ZIP and JSON are the file formats a picker shows.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const fr = {
   ...shared,
   ...source,

@@ -288,6 +288,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Photos et fichiers",
   "mobile.settings.conversations.swipeLeft": "Balayer à gauche dans un chat",
   "mobile.settings.conversations.swipeRight": "Balayer à droite dans un chat",
+  "mobile.settings.conversations.swipeQuestion": "Question annexe",
   "mobile.settings.conversations.swipeThreads": "Fils",
   "mobile.settings.conversations.swipeBrowser": "Navigateur",
   "mobile.settings.conversations.swipeOff": "Désactivé",
@@ -584,7 +585,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Choisir un agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot est verrouillé",
   "mobile.settings.shortcuts.card.locked.action": "Ouvrir OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas. Open Agent ouvre sa discussion.",
   "mobile.settings.shortcuts.send.sent": "Envoyé",
   "mobile.settings.shortcuts.send.failed": "OpenBot n’a pas pu envoyer ce message.",
   "mobile.settings.shortcuts.send.unconfirmed": "Pas de réponse du serveur. Le message est peut-être dans le chat.",

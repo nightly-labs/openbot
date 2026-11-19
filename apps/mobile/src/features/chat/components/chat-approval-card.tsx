@@ -23,11 +23,6 @@ import { type MobileText, useText } from "@/shared/lib/text";
 
 export type ApprovalDecision = "accept" | "decline";
 
-/**
- * A command that only wraps its body in a login shell, such as `/bin/zsh -lc "…"`. The body shows
- * only when the shell reads it literally: single quotes, or double quotes with no escape, variable or
- * substitution. Any other command shows as the host sent it.
- */
 const SHELL_WRAPPER = /^(?:\/(?:usr\/)?bin\/)?(?:ba|z)?sh -l?c (?:'([^']*)'|"([^"\\$`]*)")$/su;
 const HOME_FOLDER = /^(?:\/Users|\/home)\/[^/]+(?=\/|$)/u;
 
@@ -42,7 +37,6 @@ function commandText(command: string) {
   return match?.[1] ?? match?.[2] ?? command;
 }
 
-/** A closed request leaves the chat with its card. Any other failure keeps Deny and offers Try again. */
 function wholeReadFailed(error: unknown) {
   return !(error instanceof InactiveRequestError);
 }
@@ -51,15 +45,6 @@ function shortPath(path: string) {
   return path.replace(HOME_FOLDER, "~");
 }
 
-/**
- * An approval that an agent waits on, answered from the phone. It shows what the desktop card shows
- * and says what each answer does on the host. A request that the phone has only in part offers Deny
- * only: Allow must not cover text the user cannot see. With `readsWhole`, the card reads the whole
- * request from the host and then offers Allow. A bug report or an idea for the OpenBot team shows its
- * title and text in a box that scrolls, as the desktop card shows the whole report. A bug report
- * about the phone app also shows what this phone adds to it: the report is public, so the user reads
- * the version, the system and the log lines before Send.
- */
 export function ChatApprovalCard({
   approval,
   agentName,
@@ -72,14 +57,11 @@ export function ChatApprovalCard({
 }: {
   approval: PendingApproval;
   agentName: string;
-  /** In a channel, several agents can ask. In an agent's own chat, the name is the chat's. */
   showAgentName: boolean;
   serverName: string;
   canAnswer: boolean;
   respond: (decision: ApprovalDecision) => Promise<void>;
-  /** True when the server can send the whole copy of a request that the phone has only in part. */
   readsWhole: boolean;
-  /** Reads the whole copy. The approval then changes to it, so this card shows Allow. */
   loadWhole: () => Promise<void>;
 }) {
   const { t, errorMessage, sourceText } = useText();
@@ -92,21 +74,17 @@ export function ChatApprovalCard({
   const disabled = !canAnswer || pending !== null;
   const report = feedbackApproval(approval);
   const reading = partial && readsWhole && canAnswer;
-  // What this phone adds to a report about the phone app, read one time for the card. Send sends this
-  // same data, so the public issue has no line that the user did not see.
   const phoneReport = report?.phone === true;
   const { agentId, requestId } = approval;
   const phone = useMemo(
     () => (phoneReport ? showPhoneFeedback({ agentId, requestId }) : null),
     [phoneReport, agentId, requestId],
   );
-  // The network and the VPN can change while the card is open, so the card shows each new read.
   const network = useSyncExternalStore(subscribePhoneNetwork, phoneNetwork);
   useEffect(() => {
     if (phoneReport) void refreshPhoneNetwork();
   }, [phoneReport]);
 
-  // The list makes a new callback on each render, so the read starts once for each cut request.
   const loadWholeRef = useRef(loadWhole);
   loadWholeRef.current = loadWhole;
   useEffect(() => {
@@ -114,7 +92,6 @@ export function ChatApprovalCard({
     let current = true;
     setWholeFailed(false);
     loadWholeRef.current().then(
-      // A whole copy replaces this cut one, so the flag shows only when the copy did not match it.
       () => {
         if (current) setWholeFailed(true);
       },
@@ -161,7 +138,6 @@ export function ChatApprovalCard({
           : t("mobile.chat.approval.effect.permissions", names);
   const hasDetails =
     !report && (Boolean(approval.command) || approval.kind === "file-change" || permissionDetails.length > 0);
-  // The host writes its notes, such as the recent errors, as source text paragraphs.
   const reportText = report?.text
     .split("\n\n")
     .map((part) => sourceText(part))
@@ -178,7 +154,6 @@ export function ChatApprovalCard({
     } catch (error) {
       void haptics.notification("error");
       if (error instanceof InactiveRequestError) {
-        // The card is gone with its request. The alert says why the answer did not count.
         showWarningAlert("turn", t("mobile.chat.approval.inactiveTitle"), error.message);
         return;
       }
@@ -201,7 +176,6 @@ export function ChatApprovalCard({
         ? t("mobile.chat.approval.report.dontSend")
         : t("mobile.chat.approval.deny");
 
-  // A request that the phone has only in part offers no Allow and no Send.
   const acceptButton = () =>
     partial ? null : (
       <Button
@@ -230,7 +204,6 @@ export function ChatApprovalCard({
           </Typography.Paragraph>
         ) : null}
         {report ? (
-          // An offer to send feedback reads as a message, as on the desktop: the report is a quote.
           <View className="gap-2.5">
             <View className="items-center gap-1 pt-1">
               <Typography.Paragraph style={{ fontSize: 32, lineHeight: 40 }} accessible={false}>
@@ -244,10 +217,6 @@ export function ChatApprovalCard({
                 )}
               </Typography.Paragraph>
             </View>
-            {/* The whole report scrolls inside the card, so the user reads all of it before Send. A
-                report about the phone app also shows the phone's data under it, so its box is lower.
-                A ScrollView grows by default, so without grow-0 a short report keeps the whole box
-                height and pushes Send down under the composer (#10636). */}
             <ScrollView className={phone ? "max-h-56 grow-0" : "max-h-72 grow-0"} nestedScrollEnabled>
               <View className="gap-1 border-s-[3px] border-border ps-3">
                 <Typography.Paragraph weight="medium" selectable>
@@ -260,8 +229,6 @@ export function ChatApprovalCard({
                 ) : null}
               </View>
             </ScrollView>
-            {/* Outside the report's scroll box, so a long report does not hide what the phone adds. The
-                log has its own scroll box: it can have 60 lines. */}
             {phone ? (
               <View className="gap-1">
                 <Typography.Paragraph type="body-xs" className="text-muted">
@@ -347,8 +314,6 @@ export function ChatApprovalCard({
         ) : null}
       </View>
 
-      {/* Answer pills under the bubble, as the quick replies of the chat design. A report puts Send
-          last and widest, as the desktop card does. */}
       <View className={report ? "max-w-[92%] flex-row gap-2" : "flex-row flex-wrap gap-2"}>
         {report ? null : acceptButton()}
         <Button

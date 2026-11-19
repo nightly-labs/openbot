@@ -1,79 +1,3 @@
-/**
- * End-to-end check of the hosted server plan flows against the Stripe sandbox and a local account Worker.
- * Each scenario gets its own account and a Stripe test clock, so renewals and period ends happen at once.
- * A subscription made here with the server metadata stands for a paid Checkout page: the Worker reads
- * only the subscription webhooks. Local development data only. On the `test` Worker each paid server is
- * a real boat VM, so the check deletes the servers of each scenario when it ends.
- *
- *   bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
- *
- * The Worker must run with `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the IDs that `--print-user-ids`
- * prints, and `stripe listen` must forward to it. The `portal` scenario prints two Customer Portal
- * pages and waits until someone uses them. The report goes to `.openbot-build/stripe-flows-e2e.json`.
- *
- * The `boat` scenario runs only when named. It makes a real VM: the Worker needs the real `BOAT_API_KEY`
- * and `HOSTED_SERVER_TEMPLATE`, and the template must know a public origin of this Worker. It waits
- * until OpenBot in the VM redeems its claim and publishes its host. Then it keeps a focused web client
- * open with no input for 20 minutes and checks that the server stays on, waits for the idle stop
- * (about 15 minutes), starts the server, changes the plan, ends it, renews it, and deletes the server.
- * `--checkout` pays each Checkout page with a test card in the local Chrome. The web client then
- * connects to the server over Signal, and the screenshots go to `.openbot-build/`.
- * `--remote-d1` reads the D1 of the deployed `test` Worker; pass its origin as `--api`.
- *
- * The `license-*` scenarios check the commercial license: its tiered Price, Checkout, users, the count
- * of people on the owner's servers, renewal, currency, and that the server plans do not change. They need
- * `bun run api:stripe:bootstrap` to have made the license Prices in the sandbox. A subscription made here
- * with the license metadata stands for a paid license Checkout page, as for a server plan.
- *
- * The `storage-tier` scenario needs the storage add-on Prices of `bun run api:stripe:bootstrap`. It checks
- * that a boat server cannot buy storage, then moves the row to a VPS of the operator in D1 and buys tier 1
- * and tier 2 with `POST /v1/me/billing/storage`: the answer, the D1 tier, the invoices, a refused payment
- * (402), and the renewal amount. The `portal` scenario checks that the Portal has no plan change.
- *
- * The license tiers have their own scenarios:
- * - `license-prices`: the 8 license lookup keys give active Prices with the tier, the interval, the bundle
- *   flag and the amounts of `LICENSE_PLAN_PRICES` in EUR, USD and PLN. No license key is a server plan key.
- * - `license-starter`: a Starter license is 1 user at €10. It cannot change its users, its server with no
- *   plan shows a member limit of 1, and no member joins.
- * - `license-bundle-align`: an account with a server plan buys the Starter license at the bundle price
- *   (€8). When the server plan ends, the license moves to the Starter price, and the next renewal is €10.
- * - `order-bundle`: a server create with a license order gives one Checkout page with the server Price and
- *   the Team bundle Price. After the payment the license moves to its own subscription with no second
- *   charge, renews with the server, and a second license order is refused.
- * - `license-team-year`: a yearly Team license of 7 users. The state, the invoice and the sales facts
- *   show the yearly interval.
- * - `license-upgrade`: Starter → Team monthly → Team yearly. A move to a lower plan is refused.
- * - `license-legacy-request`: a checkout request from an app before the tiers buys Team monthly (5 users at €70).
- * - `license-member-limits`: a new Starter hosted server takes 1 member (the owner), and a new Standard
- *   server takes 5. A server made before these limits (`legacy_member_limits = 1`) takes 3 on Starter and
- *   10 on Standard.
- * - `license-self-hosted-limit`: a server with no plan takes 3 members with no license, the users of a
- *   Team license while it is active, and 3 again when it ends. Members who are active stay. A custom limit
- *   above the license users shows the license users, and a plan from before the license gives way to more
- *   license users.
- *
- * The license promotion (`LICENSE_TRIAL_END`, in `wrangler.jsonc`) has its own scenarios. They run only
- * when the Worker sells the free trial, and `order-bundle` runs only when it does not. To run
- * `order-bundle`, start the Worker with `LICENSE_TRIAL_END=` (empty).
- * - `license-trial`: the license state gives the trial end, and the license Checkout page charges 0 now.
- *   The paid page makes a trialing license that ends on the trial end, with no charge.
- * - `order-trial`: a server order with a license gives a Checkout page with the server Price only, and
- *   the order in its metadata. After the payment a trialing license of the order starts on its own
- *   subscription, the order metadata leaves the server subscription, and a second order is refused.
- *
- * The `promotion-link` scenario checks the code of a discount link (`?promo=CODE`), which the web client
- * sends with a Checkout request. It makes a 20% coupon with two promotion codes in the sandbox and deletes
- * them at the end. A server create with the active code gives a page with that discount and no code field.
- * A code whose minimum amount the order does not meet, and an unknown code on a license page, give the page
- * with the code field and no discount. A copy of the live Brazil partner code (server and storage Products,
- * BRL only, lower case) gives a discount on a BRL server page, also in upper case, and the code field on a
- * EUR server page and on a BRL license page.
- *
- * The `vat` scenario needs the VAT Tax Rate of `bun run api:stripe:bootstrap`. It sets the billing details
- * of `PUT /v1/me/billing/details` and reads the VAT of each new Checkout page: Polish VAT for Poland and for
- * an EU consumer, none outside the EU, reverse charge for an Irish company that VIES confirms, Polish VAT
- * for a Polish company, and 409 with no country. The reverse charge steps call the real VIES service.
- */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -119,7 +43,7 @@ import {
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
-import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
+import { EARLY_START_METADATA, STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -171,9 +95,7 @@ const STARTER_BUNDLE_MONTH: LicensePlan = { tier: "starter", interval: "month", 
 const TEAM_MONTH: LicensePlan = { tier: "team", interval: "month", bundle: false };
 const TEAM_BUNDLE_MONTH: LicensePlan = { tier: "team", interval: "month", bundle: true };
 const TEAM_YEAR: LicensePlan = { tier: "team", interval: "year", bundle: false };
-/** `WELCOME_EMAIL_CLAIM_PREFIX` of `billing-service.ts`. That module needs the Worker types. */
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
-/** `LICENSE_EMAIL_CLAIM_PREFIXES` of `license-service.ts`. */
 const LICENSE_EMAIL_CLAIM_PREFIXES = {
   welcome: "openbot_license_email:",
   payment_failed: "openbot_license_payment_failed:",
@@ -363,7 +285,6 @@ const licenseItemSchema = z.object({
 const licenseRowSchema = z.object({ tier: z.string().nullable(), billing_interval: z.string().nullable() });
 const hostListSchema = z.object({ hosts: z.array(z.object({ hostId: z.string(), memberLimit: z.number() })) });
 
-/** The request bodies of the browser API routes that this check calls. */
 type BrowserApiBody =
   | { name: string; plan: BillingPlanId; interval: "month"; currency: "eur"; license?: LicenseOrder }
   | { name: string; plan: BillingPlanId; interval: "month"; currency: BillingCurrency; promotionCode: string }
@@ -416,7 +337,6 @@ async function stripe<T>(
   return schema.parse(value);
 }
 
-/** The `boat` scenario only. The shared development key reads the VM of the test server. */
 async function boat(
   method: "GET" | "POST" | "DELETE",
   path: string,
@@ -429,7 +349,6 @@ async function boat(
     headers: {
       Authorization: `Bearer ${key}`,
       ...(body ? { "Content-Type": "application/json" } : {}),
-      // boat deletes a sandbox only when this header names it.
       ...(method === "DELETE" ? { "X-Ascii-Confirm-Delete": path.split("/").at(-1) ?? "" } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -439,9 +358,7 @@ async function boat(
 
 const d1ResultSchema = z.array(z.object({ results: z.array(z.unknown()) }));
 
-/** `--remote-d1` reads the D1 of the deployed `test` Worker. Wrangler then uses its own sign-in, not the API token. */
 const REMOTE_D1 = process.argv.includes("--remote-d1");
-/** `--checkout` pays the boat server on the real Checkout page with a test card, in the local Chrome. */
 const REAL_CHECKOUT = process.argv.includes("--checkout");
 
 function d1<T>(sql: string, schema: z.ZodType<T>): T[] {
@@ -454,7 +371,6 @@ function d1<T>(sql: string, schema: z.ZodType<T>): T[] {
     { cwd: join(ROOT, "apps/auth-api"), encoding: "utf8", env },
   );
   if (result.status !== 0) {
-    // spawnSync leaves stderr undefined when it cannot start wrangler. Report that error, not a TypeError.
     const detail = result.stderr?.slice(0, 400) || result.error?.message || `exit ${String(result.status)}`;
     throw new Error(`D1 failed: ${detail}`);
   }
@@ -480,12 +396,10 @@ class Account {
     return userId(this.scenario);
   }
 
-  /** A fresh account with a session, a test clock and a customer that pays with a working card. */
   async setUp(): Promise<this> {
     const now = Date.now();
     const hash = createHash("sha256").update(this.token).digest("base64url");
     const id = quote(this.id);
-    // A run that stopped early can leave a VM. Delete it before its row, so that no VM stays without a row.
     const left = d1(
       `SELECT provider_sandbox_id FROM hosted_servers
        WHERE owner_user_id = ${id} AND provider_sandbox_id IS NOT NULL AND deleted_at IS NULL`,
@@ -500,9 +414,7 @@ class Account {
         `DELETE FROM hosted_servers WHERE owner_user_id = ${id}`,
         `DELETE FROM billing_subscriptions WHERE user_id = ${id}`,
         `DELETE FROM licenses WHERE user_id = ${id}`,
-        // The servers and members that a license scenario adds. Deleting a host deletes its memberships.
         `DELETE FROM remote_hosts WHERE host_id LIKE ${quote(`e2e-${this.scenario}-%`)}`,
-        // The hosts that a scenario adds for its hosted servers have the server ID.
         `DELETE FROM remote_hosts WHERE owner_user_id = ${id}`,
         `DELETE FROM users WHERE id LIKE ${quote(`${this.id}-member-%`)}`,
         `DELETE FROM billing_customers WHERE user_id = ${id}`,
@@ -526,11 +438,9 @@ class Account {
       payment_method: "pm_card_visa",
       "invoice_settings[default_payment_method]": "pm_card_visa",
       "metadata[openbot_user_id]": this.id,
-      // The billing country decides the VAT of a Checkout page. `payCheckout` pays with an address in Poland.
       "address[country]": "PL",
     });
     this.customer = customer.id;
-    // The Worker makes a customer without a test clock, so the account gets this one before its first Checkout.
     d1(
       `INSERT INTO billing_customers(user_id, stripe_customer_id, created_at, updated_at)
        VALUES (${id}, ${quote(this.customer)}, ${now}, ${now})`,
@@ -565,20 +475,22 @@ class Account {
     return createdSchema.parse(response.body);
   }
 
-  /** A server create request, monthly in EUR, with a license order when one is given. */
-  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder) {
+  orderServer(name: string, plan: BillingPlanId, license?: LicenseOrder, earlyStart?: unknown) {
     return this.request(
       "POST",
       "v2/hosting/servers",
-      { name, plan, interval: "month", currency: "eur", ...(license ? { license } : {}) },
+      {
+        name,
+        plan,
+        interval: "month",
+        currency: "eur",
+        ...(license ? { license } : {}),
+        ...(earlyStart === undefined ? {} : { earlyStart }),
+      },
       { "Idempotency-Key": `e2e-${this.scenario}-${randomBytes(8).toString("hex")}` },
     );
   }
 
-  /**
-   * Deletes the servers of this account through the Worker. On the `test` Worker a paid server is a real
-   * VM, so no VM or plan stays after the scenario.
-   */
   async tearDown() {
     const listed = serverListSchema.safeParse((await this.request("GET", "v2/hosting/servers")).body).data;
     for (const server of listed?.servers ?? []) {
@@ -601,7 +513,6 @@ class Account {
     return billingSchema.parse((await this.request("GET", "v1/me/billing")).body).servers;
   }
 
-  /** The plan with its amount and storage fields, from the billing state or from a storage purchase answer. */
   async storagePlan(subscriptionId: string, body?: unknown): Promise<StoragePlan | null> {
     const state = storageBillingSchema.parse(body ?? (await this.request("GET", "v1/me/billing")).body);
     return state.servers.find((entry) => entry.subscriptionId === subscriptionId) ?? null;
@@ -633,10 +544,6 @@ class Account {
     );
   }
 
-  /**
-   * Pays for the server as a completed Checkout does: the open page closes, and a subscription with the
-   * server metadata starts.
-   */
   async pay(serverId: string) {
     const session = this.row(serverId)?.checkout_session_id;
     if (session) await stripe("POST", `/v1/checkout/sessions/${session}/expire`, idSchema).catch(() => null);
@@ -663,11 +570,6 @@ class Account {
     return licenseStateSchema.parse((await this.request("GET", "v1/me/license")).body);
   }
 
-  /**
-   * Buys a license as a completed Checkout page does: a subscription of the Price of the plan, with the
-   * user count as its quantity and the license metadata that the Worker puts on the Checkout page. With
-   * `trialEnd` (ms) the license is free until then, as during the promotion.
-   */
   async buyLicense(
     users: number,
     currency: BillingCurrency = "eur",
@@ -690,11 +592,6 @@ class Account {
     return created.id;
   }
 
-  /**
-   * Pays for a server order as a completed Checkout page does: the open page closes, and one subscription
-   * starts with the server Price and the license bundle Price. It has the server metadata only. With
-   * `trialEnd` (ms) it is an order of the promotion: the server Price only, and the order metadata.
-   */
   async payOrder(serverId: string, plan: BillingPlanId, license: LicenseOrder, trialEnd?: number) {
     const session = this.row(serverId)?.checkout_session_id;
     if (session) await stripe("POST", `/v1/checkout/sessions/${session}/expire`, idSchema).catch(() => null);
@@ -720,10 +617,6 @@ class Account {
     return created.id;
   }
 
-  /**
-   * Adds the Remote host of a hosted server, with the owner's membership, as the server does when it
-   * publishes its host. A local Worker has no VM that publishes it.
-   */
   hostServer(serverId: string, name: string) {
     const now = Date.now();
     d1(
@@ -736,10 +629,6 @@ class Account {
     );
   }
 
-  /**
-   * Adds servers that this account owns, with members. A member is a new account; `active: false` adds
-   * a revoked membership. The same key on two servers is one person.
-   */
   addServers(servers: { name: string; members: { key: string; active?: boolean }[] }[]) {
     const now = Date.now();
     const statements: string[] = [];
@@ -749,7 +638,6 @@ class Account {
       statements.push(
         `INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at)
          VALUES (${quote(hostId)}, ${quote(this.id)}, ${quote(server.name)}, ${now}, ${now})`,
-        // The owner's own membership. It must not count twice.
         `INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
          VALUES (${quote(crypto.randomUUID())}, ${quote(hostId)}, ${quote(this.id)}, 'owner', 'active', ${now}, ${now})`,
       );
@@ -777,7 +665,6 @@ class Account {
     return `${this.id}-member-${key}`;
   }
 
-  /** A browser session of a member of this account's servers. A new key is a new account. */
   memberSession(key: string) {
     const token = randomBytes(24).toString("base64url");
     const now = Date.now();
@@ -794,26 +681,22 @@ class Account {
     return token;
   }
 
-  /** The license state that a member of this account's servers sees. */
   async memberLicense(key: string): Promise<LicenseView> {
     return licenseStateSchema.parse(
       (await this.request("GET", "v1/me/license", undefined, {}, this.memberSession(key))).body,
     );
   }
 
-  /** A member opens a new member invitation of the server at this `addServers` index. */
   async memberJoins(key: string, server: number) {
     return this.joinHost(key, `e2e-${this.scenario}-${server}`);
   }
 
-  /** A member opens a new member invitation of the host with this ID. */
   async joinHost(key: string, hostId: string) {
     const invite = await this.request("POST", `v2/remote/hosts/${hostId}/invites`, { role: "member" });
     const token = z.object({ token: z.string() }).parse(invite.body).token;
     return this.request("POST", "v2/remote/invites/accept", { token }, {}, this.memberSession(key));
   }
 
-  /** Moves the test clock and waits until Stripe has run everything that the move made due. */
   async advance(days: number) {
     const clock = await stripe("GET", `/v1/test_helpers/test_clocks/${this.clock}`, clockSchema);
     const target = clock.frozen_time + days * DAY;
@@ -832,7 +715,6 @@ class Account {
   }
 }
 
-/** The `boat` scenario only: the local Chrome, headless, for the Checkout page and the web client. */
 let chrome: Promise<Browser> | null = null;
 const browser = () => {
   chrome ??= chromium.launch({
@@ -847,10 +729,6 @@ const browser = () => {
   return chrome;
 };
 
-/**
- * Pays a Checkout page with the Stripe test card and waits for the return to the Worker. Stripe shows
- * the form in an embedded frame, or in the page itself: the field IDs are different.
- */
 async function payCheckout(url: string, returnOrigin: string, screenshot: string) {
   const context = await (await browser()).newContext();
   try {
@@ -872,7 +750,6 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
           number: "#payment-numberInput",
           expiry: "#payment-expiryInput",
           cvc: "#payment-cvcInput",
-          // Checkout asks for the full billing address only when the payment needs it.
           name: "#billingAddress-nameInput, #payment-nameInput",
           country: "#billingAddress-countryInput, #payment-countryInput",
           line1: "#billingAddress-addressLine1Input",
@@ -895,7 +772,6 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
           terms: "#termsOfServiceConsentCheckbox",
           submit: "hosted-payment-submit-button",
         };
-    // With more than one payment method, Checkout shows the card fields after the card choice.
     if (embedded) {
       if (!(await form.locator(id.number).isVisible())) await form.getByText("Card", { exact: true }).first().click();
     } else if (await radio.isVisible()) await radio.check({ force: true });
@@ -904,7 +780,6 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     await form.locator(id.cvc).fill("123");
     const country = form.locator(id.country).first();
     if (await country.count()) await country.selectOption("PL");
-    // The fields of the address depend on the country, so fill only the ones that the page shows.
     for (const [field, value] of [
       [id.name, "Stripe E2E"],
       [id.line1, "Marszalkowska 1"],
@@ -927,7 +802,6 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
   }
 }
 
-// Keeps each peer connection of the page, so the check can read the selected ICE candidates.
 const PEER_TRACE = `(() => {
   const Native = window.RTCPeerConnection;
   window.__e2ePeers = [];
@@ -965,11 +839,6 @@ const peersSchema = z.array(
   }),
 );
 
-/**
- * Opens the web client as the account, waits until it shows the server and a peer connection is
- * connected, and then waits for the server's next activity report. With `holdMs`, it keeps the focused
- * page open with no input for that long and reads the server row each minute. Closing the page ends the use.
- */
 async function connectWeb(account: Account, serverId: string, name: string, screenshot: string, holdMs = 0) {
   const context = await (await browser()).newContext();
   try {
@@ -990,7 +859,6 @@ async function connectWeb(account: Account, serverId: string, name: string, scre
       process.stdout.write(`page: ${page.url()}\n${snapshot}\nconsole:\n${consoleLines.join("\n")}\n`);
       throw error;
     };
-    // The rail names the button "{name} server", followed by its status labels.
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
     const label = new RegExp(`^${escaped} server(,|$)`, "u");
     await page.getByRole("button", { name: label }).waitFor({ timeout: 180_000 }).catch(fail);
@@ -1036,12 +904,10 @@ async function connectWeb(account: Account, serverId: string, name: string, scre
 }
 
 const priceIds = new Map<string, string>();
-/** The active Price of a server plan and interval. */
 function priceId(plan: string, interval: string): Promise<string> {
   return priceIdByLookupKey(`openbot_${plan}_${interval}`);
 }
 
-/** The active Price of a license plan. Team monthly keeps the key of the license from before the tiers. */
 function licensePriceId(plan: LicensePlan): Promise<string> {
   return priceIdByLookupKey(licenseLookupKey(plan));
 }
@@ -1071,7 +937,6 @@ async function invoices(subscriptionId: string) {
   }));
 }
 
-/** The PaymentIntent that paid the latest invoice of the plan. */
 async function paymentIntent(subscriptionId: string) {
   const invoice = (await subscription(subscriptionId)).latest_invoice;
   if (!invoice) throw new Error("No invoice");
@@ -1081,9 +946,7 @@ async function paymentIntent(subscriptionId: string) {
   return { invoice, intent };
 }
 
-/** Waits until Stripe sent the event of this type about this object and the Worker applied it. */
 async function applied(type: string, objectId: string, timeoutMs = 120_000) {
-  // A test refund fails about two minutes after Stripe accepts it.
   const event = await waitFor(
     `${type} ${objectId}`,
     async () => {
@@ -1101,7 +964,6 @@ async function applied(type: string, objectId: string, timeoutMs = 120_000) {
   return event.id;
 }
 
-/** The sales facts of an invoice. The Worker records them only when OpenPanel is set. */
 function facts(invoiceId: string) {
   return d1(
     `SELECT source_key, fact_type, attributes_json FROM billing_sales_facts
@@ -1112,7 +974,6 @@ function facts(invoiceId: string) {
 
 const factAttributesSchema = z.object({ product: z.string().optional(), interval: z.string().optional() });
 
-/** The product and interval of a sales fact, or null for a value that is not JSON. */
 function factAttributes(json: string) {
   try {
     return factAttributesSchema.safeParse(JSON.parse(json)).data ?? null;
@@ -1121,7 +982,6 @@ function factAttributes(json: string) {
   }
 }
 
-/** True when the Worker records sales facts: the paid invoice gets its fact soon after the payment. */
 async function recordsSales(invoiceId: string) {
   return waitFor(
     "payment fact",
@@ -1151,7 +1011,6 @@ function record(scenario: Scenario, step: string, pass: boolean, evidence: unkno
   print(`${pass ? "PASS" : "FAIL"} [${scenario}] ${step}`);
 }
 
-/** The row once the Worker applied the paid plan. With a fake boat key the provision ends in a provider error. */
 function provisioned(account: Account, serverId: string) {
   return waitFor("provisioned", async () => {
     const row = account.row(serverId);
@@ -1170,7 +1029,6 @@ function rowWhere(account: Account, serverId: string, label: string, test: (row:
   );
 }
 
-/** The claim that the Worker records when it sends the welcome email of an account. */
 function welcomeClaims(account: Account) {
   return d1(
     `SELECT event_id, type, received_at FROM billing_webhook_events
@@ -1179,10 +1037,6 @@ function welcomeClaims(account: Account) {
   );
 }
 
-/**
- * The claim that the Worker records when it sends a license email. The welcome and ended claims name the
- * subscription, the failed payment claim names the invoice.
- */
 function licenseEmailClaims(kind: LicenseEmailKind, id: string) {
   return d1(
     `SELECT event_id, type, received_at FROM billing_webhook_events
@@ -1193,10 +1047,6 @@ function licenseEmailClaims(kind: LicenseEmailKind, id: string) {
 
 const observabilitySchema = z.object({ result: z.object({ rows: z.array(z.tuple([z.string()])) }) });
 
-/**
- * The results of one billing email that a local Worker logged since `since`: one line for each send.
- * Only `bun run dev:api` has this log query, so `--remote-d1` reads nothing.
- */
 async function billingEmailSends(
   api: string,
   since: number,
@@ -1232,7 +1082,6 @@ function licenseWhere(account: Account, label: string, test: (state: LicenseView
   );
 }
 
-/** The license rows in `billing_subscriptions`. There must be none: a license has its own table. */
 function licenseInPlans(subscriptionId: string) {
   return d1(
     `SELECT stripe_subscription_id FROM billing_subscriptions WHERE stripe_subscription_id = ${quote(subscriptionId)}`,
@@ -1240,7 +1089,6 @@ function licenseInPlans(subscriptionId: string) {
   ).length;
 }
 
-/** The Checkout Session ID in a Checkout page URL. */
 function checkoutSessionId(url: string) {
   const id = /\/(cs_test_[A-Za-z0-9]+)/u.exec(url)?.[1];
   if (!id) throw new Error("No Checkout Session ID in the URL");
@@ -1251,7 +1099,6 @@ const openSessionsSchema = z.object({
   data: z.array(z.object({ id: z.string(), metadata: z.record(z.string(), z.string()).nullable() })),
 });
 
-/** The open license Checkout pages of the account's customer. */
 async function openLicensePages(account: Account) {
   const listed = await stripe("GET", "/v1/checkout/sessions", openSessionsSchema, {
     customer: account.customer,
@@ -1265,12 +1112,10 @@ async function expireCheckout(url: string) {
   await stripe("POST", `/v1/checkout/sessions/${checkoutSessionId(url)}/expire`, idSchema).catch(() => null);
 }
 
-/** The amount of the latest invoice of a subscription. */
 async function latestInvoiceAmount(subscriptionId: string) {
   return (await invoices(subscriptionId))[0]?.amount ?? null;
 }
 
-/** The Price of a license plan, with its tiers or its amount in each currency. */
 async function licensePrice(plan: LicensePlan): Promise<LicensePriceView> {
   const expand: Record<string, string> =
     plan.tier === "team"
@@ -1279,12 +1124,6 @@ async function licensePrice(plan: LicensePlan): Promise<LicensePriceView> {
   return stripe("GET", `/v1/prices/${await licensePriceId(plan)}`, licensePriceSchema, expand);
 }
 
-/**
- * True when the Price sells the plan as `stripe-bootstrap.ts` makes it: its lookup key and metadata, and
- * the amounts of `LICENSE_PLAN_PRICES`. A Team Price is graduated: the base for the included users, then
- * each extra user. A 1-user Price is a flat amount. EUR, USD and PLN are in every Price; BRL is checked
- * when the Price has it (`stripe-bootstrap.ts --brl`). The Team BRL tiers are not expanded.
- */
 function licensePriceMatches(price: LicensePriceView, plan: LicensePlan): boolean {
   if (
     !price.active ||
@@ -1327,13 +1166,11 @@ function licensePriceMatches(price: LicensePriceView, plan: LicensePlan): boolea
   );
 }
 
-/** The Price and quantity of the license item of a subscription in Stripe. A server order also has a server item. */
 async function licenseItem(subscriptionId: string) {
   const { items } = await stripe("GET", `/v1/subscriptions/${subscriptionId}`, licenseItemSchema);
   return items.data.find((item) => LICENSE_LOOKUP_KEYS.includes(item.price.lookup_key ?? "")) ?? null;
 }
 
-/** The tier and interval that D1 stores for a license. */
 function licenseRow(subscriptionId: string) {
   return (
     d1(
@@ -1343,13 +1180,11 @@ function licenseRow(subscriptionId: string) {
   );
 }
 
-/** The member limit that the account's host list shows for this host. */
 async function hostMemberLimit(account: Account, hostId: string) {
   const listed = hostListSchema.safeParse((await account.request("GET", "v2/remote/hosts")).body).data;
   return listed?.hosts.find((host) => host.hostId === hostId)?.memberLimit ?? null;
 }
 
-/** The `legacy_member_limits` value of a hosted server row. */
 function legacyMemberLimits(serverId: string) {
   return (
     d1(
@@ -1361,7 +1196,6 @@ function legacyMemberLimits(serverId: string) {
 
 type CheckoutView = z.infer<typeof checkoutLinesSchema>;
 
-/** The VAT facts of a Checkout page, for the report. */
 function vatView(session: CheckoutView | null) {
   return (
     session && {
@@ -1373,7 +1207,6 @@ function vatView(session: CheckoutView | null) {
   );
 }
 
-/** The page charges the VAT rate of `VAT_TAX_RATE` on top of its subtotal. */
 function addsPolishVat(session: CheckoutView | null) {
   const view = vatView(session);
   return (
@@ -1383,13 +1216,11 @@ function addsPolishVat(session: CheckoutView | null) {
   );
 }
 
-/** The page charges no VAT, for the `treatment` that the billing details give. */
 function addsNoVat(session: CheckoutView | null, treatment: "reverse" | "none") {
   const view = vatView(session);
   return view?.treatment === treatment && view.tax === 0;
 }
 
-/** The Checkout Session of a license page, with its line and metadata. */
 function licenseSession(url: string) {
   return stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, checkoutLinesSchema, {
     "expand[0]": "line_items",
@@ -1397,7 +1228,6 @@ function licenseSession(url: string) {
   });
 }
 
-/** The discount state of a Checkout page: the code field, the applied promotion codes and the discount. */
 async function promotionView(url: string) {
   if (!url) return null;
   const session = await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, promotionSessionSchema);
@@ -1410,10 +1240,6 @@ async function promotionView(url: string) {
   };
 }
 
-/**
- * A copy of the live Brazil partner code: 20% once on the server and storage Products only, and only in BRL
- * (a minimum amount of 1 in BRL). Its code is in lower case, as the live code is.
- */
 async function brazilPromotionLink(account: Account, suffix: string) {
   const coupon = await stripe("POST", "/v1/coupons", idSchema, {
     percent_off: "20",
@@ -1563,14 +1389,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       renewWhileDue.status === 200 && renewWhileDue.checkoutUrl === null,
       renewWhileDue,
     );
-    // The user pays the open invoice with a working card, as in the Customer Portal.
     const good = await account.useCard("pm_card_visa");
     const current = await subscription(sub);
     if (!current.latest_invoice) throw new Error("No open invoice");
     await stripe("POST", `/v1/invoices/${current.latest_invoice}/pay`, idSchema, { payment_method: good });
     const recovered = await planWhere(account, sub, "active again", (plan) => plan.status === "active");
     record("failed-renewal", "paying the open invoice makes the plan active again", true, recovered);
-    // Now the renewal fails until Stripe gives up.
     await account.useCard("pm_card_chargeCustomerFail");
     const statuses: { afterDays: number; stripeStatus: string }[] = [];
     let final: string | null = null;
@@ -1607,7 +1431,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     record("cancel-at-period-end", "the Worker gives a Portal cancel page", portal.status === 200, {
       host: portal.url ? new URL(portal.url).host : null,
     });
-    // The Portal with mode `at_period_end` makes the same change.
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { cancel_at_period_end: "true" });
     const cancelling = await planWhere(account, sub, "cancelAtPeriodEnd", (plan) => plan.cancelAtPeriodEnd);
     const row = account.row(server.serverId);
@@ -1620,7 +1443,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { cancel_at_period_end: "false" });
     const undone = await planWhere(account, sub, "undo", (plan) => !plan.cancelAtPeriodEnd);
     record("cancel-at-period-end", "undo the cancel: the plan continues", undone.status === "active", undone);
-    // A cancel at a set time, as the Portal can store it, shows the same as a cancel at the period end.
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, {
       cancel_at: String((undone.currentPeriodEnd ?? 0) / 1_000),
     });
@@ -1642,8 +1464,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await provisioned(account, server.serverId);
     const item = (await subscription(sub)).items.data[0]?.id;
     if (!item) throw new Error("No subscription item");
-    // A plan change that an operator makes in Stripe (the Portal has no plan change): a higher price now,
-    // charged now (`always_invoice`).
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, {
       "items[0][id]": item,
       "items[0][price]": await priceId("pro", "month"),
@@ -1663,7 +1483,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     });
     const yearly = await rowWhere(account, server.serverId, "yearly", (row) => row.billing_interval === "year");
     record("plan-change", "month to year: the server interval follows", yearly.plan === "pro", yearly);
-    // A downgrade in Stripe: a schedule changes the price at the period end.
     const schedule = await stripe("POST", "/v1/subscription_schedules", scheduleSchema, { from_subscription: sub });
     const phase = schedule.phases[0];
     if (!phase) throw new Error("No schedule phase");
@@ -1692,11 +1511,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
   },
 
-  /**
-   * Storage tiers: a boat server has none. On a VPS of the operator the owner buys tier 1, then tier 2.
-   * Each purchase is invoiced at once, a refused payment changes nothing, and the renewal charges the plan
-   * and the add-on. The check gives the row an operator host in D1, as a move to a VPS does.
-   */
   async "storage-tier"(account) {
     const { server } = await account.createServer("Storage");
     const sub = await account.pay(server.serverId);
@@ -1755,7 +1569,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         { status: again.status, code: again.code },
       );
 
-      // The new card goes on the subscription too, as a payment method update in the Portal does.
       const failing = await account.useCard("pm_card_chargeCustomerFail");
       await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { default_payment_method: failing });
       const refused = await account.buyStorage(sub, 2);
@@ -1798,7 +1611,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         { renewal, plan: await account.storagePlan(sub) },
       );
     } finally {
-      // The server goes back to its sandbox, so that the scenario end deletes it as a boat server.
       d1(
         `UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
            operator_host = NULL WHERE server_id = ${id}`,
@@ -1871,7 +1683,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       removed.status === 204 && page.status === "expired",
       { status: removed.status, page: page.status },
     );
-    // A payment that arrives after the delete (a page paid at the same moment) is cancelled.
     const late = await account.pay(unpaid.server.serverId);
     await waitFor("late cancelled", async () => (await subscription(late)).status === "canceled");
     record("delete", "a payment for a deleted server is cancelled at once", true, {
@@ -1900,7 +1711,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await stripe("DELETE", `/v1/test_helpers/test_clocks/${victim.clock}`, idSchema).catch(() => null);
   },
 
-  /** The real Customer Portal pages: a person (or Playwright) uses the printed pages while this waits. */
   async portal(account) {
     const { server } = await account.createServer("Portal");
     const sub = await account.pay(server.serverId);
@@ -1928,8 +1738,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       stored.cancel_at_period_end ? { cancel_at_period_end: "false" } : { cancel_at: "" },
     );
     await planWhere(account, sub, "undo", (plan) => !plan.cancelAtPeriodEnd);
-    // An app from before the storage tiers asks for the plan change page. It gets the Portal home, which
-    // has no plan change.
     const update = await account.portal("update", sub);
     const configuration = await stripe("GET", "/v1/billing_portal/configurations", portalConfigurationSchema, {
       is_default: "true",
@@ -1966,7 +1774,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
   },
   async refund(account) {
-    // A partial refund keeps the plan. The second refund makes the payment refunded in full and ends it.
     const { server } = await account.createServer("Refund");
     const sub = await account.pay(server.serverId);
     await provisioned(account, server.serverId);
@@ -2004,7 +1811,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     } else {
       print("SKIP [refund] sales facts: the Worker has no OpenPanel client");
     }
-    // This test card makes the refund fail after Stripe accepts it. The refund is partial, so the plan stays.
     const second = await account.createServer("Refund fails");
     await account.useCard("pm_card_refundFail");
     const secondSub = await account.pay(second.server.serverId);
@@ -2024,7 +1830,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
     if (sales) {
       const recorded = facts(secondPaid.invoice);
-      // Stripe says this refund starts as succeeded, so both facts exist; the order of their events can vary.
       record(
         "refund",
         "a failed refund is a refund_failed fact",
@@ -2036,7 +1841,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
 
   async dispute(account) {
     const { server } = await account.createServer("Dispute");
-    // This test card makes the issuer open a dispute soon after the payment.
     await account.useCard("pm_card_createDispute");
     const sub = await account.pay(server.serverId);
     const paid = await paymentIntent(sub);
@@ -2054,7 +1858,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       stripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
       { dispute: disputed.status, stripeStatus: stripeSub.status, row: ended },
     );
-    // This evidence text makes the test dispute close as lost.
     await stripe("POST", `/v1/disputes/${disputed.id}`, idSchema, {
       "evidence[uncategorized_text]": "losing_evidence",
       submit: "true",
@@ -2074,7 +1877,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     }
   },
 
-  // The Worker claims the welcome email before it sends it, and logs one line for each send.
   async welcome(account) {
     const since = Date.now();
     const first = await account.createServer("Welcome");
@@ -2126,7 +1928,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         },
         600_000,
       );
-    /** The real Checkout page with a test card, or a subscription with the server metadata. */
     let pages = 0;
     const pay = async (url: string | null | undefined) => {
       if (!REAL_CHECKOUT) return account.pay(serverId);
@@ -2136,7 +1937,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       print(`Checkout paid; returned to ${returned}`);
       return openPlan();
     };
-    // The deployed Worker gets the boat webhooks and runs the cron each minute. A local Worker needs a push.
     const tick = () =>
       REMOTE_D1
         ? Promise.resolve()
@@ -2199,8 +1999,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       );
       const output = await serviceActive(sandboxId);
       record("boat", "openbot.service is active in the VM", output.startsWith("active"), output.split("\n"));
-      // The claim works one time, so a server that did not store its session cannot sign in again. The
-      // app signs in before it starts the host, so 60 seconds of a clean log is a complete start.
       const restart = await boat("POST", `/sandboxes/${sandboxId}/commands`, {
         command: [
           'test -s "$HOME/.config/OpenBot/openbot-central-auth-v1.bin" || { echo "no stored session"; exit 1; }',
@@ -2221,7 +2019,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         output: restarted,
       });
 
-      // The focused page sends `focus-use-v1` pings and no input. The idle stop would come after 15 to 20 minutes.
       const web = await connectWeb(account, serverId, name, "boat-e2e-web-connected.png", 20 * 60_000);
       record(
         "boat",
@@ -2230,7 +2027,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         web,
       );
       const reports = new Set(web.held.map((sample) => sample.lastActiveAt).filter((at) => at !== null));
-      // Without focus the page sends no ping, so a failure below would not be about the server.
       record(
         "boat",
         "the held web page has focus",
@@ -2244,7 +2040,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         { reports: reports.size, held: web.held },
       );
 
-      // The page is closed, so the server reports no use. It stops 15 minutes after its last use.
       const idleSince = Date.now();
       const idle = await rowWhere(
         account,
@@ -2278,7 +2073,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         { status: woken.status, row: awake, web: again },
       );
 
-      // A plan change: Standard (default) to Pro (large). The server stops and resumes on the new type.
       const sub = await openPlan();
       const item = (await subscription(sub)).items.data[0]?.id;
       if (!item) throw new Error("No subscription item");
@@ -2300,7 +2094,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         { row: resized, boat: resizedBoat, web: resizedWeb },
       );
 
-      // The plan ends now: the server stops with plan_ended, and the VM stays.
       await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
       const ended = await rowWhere(
         account,
@@ -2325,7 +2118,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         code: refused.code,
       });
 
-      // Renew: a new plan starts the same VM again.
       const renew = await account.checkout(serverId);
       await pay(renew.checkoutUrl);
       const renewed = await runningRow("renewed");
@@ -2522,7 +2314,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       },
     );
 
-    // A license that Stripe has but D1 does not, as before its webhook arrives.
     const sub = await account.buyLicense(5);
     await licenseWhere(account, "license active", (state) => state.license?.status === "active");
     d1(`DELETE FROM licenses WHERE user_id = ${quote(account.id)}`, z.unknown());
@@ -2543,8 +2334,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-users"(account) {
-    // 3 members on one server: the license counts 4 people with the owner. Each count stays at most
-    // LICENSE_MAX_USERS (10).
     account.addServers([{ name: "Office", members: ["a", "b", "c"].map((key) => ({ key })) }]);
     const sub = await account.buyLicense(6);
     await licenseWhere(account, "license active", (state) => state.license?.users === 6);
@@ -2619,8 +2408,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-limit"(account) {
-    // Servers with no plan take as many active members as the license has users, so the count across
-    // the owner's servers stops a join. The owner and a, b, c, lab use all 5 users.
     account.addServers([
       { name: "Office", members: [{ key: "a" }] },
       { name: "Studio", members: [{ key: "b" }, { key: "gone", active: false }] },
@@ -2793,7 +2580,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       return list.find((invoice) => invoice.reason === "subscription_cycle" && invoice.status === "paid") ?? null;
     });
     if (!REMOTE_D1) {
-      // The webhook of the paid renewal arrives after the invoice is paid. The welcome send is the only line.
       await licenseWhere(account, "renewal stored", (state) => (state.license?.currentPeriodEnd ?? 0) > firstPeriodEnd);
       const sends = await billingEmailSends(account.api, since, "license email");
       record(
@@ -2992,7 +2778,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-starter"(account) {
-    // A server with no plan takes as many members as the license has users: here only the owner.
     account.addServers([{ name: "Solo", members: [] }]);
     const sub = await account.buyLicense(1, "eur", STARTER_MONTH);
     const bought = await licenseWhere(account, "license active", (state) => state.license?.status === "active");
@@ -3081,7 +2866,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { license: bought.license, invoices: paid },
     );
 
-    // The server plan ends. Its sync moves the license to the Starter Price with no proration.
     await stripe("DELETE", `/v1/subscriptions/${planSub}`, idSchema);
     await rowWhere(account, server.serverId, "plan ended", (row) => row.desired_state === "stopped");
     const moved = await waitFor(
@@ -3133,7 +2917,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const standardMembers = memberLimitForPlan("standard");
     const starterPlan = await account.orderServer("Solo server", "starter", team(LICENSE_INCLUDED_USERS));
     const tooMany = await account.orderServer("Big server", "standard", team(standardMembers + 1));
-    // The message names the field, so a refused name cannot pass for a refused license.
     const licenseRefused = (response: { status: number; body: unknown }) =>
       response.status === 400 &&
       z.object({ error: z.object({ code: z.string(), message: z.string() }) }).safeParse(response.body).data?.error
@@ -3370,7 +3153,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async "license-legacy-request"(account) {
-    // The body of an app from before the tiers: no tier and no interval.
     const opened = await account.request("POST", "v1/me/license/checkout", { users: 5, currency: "eur" });
     const url = licenseCheckoutSchema.safeParse(opened.body).data?.url ?? "";
     const session = url ? await licenseSession(url) : null;
@@ -3493,7 +3275,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   async "license-member-limits"(account) {
     const fresh = await account.createServer("Starter now");
     const freshSub = await account.pay(fresh.server.serverId);
-    // Until the webhook stores the plan, the Worker takes the first server as unpaid and reuses it.
     await planWhere(account, freshSub, "plan", () => true);
     const legacy = await account.createServer("Starter before");
     const legacySub = await account.pay(legacy.server.serverId);
@@ -3507,9 +3288,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       written.fresh === 0 && written.legacy === 0,
       written,
     );
-    // The migration gives 1 to each hosted server row from before it. This row stands for one of them.
     d1(`UPDATE hosted_servers SET legacy_member_limits = 1 WHERE server_id = ${quote(legacyId)}`, z.unknown());
-    // Both servers pay Standard. These rows stand for Starter plans from before the member limits.
     d1(
       `UPDATE billing_subscriptions SET plan = 'starter'
        WHERE stripe_subscription_id IN (${quote(freshSub)}, ${quote(legacySub)})`,
@@ -3540,13 +3319,11 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { memberLimit: legacyLimit, joins: joins.map((join) => ({ status: join.status, code: join.code })) },
     );
 
-    // Both servers go back to Standard, the plan that they pay in Stripe.
     d1(
       `UPDATE billing_subscriptions SET plan = 'standard'
        WHERE stripe_subscription_id IN (${quote(freshSub)}, ${quote(legacySub)})`,
       z.unknown(),
     );
-    // New members join until the server is full, then one more: each join passes but the last.
     const fill = async (hostId: string, prefix: string, active: number, limit: number) => {
       const results = [];
       for (let index = active; index <= limit; index += 1)
@@ -3630,7 +3407,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { users: more.status, join: outcome(sixth), memberLimit: sixLimit },
     );
 
-    // A custom limit comes before the license, but the license still refuses a join after its users.
     const now = Date.now();
     d1(
       `INSERT INTO server_member_limits(server_id, owner_user_id, member_limit, created_at, updated_at)
@@ -3647,8 +3423,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { memberLimit: customLimit, join: outcome(overCustom) },
     );
 
-    // A self-hosted host can keep a plan from before the license. With no hosted row, Starter has its
-    // legacy limit of 3, and the larger license gives the limit.
     const legacyPlan = `sub_e2e_${account.scenario}_legacy`;
     d1(
       `INSERT INTO billing_subscriptions(stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval,
@@ -3863,6 +3637,34 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: consumer.status, vat: vatView(consumerPage) },
     );
 
+    const asked = createdSchema.safeParse(
+      (await account.orderServer("Early start server", "standard", undefined, true)).body,
+    ).data;
+    const askedPage = asked?.checkoutUrl ? await licenseSession(asked.checkoutUrl) : null;
+    const askedAt = askedPage?.metadata?.[EARLY_START_METADATA];
+    const reopened = asked ? await account.checkout(asked.server.serverId) : null;
+    const reopenedPage = reopened?.checkoutUrl ? await licenseSession(reopened.checkoutUrl) : null;
+    const notTrue = createdSchema.safeParse(
+      (await account.orderServer("No early start server", "standard", undefined, "yes")).body,
+    ).data;
+    const notTruePage = notTrue?.checkoutUrl ? await licenseSession(notTrue.checkoutUrl) : null;
+    record(
+      "vat",
+      "an early start request is on the page with its time, a reopened page keeps the same time, and a page with no request or a value other than true has none",
+      askedAt !== undefined &&
+        Number.isFinite(Date.parse(askedAt)) &&
+        reopenedPage?.metadata?.[EARLY_START_METADATA] === askedAt &&
+        consumerPage?.metadata?.[EARLY_START_METADATA] === undefined &&
+        notTruePage !== null &&
+        notTruePage.metadata?.[EARLY_START_METADATA] === undefined,
+      {
+        asked: askedPage?.metadata,
+        reopened: reopenedPage?.metadata,
+        none: consumerPage?.metadata,
+        notTrue: notTruePage?.metadata,
+      },
+    );
+
     const outside = await save({ country: "US" });
     const outsidePage = await page();
     record(
@@ -3881,7 +3683,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { foreignId: foreignId.code, otherPrefix: otherPrefix.code },
     );
 
-    // A real VAT ID of a company in Ireland: the Worker checks it with VIES, which has no test numbers there.
     const company = await save({ country: "IE", vatId: "IE 6388047V" });
     if (company.status === 503 && company.code === "vat_id_unverified") {
       print("SKIP [vat] reverse charge: VIES did not answer");
@@ -3916,8 +3717,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
     );
 
-    // A customer from before the billing details step that never paid has no address. The local Worker
-    // reads BILLING_COUNTRY_REQUIRED from the same shell as this script, else "true" from wrangler.jsonc.
     await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
     const noCountry = await account.checkout(serverId);
     const cleared = await details();
@@ -3941,11 +3740,9 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       );
     }
 
-    // Cloudflare sets CF-IPCountry; a local Worker reads the header that the client sends.
     const located = async (country: string) =>
       (await account.request("GET", "v1/me/billing/details", undefined, { "CF-IPCountry": country })).body;
     const [france, unknownPlace, tor] = [await located("FR"), await located("XX"), await located("T1")];
-    // The desktop app reads the details through the bearer route, not through the browser API.
     const desktop = async () => {
       const response = await fetch(`${account.api}/v1/me/billing/details`, {
         headers: { Authorization: `Bearer ${account.token}`, "CF-IPCountry": "FR" },
@@ -3970,7 +3767,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { france, desktopFrance, unknownPlace, tor, savedFirst, desktopSaved },
     );
 
-    // The One Stop Shop count: a paid invoice of a consumer in Germany adds its net amount, in euro cents.
     const rates = await stripe(
       "GET",
       "/v1/tax_rates",
@@ -3987,7 +3783,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       [`metadata[${VAT_METADATA.treatment}]`]: "standard",
       payment_behavior: "error_if_incomplete",
     });
-    // A plan from before VAT has no rate and no VAT treatment. A change of the details must not add VAT to it.
     const older = await stripe("POST", "/v1/subscriptions", idSchema, {
       customer: account.customer,
       "items[0][price]": await priceId("standard", "month"),
@@ -4006,7 +3801,6 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       );
       return rows[0] ?? null;
     });
-    // Checkout puts the rate on the subscription, so a change of the details must change it there too.
     const subscriptionTax = async (id: string) => {
       const read = await stripe(
         "GET",
@@ -4076,7 +3870,6 @@ async function main(args: string[]) {
   const api = args[args.indexOf("--api") + 1];
   if (!args.includes("--api") || !api) throw new Error("Pass --api <Worker origin>.");
   const chosen = SCENARIOS.filter((scenario) => args.includes(scenario));
-  // A real VM costs money, so `boat` runs only when named.
   const run = chosen.length > 0 ? chosen : SCENARIOS.filter((scenario) => scenario !== "boat");
   if (run.includes("boat") && !process.env.BOAT_API_KEY?.trim())
     throw new Error("BOAT_API_KEY is required for the boat scenario.");
@@ -4096,7 +3889,6 @@ async function main(args: string[]) {
     }
   }
   if (chrome) await (await chrome).close();
-  // Deleting a test clock deletes its customers and subscriptions.
   for (const clock of clocks)
     await stripe("DELETE", `/v1/test_helpers/test_clocks/${clock}`, idSchema).catch(() => null);
   mkdirSync(join(ROOT, ".openbot-build"), { recursive: true });

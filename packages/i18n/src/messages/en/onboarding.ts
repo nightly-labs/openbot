@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("onboarding", {
-  // The saved setup could not be read. Retry, or set up again with no saved state.
   "onboarding.readFailed.title": "OpenBot could not read your setup.",
   "onboarding.readFailed.description":
     "Your local data did not change. Try again. If the problem continues, set up OpenBot again.",

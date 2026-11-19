@@ -1,7 +1,3 @@
-// Server Settings › Agents of this computer: the agent defaults, the default for a message sent to a busy
-// agent, and the own values of the agents. The local window and the `agent-defaults-v1` host route use
-// this, so a remote owner or admin changes the same state as the local Settings.
-
 import {
   type AgentDefaultsOverview,
   type AgentSummary,
@@ -26,7 +22,6 @@ export interface AgentDefaultsSettingsDependencies {
 export interface AgentDefaultsSettingsService {
   read(): AgentDefaultsOverview;
   update(input: UpdateAgentDefaultsInput): Effect.Effect<AgentDefaultsOverview, AgentDefaultsSettingsFailure>;
-  /** Throws `AgentNotFoundError` before any change when an agent of `agentIds` does not exist. */
   setChoice(input: SetAgentDefaultChoiceInput): Effect.Effect<AgentDefaultsOverview, AgentDefaultsSettingsFailure>;
 }
 
@@ -52,8 +47,6 @@ export function createAgentDefaultsSettings({
   agentDefaults,
   busyMessageMode,
 }: AgentDefaultsSettingsDependencies): AgentDefaultsSettingsService {
-  // Each update reads, merges and writes the defaults. Two updates that overlap, such as one from a
-  // phone and one from a desktop, must not merge from the same old value, or the second loses the first.
   const updates = Semaphore.makeUnsafe(1);
 
   function read(): AgentDefaultsOverview {
@@ -71,12 +64,8 @@ export function createAgentDefaultsSettings({
     const previous = agentDefaults.get();
     const modeChanged = mode !== undefined && mode !== busyMessageMode.get().mode;
     const next = { ...previous, ...changes };
-    // The spread keeps the key order of `previous`, so the two texts differ only when a value changed.
     const defaultsChanged = JSON.stringify(next) !== JSON.stringify(previous);
     if (!modeChanged && !defaultsChanged) return read();
-    // The agents that follow a changed default get it at once, as after a change in the local window.
-    // The `agents-changed` event also tells the open Settings of each device to read the defaults again,
-    // also after a failed second write, when the first write is already saved.
     yield* Effect.gen(function* () {
       if (modeChanged && mode !== undefined) yield* rewrap(busyMessageMode.set({ mode }));
       if (defaultsChanged) yield* rewrap(agentDefaults.set(next));

@@ -4,10 +4,8 @@ import { Show } from "solid-js";
 
 export interface BrowserLocalSignInDialogProps {
   open: boolean;
-  /** The host name of the tab's page, such as `x.com`. */
   site: string;
   server: string;
-  /** False after the person closes the sign-in window. */
   windowOpen: boolean;
   pending: boolean;
   error?: string | undefined;
@@ -16,10 +14,6 @@ export interface BrowserLocalSignInDialogProps {
   onDone: () => Promise<void>;
 }
 
-/**
- * The step of a sign-in on this computer for a tab of a server's browser. The window on this computer
- * shows the site; this dialog stays in OpenBot until the person selects Done or Cancel.
- */
 export default function BrowserLocalSignInDialog(props: BrowserLocalSignInDialogProps) {
   const { t } = useText();
   return (

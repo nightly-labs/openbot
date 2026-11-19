@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/connector";
 
 export const messages = {
-  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "כל סוכן במחשב הזה יכול להשתמש במאגרי GitHub, בבעיות ובבקשות המשיכה שלך, וב-gh וב-git.",
@@ -22,9 +21,7 @@ export const messages = {
   "connector.github.repositoriesLoading": "קורא את המאגרים מ-GitHub",
   "connector.github.repositoriesFailed": "OpenBot לא הצליח לקרוא את המאגרים מ-GitHub.",
   "connector.github.noRepositories": "אפליקציית OpenBot GitHub App עדיין לא מותקנת באף מאגר.",
-  // {count} is a number, such as 12.
   "connector.github.moreRepositories": { one: "ועוד מאגר אחד", two: "ועוד שני מאגרים", other: "ועוד {count} מאגרים" },
-  // A badge next to a repository that only its members can see.
   "connector.github.private": "פרטי",
   "connector.github.disconnect": "ניתוק",
   "connector.github.disconnectTitle": "ניתוק GitHub",
@@ -33,29 +30,23 @@ export const messages = {
   "connector.github.expiredDescription": "יש להתחבר שוב בתור @{login} כדי לתת לסוכנים גישה ל-GitHub מחדש.",
   "connector.github.reconnect": "חיבור מחדש",
   "connector.github.actionFailed": "OpenBot לא הצליח לשנות את החיבור ל-GitHub.",
-  // The status next to the name at the top of the GitHub page.
   "connector.github.statusConnected": "מחובר",
   "connector.github.statusConnecting": "מתחבר",
   "connector.github.statusExpired": "פג תוקף",
   "connector.github.accountTitle": "חשבון",
-  // {count} is the number of repositories in the list, such as 12.
   "connector.github.filterPlaceholder": {
     one: "סינון מאגר אחד",
     two: "סינון שני מאגרים",
     other: "סינון {count} מאגרים",
   },
   "connector.github.filterLabel": "סינון מאגרים",
-  // {query} is the text the user typed in the filter.
   "connector.github.noMatch": "אין מאגר שמתאים ל-״{query}״.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.github.stepSignIn": "התחברות",
   "connector.github.stepConnected": "מחובר",
   "connector.github.requestingCode": "OpenBot מבקש קוד מ-GitHub.",
-  // {code} is the code to type on GitHub, such as WDJB-MJHT.
   "connector.github.codeLabel": "קוד {code}",
   "connector.github.failedTitle": "החיבור ל-GitHub נכשל",
   "connector.github.cancelConnecting": "ביטול החיבור ל-GitHub",
-  // {count} is the number of repositories that agents can use.
   "connector.github.connectedSummary": {
     one: "מאגר אחד · כל סוכן במחשב הזה",
     two: "שני מאגרים · כל סוכן במחשב הזה",
@@ -63,13 +54,11 @@ export const messages = {
   },
   "connector.github.done": "סיום",
   "connector.github.later": "מאוחר יותר",
-  // The confirmation before Disconnect. {login} is the GitHub account name, such as octocat.
   "connector.github.disconnectConfirmTitle": "לנתק את GitHub?",
   "connector.github.disconnectConfirmDescription": "הניתוק מסיר את ההתחברות של @{login} מהמחשב הזה.",
   "connector.github.disconnectEffectTools": "כל סוכן מאבד את הכלים של GitHub, את gh ואת git.",
   "connector.github.disconnectEffectRevoke": "לאחר מכן GitHub נפתח, ושם אפשר לבטל את הגישה של OpenBot.",
   "connector.github.disconnectEffectKept": "הצ'אטים, הקבצים והזיכרון של הסוכנים נשארים במחשב הזה.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "כל סוכן ב-{host} יכול להשתמש במאגרי GitHub, בבעיות ובבקשות המשיכה שלך, וב-gh וב-git.",
   "connector.github.connectedSummaryHost": {
@@ -81,19 +70,15 @@ export const messages = {
   "connector.github.disconnectEffectKeptHost": "הצ'אטים, הקבצים והזיכרון של הסוכנים נשארים ב-{host}.",
   "connector.github.keepConnected": "השארת החיבור",
   "connector.github.close": "סגירה",
-  // The last section of an integration page, with the action that removes it.
   "connector.dangerZone": "אזור מסוכן",
   "connector.statusUnknown": "לא ידוע",
   "connector.readFailed": "OpenBot לא הצליח לקרוא את מצב החיבור הזה.",
 
-  // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
-  // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "אפשר לתייג את @OpenBot ב-Slack או לשלוח לו הודעה ישירה. מתזמר Slack פונה לסוכן המתאים ועונה.",
   "connector.slack.statusConnected": "מחובר",
   "connector.slack.statusAttention": "דורש תשומת לב",
-  // {workspace} is the Slack workspace name.
   "connector.slack.summaryConnected": "{workspace} · מתזמר Slack עונה",
   "connector.slack.summaryNoAgent": "{workspace} · אין עדיין סוכן שעונה",
   "connector.slack.attentionTitle": {
@@ -118,7 +103,6 @@ export const messages = {
   "connector.slack.reconnect": "חיבור מחדש",
   "connector.slack.pause": "השהיה",
   "connector.slack.resume": "המשך",
-  // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}: {name}",
   "connector.slack.orchestratorTitle": "מתזמר Slack",
   "connector.slack.orchestratorDescription":
@@ -127,7 +111,6 @@ export const messages = {
   "connector.slack.orchestratorNoneDescription": "יש להוסיף את מתזמר Slack, אחרת Slack לא יקבל תשובה.",
   "connector.slack.inviteNote":
     "OpenBot מצטרף בעצמו לכל ערוץ ציבורי, וגם לכל ערוץ חדש. לערוץ פרטי יש להזמין אותו: /invite @OpenBot.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.slack.stepWorkspace": "סביבת עבודה",
   "connector.slack.stepAgent": "סוכן",
   "connector.slack.connectTitle": "חיבור סביבת עבודה של Slack",
@@ -139,7 +122,6 @@ export const messages = {
   "connector.slack.connectInSlack": "חיבור ב-Slack",
   "connector.slack.connectWaiting": "ממתין ל-Slack. יש לסיים את ההתקנה בדפדפן.",
   "connector.slack.agentStepTitle": "הוספת מתזמר Slack",
-  // {workspace} is the Slack workspace name.
   "connector.slack.agentStepDescription": "הסוכן החדש הזה עונה על כל מה שנשלח אל @OpenBot ב-{workspace}.",
   "connector.slack.orchestratorName": "מתזמר Slack",
   "connector.slack.orchestratorRole": "עונה ב-Slack ופונה לצוות",
@@ -159,28 +141,22 @@ export const messages = {
   "connector.slack.keep": "השארת החיבור",
   "connector.slack.close": "סגירה",
   "connector.slack.addWorkspace": "הוספת סביבת עבודה",
-  // Shown when the page has the maximum number of workspaces.
   "connector.slack.limitReached": {
     one: "אפשר לחבר סביבת עבודה אחת לכל היותר.",
     two: "אפשר לחבר שתי סביבות עבודה לכל היותר.",
     other: "אפשר לחבר {count} סביבות עבודה לכל היותר.",
   },
-  // {count} is the number of Slack workspaces: two or more.
   "connector.slack.summaryMany": {
     one: "סביבת עבודה אחת · מתזמר Slack עונה",
     two: "שתי סביבות עבודה · מתזמר Slack עונה",
     other: "{count} סביבות עבודה · מתזמר Slack עונה",
   },
 
-  // Marketplace > Apps > Discord: a Discord server (a guild) adds the one OpenBot bot, and
-  // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
-  // "Discord server": "server" alone is an OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "אפשר לתייג את @OpenBot בערוץ של שרת Discord. מתזמר Discord פונה לסוכן המתאים ועונה.",
   "connector.discord.statusConnected": "מחובר",
   "connector.discord.statusAttention": "דורש תשומת לב",
-  // {workspace} is the Discord server name.
   "connector.discord.summaryConnected": "{workspace} · מתזמר Discord עונה",
   "connector.discord.summaryNoAgent": "{workspace} · אין עדיין סוכן שעונה",
   "connector.discord.attentionTitle": {
@@ -205,7 +181,6 @@ export const messages = {
   "connector.discord.reconnect": "חיבור מחדש",
   "connector.discord.pause": "השהיה",
   "connector.discord.resume": "המשך",
-  // {action} is a button, such as Pause; {name} is the Discord server name.
   "connector.discord.rowAction": "{action}: {name}",
   "connector.discord.orchestratorTitle": "מתזמר Discord",
   "connector.discord.orchestratorDescription":
@@ -213,7 +188,6 @@ export const messages = {
   "connector.discord.orchestratorNone": "אין עדיין סוכן שעונה",
   "connector.discord.orchestratorNoneDescription": "יש להוסיף את מתזמר Discord, אחרת Discord לא יקבל תשובה.",
   "connector.discord.channelsNote": "OpenBot רואה את הערוצים שהתפקיד שלו יכול לראות.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.discord.stepWorkspace": "שרת Discord",
   "connector.discord.stepAgent": "סוכן",
   "connector.discord.connectTitle": "חיבור שרת Discord",
@@ -224,7 +198,6 @@ export const messages = {
   "connector.discord.connectInDiscord": "חיבור ב-Discord",
   "connector.discord.connectWaiting": "ממתין ל-Discord. יש לסיים את האישור בדפדפן.",
   "connector.discord.agentStepTitle": "הוספת מתזמר Discord",
-  // {workspace} is the Discord server name.
   "connector.discord.agentStepDescription": "הסוכן החדש הזה עונה על כל מה שנשלח אל @OpenBot ב-{workspace}.",
   "connector.discord.orchestratorName": "מתזמר Discord",
   "connector.discord.orchestratorRole": "עונה ב-Discord ופונה לצוות",
@@ -250,40 +223,31 @@ export const messages = {
     two: "אפשר לחבר שני שרתי Discord לכל היותר.",
     other: "אפשר לחבר {count} שרתי Discord לכל היותר.",
   },
-  // {count} is the number of Discord servers: two or more.
   "connector.discord.summaryMany": {
     one: "שרת Discord אחד · מתזמר Discord עונה",
     two: "שני שרתי Discord · מתזמר Discord עונה",
     other: "{count} שרתי Discord · מתזמר Discord עונה",
   },
-  // Who can use OpenBot in one Discord server: the members with one of the chosen Discord roles.
   "connector.discord.accessTitle": "מי יכול להשתמש ב-OpenBot",
   "connector.discord.accessDescription": "OpenBot עונה רק לאנשים האלה. הוא מתעלם מתיוגים של אחרים.",
   "connector.discord.accessEveryone": "כל אחד בשרת",
   "connector.discord.accessEveryoneDescription": "כל מי שיכול לכתוב בערוץ ש-OpenBot רואה יכול לתייג אותו.",
-  // {roles} is a list of Discord role names, such as "Admin and Moderator".
   "connector.discord.accessRoles": "חברים עם {roles}",
   "connector.discord.accessChoose": "בחירת תפקידים",
-  // {workspace} is the Discord server name.
   "connector.discord.accessDialogTitle": "מי יכול להשתמש ב-OpenBot ב-{workspace}?",
   "connector.discord.accessDialogDescription": "אם לא נבחר תפקיד, כל אחד יכול לתייג את OpenBot.",
   "connector.discord.accessLoading": "טוען תפקידים…",
   "connector.discord.accessLoadFailed": "תפקידי Discord לא נטענו",
   "connector.discord.accessNoRoles": "אין בשרת הזה תפקידים לבחירה.",
-  // {role} is the name of a Discord role that the server no longer has.
   "connector.discord.accessRoleDeleted": "{role} (נמחק)",
   "connector.discord.accessSave": "שמירה",
-  // {host} is the joined server's name.
   "connector.discord.accessHostUpdate": "יש לעדכן את OpenBot ב-{host} כדי לבחור תפקידים.",
 
-  // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
-  // Orchestrator agent receives the messages of all chats, asks the team and answers.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "אפשר להוסיף את הבוט של OpenBot לקבוצה ב-Telegram או לפתוח איתו צ'אט ישיר. מתזמר Telegram פונה לסוכן המתאים ועונה.",
   "connector.telegram.statusConnected": "מחובר",
   "connector.telegram.statusAttention": "דורש תשומת לב",
-  // {count} is the number of linked Telegram chats.
   "connector.telegram.summaryConnected": {
     one: "צ'אט אחד · מתזמר Telegram עונה",
     two: "שני צ'אטים · מתזמר Telegram עונה",
@@ -322,7 +286,6 @@ export const messages = {
   "connector.telegram.disconnectAllSummary": "כל הצ'אטים מתנתקים. אי אפשר עוד להגיע לסוכנים שלך דרך הבוט של OpenBot.",
   "connector.telegram.disconnectAllSummaryOrchestrator":
     "כל הצ'אטים מתנתקים. מתזמר Telegram והשיחות שלו נמחקים מ-OpenBot.",
-  // {action} is a button, such as Pause; {name} is the chat name.
   "connector.telegram.rowAction": "{action}: {name}",
   "connector.telegram.linkChat": "קישור צ'אט",
   "connector.telegram.addToGroup": "הוספה לקבוצה",
@@ -333,7 +296,6 @@ export const messages = {
   "connector.telegram.orchestratorNone": "אין עדיין סוכן שעונה",
   "connector.telegram.orchestratorNoneDescription": "יש להוסיף את מתזמר Telegram, אחרת Telegram לא יקבל תשובה.",
   "connector.telegram.mentionNote": "בקבוצה יש לתייג את הבוט או להשיב להודעות שלו. בצ'אט ישיר כל הודעה עוברת לבוט.",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.telegram.stepChat": "צ'אט",
   "connector.telegram.stepAgent": "סוכן",
   "connector.telegram.connectTitle": "קישור צ'אט של Telegram",
@@ -344,7 +306,6 @@ export const messages = {
   "connector.telegram.connectStepReturn": "החלון הזה ממשיך כשהצ'אט מקושר",
   "connector.telegram.connectWaiting": "ממתין ל-Telegram. יש לבחור את הצ'אט ב-Telegram.",
   "connector.telegram.agentStepTitle": "הוספת מתזמר Telegram",
-  // {chat} is the Telegram chat name.
   "connector.telegram.agentStepDescription":
     "הסוכן החדש הזה עונה על ההודעות ל-OpenBot ב-{chat} ובכל צ'אט שיקושר בהמשך.",
   "connector.telegram.orchestratorName": "מתזמר Telegram",
@@ -362,14 +323,11 @@ export const messages = {
   "connector.telegram.removeEffectDeleted": "זה הצ'אט האחרון, ולכן מתזמר Telegram והשיחות שלו נמחקים מ-OpenBot.",
   "connector.telegram.keep": "השארת החיבור",
   "connector.telegram.close": "סגירה",
-  // Marketplace > Apps > WhatsApp: a WhatsApp number links this computer as a device, and the
-  // WhatsApp Orchestrator agent receives the messages of all numbers, asks the team and answers.
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description": "אפשר לקשר מספר WhatsApp למחשב הזה. מתזמר WhatsApp פונה לסוכן המתאים ועונה.",
   "connector.whatsapp.descriptionHost": "אפשר לקשר מספר WhatsApp לשרת הזה. מתזמר WhatsApp פונה לסוכן המתאים ועונה.",
   "connector.whatsapp.statusConnected": "מחובר",
   "connector.whatsapp.statusAttention": "דורש תשומת לב",
-  // {count} is the number of linked WhatsApp numbers.
   "connector.whatsapp.summaryConnected": {
     one: "מספר אחד · מתזמר WhatsApp עונה",
     two: "שני מספרים · מתזמר WhatsApp עונה",
@@ -408,7 +366,6 @@ export const messages = {
   "connector.whatsapp.disconnectAllSummary": "כל המספרים מתנתקים. אי אפשר עוד להגיע לסוכנים שלך דרך WhatsApp.",
   "connector.whatsapp.disconnectAllSummaryOrchestrator":
     "כל המספרים מתנתקים. מתזמר WhatsApp והשיחות שלו נמחקים מ-OpenBot.",
-  // {action} is a button, such as Pause; {name} is the WhatsApp number or a person's name.
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "מספר אישי",
   "connector.whatsapp.ownNumberDescription":
@@ -425,7 +382,6 @@ export const messages = {
   "connector.whatsapp.orchestratorNone": "אין עדיין סוכן שעונה",
   "connector.whatsapp.orchestratorNoneDescription": "יש להוסיף את מתזמר WhatsApp, אחרת WhatsApp לא יקבל תשובה.",
   "connector.whatsapp.note": "במספר האישי שלך יש לכתוב בצ'אט ״הודעה לעצמך״. האנשים שאישרת כותבים למספר.",
-  // The link dialog. The steps show as numbers; screen readers read the names.
   "connector.whatsapp.stepNumber": "מספר",
   "connector.whatsapp.stepAgent": "סוכן",
   "connector.whatsapp.connectTitle": "קישור WhatsApp",
@@ -455,7 +411,6 @@ export const messages = {
   "connector.whatsapp.codeStepDevices": "ב-WhatsApp יש לפתוח מכשירים מקושרים וללחוץ על קישור מכשיר",
   "connector.whatsapp.codeStepPhone": "יש ללחוץ על קישור עם מספר טלפון במקום זאת",
   "connector.whatsapp.codeStepType": "יש להקליד את הקוד הזה בטלפון",
-  // {code} is the pairing code, read one character at a time.
   "connector.whatsapp.codeLabel": "קוד צימוד {code}",
   "connector.whatsapp.copyCode": "העתקת הקוד",
   "connector.whatsapp.codeWaiting": "ממתין לטלפון.",
@@ -466,7 +421,6 @@ export const messages = {
   "connector.whatsapp.failedUnavailable": "OpenBot לא מצליח להגיע ל-WhatsApp. יש לבדוק את החיבור לאינטרנט.",
   "connector.whatsapp.tryAgain": "ניסיון חוזר",
   "connector.whatsapp.agentStepTitle": "הוספת מתזמר WhatsApp",
-  // {number} is the WhatsApp number or its name.
   "connector.whatsapp.agentStepDescription":
     "הסוכן החדש הזה עונה על ההודעות ל-OpenBot ב-{number} ובכל מספר שיקושר בהמשך.",
   "connector.whatsapp.orchestratorName": "מתזמר WhatsApp",
@@ -485,7 +439,6 @@ export const messages = {
   "connector.whatsapp.removeEffectDeleted": "זה המספר האחרון, ולכן מתזמר WhatsApp והשיחות שלו נמחקים מ-OpenBot.",
   "connector.whatsapp.keep": "השארת הקישור",
   "connector.whatsapp.close": "סגירה",
-  // Who can give work through one number: contacts by phone number, and groups.
   "connector.whatsapp.sendersTitle": "מי יכול לכתוב אל {number}",
   "connector.whatsapp.sendersDescription": "אנשי הקשר והקבוצות האלה יכולים לתת עבודה לסוכנים שלך.",
   "connector.whatsapp.sendersEmpty": "רק בעל החשבון יכול לכתוב. אפשר להוסיף איש קשר או קבוצה.",
@@ -500,34 +453,30 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, הרשימה מציגה את מספר הטלפון.",
   "connector.whatsapp.add": "הוספה",
   "connector.whatsapp.groupTitle": "הוספת קבוצה",
-  "connector.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "connector.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "connector.whatsapp.groupSearch": "חיפוש קבוצות",
   "connector.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",
   "connector.whatsapp.groupsEmpty": "המספר הזה לא נמצא באף קבוצה.",
   "connector.whatsapp.groupsNoMatch": "אין קבוצה בשם הזה.",
   "connector.whatsapp.groupAdded": "נוספה",
-  // People who wrote to a number only for OpenBot and got a code to give the owner.
   "connector.whatsapp.requestsTitle": "בקשות עבור {number}",
   "connector.whatsapp.requestsDescription": "האנשים האלה כתבו למספר וקיבלו קוד. יש לאשר אדם רק אם מסר לך את אותו קוד.",
   "connector.whatsapp.requestsEmpty": "אין בקשות.",
-  // {code} is the 6-character code; {number} is the person's phone number, partly hidden.
   "connector.whatsapp.requestDetail": "קוד {code} · {number}",
   "connector.whatsapp.approve": "אישור",
   "connector.whatsapp.deny": "דחייה",
-  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
   "connector.onePassword.title": "1Password",
   "connector.onePassword.description":
     "אפשר לשתף עם OpenBot כספת ייעודית של 1Password דרך חשבון שירות, כדי שסוכנים יוכלו להתחבר לאתרים בדפדפן של OpenBot.",
   "connector.onePassword.howItWorks":
     "החיבור מגדיר כספת בשם ״Shared with OpenBot״ בחשבון 1Password שלך וחשבון שירות שיכול לקרוא רק את הכספת הזו. OpenBot ממלא פרטי כניסה שמורים בדפדפן שלו במחשב הזה, ולכן משותפים רק הפריטים שהעברת לכספת הזו. סוכנים אף פעם לא רואים סיסמה.",
   "connector.onePassword.connect": "חיבור 1Password",
-  // The three setup steps before a connection, each with the one button it needs.
   "connector.onePassword.setupTitle": "הגדרה",
   "connector.onePassword.stepCliTitle": "התקנת 1Password CLI",
   "connector.onePassword.stepCliChecking": "מחפש את 1Password CLI במחשב הזה",
   "connector.onePassword.stepCliInstalling": "מוריד את 1Password CLI מ-1Password",
-  // {version} is a version number, such as 2.39.0.
   "connector.onePassword.stepCliReady": "גרסה {version} מותקנת.",
   "connector.onePassword.stepCliMissing": "OpenBot מוריד אותו מ-1Password לתיקייה משלו. אין צורך בסיסמת מנהל.",
   "connector.onePassword.stepCliManual":
@@ -543,7 +492,6 @@ export const messages = {
   "connector.onePassword.stepVaultTitle": "יצירת הכספת המשותפת",
   "connector.onePassword.stepVaultDescription":
     "OpenBot יוצר את הכספת ״Shared with OpenBot״ וחשבון שירות שיכול רק לקרוא אותה. 1Password מבקש ממך לאשר.",
-  // The last row of the setup steps: the other way to connect, without the CLI.
   "connector.onePassword.useTokenDescription": "במקום השלבים האלה, אפשר להדביק אסימון של חשבון שירות מ-1Password.com.",
   "connector.onePassword.useTokenAction": "שימוש באסימון",
   "connector.onePassword.tokenLabel": "אסימון חשבון שירות",
@@ -558,7 +506,6 @@ export const messages = {
   "connector.onePassword.vaultDescription":
     "כדי לאפשר לסוכנים להתחבר עם פרטי כניסה, יש להעביר אותם לכספת הזו ב-1Password. כדי להפסיק, יש להסיר אותם.",
   "connector.onePassword.loginsLoading": "קורא את פרטי הכניסה מ-1Password",
-  // {count} is a number, such as 3.
   "connector.onePassword.loginCount": { one: "כניסה אחת", two: "שתי כניסות", other: "{count} כניסות" },
   "connector.onePassword.disconnect": "ניתוק",
   "connector.onePassword.disconnectTitle": "ניתוק 1Password",
@@ -567,7 +514,6 @@ export const messages = {
   "connector.onePassword.actionFailed": "OpenBot לא הצליח לשנות את החיבור ל-1Password.",
   "connector.onePassword.statusConnected": "מחובר",
   "connector.onePassword.statusConnecting": "מתחבר",
-  // The same page for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.onePassword.descriptionHost":
     "אפשר לשתף עם OpenBot ב-{host} כספת ייעודית של 1Password דרך חשבון שירות, כדי שסוכנים ב-{host} יוכלו להתחבר לאתרים בדפדפן שלו.",
   "connector.onePassword.howItWorksHost":
@@ -603,7 +549,6 @@ export const messages = {
   "connector.bitwarden.folderTitle": "תיקייה משותפת",
   "connector.bitwarden.folderDescription":
     "כדי לאפשר לסוכנים להתחבר עם פרטי כניסה, יש להעביר אותם לתיקייה הזו ב-Bitwarden. כדי להפסיק, יש להסיר אותם.",
-  // The exact folder name that OpenBot looks for in the vault. Keep it in English.
   "connector.bitwarden.folderName": "Shared with OpenBot",
   "connector.bitwarden.folderKind": "תיקייה ב-Bitwarden",
   "connector.bitwarden.clientId": "client_id של מפתח ה-API",
@@ -618,14 +563,12 @@ export const messages = {
   "connector.protonPass.moreWays": "דרכים נוספות להתחבר",
   "connector.protonPass.useKey": "שימוש במפתח גישה",
   "connector.protonPass.keyLabel": "מפתח גישה",
-  // A Proton Pass access key starts with pst_.
   "connector.protonPass.keyPlaceholder": "pst_…",
   "connector.protonPass.setupTitle": "הגדרה",
   "connector.protonPass.setupDescription":
     "החיבור פותח את ההתחברות של Proton בדפדפן. לאחר מכן OpenBot יוצר את הכספת המשותפת ושומר רק מפתח לקריאה בלבד עבורה.",
   "connector.protonPass.setupDescriptionHost":
     "החיבור פותח את ההתחברות של Proton בדפדפן. לאחר מכן {host} יוצר את הכספת המשותפת ושומר רק מפתח לקריאה בלבד עבורה.",
-  // The exact vault name that OpenBot makes in Proton Pass. Keep it in English.
   "connector.protonPass.vaultName": "Shared with OpenBot",
   "connector.protonPass.vaultSetup": "OpenBot יוצר את הכספת הזו בעת החיבור. כדי לשתף פרטי כניסה, יש להעביר אותם אליה.",
   "connector.protonPass.showSteps": "הצגת השלבים",
@@ -659,9 +602,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "המפתח של Proton Pass פג תוקף",
   "connector.protonPass.expiredDescription": "סוכנים לא יכולים להתחבר עם פרטי הכניסה המשותפים עד להתחברות מחדש.",
   "connector.protonPass.reconnect": "חיבור מחדש",
-  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית בתשלום",
+  "connector.protonPass.planTitle": "Proton Pass דורש תוכנית עם Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI עובד רק עם תוכנית בתשלום של Proton. יש לשנות את התוכנית ואז להתחבר שוב.",
+    "Proton Pass CLI דורש תוכנית Proton שכוללת Pass Plus. תוכניות בתשלום אחרות, כמו Mail Plus, לא כוללות אותו. יש לשנות את התוכנית ואז להתחבר שוב.",
   "connector.protonPass.vaultTitle": "כספת משותפת",
   "connector.protonPass.vaultDescription":
     "סוכנים יכולים להתחבר עם פרטי הכניסה שבכספת הזו. כדי לשתף פרטי כניסה, יש להעביר אותם אליה.",

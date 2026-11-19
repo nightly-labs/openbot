@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Hindsight here is taken from hindsight.vectorize.io and
-// docs.hindsight.vectorize.io. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const HINDSIGHT_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

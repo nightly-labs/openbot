@@ -264,6 +264,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
   "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alguns modelos precisam de uma parte que esta versão não tem. Baixe a versão do OpenBot para usá-los.",
   "provider.settings.useInstalledVersion": "Usar a instalada",
   "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",

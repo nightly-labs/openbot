@@ -284,6 +284,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Fotoğraflar ve dosyalar",
   "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
+  "mobile.settings.conversations.swipeQuestion": "Yan soru",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
   "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
   "mobile.settings.conversations.swipeOff": "Kapalı",
@@ -570,7 +571,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Ajan seç",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot kilitli",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot’u aç",
-  "mobile.settings.shortcuts.footer": "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz.",
+  "mobile.settings.shortcuts.footer":
+    "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz. Open Agent bu ajanın sohbetini açar.",
   "mobile.settings.shortcuts.send.sent": "Gönderildi",
   "mobile.settings.shortcuts.send.failed": "OpenBot bunu gönderemedi.",
   "mobile.settings.shortcuts.send.unconfirmed": "Sunucudan yanıt yok. Mesaj sohbette olabilir.",

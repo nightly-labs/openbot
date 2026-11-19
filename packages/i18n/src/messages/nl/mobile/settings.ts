@@ -285,6 +285,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Foto's en bestanden",
   "mobile.settings.conversations.swipeLeft": "Naar links vegen in een agentchat",
   "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
+  "mobile.settings.conversations.swipeQuestion": "Zijvraag",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Uit",
@@ -445,7 +446,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot is vergrendeld",
   "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open.",
+    "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open. Open Agent opent de chat.",
   "mobile.settings.shortcuts.send.sent": "Verzonden",
   "mobile.settings.shortcuts.send.failed": "OpenBot kon dit niet verzenden.",
   "mobile.settings.shortcuts.send.unconfirmed": "Geen antwoord van de server. Het bericht kan in de chat staan.",

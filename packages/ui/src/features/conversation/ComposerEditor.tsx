@@ -96,50 +96,27 @@ interface ComposerEditorProps {
   agentId: string | undefined;
   agents: ComposerAgent[];
   skills?: ComposerSkill[] | undefined;
-  /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
   attachments?: DraftAttachment[] | undefined;
-  /** The agent's browser tabs that `@` offers. A tag gives the agent the tab to use. */
   browserTabs?: ComposerBrowserTab[] | undefined;
-  /** The agent's side threads that `@` offers, newest first. A tag lets the agent read the thread. */
   threads?: ComposerThread[] | undefined;
-  /**
-   * Finds the messages of the agent's side threads that contain the `@` query, newest first. Each
-   * listed thread with a match shows under "In messages". Absent when the host cannot search threads.
-   */
   onSearchThreads?: ((query: string) => Promise<ComposerThreadMessageMatch[]>) | undefined;
-  /** Shows the browser tab, or opens the thread by its task id, that a chip in the draft names. */
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   value: string;
   placeholder: string;
   ariaLabel: string;
   disabled: boolean;
-  /** `compact` is one short line, as in the floating composer over a browser page. */
   size?: "default" | "compact";
   focusRequest?: number | undefined;
-  /** Raised by one to open the skill picker at the caret, as a typed `$` does. */
   skillPickerRequest?: number;
-  /** A new id puts a quote chip for the text at the caret, or at the end when the caret is unknown. */
   quoteRequest?: QuoteRequest | undefined;
-  /** Opens the passage that a quote chip in the draft points to. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
-  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
   skillsLoadFailed?: boolean | undefined;
   onValueChange: (value: string) => void;
   onSubmit: () => void;
-  /** Tab sends the message into the agent's running turn. Absent, Tab moves the focus as usual. */
   onSteer?: (() => void) | undefined;
-  /**
-   * Which chord sends the message. Enter keeps the current behavior; the platform modifier with
-   * Enter sends and plain Enter adds a line. The renderer resolves the platform and passes it.
-   */
   sendShortcut?: SendShortcut | undefined;
   onOpenAttachment?: ((attachment: DraftAttachment) => void) | undefined;
-  /**
-   * Receives pasted files. Without it, a file paste does nothing here; the desktop preload imports it.
-   * A text paste longer than `INPUT_LIMITS.pastedText` also comes here as `pasted-text.txt`, with
-   * `text` set: when the file cannot come, the receiver puts that text at the selection.
-   */
   onPasteFiles?:
     | ((
         files: File[],
@@ -151,23 +128,13 @@ interface ComposerEditorProps {
     clipboard: DataTransfer,
     selection: ComposerSelection,
   ) => Promise<ComposerPasteResult | undefined> | undefined;
-  /**
-   * Writes a copy or cut that includes attachments. Other selections use the native copy. After a cut
-   * removed the selection, `remaining` is the value that stays, so the draft can let go of the files
-   * that the cut moved.
-   */
   onCopyAttachments?: (
     clipboard: DataTransfer,
     text: string,
     attachments: DraftAttachment[],
     remaining: string | undefined,
   ) => void;
-  /** Offers `@everyone` in the mention picker, which a channel reads as a message to each member. */
   everyoneMention?: boolean | undefined;
-  /**
-   * The words heard so far while the user dictates. `final` is set while the recording turns into
-   * the final text. See `dictationWords` for how they show.
-   */
   dictation?: { text: string; final: boolean };
 }
 
@@ -189,23 +156,13 @@ interface MentionContext {
 const DICTATION_INTERIM_WORDS = 2;
 const EMPTY_TABS: ComposerBrowserTab[] = [];
 const EMPTY_THREADS: ComposerThread[] = [];
-/*
- * The `@` search of thread messages. A shorter query matches almost every message, so it waits for
- * three letters; it waits for a pause in the typing, and it shows a few threads. Search finds more.
- */
 const THREAD_SEARCH_MIN_QUERY = 3;
 const THREAD_SEARCH_DELAY_MS = 150;
 const THREAD_SEARCH_ROWS = 5;
-/** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
 
-/** Longer than the exit of the list in `composer.css`, for a window that does not send its end. */
 const PICKER_EXIT_FALLBACK_MS = 300;
 
-/**
- * Puts an inert copy of the closed `@` list in its place, so the list leaves with a movement. The
- * list is out of the page when it closes, so the list itself cannot stay for its exit.
- */
 function leavePicker(picker: HTMLElement, parent: HTMLElement): void {
   if (!parent.isConnected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const copy = picker.cloneNode(true);
@@ -214,7 +171,6 @@ function leavePicker(picker: HTMLElement, parent: HTMLElement): void {
   copy.dataset.leaving = "";
   copy.inert = true;
   copy.setAttribute("aria-hidden", "true");
-  // An SVG keeps its ids: an avatar draws its mask through `url(#id)`.
   for (const element of copy.querySelectorAll("[id]"))
     if (!(element instanceof SVGElement)) element.removeAttribute("id");
   parent.append(copy);
@@ -227,9 +183,7 @@ function leavePicker(picker: HTMLElement, parent: HTMLElement): void {
   window.setTimeout(remove, PICKER_EXIT_FALLBACK_MS);
 }
 
-/** Closes with the content of the list, which is the moment to start the exit of the list. */
 function PickerExit(props: { picker: () => HTMLElement | undefined }): JSX.Element {
-  // Solid takes the list out of the page before this cleanup, so its place is read while it is open.
   let parent: HTMLElement | null = null;
   queueMicrotask(() => {
     parent = props.picker()?.parentElement ?? null;
@@ -249,21 +203,15 @@ export function expandComposerMentions(value: string): string {
 }
 
 export function ComposerEditor(props: ComposerEditorProps) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
-  /* Where the `$` that the add menu wrote starts, so that picker can say why it is empty. */
   const [requestedMentionStart, setRequestedMentionStart] = createSignal<number | null>(null);
   const [attachmentTooltip, setAttachmentTooltip] = createSignal<{
     anchor: HTMLElement;
     content: string;
   } | null>(null);
   const attachmentTooltipId = `composer-file-tooltip-${createUniqueId()}`;
-  /*
-   * Measured again on every keystroke, and almost always the same two values. Without this
-   * comparison each measurement is a new object, which moves the picker to a new portal and
-   * replays its entrance animation: the panel appears to jump for each character typed.
-   */
   const [pickerFrame, setPickerFrame] = createSignal<PickerFrame>(
     { mount: undefined, bottom: 0 },
     { equals: (previous, next) => previous.mount === next.mount && previous.bottom === next.bottom },
@@ -288,15 +236,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     );
   });
   const usableSkills = createMemo(() =>
-    (props.skills ?? []).filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false),
+    (props.skills ?? []).filter(
+      (skill) => skill.state !== "needs-repair" && skill.enabled !== false && skill.problem === undefined,
+    ),
   );
+  const skillProblems = createMemo(() => {
+    const context = mention();
+    if (context?.trigger !== "$") return [];
+    const query = context.query.trim().toLocaleLowerCase();
+    return (props.skills ?? []).flatMap(({ problem, ...skill }) =>
+      problem !== undefined && skill.enabled !== false && skillMatchRank(skill, query) !== null
+        ? [{ name: skill.name, problem }]
+        : [],
+    );
+  });
   const matchingSkills = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     const ranked = usableSkills().flatMap((skill) => {
       const rank = skillMatchRank(skill, query);
       return rank === null ? [] : [{ skill, rank }];
     });
-    // Array sort is stable, so skills of one rank keep the host's order.
     ranked.sort((left, right) => left.rank - right.rank);
     const nameCounts = new Map<string, number>();
     for (const { skill } of ranked) {
@@ -324,23 +283,18 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     return threads().filter((thread) => referenceMatches({ thread }, query));
   });
-  /** The `@` query that the thread message search answers, or an empty string when it does not run. */
   const threadSearchQuery = createMemo(() => {
     const context = mention();
     const query = context?.trigger === "@" ? context.query.trim() : "";
     return query.length >= THREAD_SEARCH_MIN_QUERY ? query : "";
   });
-  /* The last answer. It stays while the user types on, so its rows do not blink for each letter. */
   const [threadMessageMatches, setThreadMessageMatches] = createSignal<ComposerThreadMessageMatch[]>([]);
   let threadSearchRequest = 0;
-  // A boolean, so that a new thread list (for example a task state change during a turn) does not
-  // start the search again.
   const hasListedThreads = createMemo(() => threads().length > 0);
   createEffect(
     () => ({ query: threadSearchQuery(), search: props.onSearchThreads, listed: hasListedThreads() }),
     ({ query, search, listed }) => {
       const request = ++threadSearchRequest;
-      // A thread that is not listed cannot be tagged, so with no listed thread nothing can show.
       if (!query || !search || !listed) {
         setThreadMessageMatches([]);
         return;
@@ -350,7 +304,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
           (matches) => {
             if (request === threadSearchRequest) setThreadMessageMatches(matches);
           },
-          // The title matches still show; the rows of a failed search are only absent.
           () => {
             if (request === threadSearchRequest) setThreadMessageMatches([]);
           },
@@ -359,10 +312,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       return () => clearTimeout(timer);
     },
   );
-  /**
-   * The listed threads that have the query in a message, but not in the title: one row for each
-   * thread, with its newest match. A match that no longer has the query, from an earlier answer, goes.
-   */
   const matchingThreadMessages = createMemo(() => {
     const query = threadSearchQuery();
     const needle = normalizedSearchText(query);
@@ -380,13 +329,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
     }
     return rows;
   });
-  /*
-   * The `@` list has a group for each kind. A title over each group shows only when the list has
-   * more than one, so a list of agents alone looks as it did.
-   */
   const pickerSections = createMemo<PickerSection[]>(() => {
     const trigger = mention()?.trigger;
-    /* Skills first: a skill is what the user writes with, and a server is what one of them reaches. */
     if (trigger === "$")
       return [
         {
@@ -437,37 +381,31 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const option = matchingOptions()[activeOption()];
     return option ? new Set([pickerOptionKey(option)]) : new Set<string>();
   });
-  /*
-   * A `$` with no match says why only when the user asked for skills: after the add menu, or a
-   * bare `$`. A price such as "$5" in a sentence keeps the picker closed.
-   */
   const pickerStatus = createMemo(() => {
     const context = mention();
-    if (context?.trigger !== "$" || matchingOptions().length > 0) return null;
+    if (context?.trigger !== "$" || matchingOptions().length > 0 || skillProblems().length > 0) return null;
     if (requestedMentionStart() !== context.start && context.query.trim()) return null;
     if (usableSkills().length === 0)
       return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
     return t("composer.picker.noSkillMatch", { query: context.query.trim() });
   });
-  const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
-  /** The `@` or `$` query, which the rows mark in their names. */
+  const pickerOpen = createMemo(
+    () => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null || skillProblems().length > 0),
+  );
   const pickerQuery = () => mention()?.query.trim() ?? "";
   const descriptionMatchQuery = (option: PickerOption) =>
     option.type === "tab" || (option.type === "thread" && option.snippet !== undefined) ? pickerQuery() : "";
   const pickerOptionElements = new Map<string, HTMLElement>();
-  /* Set by an arrow key and read once by the highlight, so only a key press slides it. */
   let keyMove = false;
   const takeKeyMove = () => {
     const moved = keyMove;
     keyMove = false;
     return moved;
   };
-  /** The list calls its ref with no owner, so the editor stops the trackers of the last list. */
   let releasePickerList: (() => void) | undefined;
   const bindPickerList = (list: HTMLElement) => {
     releasePickerList?.();
     const stops = [
-      // The list has no scrollbar, so the fade is the only sign that more options wait below it.
       trackPickerScrollFades(list),
       trackEnteringPickerRows(list),
       trackPickerHighlight(list, takeKeyMove),
@@ -487,9 +425,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
   let lastEmittedValue = "";
   let lastFocusRequest = 0;
   let lastSkillPickerRequest = 0;
-  // A request made before this editor existed belongs to an earlier one, which inserted it.
   let lastQuoteRequest = untrack(() => props.quoteRequest?.id ?? 0);
-  /* Where the caret was when the editor last had it. A selection in a message takes the caret away. */
   let savedCaret: number | null = null;
   let isComposing = false;
   const [compositionRevision, setCompositionRevision] = createSignal(0);
@@ -548,8 +484,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       quoteRequest,
       disabled,
     }) => {
-      // An owner can set its counter back to 0 after this editor read it, for example when the chat that it
-      // leaves closes after the next one opens. The next request after that must focus this editor.
       if (focusRequest < lastFocusRequest) lastFocusRequest = focusRequest;
       if (!editor || (isComposing && agentId === lastAgentId)) return;
       const attachmentKey = attachments.map((attachment) => `${attachment.id}:${attachment.name}`).join("|");
@@ -557,7 +491,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
         .map((skill) => `${skill.skillId}:${skill.name}:${skill.state}:${skill.enabled}:${skill.description ?? ""}`)
         .join("|");
       const mcpKey = mcpServers.map((server) => `${server.id}:${server.name}:${server.enabled}`).join("|");
-      // A title changes with each page the tab opens; the tags read only which tabs and threads exist.
       const referenceKey = `${browserTabs.map((tab) => tab.id).join("|")}/${threads.map((thread) => thread.id).join("|")}`;
       const draftChanged = agentId !== lastAgentId;
       const attachmentsChanged = attachmentKey !== lastAttachmentKey;
@@ -576,15 +509,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
       const skillsChanged = skillKey !== lastSkillKey;
       const mcpChanged = mcpKey !== lastMcpKey;
       const referencesChanged = referenceKey !== lastReferenceKey;
-      // A list change redraws only its own tags in the draft. With none of them, the draft does not change.
       const tagsChange =
         (attachmentsChanged && renderedAttachments.size > 0) ||
         (skillsChanged && editor.querySelector("[data-skill-id]") !== null) ||
         (mcpChanged && editor.querySelector("[data-mcp-id]") !== null) ||
         (referencesChanged && editor.querySelector("[data-tab-id], [data-thread-id]") !== null);
       const editorChanges = contentChanged || tagsChange;
-      // Only a change of the editor's content can move its caret or scroll position. A read of either
-      // lays out the page, and this effect runs for each list that loads while a conversation opens.
       const selection =
         editorChanges && !draftChanged && editor.ownerDocument.activeElement === editor
           ? readEditorSelection(editor)
@@ -620,7 +550,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
       lastReferenceKey = referenceKey;
       if (focusRequested) {
         lastFocusRequest = focusRequest;
-        // Text that the user selected in the draft stays selected, for example when they click Reply on a message.
         const draftSelection = contentChanged ? null : readEditorSelection(editor);
         editor.focus({ preventScroll: true });
         if (!draftSelection || draftSelection.anchor === draftSelection.focus) placeCaretAtEnd(editor);
@@ -630,7 +559,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
         lastSkillPickerRequest = skillPickerRequest;
         openSkillPicker();
       }
-      // A locked composer keeps the quote until it opens again.
       if (quoteRequest && quoteRequest.id > lastQuoteRequest && !disabled) {
         lastQuoteRequest = quoteRequest.id;
         insertQuote(quoteRequest.messageId, quoteRequest.text);
@@ -638,11 +566,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     },
   );
 
-  /*
-   * Live dictation continues the draft's last line, where the final text lands, so nothing moves
-   * when the recording finishes. The editor's text offsets and serializer must never see these
-   * words, so a read-only copy of the draft takes the editor's place while they show.
-   */
   const dictationWords = createMemo(() => props.dictation?.text.trim().split(/\s+/u).filter(Boolean) ?? []);
   const dictating = () => dictationWords().length > 0;
   let dictationView: HTMLDivElement | undefined;
@@ -661,7 +584,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     ({ shown, value, ...sources }) => {
       if (!shown || !dictationDraft) return;
       renderEditorValue(dictationDraft, value, sources, attachmentTokenActions);
-      // The editor needs a closing <br> to show an empty last line; inline, it would push the words a line down.
       if (value.endsWith("\n")) dictationDraft.lastChild?.remove();
     },
   );
@@ -669,9 +591,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     if (dictationView) dictationView.scrollTop = dictationView.scrollHeight;
   });
 
-  // Coming back to the window puts the caret back here, so the first keys are not lost. A touch
-  // device would open its keyboard instead, and focus leaving an embedded frame (an HTML preview)
-  // also fires `focus` here without the window having been away.
   onSettled(() => {
     const view = editor?.ownerDocument.defaultView;
     if (!view) return;
@@ -725,7 +644,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const view = document.defaultView;
     const selectionChanged = () => {
       if (editor && document.activeElement === editor) savedCaret = readEditorSelection(editor)?.focus ?? savedCaret;
-      // A dismissed picker stays closed until the user types or clicks again.
       if (mention()) updateMention();
     };
     document.addEventListener("selectionchange", selectionChanged);
@@ -763,14 +681,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     scheduleCaretScroll();
   }
 
-  /*
-   * Every plain character takes the same road: this handler cancels the native insert and asks the
-   * browser to insert the text. Letting the default action write some characters and the editor
-   * write the rest raced, and a native insert that landed a task late, or one reported with a
-   * composition input type, was read as "no native input" and the character went in twice.
-   * The text comes from the input event, not from the key: an input method that picks a phrase
-   * with Shift+1 sends the "!" key, and Chromium delivers the phrase as that key's text.
-   */
   function handleBeforeInput(event: InputEvent) {
     if (!editor || props.disabled || isComposing || event.isComposing) return;
     const lineBreak = event.inputType === "insertLineBreak" || event.inputType === "insertParagraph";
@@ -809,14 +719,12 @@ export function ComposerEditor(props: ComposerEditorProps) {
     setActiveOption(0);
   }
 
-  /* Writes a `$` at the caret, as if typed, so the picker and its query work as for a typed one. */
   function openSkillPicker() {
     if (!editor || props.disabled) return;
     editor.focus();
     ensureEditorSelection();
     const selection = window.getSelection();
     if (!selection?.rangeCount) return;
-    // Keep selected text: put the `$` after it.
     if (!selection.isCollapsed) selection.collapseToEnd();
     const beforeCaret = editorText(editor).slice(
       0,
@@ -997,10 +905,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
   function handleKeyDown(event: KeyboardEvent) {
     if (props.disabled) return;
     const sendShortcut: SendShortcut = props.sendShortcut ?? "enter";
-    /*
-     * The browser owns the IME composition buffer. The key that starts a composition comes before
-     * `compositionstart` and without `isComposing`; Chromium marks it with keyCode 229 ("Process").
-     */
     if (isComposing || event.isComposing || event.keyCode === 229 || event.key === "Process") return;
     if (handleMentionPickerKeyDown(event)) return;
     if (event.key === "Tab" && props.onSteer && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
@@ -1105,7 +1009,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const normalized = pastedText.replace(/\r\n?/g, "\n");
     const text = normalized.slice(0, INPUT_LIMITS.messageText);
     if (!text) return;
-    // The file keeps the text as it was copied, with no limit on the message length.
     if (normalized.length > INPUT_LIMITS.pastedText && props.onPasteFiles) {
       event.stopPropagation();
       const file = new File([pastedText], PASTED_TEXT_FILE_NAME, { type: "text/plain" });
@@ -1143,7 +1046,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     const ids = attachmentReferenceIds(text);
     const all = selection.start === 0 && selection.end === value.length;
     const attachments = (props.attachments ?? []).filter((attachment) => all || ids.has(attachment.id));
-    // Without an attachment, the copy goes to the next listeners, as any page text does.
     if (!attachments.length) return;
     event.preventDefault();
     let remaining: string | undefined;
@@ -1197,7 +1099,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onCut={(event) => handleCopy(event, true)}
         onBlur={() => {
           isComposing = false;
-          // A menu can return the focus to the editor within this delay; keep the picker it opened.
           window.setTimeout(() => {
             const ownerDocument = editor?.ownerDocument;
             if (!ownerDocument?.hasFocus() || ownerDocument.activeElement !== editor) setMention(null);
@@ -1209,7 +1110,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
           ref={(element) => (dictationView = element)}
           class="composer-editor-surface composer-dictation"
           data-final={props.dictation?.final ? "" : undefined}
-          // The editor under this copy takes the keys, so a click here gives it the focus.
           onPointerDown={(event) => {
             event.preventDefault();
             if (!editor) return;
@@ -1229,7 +1129,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
               {(word, index) => (
                 <span
                   class="composer-dictation-word"
-                  // The last words are the ones the next live pass is most likely to change.
                   data-interim={
                     !props.dictation?.final && index() >= dictationWords().length - DICTATION_INTERIM_WORDS
                       ? ""
@@ -1265,7 +1164,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 </p>
               )}
             </Show>
-            <Show when={pickerStatus() === null}>
+            <Show when={pickerStatus() === null && matchingOptions().length > 0}>
               <Listbox.Root<PickerOption, PickerSection>
                 as="div"
                 ref={bindPickerList}
@@ -1320,7 +1219,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       ]}
                       onPointerDown={(event) => {
                         event.preventDefault();
-                        // The composer focuses its editor on any pointerdown that is not a control.
                         event.stopPropagation();
                       }}
                       onMouseEnter={() => {
@@ -1362,7 +1260,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
                       <Show when={pickerOptionDescription(option, t, format)}>
                         {(description) => (
                           <span class="mention-picker-description">
-                            {/* A tab matches its address, and a thread its message, so they show the match. */}
                             <MatchedText text={description()} query={descriptionMatchQuery(option)} />
                           </span>
                         )}
@@ -1382,6 +1279,20 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 }}
               />
             </Show>
+            <Show when={skillProblems().length > 0}>
+              <div class="mention-picker-problems" role="status">
+                <For each={skillProblems()}>
+                  {(skill) => (
+                    <p class="mention-picker-skill-problem">
+                      {t("composer.picker.skillProblem", {
+                        name: skill.name,
+                        problem: sourceText(skill.problem),
+                      })}
+                    </p>
+                  )}
+                </For>
+              </div>
+            </Show>
           </div>
         </Portal>
       </Show>
@@ -1394,7 +1305,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
   );
 }
 
-/** A thread message as one line of plain text, as the search dialog shows it. */
 function threadMessagePreview(body: string): string {
   return expandAttachmentReferences(
     expandChatTagReferences(body, (reference) => (reference.kind === "quote" ? `“${reference.name}”` : undefined)),
@@ -1403,7 +1313,6 @@ function threadMessagePreview(body: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** Text with the part that matches the picker query marked, as the search dialog marks it. */
 function MatchedText(props: { text: string; query: string }) {
   return (
     <For each={matchParts(props.text, props.query)}>

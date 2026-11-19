@@ -29,12 +29,14 @@ import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressa
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle } from "@/shared/lib/text-direction";
@@ -60,7 +62,6 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
   const blurStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.35, 0.8, 1], [0.72, 0.58, 0.1, 0]),
   }));
-  // The text shows from its start: from the right in a right-to-left layout. The mask counts from the left.
   const maskProps = useAnimatedProps(() => ({
     x: END_X === 1 ? 0 : width.get() * (1 - progress.get()),
     width: width.get() * progress.get(),
@@ -104,18 +105,13 @@ interface AgentListRowProps {
   rightInset?: number;
 }
 
-/**
- * A chat of the home list. It renders again only when its agent, its own live state or a pin
- * transition changes, so a long list stays quiet while other agents work.
- */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("row", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -125,15 +121,15 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
-  // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
-  const waitingChannel = useWaitingChannel(agent.id, agent.serverId);
+  const activity = useAgentListActivity(agent.id);
+  const waitingChannel = useWaitingChannel(activity, agent.serverId);
   const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
-  const waitReason = useAgentListWaitReason(agent.id);
+  const waitReason = agentListWaitReason(activity);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
     <BloubAvatar
@@ -142,13 +138,13 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       hue={agent.avatarHue}
       color={agent.avatarColor}
       seed={agent.avatarSeed}
+      avatarUrl={agent.avatarUrl}
       size={54}
       animateIdle={false}
       rings
-      withThreads
+      activityMood={agentActivityMood(activity)}
     />
   );
-  // As on the desktop, a wait outranks the unread count in the corner of the avatar.
   const waitBadge = waitReason ? (
     <AgentWaitBadge reason={waitReason} />
   ) : unreadCount > 0 || unreadThreads ? (

@@ -15,7 +15,6 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { useChannelAgentPicker } from "../model/channel-agent-picker";
 
-/** Channel info > Agents, and New channel > Agents: the agents of the server, with a search. */
 export function ChannelAgentPickerScreen() {
   const { t } = useText();
   const request = useChannelAgentPicker((state) => state.request);
@@ -24,7 +23,6 @@ export function ChannelAgentPickerScreen() {
   const serverId = request?.serverId ?? "";
   const agents = useMobileWorkspaceSelector((current) => current.agents);
   const choices = useMemo(() => agents.filter((agent) => agent.serverId === serverId), [agents, serverId]);
-  // Only the Agents row opens the page. Without its request there is no form to give the change to.
   useEffect(() => {
     if (!request && router.canGoBack()) router.back();
   }, [request]);
@@ -43,7 +41,6 @@ export function ChannelAgentPickerScreen() {
       return next;
     });
   };
-  // With a search, the menu acts on the agents that the search shows.
   const toSelect = matches.filter((agent) => !selected.has(agent.id));
   const toDeselect = matches.filter((agent) => selected.has(agent.id));
   const toggleAll = (agents: readonly { id: string }[]) => {
@@ -71,13 +68,11 @@ export function ChannelAgentPickerScreen() {
           placeholder={t("mobile.channel.form.searchAgents")}
           autoCapitalize="none"
           hideWhenScrolling={false}
-          // In a sheet, the header and its back button stay while the search has focus.
           hideNavigationBar={false}
           onChangeText={(event) => setSearch(event.nativeEvent.text)}
           onCancelButtonPress={() => setSearch("")}
         />
       ) : (
-        // The Android blur header cannot draw a `Stack.SearchBar`, so the field is in the content.
         <SheetFormField
           label={t("mobile.channel.form.searchAgents")}
           hideLabel

@@ -98,4 +98,6 @@ export const messages = {
     "{name}: i valori che possono contenere un segreto sono stati rimossi dagli argomenti o dall'indirizzo. Inseriscili di nuovo nelle Impostazioni.",
   "error.import.transferSharedKept":
     "{number} file della cartella condivisa sono già presenti qui, quindi restano come sono.",
+  "error.import.transferPartSkipped":
+    "Alcune parti del file non sono state importate. Le altre parti sono su questo server, quindi non importare di nuovo il file.",
 } as const satisfies PartialTranslation<typeof source>;

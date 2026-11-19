@@ -61,19 +61,12 @@ export function supertonicVoiceLabel(voice: SpeechVoice, t: MobileTranslate): st
     : t("mobile.settings.voice.supertonic.male", { number });
 }
 
-/** A GPT live voice by its own name, the same in every language; null is OpenAI's choice. */
 export function gptLiveVoiceLabel(voice: CodexLiveVoice | null, t: MobileTranslate): string {
   return voice ? voice.charAt(0).toUpperCase() + voice.slice(1) : t("mobile.settings.voice.gptLive.automatic");
 }
 
-/**
- * Expo Go has no speech module, so voice does not work there. In development the page still shows
- * all its sections, so its layout can be checked without a native build. The choices save, and the
- * downloads and samples stay off.
- */
 const layoutPreview = __DEV__ && isRunningInExpoGo();
 
-/** A model that downloads or failed to: its progress or its failure. Null when it is ready or missing. */
 function downloadStatus(model: ModelState, t: MobileTranslate, percent: (value: number) => string): string | null {
   if (model.phase === "downloading")
     return t("mobile.settings.voice.supertonic.downloading", { percent: percent(model.progress) });
@@ -86,7 +79,6 @@ function downloadStatus(model: ModelState, t: MobileTranslate, percent: (value: 
   return null;
 }
 
-/** What Supertonic 3 can do now, for its row in the choice of voice. */
 function useSupertonicStatus(): string {
   const { t, format } = useText();
   const model = useSupertonicModel();
@@ -99,13 +91,11 @@ function useSupertonicStatus(): string {
   );
 }
 
-/** The check mark of the chosen row, in the accent colour, as in the other settings lists. */
 function useCheckMark() {
   const accent = String(useCSSVariable("--openbot-accent"));
   return (checked: boolean) => (checked ? <Check size={18} color={accent} strokeWidth={2} /> : null);
 }
 
-/** The text of each recognizer that runs on the phone: its name, its ready status and its footer. */
 const LOCAL_RECOGNITION_TEXT = {
   parakeet: {
     name: "mobile.settings.voice.recognition.parakeet",
@@ -124,10 +114,6 @@ const LOCAL_RECOGNITION_TEXT = {
   },
 } as const satisfies Record<LocalRecognition, Record<"name" | "ready" | "footer", MobileTextKey>>;
 
-/**
- * The status line of a row of a model on the phone: too little memory, ready, the download, or the
- * download size.
- */
 function useLocalModelStatus(engine: LocalRecognition): string {
   const { t, format } = useText();
   const models = {
@@ -144,11 +130,6 @@ function useLocalModelStatus(engine: LocalRecognition): string {
   );
 }
 
-/**
- * The choice of what recognizes the user's speech, in a voice conversation and in dictation. The
- * checked row is the choice; a model on the phone listens once it is downloaded, and the phone's
- * recognizer listens until then. An app binary from before Qwen3-ASR does not show it.
- */
 function RecognitionSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const settings = useVoiceSettings();
@@ -163,12 +144,10 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
   );
   const server = useVoiceServer((state) => state.server);
   const choose = (recognition: RecognitionEngine) => {
-    // ElevenLabs needs a key first; the key page makes it the recognizer when the key is saved.
     if (recognition === "elevenlabs" && !settings.hasElevenLabsKey) {
       router.push({ pathname: "/settings/elevenlabs-key", params: { use: "recognition" } });
       return;
     }
-    // The voice server needs its dictation first; saving it makes it the recognizer.
     if (recognition === "voice-server" && !server?.routes.dictation) {
       router.push("/settings/voice-server");
       return;
@@ -239,10 +218,6 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
   );
 }
 
-/**
- * The user's own OpenAI-compatible voice server, as on desktop. Its page sets the address, the key
- * and what the server does. While it reads the replies, a sample plays here.
- */
 function VoiceServerSection({ preview }: { preview?: ReturnType<typeof useVoicePreview> }) {
   const { t } = useText();
   const server = useVoiceServer((state) => state.server);
@@ -266,7 +241,6 @@ function VoiceServerSection({ preview }: { preview?: ReturnType<typeof useVoiceP
   );
 }
 
-/** The download, cancel and removal of one model, with its size and progress. */
 function ModelRow({
   model,
   label,
@@ -279,7 +253,6 @@ function ModelRow({
   label: string;
   removeTitle: string;
   removeBody: string;
-  /** Runs before the files go, such as to stop a sample that plays. */
   onRemove?: () => void;
   onError: (message: string) => void;
 }) {
@@ -328,17 +301,12 @@ function ModelRow({
   );
 }
 
-/**
- * How long a voice conversation waits for new words before it sends the words. The slider moves in
- * half seconds, natively on iOS; the choice is saved when the finger lifts.
- */
 function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
   const { t, format } = useText();
   const ready = useVoiceSettings((state) => state.ready);
   const saved = useVoiceSettings((state) => state.turnPauseMs);
   const [dragged, setDragged] = useState<number | null>(null);
   const shown = dragged ?? saved;
-  // The slider can report more than one value before the next render: a step plays one tick.
   const lastStep = useRef(shown);
   const seconds = (milliseconds: number) =>
     t("mobile.settings.voice.pause.seconds", { seconds: format.number(milliseconds / 1_000) });
@@ -376,7 +344,6 @@ function TurnPauseSection({ onError }: { onError: (message: string) => void }) {
   );
 }
 
-/** The speed of the replies that are read aloud, also in a voice conversation. */
 function ReplySpeedSection({ onError }: { onError: (message: string) => void }) {
   const { t, format } = useText();
   const ready = useVoiceSettings((state) => state.ready);
@@ -408,7 +375,6 @@ function ReplySpeedSection({ onError }: { onError: (message: string) => void }) 
   );
 }
 
-/** The model of the chosen recognizer on the phone, below the choice of recognizer. */
 function LocalModelSection({ engine, onError }: { engine: LocalRecognition; onError: (message: string) => void }) {
   const { t } = useText();
   return (
@@ -425,10 +391,6 @@ function LocalModelSection({ engine, onError }: { engine: LocalRecognition; onEr
   );
 }
 
-/**
- * The choice of the voice that reads replies. The checked row is the voice in use; the settings of
- * that voice follow below it.
- */
 function EngineSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const settings = useVoiceSettings();
@@ -442,12 +404,10 @@ function EngineSection({ onError }: { onError: (message: string) => void }) {
       ? elevenLabsVoiceParts(settings.elevenLabsVoice.name).title
       : t("mobile.settings.voice.elevenLabs.chooseVoice");
   const choose = (engine: VoiceEngine) => {
-    // ElevenLabs needs a key first; the key page makes it the voice in use when the key is saved.
     if (engine === "elevenlabs" && !settings.hasElevenLabsKey) {
       router.push("/settings/elevenlabs-key");
       return;
     }
-    // The voice server needs its spoken replies first; saving it makes it the voice in use.
     if (engine === "voice-server" && !server?.routes.speech) {
       router.push("/settings/voice-server");
       return;
@@ -554,7 +514,6 @@ function ElevenLabsSection({
   onError,
 }: {
   preview: ReturnType<typeof useVoicePreview>;
-  /** ElevenLabs reads the replies, so its voice settings show; else only the key does. */
   readsReplies: boolean;
   onError: (message: string) => void;
 }) {
@@ -622,7 +581,6 @@ const ELEVENLABS_MODEL_HINT = {
   "elevenlabs-v4": "mobile.settings.voice.elevenLabs.model.v4",
 } as const satisfies Record<ElevenLabsSpeechModelId, MobileTextKey>;
 
-/** The ElevenLabs model that reads replies, with the same choices as desktop. */
 function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; onError: (message: string) => void }) {
   const { t } = useText();
   const ready = useVoiceSettings((state) => state.ready);
@@ -631,7 +589,6 @@ function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; o
   const choose = (elevenLabsModel: ElevenLabsSpeechModelId) => {
     if (elevenLabsModel === chosen) return;
     void haptics.selection();
-    // A sample of the model before it does not go on.
     onChange();
     void saveVoiceSettings({ elevenLabsModel }).catch(() => onError(t("mobile.settings.saveFailed")));
   };
@@ -657,11 +614,6 @@ function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; o
   );
 }
 
-/**
- * GPT live voice, in three sections: the switch, its voice, and whether each server can run it. It
- * shows only in an app binary with WebRTC; a server without `live-voice-v1` keeps the conversation
- * of the phone.
- */
 function GptLiveSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -705,14 +657,6 @@ function GptLiveSection({ onError }: { onError: (message: string) => void }) {
   );
 }
 
-/**
- * Settings > Voice, in tabs. Listening: what recognizes the user's speech, the phone's
- * recognizer, Parakeet v3, Parakeet Unified or Qwen3-ASR on the phone, or ElevenLabs Scribe, and the pause that sends the words in a
- * voice conversation. Speaking: the voice that reads replies, Supertonic 3, the default, which runs
- * on the phone as on desktop, or ElevenLabs, and the reply speed. GPT live voice: its switch, its
- * voice and the servers. Each tab lists its choices with a check mark, and the
- * section below has the settings of the checked choice only.
- */
 export function VoiceSettingsScreen() {
   const { t } = useText();
   const preview = useVoicePreview();
@@ -721,22 +665,18 @@ export function VoiceSettingsScreen() {
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
   const serverSpeaks = useVoiceServer((state) => state.server?.routes.speech === true);
   const canRecognize = modelCaptureAvailable() || layoutPreview;
-  // What hears the user, what reads the replies, and GPT live voice: one tab each, so the page stays short.
   const [tab, setTab] = useState<"listening" | "speaking" | "gptLive">("listening");
   const [error, setError] = useState<string | null>(null);
   const showError = useRef((message: string) => {
     setError(message);
     void haptics.notification("error");
   }).current;
-  // The page needs to know whether the model is on the phone before Download can work.
   useEffect(() => {
     checkRecognitionModels();
   }, []);
-  // The voices of the key load once, so the voice list opens with them.
   useEffect(() => {
     if (hasKey && useElevenLabsVoices.getState().phase === "idle") void loadElevenLabsVoices();
   }, [hasKey]);
-  // A sample of the voice before it does not go on under the settings of the other one.
   const stopPreview = useRef(preview.stop);
   stopPreview.current = preview.stop;
   const shownEngine = useRef(engine);
@@ -768,9 +708,7 @@ export function VoiceSettingsScreen() {
       {canChangeReplySpeed || layoutPreview ? <ReplySpeedSection onError={showError} /> : null}
     </>
   );
-  // GPT live voice needs WebRTC, which only a newer app binary has.
   const gptLive = liveVoiceWebRtc || layoutPreview ? <GptLiveSection onError={showError} /> : null;
-  // An app binary without the speech module's microphone has only the phone's recognizer.
   if (!canRecognize)
     return (
       <SettingsContent>

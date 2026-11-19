@@ -8,12 +8,6 @@ import { isDynamicRecord } from "../runtime-values";
 import { toCurrentAgentKeys, toWireAgentKeys } from "./current-agent-keys";
 import type { TeamProtocolV1JsonObject, TeamProtocolV1JsonValue } from "./v1";
 
-/**
- * Current-side route checks that the v3 and v4 adapters share. They read the path and the app's own
- * IPC decoders only. Each adapter passes its own frozen profile codec to `currentProfileRoutes`, so
- * no released protocol takes another version's rules.
- */
-
 export function decodeUnreadRequest(value: unknown): TeamProtocolV1JsonObject {
   if (value === null || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 0) {
     throw new Error("Invalid conversation-unread request.");
@@ -47,7 +41,6 @@ interface FrozenProfileCodec {
   decodeResponse(generate: boolean, value: unknown): TeamProtocolV1JsonObject;
 }
 
-/** The profile routes of one adapter, checked by its frozen codec and by the current IPC decoders. */
 export function currentProfileRoutes(frozen: FrozenProfileCodec) {
   return {
     encodeRequest(path: string, value: unknown): TeamProtocolV1JsonObject {
@@ -93,7 +86,6 @@ function profileResponse(path: string, value: unknown): TeamProtocolV1JsonObject
   return JSON.parse(JSON.stringify(parsed));
 }
 
-// Only a saved-profile result reaches this, and both of its decoders set `agent`.
 function profileAgent(parsed: TeamProtocolV1JsonObject): TeamProtocolV1JsonValue {
   if (parsed.agent === undefined) throw new Error("Invalid agent profile.");
   return parsed.agent;

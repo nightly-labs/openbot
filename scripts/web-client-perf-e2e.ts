@@ -1,18 +1,3 @@
-// Measures the web client at `/app` in three phases and writes .openbot-build/<out>/report.json.
-//
-// - bundle: JS and CSS bytes (raw and gzip) of the chunks that `/app` loads, from the Vite manifest of
-//   the last `bun run api:build`.
-// - load: cold and warm loads of the signed-out `/app` in Chrome, with mobile CPU and network
-//   throttling, until the sign-in form shows. The script starts `vite preview` of that build (no
-//   secrets), or uses `--url`. A local gzip proxy sits in front, because `vite preview` sends assets
-//   uncompressed and production does not. Without secrets the preview cannot check a session, so the
-//   proxy answers the session check as production answers a visitor with no cookie.
-// - runtime: the `Web/Workspace/LongConversation` story of a running Storybook (`--storybook=<url>`).
-//   It streams a reply into a 160-message conversation and counts the host requests per turn and per
-//   window focus. Storybook runs development builds, so compare its times only with each other.
-//
-// `bun run perf:web [--runs=5] [--storybook=<url>] [--url=<preview url>] [--out=<folder>]
-//  [--compare=<old report.json>] [--phases=bundle,load,runtime] [--throttle=mobile|none]`
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -47,7 +32,6 @@ const storybook = option("storybook")?.replace(/\/$/, "");
 const comparePath = option("compare");
 const browserExecutable = option("browser-executable");
 
-// One metric: the value of each run, reduced to a median with its range.
 type Samples = Record<string, number[]>;
 interface Report {
   label: string;
@@ -63,8 +47,6 @@ function record(samples: Samples, key: string, value: number): void {
   values.push(Math.round(value * 10) / 10);
   samples[key] = values;
 }
-
-// ---------------------------------------------------------------- bundle
 
 interface ManifestChunk {
   file: string;
@@ -92,7 +74,6 @@ function readManifest(): Record<string, ManifestChunk> {
   return manifest;
 }
 
-/** The files that load with the given chunks: their static imports, and the CSS of each. */
 function closure(manifest: Record<string, ManifestChunk>, keys: readonly string[]): Set<string> {
   const files = new Set<string>();
   const seen = new Set<string>();
@@ -124,8 +105,6 @@ function measureBundle(samples: Samples): void {
     }
     return totals;
   };
-  // The sign-in screen needs the entry, the route and the WebApp chunk. The workspace adds its own
-  // chunk when it is split off; until then it is part of WebApp.
   const signedOut = closure(manifest, [entry, APP_ROUTE_KEY, WEB_APP_KEY]);
   const workspace = closure(manifest, [entry, APP_ROUTE_KEY, WEB_APP_KEY, WEB_WORKSPACE_KEY]);
   for (const [name, files] of [
@@ -141,8 +120,6 @@ function measureBundle(samples: Samples): void {
     }
   }
 }
-
-// ---------------------------------------------------------------- load
 
 async function listen(server: Server): Promise<number> {
   await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
@@ -171,7 +148,6 @@ async function waitForOk(url: string, child: ChildProcess): Promise<void> {
   }
 }
 
-/** Starts `vite preview` of the last build, without secrets. Stops only the process group it started. */
 async function startPreview(): Promise<{ url: string; stop: () => void }> {
   const port = await freePort();
   const child = spawn("bunx", ["vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
@@ -184,9 +160,7 @@ async function startPreview(): Promise<{ url: string; stop: () => void }> {
     if (child.pid !== undefined && child.exitCode === null) {
       try {
         process.kill(-child.pid, "SIGTERM");
-      } catch {
-        // Already gone.
-      }
+      } catch {}
     }
   };
   try {
@@ -202,7 +176,6 @@ const COMPRESSIBLE = /^(text\/|application\/(javascript|json)|image\/svg)/u;
 
 const SIGNED_OUT = JSON.stringify({ error: { code: "sign_in_required", message: "Sign in is required." } });
 
-/** Gzips what the upstream sends uncompressed, as the production edge does. Keeps one copy per asset. */
 async function startGzipProxy(upstream: string): Promise<{ url: string; server: Server }> {
   const cache = new Map<string, { status: number; headers: [string, string][]; body: Buffer }>();
   const server = createServer((request, response) => {
@@ -238,7 +211,6 @@ async function startGzipProxy(upstream: string): Promise<{ url: string; server: 
   return { url: `http://127.0.0.1:${await listen(server)}`, server };
 }
 
-// Records when the sign-in form shows and the long tasks before it, from the first byte of the page.
 const LOAD_OBSERVERS = `(() => {
   const state = { loginMs: null, longTasks: 0, longTaskMs: 0 };
   window.__openbotWebPerf = state;
@@ -295,7 +267,6 @@ const READ_LOAD = `(() => {
 
 async function throttlePage(page: Page): Promise<void> {
   if (throttle === "none") return;
-  // Lighthouse's mobile profile: a 4x slower CPU, 150 ms round trip, 1.6 Mbit/s down, 750 kbit/s up.
   const session = await page.context().newCDPSession(page);
   await session.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await session.send("Network.enable");
@@ -330,7 +301,6 @@ async function measureLoad(browser: Browser, samples: Samples): Promise<void> {
   const proxy = await startGzipProxy(upstream);
   try {
     for (let run = 0; run < runs; run++) {
-      // A new context has an empty cache: the first load is cold, the second reuses the cached assets.
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
       try {
         await loadOnce(context, proxy.url, samples, "load.cold");
@@ -345,8 +315,6 @@ async function measureLoad(browser: Browser, samples: Samples): Promise<void> {
     preview?.stop();
   }
 }
-
-// ---------------------------------------------------------------- runtime
 
 const STREAM_TOKENS = 2000;
 const OTHER_STREAM_TOKENS = 200;
@@ -385,8 +353,6 @@ const CALL_NAMES = new Set([
 
 async function measureRuntime(browser: Browser, samples: Samples): Promise<void> {
   assert.ok(storybook, "The runtime phase needs --storybook=<url> from `bun run storybook`.");
-  // The first open of a story makes Vite bundle its dependencies. One open before the runs keeps
-  // that out of the first reading.
   const warmUp = await browser.newPage();
   await warmUp.goto(`${storybook}/iframe.html?id=${STORY}&viewMode=story`);
   await warmUp.getByText("Question 158:").first().waitFor({ timeout: 300_000 });
@@ -416,7 +382,6 @@ async function measureRuntime(browser: Browser, samples: Samples): Promise<void>
         record(samples, `runtime.stream.${key.replace("render.", "")}`, value);
       recordCalls(samples, "runtime.turn.calls", await readCalls(page), CALL_NAMES);
 
-      // A turn of an agent that is not open.
       await page.evaluate("globalThis.openbotWebBench.resetCalls()");
       await page.evaluate(([tokens, text]) => globalThis.openbotWebBench.stream(tokens, text, true), [
         OTHER_STREAM_TOKENS,
@@ -436,11 +401,8 @@ async function measureRuntime(browser: Browser, samples: Samples): Promise<void>
 }
 
 declare global {
-  // The driver that `src/renderer/src/preview/bench-web-runtime.ts` installs in the story.
   var openbotWebBench: { stream(tokens: number, marker: string, other?: boolean): Promise<void> };
 }
-
-// ---------------------------------------------------------------- report
 
 function parseReport(path: string): Report {
   const parsed = JSON.parse(readFileSync(path, "utf8"));

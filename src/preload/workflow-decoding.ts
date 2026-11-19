@@ -1,6 +1,3 @@
-// What main answers for workflows: the list, one workflow, a save, the version history, runs, and
-// the GitHub catalog, options and event history.
-
 import {
   isWorkflowDetail,
   isWorkflowGitHubCatalog,
@@ -45,7 +42,6 @@ export const decodeWorkflowMediaProviders = guardedDecoder(
   "workflow media providers response",
 );
 
-/** The file id of a picture that the host kept for an asset step. */
 export function decodeWorkflowPictureId(value: unknown): string {
   if (typeof value !== "string" || !value) throw new Error("Invalid workflow picture response.");
   return value;

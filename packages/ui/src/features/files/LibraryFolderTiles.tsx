@@ -12,34 +12,24 @@ import { FavoriteMenuItem, FolderNameField } from "./LibraryFolderTree";
 import type { LibraryDropMark } from "./library-folder-drag";
 import { canHoldFolder } from "./library-folders-view";
 
-/** Where the "New folder" tile makes a folder for the dropped files. */
 export interface LibraryNewFolderTarget {
   agentId: string;
   parentId: string | undefined;
 }
 
 interface LibraryFolderTilesProps {
-  /** The folders of the place, in the sequence of the side panel. */
   folders: readonly LibraryFolder[];
-  /** All folders of the server, for the depth limit. */
   allFolders: readonly LibraryFolder[];
-  /** The agent of each folder shows on its tile: the tiles are of more than one agent. */
   owners: readonly AgentProfile[] | null;
-  /** The files in a folder and in the folders in it. */
   fileCount: (folderId: string) => number;
   folderCount: (folderId: string) => number;
-  /** The newest files in a folder and in the folders in it, newest first. */
   peek: (folderId: string) => readonly StoredFileRow[];
-  /** A drag of files can make a new folder here. Null: the "New folder" tile does not show. */
   newTarget: LibraryNewFolderTarget | null;
   newMark: (agentId: string, parentId: string | undefined) => "into" | undefined;
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
   draggedFolder: (folderId: string) => "" | undefined;
-  /** `""` for a tile that cannot take the drag that is on. */
   dropOff: (agentId: string, folderId: string) => "" | undefined;
-  /** `""` for a short time after a drop on the tile. */
   landed: (agentId: string, folderId: string) => "" | undefined;
-  /** The folder whose tile shows the name field. */
   renaming: string | null;
   isFavorite: (key: string) => boolean;
   canCreate: boolean;
@@ -53,16 +43,13 @@ interface LibraryFolderTilesProps {
   onToggleFavorite: (key: string) => void;
 }
 
-/** The files that stick out of a folder tile. */
 const PEEK = 3;
 
-/** A picture, or the type badge of the file cards: "PDF", "MD", "TS". */
 function PeekFile(props: { file: StoredFileRow }) {
   const picture = () => (fileTypeOf(props.file) === "images" ? props.file.previewUrl : undefined);
   return (
     <span
       class="library-folder-card-sheet"
-      // The web client loads a picture when it shows. The marquee does not select it: no `data-file-id`.
       data-picture-id={props.file.previewKind === "image" && !props.file.previewUrl ? props.file.id : undefined}
     >
       <Show
@@ -190,13 +177,6 @@ function FolderCard(props: { tiles: LibraryFolderTilesProps; folder: LibraryFold
   );
 }
 
-/**
- * The folders of the place above its files, as the folders of a drive: at all files the top folders of
- * each agent, at an agent its top folders, in a folder the folders in it. Each tile shows the newest
- * files in the folder. A click opens the folder; files and folders dropped on a tile go into it, and a
- * drag that stays on a tile opens it. While files are dragged, a "New folder" tile takes them into a
- * new folder.
- */
 export function LibraryFolderTiles(props: LibraryFolderTilesProps) {
   const { t } = useText();
   return (
@@ -207,7 +187,6 @@ export function LibraryFolderTiles(props: LibraryFolderTilesProps) {
         </For>
         <Show when={props.newTarget}>
           {(target) => (
-            // Only a drag of files reaches this tile; it is not a control.
             <li
               class="library-folder-card library-folder-card-new"
               aria-hidden="true"

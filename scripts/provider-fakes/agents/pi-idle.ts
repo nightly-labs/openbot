@@ -1,6 +1,3 @@
-// The Pi of `pi-idle-release-e2e.ts`, on Pi's JSONL RPC (`pi --mode rpc`). A prompt settles at once.
-// `switch_session` changes the session file that `get_state` reports, as a resumed Pi does. Each
-// process logs its start, the sessions it switches to, its prompts and its exit to `FAKE_LOG`.
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";

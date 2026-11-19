@@ -1,19 +1,3 @@
-// Moves a whole setup between two OpenBot profiles with the real transfer service and checks what
-// arrives. Two real agent services run on temporary profiles with a fake Codex app-server.
-//
-// The source has two agents with memories, routines, a chat with a file, a side thread made by a
-// branch, settings that only restrict, and a channel with both agents, a lead, a memory and a routine.
-// It also has two hidden agents with active routines: one stays as written, and the file of the other
-// is changed to the file of an app that stopped a hidden agent, so its routines arrive turned off.
-// The export includes workspace files, server settings, chat history, channel messages and the
-// server preferences, one of which is changed to a value the import does not accept. A second export
-// has the chats without the channel messages. The import goes into the second profile. The check asserts the agents, memories, routines, settings, the channel, the chat
-// messages in order with the file's bytes, the side thread, and that the first turn of an imported
-// agent gets the imported history. It also checks that `Shared/Transfers` is not copied as files.
-// Last, it copies two agents to a fourth profile as Copy to another server does, on desktop (the file
-// on disk) and on mobile (the file as Base64): the routines, workflows and routine canvas places of
-// those agents arrive, and the other server settings and the shared skills stay behind.
-// `bun scripts/instance-transfer-everything-e2e.ts`. Writes .openbot-build/instance-transfer-everything-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -48,7 +32,6 @@ const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const home = join(root, "home");
 
-// Before the service modules load: the Codex process reads these.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -70,7 +53,6 @@ const { HostEventsService } = await import("../src/main/host-events-service");
 
 const HISTORY_MARK = "the blue notebook is on the second shelf";
 
-/** A Codex app-server that answers each turn with "Done." and logs what each turn starts with. */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -196,7 +178,6 @@ function codexLog(): Array<{ method: string; params: unknown }> {
   }
 }
 
-/** One OpenBot profile: its database, stores, agent service and transfer service. */
 function profile(name: string) {
   const userData = join(root, name, "user-data");
   const profileHome = join(root, name, "home");
@@ -235,7 +216,6 @@ function profile(name: string) {
   const pins = new Set<string>();
   const levels = new Map<string, "all" | "needs-me" | "nothing">();
   const approvals = new Map<string, boolean>();
-  // The host-wide preferences, as the Server settings stores keep them.
   const serverPreferences: {
     timezone: string | null;
     personality: { responseStyle: ResponseStyle };
@@ -269,7 +249,6 @@ function profile(name: string) {
     modelVisibility: [],
     turnLimits: { turnLimit: null, agentTaskLimit: null },
   };
-  // The server's name and logo, as Server settings > General keeps them.
   const identity: {
     name: string;
     logo: { path: string; mimeType: "image/png" } | null;
@@ -279,9 +258,7 @@ function profile(name: string) {
     logo: null,
     saved: [],
   };
-  // Members' choices by account. Each server has its own member ids for the same accounts.
   const members = new Map<string, MemberPreferences<string>>();
-  /** One preference of the in-memory server settings, as the transfer port reads and writes it. */
   const preference = <K extends keyof typeof serverPreferences>(key: K) => ({
     get: () => serverPreferences[key],
     set: (value: (typeof serverPreferences)[K]) =>
@@ -294,10 +271,12 @@ function profile(name: string) {
     skills: { library: () => library, installLocal: () => Effect.void },
     sharedSkills: {
       list: () =>
-        library
-          .list()
-          .pipe(Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version })))),
-      // No agent of the check installs a library skill, so each one counts as shared.
+        library.listWithUnreadable().pipe(
+          Effect.map(({ skills, unreadable }) => ({
+            skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+            unreadable: unreadable.map(({ skillId }) => skillId),
+          })),
+        ),
       assigned: () => Effect.succeed(new Set<string>()),
       bundle: (id, version) => library.bundle(id, version),
       add: (bytes) => library.createFromBundle(bytes),
@@ -419,9 +398,7 @@ try {
   await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
   const source = profile("source");
   const target = profile("target");
-  // A server that a released client imports into: "Import server settings" without the new flag.
   const released = profile("released");
-  // The destinations of Copy to another server, from desktop and from mobile.
   const copied = profile("copied");
   const copiedOnPhone = profile("copied-on-phone");
   await runCauseEffect(source.agents.initialize());
@@ -430,7 +407,6 @@ try {
   await runCauseEffect(copied.agents.initialize());
   await runCauseEffect(copiedOnPhone.agents.initialize());
 
-  // --- The source setup.
   const create = (name: string) =>
     runCauseEffect(
       source.agents.createAgentProfile({
@@ -452,8 +428,6 @@ try {
     schedule: { kind: "daily", time: "08:00" },
   });
   await runCauseEffect(source.agents.updateAgent({ agentId: editor.id, computerUse: false, allowAutomation: true }));
-  // Two hidden agents with an active routine each. The file of the first one is changed below to the
-  // file of an app that stopped a hidden agent.
   const archivist = await create("Archivist");
   const keeper = await create("Keeper");
   for (const agent of [archivist, keeper]) {
@@ -481,7 +455,6 @@ try {
   source.levels.set(writer.id, "needs-me");
   source.approvals.set(editor.id, false);
 
-  // A real chat turn with a file, then a branch of it as a side thread.
   const notePath = join(root, "shelf-note.txt");
   const noteBytes = new TextEncoder().encode(`Note: ${HISTORY_MARK}.\n`);
   await writeFile(notePath, noteBytes);
@@ -494,7 +467,6 @@ try {
     }),
   );
   await idle(source.agents, writer.id);
-  // A test run of the writer's routine, which leaves a finished run and its messages in the chat.
   const sourceRun = await runCauseEffect(source.agents.testRoutine({ agentId: writer.id, routineId: routine.id }));
   await idle(source.agents, writer.id);
   const finishedRun = await waitFor("the test run to finish", () =>
@@ -537,7 +509,6 @@ try {
       { id: "local", name: "You" },
     ),
   );
-  // A database can keep channel instructions from before the 2,000-character limit (#5929).
   const longDesk = await runCauseEffect(
     source.agents.channels.command(
       {
@@ -566,7 +537,6 @@ try {
     schedule: { kind: "daily", time: "17:00" },
   });
 
-  // A real message with a file in the channel, which an agent answers.
   const layoutPath = join(root, "front-page-layout.txt");
   const layoutBytes = new TextEncoder().encode("Lead story left, weather right.\n");
   await writeFile(layoutPath, layoutBytes);
@@ -578,7 +548,6 @@ try {
         operationId: randomUUID(),
         channelId: channel.id,
         text: "Plan the front page.",
-        // To one member, so no routing turn runs.
         recipientAgentId: writer.id,
         replyToMessageId: null,
         attachmentDraftIds: channelDrafts.map((draft) => draft.id),
@@ -591,7 +560,6 @@ try {
     return messages.some((entry) => entry.author.kind === "agent" && entry.message.status === "completed") && messages;
   });
 
-  // A routine that a webhook starts, and the places of the routines on the writer's canvas.
   const hooked = await runCauseEffect(
     source.events.saveRoutine({
       owner: { kind: "agent", id: writer.id },
@@ -608,7 +576,6 @@ try {
     { nodeKey: `agent:${editor.id}`, x: 520, y: 40 },
   ]);
 
-  // A workflow with an agent step, a channel output, a Slack trigger and a webhook trigger.
   const at = { x: 0, y: 0 };
   source.workflows.create({
     title: "Paper pipeline",
@@ -632,7 +599,6 @@ try {
     },
   });
 
-  // A workflow that only posts to the channel of the copied agents.
   source.workflows.create({
     title: "Channel digest",
     graph: {
@@ -641,7 +607,6 @@ try {
       strokes: [],
     },
   });
-  // A workflow of an agent that the copy leaves out.
   source.workflows.create({
     title: "Archive sweep",
     graph: {
@@ -651,7 +616,6 @@ try {
     },
   });
 
-  // --- Server preferences that differ from a new server's.
   Object.assign(source.serverPreferences, {
     timezone: "Europe/Warsaw",
     personality: { responseStyle: "classic" },
@@ -665,13 +629,11 @@ try {
     browsingMemory: { enabled: false },
     claudeUserSetup: true,
     claudeCompactWindow: 400_000,
-    // The member who gets the alerts belongs to the old server; the import gives them to the owner.
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],
     turnLimits: { turnLimit: "unlimited", agentTaskLimit: 6 },
   } satisfies typeof source.serverPreferences);
 
-  // Shared skills that no agent has. The target already has one with the same name and other files.
   const fflate = await import("fflate");
   const skillBundle = (name: string, body: string) =>
     fflate.zipSync({
@@ -681,7 +643,6 @@ try {
   await runCauseEffect(source.library.createFromBundle(skillBundle("Fact check", "Check two sources.")));
   await runCauseEffect(target.library.createFromBundle(skillBundle("Fact check", "Check one source.")));
 
-  // A logo for the source server: a 1×1 PNG.
   const logoPath = join(root, "server-logo.png");
   const logoBytes = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -690,7 +651,6 @@ try {
   await writeFile(logoPath, logoBytes);
   source.identity.logo = { path: logoPath, mimeType: "image/png" };
 
-  // Two members with their choices. Only the first one has joined the target server, with no choices yet.
   source.members.set("account-ada", {
     accountId: "account-ada",
     server: "needs-me",
@@ -703,7 +663,6 @@ try {
   source.members.set("account-bob", { accountId: "account-bob", server: "all", agents: [], pins: [] });
   target.members.set("account-ada", { accountId: "account-ada", server: null, agents: [], pins: [] });
 
-  // --- The chats without the channel messages: each part is chosen on its own.
   const chatsOnly = join(root, "chats-only.zip");
   await runCauseEffect(
     source.transfer.exportTo(chatsOnly, {
@@ -734,7 +693,6 @@ try {
     pass("a file without server preferences has none", chatsManifest.serverPreferences === undefined);
   }
 
-  // --- Export everything.
   const file = join(root, "transfer.zip");
   const exported = await runCauseEffect(
     source.transfer.exportTo(file, {
@@ -762,7 +720,6 @@ try {
       manifest.serverPreferences.ownerNotificationLevel === "needs-me",
     JSON.stringify(manifest.serverPreferences),
   );
-  // A value that this app does not accept is left out, and the other preferences are still saved.
   if (manifest.serverPreferences) manifest.serverPreferences.promptCacheTtl = "9h";
   const filePreferences = (name: string) => manifest.agents.find((agent) => agent.name === name)?.preferences;
   pass(
@@ -772,7 +729,6 @@ try {
     ),
     JSON.stringify([filePreferences("Archivist"), filePreferences("Keeper")]),
   );
-  // An app that stopped a hidden agent wrote `hidden` only.
   delete filePreferences("Archivist")?.hiddenWorks;
   archive[INSTANCE_TRANSFER_MANIFEST] = new TextEncoder().encode(JSON.stringify(manifest));
   await writeFile(file, zipSync(archive));
@@ -781,10 +737,8 @@ try {
     !Object.keys(archive).some((name) => name.toLowerCase().startsWith("shared/transfers/")),
   );
 
-  // --- Import into the second profile.
   const preview = await runCauseEffect(target.transfer.stage(file));
   pass("preview offers each agent", preview.agents.length === 4);
-  // The open views read a channel again on each change that the channel service publishes.
   const published: { channelId: string; revision: number }[] = [];
   target.agents.on("event", (event: AgentEvent) => {
     if (event.type === "channels-changed") published.push({ channelId: event.channelId, revision: event.revision });
@@ -1061,11 +1015,8 @@ try {
       result.warnings.some((warning) => warning.startsWith("Paper pipeline:") && warning.includes("connection")),
   );
 
-  // --- The chats.
   const page = await runCauseEffect(target.agents.readConversationPageFor(newWriter.id, "local"));
   const texts = (messages: readonly { text: string }[]) => messages.map((message) => message.text);
-  // The shown order of both chats: a message with no turn, such as a routine run's status, has its
-  // place by time there, and the stored order of the source can differ from it.
   const sourcePage = await runCauseEffect(source.agents.readConversationPageFor(writer.id, "local"));
   pass(
     "the chat shows the same messages in order",
@@ -1100,7 +1051,6 @@ try {
     newWriter.threadId !== null && target.database.threadHasEvent(newWriter.threadId, HISTORY_IMPORTED_EVENT),
   );
 
-  // --- The first turn of the imported agent gets the history.
   const before = codexLog().length;
   await runCauseEffect(target.agents.sendMessage({ agentId: newWriter.id, text: "Where is the notebook?" }));
   await idle(target.agents, newWriter.id);
@@ -1112,13 +1062,11 @@ try {
     started.some((params) => params.includes(HISTORY_MARK)),
   );
 
-  // --- Copy to another server: two agents with their settings, from desktop and from mobile.
   const copyFile = join(root, "copy.zip");
   await runCauseEffect(
     source.transfer.exportTo(copyFile, { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true }),
   );
   const exportedCopy = new Uint8Array(await readFile(copyFile));
-  // This computer's export for a copy does not read the shared skills.
   const localCopyFile = join(root, "copy-local.zip");
   const localExport = await runCauseEffect(
     source.transfer.prepareExport(

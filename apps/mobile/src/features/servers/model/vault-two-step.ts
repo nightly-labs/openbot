@@ -1,8 +1,3 @@
-// Two-step (TOTP) codes of the Vault of a joined server (`vault-v3`). The host keeps each saved key and
-// sends only the current codes. The phone makes a code only from a key that the user typed or scanned
-// in the setup steps and has not saved yet, so the user can check the key on the site before saving it.
-// Hermes has no `crypto.subtle`, so the phone makes the HMAC from the native digests of `expo-crypto`.
-
 import type { VaultTwoStepCodes } from "@openbot/contracts/ipc";
 import {
   parseTwoStepKey,
@@ -21,31 +16,21 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/** A code and the time when the next one starts. */
 export interface LiveTwoStepCode {
   code: string;
-  /** Seconds that one code is valid. */
   period: number;
-  /** Milliseconds since 1970. */
   expiresAt: number;
 }
 
-/** The time after a failed load before the codes load again, as on desktop. */
 const RETRY_MS = 30_000;
-/**
- * The time after a code runs out that it still shows while the next codes load. Sites also accept the
- * previous code, so a copy in this time still works.
- */
 const RELOAD_GRACE_MS = 5_000;
 
-/** The time, once a second while `active`. */
 export function useSecondClock(active = true): number {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!active) return;
     setNow(Date.now());
     let timer: ReturnType<typeof setTimeout>;
-    // Each tick lands just after a whole second, so a code changes with the clock of the site.
     const schedule = () => {
       timer = setTimeout(
         () => {
@@ -61,16 +46,10 @@ export function useSecondClock(active = true): number {
   return now;
 }
 
-/** Whole seconds until the next code. */
 export function secondsLeft(code: LiveTwoStepCode, now: number): number {
   return Math.max(0, Math.ceil((code.expiresAt - now) / 1000));
 }
 
-/**
- * The current codes of the host logins with a key, while the page shows. They load again when the
- * first one runs out, after a saved change (`useServerVault` marks them stale), and 30 seconds after
- * a failed load.
- */
 export function useServerVaultCodes(serverId: string, hasKeys: boolean) {
   const { canManageVaultTwoStep } = useMobileWorkspace();
   const { loadVaultCodes } = useMobileWorkspaceActions();
@@ -100,9 +79,6 @@ export function useServerVaultCodes(serverId: string, hasKeys: boolean) {
       return Math.max(250, first - Date.now() + 50);
     },
   });
-  // A code that ran out stays for a short time while the next codes load, so it does not flash at each
-  // change. A load can wait minutes for an offline host, and a failed load keeps the last codes, so the
-  // limit is a time and not the load state.
   const code = (id: string) => {
     const live = query.data?.get(id);
     return live && live.expiresAt + RELOAD_GRACE_MS > Date.now() ? live : undefined;
@@ -118,7 +94,6 @@ const DIGESTS = {
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
-/** HMAC (RFC 2104) from the native digest. */
 async function hmac(name: TwoStepAlgorithm, key: Bytes, message: Bytes): Promise<Bytes> {
   const { algorithm, block } = DIGESTS[name];
   const hash = async (data: Bytes): Promise<Bytes> => new Uint8Array(await digest(algorithm, data));
@@ -134,20 +109,16 @@ async function hmac(name: TwoStepAlgorithm, key: Bytes, message: Bytes): Promise
   return hash(outer);
 }
 
-/** The code of `key` at `at` (milliseconds since 1970). */
 async function draftCode(key: TwoStepKey, at: number): Promise<string> {
   return twoStepCodeFromMac(await hmac(key.algorithm, key.secret, twoStepMessage(key.period, at)), key.digits);
 }
 
-/** The live code of a key that the user typed and has not saved. Undefined for no key or an invalid one. */
 export function useDraftTwoStepCode(keyText: string) {
   const key = useMemo(() => (keyText.trim() ? parseTwoStepKey(keyText) : null), [keyText]);
   const now = useSecondClock(key !== null);
   const [shown, setShown] = useState<{ key: TwoStepKey; code: LiveTwoStepCode } | null>(null);
   const run = useRef(0);
   const ofKey = shown && shown.key === key ? shown.code : undefined;
-  // The tick when no current code is ready, or 0. The effect runs again at each such tick, so a failed
-  // digest tries again.
   const staleAt = !ofKey || ofKey.expiresAt <= now ? now : 0;
   useEffect(() => {
     if (!key || staleAt === 0) return;
@@ -158,21 +129,13 @@ export function useDraftTwoStepCode(keyText: string) {
         if (ticket !== run.current) return;
         setShown({ key, code: { code, period: key.period, expiresAt: at + twoStepRemainingMs(key.period, at) } });
       },
-      // A failed digest keeps the last code until the next try. The key is still saved as typed; the
-      // host checks it.
       () => undefined,
     );
   }, [key, staleAt]);
-  // The last code stays until the next one is ready, so the digits do not flash a placeholder.
   return { code: key ? ofKey : undefined, now, valid: key !== null };
 }
 
-/**
- * The setup in progress: the key text that the key step, the scanner and the check step share. It
- * stays in memory only. The login page takes the finished key and clears it.
- */
 interface TwoStepSetupStore {
-  /** The login form that started the setup. */
   formId: string | null;
   site: string;
   keyText: string;
@@ -181,7 +144,6 @@ interface TwoStepSetupStore {
   setKeyText: (keyText: string) => void;
   finish: () => void;
   take: (formId: string) => string | null;
-  /** Ends a setup that the user left without Done, so the key does not stay in memory. */
   cancel: (formId: string) => void;
   clear: (formId: string) => void;
 }

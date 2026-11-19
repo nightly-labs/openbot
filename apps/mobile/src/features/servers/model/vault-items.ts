@@ -12,7 +12,6 @@ import {
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import type { MobileText } from "@/shared/lib/text";
 
-/** The host name of a login's website, as the desktop Vault lists it. */
 export function vaultLoginTitle(login: Pick<VaultLoginSummary, "website">): string {
   const website = login.website.trim();
   try {
@@ -32,10 +31,6 @@ export function vaultContactTitle(contact: VaultContactSummary, t: MobileText["t
   );
 }
 
-/**
- * The countries that the mobile contact form names. Each needs a catalog key in each language, so
- * the list is shorter than the desktop list (`VAULT_COUNTRY_CODES`).
- */
 const MOBILE_COUNTRY_CODES = [
   "AT",
   "AU",
@@ -78,7 +73,6 @@ const COUNTRY_NAMES = {
   US: "mobile.server.vault.countryName.US",
 } as const satisfies Record<MobileCountryCode, MobileTextKey>;
 
-/** Example values of an address, in the format of one country. */
 export interface VaultAddressExample {
   address: string;
   city: string;
@@ -87,10 +81,6 @@ export interface VaultAddressExample {
   phone: string;
 }
 
-/**
- * The placeholders of the contact form: a real place in the format of the chosen country, so the
- * user sees how to write each value. An address is written the same in each app language.
- */
 const ADDRESS_EXAMPLES = {
   AT: { address: "Stephansplatz 1", city: "Wien", region: "Wien", postalCode: "1010", phone: "+43 1 234 5678" },
   AU: { address: "1 Martin Place", city: "Sydney", region: "NSW", postalCode: "2000", phone: "+61 2 9876 5432" },
@@ -165,16 +155,11 @@ const ADDRESS_EXAMPLES = {
   },
 } as const satisfies Record<MobileCountryCode, VaultAddressExample>;
 
-/** The address placeholders for `country`. With no country, or one outside the list, a US address. */
 export function vaultAddressExample(country: string): VaultAddressExample {
   const code = MOBILE_COUNTRY_CODES.find((candidate) => candidate === country.toUpperCase());
   return ADDRESS_EXAMPLES[code ?? "US"];
 }
 
-/**
- * The country choices of the contact form, sorted by name. A saved country outside the list, such
- * as one that an agent saved, stays a choice under its code.
- */
 export function vaultCountryOptions(t: MobileText["t"], current: string): { value: string; label: string }[] {
   const countries = MOBILE_COUNTRY_CODES.map((code) => ({ value: code, label: t(COUNTRY_NAMES[code]) })).sort((a, b) =>
     a.label.localeCompare(b.label),
@@ -184,10 +169,6 @@ export function vaultCountryOptions(t: MobileText["t"], current: string): { valu
   return [{ value: "", label: t("mobile.server.vault.countryNone") }, ...saved, ...countries];
 }
 
-/**
- * The text of the item form. A secret field starts empty: the host never sends a saved secret, so an
- * empty secret of a saved item keeps the saved one.
- */
 export interface VaultDraft extends VaultContactFields {
   website: string;
   username: string;
@@ -200,18 +181,9 @@ export interface VaultDraft extends VaultContactFields {
   securityCode: string;
   billingContactId: string;
   fillSites: string[];
-  /** The environment variable name of an API key. */
   name: string;
   key: string;
-  /**
-   * The two-step key of a login: null keeps the saved key, "" removes it, and other text is a new
-   * setup key or `otpauth://totp/` link. The host never sends a saved key.
-   */
   twoStepKey: string | null;
-  /**
-   * The ids of the agents that can use the item, or null for every agent, also each agent that is
-   * added later. Only a `vault-v4` host keeps it.
-   */
   agents: string[] | null;
 }
 
@@ -271,28 +243,20 @@ export function vaultDraft(item: VaultItemSummary | undefined): VaultDraft {
   }
 }
 
-/** A whole number from the text of a field, or null. */
 function whole(value: string): number | null {
   return /^\d{1,4}$/u.test(value.trim()) ? Number(value.trim()) : null;
 }
 
-/** The agent summary of an item that is for chosen agents: one agent's name, or "2 of 5". */
 export function vaultAgentsSummary(
   scope: readonly string[],
   agents: readonly { id: string; name: string }[],
   t: MobileText["t"],
 ): string {
-  // An id of an agent that the server no longer has does not count.
   const chosen = agents.filter((agent) => scope.includes(agent.id));
   if (chosen.length === 1 && chosen[0]) return chosen[0].name;
   return t("mobile.server.vault.agentsSome", { chosen: chosen.length, total: agents.length });
 }
 
-/**
- * The save input of `draft`, or null while a required field is empty. The host checks every value
- * again, with the rules of its own Vault page, and answers a wrong one with that page's sentence.
- * With `agentScope` (a `vault-v4` host) it carries the agents; without, the saved agents stay.
- */
 export function vaultSaveInput(
   kind: VaultItemKind,
   id: string | null,
@@ -300,7 +264,6 @@ export function vaultSaveInput(
   agentScope = false,
 ): VaultSaveInput | null {
   if (!agentScope) return vaultItemInput(kind, id, draft);
-  // The host refuses an item for no agent.
   if (draft.agents?.length === 0) return null;
   const item = vaultItemInput(kind, id, draft);
   return item && { ...item, agents: draft.agents === null ? null : [...draft.agents] };
@@ -318,7 +281,6 @@ function vaultItemInput(kind: VaultItemKind, id: string | null, draft: VaultDraf
         username: draft.username.trim(),
         notes: draft.notes.trim(),
         password: secret(draft.password),
-        // Only a `vault-v3` host takes the field. The form sets it only for such a host.
         ...(draft.twoStepKey === null ? {} : { twoStepKey: draft.twoStepKey }),
       };
     }

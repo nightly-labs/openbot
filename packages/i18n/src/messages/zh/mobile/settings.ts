@@ -269,6 +269,7 @@ export const messages = {
   "mobile.settings.conversations.media": "照片和文件",
   "mobile.settings.conversations.swipeLeft": "在助手聊天中向左滑动",
   "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
+  "mobile.settings.conversations.swipeQuestion": "旁问",
   "mobile.settings.conversations.swipeThreads": "话题",
   "mobile.settings.conversations.swipeBrowser": "浏览器",
   "mobile.settings.conversations.swipeOff": "关闭",
@@ -540,7 +541,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "选择智能体",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot 已锁定",
   "mobile.settings.shortcuts.card.locked.action": "打开 OpenBot",
-  "mobile.settings.shortcuts.footer": "“快捷指令”App 中的 Send Message 会发送给此智能体。App 不会打开。",
+  "mobile.settings.shortcuts.footer":
+    "“快捷指令”App 中的 Send Message 会发送给此智能体。App 不会打开。Open Agent 会打开此智能体的聊天。",
   "mobile.settings.shortcuts.send.sent": "已发送",
   "mobile.settings.shortcuts.send.failed": "OpenBot 无法发送此消息。",
   "mobile.settings.shortcuts.send.unconfirmed": "服务器没有应答。消息可能已在聊天中。",

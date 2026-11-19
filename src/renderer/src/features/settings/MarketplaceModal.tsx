@@ -18,32 +18,13 @@ import {
 } from "./marketplace-controller";
 
 export interface MarketplaceModalProps extends MarketplaceControllerProps {
-  /**
-   * The listing an `openbot://plugins/<slug>` link or a chat suggestion asked for. It opens the app
-   * page; a link never connects, so what a link can do is show a user a listing they then decide
-   * about.
-   */
   initialPluginSlug?: string | undefined;
-  /**
-   * The person pressed Connect for `initialPluginSlug` on a chat suggestion card, so the page starts
-   * the connect step with its sign-in and approval dialogs. An agent cannot set it.
-   */
   initialPluginConnect?: boolean | undefined;
-  /**
-   * Runs after the modal consumes `initialPluginSlug`. The owner clears the pending slug there, so
-   * a second link to the same listing reads as a new request instead of no change.
-   */
   onInitialPluginSlugConsumed?: (() => void) | undefined;
-  /**
-   * The agent or skill a Marketplace link names. The page opens on its listing when the catalog has
-   * it; a link never adds, so the user still decides on the page.
-   */
   initialListing?: MarketplaceListingLink | undefined;
-  /** Runs after the modal consumes `initialListing`, as `onInitialPluginSlugConsumed` does. */
   onInitialListingConsumed?: (() => void) | undefined;
 }
 
-/** The Marketplace on this computer's or a joined server's data, with the dialogs it opens. */
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const { t } = useText();
   const nav = createMarketplaceNavigation();
@@ -61,16 +42,11 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
   const skillConfirmLabel = (confirm: PendingSkillConfirm) =>
     t(confirm.kind === "replace" ? "skill.confirm.replace" : "skill.confirm.remove");
   const skillConfirmTone = (confirm: PendingSkillConfirm) => (confirm.kind === "replace" ? "default" : "destructive");
-  /**
-   * A Connect press from a chat card. It runs when the listing is in the apps and their states are
-   * read, so an installed app is not installed again.
-   */
   const [connectWhenReady, setConnectWhenReady] = createSignal<string | null>(null);
   const startConnect = (slug: string) => {
     const model = controller.model;
     const app = model.apps().find((candidate) => candidate.id === slug);
     if (!app || app.status === "connected") return;
-    // A connector's page, which is open now, shows its dialogs, such as GitHub's device code.
     if (app.kind === "connector") {
       if (app.status === "idle") model.connector(app.connector)?.connect?.();
     } else if (app.kind === "plugin" && model.canConnectApps()) void model.connectApp(app);
@@ -80,7 +56,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     () => (props.open ? props.initialPluginSlug : undefined),
     (slug) => {
       if (!slug) return;
-      // A link replaces the page on screen. The page opens on Apps.
       nav.reset();
       setConnectWhenReady(untrack(() => props.initialPluginConnect) === true ? slug : null);
       if (untrack(() => controller.model.apps().some((app) => app.id === slug))) {
@@ -90,22 +65,17 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           draft.missingApp = slug;
         });
       }
-      // The page holds this listing now, so the owner forgets the link: the same slug arriving
-      // again changes the signal from nothing, and this effect runs for it.
       untrack(() => props.onInitialPluginSlugConsumed)?.();
     },
   );
 
-  /* A newer link, or a close, drops the answer to an older one. */
   let listingRequest = 0;
   createEffect(
     () => (props.open ? props.initialListing : undefined),
     (link) => {
-      // The owner clears the link when it is consumed, and that run must keep the answer it waits for.
       if (!link) return;
       listingRequest += 1;
       const request = listingRequest;
-      // A link replaces the page on screen, as a plugin link does.
       nav.reset();
       untrack(() => props.onInitialListingConsumed)?.();
       void controller.readListing(link).then((listing) => {
@@ -122,9 +92,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
   );
 
-  /* Sign in on an agent's card opens the row's page once the rows are read. A custom row's card
-     then starts the sign-in; an app's page has its own Reconnect. The page id, not an object, so a
-     new read of the rows does not open the page again. */
   createEffect(
     () => {
       const id = props.open ? props.mcpSignInRequest : undefined;
@@ -134,12 +101,10 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       if (app === undefined) return;
       nav.reset();
       if (app) nav.go({ kind: "app", id: app });
-      // Only a custom row's card takes the request; another page, or no row, ends it here.
       if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 
-  /* GitHub joins the apps only when its status read ends. A link that came first opens its page then. */
   createEffect(
     () => {
       const slug = nav.state.missingApp;
@@ -154,7 +119,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     () => {
       const slug = connectWhenReady();
       if (!slug) return null;
-      // A connector shows "idle" before its first read, so a connected one could connect again.
       const read = (app: MarketplaceApp) =>
         app.kind !== "connector" || controller.model.connector(app.connector)?.ready() === true;
       return controller.appStatesRead() && controller.model.apps().some((app) => app.id === slug && read(app))
@@ -167,8 +131,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       untrack(() => startConnect(slug));
     },
   );
-  // Slack, Discord, Telegram and WhatsApp change with no event from main, so each available connector is
-  // followed while the window is open.
   createEffect(
     () => (props.open ? props.connectors?.available() : undefined),
     (controllers) => {
@@ -178,7 +140,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
       };
     },
   );
-  /* A Connect press ends with the window, so a later open does not connect. */
   createEffect(
     () => props.open,
     (open) => {
@@ -191,8 +152,6 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
   return (
     <>
       <Marketplace model={controller.model} nav={nav} open={props.open} onOpenChange={props.onOpenChange} />
-      {/* The confirmation and the connect step are beside the Marketplace: each is one decision
-          over the page it was started from, not a part of that page. */}
       <Show when={controller.uninstalling()} keyed>
         {(plugin) => (
           <PluginUninstallDialog
@@ -255,10 +214,8 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             hostName={props.pluginHostName}
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
             onCancelSignIn={controller.cancelSignIn}
+            onCopySignInLink={props.pluginHostName ? undefined : controller.copySignInLink()}
             signInExtra={
-              /* The page opens in this computer's browser; the paste field is the way back when the
-                 browser cannot reach this computer's listener. A page that only the joined server can
-                 reach shows in the server's own tab instead. */
               <>
                 <Show when={controller.signInHostPage()} keyed>
                   {(page) => (

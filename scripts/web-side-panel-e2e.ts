@@ -1,13 +1,3 @@
-// Checks that the right side panel of the web client has the layout and the behavior of the desktop
-// panel (#2550). Drives the `Web/Workspace/Connected` and `App/Playground` stories of a running
-// Storybook side by side at common desktop widths: default state, the pane list, the Agent settings
-// tab and pane, Maximize and Restore, a resize, and Delete on a tab. At a phone width the web client
-// alone is checked: an open pane takes the full width under the chat header, which keeps its panel
-// button, and the tab row does not cover it.
-//
-// `bun scripts/web-side-panel-e2e.ts --storybook=<url> [--browser-executable=<path>]`
-// Writes .openbot-build/web-side-panel-e2e/report.json and a screenshot of each client, width and
-// state, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -20,10 +10,6 @@ const DESKTOP_WIDTHS = [1280, 1024];
 const PHONE_WIDTH = 390;
 const HEIGHT = 800;
 const RESIZE_BY = 100;
-/**
- * The parts of the panel, and the chat header beside it, that both clients draw with the same markup.
- * The chat and the composer are left out: the height of the composer follows its content.
- */
 const PARTS = [
   ".conversation-header",
   ".side-panel-header",
@@ -53,7 +39,6 @@ interface Part {
   style: string;
 }
 
-/** The box and the visible style of each part that shows. */
 async function measure(page: Page): Promise<Record<string, Part>> {
   return page.evaluate((selectors) => {
     const parts: Record<string, Part> = {};
@@ -75,7 +60,6 @@ async function measure(page: Page): Promise<Record<string, Part>> {
   }, PARTS);
 }
 
-/** The parts that differ between the two clients. */
 function differences(web: Record<string, Part>, desktop: Record<string, Part>) {
   const found: Record<string, { web?: Part; desktop?: Part }> = {};
   for (const selector of PARTS) {
@@ -87,7 +71,6 @@ function differences(web: Record<string, Part>, desktop: Record<string, Part>) {
   return found;
 }
 
-/** Waits until the animations of the panel and of the chat beside it end. */
 async function settled(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const panel = document.querySelector(".conversation-panel");
@@ -115,12 +98,10 @@ async function shot(page: Page, name: string): Promise<void> {
 
 async function openSettings(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Open Agent settings" }).click();
-  // The settings pane loads on first use.
   await page.locator(".conversation-panel .settings-panel").waitFor({ timeout: 60_000 });
   await settled(page);
 }
 
-/** One client at one desktop width, through the states that both clients have. */
 async function desktopStates(browser: Browser, client: Client, width: number) {
   const page = await open(browser, client, width);
   const toggle = page.locator(".side-panel-toggle").first();
@@ -160,11 +141,9 @@ async function desktopStates(browser: Browser, client: Client, width: number) {
     states.resized = await measure(page);
     const after = await page.locator(".conversation-panel .settings-panel").evaluate((element) => element.clientWidth);
 
-    // Delete closes the focused tab, and the focus goes to the pane list that takes its place.
     await page.locator(".side-panel-tab-select").first().focus();
     await page.keyboard.press("Delete");
     await page.locator(".side-panel-launcher").waitFor();
-    // The pane list takes the focus after it renders.
     const focusAfterDelete = await page
       .waitForFunction(() => document.activeElement?.classList.contains("side-panel-launch"), undefined, {
         timeout: 10_000,
@@ -181,7 +160,6 @@ async function desktopStates(browser: Browser, client: Client, width: number) {
   }
 }
 
-/** Does a click at the middle of the element reach it, and not a part drawn over it? */
 function reachable(element: Locator): Promise<boolean> {
   return element.evaluate((target) => {
     const box = target.getBoundingClientRect();
@@ -208,7 +186,6 @@ async function phone(browser: Browser) {
     await settled(page);
     const maximized = await measure(page);
     await shot(page, `web-${PHONE_WIDTH}-maximized`);
-    // A maximized pane covers the chat header, so its own button closes the panel.
     await page.locator(".side-panel-actions").getByRole("button", { name: "Close side panel" }).click();
     await page.locator(".side-panel-header").waitFor({ state: "detached" });
     return { launcher, toggleReachable, settings, settingsToggleReachable, maximized };

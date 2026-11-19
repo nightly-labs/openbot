@@ -1,16 +1,5 @@
 import * as SecureStore from "expo-secure-store";
 
-/**
- * Keychain items that the app can read while the phone is locked: the session, the server keys and
- * the server choices. iOS opens these items after the first unlock since the phone started, and they
- * stay on this device.
- *
- * iOS keeps the class of an item that already exists, and an earlier version saved these items for an
- * unlocked phone only. So they move to their own keychain service with the same key: the first read
- * of an old item writes the new one before it deletes the old one, and a failed step loses nothing.
- * The operations on one key run in order, so a read that moves an old value cannot overwrite a newer
- * write.
- */
 const OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: "openbot.after-first-unlock",
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
@@ -35,7 +24,6 @@ export function getItemAsync(key: string): Promise<string | null> {
   return inOrder(key, async () => {
     const value = await SecureStore.getItemAsync(key, OPTIONS);
     if (value !== null) return value;
-    // Throws while the phone is locked, until the app has moved the item once.
     const old = await SecureStore.getItemAsync(key);
     if (old === null) return null;
     await SecureStore.setItemAsync(key, old, OPTIONS);
@@ -58,7 +46,6 @@ export function deleteItemAsync(key: string): Promise<void> {
   });
 }
 
-/** The synchronous read. The old item goes after the new one is written. */
 export function getItem(key: string): string | null {
   const value = SecureStore.getItem(key, OPTIONS);
   if (value !== null) return value;

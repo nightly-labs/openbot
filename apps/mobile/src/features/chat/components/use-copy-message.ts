@@ -4,7 +4,6 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** How long Copy shows its check mark, as on desktop. */
 const COPIED_MS = 1_400;
 
 export function useCopyMessage(text: string) {

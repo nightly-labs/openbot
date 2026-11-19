@@ -16,16 +16,11 @@ import type { ConversationProps } from "./conversation-types";
 
 export interface SettingLinkChatCardProps {
   settingId: SettingLinkId;
-  /** The agent whose chat shows the card. Null in a channel, where no agent settings panel is open. */
   agent: { id: string; name: string } | null;
   onOpenAgentSetting: (agentId: string, settingId: AgentSettingLinkId) => void;
   appSettingOpener?: ConversationProps["appSettingOpener"];
 }
 
-/**
- * A setting that an agent showed with `show_setting`. An app setting opens Settings of this computer at
- * the row; an agent setting opens the agent settings in the side panel at the row.
- */
 export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
   const { t } = useText();
   const platform = usePlatform();
@@ -55,7 +50,6 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
   return <SettingLinkCard title={card().title} path={card().path} onOpen={card().open} note={card().note} />;
 }
 
-/** The setting card of a side thread message, as the agent's own chat draws it. Another message keeps its row. */
 export function useThreadSettingLinkCard() {
   const { props, channel, openAgentSettingRow } = useConversationViewScope();
   return (message: AgentMessage) => {

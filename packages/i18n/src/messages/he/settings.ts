@@ -23,6 +23,11 @@ export const messages = {
   "settings.codeFont.title": "גופן הקוד",
   "settings.codeFont.description": "הגופן של הקוד, המסופים ונתיבי הקבצים.",
   "settings.codeFont.default": "ברירת מחדל",
+  "settings.motion.title": "תנועה",
+  "settings.backgroundBlur.title": "טשטוש רקע",
+  "settings.backgroundBlur.description": "טשטוש מאחורי תפריטים ותיבות דו-שיח. כבוי בהתחלה במחשב בלי GPU.",
+  "settings.movingFaces.title": "פני סוכנים זזות",
+  "settings.movingFaces.description": "פני הסוכנים ממצמצות וזזות. בהתחלה הן נייחות במחשב בלי GPU.",
   "settings.logoColor.title": "צבע הלוגו",
   "settings.logoColor.description": "מוצג ב-Dock, בשורת המשימות וב-Dynamic Island.",
   "settings.logoColor.buildNote": "הגרסה הזו שומרת על צבע לוגו משלה. הבחירה חלה על אפליקציית ההפצה.",
@@ -828,6 +833,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "settings.transfer.copy.submit": { one: "העתקת סוכן אחד", two: "העתקת שני סוכנים", other: "העתקת {count} סוכנים" },
+  "settings.transfer.copy.duplicatesTitle": "להעתיק סוכנים כפולים?",
+  "settings.transfer.copy.duplicatesDescription":
+    "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
+  "settings.transfer.copy.duplicatesConfirm": "העתקת כפילויות",
   "settings.transfer.copy.copying": "מעתיק…",
   "settings.transfer.copy.done": {
     one: "סוכן אחד הועתק אל {server}.",

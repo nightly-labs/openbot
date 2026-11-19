@@ -102,7 +102,6 @@ describe("OpenBot webhook routine migration", () => {
         scheduledFor: "2026-10-01T10:00:00.000Z",
       }),
     ]);
-    // A routine from the old schema can switch to a webhook trigger and keep its runs.
     migratedRoutines.saveRecord("chief", routine.id, {
       name: routine.name,
       instruction: routine.instruction,
@@ -138,8 +137,6 @@ describe("OpenBot webhook routine migration", () => {
 
     const legacy = new DatabaseSync(path);
     removeWebhookSchema(legacy);
-    // Migration 30 creates this index after creating its first tables. A table with the same name
-    // makes the migration fail after its first DDL statement, which exercises transaction rollback.
     legacy.exec("CREATE TABLE webhook_receipts_recent (conflict TEXT)");
     legacy.close();
 

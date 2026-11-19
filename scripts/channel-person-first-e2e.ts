@@ -1,13 +1,3 @@
-// Checks that a person's request in a channel starts before the queued subtasks of a lead (#8761), on
-// the real SQLite, the real mailbox and the real channel service, on a temporary profile. No provider,
-// account or network is started. The lead waits for three subtasks: two run, so the channel is full,
-// and one is queued. The person then asks the lead a question. When one subtask ends, the question
-// takes the free place, and the queued subtask waits for the next one. While the question runs, the
-// next free place goes in the order the tasks were made: the queued subtask starts before a later
-// routine request and before a later message of a person, so delegated work is not held back for ever.
-//
-// Run: bun scripts/channel-person-first-e2e.ts
-// Writes .openbot-build/channel-person-first-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -63,7 +53,6 @@ let channels: ChannelService | null = null;
 const active = (assignment: ChannelAssignment) =>
   assignment.state === "starting" || assignment.state === "running" || assignment.state === "queued";
 
-/** Waits for the channel to hold a state, not for a time. */
 async function until<T>(read: () => T | undefined, what: string): Promise<T> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -129,7 +118,6 @@ try {
   const assignmentOf = (taskId: string) =>
     service.store.assignments(channelId).find((item) => item.taskId === taskId && active(item));
 
-  // The person's first request starts the lead. The lead gives three subtasks and waits for them.
   await send("Prepare the launch notes with the team.");
   const request = await until(
     () => service.store.tasks(channelId).find((task) => task.parentTaskId === null),
@@ -170,7 +158,6 @@ try {
     assignments: [{ ...leadTurn, state: "completed" }, ...work],
   });
 
-  // The channel is full, so the question waits.
   await send("Is only one worker active?");
   const question = await until(
     () =>
@@ -181,7 +168,6 @@ try {
   );
   assert.equal(assignmentOf(question.id), undefined, "The question started while the channel was full.");
 
-  // One subtask ends. The question takes its place before the queued subtask.
   const [ended] = work;
   const [endedTask, , queuedSubtask] = subtasks;
   assert.ok(ended && endedTask && queuedSubtask);
@@ -198,8 +184,6 @@ try {
   };
   assert.deepEqual(report.started, { question: true, queuedSubtask: false, activeInChannel: CHANNEL_PARALLEL_LIMIT });
 
-  // While the question runs, the next place goes in the order the tasks were made: the queued
-  // subtask starts before a routine's request and before another message of a person.
   const routineMessageId = randomUUID();
   await runCauseEffect(
     service.command(

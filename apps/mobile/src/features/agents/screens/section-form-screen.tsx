@@ -16,8 +16,6 @@ import { useText } from "@/shared/lib/text";
 
 export function SectionFormScreen() {
   const { t, errorMessage } = useText();
-  // A new folder goes in `parentId` when the folder menu opens the form, and takes the chat
-  // `agentId` when a chat menu opens it.
   const { serverId, sectionId, parentId, agentId } = useLocalSearchParams<{
     serverId: string;
     sectionId?: string;
@@ -41,7 +39,6 @@ export function SectionFormScreen() {
     (!sectionId || Boolean(section)) &&
     parentKnown;
   const valid = name.trim().length > 0 && name.trim().length <= 40;
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (pending.current) return;

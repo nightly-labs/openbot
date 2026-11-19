@@ -1,10 +1,3 @@
-// What main forwards from an agent service, local or remote, with the server it came from.
-//
-// An approval is checked field by field, not with `isAgentEvent`. That guard carries the Team API
-// size limits, and a local provider can ask to approve a command longer than 100,000 characters or
-// write access to more than 100 paths. The user must see that approval in full, so it must not fail
-// here.
-
 import {
   type AgentApproval,
   type AgentApprovalPermissions,

@@ -1,5 +1,3 @@
-// The embedded browser and its picture-in-picture window.
-
 import {
   type BrowserDisplayState,
   type BrowserTab,
@@ -68,10 +66,6 @@ import { eventHandler, eventPayloadHandler, handler, type IpcGroupHandlers, payl
 import { routeToServer } from "./route-to-server";
 import { optionalPayload, stringPayload } from "./validation";
 
-/**
- * Only the members these endpoints reach. Each host is an Electron-bound class that cannot be
- * constructed outside a running app, so the narrow shapes are what a test can stand in for.
- */
 export interface BrowserIpcDependencies {
   browserPictureInPicture: Pick<BrowserPictureInPicture, "open" | "close" | "dock" | "hide">;
   browser: Pick<
@@ -105,15 +99,12 @@ export function browserIpcHandlers({
   browserView,
   localSignIn,
 }: BrowserIpcDependencies): Pick<IpcGroupHandlers, "browser" | "browserInput"> {
-  // A window that closes cannot stop its live view any more, so the view stops when the window goes.
   const liveViewOwners = new WeakSet<WebContents>();
   const watchLiveViewOwner = (owner: WebContents) => {
     if (liveViewOwners.has(owner)) return;
     liveViewOwners.add(owner);
     owner.once("destroyed", () => void runCauseEffect(browserView.stop(owner.id)).catch(() => undefined));
   };
-  // The frozen tab list has no field for a person's control or the history state, so a host that
-  // can tell answers on its own routes, and its list marks the tabs here.
   const withUserControl = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
     if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY)) return tabs;
     const { tabIds } = await runCauseEffect(
@@ -202,8 +193,6 @@ export function browserIpcHandlers({
                 }),
               );
             }
-            // An older host has no route that moves an existing tab to an address. The renderer
-            // opens a new tab for it instead, so this stays the error that tells it to.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               throw new Error(sourceText("error.backend.browserNavigateUnsupported"));
             }
@@ -255,7 +244,6 @@ export function browserIpcHandlers({
           },
         }),
       ),
-      // A sign-in on this computer for a tab of the active remote server. The local browser needs none.
       openLocalSignIn: payloadHandler(parseLocalSignIn, ({ tabId, url }) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => {
@@ -270,11 +258,6 @@ export function browserIpcHandlers({
           },
         }),
       ),
-      // A failed send keeps the sign-in, so Done can try again. No sign-in found also keeps it, so the
-      // person can finish it in the window. A checked send also keeps it while the server tab shows a
-      // sign-in step; the host answers after the tab loaded again, so the tab list shows the result.
-      // Some sites show their sign-in page again after the reload, so the tab first opens the page
-      // that the window shows after the sign-in.
       finishLocalSignIn: payloadHandler(parseLocalSignInFinish, async ({ send, check }) => {
         const target = localSignIn.target();
         if (!send || !target) {
@@ -282,7 +265,6 @@ export function browserIpcHandlers({
           return null;
         }
         const cookies = await runCauseEffect(localSignIn.collect());
-        // Some sites keep the sign-in in the page storage, not in a cookie (#8686). An older server takes cookies only.
         const withStorage = remoteServers.supportsCapability(target.serverId, BROWSER_SIGN_IN_STORAGE_CAPABILITY);
         const storage = withStorage ? await runCauseEffect(localSignIn.collectStorage()) : null;
         if (cookies.length === 0 && !storage?.entries.length) return { cookies: 0, signedIn: false };
@@ -369,8 +351,6 @@ export function browserIpcHandlers({
         routeToServer<BrowserDisplayState>(remoteServers.activeServerId, {
           local: () => browser.getDisplayState(),
           remote: async (serverId) => {
-            // Without the capability the host can only list tabs, and nothing on that list says
-            // which one is in front. The first tab is the guess this route exists to replace.
             if (!remoteServers.supportsCapability(serverId, TEAM_BROWSER_NAVIGATION_CAPABILITY)) {
               const tabs = await runCauseEffect(
                 remoteServers.request(serverId, TEAM_API_ROUTES.browser.tabs, decodeBrowserTabs),
@@ -403,22 +383,14 @@ export function browserIpcHandlers({
             ),
         }),
       ),
-      // Visibility is a local placement, not a remote operation, so a host's tab is left alone. The
-      // bounds are this window's CSS rectangle, and the host's browser is a native view on the
-      // host's own screen: forwarding them mounted a page over whoever is sitting at that computer,
-      // at coordinates that mean nothing there, and still showed the remote user nothing.
-      // `/v1/browser/visible` stays served for the clients that already send it.
       setVisible: payloadHandler(parseVisibility, async (parsed) => {
         if (remoteServers.activeServerId === LOCAL_SERVER_ID) await runCauseEffect(browser.setVisible(parsed));
       }),
-      // A local tab is a native view on this screen already; only a host's tab needs its pixels sent.
-      // The window that asks owns the view: the main window and Picture in Picture can both show one.
       startLiveView: eventPayloadHandler(stringPayload("tabId"), (event, tabId) => {
         watchLiveViewOwner(event.sender);
         return runCauseEffect(browserView.start(tabId, event.sender.id));
       }),
       stopLiveView: eventHandler((event) => runCauseEffect(browserView.stop(event.sender.id))),
-      // A host's tab is not a native view on this screen, so the window draws it from the live view.
       openPictureInPicture: payloadHandler(optionalPayload(parseBrowserBounds), (bounds) =>
         routeToServer(remoteServers.activeServerId, {
           local: () => runCauseEffect(browserPictureInPicture.open(bounds)),
@@ -438,9 +410,6 @@ export function browserIpcHandlers({
       hidePictureInPicture: handler(() => browserPictureInPicture.hide()),
     },
     browserInput: {
-      // The protocol's own decoder is the boundary check: what the renderer sends is dispatched on a
-      // host that never sees this process, so it passes the same reading the host applies to any
-      // other member's input, and reaches the socket without a second one.
       sendLiveViewInput: payloadHandler(decodeBrowserViewInputValue, async (input) => browserView.sendInput(input)),
     },
   };

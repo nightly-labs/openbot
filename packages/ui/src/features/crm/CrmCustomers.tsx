@@ -63,7 +63,6 @@ import {
 import type { CrmViewModel } from "./crm-state";
 import { useCrmText } from "./crm-text";
 
-/** The text fields that the customer sheet has as columns, with their icons. */
 const TEXT_COLUMNS: { field: CrmTextField; icon: CrmIcon; width: number }[] = [
   { field: "contactName", icon: UsersRound, width: 170 },
   { field: "contactEmail", icon: Mail, width: 220 },
@@ -76,10 +75,6 @@ const TEXT_COLUMNS: { field: CrmTextField; icon: CrmIcon; width: number }[] = [
   { field: "notes", icon: FileText, width: 260 },
 ];
 
-/**
- * The layout handlers of one sheet: sort, hide, move, place, width and the filter row. They write
- * the layout that the page keeps for the viewer.
- */
 export function sheetLayout<R>(
   crm: CrmViewModel,
   key: "customers" | "payments",
@@ -118,7 +113,6 @@ export function sheetLayout<R>(
       }),
     find: () => sheet().find,
     range: () => sheet().range,
-    /** The number of columns that the filter row filters. */
     filters: () => filterCount(shown(), sheet().find, sheet().range),
     onFind: (id: string, text: string) =>
       crm.setLayout((draft) => {
@@ -476,7 +470,6 @@ export function CrmCustomers(props: { crm: CrmViewModel }) {
           </Button>
         </div>
       </div>
-      {/* The sheet stays when filters hide all rows, so the filter row stays to change them. */}
       <Show when={crm.customers().length > 0} fallback={<Empty title={emptyTitle()} />}>
         <Sheet
           label={t("crm.tab.customers")}
