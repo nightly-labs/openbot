@@ -189,7 +189,8 @@ function AgentLine({
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
         accessibilityRole="link"
-        accessibilityLabel={t("mobile.chat.exchange.openChat", { name: agent.name })}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={t("mobile.chat.exchange.openChat", { name: agent.name })}
         hitSlop={8}
         className="max-w-full self-start"
         style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
