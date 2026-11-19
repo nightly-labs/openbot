@@ -31,6 +31,7 @@ import {
   useMobileWorkspaceActions,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SaveError } from "@/shared/components/save-error";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -139,14 +140,6 @@ function useAgentHostSettings(props: AgentHostFieldsProps) {
     workspace.loadAgentHostSettings,
     workspace.updateAgentHostSettings,
   );
-}
-
-function SaveError({ error }: { error: string | null }) {
-  return error ? (
-    <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-      {error}
-    </Typography.Paragraph>
-  ) : null;
 }
 
 /** A save error under a row of a group. */

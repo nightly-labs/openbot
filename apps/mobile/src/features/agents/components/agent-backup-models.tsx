@@ -32,6 +32,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -250,14 +251,6 @@ function EditorStatus({
       {t(canManage ? "mobile.agent.edit.loading" : "mobile.agent.host.unsupported")}
     </Typography.Paragraph>
   );
-}
-
-function SaveError({ error }: { error: string | null }) {
-  return error ? (
-    <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-      {error}
-    </Typography.Paragraph>
-  ) : null;
 }
 
 /** Agent info > Backup models: what the agent does when a usage limit holds a message. */

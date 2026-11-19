@@ -8,7 +8,6 @@ import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowRight from "lucide-react-native/icons/arrow-right";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Linking, View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -20,10 +19,9 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { loadMarketplaceAgent, loadMarketplaceSkill } from "../api/marketplace-catalog";
@@ -121,26 +119,7 @@ export function MarketplaceListingScreen() {
     >
       {/* The name from the row, from the first frame; the loaded listing sets the same title. */}
       <Stack.Screen options={{ title: name ?? "" }} />
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={busy}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon={isIOS ? "xmark" : undefined}
-            accessibilityLabel={t("common.close")}
-            disabled={busy}
-            onPress={close}
-          >
-            {isIOS ? t("common.close") : "×"}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction disabled={busy} onPress={close} />
       {body}
     </SheetScrollView>
   );

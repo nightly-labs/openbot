@@ -4,15 +4,14 @@ import {
   type AgentAccessLevel,
   agentAccessRank,
 } from "@openbot/contracts/ipc";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AccessLevelMenu } from "@/features/servers/components/access-level-menu";
+import { AGENT_ACCESS_LEVEL_KEYS } from "@/features/servers/model/server-role";
 import { everyoneLevel, roleLevel, useServerRoles } from "@/features/servers/model/use-server-roles";
 import {
   SettingsContent,
@@ -22,15 +21,8 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-
-const LEVEL_KEYS = {
-  none: "mobile.server.roles.level.none",
-  view: "mobile.server.roles.level.view",
-  chat: "mobile.server.roles.level.chat",
-  manage: "mobile.server.roles.level.manage",
-} as const satisfies Record<AgentAccessLevel, MobileTextKey>;
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 /** The access that a member of a role gets to an agent: the higher level of the role and of Everyone. */
 function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
@@ -66,27 +58,7 @@ export function ServerRoleScreen() {
   /** True after Delete: the page leaves without the question about the name. */
   const leaving = useRef(false);
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && dirty, ({ repeat }) => {
-    if (leaving.current) {
-      setDiscarding(true);
-      repeat();
-      return;
-    }
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
   if (!available || !everyone || !list || !(role || everyonePage))
     return (
@@ -190,7 +162,7 @@ export function ServerRoleScreen() {
             trailing={
               <AccessLevelMenu
                 value={commonLevel}
-                options={AGENT_ACCESS_LEVELS.map((value) => ({ value, label: t(LEVEL_KEYS[value]) }))}
+                options={AGENT_ACCESS_LEVELS.map((value) => ({ value, label: t(AGENT_ACCESS_LEVEL_KEYS[value]) }))}
                 placeholder={t("mobile.server.roles.mixed")}
                 enabled={!action.isPending}
                 dark={theme === "dark"}
@@ -230,7 +202,7 @@ export function ServerRoleScreen() {
                   value={value}
                   options={AGENT_ACCESS_LEVELS.map((option) => ({
                     value: option,
-                    label: t(LEVEL_KEYS[option]),
+                    label: t(AGENT_ACCESS_LEVEL_KEYS[option]),
                     disabled: base !== undefined && agentAccessRank(option) < agentAccessRank(base),
                   }))}
                   source={base !== undefined && base !== "none" && value === base ? everyoneName : undefined}

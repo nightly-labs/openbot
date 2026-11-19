@@ -3,6 +3,7 @@ import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import * as SecureStore from "expo-secure-store";
 import { useUniwind } from "uniwind";
 import { create } from "zustand";
+import { storedFields } from "./stored-fields";
 
 /**
  * The background color of chats for each theme, or null for the background of the theme. Light and
@@ -19,14 +20,8 @@ export const useChatBackground = create<ChatBackgroundValue & { ready: boolean }
 }));
 
 function parseStored(stored: string | null): ChatBackgroundValue | null {
-  let value: unknown = null;
-  try {
-    value = stored === null ? null : JSON.parse(stored);
-  } catch {
-    return null;
-  }
-  if (typeof value !== "object" || value === null) return null;
-  const fields = new Map<string, unknown>(Object.entries(value));
+  const fields = storedFields(stored);
+  if (!fields) return null;
   const light = fields.get("light");
   const dark = fields.get("dark");
   return { light: isAvatarColor(light) ? light : null, dark: isAvatarColor(dark) ? dark : null };

@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import { MOBILE_CHAT_ORDERS, type MobileChatOrder } from "@/features/workspace/model/sidebar-layout";
+import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.chatOrder.v1";
 
@@ -25,13 +26,10 @@ export async function loadChatOrderPreference(): Promise<void> {
   }
 }
 
-/** The writes run one after the other, so the last choice is the one that stays. */
-let writes: Promise<void> = Promise.resolve();
+const write = writesInOrder(key);
 
 export function saveChatOrderPreference(order: MobileChatOrder): Promise<void> {
   // Apply immediately, also when storage fails: the list then keeps the choice until the app restarts.
   useChatOrderPreference.setState({ order, ready: true });
-  const write = writes.then(() => SecureStore.setItemAsync(key, order));
-  writes = write.catch(() => undefined);
-  return write;
+  return write(() => order);
 }

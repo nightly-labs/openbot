@@ -1,12 +1,11 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import type { NativeStackNavigationProp } from "expo-router/native-stack";
 import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, BackHandler, StyleSheet, View, type ViewInstance } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
@@ -15,6 +14,7 @@ import { useCSSVariable } from "uniwind";
 import type { AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import type { WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
+import { newAvatarSeed } from "@/features/agents/model/avatar-candidates";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { AgentStep } from "@/features/onboarding/components/agent-step";
@@ -102,12 +102,12 @@ function FadeLayer({
   visible,
   motion,
   delayIn = 0,
-  children,
+  tint,
 }: {
   visible: boolean;
   motion: OnboardingMotion;
   delayIn?: number;
-  children: ReactNode;
+  tint: string | undefined;
 }) {
   return (
     <Animated.View
@@ -123,7 +123,17 @@ function FadeLayer({
         },
       ]}
     >
-      {children}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: tint,
+            transitionProperty: "backgroundColor",
+            transitionDuration: motion === "none" ? 0 : TINT_MS,
+            transitionTimingFunction: EASE_OUT_CSS,
+          },
+        ]}
+      />
     </Animated.View>
   );
 }
@@ -200,8 +210,7 @@ export function OnboardingFlow({
   const choiceProgress = useSharedValue(0);
   const [name, setName] = useState("");
   const [task, setTask] = useState("");
-  // An agent from scratch starts with a new look and the automatic colour, as in the add-agent sheet.
-  const [customSeed, setCustomSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
+  const [customSeed, setCustomSeed] = useState(newAvatarSeed);
   const [customColor, setCustomColor] = useState<AgentColorValue>({ hue: null, color: null });
   const [customDescription, setCustomDescription] = useState("");
   const [pending, setPending] = useState(false);
@@ -609,33 +618,9 @@ export function OnboardingFlow({
         visible={step === "agent"}
         motion={motion}
         delayIn={step === "agent" && direction === 1 ? STAGGER_MS * 3 : 0}
-      >
-        {/* The colour changes once per choice, not on each frame of a swipe. */}
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: CHOICE_TINTS[choice],
-              transitionProperty: "backgroundColor",
-              transitionDuration: motion === "none" ? 0 : TINT_MS,
-              transitionTimingFunction: EASE_OUT_CSS,
-            },
-          ]}
-        />
-      </FadeLayer>
-      <FadeLayer visible={drafting} motion={motion}>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: `${draftColor}${TINT_ALPHA}`,
-              transitionProperty: "backgroundColor",
-              transitionDuration: motion === "none" ? 0 : TINT_MS,
-              transitionTimingFunction: EASE_OUT_CSS,
-            },
-          ]}
-        />
-      </FadeLayer>
+        tint={CHOICE_TINTS[choice]}
+      />
+      <FadeLayer visible={drafting} motion={motion} tint={`${draftColor}${TINT_ALPHA}`} />
       {/* The steps keep clear of the side insets (the iPhone Duo rail, the landscape cutout). The tints
           above stay edge to edge. */}
       <KeyboardAvoidingView

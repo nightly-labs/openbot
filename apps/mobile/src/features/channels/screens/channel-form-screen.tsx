@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type ChannelDraft, type ChannelSummary, canAdministerServer, isChannelDraft } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -11,7 +11,6 @@ import Crown from "lucide-react-native/icons/crown";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
 import Users from "lucide-react-native/icons/users";
-import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
@@ -25,12 +24,12 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SaveError } from "@/shared/components/save-error";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { useChannelAgentPicker } from "../model/channel-agent-picker";
 import { toggleChannelMember } from "../model/channel-draft";
@@ -207,31 +206,14 @@ function ChannelForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {create && isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
+      {create ? (
+        <SheetCloseAction
           disabled={saving}
           onPress={() => {
             void haptics.impact("soft");
             router.back();
           }}
         />
-      ) : create ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="xmark"
-            accessibilityLabel={t("common.close")}
-            disabled={saving}
-            onPress={() => {
-              void haptics.impact("soft");
-              router.back();
-            }}
-          >
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
       ) : null}
       <SheetSaveAction
         dirty={dirty}
@@ -402,11 +384,7 @@ function ChannelForm({
           {t("mobile.channel.form.invalidName")}
         </Typography.Paragraph>
       ) : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </SheetScrollView>
   );
 }

@@ -1,13 +1,12 @@
 import type { ConnectorMessagingPlatform } from "@openbot/contracts/ipc";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
-import { useRef } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
 import { isMobilePasswordManagerId } from "@/features/servers/model/password-managers";
+import { useLockedMutation } from "@/features/servers/model/use-locked-action";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { haptics } from "@/shared/lib/haptics";
 
 /**
  * How often a page reads the connections while it shows. A host sends no event for a connection, and
@@ -124,17 +123,8 @@ export function useServerConnectors(serverId: string, poll: MobileConnectorId | 
  * failure: the host can have changed part of it.
  */
 export function useConnectorAction(refetch: () => unknown) {
-  const locked = useRef(false);
-  const action = useMutation({
-    mutationFn: (operation: () => Promise<void>) => operation(),
-    onSuccess: () => {
-      void haptics.notification("success");
-    },
-    onError: () => {
-      void haptics.notification("error");
-    },
-    onSettled: () => {
-      locked.current = false;
+  const { action, perform } = useLockedMutation({
+    settled: () => {
       void refetch();
     },
   });
@@ -142,15 +132,7 @@ export function useConnectorAction(refetch: () => unknown) {
     busy: action.isPending,
     error: action.error,
     reset: action.reset,
-    /** Resolves true when the change succeeds. */
-    perform(operation: () => Promise<void>): Promise<boolean> {
-      if (locked.current) return Promise.resolve(false);
-      locked.current = true;
-      return action.mutateAsync(operation).then(
-        () => true,
-        () => false,
-      );
-    },
+    perform,
   };
 }
 

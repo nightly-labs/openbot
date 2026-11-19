@@ -17,7 +17,6 @@ import {
   WORKFLOW_TELEGRAM_ACTIONS,
   WORKFLOW_TRIGGER_TYPES,
 } from "@openbot/contracts/ipc";
-import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { type RoutineDraftKind, routineScheduleToDraft } from "@openbot/team-client/routine-schedule-draft";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
@@ -28,6 +27,7 @@ import {
   githubTrigger,
   SAME_REPOSITORY,
 } from "./workflow-github";
+import { fieldOneOf, fieldText } from "./workflow-node-fields";
 
 const KIND_LABEL = {
   trigger: "mobile.workflow.kind.trigger",
@@ -109,8 +109,7 @@ export const DISCORD_ACTION_LABEL = {
 
 /** The action of a Discord output, as the host reads it: a reply when it has none. */
 export function discordAction(node: WorkflowNode): WorkflowDiscordAction {
-  const value = node.fields.action;
-  return typeof value === "string" && isOneOf(WORKFLOW_DISCORD_ACTIONS, value) ? value : "reply";
+  return fieldOneOf(node, "action", WORKFLOW_DISCORD_ACTIONS, "reply");
 }
 
 export const TELEGRAM_ACTION_LABEL = {
@@ -121,8 +120,7 @@ export const TELEGRAM_ACTION_LABEL = {
 
 /** The action of a Telegram output, as the host reads it: a reply when it has none. */
 export function telegramAction(node: WorkflowNode): WorkflowTelegramAction {
-  const value = node.fields.action;
-  return typeof value === "string" && isOneOf(WORKFLOW_TELEGRAM_ACTIONS, value) ? value : "reply";
+  return fieldOneOf(node, "action", WORKFLOW_TELEGRAM_ACTIONS, "reply");
 }
 
 export const SLACK_ACTION_LABEL = {
@@ -133,8 +131,7 @@ export const SLACK_ACTION_LABEL = {
 
 /** The action of a Slack output, as the host reads it: a reply in the thread when it has none. */
 export function slackAction(node: WorkflowNode): WorkflowSlackAction {
-  const value = node.fields.action;
-  return typeof value === "string" && isOneOf(WORKFLOW_SLACK_ACTIONS, value) ? value : "reply";
+  return fieldOneOf(node, "action", WORKFLOW_SLACK_ACTIONS, "reply");
 }
 
 /**
@@ -165,15 +162,9 @@ export function isActiveRun(status: WorkflowRunStatus | null | undefined): boole
   return status === "running" || status === "approval" || status === "stopping";
 }
 
-const text = (node: WorkflowNode, name: string): string => {
-  const value = node.fields[name];
-  return typeof value === "string" ? value : "";
-};
-
 /** The trigger type of a trigger node. A missing type is manual, as the host reads it. */
 export function triggerType(node: WorkflowNode): WorkflowTriggerType {
-  const value = node.fields.trigger;
-  return typeof value === "string" && isOneOf(WORKFLOW_TRIGGER_TYPES, value) ? value : "manual";
+  return fieldOneOf(node, "trigger", WORKFLOW_TRIGGER_TYPES, "manual");
 }
 
 export function kindLabel(kind: WorkflowNodeKind, t: MobileTranslate): string {
@@ -184,21 +175,20 @@ export function kindLabel(kind: WorkflowNodeKind, t: MobileTranslate): string {
 export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string {
   if (node.kind === "trigger") return t(TRIGGER_LABEL[triggerType(node)]);
   if (node.kind === "agent") {
-    const agent = agents.find((candidate) => candidate.id === text(node, "agentId"));
+    const agent = agents.find((candidate) => candidate.id === fieldText(node, "agentId"));
     return agent ? t("mobile.workflow.kind.agentNamed", { name: agent.name }) : kindLabel(node.kind, t);
   }
   if (node.kind === "llm") {
-    const model = text(node, "model");
+    const model = fieldText(node, "model");
     return model ? t("mobile.workflow.kind.llmNamed", { model }) : kindLabel(node.kind, t);
   }
-  // A video step is an image node with `media: "video"`, as on the desktop canvas.
-  if (node.kind === "image" && text(node, "media") === "video") return t("mobile.workflow.kind.video");
+  if (node.kind === "image" && fieldText(node, "media") === "video") return t("mobile.workflow.kind.video");
   return kindLabel(node.kind, t);
 }
 
 /** Where an output sends its result, and what a GitHub, Discord, Telegram or Slack output does there. */
 function outputText(node: WorkflowNode, t: MobileTranslate): string {
-  switch (text(node, "target")) {
+  switch (fieldText(node, "target")) {
     case "channel":
       return t("mobile.workflow.output.channel");
     case "chat-channel":
@@ -206,11 +196,10 @@ function outputText(node: WorkflowNode, t: MobileTranslate): string {
     case "file":
       return t("mobile.workflow.output.file");
     case "github": {
-      const action = text(node, "action");
       const label = t(
-        GITHUB_ACTION_LABEL[isOneOf(WORKFLOW_GITHUB_ACTIONS, action) ? action : GITHUB_OUTPUT_DEFAULTS.action],
+        GITHUB_ACTION_LABEL[fieldOneOf(node, "action", WORKFLOW_GITHUB_ACTIONS, GITHUB_OUTPUT_DEFAULTS.action)],
       );
-      const stored = text(node, "repository");
+      const stored = fieldText(node, "repository");
       const repository =
         stored && stored !== SAME_REPOSITORY ? stored : t("mobile.workflow.github.output.sameRepository");
       return t("mobile.workflow.github.summary", { repository, event: label });
@@ -232,15 +221,15 @@ export function stepText(node: WorkflowNode, t: MobileTranslate): string {
     case "trigger":
       return triggerText(node, t);
     case "agent":
-      return text(node, "task") || t("mobile.workflow.step.taskDefault");
+      return fieldText(node, "task") || t("mobile.workflow.step.taskDefault");
     case "llm":
-      return text(node, "prompt") || t("mobile.workflow.step.promptDefault");
+      return fieldText(node, "prompt") || t("mobile.workflow.step.promptDefault");
     case "condition":
-      return text(node, "rule") || t("mobile.workflow.step.ruleDefault");
+      return fieldText(node, "rule") || t("mobile.workflow.step.ruleDefault");
     case "approval":
-      return text(node, "question") || t("mobile.workflow.step.questionDefault");
+      return fieldText(node, "question") || t("mobile.workflow.step.questionDefault");
     case "prompt":
-      return text(node, "text") || t("mobile.workflow.step.textEmpty");
+      return fieldText(node, "text") || t("mobile.workflow.step.textEmpty");
     case "output":
       return outputText(node, t);
     default:
@@ -251,7 +240,7 @@ export function stepText(node: WorkflowNode, t: MobileTranslate): string {
 /** What stops a step from running, or null. The host fails an agent step that has no agent. */
 export function stepProblem(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string | null {
   if (node.kind !== "agent") return null;
-  const agentId = text(node, "agentId");
+  const agentId = fieldText(node, "agentId");
   if (!agentId) return t("mobile.workflow.problem.noAgent");
   if (!agents.some((agent) => agent.id === agentId)) return t("mobile.workflow.problem.agentGone");
   return null;

@@ -6,7 +6,9 @@ import {
   decodeBrowserViewInputValue,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
+import { failureText } from "@/shared/lib/failure-text";
 
 // The phone's live view of a host browser tab runs in the hidden page that holds the Team peer: the
 // frames arrive on its data channel, and the native screen has no channel of its own. The page
@@ -71,24 +73,10 @@ interface OpenView {
   waiting: BrowserViewFrame | null;
 }
 
-const BASE64_CHUNK = 0x8000;
-
-function base64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + BASE64_CHUNK));
-  }
-  return btoa(binary);
-}
-
 function pageSize(value: unknown): { width: number; height: number } | null {
   return isDynamicRecord(value) && isNumber(value.width) && isNumber(value.height)
     ? { width: value.width, height: value.height }
     : null;
-}
-
-function failureText(error: unknown): string | null {
-  return error instanceof Error && error.message ? error.message : null;
 }
 
 export function createBrowserViewBridge(
@@ -118,7 +106,7 @@ export function createBrowserViewBridge(
       sequence: frame.sequence,
       width: frame.width,
       height: frame.height,
-      jpeg: base64(frame.image),
+      jpeg: bytesToBase64(frame.image),
     });
   };
 

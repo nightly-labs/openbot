@@ -5,6 +5,7 @@ import { create } from "zustand";
 
 import { openStorePage } from "@/features/app-update/model/app-update";
 import { devShowRatingAsk } from "@/shared/lib/dev-feature-overrides";
+import { localDay } from "@/shared/lib/local-day";
 
 /**
  * When home asks for a rating. The phone counts the days on which home showed, and asks only after
@@ -78,17 +79,11 @@ function save(change: Partial<RatingAskRecord>): Promise<void> {
   return writes;
 }
 
-function localDay(now: number): string {
-  const date = new Date(now);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 /** Counts today as a day of use. A second call on the same day changes nothing. */
 export function recordRatingAskUse(now = Date.now()): void {
   const state = useRatingAsk.getState();
   if (!state.ready) return;
-  const today = localDay(now);
+  const today = localDay(new Date(now));
   if (state.days.includes(today)) return;
   void save({ days: [...state.days, today].slice(-MIN_USE_DAYS), firstUse: state.firstUse ?? now });
 }

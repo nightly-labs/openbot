@@ -1,18 +1,15 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 export function SectionFormScreen() {
   const { t, errorMessage } = useText();
@@ -41,22 +38,7 @@ export function SectionFormScreen() {
     (!sectionId || Boolean(section)) &&
     parentKnown;
   const valid = name.trim().length > 0 && name.trim().length <= 40;
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
-    if (pending.current) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(!finished && (dirty || saving), { busy: () => pending.current });
   useEffect(() => {
     if (finished) router.back();
   }, [finished]);
@@ -96,32 +78,13 @@ export function SectionFormScreen() {
       <Stack.Screen
         options={{ title: t(sectionId ? "mobile.agent.sectionForm.renameTitle" : "mobile.agent.sectionForm.newTitle") }}
       />
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={() => {
-            void haptics.impact("soft");
-            router.back();
-          }}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon={isIOS ? "xmark" : undefined}
-            accessibilityLabel={t("common.close")}
-            disabled={saving}
-            onPress={() => {
-              void haptics.impact("soft");
-              router.back();
-            }}
-          >
-            {isIOS ? t("common.close") : "×"}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction
+        disabled={saving}
+        onPress={() => {
+          void haptics.impact("soft");
+          router.back();
+        }}
+      />
       <SheetSaveAction
         dirty={dirty}
         canSave={available && valid && !finished}

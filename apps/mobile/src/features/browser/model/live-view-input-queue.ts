@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { BrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { clamp } from "./live-view-geometry";
+import { clamp } from "@/shared/lib/worklet-math";
 
 /**
  * Input on its way to the peer page. A finger reports a move many times per frame of the screen,

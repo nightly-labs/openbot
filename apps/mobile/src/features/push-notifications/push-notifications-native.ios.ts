@@ -1,11 +1,9 @@
 import { NOTIFICATION_SOUND_FILES } from "@openbot/contracts/notification-relay";
-import { File, Paths } from "expo-file-system";
 import * as Notifications from "expo-notifications";
 import type { NotificationPermission } from "@/features/settings/model/push-notifications";
+import { appGroupFile } from "@/shared/lib/app-group";
 import { type PushNotificationsNative, SOUND_PREVIEW_KEY } from "./push-notifications-native.types";
 
-/** The App Group of the app and its extensions. `app.json` names the same group. */
-const APP_GROUP = "group.run.openbot.mobile";
 /** `NotificationService.swift` reads this file. */
 const KEYS_FILE = "push-notifications.json";
 
@@ -32,19 +30,15 @@ export const pushNotificationsNative: PushNotificationsNative | null = {
     return () => subscription.remove();
   },
   writeKeys(servers) {
-    const directory = Paths.appleSharedContainers[APP_GROUP];
-    // The App Group is missing when the app was built without the extension.
-    if (!directory) return;
+    const file = appGroupFile(KEYS_FILE);
+    if (!file) return;
     const text = JSON.stringify({ version: 1, servers });
-    const file = new File(directory, KEYS_FILE);
     if (file.exists && file.textSync() === text) return;
     file.writeSync(text);
   },
   removeKeys() {
-    const directory = Paths.appleSharedContainers[APP_GROUP];
-    if (!directory) return;
-    const file = new File(directory, KEYS_FILE);
-    if (file.exists) file.delete();
+    const file = appGroupFile(KEYS_FILE);
+    if (file?.exists) file.delete();
   },
   async previewSound(sound) {
     // A local notification goes through the same iOS sound path as a real one, with the iOS sound too.

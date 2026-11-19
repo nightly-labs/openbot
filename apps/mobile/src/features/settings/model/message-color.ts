@@ -2,6 +2,7 @@ import { CHAT_COLOR_PRESETS } from "@openbot/brand/chat-colors";
 import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { storedFields } from "./stored-fields";
 
 /**
  * The color of the user's own message bubbles. `agent` uses the color of the agent in an agent chat
@@ -42,13 +43,8 @@ export const useMessageColor = create<MessageColorValue & { ready: boolean }>(()
 }));
 
 function parseStored(stored: string | null): MessageColorValue | null {
-  let value: unknown = null;
-  try {
-    value = stored === null ? null : JSON.parse(stored);
-  } catch {
-    return null;
-  }
-  const fields = new Map<string, unknown>(typeof value === "object" && value !== null ? Object.entries(value) : []);
+  const fields = storedFields(stored);
+  if (!fields) return null;
   const mode = fields.get("mode");
   const customColor = fields.get("customColor");
   const style = fields.get("style");

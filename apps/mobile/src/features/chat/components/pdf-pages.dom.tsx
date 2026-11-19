@@ -4,8 +4,8 @@ import { getDocument, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist/
 // The worker module sets `globalThis.pdfjsWorker`, so pdf.js reads the file on this thread. Metro
 // cannot bundle a separate worker file into a DOM component.
 import "pdfjs-dist/legacy/build/pdf.worker.mjs";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { useEffect, useRef, useState } from "react";
-import { base64Bytes } from "../model/base64-bytes";
 
 interface PdfPagesProps {
   /** The PDF file as Base64. */
@@ -50,7 +50,7 @@ export default function PdfPages({
     const view = scroller.current;
     if (!base64 || !root || !view) return;
     setFailed(false);
-    const task = getDocument({ data: base64Bytes(base64), useSystemFonts: true });
+    const task = getDocument({ data: base64ToBytes(base64), useSystemFonts: true });
     let observer: IntersectionObserver | null = null;
     let cancelled = false;
     void (async () => {

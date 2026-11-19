@@ -5,10 +5,8 @@ import {
   type LiveVoiceSessionResponse,
   type LiveVoiceStartRequest,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
-import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { useEffect, useId, useRef, useState } from "react";
-import { BackHandler } from "react-native";
-import { Easing, ReduceMotion, type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
+import { useEffect, useRef, useState } from "react";
+import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import type { MediaStream, MediaStreamTrack, RTCPeerConnection } from "react-native-webrtc";
 import { scheduleOnRN } from "react-native-worklets";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -19,11 +17,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 import { gptLiveCaption, gptLiveLevel, gptLiveTurn } from "../model/gpt-live-conversation";
 import type { LiveConversationPhase } from "../model/live-conversation";
-import type { LiveConversation } from "./use-live-conversation";
+import { type LiveConversation, PRESENCE_CLOSE, PRESENCE_OPEN, useLiveCallSession } from "./use-live-conversation";
 
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-const OPEN_MS = 460;
-const CLOSE_MS = 400;
 /** How often the loudness of the microphone or of the reply is read, for the level of the call bar. */
 const METER_MS = 160;
 /** The data channel that the realtime model sends its events on. */
@@ -96,25 +91,7 @@ export function useGptLiveConversation(input: GptLiveConversationInput): LiveCon
     if (state.open && (!input.focused || (!input.foreground && !starting))) controller.end();
   }, [controller, state.open, input.focused, input.foreground, starting]);
 
-  const keepAwakeTag = useId();
-  useEffect(() => {
-    if (!state.open) return;
-    activateKeepAwakeAsync(keepAwakeTag).catch(() => {});
-    return () => {
-      deactivateKeepAwake(keepAwakeTag).catch(() => {});
-    };
-  }, [state.open, keepAwakeTag]);
-
-  useEffect(() => {
-    if (!state.open || !input.focused) return;
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      controller.end();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [controller, state.open, input.focused]);
-
-  useEffect(() => () => controller.dispose(), [controller]);
+  useLiveCallSession(controller, state.open, input.focused);
 
   return {
     open: state.open,
@@ -454,7 +431,7 @@ function createController({
       turns = 0;
       setState(() => ({ ...CLOSED, open: true }));
       void haptics.impact("light");
-      presence.set(withTiming(1, { duration: OPEN_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }));
+      presence.set(withTiming(1, PRESENCE_OPEN));
       if (online) void connect();
       else {
         setPhase("offline");
@@ -496,7 +473,7 @@ function createController({
         turn_count: turns,
       });
       presence.set(
-        withTiming(0, { duration: CLOSE_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }, (finished) => {
+        withTiming(0, PRESENCE_CLOSE, (finished) => {
           if (finished) scheduleOnRN(closed);
         }),
       );

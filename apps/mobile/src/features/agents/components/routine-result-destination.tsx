@@ -12,6 +12,7 @@ import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-w
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { Divider, GroupLabel } from "./routine-trigger-picker";
 
 /** A place to send to. The host adds the connection's name and platform when it saves. */
 export interface RoutineResultChoice {
@@ -30,20 +31,6 @@ interface PlaceGroup {
 
 const samePlace = (left: RoutineResultChoice | null, right: RoutineResultChoice | null) =>
   left?.connectionId === right?.connectionId && left?.placeId === right?.placeId;
-
-function Divider() {
-  return <View className="ml-4 h-px bg-grouped-border" />;
-}
-
-function GroupLabel({ children }: { children: string }) {
-  return (
-    <View className="px-4 pb-1 pt-3">
-      <Typography type="body-xs" className="text-grouped-secondary">
-        {children}
-      </Typography>
-    </View>
-  );
-}
 
 /**
  * Where an agent routine sends each answer, as well as to its chat, as on desktop. For a saved

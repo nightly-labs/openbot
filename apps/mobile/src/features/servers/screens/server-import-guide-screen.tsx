@@ -12,15 +12,17 @@ import {
 import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { useState } from "react";
+import { Linking } from "react-native";
 import {
   agentContents,
+  confirmDuplicateNames,
   exportDate,
   IncludeRow,
   importCount,
   NotesSection,
   toggledKeys,
+  useReleaseOnClose,
 } from "@/features/servers/components/import-parts";
 import { type PickedZip, pickZipFile } from "@/features/servers/model/transfer-file";
 import { IMPORT_SOURCE_NAMES } from "@/features/servers/screens/server-import-screen";
@@ -57,18 +59,7 @@ export function ServerImportGuideScreen() {
   const [copied, setCopied] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  // The open token, for the release when the screen closes. A token that comes back after that is
-  // released when it arrives.
-  const token = useRef<string | null>(null);
-  token.current = preview?.token ?? null;
-  const closed = useRef(false);
-  useEffect(() => {
-    closed.current = false;
-    return () => {
-      closed.current = true;
-      if (token.current) void discardAgentImport(token.current, serverId).catch(() => undefined);
-    };
-  }, [discardAgentImport, serverId]);
+  const closed = useReleaseOnClose(preview?.token ?? null, discardAgentImport, serverId);
 
   if (!canImportAgents(serverId))
     return (
@@ -312,19 +303,7 @@ function ImportReview({
       selected.map((agent) => agent.key),
       selectedChannels.map((channel) => channel.key),
     );
-  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
-  const confirmAndStart = () => {
-    const duplicates = selected.filter((agent) => agent.nameExists);
-    if (duplicates.length === 0) return start();
-    Alert.alert(
-      t("mobile.server.import.duplicatesTitle"),
-      t("mobile.server.import.duplicatesBody", { names: duplicates.map((agent) => agent.name).join(", ") }),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("mobile.server.import.duplicatesConfirm"), onPress: start },
-      ],
-    );
-  };
+  const confirmAndStart = () => confirmDuplicateNames(t, selected, start);
   const channelNote = (channel: AgentImportPreviewChannel) => {
     const members = selectedMembers(channel);
     const missing = channel.memberKeys

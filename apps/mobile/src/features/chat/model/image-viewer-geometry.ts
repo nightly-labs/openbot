@@ -4,6 +4,8 @@
  * Node. The model and the values follow PanelUI's ImageViewer (MIT, panelui.dev).
  */
 
+import { clamp } from "@/shared/lib/worklet-math";
+
 export interface Size {
   width: number;
   height: number;
@@ -12,11 +14,6 @@ export interface Size {
 export interface Rect extends Size {
   x: number;
   y: number;
-}
-
-export function clamp(value: number, min: number, max: number) {
-  "worklet";
-  return Math.min(Math.max(value, min), max);
 }
 
 export function lerp(from: number, to: number, t: number) {

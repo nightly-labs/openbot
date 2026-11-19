@@ -1,8 +1,8 @@
 "use dom";
 
 import { parseSpreadsheet, type SpreadsheetData } from "@openbot/contracts/spreadsheet-workbook";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { useMemo, useState } from "react";
-import { base64Bytes } from "../model/base64-bytes";
 
 interface SpreadsheetPreviewProps {
   /** The `.xlsx` file as Base64. */
@@ -63,7 +63,7 @@ export default function SpreadsheetPreview({
   const workbook = useMemo<SpreadsheetData | null>(() => {
     if (!base64) return null;
     try {
-      return parseSpreadsheet(base64Bytes(base64), {
+      return parseSpreadsheet(base64ToBytes(base64), {
         number: (value, options) => new Intl.NumberFormat(locale, options).format(value),
       });
     } catch {

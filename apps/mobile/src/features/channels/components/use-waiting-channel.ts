@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import { useChannelSubscription } from "./use-channels";
 
 /**
  * The channel where this agent waits for the user, or null: its wait is on a channel thread. A host
@@ -16,12 +16,8 @@ export function useWaitingChannel(
   activity: MobileAgentActivity | undefined,
   serverId: string,
 ): { id: string; name: string } | null {
-  const { channelStore } = useMobileWorkspaceActions();
+  const { channelStore, subscribe } = useChannelSubscription(serverId);
   const threadId = activity?.phase === "waiting" ? (activity.threadId ?? null) : null;
-  const subscribe = useCallback(
-    (listener: () => void) => channelStore.subscribe(serverId, listener),
-    [channelStore, serverId],
-  );
   const select = useCallback(() => {
     if (!threadId) return "";
     const channel = channelStore

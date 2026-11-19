@@ -1,14 +1,13 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { attachmentPreviewKind } from "../model/attachment-file-preview";
 import { largeDownloadOf } from "../model/large-files";
 import type { MessageFileTarget } from "../model/message-file-target";
-import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
+import { attachmentTypeLabel, shareLocalAttachment, showFileFailure } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { openFilePreview } from "./use-attachment-preview";
 import { mediaFile, messageFileCopy, writeMediaFile } from "./use-media-file";
@@ -108,13 +107,7 @@ export function useMessageFileOpener(serverId: string) {
         else if (kind) await openFilePreview(kind, file);
         else await shareLocalAttachment(file);
       } catch (error) {
-        void haptics.notification("error");
-        showFailureAlert(
-          error,
-          "turn",
-          t("mobile.chat.markdown.openFileFailed"),
-          error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-        );
+        showFileFailure(error, t("mobile.chat.markdown.openFileFailed"), { t, sourceText });
       } finally {
         opening.current = false;
       }

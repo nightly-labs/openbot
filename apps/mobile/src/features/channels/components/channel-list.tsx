@@ -1,13 +1,12 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { useUniwind } from "uniwind";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import { Alert, View } from "react-native";
+import { AndroidRowMenu, OpenRowMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
@@ -24,7 +23,8 @@ import {
 import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import type { MenuAction } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -57,9 +57,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   };
   const handleInfo = () =>
     router.push({ pathname: "/channel-info/[channelId]", params: { channelId: channel.id, serverId } });
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(channel.id).then(() => haptics.notification());
-  };
+  const handleCopyId = () => copyWithHaptic(channel.id);
   const handleDelete = () =>
     Alert.alert(t("mobile.channel.list.deleteTitle", { name: channel.name }), t("mobile.channel.list.deleteBody"), [
       { text: t("common.cancel"), style: "cancel" },
@@ -173,16 +171,10 @@ function ChannelAndroidMenu({
   serverId: string;
   onClose: () => void;
 }) {
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
-    <View
-      // The open menu draws in a portal. The row under it keeps its touches.
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
-    >
-      {size ? <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} /> : null}
-    </View>
+    <AndroidRowMenu>
+      {(size) => <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} />}
+    </AndroidRowMenu>
   );
 }
 
@@ -198,11 +190,6 @@ function OpenChannelMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
   const {
     isPinned,
     canPin,
@@ -248,20 +235,15 @@ function OpenChannelMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      {/* The anchor of the menu: the size of the row it covers. */}
-      <View style={size} />
-    </MenuView>
+    />
   );
 }
 

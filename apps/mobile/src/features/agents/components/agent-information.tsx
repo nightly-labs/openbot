@@ -130,6 +130,14 @@ export function AgentInformation({
     queryFn: () => workspace.loadAgentMemorySelection(agent.id, agent.serverId),
   });
   const selectionById = new Map(memorySelection.data?.selections.map((entry) => [entry.memoryId, entry]));
+  const memoryLoad = {
+    pending: memories.isPending || memorySelection.isPending,
+    failed: memories.isError || memorySelection.isError,
+    retry: () => {
+      void memories.refetch();
+      void memorySelection.refetch();
+    },
+  };
   const routines = useQuery({
     ...options,
     enabled: available && (section === "routines" || section === "routine"),
@@ -143,6 +151,14 @@ export function AgentInformation({
     queryKeys.agentEventRoutines(queryScope, agent.serverId, agent.id),
   );
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
+  const routineLoad = {
+    pending: routines.isPending || (eventsEnabled && eventRoutines.isPending),
+    failed: routines.isError || (eventsEnabled && eventRoutines.isError),
+    retry: () => {
+      void routines.refetch();
+      if (eventsEnabled) void eventRoutines.refetch();
+    },
+  };
   // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = useMobileWorkspaceSelector((current) => current.canManageAgentSkills(agent.serverId));
   const skillsQuery = agentSkillsQuery(queryScope, agent.serverId, agent.id, manageSkills, workspace.loadAgentSkills);
@@ -208,17 +224,7 @@ export function AgentInformation({
         </SettingsNote>
       ) : null}
       {section === "memories" ? (
-        <InformationSection
-          kind="memories"
-          list
-          available={available}
-          pending={memories.isPending || memorySelection.isPending}
-          failed={memories.isError || memorySelection.isError}
-          retry={() => {
-            void memories.refetch();
-            void memorySelection.refetch();
-          }}
-        >
+        <InformationSection kind="memories" list available={available} {...memoryLoad}>
           {memories.data?.map((memory) => (
             <SettingsRow
               key={memory.id}
@@ -261,17 +267,7 @@ export function AgentInformation({
         </InformationSection>
       ) : null}
       {section === "routines" ? (
-        <InformationSection
-          kind="routines"
-          list
-          available={available}
-          pending={routines.isPending || (eventsEnabled && eventRoutines.isPending)}
-          failed={routines.isError || (eventsEnabled && eventRoutines.isError)}
-          retry={() => {
-            void routines.refetch();
-            if (eventsEnabled) void eventRoutines.refetch();
-          }}
-        >
+        <InformationSection kind="routines" list available={available} {...routineLoad}>
           <AgentRoutines
             agent={agent}
             routines={allRoutines}
@@ -334,16 +330,7 @@ export function AgentInformation({
         !recordId ? (
           <MemoryEditor agent={agent} available={available} selection={memorySelection.data} />
         ) : (
-          <RecordSection
-            kind="memory"
-            available={available}
-            pending={memories.isPending || memorySelection.isPending}
-            failed={memories.isError || memorySelection.isError}
-            retry={() => {
-              void memories.refetch();
-              void memorySelection.refetch();
-            }}
-          >
+          <RecordSection kind="memory" available={available} {...memoryLoad}>
             {memories.data?.some((item) => item.id === recordId) ? (
               <MemoryEditor
                 key={recordId}
@@ -365,16 +352,7 @@ export function AgentInformation({
         !recordId ? (
           <RoutineEditor agent={agent} available={available} />
         ) : (
-          <RecordSection
-            kind="routine"
-            available={available}
-            pending={routines.isPending || (eventsEnabled && eventRoutines.isPending)}
-            failed={routines.isError || (eventsEnabled && eventRoutines.isError)}
-            retry={() => {
-              void routines.refetch();
-              if (eventsEnabled) void eventRoutines.refetch();
-            }}
-          >
+          <RecordSection kind="routine" available={available} {...routineLoad}>
             {allRoutines.some((item) => item.id === recordId) ? (
               <RoutineEditor
                 key={recordId}

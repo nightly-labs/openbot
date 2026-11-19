@@ -6,7 +6,7 @@ import {
   SKILL_CATEGORIES,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
 import { mcpServerDetail } from "@/features/servers/model/mcp-server-draft";
 import type { ConnectorRow } from "@/features/servers/model/use-connector-rows";
@@ -219,9 +219,20 @@ export const KIND_SINGULAR_LABELS = {
   skill: "mobile.marketplace.kind.skill",
 } as const satisfies Record<MarketplaceKind, MobileTextKey>;
 
+export function installsOf(listing: MarketplaceListing): number {
+  return listing.kind === "app" ? 0 : listing.installs;
+}
+
 /** The overview's order: featured first, then by installs. Apps have no install count yet. */
 export function byPopularity(left: MarketplaceListing, right: MarketplaceListing): number {
   if (left.featured !== right.featured) return left.featured ? -1 : 1;
-  const installs = (listing: MarketplaceListing) => (listing.kind === "app" ? 0 : listing.installs);
-  return installs(right) - installs(left);
+  return installsOf(right) - installsOf(left);
+}
+
+export function marketplaceFilterTokens(filter: MarketplaceFilter, t: MobileTranslate) {
+  return [
+    filter.kind ? { id: "kind", label: t(KIND_LABELS[filter.kind]) } : null,
+    filter.category ? { id: "category", label: t(CATEGORY_LABELS[filter.category]) } : null,
+    filter.installed ? { id: "installed", label: t("mobile.marketplace.installed") } : null,
+  ].filter((token) => token !== null);
 }

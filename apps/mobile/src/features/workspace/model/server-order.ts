@@ -1,5 +1,5 @@
 import { isString } from "@openbot/contracts/runtime-values";
-import { remoteHostFingerprint } from "@openbot/team-client";
+import { accountScope } from "@/shared/lib/account-scope";
 
 // Categorical hues shared with the desktop server rail (--openbot-file-blue/-orange/-teal/-pink and
 // --openbot-success). @openbot/brand ships tokens as CSS only, so JS keeps a copy.
@@ -13,7 +13,7 @@ export function serverAccent(serverId: string): string {
 }
 
 export function serverOrderKey(apiUrl: string, userId: string): string {
-  return `openbot.server-order.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.server-order.v1.${accountScope(apiUrl, userId)}`;
 }
 
 export function decodeServerOrder(stored: string | null): string[] {
@@ -27,7 +27,7 @@ export function decodeServerOrder(stored: string | null): string[] {
 }
 
 export function defaultServerKey(apiUrl: string, userId: string): string {
-  return `openbot.default-server.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.default-server.v1.${accountScope(apiUrl, userId)}`;
 }
 
 /** With no saved choice, the paired host is the default, as before. A saved `null` means no default. */

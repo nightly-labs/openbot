@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
@@ -50,12 +51,6 @@ export interface ChatAttachment extends RemoteFileUpload {
 
 /** Longer pasted or shared text goes in as a text file, not into the composer. */
 export const LARGE_TEXT_LENGTH = 4_000;
-
-function base64(bytes: Uint8Array) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
 
 let sharedImagesCleared = false;
 
@@ -302,18 +297,7 @@ export function useChatAttachments(
       if (!(await ImagePicker.requestCameraPermissionsAsync()).granted)
         throw new Error(t("mobile.chat.attachment.cameraPermission"));
     } catch (error) {
-      mobileAnalytics.track("attachment_action", {
-        action: "select",
-        result: "failed",
-        failure_code: "operation_failed",
-      });
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.addFailed"),
-        errorMessage(error, t("mobile.chat.tryAgain")),
-      );
+      reportFailures([error]);
       return false;
     }
     return true;
@@ -338,7 +322,7 @@ export function useChatAttachments(
       return add({
         name: "pasted-text.txt",
         mimeType: "text/plain",
-        base64: base64(new TextEncoder().encode(text)),
+        base64: bytesToBase64(new TextEncoder().encode(text)),
       });
     onText(text);
   }
@@ -378,7 +362,7 @@ export function useChatAttachments(
           await add({
             name: "shared-text.txt",
             mimeType: "text/plain",
-            base64: base64(new TextEncoder().encode(text)),
+            base64: bytesToBase64(new TextEncoder().encode(text)),
           });
         } catch (error) {
           failures.push(error);

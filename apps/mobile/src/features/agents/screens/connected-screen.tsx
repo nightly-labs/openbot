@@ -899,17 +899,16 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const order = MOBILE_CHAT_ORDERS.find((candidate) => event === `sort:${candidate}`);
     if (order) changeChatOrder(order);
   };
+  const openServersButton = (
+    <HeaderIconButton accessibilityLabel={t("mobile.agent.home.openServers")} glass={buttonGlass} onPress={openDrawer}>
+      <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
+    </HeaderIconButton>
+  );
   // The bar buttons that the screen draws: the Android header of the screen, and the bar of the pane.
   // In the pane, the status takes the room that the buttons leave: the pane can be 320 pt wide.
   const headerLeading = (
     <View className={pane ? "min-w-0 flex-1 flex-row items-center gap-2" : "flex-row items-center gap-2"}>
-      <HeaderIconButton
-        accessibilityLabel={t("mobile.agent.home.openServers")}
-        glass={buttonGlass}
-        onPress={openDrawer}
-      >
-        <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
-      </HeaderIconButton>
+      {openServersButton}
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
   );
@@ -962,15 +961,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // The pane also has its rail of avatars, which shows when the user drags the pane narrow.
   const railTree = pane ? (
     <ChatListRail
-      header={
-        <HeaderIconButton
-          accessibilityLabel={t("mobile.agent.home.openServers")}
-          glass={buttonGlass}
-          onPress={openDrawer}
-        >
-          <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
-        </HeaderIconButton>
-      }
+      header={openServersButton}
       pinnedAgents={pinnedAgents}
       pinnedChannels={pinnedChannels}
       items={items}

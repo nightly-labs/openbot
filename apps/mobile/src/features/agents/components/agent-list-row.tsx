@@ -22,7 +22,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
-import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
+import { AgentWaitBadge, AgentWaitChip, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
@@ -172,19 +172,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const row = (
     <ChatLinkPressable
       chatId={agent.id}
-      accessibilityLabel={
-        waitReason
-          ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : unreadCount > 0 || unreadThreads
-            ? t("mobile.agent.list.withState", {
-                label: openLabel,
-                state:
-                  unreadCount > 0
-                    ? t("mobile.agent.list.unread", { count: unreadCount })
-                    : t("mobile.agent.list.unreadThreads"),
-              })
-            : openLabel
-      }
+      accessibilityLabel={agentListStateLabel(t, openLabel, waitReason, unreadCount, unreadThreads)}
       accessibilityRole="button"
       accessibilityActions={[{ name: "pin", label: t("mobile.agent.pin.pinNamed", { name: agent.name }) }]}
       onAccessibilityAction={(event) => {

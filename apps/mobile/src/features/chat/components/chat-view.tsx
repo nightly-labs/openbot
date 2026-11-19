@@ -13,7 +13,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import { type ReactNode, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Keyboard, useColorScheme, View } from "react-native";
+import { Keyboard, useColorScheme, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
@@ -71,6 +71,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
+import { useAppActive } from "@/shared/lib/use-app-active";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 import { mentionDraft } from "../model/chat-mentions";
@@ -371,7 +372,7 @@ export function ChatView({
   const isFocused = useIsFocused();
   const foregroundVisit = useAppForeground();
   const [conversationAnalytics] = useState(() => new MobileConversationAnalytics(mobileAnalytics));
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
+  const appActive = useAppActive();
   const reducedTransparency = useReducedTransparency();
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === target.serverId));
   const insets = useSafeAreaInsets();
@@ -917,10 +918,6 @@ export function ChatView({
     serverOnline,
     server?.initialConnectionPending,
   ]);
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
-    return () => subscription.remove();
-  }, []);
 
   // Opening a chat reads it, as on desktop. After the user scrolls away, only the latest message in view reads it.
   const seesLatest = !detached && (atLatest || (motion.historyVisible && !motion.userScrolled));

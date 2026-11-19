@@ -9,7 +9,6 @@ import VideoOff from "lucide-react-native/icons/video-off";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, useWindowDimensions, View } from "react-native";
 import Animated, { type CSSTransitionProperties, cubicBezier } from "react-native-reanimated";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { supportLog } from "@/features/support/model/support-log";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -17,7 +16,7 @@ import { type MobileText, useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { playbackTime } from "../model/playback-time";
 import { shareTypeOptions } from "../model/share-file-type";
-import { knownImageDimensions, rememberImageDimensions } from "./attachment-preview";
+import { knownImageDimensions, rememberImageDimensions, showFileFailure } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
 import { useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
 import { VideoDownloadRing } from "./video-download-ring";
@@ -152,20 +151,25 @@ function useVideoPoster(key: string, uri: string | null) {
   return { poster, missing };
 }
 
-export async function runFileAction(action: () => Promise<void>, title: string, text: MobileText): Promise<boolean> {
+async function runFileAction(action: () => Promise<void>, title: string, text: MobileText): Promise<boolean> {
   try {
     await action();
     return true;
   } catch (error) {
-    void haptics.notification("error");
-    showFailureAlert(
-      error,
-      "turn",
-      title,
-      error instanceof Error ? text.sourceText(error.message) : text.t("mobile.chat.tryAgain"),
-    );
+    showFileFailure(error, title, text);
     return false;
   }
+}
+
+export function shareMediaFile(uri: string, attachment: AttachmentSummary, text: MobileText): Promise<boolean> {
+  return runFileAction(
+    async () => {
+      if (!(await Sharing.isAvailableAsync())) throw new Error(text.t("mobile.chat.attachment.sharingUnavailable"));
+      await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
+    },
+    text.t("mobile.chat.attachment.openFailed"),
+    text,
+  );
 }
 
 /**
@@ -226,14 +230,7 @@ export function ChatVideoAttachment({
   async function share() {
     if (!uri) return;
     setBusy(true);
-    await runFileAction(
-      async () => {
-        if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
-      },
-      t("mobile.chat.attachment.openFailed"),
-      text,
-    );
+    await shareMediaFile(uri, attachment, text);
     setBusy(false);
   }
 

@@ -17,6 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { formatTimer } from "@/shared/lib/countdown";
 import { useReducedMotion } from "@/shared/lib/motion";
 
 /** A hold this long on the mic opens the voice settings. The tap gives up at 500 ms. */
@@ -240,7 +241,7 @@ function DictationTimer({ color }: { color: string }) {
       type="body-sm"
       style={{ color, fontVariant: ["tabular-nums"], minWidth: 34 }}
     >
-      {`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+      {formatTimer(seconds)}
     </Typography.Paragraph>
   );
 }

@@ -1,4 +1,3 @@
-import * as Clipboard from "expo-clipboard";
 import { GlassView } from "expo-glass-effect";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,7 +18,6 @@ import { FlatList, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier, Easing, Keyframe } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { shareLocalAttachment } from "@/features/chat/components/attachment-preview";
 import { ScrollingCodeBlock } from "@/features/chat/components/chat-code-block";
 import { ChatGlassIconButton, ChatGlassLabel } from "@/features/chat/components/chat-glass-icon-button";
@@ -30,6 +28,7 @@ import { SpreadsheetFilePreview } from "@/features/chat/components/file-document
 import { HtmlPage } from "@/features/chat/components/html-page";
 import HtmlPreview from "@/features/chat/components/html-preview.dom";
 import { PdfPreview } from "@/features/chat/components/pdf-preview";
+import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import { type CodePreviewEntry, codePreview } from "@/features/chat/model/code-preview-store";
 import { type MarkdownPreviewPart, markdownPreviewSeries } from "@/features/chat/model/markdown-preview-parts";
 import { useMermaidDiagram } from "@/features/chat/model/mermaid-diagrams";
@@ -149,15 +148,7 @@ function PreviewContent({ entry }: { entry: CodePreviewEntry }) {
     void haptics.selection();
     setView(next);
   };
-  const copy = async () => {
-    try {
-      await Clipboard.setStringAsync(entry.source);
-      void haptics.notification("success");
-    } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
-    }
-  };
+  const copy = () => copyToClipboard(entry.source, "mobile.chat.code.copyFailed", t);
   const wrapAction: MenuAction = {
     id: "wrap",
     title: t("mobile.chat.preview.wrapLines"),

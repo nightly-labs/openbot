@@ -1,6 +1,6 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { File, Paths } from "expo-file-system";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
+import { appGroupFile, lockAppGroupFile } from "@/shared/lib/app-group";
 
 /**
  * What the App Intents of the shortcuts read from the App Group
@@ -39,15 +39,7 @@ export interface ShortcutDirectoryAgent {
   avatar?: string;
 }
 
-/** The App Group of the app and its extensions. `app.json` names the same group. */
-const APP_GROUP = "group.run.openbot.mobile";
 const DIRECTORY_FILE = "shortcuts.json";
-
-function directoryFile(): File | null {
-  const container = Paths.appleSharedContainers[APP_GROUP];
-  // The App Group is missing on Android and in a build without the widget extension.
-  return container ? new File(container, DIRECTORY_FILE) : null;
-}
 
 function decodeAgent(value: unknown): ShortcutDirectoryAgent | null {
   if (!isDynamicRecord(value)) return null;
@@ -65,7 +57,7 @@ export function readShortcutDirectory(
   userId: string,
 ): Pick<ShortcutDirectory, "agent" | "agents"> | null {
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (!file?.exists) return null;
     const value = JSON.parse(file.textSync());
     if (!isDynamicRecord(value) || value.apiUrl !== apiUrl || value.userId !== userId) return null;
@@ -85,7 +77,7 @@ export function writeShortcutDirectory(directory: ShortcutDirectory): void {
   const text = JSON.stringify(directory);
   if (text === written) return;
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (!file) return;
     file.writeSync(text);
     written = text;
@@ -100,12 +92,7 @@ export function writeShortcutDirectory(directory: ShortcutDirectory): void {
  */
 export function lockShortcutDirectory(): void {
   try {
-    const file = directoryFile();
-    if (!file?.exists) return;
-    const value = JSON.parse(file.textSync());
-    if (!isDynamicRecord(value) || value.locked === true) return;
-    file.writeSync(JSON.stringify({ ...value, locked: true }));
-    written = null;
+    if (lockAppGroupFile(DIRECTORY_FILE)) written = null;
   } catch (error) {
     supportLog.add("warn", "app", `Shortcut data not locked: ${supportLogValue(error)}`);
   }
@@ -115,7 +102,7 @@ export function lockShortcutDirectory(): void {
 export function resetShortcutDirectory(): void {
   written = null;
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (file?.exists) file.delete();
   } catch (error) {
     supportLog.add("warn", "app", `Shortcut data not removed: ${supportLogValue(error)}`);

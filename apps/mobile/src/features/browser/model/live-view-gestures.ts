@@ -1,5 +1,5 @@
+import { clamp } from "@/shared/lib/worklet-math";
 import {
-  clamp,
   clampFraction,
   clampZoom,
   MAX_ZOOM,

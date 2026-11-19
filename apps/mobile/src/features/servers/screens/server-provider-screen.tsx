@@ -13,7 +13,6 @@ import {
   type ProviderApiKeyStatus,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Chip, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
@@ -57,6 +56,7 @@ import { useProviderModels } from "@/features/servers/model/use-provider-models"
 import {
   useHostProviderDefault,
   useProviderKeyState,
+  useProviderSetting,
   useServerProviderAccounts,
   useServerProviders,
 } from "@/features/servers/model/use-server-providers";
@@ -592,11 +592,10 @@ function PromptCacheSection({
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerPromptCache(queryScope, serverId);
-  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { current, saving, error, save } = useProviderSetting(
+    queryKeys.providerPromptCache(queryScope, serverId),
+    setting,
+  );
   const label = t("mobile.server.providers.promptCache");
   return (
     <SettingsSection
@@ -620,20 +619,7 @@ function PromptCacheSection({
               label={label}
               onChange={(ttl) => {
                 if (ttl === current.data?.ttl) return;
-                setSaving(true);
-                setError(null);
-                setting
-                  .set(ttl)
-                  .then(async (saved) => {
-                    await queryClient.cancelQueries({ queryKey, exact: true });
-                    queryClient.setQueryData(queryKey, saved);
-                    void haptics.notification("success");
-                  })
-                  .catch((cause: unknown) => {
-                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
-                    void haptics.notification("error");
-                  })
-                  .finally(() => setSaving(false));
+                save(ttl);
               }}
             />
           ) : null
@@ -667,11 +653,10 @@ function CompactWindowSection({
   const { t, format, errorMessage } = useText();
   const { theme } = useUniwind();
   const queryScope = useQueryScope();
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerCompactWindow(queryScope, serverId);
-  const current = useQuery({ queryKey, retry: false, staleTime: 0, queryFn: () => setting.read() });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { current, saving, error, save } = useProviderSetting(
+    queryKeys.providerCompactWindow(queryScope, serverId),
+    setting,
+  );
   const label = t("mobile.server.providers.compactWindow");
   const options = claudeCompactWindowSizes(current.data?.tokens ?? null).map((size) => ({
     value: compactWindowChoice(size),
@@ -702,20 +687,7 @@ function CompactWindowSection({
               label={label}
               onChange={(choice) => {
                 if (choice === compactWindowChoice(current.data?.tokens ?? null)) return;
-                setSaving(true);
-                setError(null);
-                setting
-                  .set(choice === "default" ? null : Number(choice))
-                  .then(async (next) => {
-                    await queryClient.cancelQueries({ queryKey, exact: true });
-                    queryClient.setQueryData(queryKey, next);
-                    void haptics.notification("success");
-                  })
-                  .catch((cause: unknown) => {
-                    setError(errorMessage(cause, t("mobile.server.providers.actionFailed")));
-                    void haptics.notification("error");
-                  })
-                  .finally(() => setSaving(false));
+                save(choice === "default" ? null : Number(choice));
               }}
             />
           ) : null

@@ -13,6 +13,7 @@ import {
 import { type DynamicRecord, isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress, normalizeOneTimeCode, validateProfileName } from "@openbot/contracts/validation";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { bytesToBase64Url } from "@openbot/team-client/base64";
 import * as Crypto from "expo-crypto";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
@@ -34,8 +35,8 @@ const MOBILE_EMAIL_CODE_REQUEST_TIMEOUT_MS = 35_000;
 // The account service reads the metadata of the company provider first, for up to 10 s.
 const MOBILE_COMPANY_START_TIMEOUT_MS = 20_000;
 
-let mobileSessionStorageTail = Promise.resolve();
-let mobileProfileTail = Promise.resolve();
+const serializeMobileSessionStorage = serialQueue();
+const serializeMobileProfile = serialQueue();
 let mobileConnectInFlight = false;
 
 export class MobileSessionExpiredError extends Error {
@@ -60,11 +61,15 @@ export interface MobileSession {
 type AccountSignIn = "email" | "company";
 type MobileCredential = Pick<MobileSession, "apiUrl" | "sessionToken">;
 
-export async function redeemMobileConnectUrl(value: string): Promise<MobileSession> {
+export function redeemMobileConnectUrl(value: string): Promise<MobileSession> {
+  return exclusiveSignIn(() => redeemMobileConnectSession(value));
+}
+
+async function exclusiveSignIn<T>(operation: () => Promise<T>): Promise<T> {
   if (mobileConnectInFlight) throw new Error(currentText().t("mobile.auth.error.connectionInProgress"));
   mobileConnectInFlight = true;
   try {
-    return await redeemMobileConnectSession(value);
+    return await operation();
   } finally {
     mobileConnectInFlight = false;
   }
@@ -170,18 +175,12 @@ export async function startMobileEmailSignIn(email: string, requestId: string): 
   };
 }
 
-/**
- * Verifies the code and saves the new session. The session is a mobile session with no host.
- * `referralCode` is the invite code that the person typed. The account server uses it only for a new account.
- */
-export async function verifyMobileEmailCode(
+export function verifyMobileEmailCode(
   challengeId: string,
   code: string,
   referralCode?: string,
 ): Promise<MobileSession> {
-  if (mobileConnectInFlight) throw new Error(currentText().t("mobile.auth.error.connectionInProgress"));
-  mobileConnectInFlight = true;
-  try {
+  return exclusiveSignIn(async () => {
     const normalized = normalizeOneTimeCode(code);
     if (!normalized) {
       throw new MobileEmailSignInError(
@@ -206,21 +205,11 @@ export async function verifyMobileEmailCode(
     const session = decodeMobileSession(body, apiUrl, "email");
     await saveMobileSession(session);
     return session;
-  } finally {
-    mobileConnectInFlight = false;
-  }
+  });
 }
 
-/**
- * Signs in at the company provider of the email, after the email start answered
- * `company_sign_in_required`. The provider page opens in a browser session, which returns to
- * `openbot://company-sign-in` with a one-time code. Only the verifier that stays here makes the code
- * a session. Resolves null when the user closed the browser.
- */
-export async function signInMobileWithCompany(email: string): Promise<MobileSession | null> {
-  if (mobileConnectInFlight) throw new Error(currentText().t("mobile.auth.error.connectionInProgress"));
-  mobileConnectInFlight = true;
-  try {
+export function signInMobileWithCompany(email: string): Promise<MobileSession | null> {
+  return exclusiveSignIn(async () => {
     const address = normalizeEmailAddress(email);
     if (!address) {
       throw new MobileEmailSignInError(currentText().t("mobile.auth.email.error.invalidEmail"), "invalid_email");
@@ -266,16 +255,12 @@ export async function signInMobileWithCompany(email: string): Promise<MobileSess
     const session = decodeMobileSession(body, apiUrl, "company");
     await saveMobileSession(session);
     return session;
-  } finally {
-    mobileConnectInFlight = false;
-  }
+  });
 }
 
 /** 32 random bytes as base64url text: the form of the state and the verifier. */
 function randomToken(): string {
-  let binary = "";
-  for (const byte of Crypto.getRandomBytes(32)) binary += String.fromCharCode(byte);
-  return base64Url(btoa(binary));
+  return bytesToBase64Url(Crypto.getRandomBytes(32));
 }
 
 function base64Url(base64: string): string {
@@ -284,14 +269,8 @@ function base64Url(base64: string): string {
 
 function companySignInError(code: string, response?: Response): MobileEmailSignInError {
   const text = currentText();
-  if (code === "rate_limited") {
-    const retryAfter = Number(response?.headers.get("Retry-After"));
-    return new MobileEmailSignInError(
-      text.t("mobile.auth.email.error.wait"),
-      code,
-      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
-    );
-  }
+  if (code === "rate_limited")
+    return new MobileEmailSignInError(text.t("mobile.auth.email.error.wait"), code, retryAfterSeconds(response));
   if (code === "invalid_email") return new MobileEmailSignInError(text.t("mobile.auth.email.error.invalidEmail"), code);
   return new MobileEmailSignInError(text.t(companySignInErrorKey(code)), code || "company_sign_in_failed");
 }
@@ -348,12 +327,12 @@ function mobileEmailError(
 ): MobileEmailSignInError {
   const code = errorCode(body);
   const key = EMAIL_SIGN_IN_ERRORS.get(code) ?? fallback;
-  const retryAfter = Number(response.headers.get("Retry-After"));
-  return new MobileEmailSignInError(
-    currentText().t(key),
-    code,
-    Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
-  );
+  return new MobileEmailSignInError(currentText().t(key), code, retryAfterSeconds(response));
+}
+
+function retryAfterSeconds(response: Response | undefined): number | undefined {
+  const retryAfter = Number(response?.headers.get("Retry-After"));
+  return Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined;
 }
 
 export async function readMobileSession(): Promise<MobileSession | null> {
@@ -513,11 +492,7 @@ async function writeMobileAnalytics(session: MobileSession, enabled: boolean, ag
     if (response.status === 429) throw new Error(currentText().t("mobile.auth.error.tooManyChanges"));
     throw new Error(currentText().t("mobile.auth.error.profileSaveFailed"));
   }
-  const user = decodeUser(body);
-  if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
-  const updated = { ...session, user };
-  await saveMobileSessionIfCurrent(updated);
-  return updated;
+  return saveUpdatedUser(session, body);
 }
 
 async function writeMobileProfile(session: MobileSession, change: MobileProfileFieldChange): Promise<MobileSession> {
@@ -558,11 +533,7 @@ async function writeMobileProfile(session: MobileSession, change: MobileProfileF
     if (response.status === 409) throw new Error(currentText().t("mobile.auth.error.photoConflict"));
     throw new Error(currentText().t("mobile.auth.error.profileSaveFailed"));
   }
-  const user = decodeUser(body);
-  if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
-  const updated = { ...session, user };
-  await saveMobileSessionIfCurrent(updated);
-  return updated;
+  return saveUpdatedUser(session, body);
 }
 
 export async function logoutMobileSession(session: MobileSession): Promise<void> {
@@ -581,7 +552,15 @@ export async function logoutMobileSession(session: MobileSession): Promise<void>
   void retryMobileSessionRevocations();
 }
 
-function sameCredential(left: MobileCredential, right: MobileCredential): boolean {
+async function saveUpdatedUser(session: MobileSession, body: DynamicRecord | null): Promise<MobileSession> {
+  const user = decodeUser(body);
+  if (user.id !== session.user.id) throw new Error("The account service returned an invalid user.");
+  const updated = { ...session, user };
+  await saveMobileSessionIfCurrent(updated);
+  return updated;
+}
+
+export function sameCredential(left: MobileCredential, right: MobileCredential): boolean {
   return left.apiUrl === right.apiUrl && left.sessionToken === right.sessionToken;
 }
 
@@ -667,15 +646,16 @@ async function revokeMobileCredential(session: MobileCredential): Promise<void> 
   }
 }
 
-// Serialize profile reads and writes so a foreground refresh cannot persist an older identity
-// after a successful edit. Credential revocation uses the independent storage queue.
-function serializeMobileProfile<T>(operation: () => Promise<T>): Promise<T> {
-  const result = mobileProfileTail.then(operation, operation);
-  mobileProfileTail = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
+function serialQueue() {
+  let tail = Promise.resolve();
+  return <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = tail.then(operation, operation);
+    tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  };
 }
 
 /**
@@ -781,15 +761,6 @@ async function deleteMobileSessionIfCurrent(sessionToken: string): Promise<void>
     }
     await LockedKeychain.deleteItemAsync(MOBILE_SESSION_KEY);
   });
-}
-
-function serializeMobileSessionStorage<T>(operation: () => Promise<T>): Promise<T> {
-  const result = mobileSessionStorageTail.then(operation, operation);
-  mobileSessionStorageTail = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
 }
 
 async function mobileDeviceIdentity(): Promise<{

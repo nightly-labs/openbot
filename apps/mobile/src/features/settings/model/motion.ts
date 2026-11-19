@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { storedFields } from "./stored-fields";
 
 /** Animation choices for this device. Each value is true when the animation plays. */
 export interface MotionPreferences {
@@ -38,13 +39,7 @@ export const useMotionPreferences = create<MotionPreferences & { ready: boolean 
 
 /** Reads the stored value. A missing, damaged or older value keeps the default for each field it lacks. */
 export function decodeMotionPreferences(stored: string | null): MotionPreferences {
-  let value: unknown = null;
-  try {
-    value = stored === null ? null : JSON.parse(stored);
-  } catch {
-    value = null;
-  }
-  const fields = new Map<string, unknown>(typeof value === "object" && value !== null ? Object.entries(value) : []);
+  const fields = storedFields(stored) ?? new Map<string, unknown>();
   const preferences = { ...DEFAULTS };
   for (const name of MOTION_PREFERENCE_NAMES) {
     const field = fields.get(name);

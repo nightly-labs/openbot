@@ -10,7 +10,6 @@ import {
   type VaultState,
 } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { Children, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -43,9 +42,9 @@ import {
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
-import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const KINDS: readonly VaultItemKind[] = ["login", "card", "contact", "apiKey"];
 // Examples that are the same in each language.
@@ -163,7 +162,6 @@ export function VaultItemForm({
   const [draft, setDraft] = useState<VaultDraft>(initial);
   // Navigation runs a render later, once the guard below reads `leaving`.
   const [leaving, setLeaving] = useState(false);
-  const [discarding, setDiscarding] = useState(false);
   // The state without a deleted item. It is shown after this page goes, so the page does not say "gone".
   const removedState = useRef<VaultState | null>(null);
   const showState = useRef(setState);
@@ -192,21 +190,7 @@ export function VaultItemForm({
   const locked = action.isPending;
   const formId = useId();
 
-  usePreventRemove(!discarding && (dirty || locked) && !leaving, ({ repeat }) => {
-    if (locked) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || locked) && !leaving, { busy: () => locked, warn: true });
 
   const edit = (change: Partial<VaultDraft>) => {
     setDraft((current) => ({ ...current, ...change }));

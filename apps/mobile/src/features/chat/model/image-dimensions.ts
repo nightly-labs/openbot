@@ -1,3 +1,5 @@
+import { base64ToBytes } from "@openbot/team-client/base64";
+
 export interface ImageDimensions {
   width: number;
   height: number;
@@ -23,10 +25,7 @@ function decodePrefix(base64: string): Uint8Array | null {
   // A multiple of four, so the cut never splits a base64 group.
   const prefix = base64.slice(0, HEADER_BASE64_LENGTH);
   try {
-    const binary = atob(prefix.slice(0, prefix.length - (prefix.length % 4)));
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
+    return base64ToBytes(prefix.slice(0, prefix.length - (prefix.length % 4)));
   } catch {
     return null;
   }

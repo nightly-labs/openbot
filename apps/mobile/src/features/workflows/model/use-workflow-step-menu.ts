@@ -24,8 +24,7 @@ export function openAddStepAt(place: GraphPlace) {
   router.push({ pathname: "/workflow-editor/add", params: placeParams(place) });
 }
 
-/** Deleting a condition deletes its two paths, so it asks first. */
-function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
+export function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
   const text = currentText();
   if (node.kind !== "condition" || !draft.outline) {
     void haptics.selection();

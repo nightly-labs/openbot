@@ -9,7 +9,6 @@ import {
   type SaveBrowserProxyInput,
 } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import Monitor from "lucide-react-native/icons/monitor";
@@ -36,6 +35,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 function stackOf(agentId: string | undefined): BrowserProfileStack {
   return agentId ? { kind: "agent", agentId } : { kind: "server" };
@@ -166,26 +166,7 @@ export function ServerBrowserProxyScreen() {
   const trimmed = address.trim();
   const dirty = draft !== undefined && trimmed !== initial;
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && dirty, ({ repeat }) => {
-    if (leaving.current) {
-      setDiscarding(true);
-      repeat();
-      return;
-    }
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
   /** Runs one change at a time, then goes back. */
   async function perform(operation: () => Promise<void>): Promise<void> {

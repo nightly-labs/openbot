@@ -10,7 +10,6 @@ import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
-import * as Clipboard from "expo-clipboard";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -74,6 +73,7 @@ import { useOpenMessageFile } from "./chat-file-actions";
 import { ChatMath } from "./chat-math";
 import { useOpenTaggedTab } from "./chat-tag-actions";
 import { CHAT_CODE_STYLES, CHAT_HEADING_RAMP, CHAT_TEXT_STYLES, type ChatTextType } from "./chat-text-styles";
+import { copyToClipboard } from "./use-copy-message";
 import { type ReplyPlayback, useReplyPlayback } from "./use-reply-playback";
 
 interface MarkdownTokenByType {
@@ -974,14 +974,7 @@ function TableCopyActions({
       format === "markdown"
         ? token.raw.trim()
         : tableCsv([token.header, ...token.rows].map((row) => row.map((cell) => markdownInlinePlainText(cell.text))));
-    try {
-      await Clipboard.setStringAsync(text);
-      setCopied(format);
-      void haptics.notification("success");
-    } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(error, "turn", t("mobile.chat.table.copyFailed"), t("mobile.chat.copyFailedMessage"));
-    }
+    if (await copyToClipboard(text, "mobile.chat.table.copyFailed", t)) setCopied(format);
   }
   const action = (format: TableCopyFormat, label: string) => {
     const Icon = copied === format ? Check : Copy;

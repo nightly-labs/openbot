@@ -1,4 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { referenceFrom } from "@openbot/user-errors";
 import { CodedError } from "expo";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +18,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
-import { base64Bytes } from "../model/base64-bytes";
 import {
   applyDictationResult,
   type DictationNotice,
@@ -110,7 +110,7 @@ function showVoiceServerNotice(error: VoiceServerError): void {
 
 /** The 16 kHz mono PCM of a recording, from the Base64 chunks of the speech module. */
 function joinRecording(chunks: readonly string[]): Uint8Array {
-  const parts = chunks.map(base64Bytes);
+  const parts = chunks.map(base64ToBytes);
   const pcm = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
   let offset = 0;
   for (const part of parts) {
@@ -126,7 +126,7 @@ function voiceServerLanguage(): string | null {
   return chosen === AUTOMATIC_DICTATION_LANGUAGE ? null : (chosen.split(/[-_]/)[0]?.toLowerCase() ?? null);
 }
 
-function showNotice(notice: DictationNotice, error?: unknown): void {
+export function showNotice(notice: DictationNotice, error?: unknown): void {
   void haptics.notification("error");
   const { t } = currentText();
   showFailureAlert(
@@ -143,13 +143,15 @@ function showNotice(notice: DictationNotice, error?: unknown): void {
   );
 }
 
-/** One analytics event for each session. It has no words of the transcript. */
-function trackTurn(current: CaptureSession): void {
+export function trackTurn(
+  current: Pick<CaptureSession, "heard" | "listeningAt" | "stoppingAt" | "ending">,
+  transcription: "cloud" | "local" | undefined,
+): void {
   const now = performance.now();
   const failed = current.ending === "permission_denied" || current.ending === "operation_failed";
   mobileAnalytics.track("voice_turn", {
     server_kind: "remote",
-    transcription: current.engine === "elevenlabs" || current.engine === "voice-server" ? "cloud" : "local",
+    transcription,
     result: failed ? "failed" : current.ending === "cancelled" || !current.heard ? "cancelled" : "succeeded",
     failure_code: !failed
       ? undefined
@@ -211,7 +213,11 @@ export function useModelDictation({
   }, []);
 
   const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current);
+    if (session.current)
+      trackTurn(
+        session.current,
+        session.current.engine === "elevenlabs" || session.current.engine === "voice-server" ? "cloud" : "local",
+      );
     if (owner === id) owner = null;
     session.current = null;
     if (stopTimer.current) clearTimeout(stopTimer.current);

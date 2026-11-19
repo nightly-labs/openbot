@@ -134,30 +134,11 @@ export function ServerProviderKeyScreen() {
         >
           <Typography.Paragraph>{t("mobile.server.providers.keyState")}</Typography.Paragraph>
         </SettingsRow>
-        {/* The input is a row of the group, so the key reads as one section. */}
-        <SheetFormField
-          hideLabel
-          appearance="soft"
-          label={t(saved ? "mobile.server.providers.replaceKey" : "mobile.server.providers.newKey")}
-          placeholder={t(
-            saved ? "mobile.server.providers.replaceKeyPlaceholder" : "mobile.server.providers.keyPlaceholder",
-          )}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          editable={!saving}
-          trailing={
-            <PasteButton
-              disabled={saving}
-              onPaste={(value) => {
-                setDraft(value);
-                setError(null);
-              }}
-            />
-          }
-          maxLength={512}
+        <KeyField
+          replace={saved}
+          saving={saving}
           value={draft}
-          onChangeText={(value) => {
+          onChange={(value) => {
             setDraft(value);
             setError(null);
           }}
@@ -259,34 +240,48 @@ function AccountKeyPage({
             : t("mobile.server.providers.accountKeyHint", { provider: name }))
         }
       >
-        <SheetFormField
-          hideLabel
-          appearance="soft"
-          label={t(adding ? "mobile.server.providers.newKey" : "mobile.server.providers.replaceKey")}
-          placeholder={t(
-            adding ? "mobile.server.providers.keyPlaceholder" : "mobile.server.providers.replaceKeyPlaceholder",
-          )}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          editable={!saving}
-          trailing={
-            <PasteButton
-              disabled={saving}
-              onPaste={(value) => {
-                setDraft(value);
-                setError(null);
-              }}
-            />
-          }
-          maxLength={512}
+        <KeyField
+          replace={!adding}
+          saving={saving}
           value={draft}
-          onChangeText={(value) => {
+          onChange={(value) => {
             setDraft(value);
             setError(null);
           }}
         />
       </SettingsSection>
     </SettingsContent>
+  );
+}
+
+function KeyField({
+  replace,
+  saving,
+  value,
+  onChange,
+}: {
+  replace: boolean;
+  saving: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useText();
+  return (
+    <SheetFormField
+      hideLabel
+      appearance="soft"
+      label={t(replace ? "mobile.server.providers.replaceKey" : "mobile.server.providers.newKey")}
+      placeholder={t(
+        replace ? "mobile.server.providers.replaceKeyPlaceholder" : "mobile.server.providers.keyPlaceholder",
+      )}
+      autoCapitalize="none"
+      autoCorrect={false}
+      secureTextEntry
+      editable={!saving}
+      trailing={<PasteButton disabled={saving} onPaste={onChange} />}
+      maxLength={512}
+      value={value}
+      onChangeText={onChange}
+    />
   );
 }

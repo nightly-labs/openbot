@@ -1,8 +1,6 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
-import { androidBackOptions } from "@/shared/components/android-header-button";
-import { headerFontOptions } from "@/shared/lib/app-font";
-import { isIOS } from "@/shared/lib/platform";
+import { sheetStackOptions } from "@/shared/components/sheet-page-stack";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
 import { useText } from "@/shared/lib/text";
@@ -30,15 +28,9 @@ export default function AddServerLayout() {
       <Stack.Screen
         name="local"
         options={(props) => ({
-          ...androidBackOptions(props),
+          ...sheetStackOptions(background)(props),
           headerShown: true,
           title: t("mobile.server.local.title"),
-          headerBackButtonDisplayMode: "minimal",
-          ...headerFontOptions,
-          headerShadowVisible: false,
-          headerTransparent: isIOS,
-          headerStyle: { backgroundColor: isIOS ? "transparent" : background },
-          headerBlurEffect: "none",
         })}
       />
     </Stack>

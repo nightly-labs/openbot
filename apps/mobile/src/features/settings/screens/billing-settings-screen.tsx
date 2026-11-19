@@ -4,13 +4,13 @@ import { useFocusEffect } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Monitor from "lucide-react-native/icons/monitor";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { HOSTED_PLAN_TEXT } from "@/features/servers/model/hosted-server-plans";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useBillingState } from "@/features/settings/model/billing";
-import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
+import { useRefreshedMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
@@ -41,10 +41,7 @@ export function BillingSettingsScreen() {
   // A link can open this page also while the flag is off, or before Settings read the flags. It reads
   // the flags, and while the flag is off it reads and shows nothing.
   const apiUrl = session?.apiUrl ?? "";
-  const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
-  useEffect(() => {
-    if (apiUrl) void refreshMobileFeatures(apiUrl);
-  }, [apiUrl]);
+  const cloudServersOn = useRefreshedMobileFeature(apiUrl, "cloudServers");
   const billing = useBillingState(cloudServersOn);
   const { refetch } = billing;
   useFocusEffect(

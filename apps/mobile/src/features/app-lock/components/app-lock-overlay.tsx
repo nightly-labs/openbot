@@ -4,8 +4,8 @@ import { useThemeColor } from "heroui-native/hooks";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import LockKeyhole from "lucide-react-native/icons/lock-keyhole";
 import ScanFace from "lucide-react-native/icons/scan-face";
-import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Alert, AppState, BackHandler, Modal, StyleSheet, useWindowDimensions, View } from "react-native";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Alert, BackHandler, Modal, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { type EdgeInsets, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,6 +31,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
 import { type MobileText, useText } from "@/shared/lib/text";
+import { useAppActive } from "@/shared/lib/use-app-active";
 
 /** The attempts left are shown when this many or fewer remain. */
 const SHOW_ATTEMPTS_LEFT = 5;
@@ -46,16 +47,6 @@ export function deviceUnlockName(kind: DeviceUnlockKind | null, t: MobileText["t
   if (kind === "faceId") return t("mobile.appLock.method.faceId");
   if (kind === "touchId") return t("mobile.appLock.method.touchId");
   return t("mobile.appLock.method.phone");
-}
-
-function subscribeAppState(onChange: () => void): () => void {
-  const subscription = AppState.addEventListener("change", onChange);
-  return () => subscription.remove();
-}
-
-/** Only the active state. `useAppForeground` also counts `inactive` and `unknown`, and a start in the background can report them. */
-function isAppActive(): boolean {
-  return AppState.currentState === "active";
 }
 
 function DeviceUnlockIcon({ kind, size, color }: { kind: DeviceUnlockKind | null; size: number; color: string }) {
@@ -164,7 +155,7 @@ function LockScreen({ leaving, onHeaderLayout }: { leaving: boolean; onHeaderLay
   const confirming = useAppLock((state) => state.confirming);
   const lockCount = useAppLock((state) => state.lockCount);
   const attempts = useAppLock((state) => state.attempts);
-  const appActive = useSyncExternalStore(subscribeAppState, isAppActive, isAppActive);
+  const appActive = useAppActive();
   const [pin, setPin] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -408,30 +399,35 @@ function LockLayout({
       />
       <Animated.View
         entering={FadeIn.duration(300).delay(reduced ? 0 : LOCK_ENTER_DELAY_MS)}
-        className="grow items-center"
-        style={{ flexShrink: 0, opacity: leaving ? 0 : 1, transitionProperty: "opacity", transitionDuration: 160 }}
+        className="grow"
+        style={{ flexShrink: 0 }}
       >
-        <View className="flex-1 items-center justify-center gap-8 self-stretch px-8 pt-6">
-          <View className="items-center gap-3">
-            <Typography.Heading type="h3" align="center" accessibilityRole="header">
-              {title}
-            </Typography.Heading>
-            <View className="min-h-10">
-              {message ? (
-                <Typography.Paragraph
-                  align="center"
-                  accessibilityLiveRegion="polite"
-                  className={error ? "text-danger-text" : "text-text-secondary"}
-                >
-                  {message}
-                </Typography.Paragraph>
-              ) : null}
+        <Animated.View
+          className="grow items-center"
+          style={{ flexShrink: 0, opacity: leaving ? 0 : 1, transitionProperty: "opacity", transitionDuration: 160 }}
+        >
+          <View className="flex-1 items-center justify-center gap-8 self-stretch px-8 pt-6">
+            <View className="items-center gap-3">
+              <Typography.Heading type="h3" align="center" accessibilityRole="header">
+                {title}
+              </Typography.Heading>
+              <View className="min-h-10">
+                {message ? (
+                  <Typography.Paragraph
+                    align="center"
+                    accessibilityLiveRegion="polite"
+                    className={error ? "text-danger-text" : "text-text-secondary"}
+                  >
+                    {message}
+                  </Typography.Paragraph>
+                ) : null}
+              </View>
             </View>
+            {children}
           </View>
-          {children}
-        </View>
-        {pad}
-        <View className="mt-4 min-h-10 justify-center">{footer}</View>
+          {pad}
+          <View className="mt-4 min-h-10 justify-center">{footer}</View>
+        </Animated.View>
       </Animated.View>
     </View>
   );

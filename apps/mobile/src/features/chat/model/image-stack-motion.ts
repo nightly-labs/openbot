@@ -4,7 +4,8 @@
  * the UI thread, so a swipe and the cards that move up behind it never wait for the JS thread.
  */
 
-import { clamp, lerp } from "./image-viewer-geometry";
+import { clamp } from "@/shared/lib/worklet-math";
+import { lerp } from "./image-viewer-geometry";
 
 export interface StackPose {
   x: number;

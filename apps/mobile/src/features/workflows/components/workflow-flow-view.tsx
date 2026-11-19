@@ -20,7 +20,7 @@ import {
   type RunTone,
 } from "@/features/workflows/components/workflow-run-visuals";
 import { WorkflowStepMenuLayer } from "@/features/workflows/components/workflow-step-menu-layer";
-import type { WorkflowStepMenu } from "@/features/workflows/components/workflow-steps-list";
+import { pathLabel, pathTone, type WorkflowStepMenu } from "@/features/workflows/components/workflow-steps-list";
 import { type FlowItem, type FlowPath, workflowFlowTree } from "@/features/workflows/model/workflow-flow-tree";
 import type { GraphPlace } from "@/features/workflows/model/workflow-graph-edit";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
@@ -82,6 +82,8 @@ export function FlowStepCard({
   const actions = press?.kind === "menu" ? press.menu.actions(node) : press?.kind === "edit" ? press.actions : [];
   const hasMenu = actions.length > 0;
   const opens = (press?.kind === "open" && press.canOpen(node)) || press?.kind === "edit";
+  const openOnPress =
+    press?.kind === "edit" && !hasMenu ? press.open : press?.kind === "open" && opens ? () => press.open(node) : null;
   return (
     <View
       style={{ width: FLOW_CARD_WIDTH, opacity: quiet ? 0.6 : 1 }}
@@ -142,24 +144,14 @@ export function FlowStepCard({
           onPressedChange={setPressed}
         />
       ) : null}
-      {press?.kind === "edit" && !hasMenu ? (
+      {openOnPress ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${label}, ${problem ?? text}`}
           style={StyleSheet.absoluteFill}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
-          onPress={press.open}
-        />
-      ) : null}
-      {press?.kind === "open" && opens ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${label}, ${problem ?? text}`}
-          style={StyleSheet.absoluteFill}
-          onPressIn={() => setPressed(true)}
-          onPressOut={() => setPressed(false)}
-          onPress={() => press.open(node)}
+          onPress={openOnPress}
         />
       ) : null}
     </View>
@@ -182,17 +174,9 @@ function FlowJump({ label, loop }: { label: string; loop: boolean }) {
 
 function PathLabel({ path, index }: { path: FlowPath; index: number }) {
   const { t } = useText();
-  const text =
-    path.branch === "yes"
-      ? t("mobile.workflow.path.yes")
-      : path.branch === "no"
-        ? t("mobile.workflow.path.no")
-        : t("mobile.workflow.flow.path", { number: index + 1 });
-  const tone =
-    path.branch === "yes" ? "text-success-text" : path.branch === "no" ? "text-danger-text" : "text-grouped-secondary";
   return (
-    <Typography.Paragraph className={`font-semibold ${tone}`} style={typeScale.caption}>
-      {text}
+    <Typography.Paragraph className={`font-semibold ${pathTone(path.branch)}`} style={typeScale.caption}>
+      {pathLabel(path.branch, index, t)}
     </Typography.Paragraph>
   );
 }

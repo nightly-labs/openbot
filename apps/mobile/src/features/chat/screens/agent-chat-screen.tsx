@@ -7,6 +7,7 @@ import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
+import { firstParam } from "@/features/chat/components/use-conversation-message";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -28,8 +29,8 @@ export function AgentChatScreen() {
   }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
-  const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
-  const resolvedMessageId = Array.isArray(messageId) ? messageId[0] : messageId;
+  const resolvedAgentId = firstParam(agentId);
+  const resolvedMessageId = firstParam(messageId);
   // Only this agent: a change elsewhere in the workspace does not render the whole chat again. The
   // chat does not show the agent's latest message preview, so a new message keeps the same agent.
   const agent = useMobileWorkspaceSelector(

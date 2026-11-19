@@ -10,7 +10,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-native";
+import { Keyboard, Pressable, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -85,6 +85,7 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { useAppActive } from "@/shared/lib/use-app-active";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
@@ -417,11 +418,7 @@ function AgentTaskChat({
     "accent-foreground",
     "background",
   ]);
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
-    return () => subscription.remove();
-  }, []);
+  const appActive = useAppActive();
   // The person sees the thread while its screen is in front, so its dot in the thread menu goes, on
   // this phone and on the member's other devices.
   useMarkThreadRead(

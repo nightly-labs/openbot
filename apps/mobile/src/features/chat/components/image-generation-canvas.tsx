@@ -1,8 +1,9 @@
 import { Canvas, Fill, Shader, Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
-import { useEffect, useState } from "react";
-import { AppState, type ColorValue } from "react-native";
+import { useEffect } from "react";
+import type { ColorValue } from "react-native";
 import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { useAppActive } from "@/shared/lib/use-app-active";
 
 // A dot grid with rings that travel out from the centre: the canvas the image is painted on.
 // The dots near a crest brighten toward the accent, so the motion reads as work in progress
@@ -60,16 +61,12 @@ export function ImageGenerationCanvas({
   accent: ColorValue;
 }) {
   const reducedMotion = useReducedMotion();
-  const [foreground, setForeground] = useState(AppState.currentState === "active");
+  const foreground = useAppActive();
   const time = useSharedValue(0);
   const active = running && foreground && !reducedMotion && !failed;
   const frame = useFrameCallback(({ timeSincePreviousFrame }) => {
     time.set((value) => value + (timeSincePreviousFrame ?? 0) / 1000);
   }, false);
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setForeground(state === "active"));
-    return () => subscription.remove();
-  }, []);
   useEffect(() => {
     frame.setActive(active);
     return () => frame.setActive(false);

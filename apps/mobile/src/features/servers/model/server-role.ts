@@ -1,4 +1,4 @@
-import type { TeamRole } from "@openbot/contracts/ipc";
+import type { AgentAccessLevel, TeamRole } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 
 /** The role word inside a sentence, such as "Your role: owner". */
@@ -14,3 +14,10 @@ export const SERVER_ROLE_LABEL_KEYS = {
   admin: "mobile.server.role.adminLabel",
   member: "mobile.server.role.memberLabel",
 } as const satisfies Record<TeamRole, MobileTextKey>;
+
+export const AGENT_ACCESS_LEVEL_KEYS = {
+  none: "mobile.server.roles.level.none",
+  view: "mobile.server.roles.level.view",
+  chat: "mobile.server.roles.level.chat",
+  manage: "mobile.server.roles.level.manage",
+} as const satisfies Record<AgentAccessLevel, MobileTextKey>;

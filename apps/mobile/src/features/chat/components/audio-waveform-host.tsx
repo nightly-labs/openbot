@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { readWaveformSource, receiveWaveformResult, useWaveformJobs, WAVEFORM_BARS } from "../model/audio-waveforms";
 import AudioWaveformReader from "./audio-waveform.dom";
+import { HIDDEN_DOM } from "./mermaid-renderer-host";
 
 /**
  * Starts the waveform web view when the first audio file needs it and keeps it for the session,
@@ -18,13 +18,7 @@ export function AudioWaveformHost() {
       bars={WAVEFORM_BARS}
       readSource={readWaveformSource}
       onResult={async (result) => receiveWaveformResult(result)}
-      dom={{
-        ...expoGoDomOptions,
-        containerStyle: { flex: 0, height: 1, left: 0, opacity: 0, position: "absolute", top: 0, width: 1 },
-        pointerEvents: "none",
-        scrollEnabled: false,
-        style: { flex: 0, height: 1, width: 1 },
-      }}
+      dom={HIDDEN_DOM}
     />
   );
 }

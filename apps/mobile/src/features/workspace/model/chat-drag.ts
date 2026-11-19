@@ -5,6 +5,7 @@ import {
   type SidebarPin,
   sidebarPinKey,
 } from "@openbot/contracts/ipc";
+import { samePinList } from "./agent-pins";
 import { moveSidebarChat } from "./sidebar-layout";
 
 /** A chat that the user drags: an agent or a channel, from the pinned tiles or from the list. */
@@ -204,16 +205,6 @@ function placePin(pins: readonly SidebarPin[], chat: SidebarPin, beforeKey: stri
   return rest;
 }
 
-function samePins(left: readonly SidebarPin[], right: readonly SidebarPin[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((pin, index) => {
-      const other = right[index];
-      return other !== undefined && sidebarPinKey(pin) === sidebarPinKey(other);
-    })
-  );
-}
-
 function sameLayoutPlace(left: SidebarLayoutSnapshot, right: SidebarLayoutSnapshot, chatId: string): boolean {
   return (
     left.agentAssignments[chatId] === right.agentAssignments[chatId] &&
@@ -235,7 +226,7 @@ export function chatDropChange(
 ): DropChange {
   if (target.area === "pins") {
     const next = placePin(pins, dragged.chat, target.beforeKey);
-    return dragged.pinned && samePins(next, pins) ? {} : { pins: next };
+    return dragged.pinned && samePinList(next, pins) ? {} : { pins: next };
   }
   const key = sidebarPinKey(dragged.chat);
   const change: DropChange = dragged.pinned ? { pins: pins.filter((pin) => sidebarPinKey(pin) !== key) } : {};

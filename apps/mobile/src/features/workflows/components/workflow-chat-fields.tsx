@@ -11,14 +11,15 @@ import {
   WORKFLOW_TELEGRAM_TRIGGER_CHAT,
   type WorkflowNode,
 } from "@openbot/contracts/ipc";
-import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Typography } from "heroui-native";
 import { useUniwind } from "uniwind";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { ValueRow } from "@/features/workflows/components/workflow-value-row";
 import { useWorkflowChats, useWorkflowChatsSupported } from "@/features/workflows/model/use-workflows";
 import { channelName, slackWorkspaces, telegramChats } from "@/features/workflows/model/workflow-chats";
 import { useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { fieldOneOf, fieldText } from "@/features/workflows/model/workflow-node-fields";
 import {
   SLACK_ACTION_LABEL,
   slackAction,
@@ -28,11 +29,6 @@ import {
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
-
-const text = (node: WorkflowNode, name: string) => {
-  const value = node.fields[name];
-  return typeof value === "string" ? value : "";
-};
 
 interface Choice {
   value: string;
@@ -68,20 +64,6 @@ function ChatNote({ access, hostOnly }: { access: ReturnType<typeof useChatAcces
   if (!access.admin) return <SettingsNote>{t("mobile.workflow.chats.adminOnly")}</SettingsNote>;
   if (access.failed) return <SettingsNote>{t("mobile.workflow.chats.loadFailed")}</SettingsNote>;
   return null;
-}
-
-function ValueRow({ label, value }: { label: string; value: string }) {
-  return (
-    <SettingsRow
-      trailing={
-        <Typography.Paragraph className="text-grouped-secondary" numberOfLines={1}>
-          {value}
-        </Typography.Paragraph>
-      }
-    >
-      <Typography.Paragraph>{label}</Typography.Paragraph>
-    </SettingsRow>
-  );
 }
 
 /** A row with a native picker. A stored value that the host does not offer now stays a choice. */
@@ -127,7 +109,7 @@ function TextFilter({ node, limit, editable }: { node: WorkflowNode; limit: numb
     <SheetFormField
       label={t("mobile.workflow.telegram.text")}
       placeholder={t("mobile.workflow.telegram.anyText")}
-      value={text(node, "text")}
+      value={fieldText(node, "text")}
       maxLength={limit}
       editable={editable}
       onChangeText={(value) => setFields(node.id, { text: value.slice(0, limit) })}
@@ -151,7 +133,7 @@ export function TelegramTriggerFields({ node, draft }: { node: WorkflowNode; dra
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
   const access = useChatAccess(draft);
-  const connectionId = text(node, "connectionId");
+  const connectionId = fieldText(node, "connectionId");
   const chats = access.options ? telegramChats(access.options) : null;
   return (
     <>
@@ -184,9 +166,8 @@ export function TelegramOutputFields({ node, draft }: { node: WorkflowNode; draf
   const setFields = useWorkflowDraft((state) => state.setFields);
   const access = useChatAccess(draft);
   const action = telegramAction(node);
-  const connectionId = text(node, "connectionId") || WORKFLOW_TELEGRAM_TRIGGER_CHAT;
-  const stored = text(node, "emoji");
-  const emoji = isOneOf(WORKFLOW_TELEGRAM_EMOJI, stored) ? stored : WORKFLOW_TELEGRAM_EMOJI[0];
+  const connectionId = fieldText(node, "connectionId") || WORKFLOW_TELEGRAM_TRIGGER_CHAT;
+  const emoji = fieldOneOf(node, "emoji", WORKFLOW_TELEGRAM_EMOJI, WORKFLOW_TELEGRAM_EMOJI[0]);
   const chats = access.options ? telegramChats(access.options) : null;
   const sameChat = t("mobile.workflow.telegram.sameChat");
   return (
@@ -244,8 +225,8 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
   const access = useChatAccess(draft);
-  const connectionId = text(node, "connectionId");
-  const placeId = text(node, "placeId");
+  const connectionId = fieldText(node, "connectionId");
+  const placeId = fieldText(node, "placeId");
   const workspaces = access.options ? slackWorkspaces(access.options) : null;
   const choose = t("mobile.workflow.slack.chooseWorkspace");
   return (
@@ -303,10 +284,9 @@ export function SlackOutputFields({ node, draft }: { node: WorkflowNode; draft: 
   const access = useChatAccess(draft);
   const action = slackAction(node);
   const posts = action === "post";
-  const connectionId = text(node, "connectionId") || WORKFLOW_SLACK_TRIGGER_WORKSPACE;
-  const placeId = text(node, "placeId");
-  const stored = text(node, "emoji");
-  const emoji = isOneOf(WORKFLOW_SLACK_EMOJI, stored) ? stored : WORKFLOW_SLACK_EMOJI[0];
+  const connectionId = fieldText(node, "connectionId") || WORKFLOW_SLACK_TRIGGER_WORKSPACE;
+  const placeId = fieldText(node, "placeId");
+  const emoji = fieldOneOf(node, "emoji", WORKFLOW_SLACK_EMOJI, WORKFLOW_SLACK_EMOJI[0]);
   const workspaces = access.options ? slackWorkspaces(access.options) : null;
   const sameWorkspace = t("mobile.workflow.discord.sameServer");
   const workspaceValue =

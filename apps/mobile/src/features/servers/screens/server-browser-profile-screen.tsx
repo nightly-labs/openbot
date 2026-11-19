@@ -6,7 +6,6 @@ import {
   nextBrowserProfileHue,
 } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import Plus from "lucide-react-native/icons/plus";
 import { useMemo, useRef, useState } from "react";
@@ -34,6 +33,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 /**
  * Browser profiles > one profile, or a new one without `profileId`. A new profile takes its name and
@@ -78,26 +78,7 @@ export function ServerBrowserProfileScreen() {
   const trimmed = name.trim();
   const dirty = draftName !== undefined && trimmed !== (profile?.name ?? "");
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && dirty, ({ repeat }) => {
-    if (leaving.current) {
-      setDiscarding(true);
-      repeat();
-      return;
-    }
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
   /** Runs one change at a time. Resolves true when it succeeds. */
   async function perform(operation: () => Promise<void>): Promise<boolean> {

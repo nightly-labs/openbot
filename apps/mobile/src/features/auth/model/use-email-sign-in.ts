@@ -2,7 +2,7 @@ import { referralCodeFromInput } from "@openbot/contracts/referral";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { classifyFailure } from "@openbot/telemetry";
 import * as Crypto from "expo-crypto";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Keyboard } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import {
@@ -13,6 +13,7 @@ import {
   startMobileEmailSignIn,
   verifyMobileEmailCode,
 } from "@/features/auth/api/mobile-auth";
+import { useSecondsUntil } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -46,25 +47,6 @@ function closeKeyboard(): Promise<void> {
     const limit = setTimeout(finish, KEYBOARD_HIDE_LIMIT_MS);
     Keyboard.dismiss();
   });
-}
-
-function useSecondsUntil(until: number): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    setNow(Date.now());
-    if (until <= Date.now()) return;
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= until) clearInterval(timer);
-    }, 1_000);
-    return () => clearInterval(timer);
-  }, [until]);
-  return Math.max(0, Math.ceil((until - now) / 1_000));
-}
-
-export function formatTimer(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /**

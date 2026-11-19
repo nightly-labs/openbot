@@ -16,7 +16,6 @@ import Keyboard from "lucide-react-native/icons/keyboard";
 import KeyboardOff from "lucide-react-native/icons/keyboard-off";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
-  AppState,
   ScrollView,
   TextInput,
   type TextInputInstance,
@@ -34,12 +33,14 @@ import { ChatGlassButton, ChatGlassIconButton } from "@/features/chat/components
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
+import { failureText } from "@/shared/lib/failure-text";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { NATIVE_BAR_HEIGHT } from "@/shared/lib/native-bar";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { useAppActive } from "@/shared/lib/use-app-active";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import { menuIcon } from "../model/menu-icons";
@@ -118,10 +119,6 @@ const COMMAND_KEY_LABEL = {
   linux: "mobile.server.remoteDesktop.keySuper",
 } as const satisfies Record<RemoteDesktopHost["platform"], MobileTextKey>;
 
-function failureText(error: unknown): string | null {
-  return error instanceof Error && error.message ? error.message : null;
-}
-
 export function RemoteDesktopScreen() {
   const { t } = useText();
   const insets = useSafeAreaInsets();
@@ -143,7 +140,7 @@ export function RemoteDesktopScreen() {
   const appForeground = useAppForeground();
   const [phase, setPhase] = useState<Phase>({ type: "starting" });
   const [viewer, setViewer] = useState<ViewerStatus>({ kind: "connecting" });
-  const [covered, setCovered] = useState(AppState.currentState !== "active");
+  const covered = !useAppActive();
   const [keyboardShown, setKeyboardShown] = useState(false);
   const [modifiers, setModifiers] = useState<ReadonlySet<Modifier>>(new Set());
   const [touchMode, setTouchMode] = useState<ViewerTouchMode>(chosenTouchMode);
@@ -277,12 +274,6 @@ export function RemoteDesktopScreen() {
     void stop();
     setPhase({ type: "paused" });
   }, [appForeground, phase.type, stop]);
-
-  // The app switcher shows a picture of the app. A cover keeps the computer's screen out of it.
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setCovered(state !== "active"));
-    return () => subscription.remove();
-  }, []);
 
   // The phone stays on, and on Android no screenshot or screen recording shows the computer.
   useEffect(() => {

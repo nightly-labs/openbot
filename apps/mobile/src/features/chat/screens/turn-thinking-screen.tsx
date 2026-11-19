@@ -6,17 +6,7 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
-import {
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
@@ -38,6 +28,7 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ChatMarkdown } from "../components/chat-markdown";
 import { turnDuration } from "../components/chat-turn-steps-row";
+import { firstParam, useAgentConversation } from "../components/use-conversation-message";
 import { type TurnThinkingStep, turnStartLoaded, turnThinkingSteps, turnTimes } from "../model/turn-thinking";
 
 /** How near the end, in points, the reader counts as at the end, so the sheet follows new text. */
@@ -87,10 +78,6 @@ function dotEntering() {
     initialValues: { transform: [{ scale: 0.3 }] },
     animations: { transform: [{ scale: withDelay(80, withTiming(1, DOT_POP)) }] },
   };
-}
-
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }
 
 /** The seconds since `startedAt`, again each second while `running`. */
@@ -196,15 +183,7 @@ const TimelineStep = memo(
  */
 function useTurnConversation(agentId: string, serverId: string, taskId: string | undefined) {
   const queryScope = useQueryScope();
-  const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
-  const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agentId, notify),
-    [agentId, conversationStore],
-  );
-  const conversation = useSyncExternalStore(
-    subscribe,
-    useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
-  );
+  const conversation = useAgentConversation(agentId);
   const taskConversation = useQuery<ConversationSnapshot>({
     queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId ?? ""),
     queryFn: skipToken,

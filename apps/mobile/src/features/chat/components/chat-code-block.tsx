@@ -1,6 +1,5 @@
 import { LegendList } from "@legendapp/list/react-native";
 import type { ShjToken } from "@speed-highlight/core";
-import * as Clipboard from "expo-clipboard";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
@@ -8,15 +7,14 @@ import Copy from "lucide-react-native/icons/copy";
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { type ColorValue, Text, View, type ViewStyle } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useFontScale } from "@/shared/lib/font-scale";
-import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import type { BubbleTone } from "../model/bubble-tone";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
 import { SCROLLING_CODE_LINES } from "../model/markdown-preview-parts";
+import { copyToClipboard } from "./use-copy-message";
 import { useListSettled } from "./use-list-settled";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
@@ -188,14 +186,7 @@ function CodeBlockFrame({
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const copied = copiedText === copyText;
   async function copy() {
-    try {
-      await Clipboard.setStringAsync(copyText);
-      setCopiedText(copyText);
-      void haptics.notification("success");
-    } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
-    }
+    if (await copyToClipboard(copyText, "mobile.chat.code.copyFailed", t)) setCopiedText(copyText);
   }
   return (
     <View className="overflow-hidden" style={{ borderRadius: 16, borderCurve: "continuous", backgroundColor: card }}>

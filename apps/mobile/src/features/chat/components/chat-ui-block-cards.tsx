@@ -30,6 +30,7 @@ import type { QuestionPromptController } from "@/features/chat/components/use-qu
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { useSecondsUntil } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -302,23 +303,6 @@ function useScreenReaderEnabled(): boolean {
 }
 
 /** Whole seconds until `at`, counted down once a second. Zero without a time or after it. */
-function useSecondsLeft(at: string | undefined): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const deadline = at ? Date.parse(at) : Number.NaN;
-    if (!Number.isFinite(deadline)) return;
-    setNow(Date.now());
-    // The timer stops at the deadline: after it the label shows the plain action until the host answers.
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= deadline) clearInterval(timer);
-    }, 1_000);
-    return () => clearInterval(timer);
-  }, [at]);
-  return at ? Math.max(0, Math.ceil((Date.parse(at) - now) / 1_000)) : 0;
-}
-
 /**
  * A confirm waiting for an answer. An action that needs a second step (`confirm: true`), and the
  * primary and danger buttons of a dangerous block, are only held to press, so a stray tap cannot
@@ -345,7 +329,7 @@ export function ChatConfirmPrompt({
   const muted = useThemeColor("muted");
   const { disabled, submit } = controller;
   const autoAnswer = uiBlock?.state.autoAnswer?.done ? undefined : uiBlock?.state.autoAnswer;
-  const secondsLeft = useSecondsLeft(autoAnswer?.at);
+  const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
   // The preview as the person edits it in the card.

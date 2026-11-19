@@ -8,7 +8,6 @@ import {
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Bot from "lucide-react-native/icons/bot";
 import Globe from "lucide-react-native/icons/globe";
@@ -46,6 +45,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 /** The wire limit of a header name. */
 const HEADER_NAME_LIMIT = 128;
@@ -327,23 +327,7 @@ function CustomProviderForm({
   const dirty = customProviderDraftChanged(draft, initial.current);
   const locked = action.pending;
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || action.pending) && !action.leaving, ({ repeat }) => {
-    if (action.pending) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || action.pending) && !action.leaving, { busy: () => action.pending, warn: true });
 
   function edit(change: Partial<CustomProviderDraft>) {
     setDraft((current) => {

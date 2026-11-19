@@ -1,4 +1,4 @@
-import type { WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import type { WorkflowBranch, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import CornerDownLeft from "lucide-react-native/icons/corner-down-left";
@@ -29,6 +29,18 @@ export function rowIndent(depth: number) {
   return 16 + depth * 20;
 }
 
+export function pathLabel(branch: WorkflowBranch | null, index: number, t: MobileTranslate): string {
+  return branch === "yes"
+    ? t("mobile.workflow.path.yes")
+    : branch === "no"
+      ? t("mobile.workflow.path.no")
+      : t("mobile.workflow.flow.path", { number: index + 1 });
+}
+
+export function pathTone(branch: WorkflowBranch | null) {
+  return branch === "yes" ? "text-success-text" : branch === "no" ? "text-danger-text" : "text-grouped-secondary";
+}
+
 /**
  * A row of a workflow of any shape that is not a step: the label of a path, a way back or on to a step
  * shown at another place, the end of a path with no step, or the heading of the steps that no trigger
@@ -44,20 +56,8 @@ export function FlowRowNote({
   const { t } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   if (row.type === "path" || row.type === "loose") {
-    const text =
-      row.type === "loose"
-        ? t("mobile.workflow.editor.loose")
-        : row.branch === "yes"
-          ? t("mobile.workflow.path.yes")
-          : row.branch === "no"
-            ? t("mobile.workflow.path.no")
-            : t("mobile.workflow.flow.path", { number: row.index + 1 });
-    const tone =
-      row.type === "path" && row.branch === "yes"
-        ? "text-success-text"
-        : row.type === "path" && row.branch === "no"
-          ? "text-danger-text"
-          : "text-grouped-secondary";
+    const text = row.type === "loose" ? t("mobile.workflow.editor.loose") : pathLabel(row.branch, row.index, t);
+    const tone = row.type === "path" ? pathTone(row.branch) : "text-grouped-secondary";
     return (
       <View className="pt-2.5 pr-4 pb-1" style={{ paddingLeft: rowIndent(row.depth) }}>
         <Typography.Paragraph className={`font-semibold ${tone}`} style={typeScale.small}>

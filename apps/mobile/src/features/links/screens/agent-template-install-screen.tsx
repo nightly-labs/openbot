@@ -1,14 +1,13 @@
 import { type AgentTemplateDetail, canAdministerServer, type RoutineSchedule } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
-import X from "lucide-react-native/icons/x";
 import { type PropsWithChildren, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -21,11 +20,11 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { BlurReveal } from "@/shared/components/blur-reveal";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
+import { backOrConnected } from "@/shared/lib/back-or-connected";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { AgentTemplateNotFoundError, loadAgentTemplate } from "../api/agent-templates";
@@ -84,11 +83,6 @@ function AgentTemplateInstall({ request }: { request?: string }) {
     if (finished) router.dismissTo("/connected");
   }, [finished]);
 
-  function close(): void {
-    if (router.canGoBack()) router.back();
-    else router.replace("/connected");
-  }
-
   async function install(detail: AgentTemplateDetail, target: string): Promise<void> {
     if (lock.current || finished) return;
     lock.current = true;
@@ -126,26 +120,7 @@ function AgentTemplateInstall({ request }: { request?: string }) {
       contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
     >
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={installing}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon={isIOS ? "xmark" : undefined}
-            accessibilityLabel={t("common.close")}
-            disabled={installing}
-            onPress={close}
-          >
-            {isIOS ? t("common.close") : "×"}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction disabled={installing} onPress={backOrConnected} />
       <SheetSaveAction
         dirty={detail !== null}
         canSave={canInstall}

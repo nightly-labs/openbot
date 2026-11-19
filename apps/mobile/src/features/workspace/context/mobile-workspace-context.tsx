@@ -378,6 +378,15 @@ function colorList(colors: Readonly<Record<string, AvatarColor>> | undefined) {
   return colors ? Object.entries(colors).map(([agentId, color]) => ({ agentId, color })) : null;
 }
 
+function showPreferencesFailure(error: unknown): void {
+  showFailureAlert(
+    error,
+    "settings",
+    currentText().t("mobile.workspace.alert.preferencesTitle"),
+    currentText().t("mobile.workspace.alert.preferencesBody"),
+  );
+}
+
 /** The record without `keys`, or the same record when it has none of them. */
 function withoutKeys<T>(record: Record<string, T>, keys: ReadonlySet<string>): Record<string, T> {
   return Object.keys(record).some((key) => keys.has(key))
@@ -925,12 +934,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           const saved = reconcileChannelPins(preferenceStore, serverId, channels);
           setPreferences((current) => ({ ...current, [serverId]: saved }));
         } catch (error) {
-          showFailureAlert(
-            error,
-            "settings",
-            currentText().t("mobile.workspace.alert.preferencesTitle"),
-            currentText().t("mobile.workspace.alert.preferencesBody"),
-          );
+          showPreferencesFailure(error);
         }
       }),
     [request, preferenceStore, queryClient, queryScope],
@@ -952,12 +956,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === current[serverId] ? current : { ...current, [serverId]: next };
         });
       } catch (error) {
-        showFailureAlert(
-          error,
-          "settings",
-          currentText().t("mobile.workspace.alert.preferencesTitle"),
-          currentText().t("mobile.workspace.alert.preferencesBody"),
-        );
+        showPreferencesFailure(error);
       }
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
@@ -1908,12 +1907,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (sidebarPinsChanged(next, previous)) pushSidebarPins(serverId);
         return next;
       } catch (error) {
-        showFailureAlert(
-          error,
-          "settings",
-          currentText().t("mobile.workspace.alert.preferencesTitle"),
-          currentText().t("mobile.workspace.alert.preferencesBody"),
-        );
+        showPreferencesFailure(error);
         return null;
       }
     },
@@ -2012,6 +2006,19 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serversRef.current.find((server) => server.id === activeServerIdRef.current) ?? EMPTY_SERVER;
     const currentPinnedAgentIds = () =>
       (activeServerIdRef.current ? preferencesRef.current[activeServerIdRef.current]?.pinned : null) ?? NO_IDS;
+    const agentServerId = (agentId: string, targetServerId: string | undefined) => {
+      const serverId = targetServerId ?? agentsRef.current.find((candidate) => candidate.id === agentId)?.serverId;
+      if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
+      return serverId;
+    };
+    const putAgent = (serverId: string, updated: RemoteAgent) =>
+      setAgents((current) =>
+        current.map((agent) =>
+          agent.id === updated.id && agent.serverId === serverId
+            ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
+            : agent,
+        ),
+      );
     const workspace: MobileWorkspaceActions = {
       ...workflows,
       openBrowserView: browser.openBrowserView,
@@ -2355,13 +2362,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             payload,
             serverId,
           );
-          setAgents((current) =>
-            current.map((agent) =>
-              agent.id === updated.id && agent.serverId === serverId
-                ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
-                : agent,
-            ),
-          );
+          putAgent(serverId, updated);
         }
         if (colorRoute && color !== undefined && (color !== null || hostColors.current[serverId]?.[input.agentId]))
           applyHostColors(serverId, await writeHostAgentColor(teamApi(serverId), input.agentId, color));
@@ -2383,13 +2384,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             saveAgentAvatar(serverId, agentId, updated.avatarUrl, `data:${image.mimeType};base64,${image.base64}`),
           );
         }
-        setAgents((current) =>
-          current.map((agent) =>
-            agent.id === updated.id && agent.serverId === serverId
-              ? projectAgent(serverId, updated, hostColors.current[serverId]?.[updated.id] ?? null)
-              : agent,
-          ),
-        );
+        putAgent(serverId, updated);
       },
       deleteAgent: (agentId, serverId) => runTeamRequest(deleteAgent(teamApi(serverId), agentId)),
       interruptTurn: (agentId, turnId, serverId) =>
@@ -2399,13 +2394,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       loadLatestMessages,
       loadOlderMessages,
       uploadAttachment: async (agentId, input, targetServerId, onProgress) => {
-        const serverId = targetServerId ?? agentsRef.current.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
+        const serverId = agentServerId(agentId, targetServerId);
         return runTeamRequest(uploadAttachmentDraft(teamApi(serverId, onProgress), input));
       },
       discardAttachment: async (agentId, attachmentId, targetServerId) => {
-        const serverId = targetServerId ?? agentsRef.current.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
+        const serverId = agentServerId(agentId, targetServerId);
         await runTeamRequest(discardAttachmentDraft(teamApi(serverId), attachmentId));
       },
       sendMessage: async (
@@ -2416,8 +2409,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         targetServerId,
         clientMessageId,
       ) => {
-        const serverId = targetServerId ?? agentsRef.current.find((candidate) => candidate.id === agentId)?.serverId;
-        if (!serverId) throw new Error(currentText().t("mobile.workspace.error.agentUnavailable"));
+        const serverId = agentServerId(agentId, targetServerId);
         const receipt = await request(
           "POST",
           TEAM_API_ROUTES.agent.messages(agentId),

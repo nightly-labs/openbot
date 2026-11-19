@@ -22,7 +22,7 @@ import { loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-v
 import type { ReplyVoiceChoice } from "../model/reply-voice";
 import { useSupertonicModel } from "../model/supertonic-model";
 import { saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
-import { gptLiveVoiceLabel, supertonicVoiceLabel } from "./voice-settings-screen";
+import { ChoiceRow, gptLiveVoiceLabel, supertonicVoiceLabel } from "./voice-settings-screen";
 
 interface VoiceOption {
   id: string;
@@ -64,7 +64,6 @@ function PreviewButton({
 function GptLiveVoiceChoice() {
   const { t } = useText();
   const chosen = useVoiceSettings((state) => state.gptLiveVoice);
-  const accent = String(useCSSVariable("--openbot-accent"));
   const choose = (voice: CodexLiveVoice | null) => {
     if (voice === chosen) return;
     void haptics.selection();
@@ -75,15 +74,12 @@ function GptLiveVoiceChoice() {
       <Stack.Screen options={{ title: t("mobile.settings.voice.gptLive.title") }} />
       <SettingsSection footer={t("mobile.settings.voice.gptLive.choiceFooter")}>
         {[null, ...CODEX_LIVE_VOICES].map((voice) => (
-          <SettingsRow
+          <ChoiceRow
             key={voice ?? "automatic"}
             checked={voice === chosen}
-            disclosure={false}
-            trailing={voice === chosen ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+            label={gptLiveVoiceLabel(voice, t)}
             onPress={() => choose(voice)}
-          >
-            <Typography.Paragraph>{gptLiveVoiceLabel(voice, t)}</Typography.Paragraph>
-          </SettingsRow>
+          />
         ))}
       </SettingsSection>
     </SettingsContent>

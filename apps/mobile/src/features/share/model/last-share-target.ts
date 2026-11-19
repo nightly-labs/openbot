@@ -1,6 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { remoteHostFingerprint } from "@openbot/team-client";
 import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
+import { accountScope } from "@/shared/lib/account-scope";
 
 /** The agent that got the last share, which the next share selects first. */
 export interface ShareTarget {
@@ -9,7 +10,7 @@ export interface ShareTarget {
 }
 
 function lastShareTargetKey(apiUrl: string, userId: string): string {
-  return `openbot.share-target.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.share-target.v1.${accountScope(apiUrl, userId)}`;
 }
 
 /** Null when nothing is saved, or the value cannot be read. */
@@ -31,4 +32,19 @@ export async function saveLastShareTarget(apiUrl: string, userId: string, target
   } catch {
     // Only the next preselection is lost.
   }
+}
+
+export function useLastShareTarget(apiUrl: string | undefined, userId: string | undefined): ShareTarget | null {
+  const [target, setTarget] = useState<ShareTarget | null>(null);
+  useEffect(() => {
+    if (!apiUrl || !userId) return;
+    let mounted = true;
+    void loadLastShareTarget(apiUrl, userId).then((loaded) => {
+      if (mounted) setTarget(loaded);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [apiUrl, userId]);
+  return target;
 }

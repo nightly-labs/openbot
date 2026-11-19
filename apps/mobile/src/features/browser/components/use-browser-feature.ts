@@ -1,6 +1,5 @@
-import { useEffect } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
+import { useRefreshedMobileFeature } from "@/shared/lib/mobile-features";
 
 /**
  * Whether this app version may show a host's browser: the `browser` flag of the account server the
@@ -9,9 +8,6 @@ import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-fea
 export function useBrowserFeature(): boolean {
   const { session } = useMobileSession();
   const apiUrl = session?.apiUrl ?? null;
-  const allowed = useMobileFeature(apiUrl ?? "", "browser");
-  useEffect(() => {
-    if (apiUrl) void refreshMobileFeatures(apiUrl);
-  }, [apiUrl]);
+  const allowed = useRefreshedMobileFeature(apiUrl ?? "", "browser");
   return apiUrl !== null && allowed;
 }

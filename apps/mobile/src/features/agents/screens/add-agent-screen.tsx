@@ -1,24 +1,21 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CreateAgentInput } from "@openbot/contracts/ipc";
-import * as Crypto from "expo-crypto";
-import { router, Stack } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
+import { router } from "expo-router";
 import { Typography } from "heroui-native";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
 import { AgentAppearancePicker, type AgentColorValue } from "@/features/agents/components/agent-appearance-picker";
 import { AgentRuntimeFields } from "@/features/agents/components/agent-runtime-fields";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
+import { newAvatarSeed } from "@/features/agents/model/avatar-candidates";
 import { useMobileWorkspace, useMobileWorkspaceReader } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 type AgentRuntimeChoice = Pick<CreateAgentInput, "provider" | "model" | "reasoningEffort">;
 
@@ -31,7 +28,7 @@ export function AddAgentScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [runtime, setRuntime] = useState<AgentRuntimeChoice>({});
-  const [avatarSeed, setAvatarSeed] = useState(() => `mobile:${Crypto.randomUUID().replaceAll("-", "")}`);
+  const [avatarSeed, setAvatarSeed] = useState(newAvatarSeed);
   const [avatarColor, setAvatarColor] = useState<AgentColorValue>({ hue: null, color: null });
   const [initialAvatarSeed] = useState(avatarSeed);
   const pending = useRef(false);
@@ -51,22 +48,7 @@ export function AddAgentScreen() {
       avatarColor.color !== null ||
       runtime.provider !== undefined,
   );
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
-    if (pending.current) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(!finished && (dirty || saving), { busy: () => pending.current });
   useEffect(() => {
     if (finished) router.back();
   }, [finished]);
@@ -108,32 +90,13 @@ export function AddAgentScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={() => {
-            void haptics.impact("soft");
-            router.back();
-          }}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon={isIOS ? "xmark" : undefined}
-            accessibilityLabel={t("common.close")}
-            disabled={saving}
-            onPress={() => {
-              void haptics.impact("soft");
-              router.back();
-            }}
-          >
-            {isIOS ? t("common.close") : "×"}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction
+        disabled={saving}
+        onPress={() => {
+          void haptics.impact("soft");
+          router.back();
+        }}
+      />
       <SheetSaveAction
         dirty={dirty}
         // Create stays on without a name, so that it can show why the agent needs one.

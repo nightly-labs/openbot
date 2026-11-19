@@ -4,15 +4,16 @@ import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol
 import { sourceText } from "@openbot/i18n/source";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { useState } from "react";
 import {
   agentContents,
+  confirmDuplicateNames,
   exportDate,
   IncludeRow,
   NotesSection,
   toggledKeys,
   transferContents,
+  useReleaseOnClose,
 } from "@/features/servers/components/import-parts";
 import { pickZipUpload } from "@/features/servers/model/transfer-file";
 import {
@@ -44,18 +45,7 @@ export function ServerTransferImportScreen() {
   const [preview, setPreview] = useState<InstanceTransferPreview | null>(null);
   const [result, setResult] = useState<RemoteInstanceTransferResult | null>(null);
 
-  // The open token, for the release when the page closes. A token that comes back after that is
-  // released when it arrives.
-  const token = useRef<string | null>(null);
-  token.current = preview?.token ?? null;
-  const closed = useRef(false);
-  useEffect(() => {
-    closed.current = false;
-    return () => {
-      closed.current = true;
-      if (token.current) void discardInstanceTransfer(token.current, serverId).catch(() => undefined);
-    };
-  }, [discardInstanceTransfer, serverId]);
+  const closed = useReleaseOnClose(preview?.token ?? null, discardInstanceTransfer, serverId);
 
   if (!canTransferServer(serverId))
     return (
@@ -196,19 +186,7 @@ function TransferReview({
       selected.map((agent) => agent.key),
       settings,
     );
-  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
-  const confirmAndStart = () => {
-    const duplicates = selected.filter((agent) => agent.nameExists);
-    if (duplicates.length === 0) return start();
-    Alert.alert(
-      t("mobile.server.import.duplicatesTitle"),
-      t("mobile.server.import.duplicatesBody", { names: duplicates.map((agent) => agent.name).join(", ") }),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("mobile.server.import.duplicatesConfirm"), onPress: start },
-      ],
-    );
-  };
+  const confirmAndStart = () => confirmDuplicateNames(t, selected, start);
 
   return (
     <SettingsContent>

@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.onboarding.v1";
 // The newest accounts that finished, so the stored value stays small.
@@ -34,7 +35,7 @@ export async function loadOnboardingProgress(): Promise<void> {
   }
 }
 
-// Writes run in order, so the last change is the one that stays stored.
+const write = writesInOrder(key);
 let writes: Promise<void> = Promise.resolve();
 
 /** Records that the account finished. The flow does not show again, also when the write fails. */
@@ -43,7 +44,6 @@ export function finishOnboarding(userId: string): Promise<void> {
   if (current.includes(userId)) return writes;
   const finished = [...current, userId].slice(-MAX_ACCOUNTS);
   useOnboardingProgress.setState({ finished });
-  const write = writes.then(() => SecureStore.setItemAsync(key, JSON.stringify(finished)));
-  writes = write.catch(() => undefined);
+  writes = write(() => JSON.stringify(finished)).catch(() => undefined);
   return writes;
 }

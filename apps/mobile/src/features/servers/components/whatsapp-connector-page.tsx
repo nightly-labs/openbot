@@ -15,8 +15,9 @@ import { Fragment } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
-import { ConnectorError, ConnectorHeader } from "@/features/servers/components/connector-header";
+import { ConnectorError, ConnectorHeader, ConnectorLoading } from "@/features/servers/components/connector-header";
 import {
+  CONNECTION_KIND_KEYS,
   CONNECTOR_STATUS_KEYS,
   connectionKind,
   maskedWhatsAppNumber,
@@ -27,23 +28,11 @@ import {
   whatsappStatus,
 } from "@/features/servers/model/connectors";
 import { useConnectorAction } from "@/features/servers/model/use-server-connectors";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { type MobileText, useText } from "@/shared/lib/text";
-
-const KIND_KEYS = {
-  live: "mobile.server.connectors.statusConnected",
-  paused: "mobile.server.connectors.statusPaused",
-  setup: "mobile.server.connectors.statusConnecting",
-  attention: "mobile.server.connectors.statusAttention",
-} as const;
 
 const AVATAR_SIZE = 32;
 const ICON_SIZE = 20;
@@ -102,16 +91,7 @@ export function WhatsAppConnectorPage({
   } = useMobileWorkspaceActions();
   const action = useConnectorAction(query.refetch);
   const overview = query.data;
-  if (!overview)
-    return (
-      <SettingsContent>
-        <SettingsNote>
-          {query.isError
-            ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
-            : t("mobile.server.connectors.loading")}
-        </SettingsNote>
-      </SettingsContent>
-    );
+  if (!overview) return <ConnectorLoading query={query} />;
   const { connections, accounts } = overview;
   const serverId = server.id;
   const status = whatsappStatus(connections, agents);
@@ -216,7 +196,7 @@ export function WhatsAppConnectorPage({
                   type="body-xs"
                   className={kind === "attention" ? "text-warning-text" : "text-grouped-secondary"}
                 >
-                  {t(KIND_KEYS[kind])}
+                  {t(CONNECTION_KIND_KEYS[kind])}
                 </Typography.Paragraph>
               }
             >

@@ -1,5 +1,6 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type NativeModule, requireOptionalNativeModule } from "expo";
+import { pendingNavigation } from "@/shared/lib/pending-navigation";
 import type { ShortcutOpenTarget } from "./model/shortcut-target";
 
 declare class ShortcutsModule extends NativeModule<{ onShortcutOpen: (event: { payload: string }) => void }> {
@@ -33,11 +34,7 @@ function decodeOpenTarget(payload: string): ShortcutOpenTarget | null {
 }
 
 let listening = false;
-let navigate: ((target: ShortcutOpenTarget) => void) | null = null;
-/** A button opened the app before its screens showed. The screens open it when they show. */
-let pending: ShortcutOpenTarget | null = null;
-/** A card stays on the screen after the session ends. Its button must not wait for the next account. */
-let signedOut = false;
+const opener = pendingNavigation<ShortcutOpenTarget>();
 
 /**
  * Hears the buttons of the shortcut cards from the start, so a button that starts the app waits for
@@ -46,28 +43,15 @@ let signedOut = false;
 export function installShortcuts(): void {
   if (listening || !native) return;
   listening = true;
-  native.addListener("onShortcutOpen", ({ payload }) => {
-    const target = decodeOpenTarget(payload);
-    if (!target || signedOut) return;
-    if (navigate) navigate(target);
-    else pending = target;
-  });
+  native.addListener("onShortcutOpen", ({ payload }) => opener.receive(decodeOpenTarget(payload)));
 }
 
 /** Opens the targets of the card buttons while the signed-in screens show. A target that came before opens now. */
 export function setShortcutNavigator(open: (target: ShortcutOpenTarget) => void): () => void {
-  signedOut = false;
-  navigate = open;
-  const waiting = pending;
-  pending = null;
-  if (waiting) open(waiting);
-  return () => {
-    if (navigate === open) navigate = null;
-  };
+  return opener.setNavigator(open);
 }
 
 /** Without a session a button of a card opens nothing, also not after the next sign-in. */
 export function resetShortcuts(): void {
-  signedOut = true;
-  pending = null;
+  opener.reset();
 }

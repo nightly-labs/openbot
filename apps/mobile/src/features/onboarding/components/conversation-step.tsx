@@ -76,6 +76,23 @@ export function ConversationStep({
   const scroller = useRef<ScrollViewInstance>(null);
   const composing = useRef(false);
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
+  const reply = (index: number, label: string, selected: boolean, onPress: () => void) => (
+    <View key={label} className="max-w-[86%]">
+      <GlassChoice
+        appearDelay={replyGlassDelay(index)}
+        label={label}
+        selected={selected}
+        disabled={disabled}
+        color={color}
+        radius={22}
+        onPress={onPress}
+      >
+        <Typography type="body-sm" className="px-4 py-3 font-medium">
+          {label}
+        </Typography>
+      </GlassChoice>
+    </View>
+  );
   useEffect(() => {
     const subscription = Keyboard.addListener("keyboardDidShow", () =>
       scroller.current?.scrollToEnd({ animated: true }),
@@ -118,27 +135,10 @@ export function ConversationStep({
         <View className="items-end gap-2">
           {ideas.map((idea, index) => {
             const chosen = value === idea;
-            return (
-              <View key={idea} className="max-w-[86%]">
-                <GlassChoice
-                  appearDelay={replyGlassDelay(index)}
-                  label={idea}
-                  selected={chosen}
-                  disabled={disabled}
-                  color={color}
-                  radius={22}
-                  onPress={() => {
-                    void haptics.selection();
-                    // A second tap on the chosen reply takes it back.
-                    onChange(chosen ? "" : idea);
-                  }}
-                >
-                  <Typography type="body-sm" className="px-4 py-3 font-medium">
-                    {idea}
-                  </Typography>
-                </GlassChoice>
-              </View>
-            );
+            return reply(index, idea, chosen, () => {
+              void haptics.selection();
+              onChange(chosen ? "" : idea);
+            });
           })}
           {action ? (
             <>
@@ -150,21 +150,7 @@ export function ConversationStep({
               >
                 <Separator />
               </Animated.View>
-              <View className="max-w-[86%]">
-                <GlassChoice
-                  appearDelay={replyGlassDelay(ideas.length)}
-                  label={action.label}
-                  selected={false}
-                  disabled={disabled}
-                  color={color}
-                  radius={22}
-                  onPress={action.onPress}
-                >
-                  <Typography type="body-sm" className="px-4 py-3 font-medium">
-                    {action.label}
-                  </Typography>
-                </GlassChoice>
-              </View>
+              {reply(ideas.length, action.label, false, action.onPress)}
             </>
           ) : null}
         </View>

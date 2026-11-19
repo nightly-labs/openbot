@@ -22,6 +22,7 @@ import {
   useMobileWorkspaceActions,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SaveError } from "@/shared/components/save-error";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -135,11 +136,7 @@ export function AgentAccessFields({
           <Typography.Paragraph>{t("mobile.agent.access.label")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </>
   );
 }

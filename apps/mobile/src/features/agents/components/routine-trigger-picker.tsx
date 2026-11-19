@@ -32,11 +32,11 @@ function TriggerIcon({ choice, color }: { choice: RoutineTriggerChoice; color: s
   return <Icon size={20} color={color} strokeWidth={1.75} />;
 }
 
-function Divider() {
+export function Divider() {
   return <View className="ml-4 h-px bg-grouped-border" />;
 }
 
-function GroupLabel({ children }: { children: string }) {
+export function GroupLabel({ children }: { children: string }) {
   return (
     <View className="px-4 pb-1 pt-3">
       <Typography type="body-xs" className="text-grouped-secondary">

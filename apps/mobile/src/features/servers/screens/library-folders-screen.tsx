@@ -17,7 +17,6 @@ import Files from "lucide-react-native/icons/files";
 import FolderIcon from "lucide-react-native/icons/folder";
 import FolderPlus from "lucide-react-native/icons/folder-plus";
 import UserX from "lucide-react-native/icons/user-x";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -40,8 +39,9 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { SaveError } from "@/shared/components/save-error";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -629,22 +629,7 @@ export function LibraryFolderNameScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title }} />
-      {/* Over a list, the native back button goes to it. Alone, the page closes the sheet. */}
-      {hasListBelow ? null : isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button icon="xmark" accessibilityLabel={t("common.close")} disabled={saving} onPress={close}>
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      {hasListBelow ? null : <SheetCloseAction disabled={saving} onPress={close} />}
       <SheetSaveAction
         dirty={dirty}
         canSave={available && valid}
@@ -674,11 +659,7 @@ export function LibraryFolderNameScreen() {
       {snapshot && !available ? (
         <Typography.Paragraph className="text-muted">{t("mobile.server.library.folders.gone")}</Typography.Paragraph>
       ) : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </SheetScrollView>
   );
 }

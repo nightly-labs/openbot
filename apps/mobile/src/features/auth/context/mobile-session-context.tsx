@@ -24,6 +24,7 @@ import {
   MobileSessionExpiredError,
   readMobileSession,
   retryMobileSessionRevocations,
+  sameCredential,
   updateMobileProfile,
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
@@ -94,8 +95,8 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     (error: unknown, initiatingSession: MobileSession) => {
       if (
         error instanceof MobileSessionExpiredError &&
-        sessionRef.current?.sessionToken === initiatingSession.sessionToken &&
-        sessionRef.current?.apiUrl === initiatingSession.apiUrl
+        sessionRef.current &&
+        sameCredential(sessionRef.current, initiatingSession)
       )
         setCurrentSession(null);
     },
@@ -166,9 +167,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     if (!current) return;
     await mobileAnalytics.operation("account_sign_out", {}, () => logoutMobileSession(current));
     deleteAgentAvatars();
-    if (sessionRef.current?.sessionToken === current.sessionToken && sessionRef.current?.apiUrl === current.apiUrl) {
-      setCurrentSession(null);
-    }
+    if (sessionRef.current && sameCredential(sessionRef.current, current)) setCurrentSession(null);
   }, [setCurrentSession]);
 
   const updateProfile = useCallback(

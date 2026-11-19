@@ -134,6 +134,17 @@ export function AgentFoldersRow({
   );
 }
 
+function alertFolderFailure(cause: unknown) {
+  void haptics.notification("error");
+  const text = currentText();
+  showFailureAlert(
+    cause,
+    "agent",
+    text.t("mobile.agent.folders.failed"),
+    text.errorMessage(cause, text.t("mobile.agent.folders.failed")),
+  );
+}
+
 function openBrowser(agent: MobileAgent, mode: BrowseMode, path?: string, replace?: string) {
   router.push({
     pathname: "/agent-info/[agentId]/folder-browser",
@@ -193,14 +204,7 @@ export function AgentFolders({
       queryClient.setQueryData(queryKey, changed.list);
       void haptics.notification("success");
     } catch (cause) {
-      void haptics.notification("error");
-      const text = currentText();
-      showFailureAlert(
-        cause,
-        "agent",
-        text.t("mobile.agent.folders.failed"),
-        text.errorMessage(cause, text.t("mobile.agent.folders.failed")),
-      );
+      alertFolderFailure(cause);
     } finally {
       setBusy(false);
     }
@@ -476,14 +480,7 @@ export function AgentFolderBrowser({ agent, available }: { agent: MobileAgent; a
         params: { agentId: agent.id, serverId: agent.serverId },
       });
     } catch (cause) {
-      void haptics.notification("error");
-      const text = currentText();
-      showFailureAlert(
-        cause,
-        "agent",
-        text.t("mobile.agent.folders.failed"),
-        text.errorMessage(cause, text.t("mobile.agent.folders.failed")),
-      );
+      alertFolderFailure(cause);
     } finally {
       setSaving(false);
     }

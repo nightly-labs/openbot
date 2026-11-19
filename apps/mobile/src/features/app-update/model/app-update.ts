@@ -13,7 +13,7 @@ import { create } from "zustand";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog } from "@/features/support/model/support-log";
 import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
-import { currentAppVersion, refreshMobileFeatures, useLatestAppVersion } from "@/shared/lib/mobile-features";
+import { currentAppVersion, useLatestAppVersion, useMobileFeaturesRefresh } from "@/shared/lib/mobile-features";
 import { isIOS } from "@/shared/lib/platform";
 
 /**
@@ -149,14 +149,7 @@ export function useAppUpdate(): AppUpdate | null {
   useEffect(() => {
     if (rollbackWaits) void fetchRollback();
   }, [rollbackWaits]);
-  useEffect(() => {
-    if (!apiUrl) return;
-    void refreshMobileFeatures(apiUrl);
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refreshMobileFeatures(apiUrl);
-    });
-    return () => subscription.remove();
-  }, [apiUrl]);
+  useMobileFeaturesRefresh(apiUrl, { onAppActive: true });
 
   // Until the stored Later is read, nothing shows, so a dismissed header does not flash.
   if (dismissed === undefined) return null;

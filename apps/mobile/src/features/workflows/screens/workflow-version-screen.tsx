@@ -6,6 +6,7 @@ import { Alert } from "react-native";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import { workflowStepRows } from "@/features/workflows/components/workflow-steps-list";
+import { showWorkflowFailure } from "@/features/workflows/model/use-workflow-step-actions";
 import {
   useWorkflowDetail,
   useWorkflowVersionGraph,
@@ -20,7 +21,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 /**
@@ -54,12 +55,7 @@ export function WorkflowVersionScreen() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(queryScope, serverId, workflowId) });
       router.back();
     } catch (error) {
-      void haptics.notification("error");
-      const text = currentText();
-      Alert.alert(
-        text.t("mobile.workflow.version.restoreFailed"),
-        text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")),
-      );
+      showWorkflowFailure(error, "mobile.workflow.version.restoreFailed");
     } finally {
       setRestoring(false);
     }

@@ -89,6 +89,30 @@ export function Size({ bytes }: { bytes: number }) {
   return <Typography className="text-grouped-secondary">{format.fileSize(bytes)}</Typography>;
 }
 
+export function RowDeleteButton({
+  label,
+  deleting,
+  onPress,
+}: {
+  label: string;
+  deleting: boolean;
+  onPress: () => void;
+}) {
+  const danger = useThemeColor("danger");
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: deleting }}
+      disabled={deleting}
+      hitSlop={8}
+      onPress={onPress}
+    >
+      <Trash2 size={18} color={String(danger)} />
+    </Pressable>
+  );
+}
+
 /** A stored file opens on the preview screen, as in the chat, or else in the share sheet, like a queued file. */
 export function StoredFile({
   serverId,
@@ -102,7 +126,6 @@ export function StoredFile({
   onChanged: () => void;
 }) {
   const { t, format } = useText();
-  const danger = useThemeColor("danger");
   const { deleting, confirmDelete } = useStoredFileDelete(serverId, file, onChanged);
   const image = showsAsImage(file);
   const missing = file.status === "missing";
@@ -125,18 +148,13 @@ export function StoredFile({
       supportingText={attachment.busy || preview.opening ? t("mobile.agent.files.downloading") : details}
       trailing={
         canDelete ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
+          <RowDeleteButton
+            label={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
               name: file.name,
             })}
-            accessibilityState={{ disabled: deleting }}
-            disabled={deleting}
-            hitSlop={8}
+            deleting={deleting}
             onPress={confirmDelete}
-          >
-            <Trash2 size={18} color={String(danger)} />
-          </Pressable>
+          />
         ) : undefined
       }
       onPress={missing ? undefined : preview.kind ? preview.open : attachment.share}

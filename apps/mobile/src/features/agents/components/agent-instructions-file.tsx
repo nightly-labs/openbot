@@ -1,18 +1,18 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentInstructionsFile } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const LIMIT = INPUT_LIMITS.agentInstructionsFile;
 
@@ -49,22 +49,7 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
   const dirty = edited !== undefined && edited !== (base ?? savedText);
   const tooLong = instructionsTooLong(text, LIMIT);
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || saving), ({ repeat }) => {
-    if (pending.current) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty || saving, { busy: () => pending.current });
 
   async function saved(next: AgentInstructionsFile): Promise<void> {
     // A read that an event started before the save must not put the old file back.
@@ -138,11 +123,7 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
       <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
         {t("mobile.agent.instructionsFile.footer")}
       </Typography.Paragraph>
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
       <SheetSaveAction dirty={dirty} canSave={available && !tooLong} pending={saving} onSave={() => void save()} />
     </>
   );

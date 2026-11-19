@@ -33,9 +33,9 @@ import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { clamp } from "@/shared/lib/worklet-math";
 import type { ImageDimensions } from "../model/image-dimensions";
 import {
-  clamp,
   coverSize,
   dragFade,
   dragScale,

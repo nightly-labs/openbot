@@ -1,5 +1,4 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import * as Sharing from "expo-sharing";
 import { useVideoPlayer, type VideoPlayer } from "expo-video";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -15,9 +14,8 @@ import { useText } from "@/shared/lib/text";
 import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
 import { playbackTime } from "../model/playback-time";
-import { shareTypeOptions } from "../model/share-file-type";
 import type { AttachmentTint } from "./chat-attachment";
-import { runFileAction } from "./chat-video.native";
+import { shareMediaFile } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
@@ -211,14 +209,7 @@ function AudioCard({
   async function share() {
     if (!uri) return;
     setSharing(true);
-    await runFileAction(
-      async () => {
-        if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
-      },
-      t("mobile.chat.attachment.openFailed"),
-      text,
-    );
+    await shareMediaFile(uri, attachment, text);
     setSharing(false);
   }
 

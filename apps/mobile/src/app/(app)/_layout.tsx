@@ -98,6 +98,30 @@ function AuthenticatedStack() {
     scrollEdgeEffects: { top: "hidden", bottom: "soft" },
     title: "",
   } as const;
+  const chatPage = {
+    animation: chatAnimation,
+    contentStyle: { backgroundColor: background },
+    fullScreenGestureEnabled: true,
+    gestureEnabled: true,
+    ...nativeBarOptions,
+  } as const;
+  const routinePage = {
+    animation: pushAnimation,
+    contentStyle: { backgroundColor: sheetBackground },
+    headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+    headerBlurEffect: "none",
+    scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+    title: t("mobile.app.route.routine"),
+  } as const;
+  const formSheet = (sheetAllowedDetents: number[]) =>
+    ({
+      contentStyle: { backgroundColor: sheetBackground },
+      headerShown: false,
+      scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+      presentation: "formSheet",
+      sheetAllowedDetents,
+      sheetGrabberVisible: true,
+    }) as const;
   const { closeDrawer } = useAppDrawer();
   const { agentId: openAgentId, taskId: openTaskId } = useGlobalSearchParams<{ agentId?: string; taskId?: string }>();
   /** The chat or the side thread on the screen. `taskId` is null for an agent's own chat. */
@@ -338,42 +362,9 @@ function AuthenticatedStack() {
           contentStyle: { backgroundColor: "transparent" },
         }}
       />
-      <Stack.Screen
-        name="chat/[agentId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="side-question/[agentId]"
-        // A side question is a chat of its own beside the agent's chat, so it opens as a thread does.
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="task/[taskId]"
-        // A task is a chat of its own, so it opens as the agent's chat does.
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
+      <Stack.Screen name="chat/[agentId]" options={chatPage} />
+      <Stack.Screen name="side-question/[agentId]" options={chatPage} />
+      <Stack.Screen name="task/[taskId]" options={chatPage} />
       <Stack.Screen
         name="code-preview/[previewId]"
         options={{
@@ -408,18 +399,7 @@ function AuthenticatedStack() {
           ...nativeBarOptions,
         }}
       />
-      <Stack.Screen
-        name="browser-tabs/[agentId]"
-        // No header: the address bar is the sheet's first row, and the page shows above it.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="browser-tabs/[agentId]" options={formSheet([0.6])} />
       <Stack.Screen
         name="remote-desktop/[serverId]"
         options={{
@@ -431,138 +411,23 @@ function AuthenticatedStack() {
           ...nativeBarOptions,
         }}
       />
-      <Stack.Screen
-        name="remote-desktop-stats"
-        // Lower than a form, so the stream that the stats describe stays in view above it.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="remote-desktop-help"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="browser-help"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="channel/[channelId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="channel-info/[channelId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="context-usage/[agentId]"
-        // The context ring of the composer opens it. The header comes from the route's `_layout.tsx`.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="channel-actions/[channelId]"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-channel"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-agent"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="agent-info/[agentId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="remote-desktop-stats" options={formSheet([0.6])} />
+      <Stack.Screen name="remote-desktop-help" options={formSheet([0.85])} />
+      <Stack.Screen name="browser-help" options={formSheet([0.85])} />
+      <Stack.Screen name="channel/[channelId]" options={chatPage} />
+      <Stack.Screen name="channel-info/[channelId]" options={formSheet([0.85])} />
+      <Stack.Screen name="context-usage/[agentId]" options={formSheet([0.6, 0.85])} />
+      <Stack.Screen name="channel-actions/[channelId]" options={formSheet([0.6])} />
+      <Stack.Screen name="add-channel" options={formSheet([0.85])} />
+      <Stack.Screen name="add-agent" options={formSheet([0.85])} />
+      <Stack.Screen name="agent-info/[agentId]" options={formSheet([0.85])} />
       <Stack.Screen
         name="install-agent"
         // The header comes from the stack in `install-agent/_layout.tsx`: Android draws no header on
         // a formSheet route, so Close and Add agent would not show there.
         options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          // A page to read before adding: full height, as the agent search. On Android a full-height
-          // sheet goes under the status bar and covers its header, so it uses the form height.
-          sheetAllowedDetents: isAndroid ? [0.85] : [1],
+          ...formSheet(isAndroid ? [0.85] : [1]),
           sheetInitialDetentIndex: "last",
-          sheetGrabberVisible: true,
         }}
       />
       <Stack.Screen
@@ -570,146 +435,38 @@ function AuthenticatedStack() {
         // The header comes from the stack in `marketplace-listing/_layout.tsx`: Android draws no header
         // on a formSheet route, so Close would not show there.
         options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          // A page to read before installing, as a shared agent: full height on iOS. On Android a
-          // full-height sheet goes under the status bar and covers its header.
-          sheetAllowedDetents: isAndroid ? [0.85] : [1],
+          ...formSheet(isAndroid ? [0.85] : [1]),
           sheetInitialDetentIndex: "last",
-          sheetGrabberVisible: true,
         }}
       />
       <Stack.Screen
         name="section-form"
         // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
+        options={formSheet([0.85])}
       />
       <Stack.Screen
         name="library-folders"
         // The header comes from the route's `_layout.tsx`. The name page has a field to focus.
         listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
+        options={formSheet([0.85])}
       />
       <Stack.Screen
         name="thread-rename"
         // The header comes from the route's `_layout.tsx`, as for the section form.
         listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
+        options={formSheet([0.85])}
       />
-      <Stack.Screen
-        name="new-task"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-server"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="hosted-server"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="hidden-chats"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="deleted-chats"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="server-settings"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="new-task" options={formSheet([0.85])} />
+      <Stack.Screen name="add-server" options={formSheet([0.85])} />
+      <Stack.Screen name="hosted-server" options={formSheet([0.85])} />
+      <Stack.Screen name="hidden-chats" options={formSheet([0.85])} />
+      <Stack.Screen name="deleted-chats" options={formSheet([0.85])} />
+      <Stack.Screen name="server-settings" options={formSheet([0.85])} />
       {/* Full screens with a big header that the screen draws: the native bar keeps only its buttons. */}
       <Stack.Screen name="server-routines/index" options={largeTitlePage} />
-      <Stack.Screen
-        name="server-routines/agent-routine"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: sheetBackground },
-          headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-          headerBlurEffect: "none",
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          title: t("mobile.app.route.routine"),
-        }}
-      />
-      <Stack.Screen
-        name="server-routines/channel-routine"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: sheetBackground },
-          headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-          headerBlurEffect: "none",
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          title: t("mobile.app.route.routine"),
-        }}
-      />
+      <Stack.Screen name="server-routines/agent-routine" options={routinePage} />
+      <Stack.Screen name="server-routines/channel-routine" options={routinePage} />
       <Stack.Screen name="server-tasks" options={largeTitlePage} />
       <Stack.Screen name="server-workflows/index" options={largeTitlePage} />
       <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
@@ -733,120 +490,16 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-usage/index" options={largeTitlePage} />
       <Stack.Screen name="server-library" options={largeTitlePage} />
       <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
-      <Stack.Screen
-        name="share"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="plan-limits"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="message-actions"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="pinned-messages"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="queued-messages"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="vault-request"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="turn-thinking"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="subagent"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="memory-changes"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="share" options={formSheet([0.85])} />
+      <Stack.Screen name="plan-limits" options={formSheet([0.85])} />
+      <Stack.Screen name="message-actions" options={formSheet([0.6])} />
+      <Stack.Screen name="pinned-messages" options={formSheet([0.6, 0.85])} />
+      <Stack.Screen name="queued-messages" options={formSheet([0.85])} />
+      <Stack.Screen name="vault-request" options={formSheet([0.85])} />
+      <Stack.Screen name="turn-thinking" options={formSheet([0.85])} />
+      <Stack.Screen name="subagent" options={formSheet([0.85])} />
+      <Stack.Screen name="memory-changes" options={formSheet([0.85])} />
+      <Stack.Screen name="settings" options={formSheet([0.85])} />
     </Stack>
   );
 }
