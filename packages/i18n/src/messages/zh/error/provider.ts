@@ -341,6 +341,8 @@ export const messages = {
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.blankHistoryText":
+    "已保存的历史记录中有一条空消息，因此 模型未接受此聊天。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
   "error.provider.codexHistoryItemMissing":
     "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
   "error.provider.codexRequestRefused":
