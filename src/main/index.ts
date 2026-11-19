@@ -30,6 +30,7 @@ import {
   powerSaveBlocker,
   protocol,
   screen,
+  session,
   shell,
   systemPreferences,
 } from "electron";
@@ -1970,6 +1971,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position:", toLogValue(error)),
     );
+    session.defaultSession.flushStorageData();
     hideWindowsForQuit();
     services?.dynamicIsland.destroy();
     services?.agentDock.destroy();

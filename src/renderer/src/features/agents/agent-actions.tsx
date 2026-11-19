@@ -3,11 +3,15 @@ import { AGENT_WELCOME_CAPABILITY, TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@o
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
-import { AgentDeleteUndoToast, startUndoCountdown } from "@openbot/ui/features/agents/AgentDeleteUndoToast";
+import {
+  AgentDeleteUndoToast,
+  startUndoCountdown,
+  type UndoCountdown,
+} from "@openbot/ui/features/agents/AgentDeleteUndoToast";
 import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
@@ -25,6 +29,7 @@ import { type NewAgentDraft, newAgentInput } from "./agent-create-input";
 import { attentionAgentId, withoutAttention } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
 import { agentsPort } from "./agents-port";
+import { forgetPendingAgentDelete, readPendingAgentDeletes, rememberPendingAgentDelete } from "./pending-agent-deletes";
 
 const AgentActions = createSimpleContext({
   name: "Agent actions",
@@ -33,6 +38,7 @@ const AgentActions = createSimpleContext({
     const scopeIsCurrent = createScopeGuard();
     const {
       agentList,
+      agentListSettled,
       setAgentList,
       agentSetupOpen,
       agentSetupDraft,
@@ -217,7 +223,21 @@ const AgentActions = createSimpleContext({
       for (const commit of [...pendingDeletes.values()]) commit();
     });
 
-    async function deleteAgent(agentId: string) {
+    let pendingDeletesResumed = false;
+    createEffect(
+      () => (!pendingDeletesResumed && agentListSettled() ? agentList().map((agent) => agent.id) : null),
+      (listedIds) => {
+        if (!listedIds || pendingDeletesResumed) return;
+        pendingDeletesResumed = true;
+        const serverId = untrack(activeServerId);
+        for (const agentId of readPendingAgentDeletes(serverId)) {
+          if (listedIds.includes(agentId)) queueMicrotask(() => void deleteAgent(agentId, true));
+          else forgetPendingAgentDelete(serverId, agentId);
+        }
+      },
+    );
+
+    async function deleteAgent(agentId: string, resumed = false) {
       if (agentSetupOpen() && creatingAgent()) return;
       if (pendingDeletes.has(agentId)) return;
       const agent = agentList().find((candidate) => candidate.id === agentId);
@@ -235,20 +255,24 @@ const AgentActions = createSimpleContext({
       const showAgent: () => void = hidden;
       if (wasActive) setActiveAgentId(nextAgentId);
       setSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+      rememberPendingAgentDelete(serverId, agentId);
 
       const toastId = `agent-delete-${serverId}-${agentId}`;
       let settled = false;
+      let countdown: UndoCountdown | null = null;
       function settle(): boolean {
         if (settled) return false;
         settled = true;
-        countdown.stop();
+        countdown?.stop();
         pendingDeletes.delete(agentId);
         queueMicrotask(() => toast.dismiss(toastId));
         return true;
       }
 
       function undo(): void {
-        if (!settle() || !scopeIsCurrent()) return;
+        if (!settle()) return;
+        forgetPendingAgentDelete(serverId, agentId);
+        if (!scopeIsCurrent()) return;
         showAgent();
         if (wasActive) setActiveAgentId(agentId);
       }
@@ -306,12 +330,19 @@ const AgentActions = createSimpleContext({
             description: errorMessage(error, t("sidebar.delete.failed")),
             report: { operation: "agent", source: "action", cause_code: classifyFailure(error) },
           });
+        } finally {
+          forgetPendingAgentDelete(serverId, agentId);
         }
       }
 
-      const countdown = startUndoCountdown(() => void commit());
+      if (resumed) {
+        void commit();
+        return;
+      }
+      const undoCountdown = startUndoCountdown(() => void commit());
+      countdown = undoCountdown;
       pendingDeletes.set(agentId, () => void commit());
-      toast(() => <AgentDeleteUndoToast agent={agent} countdown={countdown} onUndo={undo} />, {
+      toast(() => <AgentDeleteUndoToast agent={agent} countdown={undoCountdown} onUndo={undo} />, {
         id: toastId,
         duration: Number.POSITIVE_INFINITY,
         unstyled: true,
