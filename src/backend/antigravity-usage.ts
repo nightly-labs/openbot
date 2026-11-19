@@ -10,7 +10,10 @@
 //
 // The call needs the account's Code Assist project, from `loadCodeAssist`, and Google refuses it
 // (403) unless the User-Agent names Antigravity. Google sends the "Gemini Models" group only to the
-// desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). A
+// desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). Pro
+// plans got no Gemini 4 Argon group with the form `antigravity/<version> <os>/<arch>`. Other readers
+// of this service send the desktop app's own `antigravity/hub/...` form and get it, so OpenBot sends
+// that form too (#10934). A
 // Google account sign-in (`oauth-personal`, the only one whose token OpenBot reads) uses its quota on
 // the daily host, so the quota comes only from that host: the other host's room for the account can
 // be wrong, and a wrong "spent" reading would hold Gemini turns. OpenBot reads the access token from
@@ -38,8 +41,9 @@ const CODE_ASSIST_URL = "https://cloudcode-pa.googleapis.com/v1internal";
 /** The Code Assist host that meters a Google account sign-in. */
 const DAILY_CODE_ASSIST_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal";
 
-/** The Antigravity desktop app's version, which the User-Agent names. */
-const DESKTOP_VERSION = "2.31.0";
+/** The Antigravity desktop app's version and build, which the User-Agent names. */
+const DESKTOP_VERSION = "2.24.0";
+const DESKTOP_BUILD = "963137146";
 
 /**
  * A local fake of the service, for `scripts/antigravity-usage-e2e.ts`. Only a loopback `http` URL is
@@ -170,11 +174,14 @@ function validAccessToken(text: string): string | null {
   return token?.access_token && expiry > Date.now() + 60_000 ? token.access_token : null;
 }
 
-/** The desktop app's User-Agent, such as `antigravity/2.31.0 darwin/arm64`, in Go's platform names. */
+/**
+ * The desktop app's User-Agent, such as
+ * `antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=arm64; cl=963137146)`, in Go's platform names.
+ */
 function antigravityUserAgent(): string {
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  return `antigravity/${DESKTOP_VERSION} ${os}/${arch}`;
+  return `antigravity/hub/${DESKTOP_VERSION} (aidev_client; os_type=${os}; arch=${arch}; cl=${DESKTOP_BUILD})`;
 }
 
 /**
