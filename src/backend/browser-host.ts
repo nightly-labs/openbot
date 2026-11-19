@@ -426,6 +426,20 @@ function urlOrigin(value: string): string | null {
   return URL.canParse(value) ? new URL(value).origin : null;
 }
 
+function keptPasswordShown(tab: BrowserHostTab, keepQueueBlocked: KeepQueueBlocked) {
+  return boundEngineOperation(
+    tab,
+    tab.engine.keptPasswordShown(tab.keptPasswords ?? []),
+    10_000,
+    "The saved password check timed out.",
+    keepQueueBlocked,
+  );
+}
+
+function keptPasswordImageError(action: string): string {
+  return `${action} is unavailable while the page shows a saved password. Use snapshots until it navigates.`;
+}
+
 function urlCarriesSecret(url: string, secret: string): boolean {
   if (url.includes(secret)) return true;
   try {
@@ -1526,6 +1540,7 @@ export class BrowserHost {
             this.#syncAttachedView();
             let kept = false;
             let shown = false;
+            let held = false;
             let leaked = false;
             let stopWaiting = () => {};
             const contents = tab.contents;
@@ -1568,7 +1583,20 @@ export class BrowserHost {
                         return Effect.sync(cleanup);
                       });
                     }
-                    if (!protection.replaced) {
+                    if (!protection.replaced && !leaked && args.method === "password" && secrets.length === 1) {
+                      held = yield* boundEngineOperation(
+                        tab,
+                        entry.keep(secret),
+                        10_000,
+                        "Authentication field check timed out.",
+                        keepQueueBlocked,
+                      ).pipe(Effect.catch(() => Effect.succeed(false)));
+                      if (held && !protection.replaced) {
+                        entry.hide(secret, false);
+                        kept = true;
+                      }
+                    }
+                    if (!protection.replaced && !kept) {
                       const cleared = yield* boundEngineOperation(
                         tab,
                         entry.clear(secrets),
@@ -1598,6 +1626,7 @@ export class BrowserHost {
               Effect.ensuring(
                 Effect.sync(() => {
                   contents.off("will-frame-navigate", blockLeak);
+                  if (held && kept) tab.keptPasswords = [...(tab.keptPasswords ?? []), secret];
                   protection.running = false;
                   tab.diagnostics.clearDiagnostics();
                   if (protection.replaced) {
@@ -1996,6 +2025,8 @@ export class BrowserHost {
     return yield* this.#enqueue(tabId, (tab, keepQueueBlocked) =>
       Effect.gen({ self: this }, function* () {
         yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser screenshot"));
+        if (yield* keptPasswordShown(tab, keepQueueBlocked))
+          return yield* browserFailure(new Error(keptPasswordImageError("Browser screenshot")));
         const image = yield* boundEngineOperation(
           tab,
           tab.engine.screenshot(target, Date.now() + 10_000, true),
@@ -2293,6 +2324,10 @@ export class BrowserHost {
                       };
                     }
                     return;
+                  }
+                  if (yield* keptPasswordShown(tab, keepQueueBlocked)) {
+                    if (mode !== "always") return;
+                    return yield* browserFailure(new Error(keptPasswordImageError("A snapshot image")));
                   }
                   const image = yield* boundEngineOperation(
                     tab,
@@ -3633,12 +3668,23 @@ export class BrowserHost {
     contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
       if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
     });
+    contents.on("will-frame-navigate", (event) => {
+      if (!tab.keptPasswords?.some((password) => urlCarriesSecret(event.url, password))) return;
+      event.preventDefault();
+      tab.diagnostics.add({
+        kind: "load",
+        level: "error",
+        message: "OpenBot stopped a page load that would put the saved password in the page address. Use takeover.",
+      });
+      this.#emitChanged();
+    });
     contents.on("did-navigate", (_event, url) => {
       tab.documents += 1;
       this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {
         tab.secretDocument = false;
         tab.secretShown = false;
+        tab.keptPasswords = undefined;
         contents.navigationHistory.clear();
       }
       if (tab.filledCard) {
@@ -3678,17 +3724,18 @@ export class BrowserHost {
     contents.setWindowOpenHandler(({ url, referrer, postBody, disposition }) => {
       if (this.#destroying || this.#tabs.get(tab.id) !== tab) return { action: "deny" };
       const unsupported = !["foreground-tab", "background-tab", "new-window"].includes(disposition);
-      const failure = tab.secret
-        ? sourceText("error.backend.popupSecureInput")
-        : unsupported
-          ? sourceText("error.backend.popupUnsupportedType")
-          : !isAllowedMainUrl(url)
-            ? sourceText("error.backend.popupUnsupportedAddress")
-            : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
-              ? sourceText("error.backend.popupTabLimit")
-              : this.#memoryLow()
-                ? sourceText("error.backend.browserLowMemory")
-                : undefined;
+      const failure =
+        tab.secret || tab.keptPasswords?.some((password) => urlCarriesSecret(url, password))
+          ? sourceText("error.backend.popupSecureInput")
+          : unsupported
+            ? sourceText("error.backend.popupUnsupportedType")
+            : !isAllowedMainUrl(url)
+              ? sourceText("error.backend.popupUnsupportedAddress")
+              : !this.#hasTabCapacity(tab.ownerThreadId, tab.ownerAgentId)
+                ? sourceText("error.backend.popupTabLimit")
+                : this.#memoryLow()
+                  ? sourceText("error.backend.browserLowMemory")
+                  : undefined;
       if (failure) {
         tab.popupFailure = { id: randomUUID(), message: failure };
         this.#emitChanged();

@@ -427,6 +427,7 @@ export class BrowserCdpEngine {
     {
       enter: (values: readonly string[]) => Effect.Effect<void, BrowserOperationError>;
       clear: (secrets: readonly string[]) => Effect.Effect<boolean, BrowserOperationError>;
+      keep: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
       hide: (secret: string, shown: boolean) => void;
       kinds: Array<{ password: boolean; oneTimeCode: boolean }>;
       servedByWorker: boolean;
@@ -689,8 +690,49 @@ export class BrowserCdpEngine {
           return true;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
+    const keep = (secret: string) =>
+      this.#leaseEffect((send) =>
+        Effect.gen({ self: this }, function* () {
+          const field = nodes.inputs[0];
+          if (!field || field.sessionId !== undefined || field.contextId !== (yield* automationContextId(send)))
+            return false;
+          const objectIds: string[] = [];
+          const kept = yield* Effect.gen(function* () {
+            for (const node of nodes.inputs) {
+              const resolved = yield* send(
+                "DOM.resolveNode",
+                { backendNodeId: node.backendNodeId, executionContextId: node.contextId },
+                node.sessionId,
+              );
+              const objectId = stringValue(recordValue(resolved.object)?.objectId);
+              if (!objectId) return false;
+              objectIds.push(objectId);
+            }
+            const result = yield* send(
+              "Runtime.callFunctionOn",
+              {
+                executionContextId: field.contextId,
+                functionDeclaration: SECRET_KEEP_FUNCTION,
+                arguments: [{ value: secret }, ...objectIds.map((objectId) => ({ objectId }))],
+                returnByValue: true,
+              },
+              field.sessionId,
+            );
+            return !recordValue(result.exceptionDetails) && recordValue(result.result)?.value === true;
+          }).pipe(
+            Effect.ensuring(
+              Effect.forEach(
+                objectIds,
+                (objectId) => send("Runtime.releaseObject", { objectId }, field.sessionId).pipe(Effect.ignore),
+                { discard: true },
+              ),
+            ),
+          );
+          return kept;
+        }),
+      ).pipe(Effect.catch(() => Effect.succeed(false)));
     const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
-    return { enter, clear, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker, origin: nodes.origin };
+    return { enter, clear, keep, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker, origin: nodes.origin };
   });
 
   readonly fillCard = Effect.fn("BrowserCdp.fillCard")(function* (
@@ -2036,6 +2078,25 @@ export class BrowserCdpEngine {
     this.#targets.clear();
     this.#lastSnapshot = null;
   }
+
+  readonly keptPasswordShown = Effect.fn("BrowserCdp.keptPasswordShown")(function* (
+    this: BrowserCdpEngine,
+    passwords: readonly string[],
+  ) {
+    if (passwords.length === 0) return false;
+    return yield* this.#leaseEffect((send) =>
+      Effect.gen(function* () {
+        const executionContextId = yield* automationContextId(send);
+        const result = yield* send("Runtime.callFunctionOn", {
+          executionContextId,
+          functionDeclaration: KEPT_PASSWORD_SHOWN_FUNCTION,
+          arguments: [{ value: passwords }],
+          returnByValue: true,
+        });
+        return Boolean(recordValue(result.exceptionDetails)) || recordValue(result.result)?.value !== false;
+      }),
+    ).pipe(Effect.catch(() => Effect.succeed(true)));
+  });
 
   scrubText(value: string): string {
     return this.#cardScrub.text(value);
@@ -3832,7 +3893,7 @@ const waitForDomQuietAcrossTargets = Effect.fn("Browser.waitForDomQuietAcrossTar
   }
 });
 
-const SECRET_SCAN_FUNCTION = `function(secret) {
+const SECRET_SCAN_FUNCTION = `function(secret, ...skipped) {
   const found = (value) => typeof value === 'string' && value.includes(secret);
   if (found(document.title) || found(location.href)) return true;
   const walk = (root) => {
@@ -3843,13 +3904,41 @@ const SECRET_SCAN_FUNCTION = `function(secret) {
         continue;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) continue;
-      if ('value' in node && found(String(node.value))) return true;
+      if ('value' in node && !skipped.includes(node) && found(String(node.value))) return true;
       for (const attribute of node.attributes) if (found(attribute.value)) return true;
       if (node.shadowRoot && walk(node.shadowRoot)) return true;
     }
     return false;
   };
   return walk(document);
+}`;
+
+const KEPT_PASSWORD_SHOWN_FUNCTION = `function(passwords) {
+  const found = (value) => typeof value === 'string' && passwords.some((password) => value.includes(password));
+  const walk = (root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.currentNode; node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (found(node.data)) return true;
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) continue;
+      if (node.shadowRoot && walk(node.shadowRoot)) return true;
+      if (node.localName === 'input' && node.type === 'password') continue;
+      if ('value' in node && found(String(node.value))) return true;
+      for (const attribute of node.attributes) if (found(attribute.value)) return true;
+    }
+    return false;
+  };
+  return walk(document);
+}`;
+
+const SECRET_KEEP_FUNCTION = `function(secret, ...fields) {
+  const isPassword = (field) => field.isConnected && field.ownerDocument === document && field.localName === 'input' && field.type === 'password';
+  if (fields.length === 0 || !fields.every(isPassword) || (${SECRET_SCAN_FUNCTION})(secret, ...fields)) return false;
+  for (const field of fields)
+    new MutationObserver(() => { if (field.type !== 'password') field.value = ''; }).observe(field, { attributes: true, attributeFilter: ['type'] });
+  return true;
 }`;
 
 function documentIdFunctionDeclaration(): string {

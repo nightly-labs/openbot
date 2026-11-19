@@ -22,6 +22,7 @@ export interface BrowserHostTab {
   hasSharedBrowsingContext?: boolean;
   secretDocument?: boolean;
   secretShown?: boolean;
+  keptPasswords?: string[] | undefined;
   filledCard?: boolean;
   scriptedOrigins?: Set<string>;
   workerExposedOrigins?: Set<string>;
