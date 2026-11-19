@@ -166,8 +166,16 @@ const searchSchema = z
         "A cursor continues the call that gave it. Send a history_search cursor with the same query, a chat list cursor with no query, and a history_read cursor to history_read as before.",
     },
   );
+// The read answer gives nextCursor and history_search takes it as `cursor`, so models send `cursor`
+// here too. The error names the argument that takes it (#12517).
+const READ_CURSOR_HINT = "Send nextCursor as before for older messages.";
 const readSchema = z
-  .strictObject(readShape)
+  .strictObject(readShape, {
+    error: (issue) =>
+      issue.code === "unrecognized_keys" && issue.keys.includes("cursor")
+        ? `history_read has no cursor. ${READ_CURSOR_HINT}`
+        : undefined,
+  })
   .refine(
     (value) =>
       !(value.messageId && value.before) &&
@@ -580,10 +588,13 @@ export class HistoryTools {
           query: query ?? null,
         }),
       ).toString("base64url");
-    const result: { messages: HistoryEntry[]; nextCursor: string | null; order: string } = {
+    // A read says where nextCursor goes, as the search answers do. It is set before the size checks
+    // below, so that they count it.
+    const result: { messages: HistoryEntry[]; nextCursor: string | null; order: string; next?: string } = {
       messages: [],
       nextCursor: null,
       order: "newest-first",
+      ...(read ? { next: READ_CURSOR_HINT } : {}),
     };
     const maximum = search ? 8000 : 16000;
     const sessions = read?.includeWorkSteps ? store.database.listProviderSessions(threadId) : [];
@@ -697,6 +708,7 @@ export class HistoryTools {
       }
     }
     if (!more) result.nextCursor = null;
+    if (result.nextCursor === null) delete result.next;
     // File reads yield. Recheck reset and message existence before any content leaves the process.
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>
