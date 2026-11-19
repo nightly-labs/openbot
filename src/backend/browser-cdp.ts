@@ -509,6 +509,7 @@ export class BrowserCdpEngine {
           fingerprints.push(value);
         }
         const kinds: Array<{ password: boolean; oneTimeCode: boolean }> = [];
+        const hiddenPasswords: boolean[] = [];
         let servedByWorker = false;
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
@@ -521,7 +522,10 @@ export class BrowserCdpEngine {
               const codeWord = /totp|\\b(?:otp|2fa|mfa)+(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bauthentication ?(?:app|code)\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?(?:factor|step)\\b|\\bmulti ?factor\\b/;
               const authenticatorForm = () => { const text = words(this.form?.innerText ?? ''); return /\\bauthenticator\\b|\\bauthentication ?app\\b|\\btotp\\b/.test(text) && !/\\be ?mail(?:ed)?\\b|\\bsms\\b|\\btext (?:message|messaged)\\b|\\btexted\\b/.test(text); };
               const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && (codeWord.test(named) || (/\\b(?:pass)?code\\b/.test(named) && authenticatorForm())) && !/backup|recovery|mail|phone|sms|name|label|promo|coupon|voucher|discount|gift|invite|referral|zip|postal|country|card|cvc|cvv|csc/.test(named));
-              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
+              const shown = (element) => element.checkVisibility({ visibilityProperty: true });
+              const formInputs = [...(this.form?.elements ?? [])].filter((element) => element.localName === 'input' && element !== this);
+              const hiddenPassword = this.type === 'password' && !shown(this) && formInputs.some((element) => ['text', 'email', 'tel'].includes(element.type) && !element.disabled && !element.readOnly && shown(element)) && !formInputs.some((element) => element.type === 'password' && shown(element));
+              return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, hiddenPassword, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
             node.sessionId,
@@ -531,9 +535,16 @@ export class BrowserCdpEngine {
             password: isDynamicRecord(kind) && kind.password === true,
             oneTimeCode: isDynamicRecord(kind) && kind.oneTimeCode === true,
           });
+          hiddenPasswords.push(isDynamicRecord(kind) && kind.hiddenPassword === true);
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
-        return { inputs, button, fingerprints, kinds, servedByWorker, origin: fieldOrigin };
+        if (submission === "enter" && hiddenPasswords.at(-1))
+          return yield* browserFailure(
+            new Error(
+              "The password field is hidden, so Enter cannot be pressed in it. Use submission=click with the page's sign-in button as submitTarget.",
+            ),
+          );
+        return { inputs, button, fingerprints, kinds, hiddenPasswords, servedByWorker, origin: fieldOrigin };
       }),
     );
     if (generation !== this.#documentGeneration)
@@ -570,6 +581,24 @@ export class BrowserCdpEngine {
               for (const [index, node] of nodes.inputs.entries()) {
                 if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
+                if (nodes.hiddenPasswords[index]) {
+                  const text = values[index];
+                  if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
+                  yield* this.#callOnNode(
+                    send,
+                    node.backendNodeId,
+                    `function(origin, text) {
+                if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly || this.type !== 'password') throw new Error('Authentication target changed.');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(this, text);
+                this.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
+                this.dispatchEvent(new Event('change', { bubbles: true }));
+              }`,
+                    [nodes.origin, text],
+                    node.sessionId,
+                    node.contextId,
+                  );
+                  continue;
+                }
                 yield* send("DOM.focus", { backendNodeId: node.backendNodeId }, node.sessionId);
                 yield* this.#callOnNode(
                   send,

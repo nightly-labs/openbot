@@ -9,6 +9,7 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 const FRAME_HOSTS = ["login.openbot.test", "login.other-site.test"];
 const FRAME_PASSWORD = "fixture-frame-password-201938";
+const HIDDEN_PASSWORD = "fixture-hidden-password-480317";
 
 async function runFrameScenario(browser: BrowserHost): Promise<void> {
   const report: {
@@ -132,6 +133,15 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         headers: { "Content-Type": "text/html" },
       });
     }
+    if (url.pathname === "/hidden-password")
+      return new Response(
+        `<!doctype html><body><form onsubmit="event.preventDefault(); location.href = [...document.querySelector('#real-password').value].reverse().join('') === '${[...HIDDEN_PASSWORD].reverse().join("")}' ? '/complete' : '/wrong'">
+        <label>User<input id="user" type="text" value="someone"></label>
+        <label>Password<input id="masked-visible" class="mask" type="text"></label>
+        <input id="real-password" name="password" type="password" style="display:none">
+        <button id="hidden-submit">Sign in</button></form></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.pathname === "/modal") {
       modalPageLoads += 1;
       return new Response(
@@ -267,6 +277,51 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/hidden-password", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing hidden password fixture.");
+        await waitForPresentedFrame(contents);
+        const hiddenParams = (callId: string, submission: "click" | "enter"): DynamicToolCallParams => ({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId,
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#real-password" }],
+            submission,
+            ...(submission === "click" ? { submitTarget: { kind: "css", selector: "#hidden-submit" } } : {}),
+          },
+        });
+        const enterRefused = await runCauseEffect(
+          browser.prepareSecret(hiddenParams("secret-hidden-enter", "enter")),
+        ).then(
+          (handoff) => {
+            handoff.cancel();
+            return false;
+          },
+          (error: unknown) => error instanceof Error && error.message.includes("password field is hidden"),
+        );
+        if (!enterRefused) throw new Error("Enter submission was accepted for a hidden password field.");
+        const handoff = await runCauseEffect(browser.prepareSecret(hiddenParams("secret-hidden-click", "click")));
+        if (!handoff.vaultFillable) throw new Error("A hidden password field was not vault-fillable.");
+        if ((await runCauseEffect(handoff.submit(HIDDEN_PASSWORD, true))) !== "submitted")
+          throw new Error("A saved password was not entered into a hidden password field.");
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if (JSON.stringify(snapshot).includes(HIDDEN_PASSWORD))
+          throw new Error("A hidden password value reached a snapshot.");
+        if (!snapshot.url.endsWith("/complete")) throw new Error("The hidden password form did not get the password.");
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
