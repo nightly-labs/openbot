@@ -211,6 +211,7 @@ export class InstanceTransferChunks {
         await handle.close();
       }
     }).pipe(
+      Effect.tap(() => Effect.sync(() => upload.received.add(input.index))),
       Effect.ensuring(
         Effect.sync(() => {
           upload.writing--;
@@ -220,7 +221,6 @@ export class InstanceTransferChunks {
         }),
       ),
     );
-    upload.received.add(input.index);
     upload.timer.refresh();
     let receivedBytes = 0;
     for (const index of upload.received) receivedBytes += partLength(upload.size, index);
