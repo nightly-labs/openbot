@@ -544,10 +544,15 @@ class Account {
     );
   }
 
-  async pay(serverId: string) {
+  async pay(serverId: string, startedDaysAgo?: number) {
     const session = this.row(serverId)?.checkout_session_id;
     if (session) await stripe("POST", `/v1/checkout/sessions/${session}/expire`, idSchema).catch(() => null);
+    const clock =
+      startedDaysAgo === undefined
+        ? null
+        : await stripe("GET", `/v1/test_helpers/test_clocks/${this.clock}`, clockSchema);
     const subscription = await stripe("POST", "/v1/subscriptions", idSchema, {
+      ...(clock ? { backdate_start_date: String(clock.frozen_time - (startedDaysAgo ?? 0) * 86_400) } : {}),
       customer: this.customer,
       "items[0][price]": await priceId("standard", "month"),
       currency: "eur",
@@ -1886,13 +1891,34 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       return list.data[0] ?? null;
     });
     await applied("charge.dispute.created", disputed.id);
-    const ended = await rowWhere(account, server.serverId, "plan ended", (row) => row.desired_state === "stopped");
+    const removed = await rowWhere(
+      account,
+      server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted",
+    );
     const stripeSub = await subscription(sub);
     record(
       "dispute",
-      "a dispute cancels the plan now; the server stops with plan_ended and is kept",
-      stripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
-      { dispute: disputed.status, stripeStatus: stripeSub.status, row: ended },
+      "a dispute in the first 30 days of the subscription cancels the plan and deletes the server",
+      stripeSub.status === "canceled" && removed.desired_state === "deleted",
+      { dispute: disputed.status, stripeStatus: stripeSub.status, row: removed },
+    );
+    const old = await account.createServer("Dispute after 30 days");
+    const oldSub = await account.pay(old.server.serverId, 40);
+    const oldPaid = await paymentIntent(oldSub);
+    const oldDisputed = await waitFor("dispute", async () => {
+      const list = await stripe("GET", "/v1/disputes", disputeListSchema, { payment_intent: oldPaid.intent });
+      return list.data[0] ?? null;
+    });
+    await applied("charge.dispute.created", oldDisputed.id);
+    const ended = await rowWhere(account, old.server.serverId, "plan ended", (row) => row.desired_state === "stopped");
+    const oldStripeSub = await subscription(oldSub);
+    record(
+      "dispute",
+      "a dispute of a subscription older than 30 days cancels the plan; the server stops with plan_ended and is kept",
+      oldStripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
+      { dispute: oldDisputed.status, stripeStatus: oldStripeSub.status, row: ended },
     );
     await stripe("POST", `/v1/disputes/${disputed.id}`, idSchema, {
       "evidence[uncategorized_text]": "losing_evidence",

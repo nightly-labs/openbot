@@ -642,6 +642,12 @@ export function Terms() {
         permanent, and the associated data cannot be recovered.
       </p>
       <p>
+        In the case of a payment dispute or chargeback for a Hosted Server subscription within 30 days of the start of
+        that subscription, the associated Hosted Server, including its environment and all stored content, will be
+        deleted immediately, without the 14-day data retention period. Such deletion is permanent, and the associated
+        data cannot be recovered.
+      </p>
+      <p>
         Users are responsible for saving or exporting any content they wish to retain before deleting a Hosted Server.
       </p>
       <p>

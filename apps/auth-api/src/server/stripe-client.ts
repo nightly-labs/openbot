@@ -127,6 +127,7 @@ const subscriptionSchema = Schema.Struct({
   canceled_at: Schema.optional(Schema.NullOr(Schema.Int)),
   metadata: Metadata,
   current_period_end: Schema.optional(Schema.Int),
+  start_date: Schema.optional(Schema.Int),
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
@@ -936,6 +937,10 @@ export function subscriptionPaymentMethodId(subscription: StripeSubscription): s
   const method = subscription.default_payment_method;
   if (!method) return null;
   return typeof method === "string" ? method : method.id;
+}
+
+export function subscriptionStartedAt(subscription: StripeSubscription): number | null {
+  return subscription.start_date === undefined ? null : subscription.start_date * 1_000;
 }
 
 export function subscriptionLatestInvoiceId(subscription: StripeSubscription): string | null {

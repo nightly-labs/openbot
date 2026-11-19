@@ -282,8 +282,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    plan of the server, such as a renewal paid just now, keeps it. A cancel at the period end after a
    refund of that period also deletes the server when the period ends. A refund that fails after it
    succeeded does not bring the server back. A dispute (`charge.dispute.created`, an inquiry too)
-   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. After a
-   dispute the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through
+   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. When the
+   subscription started less than 30 days before the dispute (Stripe `start_date`,
+   `DISPUTE_DELETES_SERVER_MS`), the webhook also deletes the server at once, as for a refund. After a
+   later dispute the server stops with `plan_ended` and keeps its disk for 14 days. The Worker finds the plan through
    the invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment
    that is not an OpenBot plan invoice changes nothing.
 8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
@@ -1871,7 +1873,8 @@ date of the cancel message. One sync sends one message: a cancel that Stripe sto
 change of plan or users sends no cancel message. A change of plan or users sends no purchase message.
 A server order with a license sends two messages, one for each subscription. A subscription that ends
 after its owner cancelled the renewal sends the cancel message and, later, the end message. A deleted
-server and a dispute end the plan at once. The reason is `not paid` when the last
+server and a dispute end the plan at once; a dispute in the first 30 days of the subscription also
+deletes the server. The reason is `not paid` when the last
 payment of the plan had failed, and `cancelled` in each other case. The boat message goes out only
 after the Worker stores the boat start, so a lost race, a retry of a boat attempt, or a pool change
 whose answer was lost sends nothing. A failed send logs one line and is not sent again. Without the

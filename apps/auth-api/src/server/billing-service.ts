@@ -96,6 +96,7 @@ import {
   subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  subscriptionStartedAt,
   subscriptionStorageItem,
   subscriptionStorageTier,
   verifyStripeSignature,
@@ -105,6 +106,7 @@ import { ViesClient } from "./vies-client";
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
+const DISPUTE_DELETES_SERVER_MS = 30 * 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_READ_INTERVAL_MS = 60 * 60 * 1000;
 const LAPSED_PLAN_BATCH_SIZE = 20;
@@ -202,6 +204,7 @@ interface SyncedSubscription {
   latestInvoiceId: string | null;
   serverId: string | null;
   ended: boolean;
+  startedAt: number | null;
 }
 
 export interface CheckoutRequest {
@@ -947,15 +950,18 @@ export class BillingService {
         ? yield* this.#stripeCall(() => dependencies.stripe.getPaymentInvoice(reversal.paymentIntentId))
         : null;
       const subscriptionId = eventSubscriptionId(event) ?? payment?.subscriptionId ?? null;
-      const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
+      let synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
       if (reversal?.type === "payment_disputed" && payment && synced) {
         yield* this.cancelSubscription(payment.subscriptionId);
-        yield* this.#syncSubscription(payment.subscriptionId);
+        synced = yield* this.#syncSubscription(payment.subscriptionId);
       }
       if (synced?.kind === "plan" && synced.ended && synced.serverId && dependencies.onServerRefunded) {
         const invoiceId = synced.latestInvoiceId;
         const refunded =
           reversal?.type === "payment_refunded" ||
+          (reversal?.type === "payment_disputed" &&
+            synced.startedAt !== null &&
+            event.created * 1_000 - synced.startedAt < DISPUTE_DELETES_SERVER_MS) ||
           (event.type === "customer.subscription.deleted" &&
             invoiceId !== null &&
             (yield* this.#stripeCall(() => dependencies.stripe.isInvoiceRefunded(invoiceId))));
@@ -1122,6 +1128,7 @@ export class BillingService {
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
       serverId,
       ended: subscription.status === "canceled",
+      startedAt: subscriptionStartedAt(subscription),
     };
     const finish = Effect.andThen(
       ordersLicense(subscription) ? this.license.splitOrder(subscription, ownerId) : Effect.void,
