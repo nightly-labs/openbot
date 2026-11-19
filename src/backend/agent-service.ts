@@ -158,6 +158,9 @@ import {
   type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
+  WORKFLOW_CATALOG_PROVIDERS,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
   WORKFLOWS_USAGE_ID,
   type WorkflowCatalogProvider,
   type WorkflowMediaCatalog,
@@ -371,6 +374,16 @@ const errorLogger = createOpenBotLogger("agent-error");
  * none of them. Codex is left out on purpose: it is the one provider that can also ship inside the
  * application, and an unset entry keeps that copy in the search.
  */
+/** The MCP host and the brand name of each media service. */
+const MEDIA_SERVICE_HOSTS: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: SUNRA_MCP_HOST,
+  higgsfield: HIGGSFIELD_MCP_HOST,
+};
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
+
 const DEFAULT_BUNDLED_EXECUTABLES: BundledProviderExecutables = { claude: null, grok: null };
 
 export type { TestMcpServerOptions } from "./agent/mcp-gateway";
@@ -3198,7 +3211,37 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   #mediaSignIn(provider: WorkflowCatalogProvider) {
-    return this.#mcp.serviceSignIn(provider === "sunra" ? SUNRA_MCP_HOST : HIGGSFIELD_MCP_HOST);
+    return this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider]);
+  }
+
+  /** The signed-in accounts of each media service, in the order of Apps; the first of a service is its default. */
+  #mediaServiceAccounts() {
+    return WORKFLOW_CATALOG_PROVIDERS.flatMap((provider) =>
+      this.#mcp.serviceSignIns(MEDIA_SERVICE_HOSTS[provider]).map((signIn) => ({
+        provider,
+        signIn,
+        account: {
+          provider,
+          id: signIn.id,
+          name: signIn.name?.slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX) ?? null,
+        },
+      })),
+    ).slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX);
+  }
+
+  /**
+   * The sign-in of the account of a service step: `account` is a row id, or null for the first
+   * account. A step on an account that the host no longer has fails: another account must never pay.
+   */
+  #mediaStepSignIn(provider: WorkflowCatalogProvider, account: string | null) {
+    const signIn = this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account);
+    return account !== null && !signIn
+      ? Effect.fail(
+          new ProfileGenerationFailed({
+            cause: new Error(sourceText("error.provider.accountNotFound", { provider: MEDIA_SERVICE_NAMES[provider] })),
+          }),
+        )
+      : Effect.succeed(() => this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account));
   }
 
   /**
@@ -3224,23 +3267,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
+    const accounts = this.#mediaServiceAccounts();
     return {
-      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
-      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
+      sunra: accounts.some((account) => account.provider === "sunra"),
+      higgsfield: accounts.some((account) => account.provider === "higgsfield"),
+      accounts: accounts.map(({ account }) => account),
     };
   }
 
   /**
-   * The credits of the media services that a workflow step can spend now. A failed read has none.
-   * With `only`, it reads that service alone and the other one is null.
+   * The credits of the media services that a workflow step can spend now: of each account, and of the
+   * first account of each service. A failed read has none. With `only`, it reads the first account of
+   * that service alone; the other service and the account list are null.
    */
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
     this: AgentService,
-    only?: keyof WorkflowMediaCredits,
+    only?: WorkflowCatalogProvider,
   ) {
-    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
-    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    if (this.#stopping) return { sunra: null, higgsfield: null, accounts: null } satisfies WorkflowMediaCredits;
+    const all = this.#mediaServiceAccounts();
+    const accounts = only ? all.filter((account) => account.provider === only).slice(0, 1) : all;
     const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
       read.pipe(
         Effect.catch((failure) =>
@@ -3250,14 +3296,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       );
-    const [sunra, higgsfield] = yield* Effect.all(
-      [
-        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
-        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
-      ],
+    const credits = yield* Effect.all(
+      accounts.map(({ provider, signIn }) =>
+        orNull(provider === "sunra" ? readSunraCredits(signIn) : readHiggsfieldCredits(signIn), provider),
+      ),
       { concurrency: "unbounded" },
     );
-    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
+    const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
+    const first = (provider: WorkflowCatalogProvider) =>
+      listed.find((account) => account.provider === provider)?.credits ?? null;
+    return {
+      sunra: first("sunra"),
+      higgsfield: first("higgsfield"),
+      accounts: only ? null : listed,
+    } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
@@ -3274,7 +3326,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         model: string;
         /** The canvas id of the model ("sunra-…", "higgsfield-…"), which finds its plan in the live list. */
         catalogId: string;
-        /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
+        /**
+         * The account of the provider that pays. Null is its own sign-in; for Sunra and Higgsfield, the
+         * id of an Apps row, and null their first account.
+         */
         account: string | null;
         specs: WorkflowMediaSpecs;
         prompt: string;
@@ -3285,10 +3340,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
         const plan = yield* this.#mediaCatalog.sunraPlan(input.catalogId, input.kind);
         return yield* generateSunraMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(SUNRA_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
@@ -3309,10 +3365,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       if (input.provider === "higgsfield") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("higgsfield", input.account);
         const plan = yield* this.#mediaCatalog.higgsfieldPlan(input.catalogId, input.model, input.kind);
         return yield* generateHiggsfieldMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },

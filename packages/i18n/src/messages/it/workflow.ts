@@ -59,7 +59,6 @@ export const messages = {
   "workflow.node.locked": "Bloccato",
   "workflow.node.missingInput": "Collega un input per eseguire questo passo.",
   "workflow.node.run": "Esegui",
-  "workflow.node.runPrice": "Esegui · {credits}",
   "workflow.node.runPriceLabel": "Esegui. Prezzo in crediti: {credits}",
   "workflow.node.running": "In esecuzione",
   "workflow.node.stop": "Ferma",

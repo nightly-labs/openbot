@@ -18,6 +18,8 @@ import {
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowMediaCatalogModel,
+  type WorkflowMediaCreditBalance,
+  type WorkflowMediaServiceAccount,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
@@ -119,6 +121,18 @@ const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS
     ? [workflowFixedCatalogModel(model, model.provider)]
     : [],
 );
+
+/** One Sunra account and two Higgsfield accounts; the first of each service has no name of its own. */
+const PREVIEW_MEDIA_ACCOUNTS: WorkflowMediaServiceAccount[] = [
+  { provider: "sunra", id: "preview-sunra", name: null },
+  { provider: "higgsfield", id: "preview-higgsfield", name: null },
+  { provider: "higgsfield", id: "preview-higgsfield-2", name: "Higgsfield 2" },
+];
+const PREVIEW_MEDIA_CREDITS: WorkflowMediaCreditBalance[] = [
+  { available: 1240, quota: 2000 },
+  { available: 860, quota: null },
+  { available: 95, quota: null },
+];
 
 /** `emit` sends the agent event `workflows-changed` for one workflow that changed. */
 export function mockWorkflows(
@@ -498,10 +512,15 @@ export function mockWorkflows(
     },
     // The preview keeps no files: the draft id names the kept picture.
     keepPicture: async (draftId) => draftId,
-    mediaProviders: async () => ({ sunra: true, higgsfield: true }),
+    // Two Higgsfield accounts, so the picker and the rail show the account of each.
+    mediaProviders: async () => ({ sunra: true, higgsfield: true, accounts: PREVIEW_MEDIA_ACCOUNTS }),
     mediaCredits: async () => ({
-      sunra: { available: 1240, quota: 2000 },
-      higgsfield: { available: 860, quota: null },
+      sunra: PREVIEW_MEDIA_CREDITS[0] ?? null,
+      higgsfield: PREVIEW_MEDIA_CREDITS[1] ?? null,
+      accounts: PREVIEW_MEDIA_ACCOUNTS.map((account, index) => ({
+        ...account,
+        credits: PREVIEW_MEDIA_CREDITS[index] ?? null,
+      })),
     }),
     mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
     // A fixed quote: a video costs per second, and a larger resolution costs more.

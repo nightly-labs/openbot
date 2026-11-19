@@ -18,6 +18,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
@@ -30,6 +34,8 @@ import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
+  decodeRemoteMediaServiceAccounts,
+  decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
@@ -88,7 +94,8 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_MEDIA_CAPABILITY
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -234,33 +241,41 @@ export function workflowIpcHandlers({
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
         // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra. The
-        // same is true for Higgsfield and `workflows-higgsfield-v1`.
+        // same is true for Higgsfield and `workflows-higgsfield-v1`. A host without
+        // `workflows-media-service-account-v1` makes each file on the first account, so it lists none.
         remote: async (serverId) => {
-          const [sunra, higgsfield] = await Promise.all([
+          const [sunra, higgsfield, accounts] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
               : { sunra: false },
             remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
               : { higgsfield: false },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts, decodeRemoteMediaServiceAccounts, {})
+              : null,
           ]);
-          return { ...sunra, ...higgsfield };
+          return { ...sunra, ...higgsfield, accounts };
         },
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
         // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show. The same is
-        // true for Higgsfield and `workflows-higgsfield-v1`.
+        // true for Higgsfield and `workflows-higgsfield-v1`. A host with
+        // `workflows-media-service-account-v1` also gives the credits of each account.
         remote: async (serverId) => {
-          const [sunra, higgsfield] = await Promise.all([
+          const [sunra, higgsfield, accounts] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
               : { sunra: null },
             remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
               : { higgsfield: null },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits, decodeRemoteMediaServiceCredits, {})
+              : null,
           ]);
-          return { ...sunra, ...higgsfield };
+          return { ...sunra, ...higgsfield, accounts };
         },
       }),
       mediaCatalog: scopedQueryHandler({

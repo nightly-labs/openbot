@@ -257,6 +257,27 @@
   line-height: 1;
 }
 
+/* The number of the account when a service has more than one, as the workflow model picker shows it. */
+.window-rail-credits-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: grid;
+  place-items: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-glyph-sm);
+  font-weight: var(--openbot-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 /* The usage of a custom agent: its logo with no ring, at the size of a rail icon. The hover card
  * shows the answer of the agent as it wrote it. */
 .window-rail-button .window-rail-agent-usage-logo {

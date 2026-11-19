@@ -713,6 +713,11 @@
   height: var(--openbot-icon-xs);
 }
 
+/* The lightning of a priced run is filled, as a credit mark, not a line icon. */
+.wfn-run-pill .wfn-run-credits-icon {
+  fill: currentcolor;
+}
+
 /* The spinner takes the place of the play icon, so the pill keeps its width. */
 .wfn-stage .wfn-run-pill[aria-busy="true"] svg {
   display: none;
@@ -1371,7 +1376,20 @@ fieldset.wfn-picker-group {
 
 /* The pill of a media step names the account that pays, muted, as the first text to shorten. */
 .wfn-field-foot > .wfn-media-pill {
+  position: relative;
+  flex-shrink: 1;
   min-width: 0;
+}
+
+/* On the pill, the number sits on the corner of the logo, smaller than on the picker tab. */
+.wfn-stage .wfn-media-pill > .wfn-media-account-badge {
+  inset-inline: 13px auto;
+  bottom: -2px;
+  min-width: 11px;
+  height: 11px;
+  padding: 0 2px;
+  overflow: visible;
+  font-size: var(--openbot-glyph-sm);
 }
 
 .wfn-media-pill-name {

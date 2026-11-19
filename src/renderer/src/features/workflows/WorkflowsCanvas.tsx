@@ -1,7 +1,11 @@
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
   WORKFLOW_MEDIA_MODELS,
+  type WorkflowCatalogProvider,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
+  type WorkflowMediaServiceAccount,
   workflowCatalogMediaModel,
 } from "@openbot/contracts/ipc";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
@@ -14,6 +18,7 @@ import {
 import { currentText } from "@openbot/ui/text";
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { mediaServiceAccountName } from "./workflow-media-credits";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
@@ -46,6 +51,8 @@ export function WorkflowsCanvas(props: {
   // the window comes back to the front. A failed read keeps the last answer.
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  // The accounts of both services, or null when the host makes each file on the first account.
+  const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
   let disposed = false;
   const readMediaProviders = () => {
@@ -56,6 +63,7 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setServiceAccounts(providers.accounts);
       })
       .catch(() => undefined);
     void props.host.workflows
@@ -76,6 +84,21 @@ export function WorkflowsCanvas(props: {
       .flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
     const ids = new Set(live.map((model) => model.id));
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
+  };
+  /**
+   * The accounts of a service as the picker lists them, when it has more than one: the first is the
+   * step's default, so it saves no account, and each other one saves the id of its Apps row.
+   */
+  const serviceAccountRows = (provider: WorkflowCatalogProvider): readonly ProviderAccountStatus[] | undefined => {
+    const accounts = serviceAccounts()?.filter((account) => account.provider === provider) ?? [];
+    if (accounts.length < 2) return undefined;
+    return accounts.map((account, index) => ({
+      id: index === 0 ? DEFAULT_PROVIDER_ACCOUNT_ID : account.id,
+      label: mediaServiceAccountName(account),
+      email: null,
+      state: "connected",
+      message: null,
+    }));
   };
   readMediaProviders();
   window.addEventListener("focus", readMediaProviders);
@@ -136,12 +159,16 @@ export function WorkflowsCanvas(props: {
         ];
       });
       // An older host ignores the background of a step, so its models make no transparent image.
-      const service = (provider: "sunra" | "higgsfield", on: boolean) =>
-        on
-          ? serviceModels(provider).map(({ transparent, ...rest }) =>
-              transparent && props.host.mediaTransparentSupported() ? { ...rest, transparent } : rest,
-            )
-          : [];
+      // A host that lists the accounts of a service makes the file on the account of the step.
+      const service = (provider: WorkflowCatalogProvider, on: boolean) => {
+        if (!on) return [];
+        const accounts = serviceAccountRows(provider);
+        return serviceModels(provider).map(({ transparent, ...rest }) => ({
+          ...rest,
+          ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+          ...(accounts ? { accounts } : {}),
+        }));
+      };
       return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
     },
     get mediaPrice() {

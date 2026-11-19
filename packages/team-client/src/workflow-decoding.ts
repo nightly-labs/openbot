@@ -11,9 +11,11 @@ import {
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
+  isWorkflowMediaAccountCredits,
   isWorkflowMediaCatalogModel,
   isWorkflowMediaCreditBalance,
   isWorkflowMediaPrice,
+  isWorkflowMediaServiceAccount,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
@@ -25,6 +27,7 @@ import {
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_MEDIA_CATALOG_MAX,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
@@ -33,9 +36,11 @@ import {
   WORKFLOW_STEP_STATUSES,
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
+  type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalog,
   type WorkflowMediaCreditBalance,
   type WorkflowMediaPrice,
+  type WorkflowMediaServiceAccount,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -189,6 +194,36 @@ export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: Workf
 export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
   return { higgsfield: remoteCreditBalance(value.higgsfield) };
+}
+
+/** The `accounts` list of a `workflows-media-service-account-v1` answer. It drops an entry that it cannot read. */
+function remoteAccountList<T>(value: unknown, item: (entry: unknown) => entry is T): T[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.accounts) ||
+    value.accounts.length > WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX
+  )
+    throw new Error("Invalid remote workflow accounts.");
+  return value.accounts.filter(item);
+}
+
+/** The `workflows-media-service-account-v1` accounts route answers `{ accounts }`. */
+export function decodeRemoteMediaServiceAccounts(value: unknown): WorkflowMediaServiceAccount[] {
+  return remoteAccountList(value, isWorkflowMediaServiceAccount).map(({ provider, id, name }) => ({
+    provider,
+    id,
+    name,
+  }));
+}
+
+/** The `workflows-media-service-account-v1` credits route answers `{ accounts }`, each with its credits. */
+export function decodeRemoteMediaServiceCredits(value: unknown): WorkflowMediaAccountCredits[] {
+  return remoteAccountList(value, isWorkflowMediaAccountCredits).map(({ provider, id, name, credits }) => ({
+    provider,
+    id,
+    name,
+    credits: credits && { available: credits.available, quota: credits.quota },
+  }));
 }
 
 /**

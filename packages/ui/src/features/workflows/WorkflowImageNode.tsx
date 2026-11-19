@@ -36,6 +36,7 @@ import {
   Square,
   Textarea,
   Type,
+  Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
@@ -407,13 +408,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const { aspect, duration, resolution, transparent } = specs();
     return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
   });
-  const runText = () => {
-    const credits = price();
-    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
-  };
   const runLabel = () => {
     const credits = price();
-    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+    return !credits ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
   };
   /**
    * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
@@ -784,8 +781,23 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       onClick={run.start}
                       aria-label={runLabel()}
                     >
-                      <Play aria-hidden="true" />
-                      {runText()}
+                      {/* A step with a price shows the credits of one run; its label says "Run" for screen readers. */}
+                      <Show
+                        when={price()}
+                        fallback={
+                          <>
+                            <Play aria-hidden="true" />
+                            {t("workflow.node.run")}
+                          </>
+                        }
+                      >
+                        {(credits) => (
+                          <>
+                            <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                            {format.number(credits())}
+                          </>
+                        )}
+                      </Show>
                     </Button>
                   }
                 >
