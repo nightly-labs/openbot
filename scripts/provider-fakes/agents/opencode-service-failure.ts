@@ -1,6 +1,3 @@
-// The `opencode acp` of `opencode-service-failure-e2e.ts`. OpenCode 2.1.3 answers each request whose
-// failure has no ACP error of its own with `-32603` "Internal error: Internal service failure" and
-// the JavaScript error class in `data.errorName` (#2850). This fake fails each prompt in that way.
 import { serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/big-pickle";

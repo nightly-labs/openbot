@@ -44,7 +44,6 @@ const DEFAULT_LAYOUT: SidebarLayoutSnapshot = {
   agentOrder: [],
 };
 
-/** Version 1 has no `agentOrder`. Each released version must still load. */
 const SIDEBAR_LAYOUT_FORMAT: VersionedJsonFormat<SidebarLayoutSnapshot> = {
   current: 2,
   releases: {
@@ -61,7 +60,6 @@ const SIDEBAR_LAYOUT_FORMAT: VersionedJsonFormat<SidebarLayoutSnapshot> = {
 
 export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   #layout = structuredClone(DEFAULT_LAYOUT);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
@@ -72,10 +70,6 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
     this.#writePath = path;
   }
 
-  /**
-   * Reads the layout. The file of a newer release stays unchanged: the store starts from the default
-   * layout and writes `<path>.v2`. See `readVersionedJsonFile`.
-   */
   initialize() {
     return Effect.gen({ self: this }, function* () {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
@@ -185,13 +179,6 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
     );
   }
 
-  /**
-   * Drops the agents that are gone -- but renames the ones that only look gone first. This layout is a
-   * JSON file outside the database, so migration v13 renamed every agent in SQLite and left the sidebar
-   * still filing them under `bot-<uuid>`. Filtering straight against the new roster would read that as
-   * "these agents no longer exist" and commit the deletion, so a user with a dozen agents in named groups
-   * comes back to all of them unassigned, in an order they never chose, with nothing to undo it.
-   */
   reconcileAgents(agentIds: ReadonlySet<string>): Effect.Effect<SidebarLayoutSnapshot, StoredStateFailure> {
     return this.#enqueue(
       Effect.gen({ self: this }, function* () {
@@ -200,16 +187,8 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
           const legacyId = legacyAgentId(agentId);
           if (legacyId !== agentId) renamedFrom.set(legacyId, agentId);
         }
-        // An id still in the roster answers for itself, which is why that test comes first: v13 declines to
-        // rename onto an id that is taken, so an agent spelled `bot-<uuid>` can be sitting beside the
-        // `agent-<uuid>` it would otherwise have become, and this entry belongs to the one the user filed.
         const currentId = (agentId: string) =>
           agentIds.has(agentId) ? agentId : (renamedFrom.get(agentId) ?? agentId);
-        // Two entries can land on one id -- the layout can hold a `bot-<uuid>` the user filed before the
-        // upgrade beside the `agent-<uuid>` it became -- and the layout is validated on the way back in.
-        // An unmerged pair leaves the same agent twice in `agentOrder`, the file is rejected on the next
-        // launch, and the user's sections and ordering are reset. The entry already spelled the way the
-        // roster spells it is the one the user filed most recently, so it wins.
         const agentAssignments: Record<string, string> = {};
         for (const [agentId, sectionId] of Object.entries(this.#layout.agentAssignments)) {
           const id = currentId(agentId);
@@ -249,10 +228,6 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   });
 }
 
-/**
- * Applies one action and puts the folders back in tree order. An action that changes nothing answers
- * `current` itself, so the store does not write the file or raise the revision.
- */
 function applySidebarLayoutAction(
   current: SidebarLayoutSnapshot,
   action: SidebarLayoutAction,
@@ -261,15 +236,9 @@ function applySidebarLayoutAction(
   const next = applyFlatSidebarLayoutAction(current, action, agentIds);
   if (next === current) return current;
   const normalized = withFolderTree(next);
-  // A move between a folder and its own folders leaves the tree as it was.
   return action.type === "move" && arraysEqual(normalized.order, current.order) ? current : normalized;
 }
 
-/**
- * The layout with each parent that `sidebarFolderParents` keeps, and the order that walks the tree.
- * An older version keeps `parentId` in the file but does not maintain it, so a loaded layout can name
- * a parent that it deleted; that folder goes to the top rather than the file being reset.
- */
 function withFolderTree(layout: SidebarLayoutSnapshot): SidebarLayoutSnapshot {
   const parents = sidebarFolderParents(layout);
   return {
@@ -299,7 +268,6 @@ function applyFlatSidebarLayoutAction(
         if (folderDepth(current, action.parentId) + 1 >= SIDEBAR_FOLDER_LEVELS)
           throw new Error(sourceText("error.backend.sidebarFolderTooDeep"));
       }
-      // A new folder goes last: at the end of its parent once the tree order is rebuilt.
       const section: SidebarSection =
         action.parentId === undefined
           ? { id: randomUUID(), name }
@@ -332,7 +300,6 @@ function applyFlatSidebarLayoutAction(
     }
     case "delete": {
       requireCustomSection(current, action.sectionId);
-      // The folders and chats of a deleted folder go to its parent; at the top, the chats are unassigned.
       const parentId = sidebarFolderParents(current).get(action.sectionId);
       return {
         revision: current.revision + 1,
@@ -350,7 +317,6 @@ function applyFlatSidebarLayoutAction(
       };
     }
     case "nest": {
-      // People and Unassigned stay at the top level, but they can move among the folders there.
       if (action.sectionId === SIDEBAR_PEOPLE_SECTION_ID || action.sectionId === SIDEBAR_UNASSIGNED_SECTION_ID) {
         if (action.parentId !== null) throw new Error(sourceText("error.backend.sidebarFolderMoveInvalid"));
       } else requireCustomSection(current, action.sectionId);
@@ -473,7 +439,6 @@ function withParent(section: SidebarSection, parentId: string | undefined): Side
     : { id: section.id, name: section.name, parentId };
 }
 
-/** 0 for a folder at the top of the list. */
 function folderDepth(layout: SidebarLayoutSnapshot, sectionId: string): number {
   return sidebarFolderAncestors(sidebarFolderParents(layout), sectionId).length;
 }
@@ -545,11 +510,6 @@ function snapshotFromLegacyStored(stored: LegacyStoredSidebarLayout): Omit<Sideb
   };
 }
 
-/**
- * The id, the name and a text `parentId`. Other fields are dropped; a parent that is not text is
- * dropped too and the folder goes to the top, so the file is not reset.
- */
 function storedSection({ id, name, parentId }: SidebarSection): SidebarSection {
-  // The file check above does not read `parentId`, so this check runs on the value in the file.
   return isString(parentId) ? { id, name, parentId } : { id, name };
 }

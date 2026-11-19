@@ -21,7 +21,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The composer column, so the notice is judged at the width it actually renders at. */
 function ComposerStack(props: { children: JSX.Element }) {
   return (
     <div class="composer-wrap" style={{ width: "640px", padding: "16px" }}>
@@ -30,7 +29,6 @@ function ComposerStack(props: { children: JSX.Element }) {
   );
 }
 
-/** A fixed moment, so the story reads the same on every run and in every review screenshot. */
 const USAGE_RESETS_AT = Date.UTC(2026, 8, 21, 9, 0) / 1_000;
 
 export const SignInRequired: Story = {
@@ -50,7 +48,6 @@ export const ClaudeSignInRequired: Story = {
   ),
 };
 
-/** The provider already reports `connecting`, so the action cannot be pressed a second time. */
 export const SigningIn: Story = {
   args: { signingIn: true },
   render: (args) => (
@@ -60,7 +57,6 @@ export const SigningIn: Story = {
   ),
 };
 
-/** Select Sign in: after 25 s of `connecting`, the notice offers the code sign-in beside it. */
 export const SigningInWithCodeFallback: Story = {
   args: { onSignInWithCode: fn() },
   render: (args) => {
@@ -73,7 +69,6 @@ export const SigningInWithCodeFallback: Story = {
   },
 };
 
-/** A spent plan notice can be dismissed without changing the provider's quota reading. */
 export const UsageLimitReached: Story = {
   render: () => {
     const [dismissed, setDismissed] = createSignal(false);
@@ -87,7 +82,6 @@ export const UsageLimitReached: Story = {
   },
 };
 
-/** Codex reports credits for the account, so the card says that work goes on, on credits. */
 export const UsageLimitOnCredits: Story = {
   render: () => {
     const [dismissed, setDismissed] = createSignal(false);
@@ -106,7 +100,6 @@ export const UsageLimitOnCredits: Story = {
   },
 };
 
-/** Some providers report a spent window with no reset time, so the card names the way out instead. */
 export const UsageLimitWithoutReset: Story = {
   render: () => {
     const [dismissed, setDismissed] = createSignal(false);

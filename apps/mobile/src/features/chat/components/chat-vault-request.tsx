@@ -23,12 +23,6 @@ const ADD_LABEL = {
 
 const KIND_ICON = { login: KeyRound, card: CreditCard, contact: UserRound } as const;
 
-/**
- * The card of an agent's `request_vault_item`, as on desktop: what the item is for, and a button that
- * opens the Vault item form with the fields that the agent filled in. The user types the secrets in
- * the form; the host saves the item and gives the agent its name only. Once saved, the card names the
- * item. Only a host with `ui-block-vault-v1` marks the block; another host's form shows as questions.
- */
 export function ChatVaultRequest({
   serverId,
   prompt,
@@ -51,7 +45,6 @@ export function ChatVaultRequest({
   const resolution =
     prompt.resolution ?? controller?.resolution ?? (controller || onActivate ? null : { status: "expired" as const });
   const open = !resolution && Boolean(controller?.question);
-  // The form sends through the controller of the moment, not the one of the render that opened it.
   const send = useRef(controller?.send);
   send.current = controller?.send;
   const title = uiBlock.spec.title ?? "";

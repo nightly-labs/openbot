@@ -1,13 +1,3 @@
-// Checks sidebar folders through the frozen sidebar-folders-v1 Team API contract. First a store on a
-// temporary profile loads a layout file that an older version damaged, and keeps every folder. Then a
-// real `TeamApiServer` runs on loopback with the real team, agent, access and sidebar stores. A member
-// sends what a current desktop client sends, and the frozen codec reads each request and reply. A
-// socket with the capability must get `sidebar-folders-changed` with the parents; a socket without it
-// must get `sidebar-layout-changed` without them, as the released route answers too.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/sidebar-folders-e2e.ts`.
-// Writes .openbot-build/sidebar-folders-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -53,7 +43,6 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "sidebar-folders-electron-boundary",
   setup(build) {
@@ -103,7 +92,6 @@ const report: { passed: boolean; findings: string[]; unverified: string[]; steps
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -112,7 +100,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -129,7 +116,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -210,7 +196,6 @@ interface Host {
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 
-/** Starts the host on the profile, as the app does at each launch. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -219,7 +204,6 @@ async function startHost(): Promise<Host> {
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
@@ -254,7 +238,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a desktop client of `protocol`, which sends the capabilities of that protocol. */
 async function call(
   method: string,
   path: string,
@@ -278,7 +261,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A sidebar-folders-v1 request through the frozen codec, in both directions. */
 async function folders(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = SIDEBAR_FOLDERS_CODECS.get(path);
   assert.ok(codec, `No sidebar-folders-v1 codec for ${path}.`);
@@ -287,7 +269,6 @@ async function folders(path: string, token: string, body: unknown): Promise<{ st
   return { status: response.status, body: codec.response(response.status, response.body) };
 }
 
-/** An action that the host must accept. Returns the layout it answers. */
 async function act(token: string, action: JsonObject): Promise<SidebarLayoutSnapshot> {
   const response = await folders(SIDEBAR_FOLDERS_ROUTES.actions, token, action);
   assert.equal(
@@ -298,7 +279,6 @@ async function act(token: string, action: JsonObject): Promise<SidebarLayoutSnap
   return layoutOf(response.body);
 }
 
-/** An action that the host must refuse. The layout must stay as it was. */
 async function refuse(token: string, action: JsonObject, reason: string): Promise<{ status: number; error: string }> {
   const before = current().sidebar.getSnapshot();
   const response = await folders(SIDEBAR_FOLDERS_ROUTES.actions, token, action);
@@ -328,7 +308,6 @@ function sectionIdNamed(layout: SidebarLayoutSnapshot, name: string): string {
   return section.id;
 }
 
-/** Each folder comes after its parent in `order`, and its folders come before the next sibling. */
 function assertTreeOrder(layout: SidebarLayoutSnapshot): void {
   const parents = new Map(
     layout.sections.flatMap((section) => (section.parentId ? [[section.id, section.parentId]] : [])),
@@ -337,7 +316,6 @@ function assertTreeOrder(layout: SidebarLayoutSnapshot): void {
     const child = layout.order.indexOf(childId);
     const parent = layout.order.indexOf(parentId);
     assert.ok(parent >= 0 && parent < child, `${childId} is not after its parent in the order.`);
-    // Everything between the parent and the child is inside the parent.
     for (const between of layout.order.slice(parent + 1, child)) {
       let ancestor = parents.get(between);
       while (ancestor && ancestor !== parentId) ancestor = parents.get(ancestor);
@@ -352,13 +330,11 @@ async function login(credentials: { username: string; password: string }): Promi
   return text(record(response.body, "login").sessionToken, "session token");
 }
 
-/** A member's event socket. It records each message, so a step can check what did not arrive. */
 interface EventSocket {
   socket: WebSocket;
   received: unknown[];
 }
 
-/** Opens an event socket that declares the capabilities of `protocol`, and waits for its first snapshot. */
 async function openEvents(token: string, protocol: number): Promise<EventSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -385,7 +361,6 @@ async function openEvents(token: string, protocol: number): Promise<EventSocket>
   return { socket, received };
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -401,7 +376,6 @@ function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): 
   });
 }
 
-/** The first `sidebar-folders-changed` whose layout has a folder named `name`. */
 function foldersEventWith(events: EventSocket, name: string) {
   return nextMessage(events.socket, (value) => {
     const event = sidebarFoldersEvent(value);
@@ -409,7 +383,6 @@ function foldersEventWith(events: EventSocket, name: string) {
   });
 }
 
-/** The first `sidebar-layout-changed` whose layout has a folder named `name`. */
 function legacyEventWith(events: EventSocket, name: string) {
   return nextMessage(events.socket, (value) => {
     if (!isRecord(value) || value.type !== "sidebar-layout-changed") return null;
@@ -429,7 +402,6 @@ try {
     const [top, orphan, loopA, loopB, kept] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
     const agentId = randomUUID();
     mkdirSync(join(root, "damaged"), { recursive: true });
-    // An older version keeps `parentId` but does not maintain it: a deleted parent, and a loop.
     const file = {
       version: 2,
       revision: 7,
@@ -462,7 +434,6 @@ try {
       "The loop is still in the layout.",
     );
     assertTreeOrder(loaded);
-    // The file is written again only on a change, so the damaged file stays as the user left it.
     assert.deepEqual(JSON.parse(await readFile(path, "utf8")), file, "Loading rewrote the file.");
     return { order: loaded.order.length, sections: loaded.sections.length };
   });
@@ -485,7 +456,6 @@ try {
       const serverId = current().team.getIdentity()?.serverId;
       assert.ok(serverId, "The host has no server id.");
       const all = new Set([shown.id, closed.id]);
-      // The member cannot see `Ledger`, so the sidebar must refuse to place it for them.
       await Effect.runPromise(
         current().access.set(serverId, { revision: 0, everyone: { [closed.id]: "none" }, roles: [] }, all, all, null),
       );
@@ -623,7 +593,6 @@ try {
       sectionsOf(record(read.body, "layout")).every((section) => !("parentId" in section)),
       "The released route answers parentId.",
     );
-    // A released client cannot know about parents: its create goes to the top level.
     const created = await call("POST", TEAM_API_ROUTES.sidebarLayout.actions, {
       token: setup.memberToken,
       protocol: TEAM_PROTOCOL_V7,
@@ -631,14 +600,12 @@ try {
     });
     const afterCreate = current().sidebar.getSnapshot();
     if (created.status !== 200) {
-      // A refusal of the unknown field is also safe: nothing was nested.
       assert.equal(created.status, 400, `The released create returned ${created.status}.`);
       assert.ok(afterCreate.sections.every((section) => section.name !== "Old client"));
     } else {
       const oldClient = sectionIdNamed(afterCreate, "Old client");
       assert.equal(parentOf(afterCreate, oldClient), undefined, "The released route nested a folder.");
     }
-    // A rename from a released client keeps the parents that it cannot see.
     const renamed = await call("POST", TEAM_API_ROUTES.sidebarLayout.actions, {
       token: setup.memberToken,
       protocol: TEAM_PROTOCOL_V7,
@@ -664,7 +631,6 @@ try {
   });
 
   await step("events: the capable socket got only sidebar-folders-changed", async () => {
-    // One more change: each event before it has arrived when this one does.
     const last = foldersEventWith(capable, "Internal team");
     const legacyLast = legacyEventWith(legacy, "Internal team");
     await act(setup.memberToken, { type: "rename", sectionId: tree.internal, name: "Internal team" });

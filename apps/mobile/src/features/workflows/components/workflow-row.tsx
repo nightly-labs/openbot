@@ -17,7 +17,6 @@ import { typeScale } from "@/shared/lib/type-scale";
 
 export type WorkflowRowAction = "pin" | "run" | "edit";
 
-/** The colour class of a run status line. */
 export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   switch (lastRun?.status) {
     case "running":
@@ -32,7 +31,6 @@ export function runStatusClass(lastRun: WorkflowSummary["lastRun"]) {
   }
 }
 
-/** One workflow of the list: its name, its last run, and a pin when the drawer shows it. */
 export function WorkflowRow({
   workflow,
   pinned,
@@ -53,7 +51,6 @@ export function WorkflowRow({
     "--openbot-file-default-soft",
   ]);
   const menu = useRef<MenuComponentRef | null>(null);
-  // The iOS menu host takes the size of its content, so the row gets the width of its slot.
   const [width, setWidth] = useState<number>();
   const last = workflow.lastRun;
   const status = last
@@ -100,8 +97,6 @@ export function WorkflowRow({
             void haptics.impact("soft");
             onPress();
           }}
-          // The native context menu does not cancel this touch. Without a long-press handler, lifting the
-          // finger after the menu opens counts as a tap. Android opens its menu from the row.
           delayLongPress={longPressDelay}
           onLongPress={() => {
             void haptics.longPress();

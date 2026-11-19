@@ -15,16 +15,10 @@ import { decodeConversationReads, type MobileConversationRead } from "@/features
 import type { MobileAgent, MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
 
-/** While events stream, at most one event read of the read state starts in this time. */
 const EVENT_READS_INTERVAL_MS = 1_000;
 
-/** A read mark write: through a message (the newest the host counts when unset), or unread from one (the whole chat when unset). */
 type ReadMark = { kind: "read"; throughMessageId?: string } | { kind: "unread"; fromMessageId?: string };
 
-/**
- * The read state of the agent chats: the host's unread counts, and the read cursors that this phone
- * writes. Each returned function is stable for the session.
- */
 export function useConversationReads({
   liveState,
   readRefresh,
@@ -42,7 +36,6 @@ export function useConversationReads({
   request: WorkspaceRequest;
   loadConversation: MobileWorkspaceContextValue["loadConversation"];
   conversationStore: MobileConversationStore;
-  /** Changes when the app leaves or another server is selected, so older reads do not apply. */
   loadGeneration: RefObject<number>;
   removedServers: RefObject<Set<string>>;
   capabilities: ServerCapabilities;
@@ -50,7 +43,6 @@ export function useConversationReads({
   agents: RefObject<MobileAgent[]>;
 }) {
   const readWrites = useRef(new Map<string, Promise<void>>());
-  /** Applies host read state. The Live Activity also shows the message counts. */
   const applyConversationReads = useCallback(
     (reads: Record<string, MobileConversationRead>) => {
       liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
@@ -58,7 +50,6 @@ export function useConversationReads({
         ...current,
         ...Object.fromEntries(Object.entries(reads).map(([agentId, read]) => [agentId, read.unreadCount])),
       }));
-      // An open chat reads the line, so an unchanged state keeps the same record.
       liveState.update("firstUnreadMessageIds", (current) =>
         Object.entries(reads).every(([agentId, read]) => current[agentId] === read.firstUnreadMessageId)
           ? current
@@ -74,14 +65,8 @@ export function useConversationReads({
   );
 
   const readLoads = useRef(new Map<string, { promise: Promise<void>; again: boolean }>());
-  /** When the last read of each server started. */
   const readStarts = useRef(new Map<string, number>());
-  /** The event read that waits for its interval, for each server. */
   const waitingReads = useRef(new Map<string, Promise<void>>());
-  /**
-   * Reads the host read state now. A call during a read waits for one more read after it, which all
-   * the calls of that time share.
-   */
   const readConversationReadsNow = useCallback(
     (serverId = activeServerId.current): Promise<void> => {
       if (!serverId) return Promise.resolve();
@@ -124,11 +109,6 @@ export function useConversationReads({
     [request, readRefresh, applyConversationReads, activeServerId, removedServers],
   );
 
-  /**
-   * Reads the host read state after an event. Each message event asks for it, and each read costs the
-   * host a query for each agent, so while events stream at most one read starts in
-   * `EVENT_READS_INTERVAL_MS`. A call while a read waits joins it, so the last change is always read.
-   */
   const refreshConversationReads = useCallback(
     (serverId = activeServerId.current): Promise<void> => {
       if (!serverId) return Promise.resolve();
@@ -146,9 +126,6 @@ export function useConversationReads({
     [activeServerId, removedServers, readConversationReadsNow],
   );
 
-  /**
-   * Writes one agent's read mark on `serverId` after its earlier writes. It rejects when the host refuses it.
-   */
   const writeAgentRead = useCallback(
     (agentId: string, mark: ReadMark, serverId = activeServerId.current): Promise<void> => {
       if (!serverId) return Promise.resolve();
@@ -175,7 +152,6 @@ export function useConversationReads({
                   );
           } else {
             const cached = conversationStore.get(agentId);
-            // A window around a searched message, or a chat that missed changes, does not hold the latest message.
             const snapshot =
               mark.throughMessageId !== undefined
                 ? null
@@ -183,7 +159,6 @@ export function useConversationReads({
                   ? cached
                   : await loadConversation(agentId, serverId);
             if (generation !== loadGeneration.current) return;
-            // The same boundary as a read from the open chat. A chat with no message the host counts reads through its newest message.
             const throughMessageId =
               mark.throughMessageId ??
               (snapshot && (latestReadBoundaryMessage(snapshot.messages) ?? snapshot.messages.at(-1)))?.id;
@@ -205,7 +180,6 @@ export function useConversationReads({
           if (generation === loadGeneration.current) void readConversationReadsNow(serverId).catch(() => undefined);
           throw error;
         });
-      // A failed write must not stop the next write for this agent.
       const settled = write.catch(() => undefined);
       readWrites.current.set(agentId, settled);
       void settled.finally(() => {
@@ -256,14 +230,11 @@ export function useConversationReads({
     [activeServerId, capabilities, writeAgentRead],
   );
 
-  /** Marks every unread agent of the active server read through its newest message. */
   const markAllRead = useCallback(async () => {
     const serverId = activeServerId.current;
     if (!serverId) return;
-    // Only listed agents: a read of an id the host no longer knows creates that agent again.
     const listed = new Set(agents.current.filter((agent) => agent.serverId === serverId).map((agent) => agent.id));
     const unread = liveState.get().unreadAgentIds.filter((agentId) => listed.has(agentId));
-    // A cached chat can be older than the read state, so each receipt uses the host's newest message.
     const results = await Promise.allSettled(
       unread.map(async (agentId) => {
         const page = await request(
@@ -279,15 +250,10 @@ export function useConversationReads({
     );
     const failure = results.find((result) => result.status === "rejected");
     if (!failure) return;
-    // A later successful write discards the refresh of a refused one, so read the host state once more.
     await readConversationReadsNow(serverId).catch(() => undefined);
     throw failure.reason;
   }, [activeServerId, agents, liveState, request, writeAgentRead, readConversationReadsNow]);
 
-  /**
-   * Marks `fromMessageId` and the messages after it unread, through `conversation-unread-from-v1`.
-   * It rejects when the host refuses it. The caller keeps the open chat from reading itself again.
-   */
   const markAgentUnreadFrom = useCallback(
     (agentId: string, fromMessageId: string, serverId: string) =>
       writeAgentRead(agentId, { kind: "unread", fromMessageId }, serverId),

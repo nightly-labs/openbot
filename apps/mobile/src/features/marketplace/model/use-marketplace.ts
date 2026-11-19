@@ -27,9 +27,7 @@ import {
 import { MOBILE_PLUGINS } from "./plugin-catalog.generated";
 import { claimedByPlugin, pluginInstalled } from "./plugin-connect";
 
-/** How long a catalog page stays fresh, as the desktop overview cache. */
 const CATALOG_FRESH_MS = 5 * 60_000;
-/** The pause after the last key press before the catalog is searched, as on the desktop. */
 const SEARCH_DEBOUNCE_MS = 220;
 
 function useDebounced(value: string, delay: number): string {
@@ -41,11 +39,6 @@ function useDebounced(value: string, delay: number): string {
   return debounced;
 }
 
-/**
- * The apps of the server that are not in the plugin catalog, as on the desktop: each connector that an
- * owner or admin can set up from the phone, and each MCP server that the user added. A member reads
- * neither, so a member sees only the plugin apps.
- */
 function useServerApps(serverId: string) {
   const { t } = useText();
   const rows = useConnectorRows(serverId);
@@ -61,15 +54,9 @@ function useServerApps(serverId: string) {
     ],
     [rows, mcpServers.data, t],
   );
-  // The Marketplace is the only list of the custom MCP servers, so a failed read shows with a retry.
   return { apps, mcpServers };
 }
 
-/**
- * The listings of the account service's catalog, with the plugin apps the app ships and the server's own
- * apps. A search and a category go to the catalog, which answers the best matches first; the apps are
- * matched here.
- */
 export function useMarketplaceCatalog({
   serverId,
   query,
@@ -90,7 +77,6 @@ export function useMarketplaceCatalog({
     ...(search ? { query: search } : {}),
     ...(category ? { category } : {}),
   };
-  // A page at a time, as the desktop: the next page loads only when the user asks for more.
   const showAgents = filter.kind === null || filter.kind === "agent";
   const showSkills = filter.kind === null || filter.kind === "skill";
   const agents = useInfiniteQuery({
@@ -123,34 +109,21 @@ export function useMarketplaceCatalog({
     (agents.isPending && agents.fetchStatus !== "idle") || (skills.isPending && skills.fetchStatus !== "idle");
   const { fetchNextPage: moreAgents } = agents;
   const { fetchNextPage: moreSkills } = skills;
-  // A disabled query keeps its cached pages, so the Apps list must not offer them.
   const agentsMore = showAgents && agents.hasNextPage;
   const skillsMore = showSkills && skills.hasNextPage;
   return {
     listings,
-    /** The debounced search, which the listings match. */
     search,
     pending,
-    /**
-     * A catalog read failed with nothing to show for it, or the MCP server list of the server failed.
-     * The bundled apps always list, so the listings are never empty and cannot tell this.
-     */
     failed: (agents.isError && !agents.data) || (skills.isError && !skills.data) || mcpServers.isError,
     refetch: () => Promise.all([agents.refetch(), skills.refetch(), mcpServers.isError ? mcpServers.refetch() : null]),
-    /** The catalog has more agents or skills than the listings show. */
     hasMore: agentsMore || skillsMore,
     loadingMore: agents.isFetchingNextPage || skills.isFetchingNextPage,
-    /** The last "Load more" failed. The listings keep the pages read before it. */
     loadMoreFailed: (showAgents && agents.isFetchNextPageError) || (showSkills && skills.isFetchNextPageError),
     loadMore: () => Promise.all([agentsMore ? moreAgents() : null, skillsMore ? moreSkills() : null]),
   };
 }
 
-/**
- * What the active server already has from the Marketplace: the agents added from a listing, the skills
- * of each agent, and the MCP servers that a plugin installs as. A member reads no MCP list, so apps
- * show as not installed for a member; a member cannot install them either.
- */
 export function useMarketplaceInstalled(serverId: string) {
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const manageSkills = useMobileWorkspaceSelector((workspace) => workspace.canManageAgentSkills(serverId));
@@ -159,7 +132,6 @@ export function useMarketplaceInstalled(serverId: string) {
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
   const skillLists = useQueries({
     queries: agents.map((agent) => ({
-      // The agent page reads the same query, so both show the same list.
       ...agentSkillsQuery(queryScope, serverId, agent.id, manageSkills, loadAgentSkills),
       staleTime: 60_000,
       retry: false,
@@ -178,7 +150,6 @@ export function useMarketplaceInstalled(serverId: string) {
     const agentFor = (listingId: string) => agents.find((agent) => agent.marketplaceSource?.listingId === listingId);
     const skillAgentIds = (skillId: string) =>
       [...skillsByAgent].filter(([, skills]) => skills.some((skill) => skill.skillId === skillId)).map(([id]) => id);
-    /** The agents that can try the skill, as on the desktop: this version or newer, on, and not broken. */
     const usableSkillAgentIds = (skillId: string, version: number) =>
       [...skillsByAgent]
         .filter(([, skills]) =>

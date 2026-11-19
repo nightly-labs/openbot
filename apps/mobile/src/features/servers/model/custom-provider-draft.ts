@@ -14,17 +14,11 @@ import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { PairItem } from "@/features/servers/components/repeatable-fields";
 import type { MobileText } from "@/shared/lib/text";
 
-/** The example address of a base URL: Ollama on the server's own computer, as on desktop. */
 export const CUSTOM_PROVIDER_URL_EXAMPLE = DEFAULT_MODEL_SERVERS.ollama.baseUrl;
 
-/**
- * What the custom provider form edits. A model is a pair of its ID and display name, and a header of
- * its name and value. A saved header starts with an empty value, which keeps the saved value.
- */
 export interface CustomProviderDraft {
   name: string;
   id: string;
-  /** False until the user types an ID. Until then the ID follows the display name. */
   idEdited: boolean;
   baseUrl: string;
   apiKey: string;
@@ -32,7 +26,6 @@ export interface CustomProviderDraft {
   headers: PairItem[];
 }
 
-/** The starting points of the add flow, as on desktop. A preset only fills the form. */
 const CUSTOM_PROVIDER_PRESETS = ["ollama", "lmstudio", "openai-compatible"] as const;
 export type CustomProviderPreset = (typeof CUSTOM_PROVIDER_PRESETS)[number];
 
@@ -40,7 +33,6 @@ export function isCustomProviderPreset(value: unknown): value is CustomProviderP
   return isOneOf(CUSTOM_PROVIDER_PRESETS, value);
 }
 
-/** The form of a preset: a local model server has its name, ID and default address on the host. */
 export function presetCustomProviderDraft(preset: CustomProviderPreset): CustomProviderDraft {
   const server = preset === "openai-compatible" ? null : DEFAULT_MODEL_SERVERS[preset];
   return {
@@ -54,10 +46,6 @@ export function presetCustomProviderDraft(preset: CustomProviderPreset): CustomP
   };
 }
 
-/**
- * The form of a saved endpoint (`custom-provider-edit-v1`). The key and the header values do not come
- * back from the host, so their fields start empty, and an empty one keeps the saved value.
- */
 export function savedCustomProviderDraft(saved: CustomProviderSummary): CustomProviderDraft {
   return {
     name: saved.name,
@@ -70,7 +58,6 @@ export function savedCustomProviderDraft(saved: CustomProviderSummary): CustomPr
   };
 }
 
-/** A provider ID from a display name: "LM Studio" gives `lm-studio`. */
 export function suggestedCustomProviderId(name: string): string {
   return name
     .normalize("NFKD")
@@ -82,7 +69,6 @@ export function suggestedCustomProviderId(name: string): string {
     .replace(/[-_]+$/u, "");
 }
 
-/** Whether the user changed the form that the preset opened with. */
 export function customProviderDraftChanged(draft: CustomProviderDraft, initial: CustomProviderDraft): boolean {
   const values = (value: CustomProviderDraft) => JSON.stringify(customProviderInput(value));
   return values(draft) !== values(initial);
@@ -92,20 +78,13 @@ function blank(pair: PairItem): boolean {
   return !pair.key.trim() && !pair.value.trim();
 }
 
-/** The message of each field that has a problem, as the page shows it. An empty field has none: Add stays off. */
 export interface CustomProviderErrors {
   id?: string;
   baseUrl?: string;
-  /** The first problem of the model rows. */
   models?: string;
-  /** The first problem of the header rows. */
   headers?: string;
 }
 
-/**
- * The checks of the desktop form, with the bounds of the contract. The host checks the same rules on
- * save, so a value that passes here does not fail there.
- */
 export function customProviderErrors(
   draft: CustomProviderDraft,
   taken: readonly string[],
@@ -114,10 +93,8 @@ export function customProviderErrors(
 ): CustomProviderErrors {
   const errors: CustomProviderErrors = {};
   const id = draft.id.trim();
-  // The ID of a saved endpoint does not change, so it has no check.
   if (id && !saved) {
     if (!CUSTOM_PROVIDER_ID_PATTERN.test(id)) errors.id = t("mobile.server.customProviders.idPattern");
-    // The field stops at the length limit, so only a built-in provider name fails here.
     else if (!isNewCustomProviderId(id)) errors.id = t("mobile.server.customProviders.idBuiltIn", { id });
     else if (taken.includes(id)) errors.id = t("mobile.server.customProviders.idTaken", { id });
   }
@@ -132,7 +109,6 @@ export function customProviderErrors(
     if (!modelId) errors.models = t("mobile.server.customProviders.modelIdRequired");
     else if (modelIds.has(modelId))
       errors.models = t("mobile.server.customProviders.modelIdDuplicate", { id: modelId });
-    // The host reports the model as `<provider id>/<model id>`, and a malformed one empties the list.
     else if (!isAgentModel(composedCustomModelId(id || "custom", modelId)))
       errors.models = t("mobile.server.customProviders.modelIdInvalid");
     modelIds.add(modelId);
@@ -162,15 +138,12 @@ function baseUrlError(baseUrl: string, t: MobileText["t"]): string | undefined {
   } catch {
     return t("mobile.server.customProviders.baseUrlInvalid", { example: CUSTOM_PROVIDER_URL_EXAMPLE });
   }
-  // A model server on the host's computer has no certificate, so `http:` is the usual case.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
     return t("mobile.server.customProviders.baseUrlProtocol");
-  // The host keeps the address as plain text. Only the key and the headers are encrypted.
   if (parsed.username || parsed.password) return t("mobile.server.customProviders.baseUrlCredential");
   return undefined;
 }
 
-/** All required fields have a value, and no field has a problem. */
 export function customProviderReady(draft: CustomProviderDraft, errors: CustomProviderErrors): boolean {
   return (
     Boolean(draft.name.trim() && draft.id.trim() && draft.baseUrl.trim()) &&
@@ -182,7 +155,6 @@ export function customProviderReady(draft: CustomProviderDraft, errors: CustomPr
   );
 }
 
-/** The save payload: trimmed, without empty rows. An empty key means that the endpoint needs no key. */
 export function customProviderInput(draft: CustomProviderDraft): SaveCustomProviderInput {
   return {
     id: draft.id.trim(),
@@ -198,18 +170,10 @@ export function customProviderInput(draft: CustomProviderDraft): SaveCustomProvi
   };
 }
 
-/**
- * Whether the endpoint has a saved header of this exact name. The host takes a kept value only for
- * the same name (`mergeHeaders` in `src/main/custom-provider-store.ts`).
- */
 function savedHeader(saved: CustomProviderSummary | undefined, name: string): boolean {
   return saved?.headerNames?.includes(name) ?? false;
 }
 
-/**
- * The edit payload of a saved endpoint. An empty key keeps the saved key. An empty value of a saved
- * header is `null`, which keeps the saved value; a saved header that is not in the list is removed.
- */
 export function customProviderUpdateInput(
   draft: CustomProviderDraft,
   saved: CustomProviderSummary,

@@ -1,13 +1,3 @@
-/**
- * A provider connection that answers like the real one, for the surfaces that offer it.
- *
- * Onboarding and Settings each pass one `ProviderConnectionApi` down to their provider rows, so a
- * story that wants to show the button also has to show what pressing it does. This is that: a
- * provider that issues a code after a moment, and a fake other device that finishes a few seconds
- * later. The ending closes the dialog and raises a notification, the way the store does. It holds
- * no real code and talks to nothing.
- */
-
 import { type AgentProviderId, agentProviderDescriptor } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { ProviderCodeLoginState } from "@openbot/ui/components/ProviderCodeLoginDialog";
@@ -15,16 +5,11 @@ import { createSignal } from "solid-js";
 import type { ProviderConnectionApi, ProviderUseApp } from "../src/components/provider-connection-api";
 
 export interface FakeConnectionOptions {
-  /** Seconds the fake other device takes. 0 leaves the code on screen for as long as the story is open. */
   finishAfterMs?: number;
   userCode?: string;
-  /** The providers whose Connect opens the code, as on a server. None when not given, as on this computer. */
   connect?: readonly AgentProviderId[];
-  /** The providers whose ⋯ menu offers the code. Codex when not given. */
   alternative?: readonly AgentProviderId[];
-  /** The providers whose Connect sends the user to the app, as in a browser tab. */
   useApp?: readonly AgentProviderId[];
-  /** The browser sign-in of this computer: the Connect of every other provider. Without it they have none. */
   browser?: (provider: AgentProviderId) => void | Promise<void>;
 }
 
@@ -47,7 +32,6 @@ export function createFakeConnection(options: FakeConnectionOptions = {}): Provi
     setState({ phase: "starting" });
     timers.push(
       window.setTimeout(() => {
-        // Claude shows its code on the page after the sign-in, and the user pastes it back.
         if (next === "claude") {
           setState({
             phase: "paste",

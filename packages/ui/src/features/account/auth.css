@@ -11,7 +11,8 @@
 }
 
 .account-login-screen {
-  padding: 32px 24px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 32px 24px var(--openbot-space-4);
   background: var(--openbot-bg-canvas);
 }
 
@@ -153,7 +154,6 @@
   margin-top: 24px;
 }
 
-/* The lock line and any fine print under it read as one footer. */
 .account-login-footer {
   display: grid;
   gap: 4px;
@@ -168,7 +168,6 @@
   text-wrap: balance;
 }
 
-/* Inline, so the lock stays beside the first word when the sentence wraps. */
 .account-login-local-data svg {
   display: inline-block;
   margin-inline-end: 6px;
@@ -177,7 +176,13 @@
 
 .account-login-email-field {
   display: grid;
-  gap: 12px;
+  grid-template-rows: auto 0px;
+  transition: grid-template-rows var(--openbot-duration-fast) ease-out var(--revert-dur, 280ms);
+}
+
+.account-login-email-field.is-error {
+  grid-template-rows: auto 24px;
+  transition: grid-template-rows var(--openbot-duration-fast) ease-out;
 }
 
 .account-login-form input:not(.otp-input-native) {
@@ -210,9 +215,10 @@
 }
 
 .account-login-field-error {
+  align-self: start;
   height: 16px;
   overflow: hidden;
-  margin: -2px 0 0;
+  margin: 8px 0 0;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
   line-height: 16px;
@@ -255,10 +261,162 @@
 }
 
 .account-login-language {
-  align-self: center;
+  position: absolute;
+  top: var(--openbot-space-4);
+  inset-inline-end: var(--openbot-space-6);
   width: auto;
-  margin-top: var(--openbot-space-6);
   color: var(--openbot-text-muted);
+  -webkit-app-region: no-drag;
+}
+
+.account-login-page-footer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--openbot-space-4);
+  align-items: center;
+  margin-top: var(--openbot-space-6);
+  -webkit-app-region: no-drag;
+}
+
+.account-login-page-footer:not([data-shown]) {
+  visibility: hidden;
+}
+
+.account-login-page-footer-start {
+  display: flex;
+  min-width: 0;
+}
+
+.account-login-legal {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.account-login-legal .account-login-local-data {
+  margin: 0;
+}
+
+.account-login-quiet {
+  display: inline-flex;
+  height: var(--openbot-control-sm);
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0 var(--openbot-space-1-5);
+  margin-inline-start: calc(var(--openbot-space-1-5) * -1);
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  cursor: pointer;
+  transition: color var(--openbot-duration-hover) ease;
+}
+
+.account-login-quiet:hover,
+.account-login-quiet[data-expanded],
+.account-login-quiet[data-has-code] {
+  color: var(--openbot-text-primary);
+}
+
+.account-login-quiet:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: 0;
+}
+
+.account-login-quiet[data-has-code] {
+  animation: account-login-invite-pop 420ms var(--openbot-ease-out) both;
+}
+
+@keyframes account-login-invite-pop {
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+.account-login-invite {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.account-login-invite-code {
+  font-family: var(--openbot-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.account-login-invite-remove {
+  color: var(--openbot-text-muted);
+}
+
+.account-login-invite-popover.ui-action-menu {
+  --ui-menu-panel-shadow: inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge);
+
+  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+  width: 288px;
+  max-width: none;
+  overflow: visible;
+  padding: var(--openbot-space-1-5);
+}
+
+.account-login-invite-entry {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+.account-login-invite-field {
+  display: flex;
+  height: var(--openbot-control-md);
+  align-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding-inline-end: 3px;
+  transition: border-color var(--openbot-duration-hover) ease;
+}
+
+.account-login-invite-field:focus-within {
+  border-color: var(--openbot-border-focus);
+}
+
+.account-login-invite-field[data-invalid] {
+  border-color: var(--openbot-danger);
+}
+
+.account-login-invite-field input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-md);
+}
+
+.account-login-invite-field input::placeholder {
+  color: var(--openbot-text-placeholder);
+  font-family: var(--openbot-font-sans);
+}
+
+.account-login-invite-error {
+  margin: 0;
+  padding-inline: 2px;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-login-quiet[data-has-code] {
+    animation: none;
+  }
 }
 
 .account-login-development-code {
@@ -497,7 +655,6 @@
   transform: translateX(2px);
 }
 
-/* Right to left, the onboarding styles mirror the arrow, so the hover nudge keeps the mirror. */
 .setup-route-button:hover .setup-route-arrow:dir(rtl) {
   transform: translateX(-2px) scaleX(-1);
 }
@@ -645,7 +802,6 @@
   cursor: pointer;
 }
 
-/* The custom row follows the radio group rather than a radio, so the sibling rule cannot reach it. */
 .provider-picker-option + .provider-picker-option,
 .provider-picker-option-custom {
   border-top: 1px solid var(--openbot-border);
@@ -683,8 +839,6 @@
   accent-color: var(--openbot-text-primary);
 }
 
-/* The actions share the grid cell the row reserves for them. In this variant the buttons carry
-   their own trailing margin, which both separates them and holds the last one off the edge. */
 .provider-picker-actions {
   display: flex;
   align-items: center;
@@ -716,8 +870,6 @@
   fill: var(--openbot-provider-current);
 }
 
-/* A custom endpoint has no brand mark, so a stroke icon takes the logo column. Until an endpoint
-   exists the radio column before it stays empty, because the row can then only add. */
 .provider-picker-custom-mark {
   width: 18px;
   height: 18px;
@@ -772,15 +924,11 @@
   white-space: nowrap;
 }
 
-/* The reason a row is not ready is the sentence the user acts on, so it wraps rather than ends in an
-   ellipsis. */
 .provider-picker-status-message {
   overflow: visible;
   white-space: normal;
 }
 
-/* The agents that keep a provider on, on a line of its own below the row and in line with the name.
-   The row grows to show the whole sentence, because the user must read which agents to change. */
 .provider-picker-check-error.provider-picker-used-by {
   grid-column: 1 / -1;
   overflow: visible;
@@ -794,14 +942,12 @@
   color: var(--openbot-text-readable);
 }
 
-/* The same icon size as the other small buttons of the row. */
 .provider-picker-add-account svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The accounts of a provider, on lines of their own below its row and in line with its name. */
 .provider-picker-accounts {
   grid-column: 1 / -1;
   display: grid;
@@ -845,9 +991,6 @@
   max-width: 220px;
 }
 
-/* The version and the status badge, in the one cell the row's last column reserves. They are read
-   together - "v2.1.246" and "Ready" answer one question between them - and a shared cell keeps a
-   provider with no version to report from leaving a gap where the badge used to sit. */
 .provider-picker-state {
   min-width: 0;
   display: flex;
@@ -855,9 +998,6 @@
   gap: 8px;
 }
 
-/* The installed version. Muted, because it answers a question a user asks once and then stops
-   asking, and tabular so that a version which changes under a running update replaces itself
-   without shifting the badge beside it. */
 .provider-picker-version {
   overflow: hidden;
   color: var(--text-muted);
@@ -882,8 +1022,6 @@
   white-space: nowrap;
 }
 
-/* How many endpoints the Custom provider row stands for. It reads like a status badge, because it
-   sits in the same cell and answers the same kind of question, but it reports no state. */
 .provider-picker-custom-count {
   color: var(--text-muted);
   font-size: var(--openbot-text-sm);
@@ -891,8 +1029,6 @@
   white-space: nowrap;
 }
 
-/* The same count, as the button that opens the saved endpoints. It keeps the badge's quiet colour
-   and sits with the row's other actions, so it needs their margin and the button's own specificity. */
 .ui-button.provider-picker-custom-count {
   min-height: 28px;
   margin-inline-end: 8px;
@@ -961,8 +1097,6 @@
   line-height: 16px;
 }
 
-/* "More providers" is a button below the list, beside the hint. It uses the style of the heading's
- * Refresh button, so the picker has one kind of small list action. */
 .provider-picker-footer {
   position: relative;
   display: flex;
@@ -1010,8 +1144,6 @@
   height: 12px;
 }
 
-/* The "More providers" dialog uses the custom provider dialog frame: a title, a close button and
- * one plain list. It is pinned near the top, so it does not move when a search changes its height. */
 .custom-provider-backdrop.provider-more-backdrop {
   align-items: start;
   padding-top: min(14vh, 120px);
@@ -1051,7 +1183,6 @@
   overflow-y: auto;
 }
 
-/* The name and description that the picker rows use; the full row is the target. */
 .ui-button.provider-more-row {
   width: 100%;
   height: auto;
@@ -1212,7 +1343,6 @@
     animation: account-login-panel-back var(--openbot-duration-overlay) 32ms var(--openbot-ease-out) both;
   }
 
-  /* A right-to-left page moves forward to the left. */
   .account-login:dir(rtl)[data-transition="forward"] :is(.account-login-title, .account-login-description) {
     animation-name: account-login-copy-back;
   }
@@ -1297,9 +1427,6 @@ textarea:not(.ui-textarea):focus-visible {
   background: var(--openbot-accent-strong);
 }
 
-/* No scroll bar on either axis: the wheel, the trackpad and the keyboard still scroll. Content
- * that a mouse wheel cannot scroll sideways, such as a table or a code block, uses ScrollEdges,
- * which shows arrows on the edge with more content. */
 * {
   scrollbar-width: none;
 }
@@ -1494,7 +1621,6 @@ body,
   color: var(--openbot-warning);
 }
 
-/* Change email goes back, so its arrow follows the reading direction. */
 .account-login-code-action-change > svg[class~="lucide-arrow-left"]:dir(rtl) {
   transform: scaleX(-1);
 }

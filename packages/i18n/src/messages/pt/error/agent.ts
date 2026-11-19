@@ -129,6 +129,8 @@ export const messages = {
     "Não foi possível remover todos os dados do agente. Tente excluir o agente novamente.",
   "error.agent.deleteFolderInUse":
     "O trabalho de outro agente ainda usa a pasta deste agente. Exclua este agente de novo quando esse trabalho terminar ou depois de reiniciar o OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "O trabalho de outro agente ainda usa a pasta deste agente. O OpenBot exclui este agente quando esse trabalho terminar.",
   "error.agent.duplicationBusy": "Este agente já está sendo duplicado.",
   "error.agent.waitBeforeDuplicate": "Aguarde o agente terminar e esvaziar a fila antes de duplicá-lo.",
   "error.agent.saveOtherAgent": "Este registro salvo pertence a outro agente.",

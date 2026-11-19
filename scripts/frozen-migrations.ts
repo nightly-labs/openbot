@@ -1,18 +1,9 @@
-// The rules of `check-frozen-migrations.ts`, without git, so the fixtures can run them.
-//
-// A user who upgrades runs each migration once, on a database that has no backup. A released
-// migration that changes later gives two users of the same version two different databases. So a
-// migration file that a release tag has never changes, and a fix is a new migration.
-
 export const MIGRATIONS_DIR = "src/backend/migrations";
 
-/** The first version in the folder: databases before it are pre-registry imports, not migrations. */
 const FIRST_VERSION = 8;
-/** These change with each new migration. Every other released file is frozen. */
 const UNFROZEN_FILES: ReadonlySet<string> = new Set(["registry.ts", "migration.ts"]);
 const NOT_MIGRATIONS: ReadonlySet<string> = new Set([...UNFROZEN_FILES, "runtime-values.ts"]);
 const ALLOWED_IMPORTS: ReadonlySet<string> = new Set(["@openbot/logging", "./runtime-values"]);
-/** `migration.ts` is not frozen, so a migration takes only types from it: a value could change later. */
 const TYPE_ONLY_IMPORTS: ReadonlySet<string> = new Set(["./migration"]);
 
 const MIGRATION_FILE = /^(\d{4})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
@@ -20,7 +11,6 @@ const MIGRATION_DECLARATION = "export const migration: OpenBotMigration = {";
 
 export interface ReleasedMigrations {
   readonly tag: string;
-  /** File name to content, for each file in `MIGRATIONS_DIR` at the tag. Empty when the tag has no such folder. */
   readonly files: ReadonlyMap<string, string>;
 }
 
@@ -33,7 +23,6 @@ function declaredField(content: string, pattern: RegExp): string | undefined {
   return start === -1 ? undefined : pattern.exec(content.slice(start))?.[1];
 }
 
-/** Each problem as one line. No problems means the folder is safe to ship. */
 export function frozenMigrationProblems(current: ReadonlyMap<string, string>, released: ReleasedMigrations): string[] {
   const problems: string[] = [];
   const { tag } = released;

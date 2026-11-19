@@ -1,13 +1,3 @@
-/**
- * Reads Higgsfield's live model list (`models_explore`) into the canvas models of
- * `workflows-media-catalog-v1`, and keeps, for each model, how the host sends a request to it: the
- * roles of its input pictures, its `mode`, and the parameter names of its resolution and background.
- *
- * Only the models that make an image or a video from a description, with optional pictures, are kept.
- * A model that needs an input (a source video, one exact picture, a style id) cannot run from the
- * canvas, so it is not shown.
- */
-
 import {
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX,
@@ -17,50 +7,29 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
-/** How the host sends the pictures and the choices of a step to one Higgsfield model. */
 export interface HiggsfieldPlan {
-  /** The role of a reference picture ("image_references" or "image"), or null when it takes none. */
   referenceRole: string | null;
-  /** The most reference pictures. */
   references: number;
-  /** Whether it takes a first frame (`start_image`) and a last frame (`end_image`). */
   start: boolean;
   end: boolean;
-  /** The most pictures in all roles together. */
   total?: number;
-  /** Frames and references cannot go together. The frames are sent. */
   exclusive?: boolean;
-  /** A last frame needs a first frame. A last frame alone is not sent. */
   endNeedsStart?: boolean;
-  /** The values of the `mode` parameter: with no picture, with a frame, and with references only. */
   mode?: { text: string; frames: string | null; references: string | null };
-  /** The parameter that takes the resolution, and the value that it takes for each canvas resolution. */
   resolution?: { param: string; values: Readonly<Record<string, string>> };
-  /** How a transparent background is asked for: `background` "transparent", or `remove_bg`. */
   background?: { param: "background"; opaque: boolean } | { param: "remove_bg" };
 }
 
-/** A canvas model of the catalog with its plan, which stays on the host. */
 export interface HiggsfieldCatalogEntry {
   model: WorkflowMediaCatalogModel;
   plan: HiggsfieldPlan;
 }
 
 const IMAGE_ROLES = ["start_image", "end_image", "image_references", "image"] as const;
-/** A model that takes no reference count in its catalog entry gets this many. */
 const DEFAULT_REFERENCES = 16;
-/** A resolution option that is a size: "2k", "1.5k", "720p". */
 const SIZE_OPTION = /^\d+(?:\.\d+)?k$|^\d+p$/iu;
-/**
- * A role text that needs an exact input, such as "Exactly one image is required.". A text that
- * needs it only in another mode ("exactly one source video for edit") does not stop the model.
- */
 const NEEDS_INPUT = /exactly one(?![^.|]*\bfor (?:edit|extend)\b)/iu;
 
-/**
- * Fixed counts that the catalog text does not give in a form that can be read. The catalog values are
- * used for every other model.
- */
 const KNOWN_LIMITS: Readonly<Record<string, Partial<Pick<HiggsfieldPlan, "references" | "total">>>> = {
   gpt_image_2_6: { references: 16 },
   nano_banana_pro: { references: 14 },
@@ -81,7 +50,6 @@ export const numbers = (value: unknown): number[] =>
 const wholeNumber = (value: unknown) =>
   typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 
-/** The text of each media role, from a description such as "Media roles: a — text | b — text". */
 function roleTexts(description: string): Map<string, string> {
   const texts = new Map<string, string>();
   for (const part of description.replace(/^Media roles:\s*/iu, "").split(" | ")) {
@@ -91,23 +59,16 @@ function roleTexts(description: string): Map<string, string> {
   return texts;
 }
 
-/** The first number after "max", "at most" or "up to" in a role text. */
 function textLimit(value: string | undefined): number | null {
   const match = value ? /(?:max|at most|up to)\s+(\d+)/iu.exec(value) : null;
   return match?.[1] ? Number(match[1]) : null;
 }
 
-/** The canvas aspect ratios of a model, in the order of the canvas. */
 export function canvasAspects(value: unknown): WorkflowMediaAspect[] {
   const listed = new Set(strings(value));
   return WORKFLOW_MEDIA_ASPECTS.filter((aspect) => listed.has(aspect));
 }
 
-/**
- * The lengths that a catalog model sends: each length that the service takes, in ascending order, so
- * the canvas can ask for any of them. A list longer than the wire limit keeps the first and the last
- * length and lengths at even steps between them, so the canvas still shows Custom.
- */
 export function catalogDurations(all: readonly number[]): number[] {
   const sorted = [...new Set(all)].sort((left, right) => left - right);
   const max = WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX;
@@ -117,11 +78,9 @@ export function catalogDurations(all: readonly number[]): number[] {
   return sorted.filter((_, index) => kept.has(index));
 }
 
-/** Each whole second from `min` to `max`. */
 const range = (min: number, max: number) =>
   max >= min && max - min <= 120 ? Array.from({ length: max - min + 1 }, (_, index) => min + index) : [];
 
-/** The lengths of a video model, from its `duration` parameter or its model fields. */
 function videoDurations(item: DynamicRecord, duration: DynamicRecord | undefined): number[] {
   if (duration) {
     const options = numbers(duration.options);
@@ -139,10 +98,18 @@ function videoDurations(item: DynamicRecord, duration: DynamicRecord | undefined
   return min !== null && max !== null ? range(min, max) : [];
 }
 
-/** The canvas name of a resolution option: "2k" is "2K", "720p" stays. */
+function idName(id: string): string {
+  const words: string[] = [];
+  for (const word of id.split(/[_-]+/u).filter(Boolean)) {
+    const last = words.at(-1);
+    if (last !== undefined && /\d$/u.test(last) && /^\d+$/u.test(word)) words[words.length - 1] = `${last}.${word}`;
+    else words.push(word.charAt(0).toUpperCase() + word.slice(1));
+  }
+  return words.join(" ") || id;
+}
+
 const canvasResolution = (value: string) => value.replace(/k$/u, "K");
 
-/** The resolution parameter of a model: `resolution`, or `quality` when its options are sizes. */
 function resolutionChoice(parameters: readonly DynamicRecord[]) {
   for (const name of ["resolution", "quality"]) {
     const parameter = parameters.find((entry) => entry.name === name);
@@ -158,7 +125,6 @@ function resolutionChoice(parameters: readonly DynamicRecord[]) {
   return null;
 }
 
-/** The `mode` values of a model whose mode says whether the request has pictures. */
 function modeChoice(parameter: DynamicRecord | undefined): HiggsfieldPlan["mode"] | null {
   const options = strings(parameter?.options);
   if (options.includes("text-to-video"))
@@ -176,20 +142,15 @@ function modeChoice(parameter: DynamicRecord | undefined): HiggsfieldPlan["mode"
   return null;
 }
 
-/**
- * The catalog entry and plan of one `models_explore` item, or null when the canvas cannot run it.
- */
 export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEntry | null {
   const id = text(item.id);
   const kind: WorkflowMediaKind | null =
     item.output_type === "image" ? "image" : item.output_type === "video" ? "video" : null;
-  // "higgsfield-" and the id fit the 128 characters of a wire identifier.
   if (!/^[a-z0-9_.-]{1,117}$/iu.test(id) || !kind) return null;
   const aspects = canvasAspects(item.aspect_ratios);
   if (aspects.length === 0) return null;
   const parameters = records(item.parameters);
   const mode = modeChoice(parameters.find((entry) => entry.name === "mode"));
-  // A parameter that the canvas cannot fill, other than a mode that it sets, stops the model.
   if (parameters.some((entry) => entry.required === "required" && !(entry.name === "mode" && mode))) return null;
   const medias = records(item.medias);
   if (medias.some((media) => media.required === true)) return null;
@@ -235,7 +196,6 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
     start: roles.has("start_image") && (!mode || mode.frames !== null),
     end: roles.has("end_image") && (!mode || mode.frames !== null),
     ...(total === undefined ? {} : { total }),
-    // A model whose references are for another mode than the frames takes one or the other.
     ...(/cannot be combined with reference/iu.test(startText) ||
     (mode?.text === "text-to-video" && referenceText !== undefined && !/image-to-video/iu.test(referenceText))
       ? { exclusive: true }
@@ -252,7 +212,7 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
         }
       : {}),
   };
-  const name = text(item.name).trim().slice(0, 160) || id;
+  const name = text(item.name).trim().slice(0, 160) || idName(id);
   const maker = text(item.provider_name).trim().slice(0, 120) || "Higgsfield";
   return {
     model: {
@@ -271,10 +231,6 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
   };
 }
 
-/**
- * The plan of a model of `WORKFLOW_MEDIA_MODELS` when the live list is not available: the inputs
- * that each one takes, from Higgsfield's catalog of 2026-11-16.
- */
 const FIXED_PLANS: Readonly<Record<string, HiggsfieldPlan>> = {
   gpt_image_2_6: {
     referenceRole: "image_references",
@@ -304,7 +260,6 @@ const FIXED_PLANS: Readonly<Record<string, HiggsfieldPlan>> = {
   wan2_7: { referenceRole: null, references: 0, start: true, end: true },
 };
 
-/** The plan of a model that is not in the live list. A video takes frames; an image takes no picture. */
 export function higgsfieldFixedPlan(model: string, kind: WorkflowMediaKind): HiggsfieldPlan {
   return FIXED_PLANS[model] ?? { referenceRole: null, references: 0, start: kind === "video", end: kind === "video" };
 }

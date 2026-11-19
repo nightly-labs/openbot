@@ -14,6 +14,7 @@ export const messages = {
   "chat.activity.cookingUp": "Etwas Nützliches entsteht…",
   "chat.activity.status": "{name} arbeitet: {label}",
   "chat.activity.waitingFor": "Warte auf {provider}…",
+  "chat.activity.backgroundWork": "Warte auf Hintergrundarbeit…",
   "chat.activity.waitingStatus": "{name} wartet auf {provider}",
   "chat.activity.waitingForAnswer": "Wartet auf deine Antwort",
   "chat.activity.waitingForApproval": "Wartet auf deine Genehmigung",

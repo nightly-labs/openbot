@@ -25,7 +25,6 @@ const RULES = `# Chief
 
 const FOLDER = "/Users/alex/OpenBot/Agents/Chief";
 
-/** Calls that keep the file in memory, so Edit and Save work in the story. */
 function storyCalls(fileName: AgentInstructionFileName, text: string): AgentInstructionsCalls {
   let file: AgentInstructionsFile = { fileName, exists: text !== "", text };
   return {
@@ -41,7 +40,6 @@ function storyCalls(fileName: AgentInstructionFileName, text: string): AgentInst
 }
 
 function InstructionsStory(props: { fileName: AgentInstructionFileName; text: string; width: number }) {
-  // The file is set once; Save changes it in the calls.
   const calls = untrack(() => storyCalls(props.fileName, props.text));
   return (
     <main
@@ -70,11 +68,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The bar names the file and its folder. Under it, the rules show as formatted text. */
 export const Default: Story = {};
-/** An older workspace keeps its rules in CLAUDE.md. */
 export const ClaudeFile: Story = { args: { fileName: "CLAUDE.md" } };
-/** The workspace has no instruction file yet. Save makes AGENTS.md. */
 export const Empty: Story = { args: { text: "" } };
-/** The pane at its widest. */
 export const Wide: Story = { args: { width: 640 } };

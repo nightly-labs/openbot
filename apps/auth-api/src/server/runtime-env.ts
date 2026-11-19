@@ -1,7 +1,3 @@
-// `wrangler.jsonc` sets the four non-secret SMTP variables in the top-level `vars`, which is what
-// local `vite dev` reads, so a local run inherits four fifths of a mail configuration and
-// `readSmtpConfig` rejects it as incomplete. They are listed here so a development env file can
-// blank all five and turn email delivery off locally instead of dialling the real mail host.
 const LOCAL_RUNTIME_KEYS = [
   "AUTH_EXPOSE_DEVELOPMENT_CODE",
   "EMAIL_SMTP_HOST",
@@ -72,7 +68,6 @@ export function readLocalRuntimeVars(environment: NodeJS.ProcessEnv): Record<str
   const result: Record<string, string> = {};
   for (const key of LOCAL_RUNTIME_KEYS) {
     const value = environment[key];
-    // A development loader may leave ciphertext when a developer has no key for the shared file.
     if (value === undefined || value.startsWith("encrypted:")) continue;
     result[key] = BOOLEAN_RUNTIME_KEYS.has(key) ? (normalizeBooleanFlag(value) ? "true" : "false") : value;
   }

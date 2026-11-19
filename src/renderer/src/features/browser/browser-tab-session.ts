@@ -2,14 +2,6 @@ import type { BrowserTab } from "@openbot/contracts/ipc";
 import type { BrowserHistoryEntry } from "@openbot/ui/features/browser/browser-suggestions";
 import { createStore } from "solid-js";
 
-/**
- * What the full browser view keeps for a server while the app runs: the order of the tabs in the top
- * row, the tabs that the user closed, and the pages of this session for the address suggestions.
- *
- * Main keeps tabs in the order it made them, and the wire has no order, so the order stays here. None
- * of it goes to disk, to a log or to the host.
- */
-
 const CLOSED_LIMIT = 25;
 const HISTORY_LIMIT = 200;
 
@@ -24,9 +16,7 @@ interface TabPlacement {
 }
 
 interface TabSession {
-  /** The tab ids in the order of the top row. Ids that main does not list any more are skipped. */
   order: string[];
-  /** Where the next new tab goes. */
   pending: TabPlacement | undefined;
   closed: ClosedTab[];
   history: BrowserHistoryEntry[];
@@ -50,12 +40,10 @@ function update(serverId: string, change: (session: TabSession) => void) {
   });
 }
 
-/** Only web pages are kept: not `about:`, `data:` or the pages of the app. */
 function recordable(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
-/** The tabs in the order of the top row. A tab that is not in the order yet goes where it was placed. */
 export function orderedBrowserTabs(serverId: string, tabs: readonly BrowserTab[]): BrowserTab[] {
   const { order } = session(serverId);
   const byId = new Map(tabs.map((tab) => [tab.id, tab]));
@@ -70,10 +58,6 @@ export function orderedBrowserTabs(serverId: string, tabs: readonly BrowserTab[]
   return ordered;
 }
 
-/**
- * Takes the tabs that main lists into the order. The first new tab goes where `placeNextBrowserTab`
- * asked, others at the end. Run it each time the list changes.
- */
 export function syncBrowserTabOrder(serverId: string, tabs: readonly BrowserTab[]) {
   const current = session(serverId);
   const listed = new Set(tabs.map((tab) => tab.id));
@@ -94,14 +78,12 @@ export function syncBrowserTabOrder(serverId: string, tabs: readonly BrowserTab[
   });
 }
 
-/** The next tab that main lists goes after `afterId`, or at `index`. */
 export function placeNextBrowserTab(serverId: string, placement: TabPlacement) {
   update(serverId, (draft) => {
     draft.pending = { ...placement };
   });
 }
 
-/** Moves a tab so that it ends at `index` of `tabs`, the order on the screen. */
 export function moveBrowserTab(serverId: string, tabs: readonly BrowserTab[], tabId: string, index: number) {
   const ids = tabs.map((tab) => tab.id);
   const from = ids.indexOf(tabId);
@@ -113,7 +95,6 @@ export function moveBrowserTab(serverId: string, tabs: readonly BrowserTab[], ta
   });
 }
 
-/** Keeps a closed tab so that it can open again at its place. */
 export function rememberClosedBrowserTab(serverId: string, tab: BrowserTab, index: number) {
   if (!recordable(tab.url)) return;
   update(serverId, (draft) => {
@@ -121,7 +102,6 @@ export function rememberClosedBrowserTab(serverId: string, tab: BrowserTab, inde
   });
 }
 
-/** The last closed tab, which is then removed from the list. */
 export function takeClosedBrowserTab(serverId: string): ClosedTab | undefined {
   const [last] = session(serverId).closed;
   if (!last) return undefined;
@@ -135,11 +115,8 @@ export function canReopenBrowserTab(serverId: string): boolean {
   return session(serverId).closed.length > 0;
 }
 
-/** Records a page that a tab shows. A second visit moves the page to the top. */
-/** The page that each tab showed last, for each server. The full view mounts again, so it is kept here. */
 const shownPages = new Map<string, Map<string, { url: string; title: string }>>();
 
-/** A tab that shows a new address is a visit. A new title for the same address only names the page. */
 export function recordBrowserPages(serverId: string, pages: readonly { tabId: string; url: string; title: string }[]) {
   const seen = shownPages.get(serverId) ?? new Map<string, { url: string; title: string }>();
   shownPages.set(serverId, seen);
@@ -162,7 +139,6 @@ function recordBrowserVisit(serverId: string, url: string, title: string) {
   });
 }
 
-/** Updates the title of a page that is in the history, without a new visit. */
 function recordBrowserTitle(serverId: string, url: string, title: string) {
   if (!title || !session(serverId).history.some((entry) => entry.url === url && entry.title !== title)) return;
   update(serverId, (draft) => {

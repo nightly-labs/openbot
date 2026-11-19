@@ -1,14 +1,3 @@
-/**
- * The infinite canvas a diagram is drawn on. Drag the background or scroll to move it; pinch, or
- * hold Command or Ctrl and scroll, to zoom around the pointer. Drag a card to move it, and drag
- * from a card's output port to another card's input port to connect them. Each port is also a
- * button, so a click on an output port and then on an input port connects them from the keyboard.
- * While a connection is in progress, each input port shows whether it accepts it.
- *
- * The board owns only the camera and the gesture in progress. The diagram itself is a prop, and
- * every edit goes out through a callback, so the caller decides what an edit does.
- */
-
 import { Button, ContextMenu, Minus, Plus, Scan } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -43,9 +32,7 @@ const ZOOM_STEP = 1.2;
 const WHEEL_ZOOM_RATE = 0.01;
 const KEY_STEP = 48;
 const FIT_MARGIN = 64;
-/** A press that moves less than this is a click, not a drag. */
 const DRAG_THRESHOLD = 4;
-/** Cards land on this grid, so a row of them lines up without effort. */
 const SNAP = 8;
 const GRID = 24;
 
@@ -62,9 +49,7 @@ type Gesture =
   | { kind: "connect"; from: string; start: DiagramPoint; moved: boolean };
 
 interface BoardInteraction {
-  /** The output a connection starts from, while one is in progress. */
   source: string | null;
-  /** The pointer, in canvas coordinates, while a connection is dragged. */
   pointer: DiagramPoint | null;
   hoverTarget: string | null;
   selectedEdgeId: string | null;
@@ -77,33 +62,22 @@ export interface DiagramBoardProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
-  /**
-   * The routine whose path and last run the canvas shows. The rest of the diagram dims. Null shows
-   * every routine's path, with no run.
-   */
   focusRoutineId: string | null;
   editable?: boolean | undefined;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
-  /** Answers whether the connection was saved; the canvas says it is connected only then. */
   onConnect: (from: string, to: string) => boolean | Promise<boolean>;
   onRemoveEdge: (edgeId: string) => void;
   onRemoveNode: (nodeId: string) => void;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
-  /** Whether a new connection may start now. Defaults to `editable`. */
   connectable?: boolean;
-  /** Whether a node or a connection may be removed. Everything may, when absent. */
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
-  /** Agents the right-click menu offers to place where the user clicked. With it, the canvas has that menu. */
   addableAgents?: readonly AgentProfile[] | undefined;
   onPlaceAgent?: ((agentId: string, position: DiagramPoint) => void) | undefined;
-  /** Creates an agent and places it. With it, the menu also offers a new agent. */
   onCreateAgent?: ((draft: DiagramNewAgentDraft, position: DiagramPoint) => Promise<void>) | undefined;
-  /** The models a new agent may run on. Without it, the host picks the model. */
   newAgentModels?: DiagramModelChoice | undefined;
-  /** Panels that float over the canvas, such as the assistant. */
   children?: JSX.Element;
 }
 
@@ -125,13 +99,11 @@ export function DiagramBoard(props: DiagramBoardProps) {
   });
   let viewport: HTMLDivElement | undefined;
   let gesture: Gesture | undefined;
-  /** The click that ends a drag must not also select or connect. */
   let suppressClick = false;
   let cameraMoved = false;
 
   const nodeById = createMemo(() => new Map(props.diagram.nodes.map((node) => [node.id, node])));
   const agentById = createMemo(() => new Map(props.agents.map((agent) => [agent.id, agent])));
-  /** Every node some routine reaches. The rest are not connected and never run. */
   const reachable = createMemo(() => diagramExecutionSteps(props.diagram.nodes, props.diagram.edges));
   const focusSteps = createMemo(() =>
     props.focusRoutineId ? diagramRoutineSteps(props.diagram.edges, props.focusRoutineId) : null,
@@ -140,12 +112,10 @@ export function DiagramBoard(props: DiagramBoardProps) {
   const stepRuns = createMemo(
     () => new Map((diagramRunOf(props.diagram, props.focusRoutineId)?.steps ?? []).map((step) => [step.nodeId, step])),
   );
-  /** True for a node outside the focused routine's path. */
   const dimmed = (nodeId: string) => {
     const focus = props.focusRoutineId;
     return focus !== null && nodeId !== focus && !focusSteps()?.has(nodeId);
   };
-  /** With one routine there is nothing to tell apart, so agent cards name routines only from two. */
   const routineCount = createMemo(() => props.diagram.nodes.filter((node) => node.kind === "routine").length);
   const routineChips = (nodeId: string) =>
     routineCount() < 2
@@ -175,7 +145,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
     x: Math.round(point.x / SNAP) * SNAP,
     y: Math.round(point.y / SNAP) * SNAP,
   });
-  /** Where the canvas was right-clicked, on screen and in the diagram; the menu adds an agent there. */
   let menuPoint: { screen: DiagramPoint; world: DiagramPoint } | null = null;
   const [newAgentAt, setNewAgentAt] = createSignal<{ screen: DiagramPoint; world: DiagramPoint } | null>(null);
   const canAddAgents = () => editable() && Boolean(props.onPlaceAgent);
@@ -186,7 +155,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
       state.x = next.x;
       state.y = next.y;
       state.scale = clampScale(next.scale);
-      // Buttons and keys glide to the new view; a drag, a scroll or a pinch follows at once.
       state.settling = animate && !prefersReducedMotion();
     });
   };
@@ -233,7 +201,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
       state.pointer = null;
       state.hoverTarget = null;
     });
-  /** A connection drawn while a routine is in focus joins that routine, so only its edges count. */
   const problemFor = (from: string, to: string) => {
     const focus = props.focusRoutineId;
     const edges = focus ? props.diagram.edges.filter((edge) => diagramEdgeCarries(edge, focus)) : props.diagram.edges;
@@ -246,7 +213,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
   };
   const tryConnect = (from: string, to: string) => {
     cancelConnection();
-    // A connection started on a card that has since been removed has nothing to start from.
     if (!nodeById().has(from) || !nodeById().has(to)) return;
     const problem = problemFor(from, to);
     if (problem) {
@@ -287,13 +253,11 @@ export function DiagramBoard(props: DiagramBoardProps) {
   onSettled(() => {
     const area = viewport;
     if (!area) return;
-    // The diagram stays fitted to the area while it resizes, until the user moves the camera.
     const onResize = new ResizeObserver(() => {
       if (!cameraMoved && area.clientWidth) fitView(false);
     });
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      // A trackpad pinch arrives as a wheel event with Ctrl held.
       if (event.ctrlKey || event.metaKey) {
         moveCamera(zoomAround(camera.scale * Math.exp(-event.deltaY * WHEEL_ZOOM_RATE), local(event)), false);
         return;
@@ -349,7 +313,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
           suppressClick = false;
         });
       }
-      // A press on a card that did not move it selects the card, wherever on the card it landed.
       if (current.kind === "node" && !current.moved) {
         setInteraction((state) => {
           state.selectedEdgeId = null;
@@ -433,7 +396,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
 
   return (
     <div class="diagram-board">
-      {/* A right-click anywhere on the canvas opens the menu that adds an agent at that spot. */}
       <ContextMenu.Root>
         <ContextMenu.Trigger
           as="div"
@@ -442,8 +404,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
           onContextMenu={(event: MouseEvent) => {
             const screen = local(event);
             menuPoint = { screen, world: toWorld(screen) };
-            // The menu gives focus back to what had it when it opened. The canvas lets it go, so a
-            // new agent's card keeps the focus it takes; placing an agent focuses the canvas itself.
             if (document.activeElement instanceof HTMLElement && viewport?.contains(document.activeElement))
               document.activeElement.blur();
           }}
@@ -458,7 +418,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
             }}
             data-connecting={interaction.source ? "" : undefined}
             data-dragging={interaction.dragging ? "" : undefined}
-            // The canvas takes the arrow keys, so a screen reader passes them through to it.
             role="application"
             aria-label={t("diagram.board.label", { name: props.diagram.name })}
             tabindex="0"
@@ -500,7 +459,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
                           const to = nodeById().get(current().to);
                           return from && to ? { from: diagramOutputPort(from), to: diagramInputPort(to) } : undefined;
                         };
-                        // The hit area runs on to the port, so the arrow can be pointed at like the line.
                         const hit = () => {
                           const ends = ports();
                           return ends ? diagramEdgePath(ends.from, ends.to) : "";
@@ -545,8 +503,6 @@ export function DiagramBoard(props: DiagramBoardProps) {
                 </Show>
               </svg>
 
-              {/* An edge is a thin line, so the button that selects it sits on its midpoint, where a
-              pointer and the keyboard can both reach it. */}
               <For each={props.diagram.edges}>
                 {(edge) => {
                   const ends = () => {

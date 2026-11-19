@@ -8,11 +8,9 @@ const options = [...CHAT_BUBBLE_STYLES];
 export interface ChatBubbleStyleSelectProps {
   value: ChatBubbleStyle;
   onChange: (value: ChatBubbleStyle) => void;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/** The "Your bubbles" row control in Settings › Appearance, on the desktop and in the web client. */
 export function ChatBubbleStyleSelect(props: ChatBubbleStyleSelectProps): JSX.Element {
   const { t } = useText();
   return (

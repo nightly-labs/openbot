@@ -1,11 +1,3 @@
-/**
- * One section - the unassigned one included. A custom section is a folder: it stays visible while
- * empty so it can be dropped into, and it shows its chats first, then the folders in it.
- *
- * The unassigned section keeps its heading only once a custom section exists. Before that it is the
- * whole list, and "Unassigned" names it against nothing.
- */
-
 import { SIDEBAR_UNASSIGNED_SECTION_ID } from "@openbot/contracts/ipc";
 import { For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
@@ -34,10 +26,6 @@ export function SidebarAgentSection(sectionProps: { sectionId: string; depth: nu
   const children = () => (custom() ? sectionChildren(sectionId()) : []);
   const name = () =>
     sectionId() === SIDEBAR_UNASSIGNED_SECTION_ID ? t("sidebar.section.unassigned") : (custom()?.name ?? "");
-  /**
-   * While a filter is set, a folder that shows only for a folder in it has no header: the header of
-   * the inner folder names the chats. It does not collapse then, because nothing could open it.
-   */
   const headed = () =>
     (Boolean(custom()) || props.layout.sections.length > 0) && !(listFiltered() && custom() && chats().length === 0);
   const collapsed = () => headed() && sectionIsCollapsed(sectionId());

@@ -10,13 +10,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * The server personality: how the server's agents talk while they work. The prompt of each agent and
- * the chat of each client follow it.
- *
- * A file that is missing, unreadable as JSON, or names an unknown style reads as the default,
- * `natural`. Writes are chained for the reason `update-preference-store.ts` chains its own.
- */
 export class ServerPersonalityPreferenceStore {
   readonly #path: string;
   #responseStyle: ResponseStyle = DEFAULT_RESPONSE_STYLE;
@@ -52,13 +45,11 @@ export class ServerPersonalityPreferenceStore {
     return this.#responseStyle;
   }
 
-  /** Calls `listener` after each saved change. Returns the function that removes it. */
   onChange(listener: (personality: HostPersonality) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
 
-  /** The caller reads the value with `parseServerPersonality` first. */
   readonly set = Effect.fn("ServerPersonalityPreference.set")((personality: HostPersonality) =>
     this.#writes.withPermit(
       Effect.uninterruptible(

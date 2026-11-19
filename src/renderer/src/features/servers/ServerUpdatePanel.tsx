@@ -32,7 +32,6 @@ import { createEffect, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { openServerUpdate, serverUpdateStatus } from "./server-update-flow";
 
-/** The update calls of one server's host. The desktop reaches them through main. */
 export type HostUpdateCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getUpdateStatus" | "checkForUpdate" | "startUpdate" | "cancelUpdate" | "setUpdateSettings"
@@ -40,22 +39,13 @@ export type HostUpdateCalls = Pick<
   Partial<Pick<OpenBotDesktopApi["hostAdmin"], "getReleaseStatus" | "checkRelease">>;
 
 export interface ServerUpdateOptions {
-  /** Only administrators can change preferences, cancel, or force a restart. */
   canManage?: boolean;
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostUpdateCalls;
 }
 
-/** How often the status is read again while the host checks, downloads or waits to restart. */
 const POLL_MS = 1000;
-/** The wait after a read failed, so a host that restarts is not asked every second. */
 const RETRY_MS = 5000;
 
-/**
- * Server Settings > Updates: the OpenBot update of a joined server's host (`host-update-v1`). The
- * host sends no progress event, so the panel reads the status again while something runs there.
- * The host checks permissions again on every call.
- */
 export function ServerUpdatePanel(
   props: ServerUpdateOptions & { serverId: string; hostName: string; actionsAvailable: boolean },
 ) {
@@ -66,7 +56,6 @@ export function ServerUpdatePanel(
   const [loadError, setLoadError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal<string | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Bumped for each server and on unmount, so an answer for an earlier one is dropped. */
   let generation = 0;
   let revision = 0;
 
@@ -115,7 +104,6 @@ export function ServerUpdatePanel(
       void untrack(read);
     },
   );
-  // The update dialog reads the status while the update runs; the panel shows the same one.
   createEffect(
     () => serverUpdateStatus(props.serverId),
     (next) => {
@@ -152,7 +140,6 @@ export function ServerUpdatePanel(
 
   const changeSettings = (settings: HostUpdateSettingsChange) =>
     act("settings", (serverId) => calls().setUpdateSettings(settings, serverId));
-  // The update dialog starts the update and follows it after Server Settings closes.
   const openUpdate = (current: HostUpdateStatus) =>
     openServerUpdate(
       { serverId: props.serverId, name: props.hostName, canManage: props.canManage !== false, calls: calls() },
@@ -280,7 +267,6 @@ export function ServerUpdatePanel(
                       <Button
                         type="button"
                         size="sm"
-                        // Only a relaunch of the host recovers from a failed install.
                         disabled={disabled() || !current().availableVersion || current().errorCode === "install_failed"}
                         onClick={() => openUpdate(current())}
                       >
@@ -364,7 +350,6 @@ export function ServerUpdatePanel(
   );
 }
 
-/** Why no action can run: the host user turned it off, a Host Manager owns updates, or no updater. */
 function BlockedNotice(props: { status: HostUpdateStatus; release: HostReleaseStatus | null; hostName: string }) {
   const { t } = useText();
   const notice = (): { title: string; description: string } | null => {

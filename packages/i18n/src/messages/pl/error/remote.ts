@@ -189,6 +189,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Nie udało się nawiązać bezpośredniego połączenia z hostem. Może je blokować zapora, VPN lub serwer proxy.",
   "error.remote.iceDisconnected": "Bezpośrednie połączenie z hostem zostało utracone.",
+  "error.remote.webrtcBlocked":
+    "To urządzenie blokuje połączenie, którego potrzebuje OpenBot. Jeśli tryb blokady jest włączony, wyłącz go dla OpenBot w Ustawienia > Prywatność i ochrona > Tryb blokady.",
   "error.remote.directoryUnreachable": "OpenBot nie mógł połączyć się z usługą OpenBot. Sprawdź połączenie.",
   "error.remote.directoryTimeout": "Usługa OpenBot nie odpowiedziała na czas. Spróbuj ponownie.",
   "error.remote.inviteAlreadyUsed": "To zaproszenie zostało już użyte. Poproś o nowe zaproszenie.",

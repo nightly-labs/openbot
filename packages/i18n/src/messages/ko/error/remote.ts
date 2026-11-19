@@ -186,6 +186,8 @@ export const messages = {
     "Signal이 이 연결에 사용할 릴레이 서버를 보내지 않았어요. 나중에 다시 시도해 주세요.",
   "error.remote.iceFailed": "호스트에 직접 연결할 수 없어요. 방화벽, VPN 또는 프록시가 연결을 막고 있을 수 있어요.",
   "error.remote.iceDisconnected": "호스트와의 직접 연결이 끊어졌어요.",
+  "error.remote.webrtcBlocked":
+    "이 기기가 OpenBot에 필요한 연결을 차단합니다. 차단 모드가 켜져 있으면 설정 > 개인정보 보호 및 보안 > 차단 모드에서 OpenBot에 대해 끄세요.",
   "error.remote.directoryUnreachable": "OpenBot이 OpenBot 서비스에 연결할 수 없어요. 연결 상태를 확인해 주세요.",
   "error.remote.directoryTimeout": "OpenBot 서비스가 제때 응답하지 않았어요. 다시 시도해 주세요.",
   "error.remote.inviteAlreadyUsed": "이미 사용된 초대예요. 새 초대를 요청해 주세요.",

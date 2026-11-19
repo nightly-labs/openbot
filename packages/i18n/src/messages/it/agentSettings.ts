@@ -203,6 +203,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Usa Chiedi prima",
 
   "agentSettings.links.usage": "Utilizzo",
+  "agentSettings.links.apps": "App",
+  "agentSettings.links.appsScope": "Tutti gli agenti",
   "agentSettings.links.memories": "Memorie",
   "agentSettings.links.memoriesCount": { one: "{count} salvata", other: "{count} salvate" },
   "agentSettings.links.skills": "Skill",

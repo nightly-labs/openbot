@@ -1,12 +1,3 @@
-// Checks a channel request that stops because the channel has no lead, in this worktree's running
-// dev app with real provider turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-lead-required-e2e.ts --allow-mutations`. It needs two visible agents whose
-// provider is signed in.
-//
-// It checks that a request in a channel of two members and no lead stops with the lead reason and
-// no owner, that a save that sets a lead starts it again with no Continue, that the lead routes it,
-// and that the member which does the work is told the lead's id. It makes its own channel and
-// deletes it. Writes .openbot-build/channel-lead-required-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type { ChannelPage, ChannelTask } from "@openbot/contracts/ipc";
@@ -38,7 +29,6 @@ try {
   const [lead, other] = agents;
   assert.ok(lead && other);
 
-  // 1. No lead and two members: routing has no model to ask, so the request stops with no owner.
   const channel = await client.create("E2E no lead", [lead.id, other.id], null);
   await client.send(channel.id, PROMPT, null);
   const stoppedPage = await waitFor(
@@ -53,7 +43,6 @@ try {
   assert.equal(stopped.ownerAgentId, null);
   assert.equal(stopped.error, sourceText("error.backend.channelLeadRequired"));
 
-  // 2. The save that sets a lead starts the request again; the script never sends Continue.
   await client.command({
     type: "save",
     operationId: crypto.randomUUID(),
@@ -78,8 +67,6 @@ try {
   report.afterLead = { ownerAgentId: routedTask.ownerAgentId, state: routedTask.state };
   assert.notEqual(routedTask.state, "paused", "The request stayed stopped after the lead was set.");
 
-  // 3. The owner reads the lead's id from its packet. Its answer is an assistant message; the lead's
-  // routing receipt is a system row, so it cannot pass for the answer.
   const owner = routedTask.ownerAgentId;
   const answered = await waitFor(
     page,

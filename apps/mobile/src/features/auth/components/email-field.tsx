@@ -17,12 +17,11 @@ interface EmailFieldProps {
   invalid: boolean;
   rejection: number;
   editable: boolean;
-  /** The field stays mounted and only shows or hides, so focus never waits for a mount. */
   visible: boolean;
   reduced: boolean;
+  kind?: "email" | "invite";
 }
 
-/** The email field of the email step. A lavender ring marks focus; a red ring marks an error. */
 export function EmailField({
   ref,
   value,
@@ -35,12 +34,13 @@ export function EmailField({
   editable,
   visible,
   reduced,
+  kind = "email",
 }: EmailFieldProps) {
+  const email = kind === "email";
   const colors = useSignInColors();
   const [focused, setFocused] = useState(false);
   const shake = useShake(rejection, reduced);
   return (
-    // The field comes down 8 pt into the top slot when the buttons below it are done.
     <Animated.View
       pointerEvents={visible ? "auto" : "none"}
       accessibilityElementsHidden={!visible}
@@ -75,15 +75,15 @@ export function EmailField({
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           accessibilityLabel={label}
-          keyboardType="email-address"
+          keyboardType={email ? "email-address" : "url"}
           autoCapitalize="none"
-          autoComplete="email"
-          textContentType="emailAddress"
+          autoComplete={email ? "email" : "off"}
+          textContentType={email ? "emailAddress" : "none"}
           autoCorrect={false}
           spellCheck={false}
           returnKeyType="send"
           submitBehavior="submit"
-          maxLength={INPUT_LIMITS.email}
+          maxLength={email ? INPUT_LIMITS.email : INPUT_LIMITS.inviteUrl}
           {...selectionColorProps(colors.brand)}
           className="flex-1 px-4 font-sans text-[17px]"
           style={{ color: colors.text }}

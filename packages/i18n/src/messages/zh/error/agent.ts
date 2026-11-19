@@ -24,7 +24,6 @@ export const messages = {
   "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",
   "error.agent.routineScheduleArgumentsInvalid":
     "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
   "error.agent.duplicateCleanupFailed": "助手复制失败，且无法移除不完整的副本。",
@@ -109,6 +108,7 @@ export const messages = {
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",
@@ -116,7 +116,6 @@ export const messages = {
   "error.agent.storedProfileUnreadable": "某个已保存的助手资料中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
   "error.agent.storedProfileUnreadableId":
     "已保存的助手资料 {id} 中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "队列编辑被拒绝：{reason}",
   "error.agent.computerUseLocalOnly": "Computer Use 只能在运行该助手的电脑上更改。",
   "error.agent.automationLocalOnly": "本地脚本只能在运行该助手的电脑上允许。",

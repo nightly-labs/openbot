@@ -32,7 +32,6 @@ if (command === "list") {
           .trim()
       : undefined;
   if (command === "reject" && !note) throw new Error("Rejecting an agent requires --note <reason>.");
-  // The card belongs to the listing's approved version, so it needs the agent id of this version.
   const agentId = command === "approve" ? await submissionAgentId(targetId) : null;
   const response = await fetch(
     new URL(`/v1/marketplace/agents/admin/submissions/${encodeURIComponent(targetId)}`, apiUrl),
@@ -59,7 +58,6 @@ if (command === "list") {
   );
   if (!response.ok) throw new Error(await response.text());
   process.stdout.write(`${rest[0] === "on" ? "Verified" : "Unverified"} ${targetId}.\n`);
-  // The card shows the shield after the name.
   await refreshCardAfterReview(api, "agent", targetId);
 } else if (command === "card" && targetId) {
   await runCardCommand(api, "agent", [targetId], outDirectoryArgument(rest));

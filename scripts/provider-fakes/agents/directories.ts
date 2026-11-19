@@ -1,6 +1,3 @@
-// The agents of `acp-additional-directories-e2e.ts`. `FAKE_MODE` picks one: "strict-resume" and
-// "strict-load" refuse `additionalDirectories` as Grok 1.0.60 does and resume with `session/resume`
-// or `session/load`; "wide" advertises the field and takes it.
 import { type AcpHandler, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const mode = process.env.FAKE_MODE;
@@ -9,7 +6,6 @@ let sessions = 0;
 const session: AcpHandler = (request, peer) => {
   const directories = request.params.additionalDirectories;
   logEntry({ method: request.method, cwd: request.params.cwd, additionalDirectories: directories ?? null });
-  // Grok 1.0.60's answer to a field it does not advertise.
   if (mode !== "wide" && directories?.length) {
     peer.fail(request, {
       code: -32602,

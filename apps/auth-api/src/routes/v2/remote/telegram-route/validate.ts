@@ -29,8 +29,6 @@ const telegramRouteSchema = z.object({
     .max(TELEGRAM_ROUTE_CHATS_LIMIT),
 });
 
-// Signal asks this while it starts: it lost the revocations it had in memory, so it accepts from a
-// route ticket only the chats that D1 still links to that host with the same link.
 export const Route = createFileRoute("/v2/remote/telegram-route/validate")({
   server: {
     handlers: {

@@ -1,22 +1,16 @@
-import type { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Publishing a local directory to a hosted site, and the sites of one server.
-//
-// Publishing is local: agents publish from the computer that runs them. The list and the delete are
-// server-scoped. A joined server answers through `hosted-sites-v1`: every member can list, and the host
-// answers a delete only for an owner or admin.
-
 import { parseHostedSiteList } from "@openbot/contracts/hosted-sites";
 import type { HostedSiteList } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOSTED_SITES_CAPABILITY, HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import { parseDeleteHostedSite, parsePublishHostedSite, parseReplaceHostedSite } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -50,7 +44,6 @@ export function hostedSiteIpcHandlers({
   getMainWindow,
   translate,
 }: HostedSiteIpcDependencies): Pick<IpcGroupHandlers, "hostedSites"> {
-  /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
     if (!remoteServers.supportsCapability(serverId, HOSTED_SITES_CAPABILITY))
       throw new Error(sourceText("error.team.hostedSitesUnsupported"));

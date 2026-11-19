@@ -193,6 +193,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Es konnte keine direkte Verbindung zum Host hergestellt werden. Eine Firewall, ein VPN oder ein Proxy kann sie blockieren.",
   "error.remote.iceDisconnected": "Die direkte Verbindung zum Host wurde unterbrochen.",
+  "error.remote.webrtcBlocked":
+    "Dieses Gerät blockiert die Verbindung, die OpenBot braucht. Wenn der Blockierungsmodus aktiv ist, schalte ihn für OpenBot aus unter Einstellungen > Datenschutz & Sicherheit > Blockierungsmodus.",
   "error.remote.directoryUnreachable": "OpenBot konnte den OpenBot-Dienst nicht erreichen. Prüfe deine Verbindung.",
   "error.remote.directoryTimeout": "Der OpenBot-Dienst hat nicht rechtzeitig geantwortet. Versuche es erneut.",
   "error.remote.inviteAlreadyUsed": "Diese Einladung wurde bereits verwendet. Bitte um eine neue Einladung.",

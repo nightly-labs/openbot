@@ -13,15 +13,12 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
 import type { ComposerContextMeter } from "./composer-context-ring";
 
-/** The chat whose context a meter shows: the agent's own chat, or one of its side threads. */
 export interface ContextChat {
   serverId: string;
   agentId: string;
-  /** For a side thread, the task and the provider thread that the host keys its state by. */
   task?: { taskId: string; threadId: string | null };
 }
 
-/** How full the chat's context is, while its server is online and reports it. */
 export function useContextUsage(chat: ContextChat): ContextUsageView | undefined {
   const { serverId, agentId } = chat;
   const threadId = chat.task ? chat.task.threadId : undefined;
@@ -38,7 +35,6 @@ export function useContextUsage(chat: ContextChat): ContextUsageView | undefined
   return useMemo(() => contextUsageView(state), [state]);
 }
 
-/** The composer's ring for the chat, which opens the context sheet. Undefined while there is no usage. */
 export function useComposerContextMeter(chat: ContextChat): ComposerContextMeter | undefined {
   const { t, format } = useText();
   const usage = useContextUsage(chat);

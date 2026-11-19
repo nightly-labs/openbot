@@ -3,6 +3,7 @@ import { expandChatTagReferences } from "../chat-tag-references";
 import { type AgentEvent, isAgentEvent } from "../ipc-agent-events";
 import { isTeamRealtimeEvent, type TeamRealtimeEvent } from "../ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { withRuntimeSnapshotBackgroundWork } from "./agent-background-work-v1";
 import { withEventAgentPendingRuntimes } from "./agent-pending-runtime-v1";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { restoreBrowserTakeoverReason } from "./browser-sign-in-v1";
@@ -38,7 +39,6 @@ export type TeamProtocolV8BaseCurrentEventDecodeResult =
 
 export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtocolV8BaseCurrentEventDecodeResult {
   if (isDynamicRecord(value) && value.type === "turn-progress") {
-    // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
     const wireValue: TeamProtocolV8BaseJsonValue = JSON.parse(JSON.stringify(value));
     const current = toCurrentAgentKeys(wireValue);
     return isAgentEvent(current) ? { kind: "known", event: current } : { kind: "invalid", type: value.type };
@@ -55,7 +55,10 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
             restoreBrowserSecretMetadata(
               toCurrentAgentKeys(
                 withEventAgentPendingRuntimes(
-                  withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                  withUsageEventTertiary(
+                    withRuntimeSnapshotBackgroundWork(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                    value,
+                  ),
                   value,
                 ),
               ),
@@ -66,12 +69,6 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
           value,
         ),
         value,
-        // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // video request only under video-generation-v1, memory changes only under memory-changes-v1,
-        // a multi-select flag only under prompt-multi-select-v1, a takeover reason only under
-        // browser-sign-in, a vault skip reason only under browser-vault-skip-v1, context states only
-        // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending
-        // runtime only under agent-pending-runtime-v1, so a present one is always kept.
         value,
         value,
         value,
@@ -99,12 +96,12 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     contextUsage?: boolean;
+    backgroundWork?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
   } = {},
 ): string | null {
-  // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
   const eventValue: TeamProtocolV8BaseJsonValue = JSON.parse(JSON.stringify(event));
   const currentValue =
@@ -118,6 +115,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const encoded = encodeTeamProtocolV8BaseEvent(decoded.event);
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   const contextUsage = options.contextUsage === true && event.type === "runtime-snapshot";
+  const backgroundWork = options.backgroundWork === true && event.type === "runtime-snapshot";
   const usageTertiary = options.usageTertiary === true && event.type === "usage-changed";
   const pendingRuntime = options.agentPendingRuntime === true && event.type === "agents-changed";
   if (
@@ -128,12 +126,11 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
       !eventConversationKey(event.type) &&
       !promptMultiSelect &&
       !contextUsage &&
+      !backgroundWork &&
       !usageTertiary &&
       !pendingRuntime)
   )
     return encoded;
-  // The block, the subagents and the video request go as written: the key swap would rename a
-  // response value under a field id such as `agentId`.
   const withPlans = withEventConversationPlans(
     JSON.parse(encoded),
     wireValue,
@@ -146,21 +143,14 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const withContext = contextUsage
     ? withRuntimeSnapshotContextUsage(withMultiSelect, wireValue, true)
     : withMultiSelect;
-  const withUsage = usageTertiary ? withUsageEventTertiary(withContext, wireValue, true) : withContext;
+  const withWork = backgroundWork ? withRuntimeSnapshotBackgroundWork(withContext, wireValue, true) : withContext;
+  const withUsage = usageTertiary ? withUsageEventTertiary(withWork, wireValue, true) : withWork;
   const output = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;
   return JSON.stringify(options.browserVaultSkip ? restoreBrowserVaultSkip(withReason, wireValue) : withReason);
 }
 
-/**
- * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
- * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
- * the video requests of `videoSource` when it is not null, and the memory changes of `memorySource`
- * when it is not null. See `withConversationPlans`,
- * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
- * `withConversationVideoGeneration` and `withConversationMemoryChanges`.
- */
 function withEventConversationPlans(
   projected: TeamProtocolV8BaseJsonValue,
   source: unknown,
@@ -223,7 +213,6 @@ export function encodeTeamProtocolV8BaseCurrentHttpResponse(
   const responseValue: TeamProtocolV8BaseJsonValue = JSON.parse(JSON.stringify(value));
   const currentValue =
     status < 400 && isAgentStatusRoute(method, path) ? withProviderDisplayNames(responseValue) : responseValue;
-  // The installed-skills route bypasses the frozen codec, so it needs the vocabulary swap by hand.
   const wireValue = toWireAgentKeysForRequestPath(path, currentValue);
   if (status < 400 && isInstalledSkillsRoute(method, path)) return JSON.stringify(wireValue);
   const downconvertedValue = options.preserveSemanticTags ? wireValue : downconvertCurrentTags(wireValue);
@@ -261,10 +250,6 @@ function isAgentStatusRoute(method: string, path: string): boolean {
   return method === "GET" && new URL(path, "http://openbot.invalid").pathname === "/v1/agents/status";
 }
 
-/**
- * The host names each provider of its status, so a client that does not know a provider id can still
- * show it. A name that the status already has stays.
- */
 function withProviderDisplayNames(status: TeamProtocolV8BaseJsonValue): TeamProtocolV8BaseJsonValue {
   if (!isDynamicRecord(status) || !Array.isArray(status.providers)) return status;
   return {

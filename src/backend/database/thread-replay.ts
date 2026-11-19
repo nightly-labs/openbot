@@ -19,16 +19,6 @@ export interface ThreadReplayOptions {
   conversations: ConversationQueries;
 }
 
-/**
- * Rebuilds a thread's projections by replaying its orchestration events from the start.
- *
- * Owns the recovery path taken when a projection is missing or stale: messages, turns, provider
- * session links, summaries and attachment projections are all reconstructed from the event log,
- * then read back through the conversation queries. This is the one place that opens an
- * unconditional transaction of its own, because the replay must be all-or-nothing and the
- * dispatches nested inside it must join it rather than commit piecemeal. The class never imports
- * the facade.
- */
 export class ThreadReplay {
   readonly #core: DatabaseCore;
   readonly #conversations: ConversationQueries;
@@ -101,7 +91,6 @@ export class ThreadReplay {
     const latest = fold.latest;
     const latestSequence = fold.latestSequence;
     if (!latest) throw new Error(`Thread ${threadId} has no conversation events to replay.`);
-    // An event from before a delete can still name the message. The record of the delete wins.
     latest.messages = withoutDeletedMessages(db, threadId, latest.messages);
 
     withTransaction(db, () => {
@@ -174,8 +163,6 @@ export class ThreadReplay {
         messages.push(message);
         messagesByTurn.set(message.turnId, messages);
       }
-      // A branch keeps the turn ids of the rows it copied, and the turn row stays with the source
-      // thread: a turn id is unique across threads. The replay of a branch writes no row for them.
       const turnInsert = db.prepare(`
         INSERT INTO projection_turns (
           turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence

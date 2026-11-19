@@ -1,5 +1,3 @@
-# Rotates the container logs of the OpenBot instances. openbot-logrotate.timer starts it.
-# `openbot-instance setup` installs it. See docs/docker.md#logs.
 [Unit]
 Description=Rotate the container logs of the OpenBot instances
 

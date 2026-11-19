@@ -249,6 +249,20 @@ export const messages = {
   "mobile.chat.header.actionsNeeded": "Erforderliche Aktionen",
   "mobile.chat.header.more": "Mehr",
   "mobile.chat.header.moreAttention": "Mehr, Aktionen erforderlich",
+  "mobile.chat.sideQuestion.title": "Nebenfrage",
+  "mobile.chat.sideQuestion.placeholder": "Nebenfrage stellen",
+  "mobile.chat.sideQuestion.send": "Nebenfrage senden",
+  "mobile.chat.sideQuestion.emptyTitle": "Frage zu diesem Chat",
+  "mobile.chat.sideQuestion.emptyBody":
+    "{name} liest diesen Chat, um zu antworten. Nichts von hier gelangt in den Chat.",
+  "mobile.chat.sideQuestion.error": "Der Agent hat nicht geantwortet. Deine Frage steht wieder im Feld unten.",
+  "mobile.chat.sideQuestion.delete": "Nebenfrage löschen",
+  "mobile.chat.sideQuestion.deleteTitle": "Diese Nebenfrage löschen?",
+  "mobile.chat.sideQuestion.deleteBody":
+    "Ihre Fragen und Antworten sind nur auf diesem Telefon. Du kannst sie nicht wiederherstellen.",
+  "mobile.chat.sideQuestion.notFound": "Dieser Agent ist nicht mehr auf dem Server.",
+  "mobile.chat.sideQuestion.unsupported":
+    "Dieser Host kann keine Nebenfragen beantworten. Aktualisiere OpenBot auf dem Host.",
   "mobile.chat.pins.title": "Angeheftete Nachrichten",
   "mobile.chat.pins.emptyTitle": "Keine angehefteten Nachrichten",
   "mobile.chat.pins.emptyBody": "Halte eine Nachricht gedrückt und tippe auf Anheften, um sie hier zu behalten.",

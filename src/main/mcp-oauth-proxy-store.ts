@@ -12,13 +12,6 @@ const settingsSchema = z.object({
   secret: z.string().min(32),
 });
 
-/**
- * The port and the secret of the MCP OAuth proxy, encrypted with the same cipher as the other
- * secrets. Read once at startup, so the proxy reads them without I/O when it starts.
- *
- * A missing or unreadable file is not fatal: the proxy takes a new port and secret, and every Codex
- * session that holds the old address is replaced at its next turn.
- */
 export class McpOAuthProxySettingsFile implements McpOAuthProxySettingsStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
@@ -29,7 +22,6 @@ export class McpOAuthProxySettingsFile implements McpOAuthProxySettingsStore {
     this.#cipher = cipher;
   }
 
-  /** The error of an unreadable file, or `null`. A missing file is not an error. */
   readonly load = Effect.fn("McpOAuthProxySettingsFile.load")(function* (this: McpOAuthProxySettingsFile) {
     const loaded = yield* Effect.result(
       readPreferenceFile(this.#path, (input) => {

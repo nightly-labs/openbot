@@ -33,7 +33,6 @@ import { stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
-  /** Null in a local server, in server mode and on a hosted server. */
   localServers: LocalServers | null;
   remoteDesktop: RemoteDesktopManager;
   remoteServers: RemoteServerManager;
@@ -74,8 +73,6 @@ export function teamIpcHandlers({
       previewInvite: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.previewInvite(request))),
       takePendingInvite: handler(takePendingInvite),
       login: payloadHandler(parseLoginServer, (request) => runCauseEffect(remoteServers.login(request))),
-      // A stopped server on this computer has no process to connect to, so Retry starts it. Only this
-      // computer can start its own child processes: web and mobile clients only reconnect.
       retryConnection: payloadHandler(stringPayload("serverId"), (serverId) =>
         runCauseEffect(
           (localServers?.startStopped(serverId) ?? Effect.succeed(null)).pipe(

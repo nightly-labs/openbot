@@ -1,14 +1,3 @@
-// Checks the private network route of remote connections against the desktop app and the web client.
-// Start the stack with `bun run dev:test-client` or `bun run dev` (never `--shared`), then run
-// `bun scripts/remote-network-route-e2e.ts --allow-mutations [--api=<url>] [--browser-executable=<path>]`.
-// `--api` is the account service of the dev stack (default http://localhost:3100); the script signs
-// in to its `/app` as the dev host user, so the web client connects to the host over WebRTC.
-//
-// It selects "Through OpenBot" in Settings › Mobile Connect on the desktop, and the web client
-// connects. Then it selects "Private network". It checks that main saves each choice, that the host
-// closes the connected peer, that the web client connects again, that each candidate of the host is a `host` candidate on
-// a private address, and that the selected pair uses one of them. It puts back the route that was set
-// before it started. Writes .openbot-build/remote-network-route-e2e/report.json and a screenshot.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -38,7 +27,6 @@ interface Report {
   openbot?: PeerState;
   firstPeerAfterChange?: RTCPeerConnectionState;
   private?: PeerState;
-  /** The state of each web client peer connection when a check fails. */
   webPeers?: RTCPeerConnectionState[];
   pageErrors: { desktop: string[]; web: string[] };
   screenshots: string[];
@@ -65,7 +53,6 @@ const routeNames = {
   private: new RegExp(`^${literal(english("settings.mobileConnect.route.private.title"))}`),
 } satisfies Record<RemoteNetworkRoute, RegExp>;
 
-/** Opens Settings › Mobile Connect and its route popover. Each visit of the tab reads the route from main again. */
 async function openRoutes(): Promise<void> {
   await desktop
     .getByRole("navigation", { name: english("app.rail.label") })
@@ -76,7 +63,6 @@ async function openRoutes(): Promise<void> {
   await showRoutes();
 }
 
-/** The routes are in a popover under the route chip in the tab header. Opens it when it is closed. */
 async function showRoutes(): Promise<void> {
   if (await routes.isVisible()) return;
   const chipLabel = literal(english("settings.mobileConnect.route.chipLabel", { route: "ROUTE" })).replace(
@@ -87,11 +73,9 @@ async function showRoutes(): Promise<void> {
   await routes.waitFor({ timeout: UI_WAIT_MS });
 }
 
-/** Selects a route by its card, as the user does, and waits until main saved it. */
 async function selectRoute(route: RemoteNetworkRoute): Promise<void> {
   await showRoutes();
   const radio = routes.getByRole("radio", { name: routeNames[route] });
-  // The radio input is hidden; the user clicks its card.
   if (!(await radio.isChecked()))
     await routes
       .getByRole("group")
@@ -107,7 +91,6 @@ async function selectRoute(route: RemoteNetworkRoute): Promise<void> {
   assert.ok(await radio.isChecked(), `The ${route} radio is not checked.`);
 }
 
-/** Signs in to the web client with the code that the development account service shows. */
 async function signIn(page: Page): Promise<void> {
   await page.goto(`${api}/app`);
   await page.getByRole("textbox", { name: english("account.login.email"), exact: true }).fill(DEV_HOST_EMAIL);
@@ -117,18 +100,15 @@ async function signIn(page: Page): Promise<void> {
   await notice.waitFor({ timeout: UI_WAIT_MS });
   const code = (await notice.innerText()).slice(prefix.length).replaceAll("-", "").trim();
   assert.ok(code.length > 0, "The account service showed no development code.");
-  // The code field takes the focus when it shows.
   await page.keyboard.type(code);
 }
 
-/** Waits until the peer connection at `index`, or a later one, is connected, and reads its candidates. */
 async function connectedPeer(page: Page, fromIndex: number): Promise<PeerState> {
   const handle = await page.waitForFunction(
     (from) => {
       const found = (window.__routeE2ePeers ?? []).findIndex(
         (pc, at) => at >= from && pc.connectionState === "connected",
       );
-      // waitForFunction waits for a truthy value, and index 0 is not truthy.
       return found >= 0 ? { found } : null;
     },
     fromIndex,
@@ -162,7 +142,6 @@ try {
   await openRoutes();
   await selectRoute("openbot");
 
-  // 1. The web client connects to the host through the default route.
   browser = await chromium.launch(browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
@@ -181,14 +160,12 @@ try {
   await signIn(web);
   report.openbot = await connectedPeer(web, 0);
 
-  // 2. The owner selects the private network on the desktop.
   await selectRoute("private");
   mkdirSync(OUT, { recursive: true });
   const shot = resolve(OUT, "settings-private.png");
   await routes.screenshot({ path: shot });
   report.screenshots.push(shot);
 
-  // 3. The host drops the peer, and the web client connects again on the private network only.
   report.private = await connectedPeer(web, report.openbot.index + 1);
   report.firstPeerAfterChange = await web.evaluate(
     (at) => window.__routeE2ePeers?.[at]?.connectionState ?? "closed",

@@ -17,7 +17,6 @@ import {
   matchesApp,
 } from "./marketplace-view";
 
-/** A category on the Apps tab shows this many apps, as on the Skills and Agents tabs. "See all" opens the rest. */
 const APP_GROUP_LIMIT = 6;
 
 const NO_MATCH = {
@@ -38,7 +37,6 @@ const SHOW_TAB = {
   skills: "marketplace.noMatch.showSkills",
 } as const;
 
-/** A tab with nothing to show: the filters hide it, the search finds nothing, or the catalog is empty. */
 function NoMatch(props: {
   scope: MarketplaceScope;
   tab: MarketplaceTab;
@@ -90,12 +88,10 @@ function NoMatch(props: {
   );
 }
 
-/** The rows of each kind after the search and the filters, and their counts. The side panel shows the counts too. */
 export function createBrowseLists(scope: MarketplaceScope) {
   const { format } = useText();
   const model = () => scope.model;
   const state = () => scope.nav.state;
-  // A Worker before the `verified` filter sends every agent, so the list filters by source too.
   const agents = () => scope.agents.items().filter((listing) => agentFromSource(listing, state().agentSource));
   const skills = () => scope.skills.items();
   const apps = () =>
@@ -113,7 +109,6 @@ export function createBrowseLists(scope: MarketplaceScope) {
     apps,
     counts,
     searching: () => state().query.trim() !== "",
-    /** A listing that pages shows "50+" while the server holds more rows than the loaded ones. */
     countLabel: (tab: MarketplaceTab) => {
       const more = (tab === "agents" && scope.agents.hasMore()) || (tab === "skills" && scope.skills.hasMore());
       return `${format.number(counts()[tab])}${more ? "+" : ""}`;
@@ -123,11 +118,8 @@ export function createBrowseLists(scope: MarketplaceScope) {
 
 export type BrowseLists = ReturnType<typeof createBrowseLists>;
 
-/** Apps in two columns of rows. */
 function AppRows(props: { scope: MarketplaceScope; apps: readonly MarketplaceApp[] }) {
   return (
-    /* Each read of the host makes new app objects, so the rows are kept by id: the element under the
-       pointer or the focus stays. */
     <ul class="marketplace-app-list">
       <For each={props.apps} keyed={(app) => app.id}>
         {(app) => <AppRow scope={props.scope} app={app()} />}
@@ -136,7 +128,6 @@ function AppRows(props: { scope: MarketplaceScope; apps: readonly MarketplaceApp
   );
 }
 
-/** The apps by category. Each category shows its first apps, also during a search; "See all" opens the category. */
 function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   const { t } = useText();
   return (
@@ -174,7 +165,6 @@ function AppList(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   );
 }
 
-/** All apps of one category, on their own page. The search stays. */
 export function AppGroupPage(props: { scope: MarketplaceScope; category: SkillCategory }) {
   const { t } = useText();
   const category = untrack(() => props.category);
@@ -210,14 +200,12 @@ export function AppGroupPage(props: { scope: MarketplaceScope; category: SkillCa
   );
 }
 
-/** The list of the kind that the side panel selected: its title and the search, then the rows. */
 export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const nav = () => props.scope.nav;
   const state = () => props.scope.nav.state;
 
-  /* "Your skills" and the agents of each skill row need each agent's skills. */
   createEffect(
     () => state().tab,
     (tab) => {

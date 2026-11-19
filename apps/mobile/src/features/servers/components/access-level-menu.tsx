@@ -5,22 +5,14 @@ import { useCSSVariable } from "uniwind";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 
-/** The id of the extra item after the levels. A level id never starts with "__". */
 const EXTRA_ID = "__extra";
 
 export interface AccessLevelOption<T extends string> {
   value: T;
   label: string;
-  /** True: the item shows, but it is off. */
   disabled?: boolean;
 }
 
-/**
- * A level menu at the end of a row, such as the access of a role to an agent. Unlike
- * `SettingsPicker`, a choice of the shown level also calls `onChange`: the shown level can come from
- * Everyone, and a choice of it clears the level that the role stores. `source` follows the level, as
- * in "Can manage · Everyone". `extra` is an action after the levels, such as "Change in Everyone".
- */
 export function AccessLevelMenu<T extends string>({
   value,
   options,
@@ -32,14 +24,12 @@ export function AccessLevelMenu<T extends string>({
   extra,
   onChange,
 }: {
-  /** The shown level, or undefined for a mixed set. */
   value: T | undefined;
   options: AccessLevelOption<T>[];
   source?: string | undefined;
   enabled: boolean;
   dark: boolean;
   label: string;
-  /** Shown when `value` is undefined. */
   placeholder?: string;
   extra?: { label: string; onPress: () => void } | undefined;
   onChange: (value: T) => void;

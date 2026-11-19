@@ -1,7 +1,3 @@
-// The Bitwarden connection of this computer: connect with a session key, and disconnect. The `host*`
-// endpoints read, connect with an API key and the master password, and disconnect a joined server's
-// connection (`bitwarden-connector-v1`).
-
 import { type BitwardenHostConnectInput, decodeHostBitwardenConnectorStatus } from "@openbot/contracts/ipc";
 import {
   BITWARDEN_CONNECTOR_CAPABILITY,

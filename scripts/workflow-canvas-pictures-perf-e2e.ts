@@ -1,22 +1,3 @@
-// Measures how fast the Workflows canvas shows its pictures, on this computer and on a joined server.
-//
-// Start this worktree's stack with `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc bun run dev:test-client`, so the
-// test client reaches the host over Signal and WebRTC, as a user does. On loopback a file comes in at
-// about 50 MB/s; add `OPENBOT_DEV_RTT_MS=80 OPENBOT_DEV_DOWNLINK_KBPS=20000` for the round trip and the
-// speed of a host on a home or server connection. Then run
-// `bun scripts/workflow-canvas-pictures-perf-e2e.ts --allow-mutations [--pictures=12] [--runs=3] [--label=<name>]
-//  [--clients=remote,local] [--compare=<old report.json>]`.
-//
-// Each run makes new pictures on the host (PNG files of about 2.4 MB, as a generated picture is), so no
-// cache holds them, and a new workflow with one asset step for each picture. Then, in each client:
-// - cold: the client opens the workflow. The time is from the click on the workflow to the first
-//   picture, to the pictures in the view, and to all pictures that show.
-// - warm: the client opens another workflow and then this one again.
-// - result: with the canvas open, the host adds a step with a new picture, as a finished image step
-//   does. The time is from the host's save to the picture on the client's canvas.
-// `remote` is the test client on the joined host. `local` is the host app on its own workflow.
-// Writes .openbot-build/workflow-canvas-pictures-perf/<label>/report.json and summary.md, and with
-// --compare also comparison.md.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -45,26 +26,19 @@ const allowMutations = process.argv.includes("--allow-mutations");
 const outDir = join(ROOT, ".openbot-build", NAME, label);
 
 interface PictureTimes {
-  /** From the click to the first picture element on the canvas: the reads before any download. */
   mountMs: number;
-  /** From the click to the first picture that shows. */
   firstMs: number;
-  /** To the last picture that was in the view when all pictures showed. */
   viewMs: number;
-  /** To the last picture. */
   allMs: number;
-  /** The pixel width of each picture that the canvas shows. A preview is narrower than the file. */
   widths: number[];
 }
 
 interface ClientRun {
   cold: PictureTimes;
   warm: PictureTimes;
-  /** From the host's save of the new step to its picture on this client's canvas. */
   resultMs: number;
 }
 
-/** The marks of one canvas open, which the page keeps between two checks. */
 interface CanvasPictures {
   start: number;
   mounted: Map<string, number>;
@@ -77,14 +51,12 @@ declare global {
   }
 }
 
-/** The value of a page check. The check ends only on a value, so `false` never comes back. */
 async function answered<T>(handle: { jsonValue(): Promise<T | false> }): Promise<T> {
   const value = await handle.jsonValue();
   assert.ok(value !== false, "The page check answered no value.");
   return value;
 }
 
-/** The client reports of an earlier `report.json`. */
 function savedReports(saved: unknown, path: string): ClientReport[] {
   assert.ok(
     typeof saved === "object" && saved !== null && "reports" in saved && Array.isArray(saved.reports),
@@ -133,7 +105,6 @@ async function connect(record: DevInstanceRecord) {
   });
 }
 
-/** Makes a PNG of about 2.4 MB on the host page and keeps it as a picture of the host. Answers its id. */
 async function makePicture(host: Page, name: string): Promise<string> {
   return host.evaluate(
     async ({ name, side }) => {
@@ -171,7 +142,6 @@ function assetNode(index: number, fileId: string, name: string) {
   };
 }
 
-/** Makes a workflow on the host with one asset step for each new picture. */
 async function seedWorkflow(host: Page, title: string) {
   const nodes = [];
   for (let index = 0; index < pictureCount; index += 1) {
@@ -185,7 +155,6 @@ async function seedWorkflow(host: Page, title: string) {
   return { workflowId: created.summary.id, nodes };
 }
 
-/** Opens a page of the given server in the app window. */
 async function openWorkflows(page: Page, serverName: string): Promise<void> {
   const serverMenu = page.getByRole("button", { name: /^Open server menu for / });
   if ((await serverMenu.getAttribute("aria-label")) !== `Open server menu for ${serverName}`) {
@@ -197,7 +166,6 @@ async function openWorkflows(page: Page, serverName: string): Promise<void> {
   await page.getByRole("main", { name: /^Workflow canvas: / }).waitFor({ timeout: WAIT_MS });
 }
 
-/** Clicks the workflow in the switcher, and answers when `expected` pictures show on the canvas. */
 async function openWorkflow(page: Page, title: string, expected: number): Promise<PictureTimes> {
   const canvas = page.getByRole("main", { name: /^Workflow canvas: / });
   const current = (await canvas.getAttribute("aria-label"))?.replace(/^Workflow canvas: /, "") ?? "";
@@ -205,7 +173,6 @@ async function openWorkflow(page: Page, title: string, expected: number): Promis
   const item = page.getByRole("menuitem", { name: new RegExp(`^${title} `) });
   await item.waitFor();
   await page.evaluate(() => {
-    // Marks by picture address: the canvas keeps an image element when only its address changes.
     const state = { start: 0, mounted: new Map<string, number>(), shown: new Map<string, number>() };
     window.__canvasPictures = state;
     document.addEventListener(
@@ -262,7 +229,6 @@ async function openWorkflow(page: Page, title: string, expected: number): Promis
     .then(answered);
 }
 
-/** With the canvas open on the client, the host adds a step with a new picture. Answers the time to show it. */
 async function newResult(host: Page, client: Page, workflowId: string, title: string, count: number) {
   const name = `${title}-result.png`.replaceAll(" ", "-");
   const fileId = await makePicture(host, name);
@@ -298,7 +264,6 @@ async function measureClient(clientName: string): Promise<ClientReport> {
   const page = clientSession.page;
   try {
     await openWorkflows(page, HOST_NAME);
-    // A second workflow to switch to, so that the warm open mounts the canvas again.
     const other = `Perf other ${label}`;
     const listed = await host.evaluate(() => window.openbot.workflows.list());
     if (!listed.some((summary) => summary.title === other))

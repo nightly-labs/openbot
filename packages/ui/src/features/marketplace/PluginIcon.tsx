@@ -1,7 +1,6 @@
 import { Blocks, Puzzle } from "@openbot/ui";
 import { createMemo, createSignal, Show } from "solid-js";
 
-/** A listing's icon, or a plugin or skill mark when it has none or it does not load. */
 export function PluginIcon(props: { iconUrl: string | null; fallback?: "plugin" | "skill"; class?: string }) {
   const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
   const iconUrl = createMemo(() => {
