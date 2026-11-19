@@ -40,6 +40,7 @@ import {
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_TIMESTAMP_HEADER,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { exportJWK, type JWTPayload, SignJWT } from "jose";
 
@@ -71,6 +72,12 @@ const GITHUB_REPOSITORY = 77;
 const LINK_HOST_ID = "host-link-e2e";
 const LINK_CHAT = "-500";
 const LINK_CODE = randomBytes(32).toString("base64url");
+// Chats that no socket holds: the account service names an offline host for the first, and fails for the second.
+const OFFLINE_LINKED_CHAT = "-700";
+const FAILED_LOOKUP_CHAT = "-701";
+const UNLINKED_CHAT = "-702";
+// One more chat with no link. Its notice comes after the work of the updates before it.
+const LAST_UNLINKED_CHAT = "-709";
 // The account service fails for the sessions of this host, and calls the sessions of the next one inactive.
 const UNAVAILABLE_HOST_ID = "host-unavailable-e2e";
 const INACTIVE_HOST_ID = "host-inactive-e2e";
@@ -219,6 +226,9 @@ function hmac(secret: string, text: string, encoding: "hex" | "base64url") {
 const controlPlaneCalls: Array<{ path: string; signed: boolean }> = [];
 // The Telegram chat and the `wake` flag of each route-wake request.
 const routeWakes: Array<{ chatId: string; wake: boolean }> = [];
+// Each Bot API call that Signal makes itself, to the fake Bot API of this run.
+// `body` is the request text, and `chatId` its `chat_id`.
+const botApiCalls: Array<{ method: string; body: string; chatId: number | null }> = [];
 // The generic webhook routes of hosted servers that sleep, and each route-wake request for a webhook.
 const SLEEPING_WEBHOOK_ROUTES: Record<string, string> = {
   "route-sleeping-a1": "host-sleeping-a",
@@ -272,7 +282,11 @@ function startControlPlane(port: number): Promise<Server> {
       return payload.code === LINK_CODE ? answer(200, { hostId: LINK_HOST_ID, linkedAt: Date.now() }) : answer(404);
     // With route wakes, Signal keeps events for a host. No route here is of a hosted server.
     if (path === "/v2/remote/route-wake") {
-      if (payload.route?.platform === "telegram") routeWakes.push({ chatId: payload.route.chatId, wake: payload.wake });
+      if (payload.route?.platform === "telegram") {
+        routeWakes.push({ chatId: payload.route.chatId, wake: payload.wake });
+        if (payload.route.chatId === OFFLINE_LINKED_CHAT) return answer(200, { hostId: HOST_ID, state: "not_hosted" });
+        if (payload.route.chatId === FAILED_LOOKUP_CHAT) return answer(500);
+      }
       if (payload.route?.platform === "webhook") {
         webhookWakes.push({ routeId: payload.route.routeId, wake: payload.wake });
         const hostId = SLEEPING_WEBHOOK_ROUTES[payload.route.routeId];
@@ -289,6 +303,24 @@ function startControlPlane(port: number): Promise<Server> {
     if (path === "/v2/remote/webhook-route/validate")
       return answer(200, { routes: payload.routes.map((route: { id: string }) => route.id) });
     return answer(404);
+  });
+  return new Promise((resolveServer) => server.listen(port, "127.0.0.1", () => resolveServer(server)));
+}
+
+// The text and the entities of a test message in a Telegram group.
+type MessageFields = { text: string; entities?: Array<{ type: string; offset: number; length: number }> };
+
+// The Bot API, for the calls that Signal makes itself. Only the bot's own token is answered.
+function startBotApi(port: number): Promise<Server> {
+  const server = createServer(async (request, response) => {
+    const body = await readBody(request);
+    const method = (request.url ?? "").match(/^\/bot([^/]+)\/([A-Za-z]+)$/u);
+    response.writeHead(200, { "Content-Type": "application/json" });
+    if (method?.[1] !== BOT_TOKEN)
+      return response.end(JSON.stringify({ ok: false, error_code: 401, description: "Unauthorized" }));
+    const chatId = body.match(/"chat_id":(-?[0-9]+)/u)?.[1];
+    botApiCalls.push({ method: method[2] ?? "", body, chatId: chatId === undefined ? null : Number(chatId) });
+    response.end(JSON.stringify({ ok: true, result: { message_id: botApiCalls.length } }));
   });
   return new Promise((resolveServer) => server.listen(port, "127.0.0.1", () => resolveServer(server)));
 }
@@ -406,8 +438,14 @@ async function waitForReady(url: string, child: ChildProcess) {
   throw new Error("Signal did not become ready.");
 }
 
-const [signalPort, healthPort, controlPlanePort] = await Promise.all([freePort(), freePort(), freePort()]);
+const [signalPort, healthPort, controlPlanePort, botApiPort] = await Promise.all([
+  freePort(),
+  freePort(),
+  freePort(),
+  freePort(),
+]);
 const controlPlane = await startControlPlane(controlPlanePort);
+const botApi = await startBotApi(botApiPort);
 const turnServer = await startTurnServer();
 const serviceOutput: string[] = [];
 const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
@@ -434,6 +472,7 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     GITHUB_WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
+    TELEGRAM_TEST_API_ORIGIN: `http://127.0.0.1:${botApiPort}`,
     // All sockets of the burst check come from one address.
     REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 2),
     REMOTE_MAX_MESSAGES_PER_MINUTE: String(BURST_PEERS * 20),
@@ -751,6 +790,58 @@ try {
     );
     return "plain text and caption: wake=false; mention, caption mention, reply, thread, direct, rename, button: wake=true";
   });
+
+  await check(
+    "A Telegram chat with no link gets one notice; a linked chat, a failed lookup and plain text get none",
+    async () => {
+      const message = (chatId: string, fields: MessageFields) => ({
+        update_id: 1,
+        message: { message_id: 1, from: { id: 5 }, chat: { id: Number(chatId), type: "group" }, ...fields },
+      });
+      const mention = { text: "@bot hi", entities: [{ type: "mention", offset: 0, length: 4 }] };
+      const silent = [
+        message(OFFLINE_LINKED_CHAT, mention),
+        message(FAILED_LOOKUP_CHAT, mention),
+        message("-703", { text: "hi" }),
+      ];
+      for (const body of silent) expect((await postUpdate(JSON.stringify(body))).status === 200, "update refused");
+      const asked = ["-700", "-701", "-703"];
+      const deadline = Date.now() + 5_000;
+      while (asked.some((chatId) => !routeWakes.some((call) => call.chatId === chatId)) && Date.now() < deadline)
+        await new Promise((next) => setTimeout(next, 20));
+      // A mention, a second mention and a /start without a link code: one notice for all three.
+      for (const fields of [
+        mention,
+        mention,
+        { text: "/start@bot true", entities: [{ type: "bot_command", offset: 0, length: 10 }] },
+      ])
+        expect((await postUpdate(JSON.stringify(message(UNLINKED_CHAT, fields)))).status === 200, "update refused");
+      const noticeOf = (chatId: string) =>
+        botApiCalls.filter((call) => call.method === "sendMessage" && call.chatId === Number(chatId));
+      while (noticeOf(UNLINKED_CHAT).length === 0 && Date.now() < deadline)
+        await new Promise((next) => setTimeout(next, 20));
+      // A second notice of the unlinked chat would come before this one.
+      expect((await postUpdate(JSON.stringify(message(LAST_UNLINKED_CHAT, mention)))).status === 200, "update refused");
+      while (noticeOf(LAST_UNLINKED_CHAT).length === 0 && Date.now() < deadline)
+        await new Promise((next) => setTimeout(next, 20));
+      const notice = noticeOf(UNLINKED_CHAT);
+      expect(notice.length === 1, `${notice.length} notices in the unlinked chat`);
+      expect(
+        notice[0]?.body ===
+          JSON.stringify({ chat_id: Number(UNLINKED_CHAT), text: sourceText("status.messaging.telegramNotLinked") }),
+        `notice: ${notice[0]?.body}`,
+      );
+      // The earlier checks addressed OpenBot in chats with no link too: a mention, a caption mention and a direct chat.
+      const noticed = [...new Set(botApiCalls.map((call) => String(call.chatId)))].sort();
+      const expected = ["-602", "-603", "606", UNLINKED_CHAT, LAST_UNLINKED_CHAT].sort();
+      expect(JSON.stringify(noticed) === JSON.stringify(expected), `notices in ${noticed.join(", ")}`);
+      expect(
+        botApiCalls.every((call) => call.method === "sendMessage"),
+        "Signal made another Bot API call",
+      );
+      return `one notice in ${expected.join(", ")}; none for a linked chat, a failed lookup, plain text, a reply, a thread, a rename, a button or a link`;
+    },
+  );
 
   // 2. Signed account events: Signal acts only on an event that the account service signed now.
   await check("An account event with a bad or stale signature gets 401; a signed one revokes the route", async () => {
@@ -1452,6 +1543,7 @@ try {
   entryChild?.kill("SIGTERM");
   entryDnsServer?.close();
   controlPlane.close();
+  botApi.close();
   turnServer.close();
 }
 

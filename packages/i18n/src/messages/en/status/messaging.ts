@@ -43,6 +43,11 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.telegramNoAgent": "No agent can answer here yet. Add the Telegram Orchestrator in OpenBot.",
   "status.messaging.telegramLinked":
     "OpenBot is connected to this chat. Mention {bot} or reply to a message of OpenBot to ask the agents.",
+  // Signal posts it in a Telegram chat that added the bot without the link from the app. The
+  // names are the app's own: marketplace.title, marketplace.tab.apps, connector.telegram.addToGroup
+  // and connector.telegram.openDirectChat.
+  "status.messaging.telegramNotLinked":
+    "OpenBot is not connected to this chat. To connect it, open the OpenBot app, go to Marketplace → Apps → Telegram, and select Add to a group or Open a direct chat.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Answers in Telegram and asks the team",
   // Text that OpenBot posts from a linked WhatsApp number, and the WhatsApp Orchestrator agent.

@@ -417,6 +417,7 @@
         "@discordjs/rest": "2.6.3",
         "@discordjs/ws": "2.0.4",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
         "discord-api-types": "0.38.57",
         "effect": "catalog:",
         "elysia": "1.4.30",

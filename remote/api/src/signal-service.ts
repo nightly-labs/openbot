@@ -21,6 +21,7 @@ import {
   type WebhookRoute,
   type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
@@ -345,6 +346,9 @@ const WEBHOOK_WAKE_TOTAL_RATE_FACTOR = 1;
 // A host can answer a callback query that Signal delivered to it in this time. Telegram allows less.
 const TELEGRAM_CALLBACK_TTL_MILLISECONDS = 15 * 60_000;
 const MAXIMUM_TELEGRAM_CALLBACKS = 100_000;
+// A Telegram chat with no link gets the notice that it is not linked at most this often.
+const TELEGRAM_UNLINKED_NOTICE_MILLISECONDS = 24 * 60 * 60_000;
+const MAXIMUM_TELEGRAM_UNLINKED_NOTICES = 100_000;
 // The Bot API calls of one socket that wait for an answer. A call beyond them is answered 429.
 const MAXIMUM_PENDING_TELEGRAM_CALLS = 32;
 const TELEGRAM_FORBIDDEN = telegramFailure(403, "forbidden");
@@ -378,6 +382,9 @@ export class SignalService {
   // the same for each entry, so the oldest entry is first.
   readonly #telegramCallbacks = new Map<string, { socketId: string; expiresAt: number }>();
   readonly #telegramCalls = new Map<string, Set<Fiber.Fiber<void>>>();
+  // The time of the last notice that a chat (`<bot ID>:<chat ID>`) is not linked. In memory only: a
+  // restart can send one more. The interval is the same for each entry, so the oldest entry is first.
+  readonly #telegramNotices = new Map<string, number>();
   readonly #telegram: SignalTelegram | null;
   // Discord guild ID to the `ingress` socket that said hello last with a route ticket for it.
   readonly #discordGuilds = new Map<string, string>();
@@ -887,7 +894,7 @@ export class SignalService {
       ).pipe(
         Effect.map(
           (outcome): SlackDeliveryResponse =>
-            outcome === "unavailable" && !delivery.chatter ? UNAVAILABLE : { status: 200 },
+            (outcome === "unavailable" || outcome === "unlinked") && !delivery.chatter ? UNAVAILABLE : { status: 200 },
         ),
       );
     }
@@ -1063,6 +1070,8 @@ export class SignalService {
    * the host, so nothing comes back. Returns `false` when no socket holds the chat; then a hosted
    * server starts for an update that `wakes` and gets it later (`IngressQueue`). `linked` marks the
    * `/start` update that the account service just linked, the only one a host links a chat on.
+   * `addresses` marks a direct message, a mention or a command: when the account service answers that
+   * no host has the chat, it gets the notice that the chat is not linked.
    */
   deliverTelegram(
     botId: string,
@@ -1071,6 +1080,7 @@ export class SignalService {
     callbackQueryId: string | null,
     linked = false,
     wakes = false,
+    addresses = false,
   ): boolean {
     const route = telegramRouteKey(botId, chatId);
     const socketId = this.#telegramChats.get(route);
@@ -1092,6 +1102,8 @@ export class SignalService {
     }
     if (!ingress) {
       this.#metrics.telegramDeliveriesUnrouted += 1;
+      // Checked before the lookup: a chat that got the notice in the last day gets nothing more.
+      const notice = addresses && !linked && this.#unlinkedNoticeDue(route, Date.now());
       this.#fork(
         this.#keep(
           { platform: "telegram", botId, chatId },
@@ -1099,6 +1111,10 @@ export class SignalService {
           wakes && !linked,
           frame,
           callbackQueryId ? { botId, queryId: callbackQueryId } : null,
+        ).pipe(
+          Effect.flatMap((outcome) =>
+            notice && outcome === "unlinked" ? this.#noticeUnlinked(botId, chatId, route) : Effect.void,
+          ),
         ),
       );
       return false;
@@ -1108,6 +1124,47 @@ export class SignalService {
     this.#send(ingress.socket, frame);
     return true;
   }
+
+  /**
+   * False while a socket holds the chat, for a chat that this Signal saw linked, revoked or named in a
+   * route ticket, and for a chat that got the notice in the last day. The floor is kept, so a lookup
+   * that started before a link and answered after it cannot send the notice.
+   */
+  #unlinkedNoticeDue(route: string, now: number): boolean {
+    if (this.#telegramChats.has(route) || this.#telegramRouteFloor.has(route)) return false;
+    const last = this.#telegramNotices.get(route);
+    return last === undefined || now - last >= TELEGRAM_UNLINKED_NOTICE_MILLISECONDS;
+  }
+
+  /**
+   * Tells a chat that added the bot without a link code how to link it. It is sent once, with no
+   * reply or thread, and a failure is not retried or logged. The time is kept before the call, so a
+   * failed call does not repeat for each message.
+   */
+  readonly #noticeUnlinked = Effect.fn("Signal.noticeUnlinked")(function* (
+    this: SignalService,
+    botId: string,
+    chatId: string,
+    route: string,
+  ) {
+    const now = Date.now();
+    // Another update of the chat can wait for the same lookup.
+    if (!this.#telegram || !this.#unlinkedNoticeDue(route, now)) return;
+    for (const [key, sentAt] of this.#telegramNotices) {
+      if (
+        now - sentAt < TELEGRAM_UNLINKED_NOTICE_MILLISECONDS &&
+        this.#telegramNotices.size < MAXIMUM_TELEGRAM_UNLINKED_NOTICES
+      )
+        break;
+      this.#telegramNotices.delete(key);
+    }
+    this.#telegramNotices.delete(route);
+    this.#telegramNotices.set(route, now);
+    yield* this.#telegram.bot.call(botId, "sendMessage", {
+      chat_id: Number(chatId),
+      text: sourceText("status.messaging.telegramNotLinked"),
+    });
+  });
 
   /**
    * Keeps the linked `/start` update for its host until a socket of the host acknowledges it. A host
@@ -1155,6 +1212,8 @@ export class SignalService {
       const route = telegramRouteKey(botId, chatId);
       if (link.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) return false;
       this.#telegramRouteFloor.set(route, link.linkedAt);
+      // A lookup from before the link said that no host has the chat.
+      this.#queue.forget(queueRouteKey("telegram", route));
       const now = Date.now();
       for (const [key, entry] of this.#telegramLinks) {
         if (entry.expiresAt > now) break;

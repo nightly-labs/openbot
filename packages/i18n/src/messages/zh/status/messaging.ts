@@ -42,6 +42,8 @@ export const messages = {
   // read the posts. The user can rename the agent.
   "status.messaging.telegramNoAgent": "这里还没有助手能回答。请在 OpenBot 中添加 Telegram 调度助手。",
   "status.messaging.telegramLinked": "OpenBot 已连接到该聊天。提及 {bot} 或回复 OpenBot 的消息即可向助手提问。",
+  "status.messaging.telegramNotLinked":
+    "OpenBot 未连接到该聊天。要连接，请打开 OpenBot 应用，前往 市场 → 应用 → Telegram，然后选择“加入群组”或“开启私聊”。",
   "status.messaging.telegramOrchestratorName": "Telegram 调度助手",
   "status.messaging.telegramOrchestratorTitle": "在 Telegram 中回答并调度团队",
   // Text that OpenBot posts from a linked WhatsApp number, and the WhatsApp Orchestrator agent.
