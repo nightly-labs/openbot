@@ -14,6 +14,7 @@ export const messages = {
   "status.messaging.stopped": "Durduruldu.",
   "status.messaging.stop": "Durdur",
   "status.messaging.approvalTitle": "OpenBot devam etmek için onay istiyor.",
+  "status.messaging.approvalTitleTeammate": "Ekip arkadaşı {agent} devam etmek için onay istiyor.",
   "status.messaging.approvalCommand": "Bir komut çalıştır",
   "status.messaging.approvalFileChange": "Dosyaları değiştir",
   "status.messaging.approvalPermissions": "Daha fazla izin al",
