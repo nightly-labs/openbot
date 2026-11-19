@@ -3,7 +3,7 @@
 // this module and in the libraries; no log holds it, a payload, or Discord's error text.
 
 import { DiscordAPIError, HTTPError, RateLimitError, REST, RequestMethod } from "@discordjs/rest";
-import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
+import { WebSocketManager, WebSocketShardEvents, WebSocketShardStatus } from "@discordjs/ws";
 import { DISCORD_GATEWAY_INTENTS, DISCORD_MESSAGE_CONTENT_INTENT } from "@openbot/contracts/discord-app";
 import { GatewayCloseCodes } from "discord-api-types/v10";
 import { Context, Effect, FiberSet, Layer, Schedule, Schema } from "effect";
@@ -22,6 +22,15 @@ const DISCORD_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
 // A first connection that fails is tried again, after 5 seconds and then twice as long each time, at
 // most every 5 minutes, until Signal stops.
 const DISCORD_CONNECT_RETRY = Schedule.min([Schedule.exponential("5 seconds"), Schedule.spaced("5 minutes")]);
+// How often Signal checks that each shard of the Gateway is ready. The library does not connect again
+// after a fatal close code (such as 4011 or 4013), and the Discord API route works without the
+// Gateway: hosts then show Discord as connected while no mention arrives.
+const DISCORD_HEALTH_INTERVAL = "1 minute";
+// Checks in a row without each shard ready before a new connection replaces the Gateway. It doubles
+// after each replacement that does not get ready, up to about 30 minutes, so that a token or an intent
+// that Discord refuses does not use up the bot's daily session starts. A ready Gateway resets it.
+const DISCORD_UNREADY_CHECKS = 2;
+const DISCORD_UNREADY_CHECKS_LIMIT = 32;
 
 class DiscordGatewayConnectError extends Schema.TaggedError<DiscordGatewayConnectError>()(
   "DiscordGatewayConnectError",
@@ -173,9 +182,9 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         };
 
         /**
-         * Connects a manager, and tries again until Signal stops; the library reconnects by itself after.
-         * A manager that the intent fallback replaced is not tried again: its first connect fails too,
-         * because the refused intent ends it.
+         * Connects a manager, and tries again until Signal stops or a new manager replaces it. After that,
+         * the library reconnects by itself, except after a fatal close code: the health check below
+         * replaces the manager then.
          */
         const connect = (gateway: WebSocketManager) =>
           run(
@@ -227,21 +236,56 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
               current === gateway
             ) {
               console.error("OpenBot Discord Gateway refused the Message Content intent. It connects without it.");
-              current = open(DISCORD_GATEWAY_INTENTS);
-              run(release(gateway));
-              connect(current);
+              replace(DISCORD_GATEWAY_INTENTS);
             }
           });
           gateway.on(WebSocketShardEvents.Error, () => console.error("OpenBot Discord Gateway failed."));
           return gateway;
         };
 
-        let current = open(
-          config.messageContent ? DISCORD_GATEWAY_INTENTS | DISCORD_MESSAGE_CONTENT_INTENT : DISCORD_GATEWAY_INTENTS,
-        );
+        /** A new connection in place of the Gateway. A new manager also asks Discord for the shard count again. */
+        const replace = (intents: number) => {
+          const previous = current;
+          currentIntents = intents;
+          current = open(intents);
+          run(release(previous));
+          connect(current);
+        };
+
+        let currentIntents = config.messageContent
+          ? DISCORD_GATEWAY_INTENTS | DISCORD_MESSAGE_CONTENT_INTENT
+          : DISCORD_GATEWAY_INTENTS;
+        let current = open(currentIntents);
         yield* Effect.addFinalizer(() => Effect.suspend(() => release(current)));
         // Signal starts without waiting for Discord. The fibers end with the runtime, which stops the retries.
         connect(current);
+
+        let unready = 0;
+        let unreadyLimit = DISCORD_UNREADY_CHECKS;
+        const check = Effect.suspend(() => {
+          const gateway = current;
+          return Effect.tryPromise(async () => gateway.fetchStatus()).pipe(
+            Effect.map((shards) => shards.size > 0 && shards.every((status) => status === WebSocketShardStatus.Ready)),
+            Effect.catch(() => Effect.succeed(false)),
+            Effect.flatMap((ready) =>
+              Effect.sync(() => {
+                if (gateway !== current) return;
+                if (ready) {
+                  unready = 0;
+                  unreadyLimit = DISCORD_UNREADY_CHECKS;
+                  return;
+                }
+                unready += 1;
+                if (unready < unreadyLimit) return;
+                unready = 0;
+                unreadyLimit = Math.min(unreadyLimit * 2, DISCORD_UNREADY_CHECKS_LIMIT);
+                console.error("OpenBot Discord Gateway is not ready. It connects again.");
+                replace(currentIntents);
+              }),
+            ),
+          );
+        });
+        run(check.pipe(Effect.delay(DISCORD_HEALTH_INTERVAL), Effect.forever));
         return DiscordGateway.of({ api: makeDiscordApi(transport, state) });
       }),
     );
