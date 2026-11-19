@@ -11,7 +11,6 @@ export const HOST_RELEASE_METHODS = [
   "unavailable",
 ] as const;
 
-/** IPC values stay native: the sandboxed preload cannot load Effect. */
 export interface HostReleaseStatus {
   currentVersion: string;
   latestVersion: string | null;

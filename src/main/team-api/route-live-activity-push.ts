@@ -10,11 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { markerExclusionsForCapabilities, readJson } from "./request-helpers";
 
-/**
- * The phone of the calling member gives or removes the push token of its Live Activity. The host
- * keeps it for this session only, and sends updates only for what this member can see. Frozen by
- * `live-activity-push-v1`.
- */
 export async function routeLiveActivityPush(
   context: TeamApiRequestContext,
   push: LiveActivityPushService | undefined,
@@ -30,7 +25,6 @@ export async function routeLiveActivityPush(
   if (!push || !capabilities.has(LIVE_ACTIVITY_PUSH_CAPABILITY)) {
     throw new HttpError(400, sourceText("error.team.liveActivityUnsupported"));
   }
-  // `readJson` has already run the body through the live-activity-push wire codec.
   const body = await readJson(request);
   if (url.pathname === LIVE_ACTIVITY_PUSH_ROUTES.remove) {
     push.remove(sessionId);

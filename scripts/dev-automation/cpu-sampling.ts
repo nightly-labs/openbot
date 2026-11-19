@@ -1,24 +1,7 @@
-// The arithmetic behind `dev:automation cpu`. Pure on purpose: no process is
-// spawned and no file is read here, so every rule below is testable in Node.
-//
-// Why this module exists at all, rather than a one-line `ps` pipe: `ps -o %cpu`
-// reports total CPU time divided by process *lifetime*. An app that was busy
-// for ten seconds at start-up and idle for an hour still reports a high `%cpu`,
-// and it reports it stably, run after run. That is the worst possible failure
-// for an A/B comparison - a confident wrong number that does not move when the
-// code gets better. The only correct reading is a delta of the cumulative
-// `cputime` counter across a known wall-clock interval, which is what
-// `cpuSecondsBetween` does for every consecutive pair of samples.
-//
-// "Percent" here is percent of one core. 100 means one core fully used; a
-// machine with eight cores can therefore report more than 100 in total.
-
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 export type ChromiumProcessType = "main" | "renderer" | "gpu" | "utility" | "network" | "crashpad" | "other";
 
-// One process at one instant. `cpuSeconds` is cumulative since the process
-// started, never a rate.
 export interface ProcessSnapshot {
   pid: number;
   type: ChromiumProcessType;
@@ -47,33 +30,21 @@ export interface CpuReport {
 export interface ProcessTableRow {
   pid: number;
   ppid: number;
-  // Resident set size in kilobytes, as `ps -o rss=` prints it.
   rssKb: number;
   cpuSeconds: number;
   command: string;
 }
 
-// `ps -o cputime=` prints `MM:SS.ss`, `HH:MM:SS.ss` or `D-HH:MM:SS`. Minutes
-// are unbounded in the two-field form, which is how macOS prints a process
-// that has used more than an hour but less than a day.
 const PROCESS_TIME_PATTERN = /^(?:(\d+)-)?(\d+):(\d{1,2})(?::(\d{1,2}))?(?:\.(\d+))?$/;
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3_600;
 const SECONDS_PER_DAY = 86_400;
 
-/**
- * Cumulative CPU seconds from a `ps -o cputime=` field, or `null` when the
- * field is not a time. `null` rather than `NaN` so a single unreadable row
- * cannot poison a sum: the caller drops the row instead of reporting a number
- * that is silently not a number.
- */
 export function parseProcessTime(raw: string): number | null {
   const match = PROCESS_TIME_PATTERN.exec(raw.trim());
   if (!match) return null;
   const [, days, first, second, third, fraction] = match;
-  // The day field only ever appears with a full `HH:MM:SS`, so `2-03:04` is
-  // not a format `ps` produces and is more likely a misread column.
   if (days !== undefined && third === undefined) return null;
   const hours = third === undefined ? 0 : Number(first);
   const minutes = third === undefined ? Number(first) : Number(second);
@@ -86,21 +57,8 @@ export function parseProcessTime(raw: string): number | null {
 
 const CHROMIUM_TYPE_SWITCH = /--type=(\S+)/;
 const UTILITY_SUB_TYPE_SWITCH = /--utility-sub-type=(\S+)/;
-// A macOS bundle executable, which is what both the dev Electron binary and a
-// packaged OpenBot are launched as.
 const BUNDLE_EXECUTABLE = /\.app\/contents\/macos\//;
 
-/**
- * Which part of the browser a command line belongs to.
- *
- * A Chromium child announces itself with `--type=`; the browser process - what
- * Electron calls main - is the one without it. That rule alone is not enough
- * here, because the sampled tree is rooted at the dev supervisor and also holds
- * the Vite server and Bun, which carry no `--type=` either. So a process only
- * counts as `main` when it is an Electron executable as well; everything else
- * unrecognized is `other`, which keeps dev-server cost visible without
- * mislabelling it as the app.
- */
 export function classifyChromiumProcess(command: string): ChromiumProcessType {
   const type = CHROMIUM_TYPE_SWITCH.exec(command)?.[1];
   if (type === undefined) return isElectronExecutable(command) ? "main" : "other";
@@ -122,13 +80,8 @@ function isElectronExecutable(command: string): boolean {
 
 const PROCESS_TABLE_ROW = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/;
 
-/** The `ps` arguments whose output `parseProcessTable` reads. */
 export const PROCESS_TABLE_PS_ARGS = ["-o", "pid=,ppid=,rss=,cputime=,command=", "-ax"] as const;
 
-/**
- * Rows from `ps -o pid=,ppid=,rss=,cputime=,command= -ax`. A row whose time
- * field does not parse is dropped rather than guessed at.
- */
 export function parseProcessTable(stdout: string): ProcessTableRow[] {
   const rows: ProcessTableRow[] = [];
   for (const line of stdout.split("\n")) {
@@ -147,11 +100,6 @@ export function parseProcessTable(stdout: string): ProcessTableRow[] {
   return rows;
 }
 
-/**
- * The root and everything under it. The walk is anchored on a pid the instance
- * registry published, never on a name: matching "electron" would pick up
- * another worktree's dev app, and attribute its cost to this measurement.
- */
 export function collectDescendants(rows: ProcessTableRow[], rootPid: number): ProcessTableRow[] {
   const byParent = new Map<number, ProcessTableRow[]>();
   for (const row of rows) {
@@ -182,11 +130,6 @@ interface ProcessCpuSeconds {
   cpuSeconds: number;
 }
 
-// A pid in only one of the two snapshots is dropped, not counted from zero: a
-// renderer that started mid-interval would otherwise report its whole lifetime
-// of CPU as if it had all happened inside the interval, and a window opened
-// during a run would read as a spike that is not there. A negative delta means
-// the pid was recycled onto a different process, which is the same problem.
 function cpuSecondsBetween(before: ProcessSnapshot[], after: ProcessSnapshot[]): ProcessCpuSeconds[] {
   const start = new Map(before.map((process) => [process.pid, process]));
   const used: ProcessCpuSeconds[] = [];
@@ -210,14 +153,6 @@ const REPORTED_TYPES: readonly ChromiumProcessType[] = [
   "other",
 ];
 
-/**
- * One report from the whole run.
- *
- * CPU is accumulated over each consecutive pair of samples rather than from the
- * first sample to the last, so a renderer that opened and closed inside the run
- * still contributes the work it did. The divisor stays the full span, which is
- * what makes two runs of different length comparable.
- */
 export function summarize(samples: CpuSample[], label: string): CpuReport {
   const first = samples[0];
   const last = samples[samples.length - 1];
@@ -258,13 +193,6 @@ function round(value: number): number {
 
 const PROCESS_TYPES: readonly ChromiumProcessType[] = REPORTED_TYPES;
 
-/**
- * A report read back from `--out`, or `null` when the file is not one.
- *
- * `--compare` points at a file a developer chose, so it can be stale, truncated
- * or from another tool. Answering `null` lets the caller say which file is
- * wrong, instead of printing a delta against undefined.
- */
 export function parseCpuReport(value: unknown): CpuReport | null {
   if (!isDynamicRecord(value)) return null;
   const { label, durationMs, samples, processes, totalCpuPercent } = value;
@@ -280,17 +208,9 @@ export function parseCpuReport(value: unknown): CpuReport | null {
   return { label, durationMs, samples, processes: parsed, totalCpuPercent };
 }
 
-// Memory, for `dev:automation memory`. Unlike CPU, resident memory is a level,
-// not a counter, so one `ps` reading is a complete answer and no interval is
-// needed.
-
 export type MemoryProcessKind = ChromiumProcessType | "provider" | "dev-tooling";
 
-// The provider command-line tools the app starts, by executable name. Each one
-// can hold hundreds of megabytes, and with `other` they would hide in the noise.
 const PROVIDER_EXECUTABLES: ReadonlySet<string> = new Set(["claude", "codex", "grok", "opencode", "cua-driver"]);
-// What `bun run dev` adds around the app. A packaged build has none of it, so
-// it is reported apart from the app total rather than inside it.
 const DEV_TOOLING =
   /(?:^|[/\s])(?:vite|electron-vite|esbuild|workerd|wrangler|dotenvx)(?:\s|$)|dev-services\.ts|bun --watch/;
 
@@ -307,7 +227,6 @@ export interface MemoryProcess {
   pid: number;
   kind: MemoryProcessKind;
   rssMb: number;
-  // The executable name only: a full command line can carry a path or a token.
   name: string;
 }
 
@@ -319,7 +238,6 @@ export interface MemoryBucket {
 
 export interface MemoryReport {
   label: string;
-  // Everything except dev tooling: what a packaged build would hold.
   appRssMb: number;
   devToolingRssMb: number;
   buckets: MemoryBucket[];
@@ -328,12 +246,6 @@ export interface MemoryReport {
 
 const MEMORY_KINDS: readonly MemoryProcessKind[] = [...REPORTED_TYPES, "provider", "dev-tooling"];
 
-/**
- * One memory report from the rows `collectDescendants` returned.
- *
- * A child of a provider counts as provider too: the MCP servers a provider
- * starts live and die with it, so they are part of what releasing it saves.
- */
 export function summarizeMemory(rows: ProcessTableRow[], label: string): MemoryReport {
   const byPid = new Map(rows.map((row) => [row.pid, row]));
   const kinds = new Map<number, MemoryProcessKind>();

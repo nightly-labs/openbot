@@ -14,22 +14,12 @@ import { readSkillFrontmatter } from "../backend/skill-frontmatter";
 import { type ArchiveOperationError, archiveCall, archiveResult } from "./archive-effects";
 import { OWNERSHIP_MARKER } from "./managed-skill-service";
 
-/**
- * A skill in one of these workspace folders is listed even when the agent's provider does not read it.
- * An agent keeps its workspace when its provider changes, so a skill can stay in a folder the new
- * provider does not read.
- */
 const WORKSPACE_SKILL_FOLDERS = [
   ...new Set(AGENT_PROVIDER_DESCRIPTORS.flatMap((descriptor) => descriptor.skillFolders)),
 ];
 const MAX_SKILLS_PER_FOLDER = 200;
 const MAX_SKILL_FILE_BYTES = 256 * 1024;
 
-/**
- * Lists the skills a user or an agent put in a workspace skill folder without OpenBot. OpenBot reads
- * these folders and never writes to them. `exclude` holds the folder names in the lock file, which
- * the installed list already shows.
- */
 export const listFolderSkills = Effect.fn("SkillFolder.listFolderSkills")(function* (
   agent: Pick<AgentSummary, "provider" | "workspacePath">,
   exclude: ReadonlySet<string>,
@@ -56,11 +46,6 @@ export const listFolderSkills = Effect.fn("SkillFolder.listFolderSkills")(functi
   return skills.sort((left, right) => left.name.localeCompare(right.name));
 });
 
-/**
- * The user's skills in `~/.agents/skills` for the `$` list, with the `home:<slug>` id that the
- * provider text resolves to the skill's `SKILL.md`. Every provider can use them: see `homeSkills` of
- * the provider descriptor. `exclude` holds the slugs that the list already has.
- */
 export const listHomeFolderSkills = Effect.fn("SkillFolder.listHomeFolderSkills")(function* (
   exclude: ReadonlySet<string>,
 ) {
@@ -82,7 +67,6 @@ export const listHomeFolderSkills = Effect.fn("SkillFolder.listHomeFolderSkills"
     );
 });
 
-/** Maps each skill folder name to the skill folders that hold it, in the order given. */
 const skillFoldersEffect = Effect.fn("SkillFolder.skillFolders")(function* (
   root: string,
   exclude: ReadonlySet<string>,
@@ -99,17 +83,14 @@ const skillFoldersEffect = Effect.fn("SkillFolder.skillFolders")(function* (
     }
     const names = entries
       .map((entry) => entry.name)
-      // `.openbot-stage-` and `.openbot-backup-` folders are an install in progress.
       .filter((name) => !name.startsWith(".") && !name.includes(".openbot-") && !exclude.has(name))
       .sort()
       .slice(0, MAX_SKILLS_PER_FOLDER);
     for (const name of names) {
       const directory = join(root, folder, name);
       try {
-        // `stat` follows a link: `npx skills` links each skill folder to one shared copy.
         if (!archiveResult(yield* Effect.result(archiveCall(() => stat(directory)))).isDirectory()) continue;
         if (archiveResult(yield* Effect.result(pathExistsEffect(join(directory, OWNERSHIP_MARKER))))) continue;
-        // A folder without SKILL.md is not a skill, and a provider skips it too.
         if (!archiveResult(yield* Effect.result(pathExistsEffect(join(directory, "SKILL.md"))))) continue;
       } catch {
         continue;

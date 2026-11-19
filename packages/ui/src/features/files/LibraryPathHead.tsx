@@ -9,27 +9,16 @@ import type { LibraryLocation } from "./library-folders-view";
 
 interface LibraryPathHeadProps {
   place: LibraryLocation;
-  /** The name of the place: "All files", the agent, or the folder. */
   title: string;
-  /** The agent of the place, when the place is an agent or a folder. */
   agent: AgentProfile | undefined;
-  /** The folders above the folder of the place, from the top level down. */
   parents: readonly LibraryFolder[];
   onGo: (place: LibraryLocation) => void;
-  /** How a step of the path shows a drop. */
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
-  /** The controls at the end of the row. */
   children: JSX.Element;
 }
 
-/**
- * The top row of the Library with folders: the path of the place, then the controls of the page. Each
- * step of the path takes dropped files and folders, and a drag that stays on a step goes there.
- */
 export function LibraryPathHead(props: LibraryPathHeadProps) {
-  /** The agent of the current folder. It is the first step of the path. */
   const parentAgent = () => (props.place.kind === "folder" ? props.agent : undefined);
-  /** The agent whose files are the place. Its avatar is at the start of the title. */
   const headAgent = () => (props.place.kind === "agent" ? props.agent : undefined);
   return (
     <header class="library-path-head">

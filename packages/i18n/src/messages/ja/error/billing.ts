@@ -12,7 +12,6 @@ export const messages = {
   "error.billing.storageUnavailable": "このストレージはこのサーバーでは利用できません。",
   "error.billing.storagePaymentFailed":
     "ストレージの支払いに失敗しました。支払い方法を更新して、もう一度お試しください。",
-  // Billing errors.
   "error.billing.licenseExists": "このアカウントにはすでにライセンスがあります。代わりにユーザー数を変更してください。",
   "error.billing.licenseCurrency": "ライセンスは他のプランと同じ通貨を使う必要があります。",
   "error.billing.planCurrency": "新しいプランは他のプランと同じ通貨を使う必要があります。",

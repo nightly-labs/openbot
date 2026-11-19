@@ -1,8 +1,3 @@
-// Runs the real `copilot` provider driver over a fake agent that, as GitHub Copilot CLI 1.0.105 does,
-// starts no stdio MCP server of a session (github/copilot-cli#3889). Computer Use is a stdio server,
-// so a Copilot agent with Computer Use on had no desktop tools. OpenBot must start each stdio server
-// itself and send it as http, with the server's environment, and end it with the session.
-// `bun run test:copilot-mcp-relay`. Writes .openbot-build/copilot-mcp-relay-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,7 +23,6 @@ interface Report {
   serverStoppedWithSession?: boolean;
 }
 
-/** A stdio MCP server with one tool, named from its environment. It writes its process id at start. */
 const ECHO_SERVER = `
 const { writeFileSync } = require("node:fs");
 writeFileSync(process.env.FAKE_PID_FILE, String(process.pid));
@@ -75,7 +69,6 @@ try {
   await writeFile(serverFile, ECHO_SERVER);
   await installFakeAgent(executable, "copilot-mcp", { FAKE_LOG: log });
 
-  // Stands for Computer Use, which the gateway gives as a stdio server with its own environment.
   const computerUse: McpServerConfig = {
     id: "computer-use",
     name: "computer_use",
@@ -107,7 +100,6 @@ try {
   report.reply = turn.reply;
   assert.equal(turn.reply, "OK", "The turn answers.");
 
-  // The client also opens a session of its own to list models. It carries no servers.
   const entries = await readJsonl<ServerEntry>(log);
   report.entries = entries;
   const given = entries.filter((entry) => entry.server === "computer_use");
@@ -122,7 +114,6 @@ try {
 
   const pid = Number(await readFile(pidFile, "utf8"));
   assert.ok(alive(pid), "The stdio server runs while the session is open.");
-  // A stop waits for the relays, so that an app quit leaves no server running.
   await stopClients(clients);
   clients.length = 0;
   report.serverStoppedWithSession = !alive(pid);

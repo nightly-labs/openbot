@@ -1,8 +1,3 @@
-// Provider administration with open provider ids. A provider id is any value that `OPEN_PROVIDER_ID`
-// matches, and each runtime snapshot is a list of rows keyed by id, so a new provider needs no new
-// route set. The host still refuses a provider that it cannot sign in or download. Earlier
-// contracts remain unchanged.
-
 import { isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -34,7 +29,6 @@ export const PROVIDERS_V8_ROUTES = {
   runtimesCheck: "/v1/admin/providers/v8/runtimes/check-updates",
 } as const;
 
-/** The most runtime rows that one snapshot carries. */
 export const PROVIDERS_V8_RUNTIME_LIMIT = 64;
 
 const providerId: AdminDecoder = (value) => {

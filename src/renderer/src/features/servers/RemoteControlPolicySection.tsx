@@ -38,10 +38,6 @@ interface PolicyState {
   error: string | null;
 }
 
-/**
- * Server Settings > Remote desktop of this computer: who may control it, whether the person at it
- * must allow each session, and the way to end every session that runs now.
- */
 export function RemoteControlPolicySection(props: { activeSessions: number; menuMount: HTMLElement | undefined }) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<PolicyState>({ policy: null, busy: false, error: null });

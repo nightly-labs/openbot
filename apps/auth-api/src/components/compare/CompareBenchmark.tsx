@@ -18,10 +18,6 @@ const MEASURES: readonly { key: Measure; label: string; hint: string; format: (v
   { key: "minutes", label: "Time per task", hint: "Lower is better", format: (value) => `${Math.round(value)} min` },
 ];
 
-// The Artificial Analysis Coding Agent Index as a table with a bar in each cell: the
-// table is the chart and its own text version. Each measure has its own column and
-// scale, from zero to the largest value in the column. A bar takes the colour of its
-// agent; the row names the agent, so the colour is never the only label.
 export function CompareBenchmark(props: { benchmark: Benchmark }) {
   const largest = (key: Measure) => Math.max(...props.benchmark.rows.map((row) => row[key]));
   const share = (row: BenchmarkRow, key: Measure) => row[key] / largest(key);

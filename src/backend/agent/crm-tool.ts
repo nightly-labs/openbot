@@ -1,10 +1,3 @@
-/**
- * The `openbot` CRM tools. An agent reads customers and payments and proposes changes; a person
- * approves each proposal on the CRM page. Only agents that an owner or admin let in get answers, and
- * private fields stay hidden (see `CrmAgentView`). Each text here goes into the agent's context, so
- * the schemas stay small and the change check is the contract's `isCrmProposedChange`.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { CRM_EVERY, CRM_LIMITS, CRM_METHODS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
@@ -153,11 +146,8 @@ export const handleCrmTool = Effect.fn("CrmTools.handle")(function* (
   tool: string,
   args: unknown,
   crm: CrmAgentOperations | null,
-  /** The agent that calls the tool. Its CRM access decides each answer. */
   agentId: string,
-  /** The public thread of the call, which a proposal links to. */
   threadId: string | null,
-  /** The tool-error redaction of the router. */
   redact: (text: string) => string,
 ) {
   if (!CRM_TOOL_NAMES.has(tool)) return null;

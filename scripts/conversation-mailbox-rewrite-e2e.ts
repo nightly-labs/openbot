@@ -1,26 +1,3 @@
-// Checks that a queue change writes no unchanged chat rows again. Runs the real SQLite, mailbox
-// store, conversation runtime and mailbox sync on a temporary profile. The chat has more messages
-// than the 100 the runtime keeps. Before them in the display order are a queued message from the
-// user, a request whose delivery still shows running, and a completed message that the agent sent
-// in that request's turn. Each round changes the chat, then a queue change syncs the mailbox.
-// Before the fix, the runtime dropped the mailbox messages again after each sync, so each queue
-// change wrote them again and sent the whole chat.
-//
-// The cases:
-// - `message-limit`: a provider update adds an answer each round.
-// - `byte-limit`: the answers are larger than the 8 MiB that the runtime keeps of one chat.
-// - `provider-read`: each round, a provider read replaces the chat with one that has no mailbox
-//   messages, so the cache has no record of them.
-// - `request-turns`: each answer has the user's request before it, and the chat is over 8 MiB. The
-//   trim must remove each old request with its answer, so that no request stays without its answer.
-// - `mailbox-limit`: a request still shows running, and more than 100 requests come after it. The
-//   chat must keep only the newest 100 completed requests, as many as mailbox sync reads.
-// - `total-budget`: the least recently used chat has a turn that runs and only a mailbox message to
-//   trim. Idle chats then go over the limit of all chats. The idle chats must still be removed.
-// No app, provider, account or network is started.
-//
-// Run: bun scripts/conversation-mailbox-rewrite-e2e.ts
-// Writes .openbot-build/conversation-mailbox-rewrite-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -44,7 +21,6 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RoutineTimer } from "../src/backend/routine-timer";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/conversation-mailbox-rewrite-e2e");
-/** More than `CONVERSATION_SNAPSHOT_MESSAGE_LIMIT`, so the runtime keeps only part of the chat. */
 const SEEDED_TURNS = 120;
 const ROUNDS = 12;
 const TIMED_QUEUE_CHANGES = 50;
@@ -65,22 +41,16 @@ interface CaseReport {
   checks: string[];
   rounds: Round[];
   passed: boolean;
-  /** The time of one queue change that changes nothing, after the rounds. */
   unchangedQueueChangeMs?: number;
-  /** Warnings that a chat was sent again with no stored change. */
   loopWarnings?: number;
-  /** In `request-turns`, the turns that stay in memory. */
   turnsKept?: string;
-  /** In `mailbox-limit`, the requests that stay in memory. */
   requestsKept?: string;
-  /** In `total-budget`, the idle chats that stay in memory. */
   idleChatsKept?: string;
   error?: string;
 }
 
 const report: { cases: CaseReport[]; passed: boolean } = { cases: [], passed: false };
 
-// The runtime writes its warnings to stderr. Count the one that shows the loop.
 const LOOP_WARNING = "[conversation-runtime] A chat was sent again with no stored change";
 let loopWarnings = 0;
 const writeStderr = process.stderr.write;
@@ -98,7 +68,6 @@ Object.defineProperty(process.stderr, "write", {
 });
 
 function assistantMessage(turn: string, createdAt: string, text: string): ConversationMessage {
-  // Mailbox sync sets the reactions of each message. Seed them, so only a real change differs.
   return {
     id: `${turn}-answer`,
     turnId: turn,
@@ -111,12 +80,10 @@ function assistantMessage(turn: string, createdAt: string, text: string): Conver
   };
 }
 
-/** The ISO time 1 ms after `iso`. */
 function after(iso: string): string {
   return new Date(Date.parse(iso) + 1).toISOString();
 }
 
-/** The real runtime, mailbox and mailbox sync on a temporary profile. */
 async function startRuntime() {
   const root = await mkdtemp(join(tmpdir(), "openbot-conversation-rewrite-"));
   const database = new OpenBotDatabase(join(root, "state"));
@@ -171,7 +138,6 @@ async function startRuntime() {
     hooks: { emit: () => {}, emitError: () => {}, queueHold: () => null, threadRequestsChanged: () => {} },
   });
 
-  // Records the message ids of each conversation write.
   const writes: string[][] = [];
   const persistConversationChanges = database.persistConversationChanges.bind(database);
   database.persistConversationChanges = (input) => {
@@ -208,13 +174,11 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     );
     const threadId = store.ensureThreadIdNow(agent.id);
 
-    // The user's message stays queued, so mailbox sync always adds it back.
     const queued = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agent.id], text: "Queued request" }),
     );
     const queuedDeliveryId = queued.deliveries[0]?.id;
     assert.ok(queuedDeliveryId);
-    // The provider finished this turn, but the delivery still shows running.
     const running = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agent.id], text: "Old request" }),
     );
@@ -226,11 +190,9 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       .conversationMessages(agent.id)
       .find((message) => message.id === runningDeliveryId)?.createdAt;
     assert.ok(runningAt);
-    // The seeded answers come after both requests, so the requests sort before the last 100.
     const answeredAt = after(runningAt);
     while (new Date().toISOString() <= answeredAt) await Promise.resolve();
 
-    // Sent in the old turn: the turn sorts before the window, but this message's time is in it.
     const sent = await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "agent", agentId: agent.id },
@@ -245,7 +207,6 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     await runCauseEffect(mailbox.markTerminal(sentDeliveryId, "completed"));
     const mailboxIds = [queuedDeliveryId, runningDeliveryId, `outbox-${sent.messageId}`];
 
-    // In `byte-limit`, all answers together are 1.5 times the limit of one chat.
     const answerText =
       name === "byte-limit" ? "x".repeat(Math.ceil((CONVERSATION_CACHE_BYTES_LIMIT * 1.5) / SEEDED_TURNS)) : null;
     const seeded: ConversationSnapshot = {
@@ -265,7 +226,6 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
       assert.ok(snapshot);
       let first = writes.length;
       if (name === "provider-read") {
-        // The provider's copy has the same answers, one with new text, and no mailbox messages.
         const read = structuredClone(snapshot);
         read.messages = read.messages.filter((message) => !mailboxIds.includes(message.id));
         const edited = read.messages.at(-1);
@@ -316,7 +276,6 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     );
     for (const round of laterRounds) {
       assert.deepEqual(round.queueChangeWrites, [], `round ${round.round}: a queue change writes no unchanged rows`);
-      // A provider read changes the chat, so the queue change that follows it sends the chat once.
       if (name !== "provider-read")
         assert.equal(round.queueChangeConversationEvents, 0, `round ${round.round}: a queue change sends no chat`);
     }
@@ -329,8 +288,6 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     for (let index = 0; index < TIMED_QUEUE_CHANGES; index += 1) sync.emitQueue(agent.id);
     result.unchangedQueueChangeMs = Number(((performance.now() - started) / TIMED_QUEUE_CHANGES).toFixed(3));
     result.loopWarnings = loopWarnings - firstLoopWarning;
-    // Each round of the provider-read case reads the provider again, which sends the chat once.
-    // A real provider read happens when a thread loads, not ten times a minute.
     if (name !== "provider-read") {
       assert.equal(result.loopWarnings, 0, "No warning that the chat is sent again with no stored change.");
       result.checks.push("no loop warning");
@@ -341,10 +298,8 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
   }
 }
 
-/** Requests and answers, together 1.5 times the limit of one chat. */
 const REQUEST_TURNS = 40;
 
-/** The ISO time after `iso`, read from the clock. */
 async function nextTime(iso: string): Promise<string> {
   while (new Date().toISOString() <= iso) await Promise.resolve();
   return new Date().toISOString();
@@ -375,7 +330,6 @@ async function runRequestTurnsCase(result: CaseReport): Promise<void> {
       answers.push(assistantMessage(turn, last, text));
       last = await nextTime(last);
     }
-    // A full read of the chat, as when it loads: each request, then its answer.
     const requests = mailbox.conversationMessages(agent.id);
     assert.equal(requests.length, REQUEST_TURNS, "Each request is in the mailbox.");
     conversation.emitConversation(
@@ -417,7 +371,6 @@ async function runRequestTurnsCase(result: CaseReport): Promise<void> {
   }
 }
 
-/** More completed requests than one mailbox read returns. */
 const LATER_REQUESTS = 130;
 
 async function runMailboxLimitCase(result: CaseReport): Promise<void> {
@@ -431,7 +384,6 @@ async function runMailboxLimitCase(result: CaseReport): Promise<void> {
       "e2e.chat-start",
       {},
     );
-    // The provider finished this turn, but the delivery still shows running.
     const running = await runCauseEffect(
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agent.id], text: "Old request" }),
     );
@@ -479,7 +431,6 @@ async function runMailboxLimitCase(result: CaseReport): Promise<void> {
   }
 }
 
-/** Idle chats of about 7.5 MiB each, together more than the limit of all chats. */
 const IDLE_CHATS = Math.ceil(CONVERSATION_CACHE_TOTAL_BYTES_LIMIT / (CONVERSATION_CACHE_BYTES_LIMIT * 0.9375)) + 1;
 
 async function runBudgetCase(result: CaseReport): Promise<void> {
@@ -511,13 +462,11 @@ async function runBudgetCase(result: CaseReport): Promise<void> {
       "e2e.turn-started",
       {},
     );
-    // Adds the queued message. It is the only message that a trim of this chat could remove.
     sync.emitQueue(busy.id);
     const busyIds = conversation.loadedSnapshot(busy.id)?.messages.map((message) => message.id) ?? [];
     assert.equal(busyIds.length, 2, "The busy chat has its turn and the queued message.");
     result.checks.push("the least recently used chat runs a turn and has only a mailbox message to trim");
 
-    // Each idle chat is used later than the busy chat.
     const usedAt = Date.now();
     while (Date.now() === usedAt) await Promise.resolve();
     const answersPerChat = 30;

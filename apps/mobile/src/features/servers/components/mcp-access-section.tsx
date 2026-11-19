@@ -24,11 +24,6 @@ const LEVEL_KEYS = {
   manage: "mobile.server.roles.level.manage",
 } as const satisfies Record<McpAccessLevel, MobileTextKey>;
 
-/**
- * MCP server page > Access, for an owner or admin of a host with `mcp-access-v1`: the agents that get
- * the server, and the level of Everyone and of each role. A level saves at once. A member gets the
- * highest level of Everyone and of their roles; the host applies it on each request.
- */
 export function McpAccessSection({
   serverId,
   mcpServerId,
@@ -41,7 +36,6 @@ export function McpAccessSection({
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
   const access = useMcpAccess(serverId, mcpServerId);
-  // The names of the roles come from `agent-access-v1`. A host without roles still gives Everyone.
   const roles = useServerRoles(serverId).list ?? [];
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
@@ -109,14 +103,12 @@ export function McpAccessSection({
           <SettingsRow
             key={role.id}
             disclosure={false}
-            // The role has no level of its own: a change of Everyone also changes it.
             supportingText={
               level === entry.everyone && level !== "none" ? t("mobile.server.mcp.access.fromEveryone") : undefined
             }
             trailing={
               <SettingsPicker
                 value={level}
-                // A role cannot go below the level that Everyone gives.
                 options={options(entry.everyone)}
                 enabled={!action.isPending}
                 dark={theme === "dark"}

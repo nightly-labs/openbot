@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "スキルパッケージにシンボリックリンクを含めることはできません。",
   "error.skill.expandedTooLarge": "展開後のスキルは 10 MB 未満である必要があります。",
   "error.skill.irregularEntry": "スキルパッケージに含められるのは通常のファイルとフォルダーのみです。",

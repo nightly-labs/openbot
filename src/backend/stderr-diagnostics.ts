@@ -1,53 +1,11 @@
-// Reading a provider CLI's stderr as records, not as chunks.
-//
-// A `data` event carries whatever the pipe held, so it ends wherever the pipe filled up: often in the
-// middle of a JSON record the CLI is writing. Redaction reads one string at a time and cannot know
-// that a string is half of something, so a record split across two chunks used to pass its second
-// half through untouched, credentials and all. Records are held here until they are whole, and only
-// whole records are redacted. A record usually ends at the next newline, but a CLI may pretty-print
-// one payload over several lines, and a line of such a payload read on its own loses the parent key
-// that tells the redactor what it holds.
-//
-// The text is read once, left to right: every character is classified as it arrives, and the state
-// of that scan (bracket depth, whether it is inside a string) is what survives between chunks. A
-// scan that started again at each newline would walk the whole record every time, which a CLI could
-// turn into seconds of blocked main process with one long payload.
-//
-// A Node CLI also writes objects through `console.error`, which prints them as `util.inspect` text
-// rather than JSON: `Error handling request {` on one line, then indented `key: 'value',` lines and a
-// closing `}`. Its keys have no quotes, so the JSON test above read the first line as a sentence, and
-// the user got `Error handling request {` as an error toast, with each later line that held the word
-// "error" as another one (#1193). Such a dump is held as one record too. Its strings never span a
-// line and every line inside it is indented, so a line that is not ends it, whatever its brackets say.
-
-/** What a record may grow to before it is read anyway. One line of provider stderr is far shorter. */
 const DEFAULT_LIMIT = 64 * 1024;
 
-/**
- * The colour a CLI writes for a terminal, which no reader of these records is.
- *
- * A CLI that keeps colour on a pipe - Grok's does - wraps every field of a record in escape
- * sequences, and they arrive here as text: the user read `[2m2026-09-14T08:28:39Z[0m [31mERROR[0m`
- * in a toast. They also sit between a label and its value, where `apiKey=<esc>[0m<secret>` no longer
- * reads as the key-value pair the redactor looks for, so they are removed before redaction, not
- * after it.
- *
- * Built from a character code because the pattern holds control characters: CSI (`<esc>[…`), OSC
- * (`<esc>]…` up to a bell or a string terminator), and the two-character escapes.
- */
 const ESCAPE = String.fromCharCode(27);
 const ANSI_SEQUENCE = new RegExp(
   `${ESCAPE}(?:\\[[0-9;?]*[ -/]*[@-~]|\\][^${ESCAPE}\\u0007]*(?:\\u0007|${ESCAPE}\\\\)|[@-Z\\\\-_])`,
   "gu",
 );
 
-/**
- * What one diagnostic may carry to a log line or a renderer event.
- *
- * Applied by the reader of a record, after every redaction it runs and not before them: a redactor
- * matches a whole value, and the first half of a quoted credential is not one. A record that a
- * shortening cut in two would keep that half.
- */
 const DIAGNOSTIC_TEXT_LIMIT = 2_000;
 
 export function shortenDiagnostic(message: string): string {
@@ -55,20 +13,10 @@ export function shortenDiagnostic(message: string): string {
 }
 
 export interface DiagnosticStream {
-  /** Takes one stderr chunk and emits every record it completes. */
   push: (chunk: string) => void;
-  /** Reads what is held, for a process that exits without a final newline. */
   flush: () => void;
 }
 
-/**
- * `redact` is given a whole record, and `emit` its redacted form; an empty result is not emitted.
- *
- * The held text is bounded: a CLI that writes megabytes without ending a record must not grow the
- * main process. What is over the bound is read as it stands, which is safe because the redactor
- * drops an unterminated payload rather than passing on what it could not parse, and the rest of that
- * record is then read and thrown away rather than emitted as a record of its own.
- */
 export function createDiagnosticStream(options: {
   redact: (value: string) => string;
   emit: (message: string) => void;
@@ -76,24 +24,13 @@ export function createDiagnosticStream(options: {
 }): DiagnosticStream {
   const limit = options.limit ?? DEFAULT_LIMIT;
   let pending = "";
-  /** Where the scan stopped. Everything before it in `pending` is classified. */
   let cursor = 0;
-  /** Bracket depth of the payload being read, and 0 while the scan is in plain text. */
   let depth = 0;
   let inString = false;
   let escaped = false;
-  /** Set while the payload being read is `util.inspect` text, not JSON. */
   let inspect = false;
-  /** The quote that opened the string being read. JSON has only `"`; `util.inspect` uses all three. */
   let quote = '"';
-  /**
-   * An opening bracket whose kind is still undecided, with `at` the place the search for the first
-   * character after it goes on. `{` at the end of a chunk may open a record or end a sentence, and
-   * the text that decides it has not arrived yet. `newline` and `indented` say whether that search
-   * crossed a line end, and whether the line after it starts with a space.
-   */
   let undecided: { open: number; at: number; newline: boolean; indented: boolean } | null = null;
-  /** Set while the rest of a record that went over the bound is being read and thrown away. */
   let dropping = false;
 
   function resetScan(): void {
@@ -110,7 +47,6 @@ export function createDiagnosticStream(options: {
     if (message) options.emit(message);
   }
 
-  /** Ends the record that stops at `end`, and starts the scan again on what follows it. */
   function takeRecord(end: number): void {
     if (!dropping) emitRecord(pending.slice(0, end));
     dropping = false;
@@ -118,13 +54,6 @@ export function createDiagnosticStream(options: {
     resetScan();
   }
 
-  /**
-   * Decides whether the held bracket opens what a serializer wrote. `{"headers":` is a record, and
-   * so is a bracket that ends its line with an indented line under it, which is how `util.inspect`
-   * prints a multi-line object; `note {` is a sentence, and holding a sentence open would keep every
-   * line after it unread until the bound. Answers `false` while only spaces follow the bracket, so
-   * the decision waits for text rather than being guessed.
-   */
   function decideUndecided(held: NonNullable<typeof undecided>): boolean {
     for (; held.at < pending.length; held.at += 1) {
       const char = pending[held.at];
@@ -139,8 +68,6 @@ export function createDiagnosticStream(options: {
       }
       if (char === "\r") continue;
       undecided = null;
-      // Back to the bracket either way: as the first level of a payload, or as one more character of
-      // the line it sits in.
       cursor = held.open + 1;
       if (char === '"' || char === "{" || char === "[") depth = 1;
       else if (held.indented && char !== "}" && char !== "]") {
@@ -162,13 +89,10 @@ export function createDiagnosticStream(options: {
       const char = pending[cursor];
       if (depth > 0 && inspect && char === "\n") {
         const next = pending[cursor + 1];
-        // The first character of the next line says whether the dump goes on, and it has not arrived.
         if (next === undefined) return;
         inString = false;
         escaped = false;
         if (next !== " " && next !== "\t" && next !== "}" && next !== "]") {
-          // A line that is not indented is not part of the dump, so the record ends here even when
-          // the brackets read so far do not balance.
           takeRecord(cursor);
           continue;
         }
@@ -209,15 +133,8 @@ export function createDiagnosticStream(options: {
       scan();
       if (pending.length <= limit) return;
       if (!dropping) emitRecord(pending);
-      // The bound was passed inside a record. What was read is emitted, and the rest of that same
-      // record is read on and dropped: shown as a record of its own it would be half a payload, and
-      // half a payload is the half the redactor cannot name.
-      // A dump that waits at the end of a line keeps that newline: the next line decides whether the
-      // dump goes on, and without it that line is dropped as the rest of the dump.
       pending = inspect && depth > 0 && pending.endsWith("\n") ? "\n" : "";
       cursor = 0;
-      // An undecided bracket loses its place with the text it pointed into. It counts as a payload,
-      // which keeps the rest of the record held back rather than passed on.
       if (undecided) {
         undecided = null;
         depth = 1;

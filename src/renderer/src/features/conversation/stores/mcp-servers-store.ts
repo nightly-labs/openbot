@@ -8,23 +8,9 @@ export interface McpServersStoreDeps {
   props: ConversationProps;
 }
 
-/**
- * The MCP servers the composer can tag with `$`.
- *
- * They are the host's, not the agent's: an MCP server is held by the computer that runs the agents,
- * so one list serves every conversation on that host. Nothing connects here. The list is read for
- * its names, and a tag is a hint in the prompt, so a server that cannot answer is still a server the
- * user can name.
- *
- * The list is read again when the server settings or the marketplace close, because those
- * are where a server is added or removed, and on a reconnection, because a remote host answers this
- * only while connected.
- */
 export function createMcpServersStore(deps: McpServersStoreDeps) {
   const [mcpServers, setMcpServers] = createSignal<McpServerConfig[]>([]);
   let request = 0;
-  // An agent that saves a server asks for its sign-in with a card, which draws from this list. Each
-  // new card, in the chat or in a thread, is read again, or the card would wait for the settings to close.
   const signInCardList = createMemo(() => {
     const threads = deps.props.threads;
     const threadMessages = [
@@ -43,10 +29,6 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       }),
     ];
   });
-  // Sorted and without repeats, so a tab that moves or opens reads nothing again.
-  const signInCards = createMemo(() => [...new Set(signInCardList().map((card) => card.mcpServerId))].sort().join(","));
-  // Each new card reads the sign-in states again, a second card for the same server too: an agent
-  // that tests again after the server refused the sign-in makes a new card for the same row (#6661).
   const signInCardMessages = createMemo(() =>
     [...new Set(signInCardList().map((card) => card.messageId))].sort().join(","),
   );
@@ -58,11 +40,8 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
   );
   const source = createMemo(() => {
     const server = deps.props.server;
-    // A host that predates the capability answers 404, and a host without `mcp-member-access-v1`
-    // refuses its list to a member with 403, because the list holds the servers' environment and
-    // header values. Neither is asked.
     const supported = server?.kind !== "remote" || serverCanManageMcp(server);
-    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCards()}`;
+    return `${server?.id ?? ""}\0${server?.connectionSequence ?? 0}\0${supported ? "supported" : "unsupported"}\0${deps.props.mcpSettingsOpen === true}\0${signInCardMessages()}`;
   });
   createEffect(source, (key) => {
     const current = ++request;
@@ -76,10 +55,7 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       .then((servers) => {
         if (current === request) setMcpServers(servers);
       })
-      .catch(() => {
-        // Nothing waits for this list: the picker offers the skills it has, and without the servers
-        // a `$` tag is one option short rather than an error over the composer.
-      });
+      .catch(() => {});
   });
 
   return { mcpServers };

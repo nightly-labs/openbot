@@ -224,7 +224,7 @@ export const messages = {
   "crm.customer.paidOn": "שולם ב-{date}",
   "crm.customer.billing": "חיוב",
   "crm.customer.details": "פרטים",
-  "crm.customer.since": "לקוח מאז",
+  "crm.customer.added": "נוסף",
   "crm.customer.activity": "פעילות",
   "crm.customer.loading": "טוען…",
 

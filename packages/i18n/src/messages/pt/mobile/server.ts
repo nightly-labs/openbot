@@ -718,6 +718,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "No Proton Pass, crie uma chave de acesso que só possa ler o cofre que você compartilha com o OpenBot e cole-a aqui. {host} guarda a chave; este telefone não.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Seu plano Proton não inclui a ferramenta de linha de comando do Proton Pass. Ela precisa de um plano do Proton que inclua o Pass Plus. Outros planos pagos, como o Mail Plus, não a incluem. Mude o plano da sua conta e conecte novamente.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} não está disponível neste servidor.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Entre no {name} neste telefone. Depois, {host} cria um cofre compartilhado e uma chave de acesso somente leitura para ele, e guarda apenas essa chave. Os agentes nunca veem uma senha.",
@@ -746,8 +748,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Somente leitura",
   "mobile.server.connectors.passwordManager.keyExpires": "Somente leitura. Expira em {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Expirou em {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "A ferramenta de linha de comando do {name} exige um plano pago. Mude o plano da sua conta e conecte novamente.",
   "mobile.server.connectors.passwordManager.expiredTitle": "A chave do {name} expirou",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Os agentes em {host} não podem entrar com seus logins compartilhados até você conectar novamente.",
@@ -997,7 +997,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Adicionar",
   "mobile.server.connectors.whatsapp.groupTitle": "Adicionar um grupo",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "As pessoas deste grupo podem passar trabalho para seus agentes.",
+    "As pessoas deste grupo podem passar trabalho para seus agentes quando mencionam o número ou respondem às mensagens dele.",
   "mobile.server.connectors.whatsapp.groupSearch": "Buscar grupos",
   "mobile.server.connectors.whatsapp.groupsLoading": "Lendo os grupos…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "O OpenBot não conseguiu ler os grupos",
@@ -1497,7 +1497,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Adicionou {member} a {role}",
   "mobile.server.audit.roleMemberRemoved": "Removeu {member} de {role}",
   "mobile.server.audit.agentLevel": "{agent} para {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importar agentes",
   "mobile.server.route.import": "Importar agentes",
   "mobile.server.import.unsupported": "Atualize o OpenBot neste servidor para importar agentes aqui.",
@@ -1571,7 +1570,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Não importado",
   "mobile.server.import.resultWarnings": "Alguns itens não foram transferidos",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transferência",
   "mobile.server.route.transfer": "Transferência",
   "mobile.server.route.transferExport": "Exportar",
@@ -1649,6 +1647,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copiar agentes duplicados?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} já tem agentes com estes nomes: {names}. A cópia adiciona um segundo agente para cada um. Cada cópia é um agente separado com seus próprios chats, arquivos e memórias.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copiar duplicados",
   "mobile.server.transfer.copying": "Copiando…",
   "mobile.server.transfer.copyFailed": "A cópia não terminou.",
   "mobile.server.transfer.copied": {

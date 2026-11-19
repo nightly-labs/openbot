@@ -140,8 +140,6 @@ describe("browser decoders", () => {
     expect(() => decode(value)).toThrow(/^Invalid /);
   });
 
-  // A renderer that read a truthy value as a person's control would show a tab as held that the agent
-  // still uses. Only the exact `true` that main sends crosses the bridge.
   it.each([false, "true", 1, null, {}])("drops a userControl value of %j", (userControl) => {
     expect(decodeBrowserTab({ ...tab, userControl })).toEqual(tab);
   });

@@ -283,6 +283,7 @@ export const messages = {
   "mobile.settings.conversations.media": "사진 및 파일",
   "mobile.settings.conversations.swipeLeft": "에이전트 채팅에서 왼쪽으로 스와이프",
   "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
+  "mobile.settings.conversations.swipeQuestion": "곁다리 질문",
   "mobile.settings.conversations.swipeThreads": "스레드",
   "mobile.settings.conversations.swipeBrowser": "브라우저",
   "mobile.settings.conversations.swipeOff": "끔",
@@ -561,7 +562,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "에이전트 선택",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot이 잠겨 있습니다",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot 열기",
-  "mobile.settings.shortcuts.footer": "단축어 앱의 Send Message는 이 에이전트에게 보냅니다. 앱은 열리지 않습니다.",
+  "mobile.settings.shortcuts.footer":
+    "단축어 앱의 Send Message는 이 에이전트에게 보냅니다. 앱은 열리지 않습니다. Open Agent는 이 에이전트의 채팅을 엽니다.",
   "mobile.settings.shortcuts.send.sent": "보냄",
   "mobile.settings.shortcuts.send.failed": "OpenBot이 이 메시지를 보내지 못했습니다.",
   "mobile.settings.shortcuts.send.unconfirmed": "서버에서 응답이 없습니다. 메시지가 채팅에 있을 수 있습니다.",

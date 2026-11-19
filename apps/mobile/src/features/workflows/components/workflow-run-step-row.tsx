@@ -19,10 +19,6 @@ const STATUS_CLASS: Record<WorkflowStep["status"], string> = {
   skipped: "text-text-secondary",
 };
 
-/**
- * One step of a run, or a step that ran alone: its status and output. The person approves or declines
- * a step that waits, retries a step that failed, and stops a step that runs.
- */
 export function WorkflowRunStepRow({
   node,
   step,
@@ -40,13 +36,11 @@ export function WorkflowRunStepRow({
   onDecide: (step: WorkflowStep, approved: boolean) => void;
   onRetry: (step: WorkflowStep) => void;
   onStop: (step: WorkflowStep) => void;
-  /** The depth of the path of the step: each path sits one level deeper than its split. */
   depth?: number;
 }) {
   const { t } = useText();
   const [open, setOpen] = useState(false);
   const status = step?.status;
-  // The output of an image or video step is the id of the file that it made, not text to read.
   const output = node.kind !== "image" && step?.output?.trim() ? step.output : null;
   return (
     <View

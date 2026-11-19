@@ -3,10 +3,6 @@ import { isIdentifier } from "./ipc-bounded-values";
 import { type ConversationMessage, isConversationMessage, type MessageReaction } from "./ipc-conversation-messages";
 import { isDynamicRecord, isNumber } from "./runtime-values";
 
-/**
- * The most recent completed messages that main keeps and sends for one conversation, plus the
- * active turn. A snapshot with fewer messages is the whole conversation.
- */
 export const CONVERSATION_SNAPSHOT_MESSAGE_LIMIT = 100;
 
 export interface ConversationSnapshot {
@@ -68,11 +64,6 @@ export type ConversationPageAnchor =
 export interface ConversationPageInfo {
   hasOlder: boolean;
   olderCursor: string | null;
-  /**
-   * How many messages are older than the page, and the time of the oldest one. The chat's scroll rail
-   * draws the part that is not loaded from these. A host that does not send them leaves them out,
-   * and the Team API never carries them.
-   */
   olderCount?: number;
   oldestAt?: string;
 }
@@ -94,19 +85,16 @@ export interface ConversationPage {
   readState?: ConversationReadState;
 }
 
-/** A link in an agent's conversation that the user opened. */
 export interface OpenMessageLinkInput {
   agentId: string;
   url: string;
 }
 
-/** The address that the browser shows at the end of a relayed sign-in link. */
 export interface PasteMessageLinkInput {
   url: string;
   address: string;
 }
 
-/** A relayed sign-in link that the user stopped. */
 export interface CancelMessageLinkInput {
   url: string;
 }
@@ -116,17 +104,12 @@ export interface SearchConversationMessagesInput {
   agentId?: string;
   cursor?: string;
   limit?: number;
-  /**
-   * Also search the open side threads. A joined server reads it only when its host serves
-   * `thread-message-search-v1`; an older host searches the agents' own chats.
-   */
   includeSideThreads?: boolean;
 }
 
 export interface ConversationSearchResult {
   agentId: string;
   message: ConversationMessage;
-  /** The side thread that has the message. A message of the agent's own chat has none. */
   taskId?: string;
 }
 
@@ -136,14 +119,12 @@ export interface ConversationSearchPage {
   nextCursor: string | null;
 }
 
-/** A file name search across the local agent chats. An empty query lists the newest files. */
 export interface SearchConversationFilesInput {
   query: string;
   cursor?: string;
   limit?: number;
 }
 
-/** One file that a message in an agent chat carries. */
 export interface ConversationFileSearchResult {
   agentId: string;
   messageId: string;
@@ -161,7 +142,6 @@ export interface MarkConversationReadInput {
   throughMessageId: string | null;
 }
 
-/** Marks `fromMessageId` and the messages after it unread, for this computer's reader. */
 export interface MarkConversationUnreadInput {
   agentId: string;
   fromMessageId: string;
@@ -172,43 +152,22 @@ export interface SendMessageInput {
   text: string;
   attachmentDraftIds?: string[];
   replyToMessageId?: string | null;
-  /**
-   * The sender's id for this message. A second send with the same id, from the same sender to the
-   * same agent, returns the first receipt instead of a new message, so a lost reply can be retried.
-   */
   clientMessageId?: string;
-  /** The open task of this agent that takes the message. Without it, the agent's own chat takes it. */
   taskId?: string;
-  /**
-   * An audio draft of what the user said, when the text came from a voice turn. The host keeps it with
-   * the message for replay and never gives it to the agent.
-   */
   voiceRecordingDraftId?: string;
 }
 
-/**
- * Deletes one message from the chat of an agent, or of one open side task of the agent. The host
- * removes it from its history and view; the provider session of the agent can still remember it.
- */
 export interface DeleteConversationMessageInput {
   agentId: string;
   messageId: string;
-  /** The open task of this agent whose chat holds the message. Without it, the agent's own chat. */
   taskId?: string;
 }
 
-/** Takes the report of a thank-you card off GitHub. The card is in the agent's chat or in one of its side threads. */
 export interface WithdrawFeedbackInput {
   agentId: string;
-  /** The thank-you card, in the agent's own chat. */
   messageId: string;
 }
 
-/**
- * What became of a withdrawal: the report is off GitHub; nobody is signed in; another account sent it;
- * the account service cannot remove an issue now; too many tries; the card is not a sent report; or the
- * issue moved to another public repository.
- */
 export const WITHDRAW_FEEDBACK_STATUSES = [
   "withdrawn",
   "signedOut",

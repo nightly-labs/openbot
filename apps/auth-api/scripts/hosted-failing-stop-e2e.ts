@@ -1,17 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that answers as during a stop that boat cannot finish. boat runs the pre-stop hook, which stops
-// OpenBot, and then cannot save the disk. It reports `stop.status: "failing"` and tries the stop again
-// until a save works, while the sandbox keeps a usable state (`idle`). On 2026-11-05 a server stayed so
-// for 18 hours: the Worker read the sandbox as running, and the fault stayed hidden.
-//
-// The Worker must read the server as `stopping`, not running, and log a warning. It must not end the
-// stop: boat does not say if a resume keeps the disk or restores the last saved one, and a forced stop
-// loses what was written after that. Each client wake and connector event still sends the start command
-// of a failed stop, as before. A webhook must not hide the failing stop. A stop that boat still does
-// gets no command.
-//
-// Run: bun run test:hosted-failing-stop
-// It writes .openbot-build/hosted-failing-stop-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -40,12 +26,7 @@ const MINUTE = 60_000;
 const NOW = Date.UTC(2026, 10, 5, 21);
 const WARNING = "Hosted server stop is failing.";
 
-/**
- * The stop that boat reports on the sandbox. `failing` keeps the state `idle`, `pending` is
- * `archiving`, and `unknown` is a stop object with no status on a sandbox that runs.
- */
 type StopAnswer = "failing" | "pending" | "unknown";
-/** `route` is a connector event (`startForRoute`). `webhook` is a boat `sandbox.ready` event. */
 type Caller = "client" | "route" | "cron" | "webhook";
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -179,7 +160,6 @@ async function runWith(options: {
   };
 }
 
-/** The command of a failed stop: it starts OpenBot only for a flag older than 5 minutes. */
 function failedStopStart(commands: { body: unknown }[]) {
   const body = commands[0]?.body;
   const text = isDynamicRecord(body) && isString(body.command) ? body.command : "";
@@ -194,7 +174,6 @@ function state(row: unknown) {
   return isDynamicRecord(row) ? row.observed_state : null;
 }
 
-/** Read as stopping, logged, and only the start command of a failed stop sent to boat. */
 function heldWithStart(result: Awaited<ReturnType<typeof runWith>>) {
   return (
     result.failure === null &&

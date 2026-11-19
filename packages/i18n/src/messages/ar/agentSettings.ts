@@ -231,6 +231,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "استخدام «السؤال أولًا»",
 
   "agentSettings.links.usage": "الاستخدام",
+  "agentSettings.links.apps": "التطبيقات",
+  "agentSettings.links.appsScope": "كل الوكلاء",
   "agentSettings.links.memories": "الذكريات",
   "agentSettings.links.memoriesCount": {
     zero: "لا ذكريات محفوظة",

@@ -9,10 +9,8 @@ export type ChatTarget =
       serverId: string;
       name: string;
       members: MobileAgent[];
-      /** The channel picture, which takes the place of the member faces. */
       icon?: ChannelIcon | null;
       imageUrl?: string | null;
     };
 
-/** The target of a chat with one agent, such as an agent task. */
 export type AgentChatTarget = Extract<ChatTarget, { kind: "agent" }>;

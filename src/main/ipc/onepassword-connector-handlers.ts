@@ -1,7 +1,3 @@
-// The one 1Password connection of this computer: connect through the 1Password CLI or with a pasted
-// service account token, cancel, and disconnect. The `host*` endpoints read, connect with a token,
-// and disconnect a joined server's connection (`onepassword-connector-v1`).
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   decodeHostOnePasswordConnectorStatus,
@@ -25,10 +21,8 @@ import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-gro
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString, stringPayload } from "./validation";
 
-/** A service account token is a few hundred characters; a much longer value is not one. */
 const MAX_TOKEN_LENGTH = 4096;
 
-// Only the methods these endpoints call, so a test can pass a double without an assertion.
 export interface OnePasswordConnectorIpcDependencies {
   onePasswordConnector: Pick<
     OnePasswordConnectorService,
@@ -59,11 +53,6 @@ function decodeHostConnectInput(value: unknown): OnePasswordHostConnectInput {
   return { token };
 }
 
-/**
- * The renderer names an account from the list main gave it, or hands over a token once. It never
- * names a CLI path, a download, a vault or a command: main builds each `op` call and the install
- * from the release it pins.
- */
 export function onePasswordConnectorIpcHandlers({
   onePasswordConnector,
   remoteServers,

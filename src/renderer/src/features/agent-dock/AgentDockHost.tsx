@@ -1,3 +1,4 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -55,6 +56,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import {
   channelConversationRows,
   channelMessageHasContent,
+  channelWorkingTurns,
   sentChannelMessageId,
 } from "../channels/channel-conversation-rows";
 import { useChannels } from "../channels/channels-context";
@@ -62,6 +64,7 @@ import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
+import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -81,11 +84,6 @@ import {
 } from "./agent-dock-preference";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
-/**
- * Where this window shows the dock. Null hides the dock: the user turned it off, the platform is not
- * known yet, or it has no dock. On Linux with Wayland windows, the dock above other apps waits for a
- * start on XWayland, and shows in the window until then.
- */
 export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   const platform = usePlatform();
   const preference = useAgentDockPreference();
@@ -97,21 +95,12 @@ export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   };
 }
 
-/**
- * The agent dock of the active server, on macOS, Windows and Linux. Each server has its own dock. By default the dock
- * is a window of its own at the right edge of the screen, above the other apps; this renderer publishes
- * what it shows. The user can keep it in the main window instead.
- */
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
   const platform = usePlatform();
   const preference = useAgentDockPreference();
 
-  /* Linux: a dock that is off or in the window does not need XWayland, so the next start on a Wayland
-     session uses Wayland again. A dock that the user turns on again on XWayland keeps it; a dock that
-     was on at start does not, so a start on XWayland for another reason stays a single start. On
-     Wayland, only the restart in the settings turns it on. */
   let wasOn: boolean | undefined;
   createEffect(
     () => {
@@ -133,8 +122,6 @@ export function AgentDockHost() {
     },
   );
 
-  /* The window hides when no server is active, when the dock is off or in the main window, and when
-     this renderer goes away. */
   const hideScreenDock = () =>
     void agentDockPort()
       .agentDock.publishPresentation(null)
@@ -165,7 +152,6 @@ export function AgentDockHost() {
   );
 }
 
-/** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
   const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
     useAgents();
@@ -216,19 +202,15 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   onCleanup(() => {
     disposed = true;
   });
-  /** A send that failed. A retry of the same text keeps its operation, so the channel gets the message once. */
   let failedSend: { channelId: string; text: string; operationId: string } | null = null;
 
   const saveSeats = (seats: readonly AgentDockSeatRef[]) => setAgentDockSeats(serverId, seats);
   const seated = (seat: AgentDockSeatRef) => seatRefs().some((item) => item.kind === seat.kind && item.id === seat.id);
 
-  /* A deleted or hidden agent, and a deleted channel, leave the dock without a change to the saved list:
-     a list that is still loading must not empty the dock. */
   const shownAgents = createMemo(() => agentList().filter((agent) => !userHiddenAgentIds().has(agent.id)));
   const shownChannels = createMemo(() =>
     channels.supported() ? channels.state.channels.filter((channel) => !channel.archived) : [],
   );
-  /* A wait in a channel thread goes to the channel, as in the sidebar. */
   const channelWaits = createMemo(() => {
     const prompts = Object.values(pendingPrompts());
     return sidebarChannelWaits({
@@ -238,12 +220,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       approvals: approvals(),
     });
   });
-  /* The badge of the sidebar row; work that runs shows when the channel has no other badge. */
   const channelState = (channel: ChannelSummary): SidebarAgentState | undefined =>
     sidebarUnreadBadge(channel.unreadCount, channelWaits()[channel.id]) ??
     (channel.activeTasks > 0 ? { kind: "working" } : undefined);
-  /* With the setting on, an agent or a channel that is not on the dock shows at its end while it has a new
-     message or waits for the user, and while its chat is open. A seat that came first stays first. */
   const temporaryRefs = createMemo(
     (previous: readonly AgentDockSeatRef[] = []): AgentDockSeatRef[] => {
       if (!preference().activeSeats) return [];
@@ -266,8 +245,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       const kept = previous.filter((seat) => activeKeys.has(agentDockSeatKey(seat)));
       const keptKeys = new Set(kept.map(agentDockSeatKey));
       const added = active.filter((seat) => !keptKeys.has(agentDockSeatKey(seat)));
-      /* The dock window shows at most AGENT_DOCK_LIMITS.seats seats; the seats of the user come first.
-         A saved seat of a deleted or hidden agent does not show, so it takes no place. */
       const shownKeys = new Set([
         ...shownAgents().map((agent) => agentDockSeatKey({ kind: "agent", id: agent.id })),
         ...shownChannels().map((channel) => agentDockSeatKey({ kind: "channel", id: channel.id })),
@@ -294,7 +271,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     };
     return [...seatRefs().flatMap((ref) => seat(ref, false)), ...temporaryRefs().flatMap((ref) => seat(ref, true))];
   });
-  /* The add menu offers what the dock does not show, also as a temporary seat. */
   const onDock = createMemo(() => new Set([...seatRefs(), ...temporaryRefs()].map(agentDockSeatKey)));
   const available = createMemo(() =>
     shownAgents().filter((agent) => !onDock().has(agentDockSeatKey({ kind: "agent", id: agent.id }))),
@@ -314,8 +290,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     });
   };
 
-  /* The page of the open channel: the one the main window shows, or one that the dock reads itself. A
-     change of the channel on the host reads it again. */
   const [readPage, setReadPage] = createSignal<ChannelPage | null>(null);
   const channelPage = (channelId: string): ChannelPage | null => {
     const selected = channels.state.page;
@@ -324,7 +298,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     return read?.channel.id === channelId ? read : null;
   };
   let readId = 0;
-  /** The channel that a read runs for. Changes during that read start one more read when it ends. */
   let reading: string | null = null;
   let readAgain = false;
   const readChannel = (channelId: string) => {
@@ -348,7 +321,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
         if (readAgain && !disposed && openChannelId() === channelId) readChannel(channelId);
       });
   };
-  /* The main window that leaves the open channel stops updating its page, so the dock reads it again. */
   const mainChannelId = createMemo(() => channels.state.page?.channel.id ?? null);
   createEffect(
     () => [openChannelId(), mainChannelId()] as const,
@@ -364,14 +336,10 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     }),
   );
 
-  /* The channel that the chat shows. It stays after a close, so the chat keeps its rows while it fades. */
   const shownChannelId = createMemo((previous?: string | null) => openChannelId() ?? previous ?? null);
-  /* The dock shows a message with no sender as the reader's own. A signed-in reader's messages carry their sender. */
   const ownCopies = new WeakMap<AgentMessage, AgentMessage>();
   const asOwn = (message: AgentMessage): AgentMessage => {
     if (message.author !== "you" || !message.senderMember || !isOwnSender(message.senderMember.id)) return message;
-    /* A copy stays the same while the text, the kind and the files of its message stay: the chat reads it
-       again for each streamed word of an answer, and a new copy would draw the row again. */
     const copy = ownCopies.get(message);
     if (copy && copy.body === message.body && copy.kind === message.kind && copy.attachments === message.attachments)
       return copy;
@@ -379,29 +347,37 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     ownCopies.set(message, own);
     return own;
   };
-  /* The rows of the shown channel. */
   const channelMessages = createMemo((): AgentMessage[] => {
     const channelId = shownChannelId();
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
-    return channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn);
+    return withStepAnswers(
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      new Set(channelWorkingTurns(page, new Set())),
+      (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
+    );
   });
-  const agentMessages = (agentId: string): AgentMessage[] => (conversations[agentId]?.messages ?? []).map(asOwn);
+  const agentMessages = (agentId: string): AgentMessage[] => {
+    const running = workingTurns()[agentId];
+    const asking = promptOf({ kind: "agent", id: agentId })?.turnId;
+    return withStepAnswers(
+      (conversations[agentId]?.messages ?? []).map(asOwn),
+      new Set(running && running !== asking ? [running] : []),
+      () => agentList().find((agent) => agent.id === agentId)?.provider,
+    );
+  };
 
-  /* The answers that failed, by request. A failure shows the card's controls again. */
   const [failedAnswers, setFailedAnswers] = createSignal<Record<string, number>>({});
   const attemptOf = (key: string) => Math.min(failedAnswers()[key] ?? 0, AGENT_DOCK_LIMITS.count);
   const failed = (key: string) => {
     if (!disposed) setFailedAnswers((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
   };
-  /** The threads whose requests show in the seat's chat: the agent's own chat, or the threads of the channel. */
   const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] =>
     seat.kind === "agent"
       ? shownAgents().flatMap((agent) =>
           agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
         )
       : (shownChannels().find((channel) => channel.id === seat.id)?.threads ?? []);
-  /** The oldest approval of the seat, the same one that the main chat shows. The user answers it in the dock chat. */
   const approvalOf = (seat: AgentDockSeatRef): AgentDockApproval | null => {
     const threads = threadsOf(seat);
     const approval = approvals().find((item) =>
@@ -414,7 +390,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       cut: approvalIsCut(approval),
     };
   };
-  /** The question that a thread of the seat waits for. */
   const promptOf = (seat: AgentDockSeatRef): AgentDockPrompt | null => {
     for (const thread of threadsOf(seat)) {
       const event = pendingPrompts()[attentionKey(thread.agentId, thread.threadId)];
@@ -430,10 +405,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     }
     return null;
   };
-  /**
-   * The title and the origin of the takeover's tab. The tabs are the active server's, as the dock's.
-   * Only the origin goes to the dock: the full address can hold a sign-in token.
-   */
   const takeoverPage = (tabId: string): AgentDockTakeoverPage | null => {
     const tab = browserTabs().find((candidate) => candidate.id === tabId);
     if (!tab) return null;
@@ -441,15 +412,12 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     try {
       const parsed = new URL(tab.url).origin;
       if (parsed !== "null") origin = parsed;
-    } catch {
-      // A tab without a web address shows the host fallback of the card.
-    }
+    } catch {}
     return {
       title: tab.title.slice(0, AGENT_DOCK_LIMITS.pageTitle),
       origin: origin.slice(0, AGENT_DOCK_LIMITS.pageOrigin),
     };
   };
-  /** The browser takeover that a thread of the seat waits for, with the vault choice of a password card. */
   const takeoverOf = (seat: AgentDockSeatRef): AgentDockTakeover | null => {
     for (const thread of threadsOf(seat)) {
       const event = pendingPrompts()[attentionKey(thread.agentId, thread.threadId)];
@@ -468,10 +436,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     return null;
   };
 
-  /* A usage limit holds the agent's queued message: the chat asks where to send it, with the same
-     gates as the main chat. On a joined server, the levels that decide Delete of any message decide it.
-     The dock does not read a joined server's backup models, so there "Remember" stays in the main
-     chat: a save here would replace the order that the host keeps. Channels ask in the main window. */
   const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
   const remote = () => activeServer()?.kind === "remote";
   const usageLimitAskFor = usageLimitAskFrom({
@@ -485,7 +449,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     modelOptions,
     providers: () => agentStatus().providers,
     limited: (choice) => usageLimitedModels().some((held) => sameAgentModelChoice(held, choice)),
-    // Model fields go through the Team API route on a joined server, as in the main chat.
     update: async (agentId, updates) => {
       await updateAgent(agentId, updates);
     },
@@ -546,8 +509,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     };
   };
 
-  /* The open chat is on screen, so its new answers are read, as in the main window. The dock window is
-     on screen when the main window is not, so there the visibility of this page does not count. */
   const readable = () => options.readWhenHidden || document.visibilityState === "visible";
   createEffect(
     () => {
@@ -562,10 +523,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
     },
   );
-  /* A joined server that connects again, as after its restart, sends only the newest reply of each agent.
-     The main window reads its open agent's latest page again. Each other agent chat that the dock loaded
-     reads its page here, or the messages from the time without a connection stay missing (#11748). A second
-     read of the open agent would replace the main window's read, which then keeps its loading state. */
   let connectedSequence: number | undefined;
   createEffect(
     () => {
@@ -584,11 +541,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
             : [],
         ),
       );
-      // A failed read keeps the chat as it is; the next change of the agent's chat reads it again.
       for (const agentId of loaded) void loadLatestAgentMessages(agentId).catch(() => undefined);
     },
   );
-  /* A channel is read through the newest message of its page, once for each new message. */
   const channelReadThrough = new Map<string, number>();
   createEffect(
     () => {
@@ -614,12 +569,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     },
   );
 
-  /* The unread answers of the agents on the dock, temporary seats too, for the finished-work shelf. The shelf hides each one
-     after some time; the seat keeps its unread badge. Channels have no results. */
   let firstSeen = new Map<string, number>();
   const results = createMemo((): AgentDockResult[] => {
     if (!preference().results) return [];
-    /* An answer with no time keeps the time when the dock first saw it, so the presentation stays the same. */
     const seen = new Map<string, number>();
     const seenAt = (id: string) => {
       const at = firstSeen.get(id) ?? Date.now();
@@ -653,15 +605,8 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     openSeat,
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
-      // The main window keeps the latest page of every agent it has opened; another agent loads it here.
       if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
-    /**
-     * The thread tab that the main window opens for an agent of the dock. When the seat's badge comes
-     * only from new replies in side threads, the dock chat cannot show them, so the main window opens
-     * the newest of those threads. Its tab reads the replies, and the badge goes. Otherwise the agent
-     * opens as before.
-     */
     mainTabOf(agentId: string): string | undefined {
       const state = agentStates()[agentId];
       if (state?.kind !== "unread" || state.count > 0) return undefined;
@@ -677,9 +622,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     remove(seat: AgentDockSeatRef) {
       saveSeats(seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id));
     },
-    /* The saved list also keeps seats that the dock does not show now, so the seat goes before its
-       neighbour and not to an index. A temporary seat that the user moves goes on the dock. A seat put
-       before a temporary seat goes to the end of the user's seats. */
     move(seat: AgentDockSeatRef, before: AgentDockSeatRef | null) {
       if (!seated(seat) && !temporaryRefs().some((item) => item.kind === seat.kind && item.id === seat.id)) return;
       const others = seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id);
@@ -687,10 +629,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       const moved = { kind: seat.kind, id: seat.id };
       saveSeats(index < 0 ? [...others, moved] : [...others.slice(0, index), moved, ...others.slice(index)]);
     },
-    /**
-     * Answers an approval that waits, the same answer as in the main window. A failure writes its error
-     * in the agent's chat, and the card shows its buttons again.
-     */
     async respondToApproval(
       agentId: string,
       requestId: string | number,
@@ -700,10 +638,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!done) failed(answerKey("approval", agentId, requestId));
       return done;
     },
-    /**
-     * Answers a question, the same answer as in the main window. The dock shows no resolution, so the
-     * question leaves the agent's chat as soon as the answer went.
-     */
     async answerPrompt(
       agentId: string,
       threadId: string | null,
@@ -717,7 +651,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       else if (turnId !== null && !disposed) presentPromptResolution(agentId, turnId, requestId);
       return done;
     },
-    /** Ends a browser takeover. A failure writes its error in the agent's chat. */
     async respondToTakeover(
       agentId: string,
       threadId: string | null,
@@ -728,26 +661,19 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!done) failed(answerKey("takeover", agentId, requestId));
       return done;
     },
-    /** Moves the held message of the agent to another model. A failure rejects. */
     async sendOnBackup(agentId: string, optionKey: string, remember: boolean): Promise<void> {
       const ask = usageLimitAsk(agentId);
       const option = ask?.options.find((item) => item.key === optionKey);
       if (!ask || !option) throw new Error(t("chat.usageLimit.failed"));
       await ask.onSend(option, remember && ask.rememberable !== false);
     },
-    /** Lets the message wait for the reset. */
     waitForReset(agentId: string): void {
       usageLimitAsk(agentId)?.onWait();
     },
-    /**
-     * Marks the failed send of a usage-limit card of the dock window, so the card shows again. That card
-     * cannot show the error, so the error goes in the agent's chat, as for the other answers.
-     */
     failBackupSend(agentId: string, error: unknown): void {
       if (!disposed) appendUiError(agentId, error, t("chat.usageLimit.failed"), serverId);
       failed(answerKey("usage-limit", agentId, usageLimitAsk(agentId)?.resetsAt ?? ""));
     },
-    /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
     async sendToChannel(channelId: string, text: string): Promise<AgentDockSendResult> {
       const sequenceBefore = channelPage(channelId)?.throughSequence ?? 0;
       const operationId =
@@ -761,7 +687,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
           operationId,
           channelId,
           text,
-          // A message that opens with a member is addressed to that member.
           recipientAgentId: leadingAddress(text).mentions[0]?.id ?? null,
           replyToMessageId: null,
           attachmentDraftIds: [],
@@ -779,7 +704,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   };
 }
 
-/** The dock inside the main window, when the user does not want it above the other apps. */
 function WindowAgentDock(props: { serverId: string }) {
   const { sendMessage } = useConversation();
   const { selectAgent } = useNavigation();
@@ -792,7 +716,6 @@ function WindowAgentDock(props: { serverId: string }) {
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
-    // Main sends the secret to the server of the dock, this computer or a joined server.
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
@@ -829,10 +752,6 @@ function WindowAgentDock(props: { serverId: string }) {
   );
 }
 
-/**
- * Publishes the dock to its window at the screen edge and does the actions that the window sends back.
- * Main sends the messages typed in the dock, so `send` does not come here.
- */
 function ScreenAgentDock(props: { serverId: string }) {
   const { selectAgent } = useNavigation();
   const channels = useChannels();
@@ -840,7 +759,6 @@ function ScreenAgentDock(props: { serverId: string }) {
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
 
-  /* Only the open chat goes to the window: a streamed answer then sends one chat, not every seat's. */
   const presentation = createMemo(
     (): AgentDockPresentation => ({
       serverId: props.serverId,
@@ -880,7 +798,6 @@ function ScreenAgentDock(props: { serverId: string }) {
     }),
   );
 
-  /* One publish at a time; the newest presentation goes next. A fast stream then waits for main. */
   let disposed = false;
   let publishing = false;
   let pending: AgentDockPresentation | null = null;
@@ -895,7 +812,6 @@ function ScreenAgentDock(props: { serverId: string }) {
         publishing = false;
         return Promise.resolve();
       }
-      // A clone error throws at the call. It must not reach the effect, which would halt this renderer.
       return Promise.resolve()
         .then(() => agentDockPort().agentDock.publishPresentation(value))
         .catch(() => undefined)
@@ -963,7 +879,6 @@ function ScreenAgentDock(props: { serverId: string }) {
           return;
       }
     });
-    // A drag of the dock ended. The position stays for the display, also after a restart.
     const stopMoved = agentDockPort().agentDock.onMoved(saveAgentDockOffset);
     return () => {
       disposed = true;
@@ -985,10 +900,10 @@ function dockAgent(agent: ComposerAgent): AgentDockAgent {
     avatarHue: agent.avatarHue ?? null,
     avatarColor: agent.avatarColor ?? null,
     avatarUrl: agent.avatarUrl && agent.avatarUrl.length <= INPUT_LIMITS.avatarUrl ? agent.avatarUrl : null,
+    ...(agent.chatColor === undefined ? {} : { chatColor: agent.chatColor }),
   };
 }
 
-/** The channel fields of a seat. The members are kept in channel order. */
 function dockChannel(channel: ChannelSummary): AgentDockUiChannel {
   return {
     id: channel.id,
@@ -1000,7 +915,6 @@ function dockChannel(channel: ChannelSummary): AgentDockUiChannel {
   };
 }
 
-/** A plain copy of a channel for the dock window, in the bounds of the presentation. */
 function plainChannel(channel: AgentDockUiChannel): AgentDockChannel {
   return {
     id: channel.id,
@@ -1013,12 +927,10 @@ function plainChannel(channel: AgentDockUiChannel): AgentDockChannel {
   };
 }
 
-/** A seat state that asks for the user: a new message, or a wait for an answer or an approval. */
 function callsForUser(state: SidebarAgentState | undefined): boolean {
   return state?.kind === "waiting" || state?.kind === "unread" || state?.kind === "responded";
 }
 
-/** Plain copies: the IPC clone refuses the store proxies that the app state is made of. */
 function dockSeatState(state: SidebarAgentState | undefined): AgentDockSeatState | null {
   if (!state) return null;
   const count = (value: number) => Math.min(Math.max(0, Math.floor(value)), AGENT_DOCK_LIMITS.count);
@@ -1062,12 +974,10 @@ function openChats(
   ];
 }
 
-/** One key for each request of an agent. */
 function answerKey(kind: string, agentId: string, requestId: string | number): string {
   return JSON.stringify([kind, agentId, String(requestId)]);
 }
 
-/** A plain copy of an approval for the dock window. */
 function dockApproval(current: { approval: AgentApproval; attempt: number }): AgentDockApproval {
   const { approval } = current;
   return {
@@ -1092,7 +1002,6 @@ function dockApproval(current: { approval: AgentApproval; attempt: number }): Ag
         : null,
     },
     attempt: current.attempt,
-    // The copy drops the runtime fields, so the cut mark goes with it on its own.
     cut: approvalIsCut(current.approval),
   };
 }
@@ -1120,7 +1029,41 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
   };
 }
 
-/** The unread agent answers: from the first unread message, or the last `count` messages. */
+function withStepAnswers(
+  messages: readonly AgentMessage[],
+  running: ReadonlySet<string>,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage[] {
+  const answered = new Set<string>();
+  for (const message of messages)
+    if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
+  const notes: AgentMessage[][] = [];
+  const rows = messages.flatMap((message) => {
+    const turnId = message.turnId;
+    if (message.kind !== "thinking" || message.streaming || !turnId || answered.has(turnId) || running.has(turnId))
+      return [message];
+    const note = stepNote(message, provider);
+    if (!note) return [message];
+    if (!note.createdAt) return [note];
+    notes.push([note]);
+    return [];
+  });
+  return notes.length > 0 ? placeTurnRowsByTime(rows, notes) : rows;
+}
+
+const stepNotes = new WeakMap<AgentMessage, { count: number; note: AgentMessage | undefined }>();
+function stepNote(
+  steps: AgentMessage,
+  provider: (row: AgentMessage) => AgentProviderRef | undefined,
+): AgentMessage | undefined {
+  const count = steps.items?.length ?? 0;
+  const known = stepNotes.get(steps);
+  if (known?.count === count) return known.note;
+  const note = narrationRows(steps, provider(steps)).at(-1);
+  stepNotes.set(steps, { count, note });
+  return note;
+}
+
 function unreadAnswers(messages: readonly AgentMessage[], count: number, firstUnreadId: string | null): AgentMessage[] {
   const first = firstUnreadId === null ? -1 : messages.findIndex((message) => message.id === firstUnreadId);
   const unread = first >= 0 ? messages.slice(first) : messages.slice(-count);
@@ -1130,10 +1073,8 @@ function unreadAnswers(messages: readonly AgentMessage[], count: number, firstUn
 }
 
 const RESULT_LABEL = 120;
-/** A Markdown block marker at the start of a line: a heading, a quote, or a list item. */
 const BLOCK_MARKER = /^(#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/;
 
-/** A plain copy of one answer for the shelf: its first file, or else its first line of text. */
 function dockResult(
   agentId: string,
   message: AgentMessage,

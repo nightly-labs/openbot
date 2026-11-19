@@ -31,7 +31,5 @@ export function writeSidebarCollapsed(
 ): void {
   try {
     storage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, JSON.stringify(collapsedByServer));
-  } catch {
-    // A private display preference must not block shared sidebar navigation.
-  }
+  } catch {}
 }

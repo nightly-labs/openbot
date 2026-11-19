@@ -2,26 +2,19 @@ import type { FooterColumnId, FooterTextId } from "./site-text";
 
 export const EXTERNAL_LINK_REL = "noopener noreferrer";
 
-/** The installer each platform's download button starts: Apple silicon on macOS, x64 elsewhere. */
 export const OPENBOT_DOWNLOAD_LINKS = {
   macos: "/download/macos/latest",
   windows: "/download/windows/latest",
   linux: "/download/linux/latest",
 } as const;
 
-/** The other installer of a platform that ships two architectures. Windows ships x64 only. */
 export const OPENBOT_ALTERNATE_DOWNLOAD_LINKS = {
   macos: "/download/macos/latest?arch=x64",
   linux: "/download/linux/latest?arch=arm64",
 } as const;
 
-/**
- * The Android app as an APK, for a phone with no Google Play. It answers only while a version has
- * an APK (`ANDROID_APK_AVAILABLE` in ./android-apk.ts), so show the link only then.
- */
 export const OPENBOT_ANDROID_APK_LINK = "/download/android/latest";
 
-/** The pages that describe each installer: requirements, install steps and known limits. */
 export const OPENBOT_DOWNLOAD_PAGE_LINKS = {
   hub: "/download",
   macos: "/download/macos",
@@ -32,7 +25,6 @@ export const OPENBOT_DOWNLOAD_PAGE_LINKS = {
 } as const;
 
 export const OPENBOT_LINKS = {
-  /** The contact form page. */
   contact: "/contact",
   x: "https://x.com/OpenBot_",
   threads: "https://www.threads.com/@openbot.run",
@@ -41,7 +33,6 @@ export const OPENBOT_LINKS = {
   instagram: "https://www.instagram.com/openbot.run/",
   tiktok: "https://www.tiktok.com/@openbot.run",
   facebook: "https://www.facebook.com/profile.php?id=61595425259628",
-  /** A Redirect Rule in the openbot.run Cloudflare zone sends this to the current Discord invite. */
   discord: "https://discord.openbot.run",
   download: "#download",
   news: "/news",
@@ -54,7 +45,6 @@ export const OPENBOT_LINKS = {
   privacy: "https://github.com/nightly-labs/openbot/blob/main/PRIVACY.md",
   documentation: "https://github.com/nightly-labs/openbot#readme",
   troubleshooting: "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md",
-  /** GitHub Pages hosts the status page, so it stays up when Cloudflare does not. */
   status: "https://status.openbot.run",
   selfHostedServer: "https://github.com/nightly-labs/openbot/blob/main/docs/self-hosted-server.md",
   dockerDocumentation: "https://github.com/nightly-labs/openbot/blob/main/docs/docker.md",
@@ -66,18 +56,8 @@ export const OPENBOT_LINKS = {
   anthropicAgents: "https://www.anthropic.com/engineering/building-effective-agents",
 } as const;
 
-/**
- * The name of a footer entry: a product or page name that stays the same in every language, or the
- * id of its text in `SiteText`.
- */
 type FooterLabel = string | { readonly text: FooterTextId };
 
-/**
- * One entry in a footer column. An internal entry carries a route, not a string,
- * so the footer can render it as a client navigation. It also fixes a link that
- * only worked on one page: "#download" on its own finds nothing on /news, because
- * there is no download section there for it to scroll to.
- */
 export type FooterLink =
   | { readonly label: FooterLabel; readonly external: true; readonly href: string }
   | {
@@ -111,7 +91,6 @@ export type FooterLink =
     };
 
 export interface FooterColumn {
-  /** The column title, in `SiteText`. */
   readonly id: FooterColumnId;
   readonly links: readonly FooterLink[];
 }

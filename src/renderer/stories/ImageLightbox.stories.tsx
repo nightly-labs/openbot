@@ -7,7 +7,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS } from "./fixtures";
 
-/* Gradients of different sizes, so the justified rows have aspect ratios to balance. */
 function sampleImage(id: string, width: number, height: number, hue: number): AttachmentSummary {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${hue} 70% 58%)'/><stop offset='1' stop-color='hsl(${hue + 50} 65% 32%)'/></linearGradient></defs><rect width='100%' height='100%' fill='url(#g)'/></svg>`;
   return {
@@ -66,7 +65,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Click an image to open the viewer. It zooms out of the tile and closes back into it. */
 export const FiveImages: Story = {};
 
 export const TwoImages: Story = { args: { images: IMAGES.slice(0, 2) } };
@@ -75,7 +73,6 @@ export const WithText: Story = {
   args: { images: IMAGES.slice(0, 4), body: "Here are the four screens after the change." },
 };
 
-/** The viewer open on the second image, without a thumbnail to zoom from. */
 export const Viewer: Story = {
   render: (storyArgs) => (
     <ImageLightbox opening={{ images: storyArgs.images, index: 1 }} onDownload={fn()} onClose={fn()} />

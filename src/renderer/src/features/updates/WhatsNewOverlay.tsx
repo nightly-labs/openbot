@@ -5,7 +5,6 @@ import { createEffect, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { useWhatsNew } from "./whats-new-context";
 
-/** Mounted only when the workspace is ready, outside the lifetime of a selected server. */
 export function WhatsNewOverlay(props: { ready: boolean }) {
   const { t, errorMessage } = useText();
   const whatsNew = useWhatsNew();

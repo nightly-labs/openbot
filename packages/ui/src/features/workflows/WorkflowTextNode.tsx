@@ -1,5 +1,3 @@
-/** Free text on the canvas, for a heading over a column of nodes. It has no card and no ports. */
-
 import type { AppTextKey } from "@openbot/i18n";
 import { Bold, Button, buttonVariants, ChevronDown, DropdownMenu, LabelTooltipTrigger, Textarea } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
@@ -32,9 +30,6 @@ import {
   useTextField,
 } from "./workflow-node-parts";
 
-/* ---------------------------------------------------------------- Text */
-
-/** The preset sizes of free text, with their size in pixels. */
 const TEXT_SIZES = [
   { value: "md", label: "workflow.text.size.body", pixels: 14 },
   { value: "lg", label: "workflow.text.size.heading", pixels: 24 },
@@ -42,10 +37,6 @@ const TEXT_SIZES = [
 ] as const satisfies readonly { value: string; label: AppTextKey; pixels: number }[];
 type TextSize = (typeof TEXT_SIZES)[number]["value"];
 
-/**
- * Free text on the canvas, for a heading over a column of nodes. It has no card and no ports. The
- * toolbar sets the colour, the font, the size, the alignment and the weight, as on a note.
- */
 export function TextNode(props: { id: string; text?: string; size?: TextSize; bold?: boolean }) {
   const board = useBoard();
   const { t } = useText();
@@ -71,13 +62,11 @@ export function TextNode(props: { id: string; text?: string; size?: TextSize; bo
     asBoolean,
   );
   const [locked, setLocked] = useLocked(() => props.id);
-  /** A font size that the user set with the grip, else the size of the preset. */
   const font = () => board.size(props.id)?.font;
   const sizeLabel = () =>
     t("workflow.text.pixels", {
       size: font() ?? TEXT_SIZES.find((option) => option.value === size())?.pixels ?? TEXT_SIZES[0].pixels,
     });
-  /** A set width wraps the text; without one, the text sets the width. */
   const width = () => board.size(props.id)?.width;
   return (
     <Show when={!board.isRemoved(props.id)}>

@@ -1,20 +1,3 @@
-// Frozen optional live-voice-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a member who can chat with an
-// agent of the host can talk to it by OpenAI realtime voice. The client makes the WebRTC offer of one
-// audio track and the `oai-events` data channel, and sends it to the host. The host starts a separate
-// Codex process with its own Codex sign-in, or the Codex account of the agent when the agent runs on
-// Codex, and sends back the answer of OpenAI. Audio goes between the client and OpenAI; it never goes
-// through the host. Each spoken request goes to the agent as the member's message, so the chat shows
-// it as usual, and the agent's answer goes back to the voice.
-//
-// A member has at most one session; a new start ends the earlier one of that member. The host sends
-// the transcript and the end of a session only to the connections of the member who started it, as
-// the `live-voice` event. The host ends the session when that member stops it, or when the last event
-// connection of the logical session that started it closes. An offer and an answer have at most
-// 65,536 characters, a transcript part at most 100,000 and an end reason at most 4,000. The voice is
-// one of the names below; an absent voice lets OpenAI choose. Widening any of it needs a second
-// capability string.
 import { isDynamicRecord, isOneOf, isString } from "../runtime-values";
 import { adminRoute, empty, fields, identifier, type OptionalRouteCodec, oneOf, string } from "./admin-wire";
 
@@ -31,7 +14,6 @@ const SDP_LIMIT = 65_536;
 export const LIVE_VOICE_TRANSCRIPT_LIMIT = 100_000;
 export const LIVE_VOICE_REASON_LIMIT = 4_000;
 
-/** The voices of this contract. A later Codex voice needs a second capability string. */
 const LIVE_VOICE_NAMES = [
   "juniper",
   "maple",
@@ -88,7 +70,6 @@ export interface LiveVoiceSessionResponse {
   sdp: string;
 }
 
-/** The request the host reads. The transport has already run it through the codec above. */
 export function decodeLiveVoiceStartRequest(value: unknown): LiveVoiceStartRequest {
   if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isText(value.sdp, SDP_LIMIT))
     throw new Error("Invalid live voice start.");
@@ -101,7 +82,6 @@ export function decodeLiveVoiceStopRequest(value: unknown): string {
   return value.sessionId;
 }
 
-/** The answer of the host, as the client type. */
 export function decodeLiveVoiceSessionResponse(value: unknown): LiveVoiceSessionResponse {
   if (!isDynamicRecord(value) || !isIdentifier(value.sessionId) || !isText(value.sdp, SDP_LIMIT))
     throw new Error("Invalid live voice session.");
@@ -119,7 +99,6 @@ export type LiveVoiceEvent =
     }
   | { type: typeof LIVE_VOICE_EVENT; kind: "ended"; sessionId: string; error: string | null };
 
-/** Null for any other event. A malformed live voice event throws, so the stream fails closed. */
 export function liveVoiceEvent(value: unknown): LiveVoiceEvent | null {
   if (!isDynamicRecord(value) || value.type !== LIVE_VOICE_EVENT) return null;
   const { kind, sessionId } = value;

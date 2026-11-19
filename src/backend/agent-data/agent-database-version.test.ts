@@ -1,7 +1,3 @@
-// Data preservation for the schema version of the shared agent database. Drives the real host
-// (`agent-database-host.ts`, run by `node` over stdio) through the real supervisor and `AgentTables`:
-// - a file of an earlier release has no version; it opens, keeps every row, and gets version 1;
-// - a file with a newer version is refused for every read and write, and stays byte for byte the same.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
@@ -49,7 +45,6 @@ function stdioHost(): AgentDatabaseHostProcess {
   };
 }
 
-/** A shared root whose `Data/agent-data.db` is the file of a release, with two rows in `notes`. */
 async function releasedFile(name: string, userVersion: number): Promise<{ sharedRoot: string; path: string }> {
   const sharedRoot = join(root, name);
   await mkdir(join(sharedRoot, "Data"), { recursive: true });

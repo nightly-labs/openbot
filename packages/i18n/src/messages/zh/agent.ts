@@ -21,7 +21,6 @@ export const messages = {
   "agent.setup.creating": "正在创建助手…",
   "agent.setup.create": "创建助手",
   "agent.setup.suggestions": "推荐",
-  // Suggested agents. Selecting one copies its name and purpose into the new agent.
   "agent.setup.suggestion.label": "{name}。{description}",
   "agent.setup.suggestion.inboxHelper.name": "收件箱助手",
   "agent.setup.suggestion.inboxHelper.description": "起草回复，避免遗漏跟进。",
@@ -48,6 +47,8 @@ export const messages = {
   "agent.dock.add": "添加到停靠栏",
   "agent.dock.allAdded": "你的所有智能体和频道都已在停靠栏中",
   "agent.dock.more": "更多",
+  "agent.dock.keepOpen": "保持打开",
+  "agent.dock.closeOnLeave": "点击别处时关闭",
   "agent.dock.openInMain": "在主窗口中打开",
   "agent.dock.openWindow": "在新窗口中打开",
   "agent.dock.remove": "从停靠栏移除",
@@ -84,7 +85,6 @@ export const messages = {
   "agent.error.provider": "服务商错误",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} 错误",
-  // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "红色",
   "agent.color.orange": "橙色",
   "agent.color.yellow": "黄色",

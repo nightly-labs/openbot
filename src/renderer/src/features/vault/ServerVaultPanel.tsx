@@ -6,25 +6,13 @@ import type { LinkAccountStore } from "./stores/link-account-store";
 import type { VaultStore } from "./stores/vault-store";
 
 export interface ServerVaultOptions {
-  /** The Vault of this computer, or of a joined server for its owner or admin. */
   store: VaultStore;
-  /** False for a joined server without `vault-v2`: it cannot keep API keys. */
   apiKeys: boolean;
-  /** False for a joined server without `vault-v3`: it cannot keep two-step keys. */
   twoStep: boolean;
-  /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
-  /**
-   * The agents of the same server, for the agents of each item. Absent or empty: each item shows no
-   * agents choice, and keeps its saved agents.
-   */
   listAgents?: (() => Promise<readonly VaultAgentChoice[]>) | undefined;
 }
 
-/**
- * The Vault section of the server settings. It lists the items each time it opens, and shows each
- * list that main sends while it is open.
- */
 export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLElement | undefined }) {
   const { t, errorMessage } = useText();
   const [agents, setAgents] = createSignal<readonly VaultAgentChoice[]>([]);
@@ -34,7 +22,6 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
     (listAgents) => {
       const current = ++request;
       setAgents([]);
-      // Without the agents, the items keep their saved agents, so a failed read only hides the choice.
       listAgents?.().then(
         (list) => {
           if (current === request) setAgents(list);

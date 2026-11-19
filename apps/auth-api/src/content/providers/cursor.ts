@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Cursor here is taken from cursor.com and the Cursor
-// documentation. Each page used is in `sources`. Check them again, and move
-// `checkedAt`, whenever this file changes.
-
 const DOCS = "https://cursor.com/docs";
 
 export const CURSOR_PROVIDER: ProviderPage = {

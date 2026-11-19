@@ -15,6 +15,7 @@ export const messages = {
   "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
   "error.workflow.handoffFailed": "OpenBot לא הצליח לשלוח את השלב הזה לסוכן שלו.",
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
+  "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":

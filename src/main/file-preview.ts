@@ -28,11 +28,8 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
   maxBytes: number = ATTACHMENT_LIMITS.fileBytes,
 ) {
   const mimeType = mimeTypeForName(name);
-  // A file over the limit is not read. The panel still opens, reveals and saves it by its path.
   const kind = size > Math.min(maxBytes, ATTACHMENT_LIMITS.fileBytes) ? "none" : filePreviewKindForFile(name, mimeType);
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
-  // A page can load the images next to its file, so it gets the real folder of the file. Without
-  // the folder, the page still shows, as before.
   const folder =
     bytes && isChatVisualMimeType(mimeType)
       ? yield* attachmentCall(() => realpath(dirname(path))).pipe(Effect.orElseSucceed(() => undefined))

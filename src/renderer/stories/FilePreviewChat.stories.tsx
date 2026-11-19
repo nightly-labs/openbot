@@ -9,9 +9,6 @@ import { INLINE_SVG_CHART, publishChatVisualPage } from "./chat-visual-fixtures"
 import { filePreviewForPath, WORKSPACE_FILE_PREVIEWS } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
 
-// The chat opens the file preview as a conversation does: a file link in the text of a
-// message calls `onOpenWorkspaceFile`, and the panel shows the file on the right side.
-// An attachment card is a different flow: it opens the media lightbox, not this panel.
 const WORKSPACE = "/Users/test/OpenBot/Agents/agent-4f2c";
 
 const MESSAGES: AgentMessage[] = [
@@ -172,16 +169,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A chat with Markdown, CSV, JSON, plain text, SVG, PDF, audio, image, and XLSX files. */
 export const Chat: Story = {};
 
-/** The same chat with the markdown file already open, as after a click. */
 export const ChatWithOpenFile: Story = {
   name: "Chat (file open)",
   args: { openFile: "RELEASE-NOTES.md" },
 };
 
-/** The workspace HTML link opens a script-rendered page in the sidebar; the source toggle stays available. */
 export const HtmlWorkspacePage: Story = {
   name: "Workspace HTML (page)",
   render: (args) => {

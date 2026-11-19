@@ -5,11 +5,9 @@ import { ArticleCard } from "./ArticleCard";
 
 export interface MoreArticlesProps {
   collection: ContentCollection;
-  /** The article on the page, which the list leaves out. */
   article: CollectionArticle;
 }
 
-/** The other articles of the collection, under the one being read. */
 export function MoreArticles(props: MoreArticlesProps) {
   let more: HTMLElement | undefined;
   const revealed = createLandingReveal(() => more);

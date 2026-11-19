@@ -1,5 +1,3 @@
-// The network line of a bug report about the phone app is public. It names the VPN product and
-// never holds an address: a tunnel address, such as the one that Tailscale gives, points to one phone.
 import { describe, expect, it } from "vitest";
 import { candidateLineAddress, interfaceAddresses, phoneNetworkText, probeShape } from "./phone-network";
 
@@ -31,11 +29,9 @@ describe("phone network in a public report", () => {
     expect(name("172.16.0.2")).toBe("Wi-Fi · VPN: probably Cloudflare WARP");
     expect(name("10.8.0.6")).toBe("Wi-Fi · VPN: on, name not known (tunnel 10.8.x.x)");
     expect(name("203.0.113.77")).toBe("Wi-Fi · VPN: on, name not known");
-    // The same address on a home network is not a VPN.
     expect(phoneNetworkText({ connection: "wifi", addresses: [{ ...wifi, address: "10.5.0.2" }] })).toBe(
       "Wi-Fi · no VPN found",
     );
-    // A mobile network gives the shared range to the phone itself.
     expect(
       phoneNetworkText({
         connection: "cellular",
@@ -50,7 +46,6 @@ describe("phone network in a public report", () => {
     expect(phoneNetworkText({ connection: "wifi", addresses: [{ ...wifi, vpn: null }] })).toBe(
       "Wi-Fi · VPN: not known",
     );
-    // Android reports the VPN as the connection.
     expect(phoneNetworkText({ connection: "vpn", addresses: null })).toBe(
       "Network type not known · VPN: on, name not known",
     );

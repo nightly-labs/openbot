@@ -4,16 +4,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * The app default for a message sent to a busy agent. The backend reads it for each such message,
- * so it is held in memory after `load` rather than read from disk each time.
- *
- * A file that is missing, unreadable as JSON or names an unknown mode reads as the default,
- * `steer`. The file exists only after the user changes the setting, so a stored `queue` stays
- * `queue`. Writes are chained for the reason
- * `update-preference-store.ts` chains its own: an earlier rename that lands last would persist the
- * value the user just changed.
- */
 export class BusyMessageModePreferenceStore {
   readonly #path: string;
   #preference: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };

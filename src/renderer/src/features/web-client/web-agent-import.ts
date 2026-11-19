@@ -22,7 +22,6 @@ import type { AgentImportCalls } from "../servers/ServerImportPanel";
 import { openWebLink } from "./web-attachments";
 import { chooseFiles } from "./web-channels-runtime";
 
-/** The file's bytes as Base64, read by the browser rather than byte by byte. */
 export function readBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -37,22 +36,14 @@ export function readBase64(file: Blob): Promise<string> {
   });
 }
 
-/**
- * Server settings > Import in the browser client: the export goes to the connected host in parts
- * with `agent-import-v2`, or with `agent-import-v1`. The export skill ships with the web client,
- * and saving it downloads it. The host reads its own Hermes folder with `hermes-import-v1`; the
- * panel offers it only when the host has it.
- */
 export function createWebAgentImportCalls(options: {
   request: (serverId: string) => TeamApiRequest;
-  /** The host accepts an export of any size with `agent-import-v2`. */
   sendsParts: () => boolean;
   listAgents: () => Promise<ClientAgentSummary[]>;
   saveFile: (file: { name: string; base64: string }) => void;
 }): AgentImportCalls {
   return {
     async choose(serverId) {
-      // The host is checked before the chooser opens, and nothing is awaited before it.
       const request = options.request(serverId);
       const [file] = await chooseFiles({ multiple: false, accept: ".zip,application/zip" });
       if (!file) return null;
@@ -104,7 +95,6 @@ export function createWebAgentImportCalls(options: {
     openExportAgent() {
       void openWebLink(GROK_BOT_EXPORT_URL);
     },
-    // No folder choice: a browser cannot name a folder of the host.
     hermes: {
       readHermes: (serverId) =>
         options.request(serverId)("POST", HERMES_IMPORT_ROUTES.read, decodeHermesImportReadResponse, {}),

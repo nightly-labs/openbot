@@ -1,8 +1,3 @@
-// Starts OpenCode on the real driver and `ProviderRuntime` when OpenBot's newer copy (2.3.0) fails
-// each `initialize` and the user installed an older CLI (1.19.5) that works (#10174). Checks that
-// the user's CLI runs after the copy's third failed start, that the row offers the copy back, that
-// the choice is not saved, and that "Use OpenBot's version" starts the copy again.
-// `bun scripts/opencode-installed-fallback-e2e.ts`. Writes .openbot-build/opencode-installed-fallback-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,7 +12,6 @@ import { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } from "../src/backe
 import { installFakeAgent, readJsonl } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-installed-fallback-e2e");
-// The copy fails 3 starts, with OpenBot's retries after 5 s and 10 s between them.
 const WAIT_MS = 60_000;
 const COPY = "2.3.0";
 const INSTALLED = "1.19.5";
@@ -38,7 +32,6 @@ interface Report {
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-installed-fallback-e2e-"));
 const log = join(root, "starts.jsonl");
 const report: Report = { passed: false };
-// The user's CLI is on `PATH`, where OpenBot looks for it after the login shell's folders.
 const userBin = join(root, "user-bin");
 process.env.PATH = [userBin, process.env.PATH].filter(Boolean).join(delimiter);
 process.env.FAKE_LOG = log;
@@ -105,7 +98,6 @@ const row = () => providers.status().providers?.find((candidate) => candidate.id
 try {
   await runCauseEffect(providers.ensureProvider("opencode").pipe(Effect.ignore));
 
-  // 1. The copy fails 3 starts. The user's CLI then runs, and the row offers the copy back.
   await waitFor("the installed CLI to run", () => row()?.state === "available");
   report.fallback = {
     state: row()?.state,
@@ -121,7 +113,6 @@ try {
   assert.deepEqual(report.starts, [COPY, COPY, COPY, INSTALLED], "the copy gets its 3 starts first");
   assert.equal(savedChoices, 0, "the fallback is not saved as the user's choice");
 
-  // 2. "Use OpenBot's version" starts the copy again.
   await runCauseEffect(providers.chooseInstalledCli("opencode", false));
   await waitFor("the copy to start again", async () => (await copyStarts()) === 4);
   report.copyChosen = { copyStarts: await copyStarts() };

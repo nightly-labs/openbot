@@ -207,6 +207,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "מעבר ל״לשאול קודם״",
 
   "agentSettings.links.usage": "שימוש",
+  "agentSettings.links.apps": "אפליקציות",
+  "agentSettings.links.appsScope": "כל הסוכנים",
   "agentSettings.links.memories": "זיכרונות",
   "agentSettings.links.memoriesCount": { one: "אחד נשמר", two: "שניים נשמרו", other: "{count} נשמרו" },
   "agentSettings.links.skills": "מיומנויות",

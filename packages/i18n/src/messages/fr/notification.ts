@@ -2,16 +2,12 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/notification";
 
 export const messages = {
-  // Desktop notifications, raised by the main process while the window may be closed, and browser
-  // notifications, raised by the web client while its tab is open.
   "notification.needsInput": "Nécessite votre réponse.",
   "notification.needsApproval": "Nécessite votre approbation.",
   "notification.needsBrowserStep": "Vous devez terminer une étape dans le navigateur.",
   "notification.needsApprovalFor": "Nécessite votre approbation : {action}",
   "notification.finished": "Travail terminé.",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "Une étape attend votre approbation.",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "Un workflow a un nouveau résultat.",
   "notification.failed": "Arrêté à cause d’une erreur.",
   "notification.subagentFailed": "Un sous-agent s’est arrêté à cause d’une erreur.",
@@ -33,7 +29,6 @@ export const messages = {
   "notification.machineAlert.body": "Le seuil d’alerte de {level} est dépassé. Voir Réglages du serveur > Stockage.",
   "notification.test": "Les notifications fonctionnent.",
   "notification.welcome": "OpenBot vous préviendra ici quand un agent aura besoin de vous.",
-  // The toast region in each window.
   "notification.toast.region": "Notifications",
   "notification.toast.close": "Fermer la notification",
 } as const satisfies PartialTranslation<typeof source>;

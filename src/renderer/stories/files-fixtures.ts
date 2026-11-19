@@ -9,7 +9,6 @@ import type {
 } from "@openbot/ui/features/files/files-view";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
-/** The fixed clock of every Files story, so "Today" and "Yesterday" do not move with the run date. */
 export const FILES_NOW = new Date("2026-09-23T15:00:00");
 
 const KB = 1024;
@@ -68,7 +67,6 @@ function conversation(id: string) {
   return found ? { id: found.id, title: found.title } : null;
 }
 
-/** A small gradient image, so image rows show a real thumbnail without a network request. */
 function thumbnail(from: string, to: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="40" height="40" fill="url(#g)"/><circle cx="28" cy="13" r="5" fill="rgba(255,255,255,0.55)"/><path d="M0 40 L14 22 L24 32 L30 26 L40 36 V40 Z" fill="rgba(0,0,0,0.3)"/></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -344,13 +342,11 @@ export const FILES_BREAKDOWN: StorageBreakdown[] = (
   ] satisfies StorageBreakdown[]
 ).map((entry) => ({ ...entry, bytes: Math.round(entry.bytes) }));
 
-/** The part of the `runtimes` row above that can go: older versions, and the Claude and OpenCode downloads. */
 export const FILES_REMOVABLE_RUNTIMES: RemovableRuntimes = {
   bytes: Math.round(840 * MB),
   providers: ["claude", "opencode"],
 };
 
-/** A server with years of agent work, for the widths and units of a large total. */
 export const FILES_BREAKDOWN_LARGE: StorageBreakdown[] = (
   [
     { category: "workspaces", bytes: 1.3 * 1024 * GB, removable: false },
@@ -370,7 +366,6 @@ export const FILES_AGENT_USAGE: AgentStorageRow[] = [
   { agentId: "sales", bytes: Math.round(354 * MB), fileCount: 8, conversationCount: 2 },
 ];
 
-/** Chief's share of each location, for Agent settings > Files. */
 export const FILES_CHIEF_BREAKDOWN: StorageBreakdown[] = [
   { category: "workspaces", bytes: Math.round(2.3 * GB), removable: false },
   { category: "attachments", bytes: 402 * MB, removable: false },
@@ -384,7 +379,6 @@ export const FILES_CHIEF_CONVERSATIONS = FILES_CONVERSATIONS.filter((chat) => ch
 export const FILES_LAUNCH_ROWS = FILES_ROWS.filter((file) => file.conversation?.id === "c-launch");
 const FILES_SOURCES_ROWS = FILES_ROWS.filter((file) => file.conversation?.id === "c-sources");
 
-/** The pricing-brief chat with one file of each status, for the missing and remote row design. */
 export const FILES_STATUS_ROWS: StoredFileRow[] = [
   ...FILES_SOURCES_ROWS,
   ...FILES_ROWS.filter((file) => file.status === "remote" || file.status === "failed").map((file) => ({

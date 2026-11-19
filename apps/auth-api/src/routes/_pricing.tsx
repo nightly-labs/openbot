@@ -3,13 +3,9 @@ import { Show } from "solid-js";
 import { PricingPage } from "../components/pricing/PricingPage";
 import { readPricingOffer } from "../lib/pricing-offer";
 
-// The pricing page at `/pricing`, `/pl/pricing` and `/pt/pricing`. Each child route loads the text of its
-// language, and this layout shows the page, so a change of language changes only the text.
 export const Route = createFileRoute("/_pricing")({
-  // The offer depends on the visitor's country, not on the language, so a change of language keeps it.
   loader: () => readPricingOffer(),
   shouldReload: false,
-  // The VAT line depends on the visitor's country, so a shared cache must not keep the page.
   headers: () => ({ "Cache-Control": "no-store" }),
   component: PricingLayout,
 });
