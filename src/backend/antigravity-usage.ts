@@ -176,10 +176,12 @@ function validAccessToken(text: string): string | null {
 
 /**
  * The desktop app's User-Agent, such as
- * `antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=arm64; cl=963137146)`.
+ * `antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=arm64; cl=963137146)`, in Go's platform names.
  */
 function antigravityUserAgent(): string {
-  return `antigravity/hub/${DESKTOP_VERSION} (aidev_client; os_type=${process.platform}; arch=${process.arch}; cl=${DESKTOP_BUILD})`;
+  const os = process.platform === "win32" ? "windows" : process.platform;
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
+  return `antigravity/hub/${DESKTOP_VERSION} (aidev_client; os_type=${os}; arch=${arch}; cl=${DESKTOP_BUILD})`;
 }
 
 /**

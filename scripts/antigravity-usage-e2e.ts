@@ -346,9 +346,11 @@ try {
   report.cli = cli;
   assert.equal(cli.version, VERSION);
   assert.equal(cli.source, "managed");
+  const os = process.platform === "win32" ? "windows" : process.platform;
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
   // The desktop app's own form and version, not the CLI's: Google sends the Gemini group only to the
   // desktop version (#7215), and a Pro plan's Gemini 4 Argon group only to the `hub` form (#10934).
-  report.userAgent = `antigravity/hub/2.24.0 (aidev_client; os_type=${process.platform}; arch=${process.arch}; cl=963137146)`;
+  report.userAgent = `antigravity/hub/2.24.0 (aidev_client; os_type=${os}; arch=${arch}; cl=963137146)`;
 
   // 1. A Google sign-in: the Gemini group's weekly window, from the account's project.
   await writeToken(ACCESS_TOKEN, inOneHour());
