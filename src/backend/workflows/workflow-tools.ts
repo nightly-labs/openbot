@@ -4,10 +4,14 @@ import {
   isRoutineSchedule,
   isWorkflowGraph,
   WORKFLOW_BRANCHES,
+  WORKFLOW_DISCORD_EVENTS,
+  WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_MAX_COORDINATE,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
+  WORKFLOW_SLACK_EVENTS,
+  WORKFLOW_TELEGRAM_EVENTS,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
@@ -313,6 +317,25 @@ function withRepositoryList(
   return { ...fields, ...workflowGitHubTriggerRepositoryFields(repositories) };
 }
 
+const TRIGGER_EVENTS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+  ["github", WORKFLOW_GITHUB_EVENTS],
+  ["discord", WORKFLOW_DISCORD_EVENTS],
+  ["telegram", WORKFLOW_TELEGRAM_EVENTS],
+  ["slack", WORKFLOW_SLACK_EVENTS],
+]);
+
+function changesTriggerEvent(patch: WorkflowOp["fields"]): boolean {
+  return patch?.trigger !== undefined || patch?.event !== undefined;
+}
+
+function checkTriggerEvent(node: WorkflowNode, op: number): void {
+  const { trigger, event } = node.fields;
+  const events = node.kind === "trigger" && typeof trigger === "string" ? TRIGGER_EVENTS.get(trigger) : undefined;
+  if (!events || events.some((known) => known === event)) return;
+  const given = event === undefined ? "has no event" : `has event "${String(event)}", which is unknown`;
+  refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
+}
+
 function checkedSchedule(value: WorkflowOp["schedule"]) {
   if (value === undefined) return undefined;
   if (!isRoutineSchedule(value)) refuse("The schedule is not a valid routine schedule.");
@@ -363,6 +386,7 @@ function applyWorkflowOps(
   };
   const placed: { id: string; withFrom: boolean }[] = [];
   const pinned = new Set<string>();
+  const eventChanges = new Map<string, number>();
 
   ops.forEach((op, index) => {
     const n = index + 1;
@@ -376,6 +400,7 @@ function applyWorkflowOps(
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
+        if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -394,6 +419,7 @@ function applyWorkflowOps(
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         replace(withSchedule({ ...node, fields }, scheduled));
+        if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
         return;
       }
       case "move": {
@@ -428,6 +454,10 @@ function applyWorkflowOps(
       }
     }
   });
+  for (const node of nodes) {
+    const op = eventChanges.get(node.id);
+    if (op !== undefined) checkTriggerEvent(node, op);
+  }
   const empty = graph.nodes.every((node) => ANNOTATION_KINDS.has(node.kind));
   if (tidy || empty) {
     const fixed = (node: WorkflowNode) =>
