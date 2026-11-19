@@ -25,10 +25,6 @@ import { browserTeachFile, browserTeachSteps } from "./browser-teach-message";
 import { conversationPort } from "./conversation-port";
 import { useConversationViewScope } from "./conversation-scope";
 
-/**
- * The full browser view of the conversation. The order of the tabs, the closed tabs and the pages of the
- * session stay in this window (`browser-tab-session.ts`); the tabs themselves are main's.
- */
 export default function BrowserFullViewAdapter() {
   const {
     props,
@@ -60,8 +56,6 @@ export default function BrowserFullViewAdapter() {
   const { t } = useText();
   const serverId = () => props.server?.id ?? "";
   const tabs = createMemo(() => orderedBrowserTabs(serverId(), allBrowserTabs()));
-  // Any member who sees a tab reads its profile label, from a host that serves `browser-profiles-v1`.
-  // An admin also reads the proxy of each profile.
   const readTabProfiles = createMemo(() => {
     if (props.runtime) {
       const calls = props.runtime.browserProfiles;
@@ -78,7 +72,6 @@ export default function BrowserFullViewAdapter() {
 
   createEffect(
     () => ({ id: serverId(), listed: allBrowserTabs() }),
-    // The order is read to change it, not to run again when it changes.
     ({ id, listed }) => untrack(() => syncBrowserTabOrder(id, listed)),
   );
 
@@ -97,10 +90,6 @@ export default function BrowserFullViewAdapter() {
     return tab;
   }
 
-  /**
-   * The dock is the composer of the conversation, so a tab of another agent brings its chat: the page stays
-   * open, and the dock sends, stops and edits the queue of the agent that owns the tab.
-   */
   function activateTab(tabId: string) {
     if (browserTabs().some((tab) => tab.id === tabId)) {
       activateBrowserTab(tabId);
@@ -115,7 +104,6 @@ export default function BrowserFullViewAdapter() {
 
   function closeTabs(tabIds: readonly string[]) {
     const order = tabs();
-    // The tab with the lowest index is the first to open again, so each one goes back to its place.
     const closing = tabIds
       .map((tabId) => ({
         tab: order.find((tab) => tab.id === tabId),
@@ -129,10 +117,6 @@ export default function BrowserFullViewAdapter() {
     }
   }
 
-  /**
-   * Save sends one short message of the user with the steps in a file, so the chat stays easy to read.
-   * When the chat cannot send now, the steps go to the end of the draft as text.
-   */
   async function saveTeach() {
     const steps = await stopBrowserTeach(true);
     if (!steps) return;
@@ -154,7 +138,6 @@ export default function BrowserFullViewAdapter() {
     };
   });
 
-  // The session of the sign-in stays in main only while this dialog can finish it.
   onCleanup(localSignIn.cancel);
 
   return (
@@ -186,7 +169,6 @@ export default function BrowserFullViewAdapter() {
       onStop={(tabId) => void stopBrowserTab(tabId)}
       onNavigate={(tabId, direction) => void navigateBrowserTab(tabId, direction)}
       onOpenAddress={(url, tabId) => void openBrowserAddress(url, tabId === undefined)}
-      // A host's tab can show in Picture in Picture only through the live view.
       canEnterPip={
         !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"))
       }
@@ -202,7 +184,6 @@ export default function BrowserFullViewAdapter() {
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onSignInLocally={localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
       teach={teach()}
-      // A local tab is a native view above this window, so its dock goes in the overlay above the page.
       dock={<BrowserDockAdapter tab={activeBrowserTab()} overlay={!props.runtime && props.server?.kind === "local"} />}
       dialogs={
         <Show when={localSignIn.state()}>

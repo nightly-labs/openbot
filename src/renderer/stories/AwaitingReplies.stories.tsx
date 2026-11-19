@@ -4,11 +4,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "../src/preview/fixtures";
 
-/*
- * The block above the composer while an agent waits for other agents. The agent chat shows the
- * agents it asked; a channel shows the sub-tasks that an owner waits for.
- */
-
 const research: AgentProfile = requireFixture(STORY_AGENTS[1], "Research agent");
 const sales: AgentProfile = requireFixture(STORY_AGENTS[2], "Sales agent");
 
@@ -44,7 +39,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Waiting: Story = {};
 
-/** The person closed the block. The header names the agent that works. */
 export const Collapsed: Story = { args: { defaultOpen: false } };
 
 export const OneFailed: Story = {
@@ -56,7 +50,6 @@ export const OneFailed: Story = {
   },
 };
 
-/** Every agent is done, so the block has a close button. */
 export const AllReplied: Story = {
   args: {
     onDismiss: fn(),
@@ -64,7 +57,6 @@ export const AllReplied: Story = {
   },
 };
 
-/** A channel owner that waits for the sub-tasks it gave out. A sub-task that still works has Stop. */
 export const ChannelSubtasks: Story = {
   args: {
     title: "Waiting for sub-tasks",
@@ -89,7 +81,6 @@ export const ChannelSubtasks: Story = {
   },
 };
 
-/** An agent that was asked waits for an approval in its own chat. Review opens that chat. */
 export const NeedsApproval: Story = {
   args: {
     onOpenAgent: fn(),
@@ -106,7 +97,6 @@ export const NeedsApproval: Story = {
   },
 };
 
-/** An agent that was asked has a question for the person. */
 export const AsksQuestion: Story = {
   args: {
     onOpenAgent: fn(),
@@ -123,7 +113,6 @@ export const AsksQuestion: Story = {
   },
 };
 
-/** The agent still runs a turn, so the person can steer a reply into it. */
 export const SteerReply: Story = {
   args: {
     onSteer: fn(),
@@ -131,7 +120,6 @@ export const SteerReply: Story = {
   },
 };
 
-/** The plan of an agent that was asked is spent. Nobody can act, so the row has no button. */
 export const UsageLimit: Story = {
   args: {
     onOpenAgent: fn(),

@@ -26,7 +26,6 @@ export type TeamProtocolV4BaseCurrentEventDecodeResult =
 
 export function decodeTeamProtocolV4BaseCurrentEvent(value: unknown): TeamProtocolV4BaseCurrentEventDecodeResult {
   if (isDynamicRecord(value) && value.type === "turn-progress") {
-    // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
     const wireValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(value));
     const current = toCurrentAgentKeys(wireValue);
     return isAgentEvent(current) ? { kind: "known", event: current } : { kind: "invalid", type: value.type };
@@ -49,7 +48,6 @@ export function encodeTeamProtocolV4BaseCurrentEvent(
   event: AgentEvent | TeamRealtimeEvent,
   options: { preserveSemanticTags?: boolean; preserveBrowserSecrets?: boolean } = {},
 ): string | null {
-  // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
   const currentValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(event));
   const wireValue = toWireAgentKeys(currentValue);
@@ -62,7 +60,6 @@ export function encodeTeamProtocolV4BaseCurrentEvent(
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
 }
 
-/** Puts the plans of a conversation event beside its frozen projection. See `withConversationPlans`. */
 function withEventConversationPlans(
   projected: TeamProtocolV4BaseJsonValue,
   source: unknown,
@@ -106,7 +103,6 @@ export function encodeTeamProtocolV4BaseCurrentHttpResponse(
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
   const currentValue: TeamProtocolV4BaseJsonValue = JSON.parse(JSON.stringify(value));
-  // The installed-skills route bypasses the frozen codec, so it needs the vocabulary swap by hand.
   const wireValue = toWireAgentKeysForRequestPath(path, currentValue);
   if (status < 400 && isInstalledSkillsRoute(method, path)) return JSON.stringify(wireValue);
   const downconvertedValue = options.preserveSemanticTags ? wireValue : downconvertCurrentTags(wireValue);

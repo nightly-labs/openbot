@@ -1,14 +1,3 @@
-// Checks the channel chat of the desktop app through its UI, in this worktree's running dev app with
-// real provider turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-chat-e2e.ts --allow-mutations`. It needs two visible agents whose provider is
-// signed in.
-//
-// It creates a channel from the "+" menu, and opens it from the sidebar, global search and the
-// schedule. It checks that the channel has one conversation panel and no model picker, that a sent
-// message shows at once and the agent's reply follows, that the activity row shows and Stop ends the
-// work, and that a deleted channel shows the preview notice and is in "Deleted channels" until a
-// restore. It makes its own channel and deletes it at the end.
-// Writes .openbot-build/channel-chat-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import type { CreateChannelRoutineInput } from "@openbot/contracts/ipc";
@@ -64,7 +53,6 @@ async function shot(label: string, target: Locator = page.locator("body")): Prom
   report.screenshots.push(path);
 }
 
-/** Writes a message that starts with a mention picked from the composer's menu, and sends it. */
 async function sendTo(agentName: string, text: string): Promise<void> {
   await composer().click();
   await composer().pressSequentially(`@${agentName.slice(0, 3)}`);
@@ -78,7 +66,6 @@ async function sendTo(agentName: string, text: string): Promise<void> {
     .click();
 }
 
-/** Opens another agent's chat, so the next step opens the channel again. */
 async function leaveChannel(agentName: string): Promise<void> {
   await page
     .getByRole("navigation", { name: english("sidebar.nav.label") })
@@ -95,7 +82,6 @@ try {
   assert.ok(a && b);
   await leaveChannel(a.name).catch(() => undefined);
 
-  // 1. The "+" menu has New channel, and the dialog creates the channel.
   await page.getByRole("button", { name: english("sidebar.new.menuWithChannel"), exact: true }).click();
   await page.getByRole("menuitem", { name: english("sidebar.new.channel"), exact: true }).click();
   const dialog = page.getByRole("dialog", { name: english("sidebar.new.channel") });
@@ -118,7 +104,6 @@ try {
   report.created = { fromMenu: true, members: channel.members.length };
   assert.equal(channel.members.length, 2);
 
-  // 2. One conversation panel, and no model picker.
   await header().waitFor({ timeout: UI_WAIT_MS });
   report.layout = {
     conversationPanels: await page.getByRole("main", { name: english("conversation.view.label") }).count(),
@@ -127,7 +112,6 @@ try {
   assert.equal(report.layout.conversationPanels, 1, "The channel shows more than one conversation panel.");
   assert.equal(report.layout.modelPickers, 0, "The channel shows a model picker.");
 
-  // 3. The sidebar, global search and the schedule open the channel.
   const opened = { sidebar: false, search: false, schedule: false };
   report.opened = opened;
   await leaveChannel(a.name);
@@ -164,7 +148,6 @@ try {
   await page.getByLabel(english("channel.panel.label")).first().waitFor({ timeout: UI_WAIT_MS });
   opened.schedule = true;
 
-  // 4. A sent message shows at once; the agent's reply follows it.
   await sendTo(a.name, SHORT_PROMPT);
   const own = conversation()
     .getByRole("article", { name: english("chat.row.label", { name: "You" }) })
@@ -182,7 +165,6 @@ try {
   assert.ok(report.send.ownBeforeAgent, "The agent's reply does not follow the sent message.");
   await shot("conversation", conversation());
 
-  // 5. The activity row shows while work runs, and Stop ends it.
   const before = (await client.read(channel.id)).tasks.length;
   await sendTo(b.name, LONG_PROMPT);
   const activity = conversation().getByRole("status", { name: /is working/ });
@@ -202,10 +184,8 @@ try {
   );
   await activity.first().waitFor({ state: "detached", timeout: UI_WAIT_MS });
   report.stop = { activityShown: true, taskState: stopped.tasks.slice(before).at(-1)?.state ?? "missing" };
-  // Stop pauses a task that no agent took yet, and cancels one that an agent runs.
   assert.ok(["cancelled", "paused"].includes(report.stop.taskState), "Stop did not end the channel task.");
 
-  // 6. Delete shows the preview notice and lists the channel in Deleted channels; restore ends it.
   await sidebarRow().click({ button: "right" });
   await page.getByRole("menuitem", { name: english("sidebar.channelMenu.delete"), exact: true }).click();
   await page.getByRole("button", { name: english("common.delete"), exact: true }).click();
@@ -223,7 +203,6 @@ try {
   await deletedRow.click();
   const notice = conversation().getByText(english("channel.conversation.archivedNotice"), { exact: true });
   await notice.waitFor({ timeout: UI_WAIT_MS });
-  // A deleted channel takes no edit, so its settings, the empty side panel and the panel button do not show.
   const sidePanels =
     (await page.getByLabel(english("channel.panel.label")).count()) +
     (await page.getByRole("complementary", { name: english("conversation.sidePanel.label") }).count()) +

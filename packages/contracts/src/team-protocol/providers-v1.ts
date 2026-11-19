@@ -1,15 +1,3 @@
-// Frozen optional providers-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can sign the host's providers in with a device code, store or clear a provider API key on
-// the host, download or cancel the host's managed CLI runtimes, and add or remove the host's custom
-// OpenCode endpoints. A member cannot use any route; `requireAdmin` on the host is the only gate.
-//
-// Secrets are write-only. A provider key, a custom endpoint key and a header value travel only in a
-// request body, towards the host. No response carries one: key state is `missing`, `saved` or
-// `unreadable`, and a custom endpoint says only whether it has a key. The browser sign-in is not
-// here, because it opens a browser on the host. A runtime message longer than 1024 characters is cut
-// by the host before it is sent. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,
@@ -41,7 +29,6 @@ export const PROVIDERS_ADMIN_ROUTES = {
   customDelete: "/v1/admin/providers/custom/delete",
 } as const;
 
-/** The providers that `codeLoginStart` signs in. The host refuses the other providers that its codec reads. */
 export const PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS = ["codex"] as const;
 
 const provider = oneOf("codex", "claude", "grok", "opencode");

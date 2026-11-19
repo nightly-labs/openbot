@@ -1,17 +1,3 @@
-// Runs the real Dynamic Island on a Linux X11 desktop and drives it with the real pointer and keyboard:
-// 1. The island is a DOCK window at the top centre of the work area, above other windows and on all workspaces.
-// 2. A click outside the shape of the island goes to the window under it.
-// 3. The pointer on the island expands it.
-// 4. Text typed in the inline reply is sent with Return.
-// 5. A click on Approve answers an approval request.
-// 6. A switch to another workspace keeps the island on the screen.
-// 7. With the pointer away, an idle island keeps its greeting and its logo still: it uses little CPU and
-//    does not send a new shape. The pointer on the island changes the greetings again. The greeting
-//    emoji draws in color on a desktop with no emoji font.
-//
-// Build the app first (`bun run build`), then run on Linux: bun scripts/linux-dynamic-island-e2e.ts
-// `scripts/linux-above-apps-e2e.ts` starts the desktop and records the video (see there).
-// It writes .openbot-build/linux-dynamic-island-e2e/<desktop>/report.json, screenshots and video.mp4.
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -46,16 +32,8 @@ import {
   windowManagerProperties,
 } from "./linux-above-apps-e2e";
 
-/** Two greeting intervals: with the pointer on the island, it shows the next greeting every 8 s. */
 const IDLE_SECONDS = 16;
-/**
- * Percent of one core, in the second half of the idle measure. With the pointer away, the idle island
- * draws no frame. The greeting crossfades and the blink cost 1.2% on X11 in software, with no GPU; one
- * motion that never ended cost about a fifth of a core on macOS. The first seconds after the change to
- * idle can have short peaks of clean-up work: 1% on GNOME, all in the first 8 s.
- */
 const IDLE_CPU_LIMIT_PERCENT = 1;
-/** The number of colored pixels of the first greeting emoji, drawn with the font of the greeting. */
 const GREETING_COLOR_PIXELS = `(async () => {
   const style = getComputedStyle(document.querySelector('.dynamic-island-surface-idle-greeting'));
   const font = '48px ' + style.fontFamily;
@@ -186,7 +164,6 @@ try {
   await settle(app);
   const island = await app.island();
 
-  // 1. Placement: centred in the work area, at its top edge, below a top panel.
   const properties = await windowManagerProperties(session, island.xid);
   const centre = island.bounds.x + island.bounds.width / 2;
   assert.ok(
@@ -202,8 +179,6 @@ try {
   });
   screenshot(session, "01-placement");
 
-  // 2. Click-through: a point of the island window outside its shape. A first click away from the
-  // island shows that the pointer of the test reaches the window under it.
   await firstClick(desktop, AWAY, () => app.eval("main", "clicks.length", decodeNumber));
   const region = latestRegion(await app.stats());
   const outside = pointOutside(island.bounds, region);
@@ -217,12 +192,10 @@ try {
   assert.equal(await app.eval("island", EXPANDED, decodeBoolean), false, "a click beside the island leaves it shut");
   steps.push({ step: "click-through", detail: { point: outside, region } });
 
-  // 3. Hover expands the island.
   await hoverOpen(app, desktop, island);
   screenshot(session, "02-hover");
   steps.push({ step: "hover expands" });
 
-  // 4. Typing in the inline reply.
   const field = centreOf(await screenBox(app, island, REPLY));
   desktop.move(field.x, field.y);
   desktop.click();
@@ -251,7 +224,6 @@ try {
   assert.equal(keyboard, true, "the reply field asked for key input");
   steps.push({ step: "typing sends the reply" });
 
-  // 5. Approve a request.
   await leave(app, desktop);
   await app.publish(APPROVAL);
   await until(
@@ -275,12 +247,10 @@ try {
   );
   steps.push({ step: "click on Approve answers the request" });
 
-  // 6. Another workspace.
   await leave(app, desktop);
   await checkOtherWorkspace(session, desktop, island.xid, "05-workspace-2");
   steps.push({ step: "all workspaces" });
 
-  // 7. CPU with the pointer away: an agent at work, then idle.
   await app.publish(WORKING);
   await sleep(2_000);
   screenshot(session, "06-working");
@@ -295,16 +265,12 @@ try {
       ),
     "the idle island",
   );
-  // The image has no emoji font: the greeting draws with the font of the app. A missing glyph draws a
-  // grey box; an emoji has colors.
   const greetingColorPixels = await app.eval("island", GREETING_COLOR_PIXELS, decodeNumber);
   assert.ok(greetingColorPixels > 100, `the greeting emoji has colors (${greetingColorPixels} pixels)`);
   steps.push({ step: "greeting emoji in color", detail: { pixels: greetingColorPixels } });
   await settle(app);
   screenshot(session, "07-idle");
-  // The screenshot and the change to idle end before the measure.
   await settle(app);
-  // The greeting changes and the blinks of the logo.
   await app.eval(
     "island",
     "(() => { window.e2eGreetingChanges = []; window.e2eBlinks = []; new MutationObserver(() => e2eGreetingChanges.push(Date.now())).observe(document.querySelector('.dynamic-island-surface-idle-greeting'), { attributes: true, attributeFilter: ['data-active-slot'] }); new MutationObserver(() => e2eBlinks.push(Date.now())).observe(document.querySelector('.dynamic-island-surface-logo'), { attributes: true, attributeFilter: ['data-blink'] }); return true; })()",
@@ -328,7 +294,6 @@ try {
     `steady idle CPU ${steadyPercent.toFixed(2)}% is under ${IDLE_CPU_LIMIT_PERCENT}% (all: ${usage.percent.toFixed(2)}%)`,
   );
 
-  // 8. The pointer on the idle island: the greetings change and the logo blinks again.
   const idleShell = centreOf(await screenBox(app, island, ".dynamic-island-shell"));
   desktop.move(idleShell.x, idleShell.y);
   await until(
@@ -344,14 +309,11 @@ try {
   assert.equal(stats.aboveAppsWindows, 1, "the app has one island window: one display");
   await app.quit();
 
-  // A self-hosted or hosted server, and native Wayland windows on a Wayland desktop: the same app, with a
-  // message, opens no island window.
   for (const mode of NO_WINDOW_MODES) {
     const other = islandApp(startHarness<Command>(session, bundle, mode));
     started = other;
     await other.ready;
     await other.publish(MESSAGE);
-    // A window can open after the start. The app above has its window in much less time.
     await sleep(NO_WINDOW_WAIT_MS);
     const { aboveAppsWindows, x11 } = await other.stats();
     assert.equal(x11, mode !== "wayland", `${mode}: the app uses the expected windows`);
@@ -389,7 +351,6 @@ interface App {
   island: () => Promise<IslandInfo>;
   stats: () => Promise<Stats>;
   publish: (presentation: DynamicIslandPresentation) => Promise<void>;
-  /** Runs `js` in a window of the app and decodes its result. */
   eval: <A>(target: "island" | "main", js: string, decode: (value: unknown) => A) => Promise<A>;
   quit: () => Promise<void>;
 }
@@ -411,7 +372,6 @@ function islandApp(harness: Harness<Command>): App {
   };
 }
 
-/** Moves the pointer onto the island shell and waits for the expanded island. */
 async function hoverOpen(app: App, desktop: Desktop, island: IslandInfo): Promise<void> {
   const shell = centreOf(await screenBox(app, island, ".dynamic-island-shell"));
   desktop.move(shell.x, shell.y);
@@ -419,7 +379,6 @@ async function hoverOpen(app: App, desktop: Desktop, island: IslandInfo): Promis
   await settle(app);
 }
 
-/** Moves the pointer away and waits for the shut island and its compact shape. */
 async function leave(app: App, desktop: Desktop): Promise<void> {
   desktop.move(AWAY.x, AWAY.y);
   await until(async () => !(await app.eval("island", EXPANDED, decodeBoolean)), "the shut island");
@@ -430,14 +389,12 @@ async function leave(app: App, desktop: Desktop): Promise<void> {
   await sleep(1_000);
 }
 
-/** The renderer applies the last change, its motion ends, and it draws a frame. */
 async function settle(app: App): Promise<void> {
   await app.eval("island", TWO_FRAMES, () => undefined);
   await until(async () => await app.eval("island", MOTION_DONE, decodeBoolean), "the end of the island motion");
   await app.eval("island", TWO_FRAMES, () => undefined);
 }
 
-/** A script that gives the box of the first button whose text is `text`. */
 function buttonByText(text: string): string {
   return `[...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === ${JSON.stringify(text)})`;
 }
@@ -446,7 +403,6 @@ function screenBox(app: App, island: IslandInfo, selector: string): Promise<Rect
   return screenBoxOf(app, island, `document.querySelector(${JSON.stringify(selector)})`, selector);
 }
 
-/** The screen box of the element that `find` gives in the island window. */
 async function screenBoxOf(app: App, island: IslandInfo, find: string, what: string): Promise<Rect> {
   const box = await app.eval(
     "island",

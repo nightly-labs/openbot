@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/marketplace";
 
 export const messages = {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "Kodlama",
   "marketplace.category.design": "Tasarım",
   "marketplace.category.dataAnalytics": "Veri ve analitik",
@@ -19,7 +18,6 @@ export const messages = {
   "marketplace.loadMore": "Daha fazla yükle",
   "marketplace.version": "Sürüm {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "Pazaryeri",
   "marketplace.kinds": "Pazaryeri içerik türleri",
   "marketplace.tab.agents": "Ajanlar",
@@ -28,10 +26,8 @@ export const messages = {
   "marketplace.description.agents": "Kendi talimatları ve becerileri olan hazır ajanlar.",
   "marketplace.description.skills": "Bir ajana bir görevi veya aracı öğreten talimatlar.",
 
-  // A plugin link.
   "marketplace.plugins.missing": "Bu eklenti OpenBot kataloğunda yok.",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "Ajan ayrıntıları yükleniyor…",
   "marketplace.agents.skills": "Beceriler",
   "marketplace.agents.routines": "Rutinler",
@@ -50,7 +46,6 @@ export const messages = {
     "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı. Eklendiğinde sizin adınıza işlem yapabilir.",
   "marketplace.agents.source.pending": "Henüz incelenmedi",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "Beceri yükleniyor",
   "marketplace.try.readFailed": "OpenBot bu ajanın becerilerini okuyamadı. Tekrar deneyin.",
   "marketplace.try.enable": "Bu beceriyi denemek için ajan ayarlarından etkinleştirin.",
@@ -58,7 +53,6 @@ export const messages = {
   "marketplace.try.update": "Bu sürümü denemek için bu beceriyi güncelleyin.",
   "marketplace.try.composerUnavailable": "Ajan mesaj kutusu kullanılamıyor.",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "{name} öğesini aç",
   "marketplace.tab.apps": "Uygulamalar",
   "marketplace.crumbs.label": "Konum",
@@ -92,7 +86,6 @@ export const messages = {
   "marketplace.properties.updated": "Güncellendi",
   "marketplace.properties.installs": "Yüklemeler",
 
-  // Agents.
   "marketplace.agent.add": "Ekle",
   "marketplace.agent.addNamed": "Ekle: {name}",
   "marketplace.agent.addAgent": "Ajan ekle",
@@ -101,7 +94,6 @@ export const messages = {
   "marketplace.agent.update": "Güncelle",
   "marketplace.agent.openChat": "Sohbeti aç",
 
-  // Apps.
   "marketplace.app.connect": "Bağlan",
   "marketplace.app.reconnect": "Yeniden bağlan",
   "marketplace.app.connectNamed": "{name} uygulamasına bağlan",
@@ -111,6 +103,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} tamamlanmadı",
   "marketplace.app.partialDescription": "Bazı uygulamaları veya becerileri yüklü değil. Yeniden bağlan bunları yükler.",
   "marketplace.app.notConnected": "Bağlı değil",
+  "marketplace.app.paused": "Duraklatıldı",
   "marketplace.app.custom": "MCP sunucusu",
   "marketplace.app.githubTagline": "Depolar, sorunlar ve çekme istekleri",
   "marketplace.app.onePasswordTagline": "Paylaştığınız oturum bilgileriyle sitelerde oturum açın",
@@ -120,7 +113,6 @@ export const messages = {
   "marketplace.app.whatsappTagline": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
   "marketplace.app.bitwardenTagline": "Paylaşılan bir klasördeki oturum bilgileriyle sitelerde oturum açın",
   "marketplace.app.protonPassTagline": "Paylaşılan bir kasadaki oturum bilgileriyle sitelerde oturum açın",
-  // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "Oturum açma ve kimlik bilgisi yönetimi",
   "marketplace.app.yourApps": "Uygulamalarınız",
   "marketplace.app.addCustom": "Özel ekle",
@@ -136,6 +128,10 @@ export const messages = {
   "marketplace.app.remove.action": "Kaldır",
   "marketplace.app.remove.confirmTitle": "{name} kaldırılsın mı?",
   "marketplace.app.remove.keep": "Koru",
+  "marketplace.app.replace.title": "{server} değiştirilsin mi?",
+  "marketplace.app.replace.description":
+    "{server} adlı bir sunucunuz zaten var, ancak bu {name} değil. {name} ile değiştirilsin mi? Adresi ve kayıtlı anahtarları silinir.",
+  "marketplace.app.replace.action": "Değiştir",
   "marketplace.app.connection": "Bağlantı",
   "marketplace.app.access.use": "Kullanabilir",
   "marketplace.app.access.noAgents": "Ajan yok",
@@ -153,6 +149,7 @@ export const messages = {
     "{host} uygulama bağlayamayan eski bir OpenBot sürümü çalıştırıyor. {host} üzerindeki OpenBot'u güncelleyin veya sahibinden güncellemesini isteyin.",
   "marketplace.app.blocked.member":
     "{host} üzerinde yalnızca bir sahip veya yönetici uygulama bağlayabilir. Onlardan {name} uygulamasını bağlamalarını ya da üyelerin uygulama bağlayabilmesi için {host} üzerindeki OpenBot'u güncellemelerini isteyin.",
+  "marketplace.app.blocked.mac": "{name} yalnızca OpenBot çalıştıran bir Mac'te çalışır.",
   "marketplace.app.connectAgain": "Tekrar bağlan",
   "marketplace.app.automation.askOnInstall": "Yüklerken macOS'ten erişim iste",
   "marketplace.app.automation.title": "Apple uygulamalarına erişim",
@@ -174,9 +171,6 @@ export const messages = {
   "marketplace.app.signInDescription":
     "{name} kayıtlı oturumu reddetti. Yeniden oturum açana kadar ajanlarınız bu uygulamayı kullanamaz.",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave verileri ve işlemleri",
   "marketplace.plugin.aave.description":
     "Aave, kullanıcıların canlı Aave V3 ve V4 piyasalarını keşfetmesine, cüzdan pozisyonlarını ve DAO yönetişimini incelemesine, borç verme işlemlerini simüle etmesine ve emanetsiz işlemler hazırlamasına yardımcı olur. Her işlem imzasız olarak döndürülür: eklenti piyasaları okur ve çağrıyı yazar, cüzdan ise kullanıcıda kalır.",
@@ -274,6 +268,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
+  "marketplace.plugin.sunra.tagline": "Yapay zekâ ile görsel, video, ses ve 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra, ajanların GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling ve Veo gibi modellerle görsel, video, ses ve 3D model üretmesini, kredi bakiyesini kontrol etmesini ve sonuçları almasını sağlar. Sonuçlar kullanıcının Sunra hesabındaki bir projeye kaydedilir. Her kullanıcı tarayıcıda kendi Sunra hesabına giriş yapar. Sunra her üretimin maliyetini önce bildirir ve o hesabın kredilerini yalnızca onaydan sonra harcar.",
+  "marketplace.plugin.sunra.app":
+    "Sunra MCP sunucusu üzerinden, tarayıcıda girişle görsel, video, ses ve 3D üretimi, krediler ve sonuçlar.",
+  "marketplace.plugin.sunra.prompt.balance": "Kaç Sunra kredim var?",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra ile yağmurda bir gece pazarının dikey formatta posterini yap.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra ile nehirdeki kâğıt bir teknenin 5 saniyelik videosunu yap. Önce maliyetini söyle.",
   "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",
@@ -400,7 +403,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Bu kararı kasamda yeni bir not olarak kaydet.",
   "marketplace.plugin.obsidian.prompt.log": "Bugünkü çalışmanın özetini İş günlüğü notuma ekle.",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian\'da Settings > Local REST API bölümünü aç. API anahtarını kopyala ve "Enable non-encrypted (HTTP) server" seçeneğini aç.',
+    "Obsidian'da Settings > Local REST API bölümünü aç ve API anahtarını kopyala.",
   "marketplace.plugin.resend.tagline": "İşlemsel e-posta",
   "marketplace.plugin.resend.description":
     "Resend, ajanların tek bir API üzerinden işlemsel e-posta göndermesine ve teslimatı kontrol etmesine olanak tanır. Resend panosundaki API anahtarı yerel sunucuya tek bir ortam değişkeni olarak aktarılır.",
@@ -411,14 +414,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
   "marketplace.plugin.omnisend.tagline": "E-posta ve SMS pazarlaması",
   "marketplace.plugin.omnisend.description":
-    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı tarayıcıda kendi Omnisend hesabına giriş yapar ve onay ekranında erişim düzeyini seçer. Yazma erişimiyle ajanlar kampanya da gönderebilir ve veri silebilir. Ajanlar yalnızca rapora ihtiyaç duyuyorsa salt okunur erişimi seç.",
+    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı kendi Omnisend hesabından aldığı bir API anahtarıyla bağlanır. Ajanlar anahtarın izin verdiği her şeyi yapabilir; buna kampanya göndermek ve veri silmek de dahil olabilir.",
   "marketplace.plugin.omnisend.app":
-    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; tarayıcıda giriş ile Omnisend'in MCP sunucusu üzerinden.",
+    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; API anahtarı ile Omnisend'in MCP sunucusu üzerinden.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.omnisend.hint.apiKey":
+    "Omnisend'de Store settings > API keys bölümünü açın ve bir anahtar oluşturun.",
   "marketplace.plugin.postiz.description":
     "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz hesabınıza tarayıcıdan giriş yapın veya Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları API erişimi içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin.",
   "marketplace.plugin.postiz.app":
@@ -427,6 +432,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
   "marketplace.plugin.postiz.prompt.draft":
     "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.trypost.description":
+    "TryPost, ajanların bağlı kanallarınızı listelemesini ve X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest ve daha fazlasında gönderi taslağı hazırlamasını, planlamasını, sıraya eklemesini ve yayınlamasını sağlar. Ajanlar ayrıca analizleri okuyabilir, fikirleri ve onayları yönetebilir ve yayın saatlerini ayarlayabilir. Tarayıcıda TryPost hesabınıza giriş yapın ve bir çalışma alanı seçin. Ajanlar bir gönderiyi hemen yayınlayabilir, bu yüzden onaylamadan önce her gönderiyi gözden geçirin.",
+  "marketplace.plugin.trypost.app":
+    "Kanallar, gönderiler, sıra, fikirler ve analizler; tarayıcıda giriş ile TryPost'un MCP sunucusu üzerinden.",
+  "marketplace.plugin.trypost.prompt.week": "Bu hafta hangi gönderiler planlandı?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.prompt.analytics": "Geçen ayki gönderilerimden hangileri en çok etkileşim aldı?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",
@@ -552,7 +566,6 @@ export const messages = {
   "marketplace.auth.personalApiKey": "Kişisel API anahtarı",
   "marketplace.auth.createKey": "Anahtar oluştur",
 
-  // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "{name} içinde dene",
   "marketplace.skills.yours": "Becerileriniz",
@@ -586,6 +599,13 @@ export const messages = {
   "marketplace.skills.origin.local": "Bu bilgisayarda oluşturuldu",
   "marketplace.skills.origin.workspace": "Bu ajanın klasöründe",
   "marketplace.skills.origin.marketplace": "Pazaryerinden · sürüm {version}",
+  "marketplace.skills.origin.github": "GitHub'dan · {repository}",
+  "marketplace.skills.github.search": "Arayın veya bir GitHub bağlantısı yapıştırın",
+  "marketplace.skills.github.reading": "Depoda beceriler aranıyor",
+  "marketplace.skills.github.trust": "OpenBot, GitHub'daki becerileri incelemedi. Bir beceriyi eklemeden önce okuyun.",
+  "marketplace.skills.github.source": "GitHub · {repository}, {commit} işlemesi",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} deposunu GitHub'da aç",
   "marketplace.skills.status.notAdded": "Eklenmedi",
   "marketplace.skills.status.on": "Açık: {agents}",
   "marketplace.skills.agentCount": { one: "{count} ajan", other: "{count} ajan" },
@@ -620,7 +640,6 @@ export const messages = {
   "marketplace.skills.dialog.unread": "Beceriler okunamadı",
   "marketplace.skills.local.gone": "Şu anda hiçbir ajanda bu beceri yok.",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "{name} eklendi.",
   "marketplace.notice.agentUpdated": "{name} güncellendi.",
   "marketplace.notice.appConnected": "{name} bağlandı.",
@@ -636,7 +655,6 @@ export const messages = {
   },
   "marketplace.error.skillPartial": "{name} şu ajanlarda değiştirilemedi: {agents}. {reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "Bağlantı açılamadı.",
   "marketplace.error.copyLink": "Bağlantı kopyalanamadı.",
   "marketplace.error.connectNoServer": "Bu uygulamayı bağlamak için yerel bir sunucu seçin.",

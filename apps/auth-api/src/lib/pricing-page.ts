@@ -1,21 +1,14 @@
-// The /pricing page: hosted servers and the license, as one order form. No JSX here, for the same
-// reason `content-collection.ts` holds none.
-
 import { BILLING_PLANS, type BillingPlanId, billingListPrices } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 
 export const PRICING_ROUTE = "/pricing";
 
-/** The social image. Its alt text is the `sitePage.pricing.imageAlt` key. */
 export const PRICING_SOCIAL_IMAGE_PATH = "/social/pricing.jpg";
 
-/** The plans that no new server can take. Servers that have one keep it. */
-export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set(["starter"]);
+export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set<BillingPlanId>();
 
-/** The sitemap date of the page. Change it when its text changes. */
-export const PRICING_PAGE_UPDATED_AT = "2026-10-29";
+export const PRICING_PAGE_UPDATED_AT = "2026-11-14";
 
-/** The EU member states, as the ISO 3166-1 alpha-2 codes of the `CF-IPCountry` header. */
 const EU_COUNTRIES: ReadonlySet<string> = new Set([
   "AT",
   "BE",
@@ -46,24 +39,16 @@ const EU_COUNTRIES: ReadonlySet<string> = new Set([
   "SK",
 ]);
 
-/** True for a `CF-IPCountry` value in the EU. A missing or unknown country is not in the EU. */
 export function isEuCountry(country: string | undefined): boolean {
   return country !== undefined && EU_COUNTRIES.has(country.toUpperCase());
 }
 
-/** What the page sells: the server plans with their prices. */
 export interface PricingOffer {
   plans: readonly HostedServerCatalogPlan[];
-  /** A visitor in the EU sees "excl. VAT" beside the total. */
   inEu: boolean;
-  /** A license bought now is free until this time, in milliseconds since the epoch. */
   licenseTrialEnd?: number;
 }
 
-/**
- * The plans at their list prices. Stripe has the same amounts (`scripts/stripe-bootstrap.ts`), so the page
- * shows these when the Stripe catalog does not load, as on a preview Worker.
- */
 export const LIST_PRICE_PLANS: readonly HostedServerCatalogPlan[] = BILLING_PLANS.map((plan) => {
   const month = billingListPrices(plan.id, "month");
   const year = billingListPrices(plan.id, "year");

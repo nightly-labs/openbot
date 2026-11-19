@@ -1,15 +1,3 @@
-// Checks stopped and unassignable channel work, in this worktree's running dev app with real provider
-// turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-stuck-tasks-e2e.ts --allow-mutations`. It needs two visible agents whose
-// provider is signed in and runs turns at the same time.
-//
-// It checks that a stopped task has the stop reason (so Continue and Reassign show), that "continue"
-// resumes the tasks of the newest stopped request and not an older stopped one, that the resumed
-// members answer that request, that a typed "@Name" goes to that member with no routing turn, that a
-// lead that answers alone gets no "Assigned to" row, that a restore gives archived work the stop
-// reason, and that Cancel ends a stopped task and leaves other stopped work. It makes its own channel
-// and deletes it. Writes
-// .openbot-build/channel-stuck-tasks-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import { type ChannelPage, type ChannelTask, channelRoutingConversationEvent } from "@openbot/contracts/ipc";
@@ -31,6 +19,7 @@ interface Report {
   continuedReplies?: { agentId: string; mentionsMountains: boolean; mentionsRivers: boolean }[];
   typedAddress?: { ownerAgentId: string | null; routingRows: number };
   leadAlone?: { ownerAgentId: string | null; routingRows: number; checked: boolean };
+  archiveRefusal?: string | null;
   restoreReason?: string | null;
   cancelled?: { state: string; error: string | null; otherStoppedState: string };
   passed: boolean;
@@ -41,6 +30,7 @@ const session = await connectChannelE2e("channel-stuck-tasks-e2e");
 const { page } = session;
 const client = new ChannelClient(page);
 const stopped = sourceText("error.backend.channelTaskStopped");
+const archiveRunning = sourceText("error.backend.channelArchiveRunning");
 
 const taskOf = (channel: ChannelPage, id: string): ChannelTask | undefined =>
   channel.tasks.find((task) => task.id === id);
@@ -59,7 +49,6 @@ try {
   assert.notEqual(lead.name.toLowerCase(), other.name.toLowerCase(), "The two agents need different names.");
   const channel = await client.create("E2E stuck tasks", [lead.id, other.id], lead.id);
 
-  // 1. An older request to one member, stopped while it runs. It has the stop reason.
   await client.send(channel.id, LONG_PROMPT, other.id);
   const olderId = lastMessageId(await client.read(channel.id));
   assert.ok(olderId);
@@ -81,7 +70,6 @@ try {
   report.stopReason = taskOf(afterStop, olderTask.id)?.error ?? null;
   assert.equal(report.stopReason, stopped);
 
-  // 2. A newer request to both members, stopped while both run.
   await client.send(channel.id, `@everyone ${MOUNTAINS}`, null);
   const newerId = lastMessageId(await client.read(channel.id));
   assert.ok(newerId);
@@ -104,7 +92,6 @@ try {
   );
   const tasksBefore = bothStopped.tasks.length;
 
-  // 3. "continue" resumes the newer request, not the older one, and starts no new task.
   await client.send(channel.id, "continue", null);
   const continueId = lastMessageId(await client.read(channel.id));
   assert.ok(continueId);
@@ -127,7 +114,6 @@ try {
     "continue replaced the instruction.",
   );
 
-  // The resumed members answer the request they were stopped on: mountains, not rivers.
   const continueSequence = resumed.messages.find((message) => message.id === continueId)?.sequence ?? 0;
   const replies = await waitFor(
     page,
@@ -162,7 +148,6 @@ try {
   );
   for (const task of newerTasks) await client.taskCommand("stop", channel.id, task.id).catch(() => undefined);
 
-  // 4. A typed "@Name" with no mention tag goes to that member, with no routing turn.
   await client.send(channel.id, `@${other.name} ${SHORT_PROMPT}`, null);
   const typedId = lastMessageId(await client.read(channel.id));
   assert.ok(typedId);
@@ -182,8 +167,6 @@ try {
   assert.equal(report.typedAddress.ownerAgentId, other.id, "The typed address did not choose its member.");
   assert.equal(report.typedAddress.routingRows, 0, "The typed address went through routing.");
 
-  // 5. A request that the lead takes alone has no "Assigned to" row. The model chooses, so the check
-  // applies only when it chose the lead.
   const current = await client.read(channel.id);
   await client.command({
     type: "save",
@@ -217,7 +200,6 @@ try {
   };
   if (leadAlone) assert.equal(report.leadAlone.routingRows, 0, "The lead's self-assignment has a routing row.");
 
-  // 6. Work that an archive paused gets the stop reason on restore.
   await client.send(channel.id, LONG_PROMPT, lead.id);
   const archivedId = lastMessageId(await client.read(channel.id));
   assert.ok(archivedId);
@@ -229,15 +211,28 @@ try {
   );
   const archivedTask = requestTasks(running, archivedId)[0];
   assert.ok(archivedTask);
+  report.archiveRefusal = await client
+    .command({ type: "archive", operationId: crypto.randomUUID(), channelId: channel.id })
+    .then(
+      () => null,
+      (cause: unknown) => (cause instanceof Error ? cause.message : String(cause)),
+    );
+  assert.ok(report.archiveRefusal?.includes(archiveRunning), "The host archived a channel with a running task.");
+  assert.equal((await client.read(channel.id)).channel.archived, false, "The refused archive changed the channel.");
+  await client.taskCommand("stop", channel.id, archivedTask.id);
+  await waitFor(
+    page,
+    "the request before the archive stops",
+    () => client.read(channel.id),
+    (current) => taskOf(current, archivedTask.id)?.state === "paused",
+  );
   await client.command({ type: "archive", operationId: crypto.randomUUID(), channelId: channel.id });
   const archived = await client.read(channel.id);
-  assert.equal(taskOf(archived, archivedTask.id)?.error, null, "The archive gave its paused task a reason.");
+  assert.equal(archived.channel.archived, true, "The host did not archive the stopped channel.");
   await client.command({ type: "restore", operationId: crypto.randomUUID(), channelId: channel.id });
   report.restoreReason = taskOf(await client.read(channel.id), archivedTask.id)?.error ?? null;
   assert.equal(report.restoreReason, stopped);
 
-  // 7. Cancel ends the stopped task, so it shows no Continue or Reassign, and leaves the older
-  // stopped request as it is.
   await client.taskCommand("cancel", channel.id, archivedTask.id);
   const afterCancel = await client.read(channel.id);
   report.cancelled = {

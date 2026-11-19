@@ -1,14 +1,3 @@
-// The programs that agents left running, such as a dev server that `nohup ... &` started (#3961).
-//
-// Each provider process gets `AGENT_PROCESS_VARIABLE`, and so every program that an agent starts.
-// When the shell of a tool call ends, the system adopts a program that it left in the background:
-// its parent becomes PID 1, or a subreaper such as `systemd --user` on Linux. A process with the
-// variable and such a parent is the root of a left program, also after OpenBot quit and started
-// again. A provider process that OpenBot runs has OpenBot as its parent, so it is never one.
-//
-// macOS shows the environment of a program, but not of an Apple system program such as `/bin/sleep`.
-// Such a program is not found. The environment stays in memory: it can hold secrets.
-
 import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
 import { sep } from "node:path";
@@ -25,10 +14,8 @@ class BackgroundProcessFailure extends Schema.TaggedError<BackgroundProcessFailu
 const { io } = causeHelpers(BackgroundProcessFailure);
 
 const COMMAND_TIMEOUT_MS = 5_000;
-// With `-E`, macOS writes the environment of each process after its command line.
 const COMMAND_MAX_BUFFER = 32 * 1024 * 1024;
 const MAX_COMMAND_LENGTH = 500;
-/** How long a stopped tree has to end after SIGTERM, before SIGKILL. */
 const STOP_GRACE_MS = 3_000;
 const STOP_CHECK_INTERVAL_MS = 100;
 const MARKER = `${AGENT_PROCESS_VARIABLE}=1`;
@@ -48,14 +35,9 @@ interface ProcessRow {
 
 interface LeftProcess {
   root: ProcessRow;
-  /** The root first, then its descendants. */
   tree: ProcessRow[];
 }
 
-/**
- * `ps` runs in the C locale: `lstart` is then `Fri Oct 30 14:42:59 2026` on macOS and with procps. lsof
- * keeps the user's locale, because in the C locale it writes a non-ASCII byte of a path as `\xNN`.
- */
 function run(command: string, args: readonly string[]): Effect.Effect<string, BackgroundProcessFailure> {
   return io(
     (signal) =>
@@ -71,7 +53,6 @@ function run(command: string, args: readonly string[]): Effect.Effect<string, Ba
             env: command === "ps" ? { ...process.env, LC_ALL: "C" } : process.env,
           },
           (error, stdout) => {
-            // lsof exits with 1 when no file matches.
             if (error && !(command === "lsof" && error.code === 1)) reject(error);
             else resolve(stdout);
           },
@@ -97,7 +78,6 @@ const readProcessTable = run("ps", ["-A", "-ww", "-o", "pid=,ppid=,uid=,lstart=,
   Effect.map(parseProcessTable),
 );
 
-/** The pids of `candidates` whose environment has the marker. */
 const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
   platform: NodeJS.Platform,
   candidates: readonly number[],
@@ -109,7 +89,6 @@ const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
       (pid) =>
         io(() => readFile(`/proc/${pid}/environ`, "latin1")).pipe(
           Effect.map((environment) => `\0${environment}\0`.includes(`\0${MARKER}\0`)),
-          // A process can end during the pass.
           Effect.orElseSucceed(() => false),
         ),
       { concurrency: 16 },
@@ -125,7 +104,6 @@ const markedProcesses = Effect.fn("BackgroundProcesses.marked")(function* (
   return marked;
 });
 
-/** The left programs of this user, each with its descendants. */
 const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platform: NodeJS.Platform) {
   const rows = yield* readProcessTable;
   const uid = process.getuid?.() ?? -1;
@@ -135,7 +113,6 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platf
     siblings.push(row);
     children.set(row.ppid, siblings);
   }
-  // On Linux a desktop session adopts orphans in the user's systemd manager, not in PID 1.
   const reapers = new Set(
     rows.filter((row) => row.uid === uid && /(^|\/)systemd --user\b/u.test(row.command)).map((row) => row.pid),
   );
@@ -151,7 +128,6 @@ const findLeftProcesses = Effect.fn("BackgroundProcesses.find")(function* (platf
     if (!marked.has(root.pid)) continue;
     const tree = [root];
     for (let index = 0; index < tree.length; index++) tree.push(...(children.get(tree[index]?.pid ?? -1) ?? []));
-    // An OpenBot that an agent started is never stopped from this one.
     if (tree.some((row) => row.pid === process.pid)) continue;
     left.push({ root, tree });
   }
@@ -162,7 +138,6 @@ function processId(row: ProcessRow): string {
   return `${row.pid}:${row.startedAt}`;
 }
 
-/** `lsof -F` writes one field a line: `p` starts a process, `n` is a name. */
 function parseLsof(text: string): Map<number, string[]> {
   const names = new Map<number, string[]>();
   let current: string[] | null = null;
@@ -175,7 +150,6 @@ function parseLsof(text: string): Map<number, string[]> {
   return names;
 }
 
-/** lsof can be missing on Linux. Then ports and owners are not known. */
 function lsof(args: readonly string[]): Effect.Effect<Map<number, string[]>> {
   return run("lsof", ["-nP", "-F", "pn", ...args]).pipe(
     Effect.map(parseLsof),
@@ -193,7 +167,6 @@ function ownerOf(cwd: string | undefined, agents: readonly BackgroundProcessAgen
   return owner?.id ?? null;
 }
 
-/** Null on Windows, where OpenBot cannot find these programs. */
 export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(function* (
   platform: NodeJS.Platform,
   agents: readonly BackgroundProcessAgent[],
@@ -207,7 +180,6 @@ export const listBackgroundProcesses = Effect.fn("BackgroundProcesses.list")(fun
     [lsof(["-a", "-d", "cwd", "-p", roots]), lsof(["-a", "-iTCP", "-sTCP:LISTEN", "-p", everyPid])],
     { concurrency: 2 },
   );
-  // lsof gives the real path of a folder, such as `/private/tmp` for `/tmp` on macOS.
   const workspaces = yield* Effect.forEach(
     agents,
     (agent) =>
@@ -247,10 +219,6 @@ function signal(pid: number, name: NodeJS.Signals | 0): boolean {
   }
 }
 
-/**
- * Ends one left program and its children: SIGTERM, then SIGKILL to each process that still runs
- * after `STOP_GRACE_MS`. The id must name a left program now, so a page cannot signal another process.
- */
 export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(function* (
   platform: NodeJS.Platform,
   id: string,
@@ -264,7 +232,6 @@ export const stopBackgroundProcess = Effect.fn("BackgroundProcesses.stop")(funct
     if (!pids.some((pid) => signal(pid, 0))) return;
     yield* Effect.sleep(STOP_CHECK_INTERVAL_MS);
   }
-  // A pid that ended in the grace period can name a new program now: only the same start is killed.
   const current = new Map((yield* readProcessTable).map((row) => [row.pid, row.startedAt]));
   for (const row of found.tree) if (current.get(row.pid) === row.startedAt) signal(row.pid, "SIGKILL");
 });

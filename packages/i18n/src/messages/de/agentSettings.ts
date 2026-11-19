@@ -149,8 +149,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Agentenzugriff",
   "agentSettings.runtime.busyMessage": "Während der Arbeit",
   "agentSettings.runtime.busyMessageLabel": "Nachrichten während der Arbeit des Agenten",
-  "agentSettings.runtime.taskLimit": "Parallele Threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads, die gleichzeitig laufen",
   "agentSettings.runtime.workingDirectory": "Arbeitsverzeichnis",
   "agentSettings.runtime.notAvailable": "Noch nicht verfügbar",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +167,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Steuern",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kann einen laufenden Durchlauf nicht steuern. Während der Arbeit gesendete Nachrichten warten in der Warteschlange.",
-  "agentSettings.taskLimit.default": "Standard ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} führt immer nur einen Durchlauf aus. Die Threads dieses Agenten warten aufeinander.",
   "agentSettings.notificationLevel.title": "Mich benachrichtigen",
   "agentSettings.notificationLevel.server": "Server-Standard ({level})",
   "agentSettings.notificationLevel.note":
@@ -202,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Vollen Zugriff erlauben",
   "agentSettings.fullAccess.askConfirm": "Erst fragen nutzen",
   "agentSettings.links.usage": "Nutzung",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle Agenten",
   "agentSettings.links.memories": "Erinnerungen",
   "agentSettings.links.memoriesCount": {
     one: "{count} gespeichert",

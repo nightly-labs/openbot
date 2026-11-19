@@ -10,7 +10,6 @@ export async function loadTextSize(): Promise<void> {
   if (useTextSize.getState().ready) return;
   try {
     const stored = Number(await SecureStore.getItemAsync(key));
-    // A second startup read must not overwrite a change made in Settings.
     if (isAppInterfaceSize(stored) && !useTextSize.getState().ready) useTextSize.setState({ percent: stored });
   } finally {
     useTextSize.setState({ ready: true });
@@ -19,7 +18,6 @@ export async function loadTextSize(): Promise<void> {
 
 export async function saveTextSize(percent: AppInterfaceSize): Promise<void> {
   if (!useTextSize.getState().ready) return;
-  // Apply immediately, including when storage fails.
   useTextSize.setState({ percent });
   await SecureStore.setItemAsync(key, String(percent));
 }

@@ -26,17 +26,12 @@ const STATUS_KEYS = {
   expired: "mobile.server.connectors.statusExpired",
 } as const;
 
-/** Opens a GitHub page that the host named. The host opens no page of its own. */
 async function openGitHub(address: string | null): Promise<void> {
   const page = platformPage("github", address);
   if (!page) throw new Error(currentText().t("mobile.server.connectors.openFailed"));
   await openBrowserAsync(page);
 }
 
-/**
- * Marketplace › Apps › GitHub of a joined server. The host runs the device flow: the phone
- * shows the code and opens GitHub's page, where the user types it. The host sees the sign-in by itself.
- */
 export function GitHubConnectorPage({
   server,
   query,
@@ -82,7 +77,6 @@ export function GitHubConnectorPage({
           style: "destructive",
           onPress: () =>
             void action.perform(async () => {
-              // GitHub's revoke page opens only when a sign-in was stored, as on the desktop.
               const signedIn = status.state === "connected" || status.state === "expired";
               const next = await send("githubDisconnect");
               if (signedIn && next.revokeUrl) await openGitHub(next.revokeUrl);
@@ -174,7 +168,6 @@ export function GitHubConnectorPage({
                 onPress={() =>
                   void action.perform(async () => {
                     await openGitHub(status.installUrl);
-                    // The user can change the repositories on GitHub's page, so the list is read again.
                     await repositories.refetch();
                   })
                 }

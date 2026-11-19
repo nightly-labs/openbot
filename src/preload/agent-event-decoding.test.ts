@@ -16,7 +16,6 @@ const delta = {
   },
 } satisfies ScopedAgentEvent;
 
-// Larger than the Team API limits: 100,000 characters for a command and 100 paths for a list.
 const largeApproval = {
   serverId: "local",
   event: {
@@ -85,7 +84,6 @@ const memoryChanges = {
   },
 } satisfies ScopedAgentEvent;
 
-/** The memory-changes event with its first change replaced by `change`. */
 function withMemoryChange(change: unknown) {
   const [message] = memoryChanges.event.snapshot.messages;
   return {

@@ -1,6 +1,7 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { CONNECTOR_IDS, type ConnectorId } from "@openbot/ui/features/connectors/connectors";
 import { createEffect, createMemo, untrack } from "solid-js";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { createBitwardenConnector } from "./bitwarden-connector";
 import { type BitwardenConnectorPort, bitwardenConnectorPort } from "./bitwarden-connector-port";
 import { connectorAccess } from "./connector-access";
@@ -14,31 +15,23 @@ import { createPasswordManagerConnector } from "./password-manager-connector";
 import { type PasswordManagerPort, passwordManagerPort } from "./password-manager-port";
 import { createWhatsAppConnector, type WhatsAppPort } from "./whatsapp-connector";
 
-/** The connectors of one place. A connector that the place cannot reach has no controller. */
 export type ConnectorSet = Partial<Record<ConnectorId, ConnectorController>>;
 
-/** How a place reaches each connector. Absent: the place does not have that connector. */
 export interface ConnectorTransports {
   github?: () => GitHubConnectorPort;
   onePassword?: () => OnePasswordConnectorPort;
   bitwarden?: () => BitwardenConnectorPort;
-  /** The shared password manager engine, for the managers that have no port of their own (Proton Pass). */
   passwordManagers?: () => PasswordManagerPort;
   messaging?: MessagingApi;
   whatsapp?: () => WhatsAppPort;
 }
 
-/** This computer's transports, through main. */
 export const LOCAL_CONNECTOR_TRANSPORTS = {
   onePassword: onePasswordConnectorPort,
   bitwarden: bitwardenConnectorPort,
   passwordManagers: passwordManagerPort,
 } as const satisfies ConnectorTransports;
 
-/**
- * Makes the controllers of one place once. Call it inside the component that owns them: each
- * subscription ends with it.
- */
 export function createConnectorSet(transports: ConnectorTransports, options: MessagingConnectorOptions): ConnectorSet {
   const set: ConnectorSet = {};
   const { messaging } = transports;
@@ -57,29 +50,18 @@ export function createConnectorSet(transports: ConnectorTransports, options: Mes
   return set;
 }
 
-/**
- * One connector on one server. `unsupported`: the server could run it, but this build or its host
- * cannot, such as GitHub with no GitHub App. `loading`: that is not known before the first read.
- */
 type ConnectorEntry =
   | { id: ConnectorId; access: "available"; controller: ConnectorController }
   | { id: ConnectorId; access: "local-only" | "hidden" | "unsupported" | "loading" };
 
-/** The connectors of the server on screen, which every surface reads. */
 export interface ConnectorRegistry {
-  /** Every connector, in catalogue order. */
   entries: () => readonly ConnectorEntry[];
   get: (id: ConnectorId) => ConnectorEntry;
-  /** The controllers of the available connectors. It changes only when one comes or goes. */
   available: () => readonly ConnectorController[];
-  /** Reads the available connectors again, for a view that opens. */
   reload: () => void;
+  canManage: () => boolean;
 }
 
-/**
- * The connectors of `server`: this computer's set for the local server, and the server set for a
- * joined one. The set reads its state again when the server changes.
- */
 export function createConnectorRegistry(
   server: () => ServerSummary | undefined,
   sets: { computer: ConnectorSet; server: ConnectorSet },
@@ -95,7 +77,6 @@ export function createConnectorRegistry(
       return { id, access: controller && !controller.ready() ? "loading" : "unsupported" };
     });
   });
-  /** The controllers that the server can reach, also those whose first read is still to come. */
   const reachable = () => {
     const current = server();
     const set = current?.kind === "local" ? sets.computer : sets.server;
@@ -104,7 +85,6 @@ export function createConnectorRegistry(
       return controller && connectorAccess(id, current) === "available" ? [controller] : [];
     });
   };
-  // Effects call it when a server or a view changes; what it reads must not make them run again.
   const reload = () =>
     untrack(() => {
       for (const controller of reachable()) controller.reload();
@@ -115,10 +95,6 @@ export function createConnectorRegistry(
       equals: (before, after) => before.length === after.length && before.every((item, index) => item === after[index]),
     },
   );
-  // GitHub tells its availability only after a read, so a new server is read before it can show. A
-  // joined server's capabilities come after its id, so the connectors it can reach are part of the key.
-  // The key is a memo because the server summary changes while a workspace loads, and an effect runs
-  // again each time its key is computed.
   createEffect(
     createMemo(() => {
       const id = server()?.id;
@@ -133,5 +109,9 @@ export function createConnectorRegistry(
     get: (id) => entries().find((entry) => entry.id === id) ?? { id, access: "hidden" },
     available,
     reload,
+    canManage: () => {
+      const current = server();
+      return current?.kind !== "remote" || serverRoleCanAdminister(current);
+    },
   };
 }

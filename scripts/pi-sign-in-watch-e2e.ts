@@ -1,8 +1,3 @@
-// Starts Pi signed out on the real driver and `ProviderRuntime`, with a fake `pi` that lists models
-// only while its `auth.json` holds a credential. Then writes that file in two steps, an empty object
-// and then a credential, and checks that the Pi row is checked after each write and becomes
-// available with no restart and no user action (#2895).
-// `bun scripts/pi-sign-in-watch-e2e.ts`. Writes .openbot-build/pi-sign-in-watch-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -76,7 +71,6 @@ async function spawns(): Promise<number> {
 }
 
 const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
-/** The Pi row state of each status event that changed it, in order. */
 const piStates: (AgentProviderState | undefined)[] = [];
 let onStatus = () => {};
 const providers = new ProviderRuntime({
@@ -118,7 +112,6 @@ const providers = new ProviderRuntime({
 
 const piState = () => providers.status().providers?.find((row) => row.id === "pi")?.state;
 
-/** Resolves when the Pi row has gone through `states` in order, counting from `from` in `piStates`. */
 function waitForPiStates(from: number, states: readonly AgentProviderState[]): Promise<void> {
   const reached = () => {
     let next = 0;
@@ -145,19 +138,16 @@ try {
   await writeFile(executable, FAKE_PI);
   await chmod(executable, 0o755);
 
-  // 1. No sign-in file: Pi starts signed out and keeps no client.
   await runCauseEffect(providers.start());
   report.atStart = { state: piState(), spawns: await spawns() };
   assert.equal(report.atStart.state, "sign-in-required");
 
-  // 2. Pi creates the file empty before the credential. The host checks again and finds no account.
   let from = piStates.length;
   await writeFile(join(agentDirectory, "auth.json"), "{}");
   await waitForPiStates(from, ["checking", "sign-in-required"]);
   report.afterEmptyFile = { states: piStates.slice(from), spawns: await spawns() };
   assert.ok(report.afterEmptyFile.spawns > report.atStart.spawns, "Pi was asked for its models again");
 
-  // 3. The credential lands. The host checks again, with no restart and no user action.
   from = piStates.length;
   await writeFile(join(agentDirectory, "auth.json"), JSON.stringify({ openai: { type: "oauth" } }));
   await waitForPiStates(from, ["checking", "available"]);

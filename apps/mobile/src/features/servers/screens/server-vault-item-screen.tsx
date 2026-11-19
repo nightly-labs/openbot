@@ -12,13 +12,16 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { Children, type ReactNode, useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { Children, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { VaultTwoStepSection } from "@/features/servers/components/vault-two-step-section";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
+import { useVaultAgentPicker } from "@/features/servers/model/vault-agent-picker";
 import {
   type VaultDraft,
   vaultAddressExample,
+  vaultAgentsSummary,
   vaultCardTitle,
   vaultContactTitle,
   vaultCountryOptions,
@@ -33,15 +36,18 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const KINDS: readonly VaultItemKind[] = ["login", "card", "contact", "apiKey"];
-// Examples that are the same in each language.
 const WEBSITE_PLACEHOLDER = "https://example.com";
 const PERSON_PLACEHOLDER = "Ada Lovelace";
 const EMAIL_PLACEHOLDER = "ada@example.com";
@@ -51,7 +57,6 @@ const SECURITY_CODE_PLACEHOLDER = "123";
 const API_KEY_PLACEHOLDER = "sk-proj-4f9a…";
 const VARIABLE_NAME_LIMIT = 64;
 
-/** Short fields side by side, each with an equal share of the width. */
 function FieldRow({ children }: { children: ReactNode }) {
   return (
     <View className="flex-row gap-3">
@@ -63,16 +68,21 @@ function FieldRow({ children }: { children: ReactNode }) {
 }
 
 type FieldProps = Partial<Omit<SheetFormFieldProps, "label" | "value" | "onChangeText">>;
-type TextKey = Exclude<keyof VaultDraft, "fillSites">;
+type TextKey = Exclude<keyof VaultDraft, "fillSites" | "twoStepKey" | "agents">;
 
 function isKind(value: string | undefined): value is VaultItemKind {
   return KINDS.some((kind) => kind === value);
 }
 
-/**
- * Server settings › Vault › one item of a joined server, or a new one of `kind`. The header action
- * saves it. A saved secret is never shown: its field starts empty, and a value typed there replaces it.
- */
+function LoginLine({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center ps-4">
+      <Typography.Paragraph className="w-28 py-2 pe-2 text-grouped-secondary">{label}</Typography.Paragraph>
+      <View className="min-w-0 flex-1">{children}</View>
+    </View>
+  );
+}
+
 export function ServerVaultItemScreen() {
   const { t } = useText();
   const { serverId, itemId, kind } = useLocalSearchParams<{ serverId: string; itemId?: string; kind?: string }>();
@@ -109,10 +119,6 @@ export function ServerVaultItemScreen() {
   );
 }
 
-/**
- * An agent's request for a new item (`request_vault_item`). The form shows only the fields of the
- * request, starts with the values that the agent filled in, and `save` answers the request.
- */
 export interface VaultItemRequest {
   title: string;
   prefill: Partial<VaultDraft>;
@@ -140,14 +146,11 @@ export function VaultItemForm({
   const { theme } = useUniwind();
   const { saveVaultItem, deleteVaultItem } = useMobileWorkspaceActions();
   const { action, perform, setState } = vault;
-  // The agent's label is only a suggestion: the field starts empty and shows it as its placeholder.
   const { label: suggestedLabel, ...prefill } = request?.prefill ?? {};
   const [initial] = useState(() => ({ ...vaultDraft(saved), ...prefill }));
   const [draft, setDraft] = useState<VaultDraft>(initial);
-  // Navigation runs a render later, once the guard below reads `leaving`.
   const [leaving, setLeaving] = useState(false);
   const [discarding, setDiscarding] = useState(false);
-  // The state without a deleted item. It is shown after this page goes, so the page does not say "gone".
   const removedState = useRef<VaultState | null>(null);
   const showState = useRef(setState);
   showState.current = setState;
@@ -158,10 +161,18 @@ export function VaultItemForm({
     removedState.current = null;
     if (state) void showState.current(state);
   }, [leaving]);
-  const input = vaultSaveInput(kind, saved?.id ?? null, draft);
+  const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
+  const agentScope = vault.query.data?.agentScope === true && !request && agents.length > 0;
+  const openAgentPicker = useVaultAgentPicker((state) => state.open);
+  const agentsKey = (value: string[] | null) => (value === null ? null : [...value].sort());
+  const agentsChanged = JSON.stringify(agentsKey(draft.agents)) !== JSON.stringify(agentsKey(initial.agents));
+  const input = vaultSaveInput(kind, saved?.id ?? null, draft, agentScope && agentsChanged);
   const example = vaultAddressExample(draft.country);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty =
+    agentsChanged || JSON.stringify({ ...draft, agents: null }) !== JSON.stringify({ ...initial, agents: null });
   const locked = action.isPending;
+  const formId = useId();
 
   usePreventRemove(!discarding && (dirty || locked) && !leaving, ({ repeat }) => {
     if (locked) return;
@@ -217,7 +228,6 @@ export function VaultItemForm({
     });
     if (action.error) action.reset();
   };
-  /** One text field of the draft. */
   const field = (key: TextKey, label: string, props: FieldProps = {}) => (
     <SheetFormField
       label={label}
@@ -225,18 +235,15 @@ export function VaultItemForm({
       maxLength={VAULT_TEXT_LIMIT}
       editable={!locked}
       value={draft[key]}
-      // A variable name is capitals: the keyboard capitalizes typed letters, not pasted text.
       onChangeText={(value) => editText(key, key === "name" ? value.toUpperCase() : value)}
       {...props}
     />
   );
-  /** A secret field: empty for a saved item, which keeps its secret until a new one is typed. */
   const secret = (key: "password" | "number" | "securityCode" | "key", label: string, props: FieldProps) =>
     field(key, label, {
       autoCapitalize: "none",
       isRequired: !saved && key !== "securityCode",
       ...props,
-      // A saved secret keeps its value until a new one is typed, and the placeholder says so.
       ...(saved
         ? {
             placeholder: t(
@@ -273,7 +280,6 @@ export function VaultItemForm({
     <SettingsContent>
       <Stack.Screen options={{ title }} />
       <SheetSaveAction
-        // The agent can fill in a whole address, which the user may save as it is.
         dirty={dirty || Boolean(request)}
         canSave={input !== null && !locked}
         pending={locked && (dirty || Boolean(request))}
@@ -295,16 +301,36 @@ export function VaultItemForm({
               placeholder: WEBSITE_PLACEHOLDER,
               hint: t("mobile.server.vault.websiteHint"),
             })}
-            {field("username", t("mobile.server.vault.username"), {
-              autoCapitalize: "none",
-              placeholder: EMAIL_PLACEHOLDER,
-            })}
-            {secret("password", t("mobile.server.vault.password"), {
-              secureTextEntry: true,
-              placeholder: PASSWORD_PLACEHOLDER,
-              maxLength: VAULT_PASSWORD_LIMIT,
-              hint: t("mobile.server.vault.secretHint", { host }),
-            })}
+            <View className="gap-2">
+              <View
+                className={`overflow-hidden border border-border bg-grouped ${isIOS ? "" : "rounded-2xl"}`}
+                style={isIOS ? { borderRadius: 16, borderCurve: "continuous" } : undefined}
+              >
+                <LoginLine label={t("mobile.server.vault.username")}>
+                  {field("username", t("mobile.server.vault.username"), {
+                    autoCapitalize: "none",
+                    placeholder: EMAIL_PLACEHOLDER,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+                <View className="ms-4 bg-border" style={{ height: StyleSheet.hairlineWidth }} />
+                <LoginLine label={`${t("mobile.server.vault.password")}${saved ? "" : " *"}`}>
+                  {secret("password", t("mobile.server.vault.password"), {
+                    secureTextEntry: true,
+                    placeholder: PASSWORD_PLACEHOLDER,
+                    maxLength: VAULT_PASSWORD_LIMIT,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+              </View>
+              <View className="px-1">
+                <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                  {t("mobile.server.vault.secretHint", { host })}
+                </Typography.Paragraph>
+              </View>
+            </View>
             {request
               ? null
               : field("notes", t("mobile.server.vault.notes"), {
@@ -383,7 +409,6 @@ export function VaultItemForm({
             {field("fullName", t("mobile.server.vault.fullName"), {
               placeholder: PERSON_PLACEHOLDER,
             })}
-            {/* The country comes first: the address placeholders follow its format. */}
             <SettingsSection>
               <SettingsRow
                 disclosure={false}
@@ -430,6 +455,18 @@ export function VaultItemForm({
           </Typography.Paragraph>
         </View>
       </View>
+      {kind === "login" && !request && vault.canManageTwoStep ? (
+        <VaultTwoStepSection
+          formId={formId}
+          serverId={serverId}
+          host={host}
+          website={draft.website}
+          saved={saved?.kind === "login" ? saved : undefined}
+          twoStepKey={draft.twoStepKey}
+          disabled={locked}
+          onChange={(twoStepKey) => edit({ twoStepKey })}
+        />
+      ) : null}
       {kind === "card" && !request ? (
         <SettingsSection title={t("mobile.server.vault.billingContact")}>
           <SettingsRow
@@ -470,6 +507,26 @@ export function VaultItemForm({
               <Typography.Paragraph numberOfLines={1}>{site}</Typography.Paragraph>
             </SettingsRow>
           ))}
+        </SettingsSection>
+      ) : null}
+      {agentScope ? (
+        <SettingsSection footer={draft.agents?.length === 0 ? t("mobile.server.vault.agentsNone") : undefined}>
+          <SettingsRow
+            value={
+              draft.agents === null ? t("mobile.server.vault.agentsAll") : vaultAgentsSummary(draft.agents, agents, t)
+            }
+            disabled={locked}
+            onPress={() => {
+              openAgentPicker({
+                serverId,
+                agents: draft.agents,
+                onChange: (next) => edit({ agents: next }),
+              });
+              router.push({ pathname: "/server-settings/vault-item-agents" });
+            }}
+          >
+            <Typography.Paragraph>{t("mobile.server.vault.agents")}</Typography.Paragraph>
+          </SettingsRow>
         </SettingsSection>
       ) : null}
       {saved ? (

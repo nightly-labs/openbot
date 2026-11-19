@@ -4,6 +4,7 @@ import {
   type BillingSubscriptionStatus,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
+import type { BillingDetails } from "@openbot/contracts/billing-details";
 import {
   LICENSE_INCLUDED_USERS,
   LICENSE_MAX_USERS,
@@ -62,29 +63,32 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { guessHostedCurrency, HOSTED_BILLING_CURRENCY, HostedBillingSwitch } from "../servers/HostedServerPricing";
+import {
+  type BillingDetailsCalls,
+  type BillingDetailsDraft,
+  BillingDetailsFields,
+  billingDetailsDraft,
+  billingDetailsRequest,
+  saveBillingDetails,
+} from "./BillingDetailsFields";
 import type { LicenseStore } from "./license-store";
 import { formatMinorMoney } from "./money";
 
 export interface LicenseSectionProps {
   store: LicenseStore;
-  /** Opens the Stripe Customer Portal of the account, where the owner changes the payment method. */
   onManagePayment?: (() => void) | undefined;
-  /** Opens the sales contact, for a team with more than `LICENSE_MAX_USERS` users. */
   onContactUs?: (() => void) | undefined;
-  /** Opens the license dialog at once, as `/app?start=license` does. */
   startBuying?: boolean | undefined;
-  /** The order from the pricing page. The license dialog fills it in and goes on to Checkout. */
   startOrder?: PricingOrder | undefined;
+  billingDetails?: BillingDetailsCalls | undefined;
 }
 
 export { formatMinorMoney } from "./money";
 
-/** The fewest users that the owner can set: the included users, or the people who use the license now. */
 export function licenseMinimumUsers(state: LicenseState): number {
   return Math.min(LICENSE_MAX_USERS, Math.max(LICENSE_INCLUDED_USERS, state.used));
 }
 
-/** The statuses that show a badge. An active license shows none. */
 const STATUS_BADGE: Partial<
   Record<BillingSubscriptionStatus, { text: AppTextKey; variant: "info-light" | "destructive-light" | "warning-light" }>
 > = {
@@ -98,7 +102,6 @@ function paymentFailed(license: License): boolean {
   return license.status === "past_due" || license.status === "unpaid";
 }
 
-/** True for the Starter tier at either price: 1 user, and no users to change. */
 function isOneUser(license: License): boolean {
   return licensePlanOf(license).tier !== "team";
 }
@@ -108,11 +111,6 @@ const TIER_TITLE = {
   team: "billing.license.tier.team.title",
 } as const satisfies Record<LicenseTier, AppTextKey>;
 
-/**
- * The License part of Billing: the commercial license of the account, above the server plans. It
- * shows nothing until the account server says that it sells licenses, so an older account server, or
- * one with no license price, shows the Billing panel as before.
- */
 export function LicenseSection(props: LicenseSectionProps): JSX.Element {
   const { t } = useText();
   const [changing, setChanging] = createSignal(false);
@@ -162,6 +160,7 @@ export function LicenseSection(props: LicenseSectionProps): JSX.Element {
                     store={props.store}
                     startBuying={props.startBuying ?? false}
                     startOrder={props.startOrder}
+                    billingDetails={props.billingDetails}
                     onContactUs={props.onContactUs}
                   />
                 }
@@ -244,7 +243,6 @@ function CancelDescription(props: { license: License }): JSX.Element {
   );
 }
 
-/** The failed payment and the over-limit warnings of an open license. */
 function LicenseAlerts(props: {
   license: License;
   used: number;
@@ -322,7 +320,6 @@ function LicenseIcon(props: { offer?: boolean }): JSX.Element {
   );
 }
 
-/** The open license of the account: tier, users, renewal date, price, and the actions menu. */
 function ActiveLicenseRow(props: {
   license: License;
   used: number;
@@ -438,16 +435,12 @@ function ActiveLicenseRow(props: {
   );
 }
 
-/**
- * The rows of an account with no open license. The first row is what the account has now: personal
- * use, an ended license, or the license of a server owner that covers this account. The second row
- * sells the work license, so that "Buy a license" does not look like it buys the first row.
- */
 function LicenseOffer(props: {
   state: LicenseState;
   store: LicenseStore;
   startBuying: boolean;
   startOrder: PricingOrder | undefined;
+  billingDetails: BillingDetailsCalls | undefined;
   onContactUs: (() => void) | undefined;
 }): JSX.Element {
   const { t, format } = useText();
@@ -535,6 +528,7 @@ function LicenseOffer(props: {
           state={props.state}
           store={props.store}
           order={props.startOrder}
+          billingDetails={props.billingDetails}
           onContactUs={props.onContactUs}
           onClose={() => setBuying(false)}
         />
@@ -543,15 +537,11 @@ function LicenseOffer(props: {
   );
 }
 
-/**
- * Buys a license without a server. The slider sets the people at work; after the maximum, the dialog
- * sends the team to the sales contact. A server with its license is sold in the add server dialog.
- */
 function BuyLicenseDialog(props: {
   state: LicenseState;
   store: LicenseStore;
-  /** The pricing page order. The dialog shows it and opens Checkout at once when it fits the account. */
   order: PricingOrder | undefined;
+  billingDetails: BillingDetailsCalls | undefined;
   onContactUs: (() => void) | undefined;
   onClose: () => void;
 }): JSX.Element {
@@ -560,7 +550,6 @@ function BuyLicenseDialog(props: {
   const minimum = untrack(() => Math.min(SLIDER_MAX, licenseOrderFor(Math.max(1, props.state.used)).users));
   const [people, setPeople] = createSignal(Math.max(minimum, start?.license?.users ?? minimum));
   const [interval, setInterval] = createSignal<BillingInterval>(start?.interval ?? "year");
-  // A Stripe customer pays all its subscriptions in one currency.
   const currency = untrack(
     () => props.state.currency ?? start?.currency ?? HOSTED_BILLING_CURRENCY[guessHostedCurrency()],
   );
@@ -571,11 +560,13 @@ function BuyLicenseDialog(props: {
   const monthly = () => licenseOrderMonthly(plan(), order().users, currency);
   const money = (amount: number) => formatMinorMoney(format, amount, currency);
   const trialEnd = () => props.state.trialEnd;
+  const details = createBillingDetailsForm(() => props.billingDetails);
   async function confirm(): Promise<void> {
     if (contact()) {
       props.onContactUs?.();
       return;
     }
+    if (!(await details.save())) return;
     const request: LicenseCheckoutRequest = {
       users: order().users,
       currency,
@@ -584,11 +575,13 @@ function BuyLicenseDialog(props: {
     };
     if (await props.store.openCheckout(request)) props.onClose();
   }
-  // The order goes on to Checkout when it fits: the same currency, enough users, and no license of an owner.
   onSettled(() => {
     const license = start?.license;
     if (!license || start.currency !== currency || license.users < minimum) return;
-    if (untrack(() => props.state.coveredBy.length) === 0) void confirm();
+    if (untrack(() => props.state.coveredBy.length) !== 0) return;
+    void details.loaded.then((country) => {
+      if (country) void confirm();
+    });
   });
   const confirmLabel = () => {
     if (contact()) return t("billing.license.contact.action");
@@ -603,8 +596,8 @@ function BuyLicenseDialog(props: {
       description={t("billing.license.buy.description")}
       confirmLabel={confirmLabel()}
       pendingLabel={t("billing.opening")}
-      pending={props.store.state.pending === "checkout"}
-      error={props.store.state.actionError ?? undefined}
+      pending={props.store.state.pending === "checkout" || details.saving()}
+      error={details.error() ?? props.store.state.actionError ?? undefined}
       onCancel={() => {
         props.store.clearActionError();
         props.onClose();
@@ -612,6 +605,13 @@ function BuyLicenseDialog(props: {
       onConfirm={confirm}
     >
       <div class="billing-license-change">
+        <Show when={props.billingDetails && !contact()}>
+          <BillingDetailsFields
+            value={details.draft()}
+            disabled={props.store.state.pending !== null || details.saving()}
+            onChange={details.edit}
+          />
+        </Show>
         <HostedBillingSwitch
           billing={interval() === "year" ? "yearly" : "monthly"}
           discountPercent={LICENSE_YEAR_DISCOUNT_PERCENT}
@@ -642,7 +642,6 @@ function BuyLicenseDialog(props: {
           >
             <dl class="billing-license-lines">
               <div>
-                {/* The slider above shows the users, so the line names the license only. */}
                 <dt>
                   <Show when={order().tier === "team"} fallback={t("billing.license.tier.starter.title")}>
                     {t("billing.license.tier.team.title")}
@@ -676,7 +675,57 @@ function BuyLicenseDialog(props: {
   );
 }
 
-/** The price lines of a plan for a number of users, and the total of one period. */
+function createBillingDetailsForm(calls: () => BillingDetailsCalls | undefined) {
+  const { t, errorMessage } = useText();
+  const [saved, setSaved] = createSignal<BillingDetails | null>(null);
+  const [draft, setDraft] = createSignal<BillingDetailsDraft>(billingDetailsDraft(null));
+  const [edited, setEdited] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+  const api = untrack(calls);
+  const loaded: Promise<string | null> = api
+    ? api.getDetails().then(
+        (details) => {
+          setSaved(details);
+          if (!untrack(edited)) setDraft(billingDetailsDraft(details));
+          return details.country;
+        },
+        () => null,
+      )
+    : Promise.resolve(null);
+  async function save(): Promise<boolean> {
+    const current = calls();
+    if (!current) return true;
+    if (!billingDetailsRequest(draft())) {
+      setError(t("billing.details.countryMissing"));
+      return false;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      setSaved(await saveBillingDetails(current, saved(), draft()));
+      return true;
+    } catch (failure) {
+      setError(errorMessage(failure, t("billing.details.saveFailed")));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+  return {
+    draft,
+    saving,
+    error,
+    loaded,
+    save,
+    edit: (next: BillingDetailsDraft) => {
+      setEdited(true);
+      setError(null);
+      setDraft(next);
+    },
+  };
+}
+
 function Quote(props: { plan: LicensePlan; users: number; currency: BillingCurrency }): JSX.Element {
   const { t, format } = useText();
   const included = () => licenseIncludedUsers(props.plan.tier);
@@ -713,13 +762,8 @@ function Quote(props: { plan: LicensePlan; users: number; currency: BillingCurre
   );
 }
 
-/** The value after the maximum means "more than `LICENSE_MAX_USERS` users". */
 const SLIDER_MAX = LICENSE_MAX_USERS + 1;
 
-/**
- * Changes the users of the open license. The minimum is the people who use it now. More users bill
- * the difference for the rest of the period now; fewer users take effect on the next invoice.
- */
 function ChangeUsersDialog(props: {
   license: License;
   minimum: number;
@@ -808,11 +852,6 @@ function ChangeUsersDialog(props: {
   );
 }
 
-/**
- * Moves a Starter license to Team, or a monthly Team license to yearly. A yearly Starter license stays
- * yearly. The account server bills the
- * difference now. It sells no other change: to go down, the owner cancels and buys again.
- */
 function ChangePlanDialog(props: {
   license: License;
   minimum: number;
@@ -876,7 +915,6 @@ function ChangePlanDialog(props: {
   );
 }
 
-/** Who uses the license: the owner and each member of the owner's servers. */
 function LicenseUsersDialog(props: { users: LicenseUser[]; license: License; onClose: () => void }): JSX.Element {
   const { t, format } = useText();
   return (

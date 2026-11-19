@@ -10,7 +10,6 @@ import {
 } from "../database/database-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 
-/** A saved proxy address without its password. */
 export interface BrowserProxyAddressRecord {
   kind: "address";
   id: string;
@@ -21,7 +20,6 @@ export interface BrowserProxyAddressRecord {
   hasPassword: boolean;
 }
 
-/** The computer of one member: the pages go out through the OpenBot desktop app of that member. */
 export interface BrowserProxyComputerRecord {
   kind: "computer";
   id: string;
@@ -30,7 +28,6 @@ export interface BrowserProxyComputerRecord {
 
 export type BrowserProxyRecord = BrowserProxyAddressRecord | BrowserProxyComputerRecord;
 
-/** A proxy as the browser connects to it. The password is plain text: it never leaves main. */
 export type BrowserProxyConnection =
   | {
       kind: "address";
@@ -43,7 +40,6 @@ export type BrowserProxyConnection =
     }
   | { kind: "computer"; proxyId: string; memberId: string };
 
-/** The columns of a new or changed proxy. The password is already encrypted. */
 export interface BrowserProxyRow {
   scheme: BrowserProxyScheme;
   host: string;
@@ -52,11 +48,6 @@ export interface BrowserProxyRow {
   password: Uint8Array | null;
 }
 
-/**
- * Owns the `browser_proxies` rows and the proxy of each named profile. It stores the password as the
- * caller encrypted it, and reads it back only in `connection`. Configuration, so it writes directly,
- * as `BrowserProfileStore` does.
- */
 export class BrowserProxyStore {
   readonly #database: OpenBotDatabase;
 
@@ -82,7 +73,6 @@ export class BrowserProxyStore {
     return row === undefined ? undefined : proxyRecord(row);
   }
 
-  /** The computer of a member, added when it is not there yet. */
   ensureComputer(memberId: string): BrowserProxyComputerRecord {
     const now = new Date().toISOString();
     this.#database.connection
@@ -100,14 +90,12 @@ export class BrowserProxyStore {
     return { kind: "computer", id, memberId };
   }
 
-  /** The encrypted password of a proxy, or null. */
   password(id: string): Uint8Array | null {
     const row = this.#database.connection.prepare("SELECT password FROM browser_proxies WHERE proxy_id = ?").get(id);
     const value = row?.password;
     return value instanceof Uint8Array ? value : null;
   }
 
-  /** The proxy of each named profile that has one, by profile id. */
   assignments(): Map<string, string> {
     return new Map(
       databaseRows(
@@ -116,7 +104,6 @@ export class BrowserProxyStore {
     );
   }
 
-  /** The proxy of one named profile, or undefined for the proxy settings of the computer. */
   proxyOfProfile(profileId: string): string | undefined {
     const row = this.#database.connection
       .prepare("SELECT proxy_id FROM browser_profile_proxies WHERE profile_id = ?")
@@ -125,7 +112,6 @@ export class BrowserProxyStore {
     return typeof value === "string" ? value : undefined;
   }
 
-  /** Adds a proxy address with a new random id. The caller checks the limit and the address. */
   create(row: BrowserProxyRow): string {
     const id = randomBytes(16).toString("hex");
     const now = new Date().toISOString();
@@ -147,12 +133,10 @@ export class BrowserProxyStore {
       .run(row.scheme, row.host, row.port, row.username, row.password, new Date().toISOString(), id);
   }
 
-  /** Deletes the proxy. Its profiles go back to the proxy settings of the computer. */
   delete(id: string): void {
     this.#database.connection.prepare("DELETE FROM browser_proxies WHERE proxy_id = ?").run(id);
   }
 
-  /** Null: the profile uses the proxy settings of the computer. */
   assign(profileId: string, proxyId: string | null): void {
     if (proxyId === null) {
       this.#database.connection.prepare("DELETE FROM browser_profile_proxies WHERE profile_id = ?").run(profileId);

@@ -1,19 +1,12 @@
-/**
- * What the row labels are made of. Every function here takes its inputs and returns a string, so a
- * label can be computed without the component.
- */
-
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import type { SidebarAgentState, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
 
-/** The state line a waiting row reads out and shows as its tooltip title. */
 export const SIDEBAR_WAIT_TITLE = {
   question: "sidebar.state.waitingQuestion",
   approval: "sidebar.state.waitingApproval",
   takeover: "sidebar.state.waitingTakeover",
 } as const satisfies Record<SidebarWaitReason, AppTextKey>;
 
-/** The chip in the time slot: what the user does next. */
 export const SIDEBAR_WAIT_ACTION = {
   question: "sidebar.waiting.action.question",
   approval: "sidebar.waiting.action.approval",
@@ -48,7 +41,6 @@ function routineStateLabel(phase: SidebarRoutinePhase, count: number, t: AppTran
   return t("sidebar.state.routineRunning", { count });
 }
 
-/** When a plan limit resets: the time today, or the day and time later. Null when the provider gave none. */
 export function sidebarUsageResetTime(resetsAt: number | null, format: AppFormat): string | null {
   if (resetsAt === null) return null;
   const date = new Date(resetsAt * 1_000);
@@ -63,7 +55,6 @@ export function sidebarMessageTime(value: string, format: AppFormat): string {
   const date = new Date(value);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) {
-    // A 12-hour clock drops the leading zero: "오후 04:11" is too wide for the row and clips its badge.
     return format.date(date, {
       hour: format.hour12 ? "numeric" : "2-digit",
       minute: "2-digit",

@@ -15,14 +15,8 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** A search shows this many zones at most, so the page needs no virtualized list. */
 const MATCH_LIMIT = 50;
 
-/**
- * Server settings > Timezone: the zone of a routine that an agent creates when neither the tool call
- * nor the sender's message names one (`host-timezone-v1`). Without a search the page shows
- * Automatic, the saved zone, this phone's zone and UTC. The host checks the role and the zone again.
- */
 export function ServerTimezoneScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));

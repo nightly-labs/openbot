@@ -6,6 +6,7 @@ import type {
   AgentProviderStatus,
   AgentReasoningEffort,
   AgentSummary,
+  CustomProviderHarness,
   ProviderAccountStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -17,6 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
+import { isEncodedModelOf } from "../encoded-model-id";
 import { AgentSettingsRefused } from "./agent-settings-refused";
 import { providerLabel } from "./thread-items";
 
@@ -26,7 +28,6 @@ export interface ModelRequest {
   reasoningEffort?: AgentReasoningEffort | undefined;
 }
 
-/** The model a request that names only `provider` starts on: the same pick as `creationModel`. */
 function providerDefault(provider: AgentProvider, models: AgentModelOption[]): AgentModelOption | null {
   return (
     models.find((model) => model.provider === provider && model.id === defaultProviderModel(provider)) ??
@@ -35,14 +36,12 @@ function providerDefault(provider: AgentProvider, models: AgentModelOption[]): A
   );
 }
 
-/** The accounts of a provider that can hold more than one, its own sign-in first; undefined for the others. */
 export type ProviderAccountRows = (provider: AgentProvider) => ProviderAccountStatus[] | undefined;
 
 interface ProviderModels {
   provider: AgentProvider;
   defaultModel: string;
   models: ToolModel[];
-  /** The number of models of the provider that the list leaves out. */
   omittedModels?: number;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
 }
@@ -54,8 +53,6 @@ function toolModel(model: AgentModelOption): ToolModel {
   return {
     id: model.id,
     name: model.name,
-    // A model with no effort setting holds only a `medium` placeholder that never reaches the
-    // provider, and an agent read it as a choice (#5215).
     ...(model.reasoningEffortConfigurable === false
       ? {}
       : {
@@ -65,31 +62,104 @@ function toolModel(model: AgentModelOption): ToolModel {
   };
 }
 
-/** A provider row of the settings page, as `list_models` reads it. */
-export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message" | "lastError">;
 
-/** The states in which a provider that is on lists no model until the user acts in its settings. */
+export function providerCanRun(provider: AgentProvider, statuses: readonly ProviderStatusRow[]): boolean {
+  const row = statuses.find((candidate) => candidate.id === provider);
+  if (!row || provider === "acp") return true;
+  return !row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started");
+}
+
+export function requireRunnableProvider(
+  model: Pick<AgentModelOption, "provider" | "id">,
+  statuses: readonly ProviderStatusRow[],
+): void {
+  if (providerCanRun(model.provider, statuses)) return;
+  throw new AgentSettingsRefused(
+    sourceText("error.agent.modelProviderNotConnected", { model: model.id, provider: providerLabel(model.provider) }),
+  );
+}
+
+export function requireRunnableChange(
+  target: Pick<AgentSummary, "provider" | "model">,
+  runtime: Pick<UpdateAgentInput, "provider" | "model">,
+  statuses: readonly ProviderStatusRow[],
+): void {
+  const { provider, model } = runtime;
+  if (provider === undefined || model === undefined) return;
+  if (provider === target.provider && model === target.model) return;
+  requireRunnableProvider({ provider, id: model }, statuses);
+}
+
 const NEEDS_USER_STATES: ReadonlySet<AgentProviderState> = new Set(["sign-in-required", "outdated", "error"]);
-/** Where the user fixes such a provider. It is in the payload, not in the tool description that each turn sends. */
 const FIX_IN = "Server settings > Providers";
 
-/** The models of each provider that a list with no query shows, before the models in use. */
+function emptyCatalogMessage(provider: AgentProvider): string {
+  if (provider === "muse")
+    return "Muse is signed in, but Muse sent no models for this account. Muse may not be available in the country where this agent runs, or this account may have no access to Muse models. The provider settings cannot fix this. Choose a model from another provider.";
+  return `${providerLabel(provider)} is ready, but it lists no models now. Choose a model from another provider.`;
+}
+
 const SHORT_LIST_LENGTH = 8;
-/** The models that a `list_models` query returns at most, over all providers. */
 const QUERY_RESULT_LIMIT = 20;
 
 export interface ListModelsRequest {
   provider?: AgentProvider | undefined;
-  /** Words that the id or the name of each model must contain. */
   query?: string | undefined;
-  /** The models that agents on this computer use now, as their model or as a backup model. */
   inUse?: readonly Pick<AgentModelChoice, "provider" | "model">[];
+  customEndpoints?: readonly ListedCustomEndpoint[];
 }
 
-/**
- * The models of one provider in a short list, in catalog order: each model in `pinned`, then the first
- * models of the catalog up to `SHORT_LIST_LENGTH`.
- */
+export interface ListedCustomEndpoint {
+  id: string;
+  name: string;
+  provider: CustomProviderHarness;
+  loading: boolean;
+}
+
+const CUSTOM_PROVIDER_SETTINGS = `${FIX_IN} > Custom provider`;
+
+interface CustomEndpointModels {
+  id: string;
+  name: string;
+  provider: CustomProviderHarness;
+  models: string[];
+  omittedModels?: number;
+  message?: string;
+}
+
+function customEndpointModels(
+  endpoints: readonly ListedCustomEndpoint[],
+  models: readonly AgentModelOption[],
+  statuses: readonly ProviderStatusRow[],
+  words: readonly string[],
+): CustomEndpointModels[] {
+  return endpoints.flatMap((endpoint) => {
+    const runner = providerLabel(endpoint.provider);
+    const canRun = providerCanRun(endpoint.provider, statuses);
+    const own = canRun
+      ? models.filter((model) => model.provider === endpoint.provider && model.id.startsWith(`${endpoint.id}/`))
+      : [];
+    const matching = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
+    const listed = matching.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
+    let message: string | undefined;
+    if (!canRun) message = `${runner} runs this endpoint and cannot run now. The user fixes it in ${FIX_IN}.`;
+    else if (endpoint.loading)
+      message = `${runner} reads the last change of this endpoint after its current task stops.`;
+    else if (own.length === 0)
+      message = `${runner} lists no model of this endpoint. The user checks it in ${CUSTOM_PROVIDER_SETTINGS}.`;
+    if (listed.length === 0 && message === undefined) return [];
+    return {
+      id: endpoint.id,
+      name: endpoint.name,
+      provider: endpoint.provider,
+      models: listed,
+      ...(matching.length > listed.length ? { omittedModels: matching.length - listed.length } : {}),
+      ...(message === undefined ? {} : { message }),
+    };
+  });
+}
+
 function shortList(own: AgentModelOption[], pinned: ReadonlySet<string>): AgentModelOption[] {
   let room = SHORT_LIST_LENGTH - own.filter((model) => pinned.has(model.id)).length;
   return own.filter((model) => {
@@ -99,24 +169,11 @@ function shortList(own: AgentModelOption[], pinned: ReadonlySet<string>): AgentM
   });
 }
 
-/** True when the id or the name of the model contains each word of the query, in any case. */
 function matchesQuery(model: AgentModelOption, words: readonly string[]): boolean {
   const text = `${model.id} ${model.name}`.toLowerCase();
   return words.every((word) => text.includes(word));
 }
 
-/**
- * The `list_models` payload: each provider that lists a model, in `AGENT_PROVIDERS` order. The models
- * are the ones the model picker shows, so the ones `create_agent` accepts. With no query, a provider
- * shows its default model, the models in use, and its first models; `omittedModels` counts the rest.
- * A query searches all models. An account has its id, the name the user gave it and the models that
- * only it serves, never its email, its credentials or its folder. A provider that is on but lists no model until the user signs in,
- * updates or repairs it is in `unavailableProviders`, with the text of its settings row and where
- * that row is: without it, the agent could not tell the user why the provider is missing (#6053).
- * A provider that the request names is there in each state in which it has no model, also when it is
- * off or not downloaded: a CLI of the user's own on `PATH` does not make it available, and the agent
- * got an empty list with no reason (#7647). A list of all providers leaves those rows out.
- */
 export function listModelsPayload(
   models: AgentModelOption[],
   preferredProvider: AgentProvider,
@@ -129,18 +186,18 @@ export function listModelsPayload(
   unavailableProviders?: {
     provider: AgentProvider;
     state: AgentProviderState;
-    /** True when the user turned the provider off in its settings row. */
     off?: true;
     message?: string;
-    fixIn: string;
+    fixIn?: string;
   }[];
+  customProviders?: { settings: string; endpoints: CustomEndpointModels[] };
 } {
   const words = request.query?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let resultRoom = QUERY_RESULT_LIMIT;
   const providers = AGENT_PROVIDERS.filter((id) => request.provider === undefined || id === request.provider).flatMap(
     (id) => {
       const fallback = providerDefault(id, models);
-      if (!fallback) return [];
+      if (!fallback || !providerCanRun(id, statuses)) return [];
       const own = models.filter((model) => model.provider === id);
       const candidates = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
       let listed: AgentModelOption[];
@@ -162,7 +219,6 @@ export function listModelsPayload(
           ...(rows
             ? {
                 accounts: rows.map((account) => {
-                  // The models that only this account serves, as the model picker shows them (#6109).
                   const extra = (account.models ?? []).filter(
                     (model) => words.length === 0 || matchesQuery(model, words),
                   );
@@ -179,24 +235,45 @@ export function listModelsPayload(
       ];
     },
   );
-  const unavailableProviders = statuses.flatMap((row) =>
-    (request.provider === undefined ? !row.off && NEEDS_USER_STATES.has(row.state) : row.id === request.provider) &&
-    !providers.some((listed) => listed.provider === row.id)
-      ? [
-          {
-            provider: row.id,
-            state: row.state,
-            ...(row.off ? { off: true as const } : {}),
-            ...(row.message ? { message: row.message } : {}),
-            fixIn: FIX_IN,
-          },
-        ]
-      : [],
+  const unavailableProviders = statuses.flatMap((row) => {
+    if (
+      !(request.provider === undefined ? !row.off && NEEDS_USER_STATES.has(row.state) : row.id === request.provider) ||
+      providers.some((listed) => listed.provider === row.id)
+    )
+      return [];
+    const available = !row.off && row.state === "available";
+    const ready = available && !row.message && !row.lastError;
+    const message = ready ? emptyCatalogMessage(row.id) : row.message || (available ? row.lastError : null);
+    return [
+      {
+        provider: row.id,
+        state: row.state,
+        ...(row.off ? { off: true as const } : {}),
+        ...(message ? { message } : {}),
+        ...(ready && row.id === "muse" ? {} : { fixIn: FIX_IN }),
+      },
+    ];
+  });
+  const endpoints = customEndpointModels(
+    (request.customEndpoints ?? []).filter(
+      (endpoint) => request.provider === undefined || endpoint.provider === request.provider,
+    ),
+    models,
+    statuses,
+    words,
   );
-  return { preferredProvider, providers, ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}) };
+  return {
+    preferredProvider,
+    providers,
+    ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}),
+    ...(endpoints.length > 0
+      ? {
+          customProviders: { settings: CUSTOM_PROVIDER_SETTINGS, endpoints },
+        }
+      : {}),
+  };
 }
 
-/** The account and backup models of an agent as `read_agent` and `update_profile` report them. */
 export function agentAccountSetup(agent: AgentSummary) {
   const choice = (model: AgentModelChoice) => ({
     provider: model.provider,
@@ -208,7 +285,6 @@ export function agentAccountSetup(agent: AgentSummary) {
     backupModels: agent.backupModels
       ? { automatic: agent.backupModels.automatic, order: agent.backupModels.order.map(choice) }
       : null,
-    // Set while a usage limit or a provider error keeps the agent on a backup model: the model it goes back to.
     usageLimitReturn: agent.usageLimitReturn
       ? {
           ...choice(agent.usageLimitReturn),
@@ -219,13 +295,6 @@ export function agentAccountSetup(agent: AgentSummary) {
   };
 }
 
-/**
- * The backup models that an `update_profile` request names, checked against the models and accounts
- * of this computer, the ones the settings page offers. `modelsOf` gives the models of one account,
- * with the ones that only that account serves. As the settings page writes it, the stored
- * order omits the provider's own sign-in and the agent's own model, has each choice once, and an
- * order that asks first with no model is null.
- */
 export function requestedBackupModels(
   request: AgentBackupModels | null,
   modelsOf: (choice: Pick<AgentModelChoice, "provider" | "providerAccountId">) => AgentModelOption[],
@@ -242,10 +311,10 @@ export function requestedBackupModels(
         sourceText("error.provider.accountNotFound", { provider: providerLabel(provider) }),
       );
     }
-    requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
+    const listed = requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
     const choice: AgentModelChoice = {
       provider,
-      model,
+      model: listed?.id ?? model,
       ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
     };
     if (![own, ...order].some((other) => sameAgentModelChoice(other, choice))) order.push(choice);
@@ -253,10 +322,6 @@ export function requestedBackupModels(
   return request.automatic || order.length > 0 ? { automatic: request.automatic, order } : null;
 }
 
-/**
- * The model ids that an error names: for each provider, the short list that `list_models` shows with
- * no query, and "…" when the list leaves models out.
- */
 export function modelList(models: AgentModelOption[], provider?: AgentProvider): string {
   const ids = (id: AgentProvider) => {
     const own = models.filter((model) => model.provider === id);
@@ -270,12 +335,6 @@ export function modelList(models: AgentModelOption[], provider?: AgentProvider):
   ).join("; ");
 }
 
-/**
- * The model a `create_agent` call names, checked before the agent exists, with the same pick as
- * `creationModel`. Unlike the settings path, an unknown model or an effort the model does not
- * support is an error that names the valid values, so the calling agent can correct its request.
- * `null` means the request names no provider and no model.
- */
 export function requestedToolModel(request: ModelRequest, models: AgentModelOption[]): AgentModelOption | null {
   const { provider, model } = request;
   if (provider !== undefined && !models.some((candidate) => candidate.provider === provider)) {
@@ -283,15 +342,13 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
   }
   let chosen: AgentModelOption | null = null;
   if (model !== undefined) {
+    const own = (candidate: AgentModelOption) => provider === undefined || candidate.provider === provider;
     chosen =
-      models.find(
-        (candidate) => candidate.id === model && (provider === undefined || candidate.provider === provider),
-      ) ?? null;
+      models.find((candidate) => candidate.id === model && own(candidate)) ??
+      models.find((candidate) => isEncodedModelOf(candidate.id, model) && own(candidate)) ??
+      null;
     if (!chosen && models.length === 0) throw new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
     if (!chosen) {
-      // Cursor puts the settings of a model in its value (`grok-4.7[context=256k,…]`) and lists only
-      // some of them. The short list can leave them out, so name the listed values of that model (#4411).
-      // `grok-4.7` and `grok-4.7[context=500k]` both name the model `grok-4.7`.
       const base = `${model.includes("[") ? model.slice(0, model.indexOf("[")) : model}[`;
       const first = models.find(
         (candidate) => candidate.id.startsWith(base) && (provider === undefined || candidate.provider === provider),
@@ -319,7 +376,6 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
 export function requireReasoningEffort(model: AgentModelOption, effort: AgentReasoningEffort): void {
   if (model.supportedReasoningEfforts.includes(effort)) return;
   throw new AgentSettingsRefused(
-    // A model with no effort setting lists only a `medium` placeholder, which `list_models` hides (#6372).
     model.reasoningEffortConfigurable === false
       ? sourceText("error.agent.reasoningEffortNotConfigurable", { model: model.id })
       : sourceText("error.agent.reasoningEffortUnsupported", {
@@ -330,10 +386,6 @@ export function requireReasoningEffort(model: AgentModelOption, effort: AgentRea
   );
 }
 
-/**
- * The effort of an agent as the agent tools report it. A model with no effort setting gets none:
- * its stored effort never reaches the provider, and `list_models` shows no effort for it (#6372).
- */
 export function agentReasoningEffort(
   agent: Pick<AgentSummary, "provider" | "model" | "reasoningEffort">,
   models: AgentModelOption[],
@@ -342,11 +394,6 @@ export function agentReasoningEffort(
   return model?.reasoningEffortConfigurable === false ? {} : { reasoningEffort: agent.reasoningEffort };
 }
 
-/**
- * The provider, model and effort that a settings request names, checked against what the CLIs list
- * now. Like `create_agent`, a model or an effort that is not listed is an error that names the valid
- * values. A new model keeps the agent's effort when it supports it, else takes the model's default.
- */
 export function requestedRuntime(
   target: Pick<AgentSummary, "provider" | "model" | "reasoningEffort">,
   request: ModelRequest,

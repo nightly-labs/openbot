@@ -23,11 +23,6 @@ export const hmacSha256 = Effect.fn("Crypto.hmacSha256")(function* (secret: stri
   return encodeBase64Url(new Uint8Array(digest));
 });
 
-/**
- * Derives a key for one use from a secret that has another use. A different label gives an unrelated
- * key, so the derived key tells nothing about the secret or about a key with another label.
- */
-
 export const deriveSecret = Effect.fn("Crypto.deriveSecret")(function* (secret: string, label: string) {
   const encoder = new TextEncoder();
   const key = yield* cryptoCall(() =>
@@ -55,14 +50,12 @@ export function encodeBase64Url(value: Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-/** Throws when `atob` rejects `value`. It does not reject the `+` and `/` characters of standard base64. */
 export function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
   return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
 }
 
-/** The caller must first check that `value` has an even number of hex digits. */
 export function hexToBytes(value: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(value.length / 2);
   for (let index = 0; index < bytes.length; index += 1) {
@@ -71,7 +64,6 @@ export function hexToBytes(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-/** The time does not show where the values differ. A different length returns at once. */
 export function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) return false;
   let difference = 0;

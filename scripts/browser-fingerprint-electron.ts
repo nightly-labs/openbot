@@ -10,10 +10,6 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
 
-// Opens agent tabs in the real BrowserHost with the tab preload, and checks the values that bot
-// checks (sannysoft, CreepJS, BrowserScan) read: the outer size of a hidden tab, `window.chrome` in
-// the page and in a new frame, and the key and pointer events of the agent's input.
-
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
   if (!value) throw new Error(`Missing ${name}.`);
@@ -38,7 +34,6 @@ const pageEventSchema = z.object({
   type: z.string(),
   target: z.string(),
   trusted: z.boolean(),
-  // Key events have no position, and pointer events have no key.
   key: z.string().optional(),
   code: z.string().optional(),
   keyCode: z.number().optional(),
@@ -59,7 +54,12 @@ const values: {
   keys?: Array<Pick<z.infer<typeof pageEventSchema>, "key" | "code" | "keyCode" | "shift">>;
   hiddenClick?: ClickValues;
   shownClick?: ClickValues;
+  webgl?: { real: Array<[string, string] | null>; tab: Array<[string, string] | null> };
 } = {};
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+  app.commandLine.appendSwitch("enable-unsafe-swiftshader");
+}
 const THREAD_ID = "fixture-thread";
 const TURN_ID = "fixture-turn";
 
@@ -200,7 +200,6 @@ async function main(): Promise<void> {
       assert.equal(maskedToString, "function toString() { [native code] }");
       recordCase("replaced-functions-read-as-native");
 
-      // A lie check gives a replaced function a receiver that makes it throw, and reads the stack.
       const stacks = await page(
         contents,
         `[
@@ -214,10 +213,117 @@ async function main(): Promise<void> {
         `A replaced function shows its trap in the stack: ${stacks.join(" | ")}`,
       );
       recordCase("replaced-function-errors-have-native-stacks");
+
+      const cyclic = await page(
+        contents,
+        `[
+          Function.prototype.toString,
+          Object.getOwnPropertyDescriptor(window, 'outerWidth').get,
+          Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get,
+          WebGLRenderingContext.prototype.getParameter,
+        ].map((method) => {
+          const prototype = Object.getPrototypeOf(method);
+          let result;
+          try {
+            Object.setPrototypeOf(method, Object.create(method));
+            result = 'no error';
+          } catch (error) {
+            result = error instanceof TypeError ? error.message : 'not a TypeError';
+            if (String(error.stack).includes('at Object.setPrototypeOf (<anonymous>:')) result += ' (trap frame)';
+          }
+          Object.setPrototypeOf(method, prototype);
+          return Object.getPrototypeOf(method) === prototype ? result : result + ' (not restored)';
+        })`,
+        z.array(z.string()),
+      );
+      assert.deepEqual(cyclic, Array(4).fill("Cyclic __proto__ value"));
+      recordCase("replaced-functions-refuse-cyclic-prototypes");
+
+      const readGpu = `(() => ['webgl', 'webgl2'].map((kind) => {
+        const gl = document.createElement('canvas').getContext(kind);
+        const info = gl?.getExtension('WEBGL_debug_renderer_info');
+        return info ? [gl.getParameter(info.UNMASKED_VENDOR_WEBGL), gl.getParameter(info.UNMASKED_RENDERER_WEBGL)] : null;
+      }))()`;
+      const gpuSchema = z.array(z.tuple([z.string(), z.string()]).nullable());
+      const plain = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } });
+      try {
+        await plain.loadURL(`${origin}/plain`);
+        values.webgl = {
+          real: await page(plain.webContents, readGpu, gpuSchema),
+          tab: await page(contents, readGpu, gpuSchema),
+        };
+      } finally {
+        plain.destroy();
+      }
+      const getParameterSource = await page(
+        contents,
+        "[WebGLRenderingContext, WebGL2RenderingContext].map((context) => context.prototype.getParameter.toString())",
+        z.array(z.string()),
+      );
+      assert.deepEqual(getParameterSource, Array(2).fill("function getParameter() { [native code] }"));
+      const { real, tab } = values.webgl;
+      if (process.platform === "linux") {
+        assert(
+          real.every((names) => names !== null),
+          "A Linux server has no WebGL.",
+        );
+      }
+      assert(
+        tab.every((names) => names === null || !/SwiftShader/i.test(names.join())),
+        `An agent tab names SwiftShader: ${JSON.stringify(tab)}`,
+      );
+      real.forEach((names, index) => {
+        if (names && !/SwiftShader/i.test(names.join())) {
+          assert.deepEqual(tab[index], names, "An agent tab changed the name of a real GPU.");
+        }
+      });
+      recordCase("software-webgl-names-a-gpu");
     }
 
     {
-      // The fpCollect HEADCHR_IFRAME check reads the window of a srcdoc frame before it loads.
+      await call("evaluate", {
+        tabId,
+        expression: `(() => {
+          let reads = 0;
+          const error = new Error('probe');
+          Error.prepareStackTrace = (formatted) => {
+            if (formatted === error) reads += 1;
+            return String(formatted);
+          };
+          console.debug(error);
+          delete Error.prepareStackTrace;
+          window.__consoleReads = reads;
+          return reads;
+        })()`,
+      });
+      assert.equal(
+        await page(contents, "window.__consoleReads", z.number()),
+        0,
+        "The agent's evaluate lets DevTools read the page's console arguments.",
+      );
+      recordCase("agent-evaluate-leaves-console-unread");
+
+      const failed = await Effect.runPromise(
+        host.handleDynamicTool({
+          namespace: "openbot_browser",
+          tool: "evaluate",
+          arguments: { tabId, expression: "(() => { throw new Error('page failure') })()" },
+          ownerAgentId: "fixture-agent",
+          threadId: THREAD_ID,
+          turnId: TURN_ID,
+          callId: `fingerprint-${++sequence}`,
+        } satisfies DynamicToolCallParams),
+      );
+      const failure = failed.contentItems.find((content) => content.type === "inputText");
+      assert.equal(failed.success, false, "A page error in evaluate was reported as a success.");
+      assert(
+        failure?.type === "inputText" && failure.text.includes("page failure"),
+        "The evaluate error does not hold the page's message.",
+      );
+      recordCase("agent-evaluate-reports-page-errors");
+    }
+
+    {
       const frames = await page(
         contents,
         `(async () => {
@@ -248,8 +354,6 @@ async function main(): Promise<void> {
       assert.equal(frames.openbot, "undefinedundefined", "The tab page can reach window.openbot or require.");
       recordCase("page-has-no-openbot-bridge");
 
-      // A lie check reads the functions of one frame with the toString of another frame. The frame
-      // is read after it loads, so its own preload ran first.
       const crossFrame = await page(
         contents,
         `new Promise((resolve) => {
@@ -318,7 +422,6 @@ async function main(): Promise<void> {
       assert.equal(await page(contents, "document.getElementById('other').value", z.string()), mixed);
       recordCase("text-with-no-us-key-is-inserted");
 
-      // A code editor adds a closing bracket for a typed opening bracket, so this text is inserted.
       await takeEvents(contents);
       const code = "if (x) {";
       await call("type", { tabId, target: { kind: "css", selector: "#long" }, text: code });
@@ -349,8 +452,6 @@ async function main(): Promise<void> {
     };
 
     {
-      // A tab with no frames acknowledges each pointer move late. The path is cut short, so the
-      // click waits no longer than the single move that it used before.
       const hidden = await click();
       timings.hiddenClickMs = hidden.elapsed;
       values.hiddenClick = { moves: hidden.moves.length, holdMs: hidden.holdMs };

@@ -37,11 +37,6 @@ import { currentText, useText } from "@/shared/lib/text";
 
 type Phase = "guide" | "reading" | "review" | "importing" | "done";
 
-/**
- * Server settings › Import agents › one source. The guide names the export agent or skill and what to
- * say to it. The export goes to the host, which keeps it under a token: the review shows what is in
- * it before anything changes. A token left open when the screen closes is released.
- */
 export function ServerImportGuideScreen() {
   const { t, errorMessage } = useText();
   const params = useLocalSearchParams<{ serverId: string; source: string }>();
@@ -57,8 +52,6 @@ export function ServerImportGuideScreen() {
   const [copied, setCopied] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  // The open token, for the release when the screen closes. A token that comes back after that is
-  // released when it arrives.
   const token = useRef<string | null>(null);
   token.current = preview?.token ?? null;
   const closed = useRef(false);
@@ -97,7 +90,6 @@ export function ServerImportGuideScreen() {
       file = await pickZipFile();
       if (file) checkAgentExport(file.size, serverId);
     } catch (caught) {
-      // Nothing went to the host, so the open export stays open.
       file?.release();
       setPhase(open ? "review" : "guide");
       setError(errorMessage(caught, t("mobile.server.import.readFailed")));
@@ -109,7 +101,6 @@ export function ServerImportGuideScreen() {
       return;
     }
     try {
-      // A new export releases the earlier one on the host. A closed screen stops at the next part.
       const picked = file;
       const readPart = (offset: number, length: number) =>
         closed.current ? Promise.reject(new Error()) : picked.readPart(offset, length);
@@ -123,7 +114,6 @@ export function ServerImportGuideScreen() {
       setPreview(next);
       setPhase("review");
     } catch (caught) {
-      // The host may still hold the export that was open, so it is released.
       if (open) void discardAgentImport(open.token, serverId).catch(() => undefined);
       if (closed.current) return;
       setPreview(null);
@@ -147,7 +137,6 @@ export function ServerImportGuideScreen() {
       setPhase("done");
       void haptics.notification("success");
     } catch (caught) {
-      // The token is spent either way, so the user chooses the export again.
       setPreview(null);
       setPhase("guide");
       setError(errorMessage(caught, t("mobile.server.import.applyFailed")));
@@ -283,7 +272,6 @@ function ImportReview({
   const busy = reading || importing;
   const selected = preview.agents.filter((agent) => !excluded.has(agent.key));
   const agentsByKey = new Map(preview.agents.map((agent) => [agent.key, agent]));
-  // A channel imports with the members that are selected, and needs at least one of them.
   const selectedMembers = (channel: AgentImportPreviewChannel) =>
     channel.memberKeys.filter((key) => !excluded.has(key));
   const importable = (channel: AgentImportPreviewChannel) => selectedMembers(channel).length > 0;
@@ -312,7 +300,6 @@ function ImportReview({
       selected.map((agent) => agent.key),
       selectedChannels.map((channel) => channel.key),
     );
-  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
   const confirmAndStart = () => {
     const duplicates = selected.filter((agent) => agent.nameExists);
     if (duplicates.length === 0) return start();
@@ -436,7 +423,6 @@ function ImportResult({ result }: { result: RemoteAgentImportResult }) {
             items: result.skipped.length > 0 ? skippedAgents : skippedChannels,
           })
         : undefined;
-  // An agent and a channel of one export can have the same key.
   const skipped = [
     ...result.skipped.map((entry) => ({ ...entry, id: `agent:${entry.key}` })),
     ...result.skippedChannels.map((entry) => ({ ...entry, id: `channel:${entry.key}` })),

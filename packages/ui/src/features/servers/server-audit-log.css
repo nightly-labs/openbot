@@ -8,7 +8,6 @@
   white-space: nowrap;
 }
 
-/* The words between keywords step back, so the keywords carry the line. */
 .server-audit-row .server-audit-title {
   color: var(--openbot-text-secondary);
   font-weight: var(--openbot-weight-regular);
@@ -19,7 +18,6 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* The danger tone takes access away, success lets the member chat, warning gives full control. */
 .server-audit-key[data-level="none"] {
   color: var(--openbot-danger);
 }
@@ -41,12 +39,10 @@
   vertical-align: -2px;
 }
 
-/* The old value comes first in the reading direction, so the arrow points to the new one. */
 .server-audit-arrow svg:dir(rtl) {
   transform: scaleX(-1);
 }
 
-/* The change mark at the start of the row: success adds, danger takes away, accent changes. */
 .server-audit-mark {
   display: inline-flex;
   width: 32px;

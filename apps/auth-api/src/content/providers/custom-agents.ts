@@ -1,10 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about the Agent Client Protocol and the agents here is taken from
-// agentclientprotocol.com and each agent's own documentation. Each page used is in
-// `sources`. The presets are in packages/contracts/src/acp-agent-presets.ts. Check the
-// sources again, and move `checkedAt`, whenever this file changes.
-
 const ACP = "https://agentclientprotocol.com/get-started";
 
 export const CUSTOM_AGENTS_PROVIDER: ProviderPage = {

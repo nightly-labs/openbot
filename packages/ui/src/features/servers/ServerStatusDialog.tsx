@@ -9,7 +9,6 @@ import { Spinner } from "../../surface";
 import { useText } from "../../text";
 import type { ServerWorkspacePhase } from "./ServerConnectionNotice";
 
-/** What took the workspace away. An update or a wake keeps its cause until the workspace is back. */
 type Cause = "update" | "wake" | "connection";
 type Step = "update" | "wake" | "connect" | "load";
 type StepStatus = "done" | "active" | "failed" | "pending";
@@ -25,24 +24,17 @@ export interface ServerStatusDialogProps {
   open: boolean;
   onClose: () => void;
   name: string;
-  /** The title of the connection notice that opened the dialog. */
   title: string;
   phase: ServerWorkspacePhase;
   initial: boolean;
   issue?: HostedServerIssue | null;
-  /** The OpenBot version that the server restarts into. */
   updateVersion?: string | null;
   remainingSeconds?: number;
   detail?: string | null;
   reference?: string | null;
-  /** When the notice appeared, in epoch milliseconds. */
   since: number;
 }
 
-/**
- * Tells the user why the workspace is away and which step it is at: the server installs an update or
- * starts, then this app connects and loads the workspace.
- */
 export function ServerStatusDialog(props: ServerStatusDialogProps) {
   const { t } = useText();
   const cause = createMemo<Cause>((previous) => {
@@ -73,7 +65,6 @@ export function ServerStatusDialog(props: ServerStatusDialogProps) {
     if (index < currentIndex) return "done";
     if (index > currentIndex) return "pending";
     if (props.phase === "blocked") return "failed";
-    // A sleeping server starts only when the user asks for it.
     return props.phase === "sleeping" ? "pending" : "active";
   };
   const stepDetail = (step: Step): string => {

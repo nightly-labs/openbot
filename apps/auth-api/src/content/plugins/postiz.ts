@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Postiz here is taken from postiz.com and docs.postiz.com. Each page used is
-// in `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const POSTIZ_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

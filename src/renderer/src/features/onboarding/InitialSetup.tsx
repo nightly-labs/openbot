@@ -26,10 +26,6 @@ interface InitialSetupProps extends SetupProviderProps {
   platform: DesktopPlatform;
   accountEmail: string;
   inviteUrl?: string;
-  /**
-   * Records the choice. An omitted model keeps the saved one while the provider stays the same;
-   * `null` clears it; the custom row names the endpoint model that new agents start on.
-   */
   onSave: (provider: AgentProviderId, model?: AgentModelId | null) => Promise<void>;
   onPreviewInvite: (input: JoinServerInput) => Promise<InvitePreview>;
   onJoinRemote: (input: JoinServerInput, provider: AgentProviderId) => Promise<void>;
@@ -39,7 +35,6 @@ interface InitialSetupProps extends SetupProviderProps {
 
 type SetupRoute = "local" | "remote";
 
-// A custom agent is added in Settings after setup, so it is not a first provider.
 const PROVIDERS: Array<{ id: AgentProviderId; name: string }> = AGENT_PROVIDERS.filter((id) => id !== "acp").map(
   (id) => ({ id, name: agentProviderName(id) }),
 );
@@ -50,18 +45,10 @@ export function InitialSetup(props: InitialSetupProps) {
   const { t, errorMessage } = useText();
   const initialInviteUrl = untrack(() => props.inviteUrl?.trim() ?? "");
   const [route, setRoute] = createSignal<SetupRoute | null>(untrack(() => (initialInviteUrl ? "remote" : null)));
-  /**
-   * The saved endpoint model, when the saved choice is the custom row. The state is the one saved
-   * when the screen opened; the endpoint list can load later.
-   */
   const savedState = untrack(() => props.state);
   const savedEndpointModel = createMemo(() =>
     savedCustomModel(savedState.preferredProvider, savedState.preferredModel, props.customProviders),
   );
-  /**
-   * Stays true once the saved model is known to be an endpoint's. A removal of that endpoint then
-   * empties `savedEndpointModel`, but the save must still clear the model.
-   */
   let savedModelIsEndpoint = false;
   createEffect(savedEndpointModel, (model) => {
     if (model) savedModelIsEndpoint = true;
@@ -73,7 +60,6 @@ export function InitialSetup(props: InitialSetupProps) {
   const selectedProvider = providers.selectedProvider;
   const setError = providers.setError;
   const error = providers.error;
-  /** The screen sits on the dialog layer, so the row menus mount in it rather than behind it. */
   const [dialogElement, setDialogElement] = createSignal<HTMLElement | undefined>();
   const [saving, setSaving] = createSignal(false);
   const [inviteUrl, setInviteUrl] = createSignal(initialInviteUrl);
@@ -104,8 +90,6 @@ export function InitialSetup(props: InitialSetupProps) {
     setSaving(true);
     setError("");
     try {
-      // The custom row names its model. A built-in row keeps the saved model, unless the saved
-      // model was the custom row's: the user chose another row, so that model must go.
       await props.onSave(
         provider,
         providers.customSelected() ? providers.customModel() : savedModelIsEndpoint ? null : undefined,
@@ -154,7 +138,6 @@ export function InitialSetup(props: InitialSetupProps) {
     return [before, after] as const;
   };
 
-  /** "ChatGPT, Claude, or Grok", built from the registry so a new provider joins the sentence. */
   function providerSentence(): string {
     const names = PROVIDERS.map((provider) => provider.name);
     const last = names[names.length - 1];

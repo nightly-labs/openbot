@@ -1,7 +1,7 @@
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { memo, type PropsWithChildren, useState } from "react";
+import { Children, createContext, memo, type PropsWithChildren, useContext, useMemo, useState } from "react";
 import { View } from "react-native";
 import Animated, {
   CurvedTransition,
@@ -13,6 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/components/agent-context-menu";
+import { type AgentListRevealState, AgentListRowReveal } from "@/features/agents/components/agent-list-reveal";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
@@ -27,11 +28,13 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -47,21 +50,32 @@ const PINNED_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMo
 const PINNED_EXIT = FadeOut.duration(140).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const PINNED_COLUMNS = 4;
 const PINNED_PADDING_X = 12;
+const TILE_REVEAL_STYLE = { width: "100%", alignItems: "center" } as const;
 
-/**
- * The pinned agents, then `children`: the pinned channels. `animateLayout` false stops the grid from
- * animating to a new place, while something above it changes height on every frame.
- */
+const PinnedRevealContext = createContext<{ reveal: AgentListRevealState; index: number } | null>(null);
+
+function PinnedReveal({
+  reveal,
+  index,
+  children,
+}: PropsWithChildren<{ reveal: AgentListRevealState | undefined; index: number }>) {
+  const value = useMemo(() => (reveal ? { reveal, index } : null), [reveal, index]);
+  return <PinnedRevealContext.Provider value={value}>{children}</PinnedRevealContext.Provider>;
+}
+
 export function PinnedAgentsGrid({
   agents,
   animateLayout = true,
   dropZone = false,
+  reveal,
+  revealOffset = 0,
   children,
 }: PropsWithChildren<{
   agents: MobileAgent[];
   animateLayout?: boolean;
-  /** Shows an empty place for a new pin, while the user drags a chat and nothing is pinned. */
   dropZone?: boolean;
+  reveal?: AgentListRevealState;
+  revealOffset?: number;
 }>) {
   const dropTarget = useChatDropTarget(PIN_AREA_KEY);
   return (
@@ -80,10 +94,16 @@ export function PinnedAgentsGrid({
               paddingBottom: 18,
             }}
           >
-            {agents.map((agent) => (
-              <PinnedAgentItem key={agent.id} agent={agent} />
+            {agents.map((agent, index) => (
+              <PinnedReveal key={agent.id} reveal={reveal} index={revealOffset + index}>
+                <PinnedAgentItem agent={agent} />
+              </PinnedReveal>
             ))}
-            {children}
+            {Children.map(children, (child, index) => (
+              <PinnedReveal reveal={reveal} index={revealOffset + agents.length + index}>
+                {child}
+              </PinnedReveal>
+            ))}
           </View>
         </Animated.View>
       ) : dropZone ? (
@@ -115,7 +135,6 @@ function PinDropZone({ dropTarget }: { dropTarget: ReturnType<typeof useChatDrop
 const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const agentChatPreview = useAgentChatPreview(agent);
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("pin", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -126,7 +145,8 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
-  const waitReason = useAgentListWaitReason(agent.id);
+  const activity = useAgentListActivity(agent.id);
+  const waitReason = agentListWaitReason(activity);
 
   const openLabel = agent.title.trim()
     ? t("mobile.agent.list.openPinnedWithTitle", { name: agent.name, title: agent.title.trim() })
@@ -162,12 +182,12 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
           hue={agent.avatarHue}
           color={agent.avatarColor}
           seed={agent.avatarSeed}
+          avatarUrl={agent.avatarUrl}
           size={64}
           animateIdle={false}
           rings
-          withThreads
+          activityMood={agentActivityMood(activity)}
         />
-        {/* As on the desktop, a wait outranks the unread count in the corner of the avatar. */}
         {waitReason ? (
           <AgentWaitBadge reason={waitReason} size={22} />
         ) : unreadCount > 0 || unreadThreads ? (
@@ -213,6 +233,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
 });
 
 export function PinnedChatItem({ children }: PropsWithChildren) {
+  const place = useContext(PinnedRevealContext);
   return (
     <Animated.View
       entering={PINNED_ENTER}
@@ -220,7 +241,13 @@ export function PinnedChatItem({ children }: PropsWithChildren) {
       layout={PINNED_ITEM_LAYOUT}
       style={{ width: `${100 / PINNED_COLUMNS}%`, alignItems: "center" }}
     >
-      {children}
+      {place ? (
+        <AgentListRowReveal index={place.index} reveal={place.reveal} style={TILE_REVEAL_STYLE}>
+          {children}
+        </AgentListRowReveal>
+      ) : (
+        children
+      )}
     </Animated.View>
   );
 }

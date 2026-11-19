@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/startup";
 
 export const messages = {
-  // The one native error box: the app could not start, so no renderer exists to show it.
   "startup.failedTitle": "OpenBot 无法启动",
   "startup.failedBody": "{message}\n\n你的本地数据没有被重置或覆盖。请查看故障排查指南了解恢复步骤。",
   "startup.archiveChangedTitle": "OpenBot 文件已被更改",
@@ -19,14 +18,21 @@ export const messages = {
   "startup.newerDataDownload": "下载 OpenBot",
   "startup.newerDataGuide": "打开指南",
   "startup.newerDataQuit": "退出",
+  "startup.newerDataLoopTitle": "最新版本的 OpenBot 未能打开",
+  "startup.newerDataLoopBody":
+    "较新版本的 OpenBot 保存了你的数据，此版本（{version}）无法打开这些数据。OpenBot {loopVersion} 连续多次在打开前停止，因此不会再次安装它。\n\n请在有比 {loopVersion} 更新的版本时安装它。如需帮助，请打开指南。\n\n你的本地数据未被重置或覆盖。",
+  "startup.newerDataReleases": "查看版本",
   "startup.recoveryWindowTitle": "OpenBot 恢复",
   "startup.recoveryTitle": "OpenBot 未能打开",
   "startup.recoveryBody": {
     other: "OpenBot {version} 在打开前已连续 {count} 次停止。你的本地数据没有被重置或覆盖。",
   },
   "startup.recoveryHint": "请重试，或安装上一个能打开的版本。如需帮助，请导出诊断信息，并将文件随报告一起发送。",
+  "startup.recoveryHintLatest":
+    "OpenBot 未找到能打开你数据的早期版本。请重试，或安装最新版本。如需帮助，请导出诊断信息，并将文件随报告一起发送。",
   "startup.recoveryRetry": "重试",
   "startup.recoveryPreviousVersion": "下载上一个版本",
+  "startup.recoveryLatestVersion": "下载最新版本",
   "startup.recoveryExportDiagnostics": "导出诊断信息",
   "startup.recoveryOpenDataFolder": "打开数据文件夹",
   "startup.recoveryQuit": "退出",

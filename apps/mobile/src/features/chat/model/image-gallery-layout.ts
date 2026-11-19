@@ -5,11 +5,6 @@ export interface GalleryTile {
   height: number;
 }
 
-/**
- * The tiles of a message's images: two square columns, and with an odd count the first image
- * spans both. Tiles crop to their box, so the gallery keeps its height while the images download
- * and the messages below it do not move.
- */
 export function galleryTiles(count: number, width: number, gap: number): { tiles: GalleryTile[]; height: number } {
   if (count <= 0 || width <= 0) return { tiles: [], height: 0 };
   const column = Math.floor((width - gap) / 2);

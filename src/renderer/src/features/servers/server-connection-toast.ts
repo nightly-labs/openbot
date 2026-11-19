@@ -2,7 +2,6 @@ import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, onCleanup } from "solid-js";
 
-/** A retry changes the same notice. Only a recovered workspace earns a success notice. */
 export function createServerConnectionToast(
   read: () => { id: string; name: string; ready: boolean; quiet: boolean } | null,
 ) {

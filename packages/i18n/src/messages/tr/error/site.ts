@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Barındırılan site hataları.
   "error.site.absolutePath": "Mutlak bir site dizini yolu seçin.",
   "error.site.rootSymlink": "Barındırılan sitelerde sembolik bağlantılara izin verilmez.",
   "error.site.notDirectory": "Site kaynağı bir dizin olmalıdır.",

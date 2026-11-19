@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Paperclip here is taken from paperclip.ing, its documentation, or
-// its repository (the README, the deployment and Tailscale guides, and the telemetry
-// config and rules in packages/shared), and each page used is in `sources`. Paperclip lists no app
-// for iPhone or Android and no price for Paperclip Cloud, so the text says so. Check them
-// again, and move `checkedAt`, whenever this file changes.
-
 const PAPERCLIP_REPO = "https://github.com/paperclipai/paperclip";
 const PAPERCLIP_DOCS = "https://docs.paperclip.ing";
 
@@ -201,7 +195,7 @@ export const PAPERCLIP_COMPARISON: Comparison = {
     {
       question: "Is there a Paperclip cloud?",
       answer:
-        "Paperclip Cloud has a waitlist, with no published date or price. Until then, you run Paperclip on your own computer or server. If you do not want to keep a computer on for OpenBot, a hosted OpenBot server in the EU is available today, from €20 or $25 a month.",
+        "Paperclip Cloud has a waitlist, with no published date or price. Until then, you run Paperclip on your own computer or server. If you do not want to keep a computer on for OpenBot, a hosted OpenBot server in the EU is available today, from €30 or $36 a month.",
     },
     {
       question: "Do agents keep working when my laptop is closed?",

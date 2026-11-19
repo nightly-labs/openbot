@@ -1,9 +1,3 @@
-// Runs the real `codex app-server` against a fake Responses server, to check that a thread with the
-// features that OpenBot sets declares no goal tools. Codex sends each other tool and its permission
-// text as before: at Ask first Codex runs with no sandbox, and that text makes the model ask before a
-// destructive command. A local server stands in for the model and records the tools and the
-// instructions of each request, so no account or key is used.
-// `bun scripts/codex-prompt-trim-e2e.ts`. Writes .openbot-build/codex-prompt-trim-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
@@ -32,7 +26,6 @@ interface OutputItem {
   content: Array<{ type: "output_text"; text: string }>;
 }
 
-/** One server-sent event of a streamed Responses answer. */
 interface StreamEvent {
   type: string;
   output_index?: number;
@@ -123,14 +116,12 @@ const results: Record<string, Recorded | undefined> = {};
 const report: {
   passed: boolean;
   codexVersion: string;
-  /** The characters that the largest request of a turn no longer sends. */
   saved?: number;
   results?: Record<string, { bytes: number; tools: string[] } | undefined>;
   error?: string;
 } = { passed: false, codexVersion: cli.version };
 try {
   for (const [index, [name, variant]] of Object.entries(VARIANTS).entries()) {
-    // Homes of one length, so each request carries paths of one length.
     const home = join(root, String(index));
     await mkdir(home, { recursive: true });
     await writeFile(

@@ -31,6 +31,7 @@ describe("development Auth API LAN access", () => {
       "/v2/remote/hosts/host-1/",
       "/v2/remote/hosts/host-1/members/member-1",
       "/v2/remote/hosts/host-1/logo?v=logo-version",
+      "/v2/remote/hosts/host-1/appearance",
       "/v1/agent-templates/AbCdEfGhIjKlMnOpQrSt_-",
       "/v1/agent-templates/AbCdEfGhIjKlMnOpQrSt_-/avatar",
       "/v2/hosting/plans",
@@ -42,7 +43,6 @@ describe("development Auth API LAN access", () => {
       expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(true);
     }
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/auth/logout")).toBe(false);
-    // A development code follows from the challenge ID, so email sign-in stays on loopback.
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/auth/email/start")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/email/verify")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/ticket")).toBe(false);
@@ -67,6 +67,7 @@ describe("development Auth API LAN access", () => {
     }
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/slack/authorize")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/host-1/logo/other")).toBe(false);
+    expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/hosts/host-1/appearance/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/remote/sessions/session-1/other")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/hosting/servers/server-1/activity")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v2/hosting/servers/server-1")).toBe(false);

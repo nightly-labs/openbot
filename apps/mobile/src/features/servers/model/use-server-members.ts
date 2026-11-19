@@ -9,15 +9,10 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
-/** An invitation that someone can still accept. A permanent link stays open after each join. */
 function isPendingInvite(invite: RemoteTeamInvite, now: number): boolean {
   return (invite.permanent || !invite.usedAt) && !invite.revokedAt && invite.expiresAt > now;
 }
 
-/**
- * The members and invitations of one server, as the Members, Invite and Member pages of the server
- * sheet show them. The pages use the same queries, so a change on one page shows on the others.
- */
 export function useServerMembers(serverId: string) {
   const { servers, teamDirectory } = useMobileWorkspace();
   const queryScope = useQueryScope();
@@ -42,7 +37,6 @@ export function useServerMembers(serverId: string) {
     mutationFn: (operation: () => Promise<void>) => operation(),
     onSuccess: () => {
       void haptics.notification("success");
-      // A refresh failure must not retry a committed membership change or invitation.
       void members.refetch();
       if (canManage) void invites.refetch();
     },
@@ -68,7 +62,6 @@ export function useServerMembers(serverId: string) {
     memberLimit,
     membersFull: (activeMembers?.length ?? 0) >= memberLimit,
     action,
-    /** Runs one change at a time. Resolves true when it succeeds. */
     perform(operation: () => Promise<void>): Promise<boolean> {
       if (locked.current) return Promise.resolve(false);
       locked.current = true;

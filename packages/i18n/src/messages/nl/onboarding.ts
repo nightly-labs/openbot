@@ -100,7 +100,7 @@ export const messages = {
   "onboarding.action.connect": "Verbinden",
   "onboarding.action.open": "OpenBot openen",
   "onboarding.action.next": "Volgende",
-  "onboarding.server.title": "{server} instellen",
+  "onboarding.server.title": "Welkom bij {server}",
   "onboarding.server.description":
     "OpenBot bevat geen AI-abonnement. Verbind je eigen aanbieder met deze server voordat je een agent maakt.",
   "onboarding.server.label": "Kies de AI-aanbieder van deze server",

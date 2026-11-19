@@ -1,14 +1,3 @@
-// Measures the time from a click on a pin to the pinned message in view, in this worktree's dev app.
-//
-// 1. Stop the app (`bun run dev:stop`), then seed a side thread of 50,000 messages:
-//    `bun scripts/pinned-message-jump-e2e.ts --seed --profile=<userData of this worktree's dev profile>`
-// 2. Start the app (`bun run dev`), then measure:
-//    `bun scripts/pinned-message-jump-e2e.ts --allow-mutations`
-//
-// The measure step pins messages of the seeded thread through the preload bridge, opens the pin list
-// of the agent's main chat, and clicks each pin. In the renderer, it records the time to the row in
-// the DOM, to the row in view, to the flash, and to a still scroll position. The report and one
-// screenshot for each case go to `.openbot-build/pinned-message-jump-e2e/`.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,7 +19,6 @@ const FILLER = "The team checked the release plan, the open questions, and the n
 interface Case {
   name: string;
   index: number;
-  /** What the view holds before the click. */
   before: string;
 }
 
@@ -68,7 +56,6 @@ async function seed(): Promise<void> {
     const start = Date.now() - (MESSAGE_COUNT + 60) * 60_000;
     const messages: ConversationMessage[] = [];
     for (let index = 0; index < MESSAGE_COUNT; index += 1) {
-      // One request, then four replies.
       const author = index % 5 === 0 ? "user" : "assistant";
       messages.push({
         id: messageId(index),
@@ -94,13 +81,10 @@ async function seed(): Promise<void> {
 }
 
 interface Timing {
-  /** Milliseconds from the click. Null when the step did not occur in the wait time. */
   rowInDom: number | null;
   rowInView: number | null;
   flash: number | null;
-  /** The row is in view and the scroll position did not change for 5 frames. */
   settled: number | null;
-  /** Messages in the thread view after the jump. */
   rows: number;
 }
 
@@ -111,7 +95,6 @@ async function measure(): Promise<void> {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.stack ?? error.message));
   const results: Array<Case & { messageId: string; timing: Timing; toasts: string[]; screenshot: string }> = [];
-  /** The toasts on screen. A toast after a jump is a failure, so each one is in the report. */
   const toasts = () =>
     page.evaluate(() => [...document.querySelectorAll("[data-sonner-toast]")].map((toast) => toast.textContent ?? ""));
   const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -123,7 +106,6 @@ async function measure(): Promise<void> {
       await whatsNew.getByRole("button", { name: english("update.whatsNew.done") }).click();
       await whatsNew.waitFor({ state: "detached", timeout: UI_WAIT_MS });
     }
-    // The pins: unpin old ones of this thread, then pin each case.
     await page.evaluate(
       async ({ agentId, taskId, ids }) => {
         const snapshot = await window.openbot.agent.listPinnedMessages(agentId);
@@ -145,7 +127,6 @@ async function measure(): Promise<void> {
         .first()
         .click({ timeout: UI_WAIT_MS * 2 });
     await openAgent();
-    // A cold start: the thread tab is closed, and a reload drops the loaded messages.
     const tab = page.locator(`.agent-threads-tab[data-thread-id="${seedData.taskId}"]`);
     if ((await tab.count()) > 0) {
       await tab.locator(".agent-threads-tab-close").click();
@@ -210,7 +191,6 @@ async function measure(): Promise<void> {
       );
       const screenshot = resolve(OUT, `${item.name.replace(/[^a-z0-9]+/gi, "-")}.png`);
       await page.screenshot({ path: screenshot });
-      // The jump ends after the row shows. The next reads of the pin list wait for it.
       await page.evaluate(() => window.openbot.agent.listAgents());
       const shown = await toasts();
       results.push({ ...item, messageId: id, timing, toasts: shown, screenshot });

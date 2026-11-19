@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/error/attachment";
 export const messages = {
   "error.attachment.notFound": "لم يُعثر على المرفق.",
   "error.attachment.fileTooLarge": "يتجاوز أحد الملفات الحد البالغ 100 MB.",
+  "error.attachment.namedFileTooLarge": "{name} أكبر من الحد البالغ 100 MB.",
   "error.attachment.totalTooLarge": "تتجاوز المرفقات الحد الإجمالي البالغ 250 MB.",
   "error.attachment.unavailable": "لم يعد هذا الملف متاحًا.",
   "error.attachment.tooMany": "اختر {limit} ملفات على الأكثر.",

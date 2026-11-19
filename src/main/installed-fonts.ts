@@ -29,11 +29,6 @@ function powerShellCommand(script: string): FontCommand {
   };
 }
 
-/**
- * The command that writes one family name on each line. Each one is part of the system: AppKit
- * through JavaScript for Automation on macOS, Fontconfig on Linux, and .NET through PowerShell on
- * Windows. The renderer could ask Chromium (`queryLocalFonts`), but that needs a new permission.
- */
 function fontListCommand(platform: NodeJS.Platform): FontCommand {
   switch (platform) {
     case "darwin":
@@ -55,14 +50,6 @@ function fontListCommand(platform: NodeJS.Platform): FontCommand {
   }
 }
 
-/**
- * The Windows command that writes the family names of the symbol fonts, such as Wingdings, Webdings
- * and Marlett. A symbol font has a picture for each letter, so the default fonts after it never draw
- * the letters, and all text in it is unreadable. `Win32FamilyNames` are the names, in each language,
- * that `InstalledFontCollection` writes. `SystemFontFamilies` has only the fonts of all users, so the
- * command also reads the fonts of this user. A font that does not load is skipped, so it does not stop
- * the others.
- */
 const WINDOWS_SYMBOL_FONTS_COMMAND = powerShellCommand(
   [
     "Add-Type -AssemblyName PresentationCore",
@@ -88,10 +75,6 @@ const runFontCommand = ({ command, args }: FontCommand) =>
     });
   });
 
-/**
- * The family names, one time each, in alphabetical order. A name that starts with a dot is a font
- * that macOS keeps for itself. A name that cannot go into a CSS font list is left out.
- */
 function parseFontFamilies(output: string): string[] {
   const families = new Set<string>();
   for (const line of output.split(/\r?\n/u)) {
@@ -102,23 +85,14 @@ function parseFontFamilies(output: string): string[] {
   return [...families].sort((left, right) => left.localeCompare(right));
 }
 
-/**
- * The symbol fonts from the first scan that loaded. The scan opens each font file, so Settings does
- * not repeat it each time it opens. A symbol font that is installed later shows until a restart.
- */
 let symbolFontsCache: ReadonlySet<string> | null = null;
 
-/**
- * The symbol fonts to leave out of the font choices. Only Windows has a system command for them. When
- * the command fails, no font is left out, so the font choices stay as they were.
- */
 const listSymbolFonts = Effect.fn("InstalledFonts.listSymbolFonts")(function* (platform: NodeJS.Platform) {
   if (platform !== "win32") return new Set<string>();
   if (symbolFontsCache !== null) return symbolFontsCache;
   const listed = yield* Effect.result(runFontCommand(WINDOWS_SYMBOL_FONTS_COMMAND));
   if (Result.isSuccess(listed)) {
     const symbolFonts = new Set(parseFontFamilies(listed.success));
-    // Windows always has symbol fonts, such as Marlett. No names means that the scan did not run.
     if (symbolFonts.size > 0) symbolFontsCache = symbolFonts;
     return symbolFonts;
   }
@@ -126,11 +100,6 @@ const listSymbolFonts = Effect.fn("InstalledFonts.listSymbolFonts")(function* (p
   return new Set<string>();
 });
 
-/**
- * The fonts that are installed on this computer, for the font choices in Settings. When the list
- * does not load, such as on a Linux computer without Fontconfig, it is empty: Settings then shows
- * only the default font and the saved one.
- */
 export const listInstalledFonts = Effect.fn("InstalledFonts.list")(function* (
   platform: NodeJS.Platform = process.platform,
 ) {

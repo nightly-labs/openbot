@@ -3,32 +3,22 @@ import { createDiscordGuildKeyPair, openDiscordGuildGrant } from "@openbot/contr
 import { Effect, Schema } from "effect";
 import { causeHelpers } from "../../effect-boundary";
 
-/** How long a connect link stays usable. */
 const PENDING_TTL_MS = 15 * 60_000;
 
-/** The account service half of the OpenBot Discord app: the Worker holds its client secret. */
 export interface DiscordAppPort {
-  /** The Discord install URL for one connect of this host. The Worker seals the guild link to `hostPublicKey`. */
   authorize(input: { hostNonce: string; hostPublicKey: string }): Effect.Effect<string, DiscordConnectFailed>;
-  /** Unlinks a guild from this host in the account service, so Signal stops routing it here. */
   unlink(guildId: string): Effect.Effect<void, DiscordConnectFailed>;
   openExternal(url: string): Promise<void>;
 }
 
-/**
- * The install of the OpenBot Discord app in a guild, started on this computer. Each connect has a
- * one-use key pair, as a Slack connect has: only this run can open the grant that names the guild.
- */
 export class DiscordConnect {
   readonly #port: DiscordAppPort;
-  /** The connects that are open, by nonce. */
   readonly #pending = new Map<string, { privateKey: CryptoKey; expiresAt: number }>();
 
   constructor(port: DiscordAppPort) {
     this.#port = port;
   }
 
-  /** Returns the install page and its nonce. With `opensPage` false the client of a joined server opens it. */
   readonly start = Effect.fnUntraced(function* (this: DiscordConnect, opensPage: boolean) {
     this.#prune();
     const nonce = randomBytes(24).toString("base64url");
