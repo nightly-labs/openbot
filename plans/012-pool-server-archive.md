@@ -15,7 +15,7 @@
 - **Size**: L
 - **Planned at**: commit `5fd3a12b9a` (2026-11-19); updated at `39a0642862` for #12721 (new Terms:
   14 days of data, a cancelled and refunded server is deleted at once)
-- **State**: IN PROGRESS (items 1 and 2 done)
+- **State**: IN PROGRESS (items 1 and 2 done; items 3, 5 and 6 written, not applied)
 
 ## Why this matters
 
@@ -164,6 +164,14 @@ in the GitHub `cloudflare-production` Environment, and the deploy makes them Wor
   (decision 2). The operator runs `sync` once a day, so "at once" means "at the next `sync`". The
   developer decided on 2026-11-19 that the daily `sync` is enough: no timer.
 - **STOP** before the first `--apply` on a production machine: the developer approves it.
+- **Written (2026-11-19, branch `t3/pool-archive-job`)**: `scripts/hosting/pool-archive.ts` holds the
+  B2, `age` and key-wrap code that the E2E and `sync` share. `sync` archives, writes the row only while
+  the server is still stopped, then frees and reinstalls the machine. The Worker 14-day delete now also
+  finds a server with a live archive and no machine, and deletes the old boat sandbox of a moved server
+  (`retired_sandbox_id`) when the server has no machine.
+- **Found**: the Worker `#renew` gives a server with no machine and no sandbox a new, empty server. So
+  the first production `--apply` waits until item 4 is live. On 2026-11-19 production had two servers
+  that `sync` would archive (both `canceled`).
 
 ### 4. Restore through the pool assignment
 
@@ -184,6 +192,10 @@ in the GitHub `cloudflare-production` Environment, and the deploy makes them Wor
 
 - **Change**: the 14-day cron deletes the archive and the row; the owner delete, the refund delete
   (`deleteForRefund`) and the account delete delete the archive at once.
+- **Decided (default, 2026-11-19)**: `sync` deletes, not the Worker, so the Worker key stays
+  read-only. Each `sync` deletes an archive whose `delete_after` is past, whose server is deleted, or
+  that a restore used (`restored_at`). "At once" is "at the next daily `sync`"; the B2 lifecycle is the
+  backstop. Written in item 3's branch.
 
 ### 6. Documents
 
@@ -191,6 +203,10 @@ in the GitHub `cloudflare-production` Environment, and the deploy makes them Wor
   processor, the regions), `apps/auth-api/src/content/dpa.tsx` (Backblaze as a sub-processor). The
   developer approves the legal text.
 - `changelog.d/<branch>.md` for each PR.
+- **Written (2026-11-19)** on `t3/pool-archive-job`: `PRIVACY.md` (archive paragraph; also `pool-free`
+  to `pool`), `dpa.tsx` § 9 (Backblaze, Inc.), `docs/hosted-servers.md` "Archive of an ended pool
+  server". Not changed: the DPA § 11 says 30 days of retention and names no Leaseweb; PRIVACY says
+  14 days and names Leaseweb.
 
 ## Surfaces
 

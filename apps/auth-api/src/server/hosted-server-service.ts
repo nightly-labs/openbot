@@ -104,6 +104,8 @@ const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 const CLAIM_OPEN_SQL = `(hosted_servers.auth_session_id IS NULL OR NOT EXISTS(
   SELECT 1 FROM auth_sessions WHERE auth_sessions.id = hosted_servers.auth_session_id AND auth_sessions.revoked_at IS NULL))`;
 const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
+const HAS_POOL_DATA_SQL = `(operator_host IS NOT NULL OR EXISTS(SELECT 1 FROM hosted_server_archives a
+  WHERE a.server_id = hosted_servers.server_id AND a.deleted_at IS NULL))`;
 
 export type HostedServerBindings = Pick<
   WorkerBindings,
@@ -724,7 +726,7 @@ export class HostedServerService {
         dependencies.database
           .prepare(
             `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
-         WHERE server_id = ? AND desired_state = 'stopped' AND operator_host IS NOT NULL AND plan_ended_at = ?
+         WHERE server_id = ? AND desired_state = 'stopped' AND ${HAS_POOL_DATA_SQL} AND plan_ended_at = ?
          AND lifecycle_token = ? AND lifecycle_lease_until > ?
          AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
            AND s.status IN ${OPEN_STATUSES_SQL})`,
@@ -1491,7 +1493,7 @@ export class HostedServerService {
         dependencies.database
           .prepare(
             `SELECT ${ROW_COLUMNS}, plan_ended_at FROM hosted_servers
-         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ?
+         WHERE ${HAS_POOL_DATA_SQL} AND desired_state = 'stopped' AND plan_ended_at <= ?
            AND EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id)
            AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
              AND s.status IN ${OPEN_STATUSES_SQL})
@@ -2654,7 +2656,9 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     if (row.observed_state === "creating" && !row.provider_sandbox_id) return;
     const sandboxId =
-      row.provider_sandbox_id ?? (row.operator_host ? row.retired_sandbox_id : yield* this.#findLostSandbox(row));
+      row.provider_sandbox_id ??
+      row.retired_sandbox_id ??
+      (row.operator_host ? null : yield* this.#findLostSandbox(row));
     if (sandboxId) {
       const boat = dependencies.boat;
       if (!boat)
