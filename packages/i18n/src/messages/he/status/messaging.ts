@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "נעצר.",
   "status.messaging.stop": "עצירה",
   "status.messaging.approvalTitle": "OpenBot מבקש אישור כדי להמשיך.",
+  "status.messaging.approvalTitleTeammate": "חבר הצוות {agent} מבקש אישור כדי להמשיך.",
   "status.messaging.approvalCommand": "הרצת פקודה",
   "status.messaging.approvalFileChange": "שינוי קבצים",
   "status.messaging.approvalPermissions": "קבלת הרשאות נוספות",

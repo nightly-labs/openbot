@@ -2325,11 +2325,21 @@ export class MessagingService {
     this: MessagingService,
     approval: AgentApproval,
   ) {
-    const link = this.#threads.store.linkForThread(approval.threadId);
+    const own = this.#threads.store.linkForThread(approval.threadId);
+    // A teammate that works on a request from an external conversation asks there too: nobody in that
+    // conversation sees the card in OpenBot, and the request would wait for the OpenBot user.
+    const request = own ? null : this.#threads.teammateRequest(approval.agentId, approval.turnId);
+    const link = own ?? request?.link;
     if (!link) return;
-    const running = this.#threads.runningOrigin(link.linkId);
-    const key = running ? `${link.linkId}:${running.origin.platformMessageId}` : null;
+    const origin = request?.origin ?? this.#threads.runningOrigin(link.linkId)?.origin;
+    const key = origin ? `${link.linkId}:${origin.platformMessageId}` : null;
     const target = (key && this.#targets.get(key)) || (key && this.#posts.get(key)?.target) || linkTarget(link);
+    const teammate = request
+      ? this.#agents
+          .listAgents()
+          .find((agent) => agent.id === approval.agentId)
+          ?.name.replace(MENTION_MARKERS, "")
+      : undefined;
     const kind =
       approval.kind === "command"
         ? sourceText("status.messaging.approvalCommand")
@@ -2340,7 +2350,9 @@ export class MessagingService {
       .replace(MENTION_MARKERS, "")
       .slice(0, APPROVAL_TEXT_LIMIT);
     const text = [
-      sourceText("status.messaging.approvalTitle"),
+      teammate
+        ? sourceText("status.messaging.approvalTitleTeammate", { agent: teammate })
+        : sourceText("status.messaging.approvalTitle"),
       `**${kind}**`,
       detail ? `\`\`\`\n${detail}\n\`\`\`` : "",
     ]
@@ -2354,7 +2366,7 @@ export class MessagingService {
       connectionId: link.connectionId,
       target,
       messageId: null,
-      allowedUserId: running?.origin.authorId ?? null,
+      allowedUserId: origin?.authorId ?? null,
       text,
       answered: false,
       accept,
