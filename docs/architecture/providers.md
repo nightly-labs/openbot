@@ -1158,9 +1158,12 @@ the download size. `OPENBOT_DEVIN_PATH` selects another executable.
 
 Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
 browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
-(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
-the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
-empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+(`~/.local/share/devin`). It has no device-code sign-in. A joined computer signs in Devin on a Linux
+host with `devin auth login --force-manual-token-flow` (`cli` / `paste`): the CLI prints Devin's page
+and "copy the code and paste it below", and the client sends that code back on the released
+providers-v8 `codeLoginSubmit`. A client offers it only on a host with `devin-code-sign-in-v1`, which
+the host advertises only when it takes a pasted code. Sign out runs `devin auth logout`. A signed-out
+Devin process answers `session/new` with an empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
 
 `devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
 `devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
