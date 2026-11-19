@@ -53,6 +53,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "Uruchomienie {number} czeka na ciebie. Sprawdź",
   "mobile.workflow.detail.trigger": "Wyzwalacz",
   "mobile.workflow.detail.nextRun": "Następne uruchomienie: {time}",
+  "mobile.workflow.detail.nextRunAfter": "Następne uruchomienie: po zakończeniu uruchomienia {number}",
   "mobile.workflow.detail.copyWebhook": "Kopiuj adres webhooka",
   "mobile.workflow.detail.runs": "Uruchomienia",
   "mobile.workflow.detail.allRuns": "Pokaż wszystkie uruchomienia",

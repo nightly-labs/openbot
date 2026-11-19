@@ -545,7 +545,11 @@ const NO_DRAG = [
 ].join(", ");
 
 /** A node of the canvas. Its fields are on the board, so each node reads them from there. */
-function CanvasNodeView(props: { node: CanvasItem; trigger: WorkflowTriggerState | undefined }) {
+function CanvasNodeView(props: {
+  node: CanvasItem;
+  trigger: WorkflowTriggerState | undefined;
+  heldBy: number | undefined;
+}) {
   const node = untrack(() => props.node);
   switch (node.kind) {
     case "text":
@@ -566,6 +570,7 @@ function CanvasNodeView(props: { node: CanvasItem; trigger: WorkflowTriggerState
           id={node.id}
           webhookUrl={props.trigger?.webhookUrl ?? undefined}
           nextRun={props.trigger?.nextDueAt ?? undefined}
+          heldBy={props.heldBy}
         />
       );
     case "condition":
@@ -978,6 +983,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return byNode;
   });
   const triggerOf = (id: string) => triggers().get(id);
+  /** The oldest run that has not ended. While a run is open, the host starts no schedule run. */
+  const heldBy = createMemo(() => props.runs.runs.findLast(isOpenRun)?.run.number);
   /** A prompt or a file gives its value with no step, so it counts as done when the steps after it run. */
   const passive = (id: string) => {
     const kind = kindOf(id);
@@ -3562,7 +3569,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         "--wfn-peer": ringOn(node().id),
                       }}
                     >
-                      <CanvasNodeView node={node()} trigger={triggerOf(node().id)} />
+                      <CanvasNodeView node={node()} trigger={triggerOf(node().id)} heldBy={heldBy()} />
                       <Show when={peerTag(node().id)}>
                         {(peer) => (
                           <span class="wfn-peer-tag" aria-hidden="true">

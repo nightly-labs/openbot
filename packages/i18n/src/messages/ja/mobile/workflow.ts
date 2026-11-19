@@ -38,6 +38,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "実行 {number} があなたの対応を待っています。確認",
   "mobile.workflow.detail.trigger": "トリガー",
   "mobile.workflow.detail.nextRun": "次回の実行: {time}",
+  "mobile.workflow.detail.nextRunAfter": "次回の実行: 実行 {number} の終了後",
   "mobile.workflow.detail.copyWebhook": "Webhook のアドレスをコピー",
   "mobile.workflow.detail.runs": "実行履歴",
   "mobile.workflow.detail.allRuns": "すべての実行を表示",

@@ -19,7 +19,7 @@ import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-
 import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
 import { useWorkflowEditorView } from "@/features/workflows/model/workflow-editor-view";
 import { githubTrigger as githubTriggerSettings, triggerDeliveries } from "@/features/workflows/model/workflow-github";
-import { latestSteps, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
+import { isActiveRun, latestSteps, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -68,6 +68,8 @@ export function WorkflowScreen() {
   const moreRuns = runList.length > LATEST_RUNS || Boolean(runs.data?.nextBefore);
   const trigger = workflow?.graph.nodes.find((node) => node.kind === "trigger");
   const triggerState = workflow?.triggers.find((state) => state.nodeId === trigger?.id);
+  /** The oldest run that has not ended. While a run is open, the host starts no schedule run. */
+  const heldBy = runList.findLast((item) => isActiveRun(item.run.status))?.run.number;
   const githubTrigger = trigger && triggerType(trigger) === "github" ? trigger : undefined;
   const github = useWorkflowGitHubHistory(serverId, workflowId, Boolean(githubTrigger));
   const githubHistory = githubTrigger ? github.data : undefined;
@@ -256,15 +258,17 @@ export function WorkflowScreen() {
                 <SettingsRow
                   disclosure={false}
                   supportingText={
-                    triggerState?.nextDueAt
-                      ? t("mobile.workflow.detail.nextRun", {
-                          time: format.date(new Date(triggerState.nextDueAt), {
-                            weekday: "short",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          }),
-                        })
-                      : undefined
+                    !triggerState?.nextDueAt
+                      ? undefined
+                      : heldBy !== undefined
+                        ? t("mobile.workflow.detail.nextRunAfter", { number: heldBy })
+                        : t("mobile.workflow.detail.nextRun", {
+                            time: format.date(new Date(triggerState.nextDueAt), {
+                              weekday: "short",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            }),
+                          })
                   }
                 >
                   <Typography.Paragraph>{stepLabel(trigger, serverAgents, t)}</Typography.Paragraph>

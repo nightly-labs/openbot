@@ -94,6 +94,11 @@ export function TriggerNode(props: {
   webhookUrl?: string | undefined;
   /** The next run of the schedule, as an ISO time. */
   nextRun?: string | undefined;
+  /**
+   * The number of the oldest run that has not ended. The host starts no schedule run while a run
+   * is open, so the next run comes after it ends, and the planned time can be in the past.
+   */
+  heldBy?: number | undefined;
 }) {
   const board = useBoard();
   const { t, format, errorMessage } = useText();
@@ -163,16 +168,17 @@ export function TriggerNode(props: {
     if (isGitHub()) return board.github()?.runLastEvent(props.id);
     return board.runFrom ? board.runFrom(props.id) : run.start();
   };
-  const nextRun = () =>
-    props.nextRun
-      ? format.date(new Date(props.nextRun), {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : undefined;
+  const nextRun = () => {
+    if (!props.nextRun) return undefined;
+    if (props.heldBy !== undefined) return t("workflow.trigger.nextRunAfter", { number: props.heldBy });
+    return format.date(new Date(props.nextRun), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
   return (
     <NodeShell
       action={

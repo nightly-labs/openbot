@@ -36,6 +36,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "第 {number} 次运行正在等你。查看",
   "mobile.workflow.detail.trigger": "触发器",
   "mobile.workflow.detail.nextRun": "下次运行：{time}",
+  "mobile.workflow.detail.nextRunAfter": "下次运行：第 {number} 次运行结束后",
   "mobile.workflow.detail.copyWebhook": "复制 Webhook 地址",
   "mobile.workflow.detail.runs": "运行记录",
   "mobile.workflow.detail.allRuns": "查看所有运行",

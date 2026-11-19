@@ -38,6 +38,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "Lauf {number} wartet auf dich. Prüfen",
   "mobile.workflow.detail.trigger": "Auslöser",
   "mobile.workflow.detail.nextRun": "Nächster Lauf: {time}",
+  "mobile.workflow.detail.nextRunAfter": "Nächster Lauf: nach Ende von Lauf {number}",
   "mobile.workflow.detail.copyWebhook": "Webhook-Adresse kopieren",
   "mobile.workflow.detail.runs": "Läufe",
   "mobile.workflow.detail.allRuns": "Alle Läufe anzeigen",

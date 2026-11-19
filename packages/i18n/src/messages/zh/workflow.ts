@@ -204,6 +204,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "用最近的事件运行",
   "workflow.trigger.webhook.address": "地址",
   "workflow.trigger.nextRunName": "下次运行",
+  "workflow.trigger.nextRunAfter": "第 {number} 次运行结束后",
 
   "workflow.condition.title": "条件",
   "workflow.condition.name": "条件",
