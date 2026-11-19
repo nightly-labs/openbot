@@ -703,6 +703,11 @@ export interface WorkflowStepSource {
   attachmentId: string | null;
 }
 
+export interface WorkflowStepSettings {
+  settings: WorkflowFields | null;
+  sources: WorkflowStepSource[] | null;
+}
+
 export interface WorkflowRunDetail {
   run: WorkflowRun;
   steps: WorkflowStep[];
@@ -984,6 +989,14 @@ export function isWorkflowStepSource(value: unknown): value is WorkflowStepSourc
     isOneOf(WORKFLOW_PORT_TYPES, value.type) &&
     (value.stepId === null || isIdentifier(value.stepId)) &&
     (value.attachmentId === null || isIdentifier(value.attachmentId))
+  );
+}
+
+export function isWorkflowStepSettings(value: unknown): value is WorkflowStepSettings {
+  return (
+    isDynamicRecord(value) &&
+    (value.settings === null || isWorkflowFields(value.settings)) &&
+    (value.sources === null || (Array.isArray(value.sources) && value.sources.every(isWorkflowStepSource)))
   );
 }
 

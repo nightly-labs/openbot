@@ -64,6 +64,11 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_CODECS,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
+import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_CODECS,
   WORKFLOWS_SUNRA_ROUTES,
@@ -2092,6 +2097,121 @@ try {
         files: pair.handoff.sourcePaths.length,
         missing: missing.done.status,
       };
+    },
+  );
+
+  await step(
+    "step settings: the host advertises workflows-step-settings-v1 to a protocol 10 peer; a member reads the settings and inputs of each attempt, and not those of a hidden agent",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_STEP_SETTINGS_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_STEP_SETTINGS_CAPABILITY));
+      const codec = WORKFLOWS_STEP_SETTINGS_CODECS.get(WORKFLOWS_STEP_SETTINGS_ROUTES.read);
+      assert.ok(codec, "No workflows-step-settings-v1 codec for read.");
+      const raw = (token: string, stepId: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10)) => {
+        codec.request({ stepId });
+        return call("POST", WORKFLOWS_STEP_SETTINGS_ROUTES.read, {
+          token,
+          body: { stepId },
+          protocol: TEAM_PROTOCOL_V10,
+          capabilities,
+        });
+      };
+      const read = async (token: string, stepId: string) => {
+        const response = await raw(token, stepId);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return record(codec.response(response.status, response.body), "step settings");
+      };
+      const refusal = async (
+        response: { status: number; body: unknown },
+        status: number,
+        key: "error.workflow.stepMissing" | "error.workflow.serverTooOld" | "error.workflow.missing",
+      ) => {
+        assert.equal(response.status, status, JSON.stringify(response.body));
+        assert.ok(JSON.stringify(response.body).includes(sourceText(key)), JSON.stringify(response.body));
+        return response.status;
+      };
+      const runOnce = async (workflowId: string) => {
+        const started = await ok(WORKFLOWS_ROUTES.startRun, member, { workflowId, requestId: requestId() });
+        const runId = text(record(started.run, "run").id, "run id");
+        const agent = await settled(runId, "agent");
+        const prompt = await settled(runId, "prompt");
+        return { agent, prompt };
+      };
+
+      const workflow = await hostWorkflow("Settings", agentGraph(open));
+      const first = await runOnce(workflow.id);
+      const firstRead = await read(member, first.agent.id);
+      assert.deepEqual(firstRead, {
+        settings: { agentId: open },
+        sources: [{ from: "prompt", type: "text", stepId: first.prompt.id, attachmentId: null }],
+      });
+      assert.deepEqual(await read(member, first.prompt.id), { settings: { text: "Start." }, sources: [] });
+
+      const edited = agentGraph(open);
+      const saved = await runCauseEffect(
+        current().workflows.saveGraph({
+          workflowId: workflow.id,
+          baseRevision: workflow.revision,
+          graph: {
+            ...edited,
+            nodes: edited.nodes.map((node) =>
+              node.id === "agent" ? { ...node, fields: { ...node.fields, task: "Say goodbye." } } : node,
+            ),
+          },
+        }),
+      );
+      assert.ok(saved.ok, "The edit did not save.");
+      const second = await runOnce(workflow.id);
+      const secondRead = await read(member, second.agent.id);
+      assert.deepEqual(secondRead.settings, { agentId: open, task: "Say goodbye." });
+      assert.deepEqual(await read(member, first.agent.id), firstRead, "The edit changed the earlier attempt.");
+      assert.deepEqual(await read(ownerToken, second.agent.id), secondRead);
+
+      const old = await refusal(
+        await raw(
+          member,
+          first.agent.id,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+          ),
+        ),
+        400,
+        "error.workflow.serverTooOld",
+      );
+
+      const hiddenWorkflow = await hostWorkflow("Hidden settings", agentGraph(later));
+      const { run: hiddenRun } = await runCauseEffect(
+        current().workflows.startRun({ workflowId: hiddenWorkflow.id, requestId: requestId() }),
+      );
+      const hiddenStep = await settled(hiddenRun.id, "agent");
+      const hiddenWorkflowRead = await refusal(await raw(member, hiddenStep.id), 404, "error.workflow.missing");
+      const withoutAgent = await runCauseEffect(
+        current().workflows.saveGraph({
+          workflowId: hiddenWorkflow.id,
+          baseRevision: hiddenWorkflow.revision,
+          graph: { nodes: [promptNode], edges: [], strokes: [] },
+        }),
+      );
+      assert.ok(withoutAgent.ok, "The graph without the agent did not save.");
+      const hidden = await refusal(await raw(member, hiddenStep.id), 404, "error.workflow.stepMissing");
+      const ownerHidden = await read(ownerToken, hiddenStep.id);
+      assert.deepEqual(ownerHidden.settings, { agentId: later });
+      const missing = await refusal(await raw(member, "step-missing-e2e"), 404, "error.workflow.stepMissing");
+
+      current()
+        .database.connection.prepare(
+          "UPDATE workflow_steps SET settings_json = NULL, sources_json = NULL WHERE step_id = ?",
+        )
+        .run(first.agent.id);
+      const older = await read(member, first.agent.id);
+      assert.deepEqual(older, { settings: null, sources: null });
+
+      return { first: firstRead, second: secondRead, old, hiddenWorkflowRead, hidden, missing, older };
     },
   );
 

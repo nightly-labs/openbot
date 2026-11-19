@@ -40,6 +40,7 @@ import {
   type WorkflowRunsInput,
   type WorkflowSaveResult,
   type WorkflowStep,
+  type WorkflowStepSettings,
   type WorkflowSummary,
   type WorkflowVersion,
   type WorkflowVersionInput,
@@ -350,6 +351,7 @@ interface WorkflowsShape {
   decide(input: DecideWorkflowStepInput): Effect.Effect<void, WorkflowFailed>;
   runs(input: WorkflowRunsInput): Effect.Effect<WorkflowRunPage, WorkflowFailed>;
   run(runId: string): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
+  stepSettings(stepId: string): Effect.Effect<WorkflowStepSettings, WorkflowFailed>;
   workflowOf(ref: { runId: string } | { stepId: string }): Effect.Effect<WorkflowRunScope | null, WorkflowFailed>;
   sweep(): Effect.Effect<void>;
   notice(event: AgentEvent): Effect.Effect<void>;
@@ -1928,6 +1930,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* attempt(() => runDetail(found));
         });
 
+        const stepSettings = Effect.fn("Workflows.stepSettings")(function* (stepId: string) {
+          const step = yield* attempt(() => runs.step(stepId));
+          if (!step) return yield* refuse("missing", sourceText("error.workflow.stepMissing"));
+          return { settings: step.settings, sources: step.sources && [...step.sources] };
+        });
+
         const versionGraph = Effect.fn("Workflows.versionGraph")(function* (input: WorkflowVersionInput) {
           const graph = yield* attempt(() => store.versionGraph(input.workflowId, input.versionId));
           if (graph === null) return yield* refuse("missing", sourceText("error.workflow.versionMissing"));
@@ -1981,6 +1989,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           decide,
           runs: runPage,
           run,
+          stepSettings,
           workflowOf,
           sweep,
           notice,

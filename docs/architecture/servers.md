@@ -548,6 +548,17 @@ video step has one `file` input port for its video and audio references: the hos
 role from its type (`video/*` or `audio/*`) and refuses another type. The v1 catalog leaves out `inputs`
 and `modes`.
 
+`workflows-step-settings-v1` reads the settings and the inputs that one step attempt ran with.
+`POST /v1/workflows/step-settings { stepId }` answers `{ settings, sources }`. `settings` are the
+runtime fields of the node (`runtimeFields` in `src/backend/workflows/workflow-graph.ts`), so the
+label and the canvas layout are not in them. Each source names the node of an incoming edge, the
+edge type, the step that the attempt read (`stepId`) and the file of an asset or image input
+(`attachmentId`). A step from a release before migration 66 answers `null` for both: "not
+recorded". Each member who can read the run can read its steps. A workflow that the member cannot
+see answers `missing`, and a step of an agent that the member cannot see answers `stepMissing`. The fields are the node settings that the member can already read
+in the graph, and no secret is in them. The answer has its own route so that the frozen
+`workflows-v1` step stays as it is. The capability goes to protocol 10 peers.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

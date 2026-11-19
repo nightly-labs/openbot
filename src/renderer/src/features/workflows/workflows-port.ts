@@ -147,6 +147,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       decide: (input) => api().decide(input, serverId),
       runs: (input) => api().runs(input, serverId),
       run: (runId) => api().run(runId, serverId),
+      stepSettings: (stepId) => api().stepSettings(stepId, serverId),
       rotateWebhookSecret: (input) => api().rotateWebhookSecret(input, serverId),
       githubCatalog: () => api().githubCatalog(serverId),
       githubOptions: (input) => api().githubOptions(input, serverId),
