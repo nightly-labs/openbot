@@ -1294,6 +1294,7 @@
 .wfn-deleted .wfn-deleted-item {
   width: 100%;
   justify-content: space-between;
+  color: var(--openbot-text-primary);
 }
 
 .wfn-deleted-name {
@@ -1305,7 +1306,8 @@
 
 .wfn-deleted-steps {
   flex: none;
-  color: var(--openbot-text-secondary);
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .wfn-undo-toast-tile {
