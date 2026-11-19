@@ -1,8 +1,5 @@
-// Sample data for the status page story. The Connections incident of 2026-10-11 and the hosted
-// server incident of 2026-10-10 follow real events; the rest is plausible sample history.
 import { HISTORY_DAYS, type Incident, SERVICE_IDS, type ServiceId, type StatusFile, statusDates } from "./model";
 
-/** The moment the story renders. Fixed, so the story and its screenshots repeat. */
 export const FIXTURE_NOW = "2026-10-16T10:05:00Z";
 
 const ISSUES = "https://github.com/nightly-labs/openbot/issues";
@@ -150,7 +147,6 @@ const INCIDENTS: readonly Incident[] = [
   },
 ];
 
-/** Minutes in which the check failed or was slow, by service and day. */
 const FAILED: Partial<Record<ServiceId, Record<string, number>>> = {
   connections: { "2026-10-11": 55, "2026-10-10": 20 },
   hosted: { "2026-10-10": 205 },
@@ -161,7 +157,6 @@ const DEGRADED: Partial<Record<ServiceId, Record<string, number>>> = {
   updates: { "2026-08-14": 90 },
 };
 
-/** The checks started 75 days ago, so the oldest 15 bars of the 90-day view have no data. */
 const CHECKED_DAYS = 75;
 
 function fixture(): StatusFile {
@@ -191,7 +186,6 @@ function fixture(): StatusFile {
 
 export const STATUS_FIXTURE = fixture();
 
-/** The same history with no open incident and no planned maintenance. */
 export const ALL_CLEAR_FIXTURE: StatusFile = {
   ...STATUS_FIXTURE,
   services: STATUS_FIXTURE.services.map((service) => ({ ...service, result: "ok" })),

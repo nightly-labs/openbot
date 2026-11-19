@@ -1,10 +1,3 @@
-// Workflows: graphs of steps drawn on a canvas. This computer's host answers from its own runtime,
-// and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
-// its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
-// keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
-// `workflows-sunra-v1`, and Higgsfield through `workflows-higgsfield-v1`. It gives the live models of
-// both, and a price for a step, through `workflows-media-catalog-v1`.
-
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -110,7 +103,6 @@ interface WorkflowRemoteServers {
 interface WorkflowIpcDependencies {
   workflows: WorkflowsHandle;
   events: Pick<HostEventsService, "rotateWorkflowSecret">;
-  /** This computer's GitHub repositories, labels and people for the editor. The user is the owner. */
   github: WorkflowGitHubDirectory;
   remoteServers: WorkflowRemoteServers;
 }
@@ -126,7 +118,6 @@ export function workflowIpcHandlers({
       throw new Error(sourceText("error.workflow.serverTooOld"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A `workflows-github-v1` route of a joined server, which needs `workflows-v1` too. */
   function remoteGitHub<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: unknown): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_GITHUB_CAPABILITY))
       throw new Error(sourceText("error.workflow.serverTooOld"));
@@ -242,10 +233,6 @@ export function workflowIpcHandlers({
       }),
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
-        // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra. The
-        // same is true for Higgsfield and `workflows-higgsfield-v1`. A host with
-        // `workflows-media-service-account-v1` lists the accounts, so one read gives all; a host
-        // without it makes each file on the first account, so it lists none.
         remote: async (serverId) => {
           if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
             const accounts = await remote(
@@ -269,9 +256,6 @@ export function workflowIpcHandlers({
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
-        // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show. The same is
-        // true for Higgsfield and `workflows-higgsfield-v1`. A host with
-        // `workflows-media-service-account-v1` gives the credits of each account, so one read gives all.
         remote: async (serverId) => {
           if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
             const accounts = await remote(
@@ -295,7 +279,6 @@ export function workflowIpcHandlers({
       }),
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
-        // A host without `workflows-media-catalog-v1` runs only the fixed models, so it has no catalog.
         remote: (serverId) =>
           remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
             ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
@@ -303,7 +286,6 @@ export function workflowIpcHandlers({
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
         local: (input) => runCauseEffect(workflows.mediaPrice(input)),
-        // A host without `workflows-media-catalog-v1` gives no quote.
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
             ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)

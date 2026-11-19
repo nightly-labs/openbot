@@ -14,7 +14,6 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { haptics } from "@/shared/lib/haptics";
 import type { StageBackButtonProps } from "./stage-back-button";
 
-/** The back or close button on the stage: a native Liquid Glass button, bordered before iOS 26. */
 export function StageBackButton({ icon, label, color, disabled = false, onPress }: StageBackButtonProps) {
   return (
     <Host ignoreSafeArea="all" style={{ width: 44, height: 44 }}>

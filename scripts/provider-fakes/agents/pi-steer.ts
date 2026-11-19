@@ -1,9 +1,3 @@
-// The Pi of `pi-steer-e2e.ts`, on Pi's JSONL RPC (`pi --mode rpc`). A `work` prompt stays open until
-// a `steer` arrives, then answers with the steer's text and settles, as Pi reads a queued steer before
-// it settles. The answer has the text of every steer in the queue. A steer whose text starts with
-// `refuse` is refused, as Pi refuses an extension command, and the run goes on. A steer whose text
-// starts with `hold` stays in the queue, as during a long tool call. A steer whose text starts with
-// `slow` is queued but gets no answer. Each request is logged to `FAKE_LOG`.
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -11,7 +5,6 @@ import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contr
 
 const sessionFile = join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}.jsonl`);
 let streaming = false;
-/** The steers that Pi has queued and not read. */
 let queue: string[] = [];
 
 function log(entry: RpcRecord): void {
@@ -55,11 +48,9 @@ const handlers: Record<string, (command: RpcRecord) => void> = {
     log({ event: "steer", text, images: Array.isArray(command.images) ? command.images.length : 0 });
     if (text.startsWith("refuse")) return refuse(command, `Pi refused the steer: ${text}`);
     queue.push(text);
-    // A busy Pi answers after the client stopped waiting.
     if (text.startsWith("slow")) return;
     answer(command, { disposition: "queued" });
     if (text.startsWith("hold") || !streaming) return;
-    // Pi reads the steer in a model call of its own, so it never settles in the steer's answer chunk.
     setTimeout(() => {
       const read = queue.join(", ");
       queue = [];

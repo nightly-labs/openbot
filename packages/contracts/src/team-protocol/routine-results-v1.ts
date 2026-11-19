@@ -1,14 +1,3 @@
-// Frozen optional routine-results-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server reads the host's enabled messaging connections with the places each one can post in, and
-// reads and sets the place where an agent routine of that host sends its answers. `destination: null`
-// stops sending. The host takes the connection's name and platform from its own connection, and
-// refuses a connection that is off or removed. The host leaves out a connection of a platform that
-// this contract does not name, and sends at most `ROUTINE_RESULTS_PLACE_LIMIT` places of one
-// connection. A destination applies only to the runs that end after it was set. The deliveries of
-// each answer and a second send stay on the host's own computer. A member cannot use any route;
-// `requireAdmin` on the host is the only gate. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,
@@ -30,9 +19,7 @@ export const ROUTINE_RESULTS_ROUTES = {
   setDestination: "/v1/admin/routine-results/destination/update",
 } as const;
 
-/** The platforms this contract names. A host leaves out a connection of any other platform. */
 export const ROUTINE_RESULTS_PLATFORMS = ["slack", "discord", "telegram"] as const;
-/** The most places of one connection; the host sends the first ones. */
 export const ROUTINE_RESULTS_PLACE_LIMIT = 10_000;
 
 const name = string(256);

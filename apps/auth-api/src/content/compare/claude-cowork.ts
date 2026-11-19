@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Claude Cowork here is taken from claude.com, the Claude help
-// center, Anthropic's privacy center and its terms, and each page used is in `sources`.
-// Where they state nothing, the text says so. Check them again, and move `checkedAt`,
-// whenever this file changes. From 16 September 2026, Cowork rolls out inside Claude with
-// no separate name, first on Pro and Max; the pages still call the agent Claude Cowork.
-
 const CLAUDE_HELP = "https://support.claude.com/en/articles";
 
 export const CLAUDE_COWORK_COMPARISON: Comparison = {

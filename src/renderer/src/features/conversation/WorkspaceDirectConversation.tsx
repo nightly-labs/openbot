@@ -10,13 +10,6 @@ import { useServers } from "../servers/servers-context";
 import { usePresence } from "../team/team-context";
 import { useDirectMessages } from "./direct-messages-context";
 
-/**
- * A conversation with a person rather than an Agent. The member is a prop because
- * the shell holds it in a keyed `<Show>`: switching to another person has to
- * remount the transcript, and a `useDirectMessages()` read here would keep the
- * same component alive across the change and leave the previous scroll state on
- * screen.
- */
 export function WorkspaceDirectConversation(props: { member: TeamPresenceMember }) {
   const platform = usePlatform();
   const scope = useServerScope();

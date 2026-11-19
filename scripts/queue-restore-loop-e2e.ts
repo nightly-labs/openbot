@@ -1,18 +1,3 @@
-// Checks that a queued message waits, and does not loop, while the agent's chat runs a turn that
-// the Claude CLI started itself and that waits on a question nobody answers (bx_b4pehphr, 63 GB of
-// `conversation.snapshot-updated`). Runs the real agent service on a temporary profile. Claude is
-// the real `ClaudeAgentClient`, which the Claude Agent SDK connects to a stand-in `claude`.
-// Stand-in turns: SLOW ends when the file `release` exists; LATER ends at once, and then the CLI
-// starts a turn of its own that asks an AskUserQuestion permission when the file `ask` exists (as a
-// steered message does when it arrives just after its turn ended); ASK asks at once; others end.
-// Steps (LOOP_VARIANT=routine, the incident): 1. a LATER chat turn ends; 2. a routine that runs in
-// the chat starts a SLOW turn in its own session; 3. the CLI's own turn asks; 4. the routine turn
-// ends; 5. a user message queues; 6. the drain must log that the message waits, with at most one
-// refused `turn/start` (a loop reaches 100 first); 7. the
-// asking turn ends (file `end-ask`), and the queued message must then run and complete.
-// LOOP_VARIANT=simple skips the routine. The check fails when the queued message loops: each cycle
-// calls `turn/start`, gets `ProviderTurnActiveError`, and writes the chat twice.
-// `bun scripts/queue-restore-loop-e2e.ts`. Writes .openbot-build/queue-restore-loop-e2e/report.json.
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -39,9 +24,7 @@ const askFile = join(root, "ask");
 const endAskFile = join(root, "end-ask");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
-/** The loop count that proves the loop; a healthy queue writes a few events only. */
 const LOOP_EVENTS = 200;
-/** `routine` (default): a routine turn in its own session ends while the question waits; `simple`: no routine. */
 const VARIANT = process.env.LOOP_VARIANT === "simple" ? "simple" : "routine";
 
 process.env.HOME = home;
@@ -89,7 +72,6 @@ const result = (text) => {
 const turn = (message) => {
   const text = JSON.stringify(message.message?.content ?? "");
   log({ event: "turn", text: text.slice(0, 80), slow: text.includes("SLOW"), ask: text.includes("ASK") });
-  // First: a routine run in its own session gets the chat's history, which has the other words.
   if (text.includes("SLOW")) {
     const timer = setInterval(() => {
       if (!fs.existsSync(${JSON.stringify(releaseFile)})) return;
@@ -99,8 +81,6 @@ const turn = (message) => {
     return;
   }
   if (text.includes("LATER")) {
-    // The turn ends; later the CLI starts a turn of its own that asks, as a steered message does
-    // when it arrives just after the turn that should have taken it ended.
     result("Done.");
     const timer = setInterval(() => {
       if (!fs.existsSync(${JSON.stringify(askFile)})) return;
@@ -124,7 +104,6 @@ const ask = () => {
       input: { questions: [{ question: "SECRET_VALUE?", header: "Secret", options: [{ label: "a", description: "a" }, { label: "b", description: "b" }], multiSelect: false }] },
       tool_use_id: toolUseId } });
     log({ event: "asked" });
-    // The question ends with its turn when the file \`end-ask\` exists, as an expired prompt does.
     const timer = setInterval(() => {
       if (!fs.existsSync(${JSON.stringify(endAskFile)})) return;
       clearInterval(timer);
@@ -157,10 +136,8 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/** The `turn/start` calls that reach the client, and the errors they end with. */
 const turnStarts: { calls: number; errors: Record<string, number> } = { calls: 0, errors: {} };
 
-/** The real Claude client; only the account, usage and model reads are answered here. */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -372,7 +349,6 @@ try {
 
   const queueBrief = () =>
     agents.listQueue(agent.id).deliveries.map((delivery) => `${delivery.text.slice(0, 20)}:${delivery.status}`);
-  // 1. A chat turn ends, and the CLI is about to start a turn of its own (a steered message that came late).
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "LATER steer." }));
   await waitFor("the LATER turn to end", idle);
   step("chat turn ended", queueBrief());
@@ -387,25 +363,21 @@ try {
     runIn: "chat",
   });
   if (VARIANT === "routine") {
-    // 2. A routine in the chat runs a slow turn in its own session.
     await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
     await waitFor("the slow routine turn", () => logEntries().some((entry) => entry.slow === true));
     step("routine turn running", queueBrief());
   }
 
-  // 3. The CLI's own turn asks a question that nobody answers.
   writeFileSync(askFile, "");
   await waitFor("the question", () => logEntries().some((entry) => entry.event === "asked"));
   step("CLI turn asked", queueBrief());
 
   if (VARIANT === "routine") {
-    // 4. The routine turn ends.
     writeFileSync(releaseFile, "");
     await waitFor("the slow routine result", () => logEntries().some((entry) => entry.text === "Slow done."));
     step("routine turn ended", queueBrief());
   }
 
-  // 5. More work queues behind the waiting question. The drain logs once why it holds a message.
   const holds: string[] = [];
   const stopTee = teeLogLines(["drain-scheduler"], (line) => {
     if (line.includes("A queued message waits.") && line.includes(agent.id)) holds.push(line);
@@ -416,8 +388,6 @@ try {
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Plain follow-up." }));
   step("message queued", queueBrief());
 
-  // 6. The drain holds the message, or loops. Each cycle of the loop calls `turn/start` and gets
-  // `ProviderTurnActiveError`; a held queue calls it at most once, when only the provider knew of its turn.
   const looping = () => turnStarts.calls - startsBefore >= LOOP_EVENTS / 2;
   await waitFor("the queue to hold the message, or the loop", () => holds.length > 0 || looping());
   stopTee();
@@ -437,7 +407,6 @@ try {
     .listQueue(agent.id)
     .deliveries.map((delivery) => ({ id: delivery.id, status: delivery.status, position: delivery.position }));
   step("watch ended", { log: logEntries().map((entry) => `${entry.event}:${entry.text ?? ""}`) });
-  // 7. The asking turn ends, and the held message runs: the hold must end with that turn.
   if (!report.loop) {
     writeFileSync(endAskFile, "");
     await waitFor("the queued message to complete", () =>

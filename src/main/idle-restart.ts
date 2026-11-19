@@ -1,11 +1,3 @@
-// A restart that the user of this computer asks for: OpenBot starts again, or installs the downloaded
-// update, when no work runs. With many agents and routines there is seldom such a moment, so new
-// routine runs wait while the restart waits. An overdue routine runs once after the restart, or after
-// a cancel.
-//
-// A restart that an admin of a joined server asks for, and the automatic install, are
-// `RequestedUpdate`. They do not hold routines.
-
 import type { IdleRestart as IdleRestartStatus, IdleRestartTarget, UpdateStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
@@ -24,15 +16,9 @@ export interface IdleRestartOptions {
   describeReadiness: () => RestartReadiness;
   holdRoutines: () => void;
   releaseRoutines: () => void;
-  /**
-   * Keeps the hold window over a restart or a quit, so that the next start runs the routines that
-   * came due while they were held. `null` removes it.
-   */
   recordHold: (window: RoutineHoldWindow | null) => void;
-  /** Starts OpenBot again through the normal shutdown. */
   relaunch: () => void;
   log: (message: string) => void;
-  /** How long the restart waits between two readiness checks. */
   pollMs?: number;
 }
 
@@ -48,15 +34,9 @@ export class IdleRestart {
   readonly #log: (message: string) => void;
   readonly #pollMs: number;
   #status: IdleRestartStatus | null = null;
-  /** When the routines were held, or `null` when they run. */
   #heldSince: Date | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
-  /** The restart started. A cancel then would report a restart that happens. */
   #restarting = false;
-  /**
-   * The updater took over the install and stopped the services. The routines stay held, because
-   * this process can only quit or start again, which a later relaunch request still does.
-   */
   #handedOff = false;
 
   constructor(options: IdleRestartOptions) {
@@ -70,7 +50,6 @@ export class IdleRestart {
     this.#pollMs = options.pollMs ?? DEFAULT_POLL_MS;
   }
 
-  /** A second request replaces the target of the first. */
   request(target: IdleRestartTarget): UpdateStatus {
     if (this.#restarting || this.#updater.getStatus().phase === "installing") {
       throw new Error(sourceText("error.update.alreadyRestarting"));
@@ -90,7 +69,6 @@ export class IdleRestart {
     return this.#updater.getStatus();
   }
 
-  /** Removes the restart, or the error of the last one, and lets the routines run. */
   cancel(): UpdateStatus {
     if (this.#restarting) throw new Error(sourceText("error.update.alreadyRestarting"));
     if (this.#status && !this.#status.error) this.#log("The restart when idle was cancelled.");
@@ -98,7 +76,6 @@ export class IdleRestart {
     return this.#updater.getStatus();
   }
 
-  /** A quit while the routines are held keeps the window, as a restart does. */
   dispose(): void {
     this.#clearTimer();
     this.#keepHold();
@@ -134,16 +111,11 @@ export class IdleRestart {
     this.#log("Installing the update: no work runs.");
     const installed = yield* Effect.result(this.#updater.installUpdate());
     if (Result.isSuccess(installed)) {
-      // The updater owns the install from here, and reports its own failure, which can come after
-      // this returns. A relaunch then stays possible.
       this.#restarting = false;
       this.#handedOff = true;
       this.#publish(null);
     } else {
       const error = installed.failure.cause;
-      // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready, and
-      // the routines run again. A failure after teardown stopped the services: only a relaunch runs
-      // the held routines, so the saved window stays.
       const message = error instanceof Error ? error.message : String(error);
       this.#log(`The restart when idle failed: ${message}`);
       this.#restarting = false;

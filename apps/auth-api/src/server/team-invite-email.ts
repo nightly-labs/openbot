@@ -38,8 +38,6 @@ export const sendTeamInviteEmail = Effect.fn("TeamInviteEmail.send")(function* (
     try: () => normalizeEmail(body.email),
     catch: (error) => (error instanceof AuthServiceError ? error : invalid()),
   });
-  // Only an owner or admin of the host can email an open invitation of that host, for that recipient.
-  // Released clients create the invitation in D1 before they ask for the email.
   const invite = yield* services.remote
     .emailableInvite(user.id, { hostId: link.serverId, token: link.token, email, role: body.role })
     .pipe(
@@ -63,7 +61,6 @@ export const sendTeamInviteEmail = Effect.fn("TeamInviteEmail.send")(function* (
     .send({
       email,
       inviterEmail: user.email,
-      // The email subject is one line. The host registration does not reject line breaks in the name.
       serverName: invite.hostName.replace(/[\r\n]+/gu, " "),
       inviteUrl: body.inviteUrl,
       role: body.role,
@@ -76,8 +73,6 @@ export const sendTeamInviteEmail = Effect.fn("TeamInviteEmail.send")(function* (
       ),
     );
 });
-
-/** The bearer and cookie routes share the same invitation workflow. */
 
 function inviteLink(value: string): InviteLinkPayload | null {
   if (value.length > 4_096 || /[\r\n]/u.test(value)) return null;

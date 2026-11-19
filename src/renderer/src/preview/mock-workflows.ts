@@ -1,9 +1,3 @@
-// The workflow group of the preview: workflows, graphs, versions and runs in memory, and a fixed
-// GitHub connection. A save checks the revision as the host does; the graph rules stay the host's. A
-// run walks the graph as the host does: each step ends after `STEP_MS` with a fixed answer, a
-// condition answers yes, an approval waits for `decide`, and a node with the field `mockFail` fails. A
-// Sunra or Higgsfield step that ends spends the credits of its quote.
-
 import {
   isWorkflowStepKind,
   nodeAgentId,
@@ -38,7 +32,6 @@ import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-
 
 const PREVIEW_HOOKS = "https://hooks.openbot.run/wf";
 
-/** The GitHub connection of the preview: two repositories, and the bot cannot change the second one. */
 const PREVIEW_GITHUB_CATALOG: WorkflowGitHubCatalog = {
   connected: true,
   repositories: [
@@ -56,10 +49,6 @@ const PREVIEW_GITHUB_OPTIONS: WorkflowGitHubRepositoryOptions = {
   people: ["octocat", "hubot"],
 };
 
-/**
- * An issue of a repository that a GitHub trigger watches, or of the first preview repository. The items
- * take the trigger's repositories in turn, so a trigger with more than one shows events of each.
- */
 function previewItem(node: WorkflowNode, number: number, title: string): WorkflowGitHubItem {
   const repositories = workflowGitHubTriggerRepositories(node.fields);
   return {
@@ -70,7 +59,6 @@ function previewItem(node: WorkflowNode, number: number, title: string): Workflo
   };
 }
 
-/** The next time of a schedule trigger, in its zone. A schedule without a next time, such as a past once, has none. */
 function nextDue(node: WorkflowNode): string | null {
   if (!node.schedule) return null;
   const zone = typeof node.fields.timezone === "string" && node.fields.timezone ? node.fields.timezone : undefined;
@@ -85,7 +73,6 @@ function nextDue(node: WorkflowNode): string | null {
   }
 }
 
-/** A workflow that a story starts with. */
 export interface MockWorkflowSeed {
   id: string;
   title: string;
@@ -101,7 +88,6 @@ interface MockWorkflowRecord {
 const STEP_MS = 900;
 const OPEN_STEPS: readonly WorkflowStep["status"][] = ["running", "approval"];
 
-/** The fixed answer of a step in the preview. */
 function mockAnswer(node: WorkflowNode, input: string): string {
   switch (node.kind) {
     case "trigger":
@@ -117,10 +103,6 @@ function mockAnswer(node: WorkflowNode, input: string): string {
   }
 }
 
-/**
- * The preview catalog: the fixed Sunra and Higgsfield models, as a host with a live catalog sends them.
- * Sunra writes its image resolutions in lower case, such as "2k".
- */
 const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
   if (model.provider === "higgsfield") return [workflowFixedCatalogModel(model, model.provider)];
   if (model.provider !== "sunra") return [];
@@ -128,29 +110,24 @@ const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS
   return [{ ...entry, resolutions: entry.resolutions.map((value) => value.replace(/K$/u, "k")) }];
 });
 
-/** A fixed quote: a video costs per second, and a larger resolution costs more. */
 function previewQuote(kind: "image" | "video", duration: number, resolution: string | null): number {
   const scale = resolution?.startsWith("4") || resolution === "1080p" ? 2 : 1;
   return (kind === "video" ? duration * 2.5 : 1.5) * scale;
 }
 
-/** One Sunra account and two Higgsfield accounts; the first of each service has no name of its own. */
 const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
   { provider: "sunra", id: "preview-sunra", name: null, credits: { available: 1240, quota: 2000 } },
   { provider: "higgsfield", id: "preview-higgsfield", name: null, credits: { available: 860, quota: null } },
   { provider: "higgsfield", id: "preview-higgsfield-2", name: "Higgsfield 2", credits: { available: 95, quota: null } },
 ];
 
-/** `emit` sends the agent event `workflows-changed` for one workflow that changed. */
 export function mockWorkflows(
   seeds: readonly MockWorkflowSeed[],
   emit: (workflowId: string) => void,
 ): OpenBotDesktopApi["workflows"] {
   const records = new Map<string, MockWorkflowRecord>();
   const stamp = () => new Date().toISOString();
-  /** The webhook triggers that have a secret, as `<workflowId>/<nodeId>`. The host makes a route only then. */
   const webhooks = new Set<string>();
-  /** The triggers that the host stores: a message trigger does not run in v1, so it has no state. */
   const triggersOf = (id: string, graph: WorkflowGraph): WorkflowTriggerState[] =>
     graph.nodes.flatMap((node): WorkflowTriggerState[] => {
       if (node.kind !== "trigger") return [];
@@ -196,7 +173,6 @@ export function mockWorkflows(
   for (const seed of seeds) put(seed.id, seed.title, seed.graph, 0, seed.updatedAt);
 
   const accounts = structuredClone(PREVIEW_MEDIA_ACCOUNTS);
-  /** A Sunra or Higgsfield step spends its quote from its account when it ends; no account is the first one. */
   const spend = (node: WorkflowNode) => {
     const provider = typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
     if (node.kind !== "image" || !provider) return;
@@ -214,7 +190,6 @@ export function mockWorkflows(
   const runs = new Map<string, { run: WorkflowRun; graph: WorkflowGraph; scope: Set<string> }>();
   const steps = new Map<string, WorkflowStep>();
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  /** The input of each step. A retry and an approval hand it on, as the host does. */
   const stepInputs = new Map<string, string>();
   const runSteps = (runId: string) => [...steps.values()].filter((step) => step.runId === runId);
   const latestOf = (runId: string) => {
@@ -285,7 +260,6 @@ export function mockWorkflows(
         const active = source?.status === "done" && (source.branch === null || edge.branch === source.branch);
         return active ? [source.output ?? ""] : [];
       });
-  /** Starts each node whose nodes before it ended, then sets the run's status. */
   const advance = (runId: string) => {
     const entry = runs.get(runId);
     if (!entry) return;
@@ -354,7 +328,6 @@ export function mockWorkflows(
     if (!step) throw new Error(sourceText("error.workflow.stepMissing"));
     return step;
   };
-  /** The nodes after `origin`, and `origin` itself. */
   const reach = (graph: WorkflowGraph, origin: string) => {
     const seen = new Set([origin]);
     const pending = [origin];
@@ -368,7 +341,6 @@ export function mockWorkflows(
     return seen;
   };
   const runRequests = new Map<string, string>();
-  /** Starts a run from `fromNodeId`, or of the whole workflow. A repeat of one request gives the same run. */
   const beginRun = (input: StartWorkflowRunInput, source: WorkflowRunSource) => {
     const known = runRequests.get(input.requestId);
     if (known) return runDetail(known);
@@ -399,7 +371,6 @@ export function mockWorkflows(
     emit(input.workflowId);
     return runDetail(run.id);
   };
-  /** The GitHub trigger `nodeId` of a workflow, or the same failure as the host's. */
   const githubTriggerOf = (workflowId: string, nodeId: string) => {
     const node = nodeOf(workflowId, nodeId);
     if (node.kind !== "trigger" || node.fields.trigger !== "github")
@@ -500,7 +471,6 @@ export function mockWorkflows(
       if (input.approved) {
         end(step, { status: "done", output: stepInputs.get(step.id) ?? "" });
       } else {
-        // A rejection stops the whole run.
         end(step, { status: "stopped" });
         if (entry) {
           entry.run.status = "stopping";
@@ -528,7 +498,6 @@ export function mockWorkflows(
       };
     },
     run: async (runId) => runDetail(runId),
-    // The preview has no relay: the address takes no request, and the secret is only for the dialog.
     rotateWebhookSecret: async (input) => {
       const { detail } = record(input.workflowId);
       webhooks.add(`${input.workflowId}/${input.nodeId}`);
@@ -536,9 +505,7 @@ export function mockWorkflows(
       emit(input.workflowId);
       return { secret: `whsec_preview_${crypto.randomUUID()}` };
     },
-    // The preview keeps no files: the draft id names the kept picture.
     keepPicture: async (draftId) => draftId,
-    // Two Higgsfield accounts, so the picker and the rail show the account of each.
     mediaProviders: async () =>
       workflowMediaProvidersOf(accounts.map(({ provider, id, name }) => ({ provider, id, name }))),
     mediaCredits: async () => workflowMediaCreditsOf(structuredClone(accounts)),
@@ -550,7 +517,6 @@ export function mockWorkflows(
         throw new Error(sourceText("error.workflow.githubNoAccess"));
       return structuredClone(PREVIEW_GITHUB_OPTIONS);
     },
-    // Two events of each GitHub trigger: one that started a run of the preview, and one that a filter skipped.
     githubHistory: async (workflowId) => {
       const { detail } = record(workflowId);
       const triggers = detail.graph.nodes.filter((node) => node.kind === "trigger" && node.fields.trigger === "github");
@@ -589,7 +555,6 @@ export function mockWorkflows(
         }),
       };
     },
-    // The preview has no GitHub: the newest matching item is a fixed one, and the run starts at once.
     githubRunLastEvent: async (input) => {
       githubTriggerOf(input.workflowId, input.nodeId);
       return beginRun({ workflowId: input.workflowId, requestId: input.requestId, fromNodeId: input.nodeId }, "github");

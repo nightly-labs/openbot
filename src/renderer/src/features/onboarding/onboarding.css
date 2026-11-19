@@ -449,9 +449,6 @@
   }
 }
 
-/* The OpenCode note sits outside the list, so the list lets it through and its first and last rows
-   round their own corners instead of relying on the clip. The first run and the setup dialog both
-   show the note; without the row as its containing block, it points at a different row. */
 :is(.onboarding-provider, .setup-local-content) .provider-picker-list {
   overflow: visible;
 }
@@ -478,7 +475,6 @@
   position: relative;
 }
 
-/* Drawn like the drag hint of the macOS installer: a note, then a thin arrow into the row. */
 .provider-picker-callout {
   position: absolute;
   inset-inline-end: calc(100% + 10px);
@@ -509,7 +505,6 @@
   height: 40px;
   align-self: flex-end;
   margin-top: 2px;
-  /* The note ends at the middle of its target; this puts the arrowhead (y 30 of 40) there too. */
   margin-bottom: -10px;
 }
 
@@ -519,8 +514,6 @@
   }
 }
 
-/* The same note on the right of the list, for "More providers": the text aligns right and the
-   arrow is mirrored to point left. */
 .provider-picker-callout-end {
   inset-inline-end: auto;
   inset-inline-start: calc(100% + 10px);
@@ -533,7 +526,6 @@
   transform: scaleX(-1);
 }
 
-/* Right to left, the notes change sides, so each arrow points the other way. */
 .provider-picker-callout:dir(rtl) .provider-picker-callout-arrow {
   transform: scaleX(-1);
 }
@@ -542,7 +534,6 @@
   transform: none;
 }
 
-/* The arrows of the setup routes and the choice rows point to the reading direction. */
 :is(.setup-route-arrow, .first-run-choice-row-chevron):dir(rtl) {
   transform: scaleX(-1);
 }
@@ -553,21 +544,18 @@
   }
 }
 
-/* No room beside the list: the row's own description says the same. */
 @media (max-width: 860px) {
   .provider-picker-callout {
     display: none;
   }
 }
 
-/* The setup dialog is 620px wide, and a note needs 160px on each side of it. */
 @media (max-width: 960px) {
   .setup-local-content .provider-picker-callout {
     display: none;
   }
 }
 
-/* The provider step of a joined server covers the window, over the rail and the sidebar. */
 .server-onboarding-screen {
   position: fixed;
 }
@@ -579,17 +567,10 @@
   -webkit-app-region: no-drag;
 }
 
-/* The first question of first run. The team rises in from the sides to the large agent in the
-   middle; the two answers are rows of one grouped list. */
-
 .first-run-screen[data-step="choose"] .onboarding-shell {
   width: min(100%, 960px);
 }
 
-/* First run changes steps in a view transition (`first-run-transition.ts`). The old step blurs and
-   fades out while the next one comes into focus in the same place; the progress and the actions
-   move to their new place. Opening the app blurs the setup screen away into
-   the app. The motion stays small: blur and fade carry the change, not travel. */
 .first-run-screen .onboarding-shell > .onboarding-step {
   view-transition-name: first-run-step;
 }
@@ -609,7 +590,6 @@
   animation-timing-function: var(--openbot-ease-out);
 }
 
-/* The steps are not the same width. Each image keeps its own size in the middle, so none stretches. */
 ::view-transition-old(first-run-step),
 ::view-transition-new(first-run-step) {
   left: 50%;
@@ -625,7 +605,6 @@ html:active-view-transition-type(step)::view-transition-new(first-run-step) {
   animation: first-run-step-in 440ms var(--openbot-ease-out) 40ms both;
 }
 
-/* The live dots animate their own width, so the old picture of them is not needed. */
 ::view-transition-old(first-run-progress):not(:only-child) {
   animation: none;
   opacity: 0;
@@ -640,7 +619,6 @@ html:active-view-transition-type(step)::view-transition-new(first-run-step) {
   animation: first-run-step-rise 440ms var(--openbot-ease-out) 40ms both;
 }
 
-/* The buttons change their labels in place, so the old ones blur away under the new ones. */
 ::view-transition-old(first-run-actions),
 ::view-transition-old(first-run-progress):only-child {
   animation: first-run-blur-out 220ms var(--openbot-ease-out) both;
@@ -859,7 +837,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   margin-top: var(--openbot-space-3);
 }
 
-/* The product analytics choice is the last line of the answer list, lighter than the answers. */
 .first-run-choice-improve {
   position: relative;
   display: flex;
@@ -886,7 +863,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   font-weight: var(--openbot-weight-medium);
 }
 
-/* Three of the team rise beside the title line, which is short, so they never cover the detail. */
 .first-run-choice-improve-pop {
   position: absolute;
   top: var(--openbot-space-2);
@@ -978,18 +954,11 @@ html:active-view-transition-type(open)::view-transition-new(*) {
     animation: none;
   }
 
-  /* The title still says thanks, and the toast still shows. */
   .first-run-choice-improve-pop {
     display: none;
   }
 }
 
-/*
- * The agents of the first screen and of the splash watch the pointer with their eyes (see
- * `followPointer`). A hovered agent grows a little and a pressed one squeezes, then both spring back.
- * The `scale` property leaves `transform` and `translate` to the arc and to the jumps. On the splash
- * the hover is on the member, which stays still: a jump under a still pointer must not start it.
- */
 @media (prefers-reduced-motion: no-preference) {
   .first-run-choice-avatar,
   .first-run-launch-avatar {
@@ -1030,11 +999,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   }
 }
 
-/*
- * While first run waits to open the app, a splash covers it. The team from the first screen stands
- * in the same arc and jumps in a slow wave, one agent after the other. The scribble under the team
- * fills with the download; a wait with no percent draws and erases it.
- */
 .first-run-launch {
   --first-run-launch-accent: var(--openbot-logo-production);
   position: absolute;
@@ -1079,7 +1043,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   height: 52px;
 }
 
-/* The same arc as the team on the first screen. */
 .first-run-launch-member:nth-child(1),
 .first-run-launch-member:nth-child(7) {
   translate: 0 24px;
@@ -1196,7 +1159,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   }
 }
 
-/* A short jump, then a rest, so the wave reads as one team and not as noise. */
 @keyframes first-run-launch-hop {
   0%,
   36%,
@@ -1217,7 +1179,6 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   }
 }
 
-/* The read error reuses the sign-in screen; its one secondary action sits under the primary button. */
 .setup-read-error-actions {
   justify-content: center;
   margin-top: var(--openbot-space-3);

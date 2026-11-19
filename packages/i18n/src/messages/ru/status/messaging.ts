@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/messaging";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "status.messaging.working": "Уже работаю…",
   "status.messaging.queued": "Ожидание: предыдущий запрос ещё выполняется. Ответ придёт сюда.",

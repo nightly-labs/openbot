@@ -40,31 +40,16 @@ interface ChatHeaderProps {
   liquidGlassAvailable: boolean;
   topInset: number;
   onBack: () => void;
-  /** A channel task needs the user: the More menu has the channel actions, and its button a warning dot. */
   needsAction?: boolean;
-  /**
-   * The member whose browser the browser button of a channel opens, the tab of its request, and the
-   * members whose browser the browser screen can switch to. Null hides the button.
-   */
   channelBrowser?: { agentId: string; agentIds: readonly string[]; tabId?: string } | null;
-  /** Something covers the header, such as the voice mode, so screen readers skip it. */
   accessibilityHidden?: boolean;
-  /** Shown next to the avatar in place of the agent's name, such as a task title. */
   title?: string;
-  /** Shown before the title with a dot between them, such as "Task". */
   kicker?: string;
-  /**
-   * A menu in place of the More menu, such as the actions of a task. Its actions go to the native bar
-   * menu when iOS shows the vertical bar. Null keeps the place empty, as for a task that has not loaded.
-   */
   actionsMenu?: { label: string; actions: MenuAction[]; onPressAction: (id: string) => void } | null;
-  /** The agent's threads. The agent's name then opens this menu, and the menu has the agent's info. */
   threadMenu?: ChatThreadMenu;
-  /** A delete button in place of the More menu, such as on a side question. */
   deleteAction?: { label: string; disabled: boolean; onPress: () => void };
 }
 
-/** In `memo`: the chat renders again on each streamed chunk, and the header reads nothing of it. */
 export const ChatHeader = memo(function ChatHeader({
   target,
   fallbackBackground,
@@ -95,17 +80,13 @@ export const ChatHeader = memo(function ChatHeader({
   );
   const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(target.serverId).view);
   const browserAllowed = useBrowserFeature();
-  // A channel opens the browser of one member: the browser is the browser of an agent.
   const browserAgent =
     target.kind === "agent" ? { agentId: target.id, agentIds: [], tabId: undefined } : channelBrowser;
-  // A screen with its own trailing action, such as a side question, has no More menu.
   const plainChat = actionsMenu === undefined && deleteAction === undefined;
   const browserShown = plainChat && browserAllowed && !disconnected && browserView && Boolean(browserAgent);
-  // The pins of the agent's chats, on a host with `message-pins-v1`. A channel has no pins.
   const pinsEnabled = useMessagePinsEnabled(target.serverId);
   const pinsShown = plainChat && target.kind === "agent" && pinsEnabled;
   const attention = plainChat && target.kind === "channel" && needsAction;
-  // A question about the agent's chat that stays out of it, on a host with `side-question-v1`.
   const sideQuestionEnabled = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(target.serverId));
   const sideQuestionShown = plainChat && target.kind === "agent" && sideQuestionEnabled;
   const members = useMemo(
@@ -193,10 +174,6 @@ export const ChatHeader = memo(function ChatHeader({
     void haptics.impact("soft");
     onBack();
   };
-  // The More menu in the top right corner: the agent's browser, the pinned messages, the side question
-  // in its own section and, last in its own section, the channel actions when a task needs the user,
-  // with a triangle in the warning color. The button has a warning dot then. The iOS system menu draws item titles in its own color: only
-  // Android shows the title in the warning color.
   const browserAction: MenuAction = { id: "browser", title: t("mobile.browser.open"), image: "globe" };
   const pinsAction: MenuAction = { id: "pins", title: t("mobile.chat.pins.title"), image: "pin" };
   const sideQuestionAction: MenuAction = {
@@ -227,10 +204,6 @@ export const ChatHeader = memo(function ChatHeader({
   };
   const moreLabel = attention ? t("mobile.chat.header.moreAttention") : t("mobile.chat.header.more");
   const moreHidden = moreActions.length === 0;
-  // Not in a BlurReveal: glass stops rendering under an ancestor with zero opacity, so the button hides
-  // itself, and its glass turns off with the native animation. A menu with no items, such as a channel
-  // on a host that cannot stream a tab, shows no button. The button is drawn, not a native bar menu,
-  // so that the menu can tint the warning dot of its item and the button can draw a small dot.
   const moreButton = (size: number) => (
     <MenuView
       colorScheme={theme === "dark" ? "dark" : "light"}
@@ -266,10 +239,7 @@ export const ChatHeader = memo(function ChatHeader({
     </MenuView>
   );
 
-  // The row's side padding, and on the drawn header the gap after the pill and a 48 pt button with its
-  // 8 pt gap for Back and for the trailing button. The vertical bar has these buttons in the native bar.
   const titleReserve = verticalBar ? 32 : 40 + (splitDetailRoot ? 0 : 56) + (actionsMenu === null ? 0 : 56);
-  // In the native bar, the pill is as tall as the bar, as the bar buttons beside it are.
   const pillHeight = isIOS && !verticalBar ? NATIVE_BAR_HEIGHT : BAR_BUTTON_SIZE;
   const titlePill = (
     <GlassView
@@ -281,7 +251,6 @@ export const ChatHeader = memo(function ChatHeader({
         borderCurve: "continuous",
         borderRadius: pillHeight / 2,
         flexDirection: "row",
-        // A kicker and a title need the width up to the trailing button.
         maxWidth: kicker ? undefined : 220,
         flexShrink: 1,
         overflow: "hidden",
@@ -294,8 +263,6 @@ export const ChatHeader = memo(function ChatHeader({
           onPressAction={({ nativeEvent }) => threadMenu.onPressAction(nativeEvent.event)}
           style={{ alignSelf: "stretch" }}
         >
-          {/* The native menu sizes its trigger to the content, so the title gets the width it can use. A
-            wider trigger goes under the pill's edge and cuts the chevron. */}
           <View
             accessible
             accessibilityRole="button"
@@ -384,10 +351,6 @@ export const ChatHeader = memo(function ChatHeader({
     );
 
   if (isIOS) {
-    // The chat routes show the native bar on iOS, so its items morph into and out of the bar items of
-    // the screen under the chat, as on the other screens. iOS moves native bar buttons into the
-    // vertical bar of iPhone Duo, beside the status bar. iOS hides a custom view of the top bar there
-    // while the content scrolls, so the title is not one then: it stays drawn at the top.
     return (
       <>
         <Stack.Toolbar placement="left">
@@ -421,8 +384,6 @@ export const ChatHeader = memo(function ChatHeader({
               </View>
             </Stack.Toolbar.View>
           ) : (
-            // iOS hides a custom view of the vertical bar while the content scrolls, so the menu is a
-            // native bar menu there. iOS 26 draws the badge with no text as a dot on the button.
             <Stack.Toolbar.Menu
               icon="ellipsis"
               accessibilityLabel={moreLabel}
@@ -463,9 +424,6 @@ export const ChatHeader = memo(function ChatHeader({
         pointerEvents="box-none"
         accessibilityElementsHidden={accessibilityHidden}
         importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
-        // The side insets keep the buttons clear of the iPhone Duo rail and of the landscape cutout.
-        // Beside the chat list pane, the buttons line up with the native bar buttons of the screens
-        // around it. A phone keeps them 8 pt under the status bar.
         style={{
           top: topInset + (splitShown ? NATIVE_BAR_BUTTON_TOP : 8),
           paddingLeft: insets.left + 16,

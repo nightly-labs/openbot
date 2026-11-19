@@ -1,16 +1,8 @@
 import type { TranslatedLocale } from "./locale";
 import { createTranslate, type Message, type MessageCatalog, type PartialTranslation, type Translate } from "./message";
 
-/**
- * Map English text back to its key, then render the key in another language.
- *
- * Each English template compiles to one anchored pattern: `{count}` matches a number, and any other
- * placeholder matches the shortest text that lets the rest of the template match. Text that no
- * template matches - from an older host, a provider, or a tool - is returned as it is.
- */
 export interface SourceLocalizer {
   localize: (text: string, locale: TranslatedLocale) => string;
-  /** Every key whose English can render `text`. A template that is not unique is a catalog bug. */
   matchingKeys: (text: string) => readonly string[];
 }
 
@@ -20,10 +12,8 @@ interface Template {
   readonly names: readonly string[];
 }
 
-/** Placeholders whose value is itself text from a sender, so it is translated in turn. */
 const NESTED_PLACEHOLDERS = new Set(["reason", "detail"]);
 const MAX_NESTING = 2;
-/** Templates are grouped by this many leading characters, so a lookup tries only a few. */
 const BUCKET_LENGTH = 4;
 const CACHE_LIMIT = 256;
 
@@ -38,11 +28,6 @@ function forms(message: Message): readonly string[] {
   );
 }
 
-/**
- * `{count}` is a number. `{reason}` and `{detail}` hold another message, which can have more than one
- * line. Other values are one line, so a template without a `\n{detail}` tail cannot match the text of
- * the template that has one.
- */
 function placeholderPattern(name: string) {
   if (name === "count") return "(-?\\d+(?:\\.\\d+)?)";
   if (name === "reason" || name === "detail") return "([\\s\\S]+?)";
@@ -64,7 +49,6 @@ function compile(key: string, text: string): Template {
   return { key, pattern: new RegExp(`^${pattern}$`), names };
 }
 
-/** The literal text before the first placeholder. */
 function literalPrefix(text: string): string {
   const brace = text.indexOf("{");
   return brace === -1 ? text : text.slice(0, brace);
@@ -72,14 +56,11 @@ function literalPrefix(text: string): string {
 
 export function createSourceLocalizer(input: {
   source: MessageCatalog;
-  /** `undefined` while the language is not loaded. Its text then stays English and is not cached. */
   translation: (locale: TranslatedLocale) => PartialTranslation<MessageCatalog> | undefined;
 }): SourceLocalizer {
   let byPrefix: Map<string, Template[]> | undefined;
-  /** Templates whose literal prefix is shorter than a bucket. Every lookup tries these. */
   const unbucketed: Template[] = [];
 
-  // Compiled on first use: most sessions never show a host error.
   function buckets(): ReadonlyMap<string, readonly Template[]> {
     if (byPrefix) return byPrefix;
     byPrefix = new Map();
@@ -104,8 +85,6 @@ export function createSourceLocalizer(input: {
 
   const translators = new Map<TranslatedLocale, Translate<MessageCatalog>>();
 
-  // Typed on the wide catalog: a matched template brings values read off the text, not values the
-  // compiler checked against the key's parameters.
   function translatorFor(locale: TranslatedLocale): Translate<MessageCatalog> {
     const cached = translators.get(locale);
     if (cached) return cached;
@@ -144,7 +123,6 @@ export function createSourceLocalizer(input: {
       const cacheKey = `${locale}\u0000${text}`;
       const cached = cache.get(cacheKey);
       if (cached !== undefined) {
-        // Move the entry to the end, so the oldest entry is the first one dropped.
         cache.delete(cacheKey);
         cache.set(cacheKey, cached);
         return cached;

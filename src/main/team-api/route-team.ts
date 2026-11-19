@@ -1,11 +1,3 @@
-import type { TeamApiOptions } from "./dependencies";
-// The team itself: who you are, who else is here, and who is allowed to stay.
-//
-// Membership, invitations and sessions all run through `requireAdmin` first. That check is a
-// throw, not a branch, so a route that forgets it does not fail closed - it quietly hands a member
-// the administrator's view. Every handler below that touches another member calls it on its own
-// first line for exactly that reason.
-
 import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { TeamPresenceSnapshot } from "@openbot/contracts/ipc";
@@ -15,7 +7,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { memberAuditName } from "../server-audit-store";
 import type { TeamStore } from "../team-store";
-import type { TeamApiBrowser, TeamApiBrowserView, TeamApiRemoteScreen } from "./dependencies";
+import type { TeamApiBrowser, TeamApiBrowserView, TeamApiOptions, TeamApiRemoteScreen } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, pathIdentifier, readJson, requireAdmin, stringField } from "./request-helpers";
@@ -35,7 +27,6 @@ export interface TeamRouteDependencies {
     | "revokeSession"
   >;
   remoteScreen?: Pick<TeamApiRemoteScreen, "revokeTeamSession" | "revokeMember">;
-  /** A session or a member that ends gives back the browser tabs it controls. */
   browser?: Pick<TeamApiBrowser, "releaseUserControlHeldBy">;
   browserView?: Pick<TeamApiBrowserView, "revokeTeamSession">;
   createInvite?: TeamApiOptions["createInvite"];
@@ -63,11 +54,6 @@ export async function routeTeam(
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, token, sessionId, json, empty } = context;
 
-  /** What removing a member does, whether an admin removes them or they leave. */
-  /**
-   * Whether the host service makes the change, so that it also reaches the account directory. The
-   * owner and an unknown member stay with the team store, which refuses them with its released error.
-   */
   function hostChanges(memberId: string): boolean {
     const target = store.listMembers().find((candidate) => candidate.id === memberId);
     return target !== undefined && target.role !== "owner";
@@ -132,9 +118,6 @@ export async function routeTeam(
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.events) {
     return json(426, { error: "Use WebSocket for remote events." });
   }
-  // Two routes a released client still asks for. They answer 426 rather than 404 so the client
-  // shows "update the host" instead of treating the host as broken; the features behind them are
-  // gone, and the wire protocol is frozen, so the tombstones stay.
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.host.remoteMac) {
     return json(426, { error: sourceText("error.team.updateRequired"), code: "protocol_mismatch" });
   }
@@ -184,9 +167,6 @@ export async function routeTeam(
     const role = stringField(body, "role");
     if (role !== "admin" && role !== "member") throw new HttpError(400, "Invalid role.");
     const email = nullableString(body, "email", INPUT_LIMITS.email) ?? undefined;
-    // Unknown to released hosts, which ignore it and mint single-use. The frozen HTTP
-    // projections strip `permanent` from the reply, so a caller on this transport reads the
-    // link back as single-use; joining with it still works, and IPC callers see the full shape.
     const permanent = body.permanent === undefined ? undefined : body.permanent === true;
     if (body.permanent !== undefined && !isBoolean(body.permanent)) throw new HttpError(400, "Invalid invitation.");
     if (!createInvite) throw new HttpError(503, sourceText("error.team.inviteServiceUnavailable"));
@@ -213,7 +193,6 @@ export async function routeTeam(
   if (method === "DELETE" && sessionMatch) {
     requireAdmin(member);
     const revokedSessionId = pathIdentifier(sessionMatch[1], "sessionId");
-    // Admins manage members, not the owner: only the owner ends the owner's sessions.
     const target = store.listSessions().find((session) => session.id === revokedSessionId);
     const targetMember = target && store.listMembers().find((candidate) => candidate.id === target.memberId);
     if (member.role !== "owner" && targetMember?.role === "owner") {

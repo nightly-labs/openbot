@@ -1,24 +1,12 @@
 import type { ConversationMessage, ConversationPlan, ConversationTraceStep } from "@openbot/contracts/ipc";
 import { Schema } from "effect";
 
-/**
- * The finish check: when a turn of the user's request ends and no other rule continues it, a short
- * call to the agent's own model, with no tools, reads the request and the turn and says whether the
- * request is done. It is the host's own check of each round, as in Grok's goal mode, so that the
- * user does not have to write "continue" when the agent stopped after a part of the work.
- * The verdict only starts a continuation; it never approves an action.
- */
-
-/** The longest wait for a finish check. A check that takes longer does not continue the request. */
 export const FINISH_CHECK_DEADLINE_MS = 30_000;
 
-/** The text in the provider input that marks a finish check, for logs and test fakes. */
 const FINISH_CHECK_MARKER = "OpenBot finish check";
 
-/** How often a running check looks for a Stop or a new message, which end it at once. */
 export const FINISH_CHECK_ABORT_POLL = "250 millis";
 
-/** The most chat messages from before the request that the check reads. */
 export const FINISH_CHECK_CONTEXT_MESSAGES = 6;
 
 const REQUEST_CHARACTERS = 2_000;
@@ -26,13 +14,8 @@ const CONTEXT_CHARACTERS = 600;
 const ANSWER_CHARACTERS = 4_000;
 const STEP_LINES = 40;
 const STEP_CHARACTERS = 160;
-/** The most characters of the missing work that goes to the agent in its note. */
 const MISSING_CHARACTERS = 600;
 
-/**
- * The model's answer. `done` and `user` and `blocked` end the request; only `continue` with a named
- * gap continues it. An answer that does not decode ends the request too.
- */
 export const FinishCheckResult = Schema.Struct({
   verdict: Schema.Literals(["done", "continue", "user", "blocked"]),
   missing: Schema.optional(Schema.NullOr(Schema.String)),
@@ -40,15 +23,11 @@ export const FinishCheckResult = Schema.Struct({
 export type FinishCheckResult = typeof FinishCheckResult.Type;
 
 export interface FinishCheckInput {
-  /** The messages of the request: what the user asked in this chain of turns, oldest first. */
   request: readonly string[];
-  /** The chat messages before the request, oldest first, for a request such as "do it then". */
   context: readonly Pick<ConversationMessage, "author" | "text">[];
-  /** The tool steps of the turn that just ended. */
   steps: readonly ConversationTraceStep[];
   plan: ConversationPlan | null;
   answer: string;
-  /** The automatic continuations that the request had before this turn ended. */
   continuations: number;
 }
 
@@ -63,10 +42,6 @@ function stepLine(step: ConversationTraceStep): string {
   return `- ${clip(what, STEP_CHARACTERS)}${clip(outcome, STEP_CHARACTERS)}`;
 }
 
-/**
- * The prompt of one finish check. Every text in `input` must already have its secrets removed: the
- * call goes to the agent's provider, as the turn did.
- */
 export function finishCheckPrompt(input: FinishCheckInput): string {
   const tools = input.steps.filter((step) => step.kind === "tool");
   const shownTools = tools.slice(-STEP_LINES);
@@ -114,7 +89,6 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
   ].join("\n");
 }
 
-/** The gap to send to the agent, or null when the verdict does not continue the request. */
 export function finishCheckGap(result: FinishCheckResult): string | null {
   if (result.verdict !== "continue") return null;
   const missing = result.missing?.trim();

@@ -6,20 +6,12 @@ import { Effect } from "effect";
 import { readCgroupRoot, readLinuxMemory } from "./server-memory";
 
 const VM_STAT_TIMEOUT_MS = 5_000;
-/** A CPU reading needs two samples. A first read waits this long for the second one. */
 const CPU_FIRST_SAMPLE_MS = 1_000;
 
-/**
- * The CPU time used up to one moment. In a container or a service with a CPU limit it is the time of
- * its cgroup, measured against that limit; otherwise it is the time of every core of the machine.
- */
 interface CpuSample {
   at: number;
-  /** Microseconds of CPU time used. */
   busy: number;
-  /** Microseconds of CPU time the cores gave, used or idle. Null for a cgroup: it follows from `cores`. */
   capacity: number | null;
-  /** The CPUs the server can use: the cgroup limit, or every core. */
   cores: number;
 }
 
@@ -34,16 +26,6 @@ interface MemoryReading {
   totalBytes: number;
 }
 
-/**
- * Reads the disk, memory and CPU use of this machine for Server settings and the machine alerts.
- * Each one is what the server can use: in a container, its memory and CPU limits.
- *
- * - Disk: the disk that holds the data folder, counted as `df` counts it. Space that the file system
- *   keeps for root is neither used nor free, so an empty ext4 disk does not read as 5% used.
- * - Memory: what programs can still use, as the system monitor of each platform counts it, so the
- *   file cache does not read as used.
- * - CPU: the use since the reading before, of the CPU limit or of all cores.
- */
 export class MachineMetricsSampler {
   readonly #dataPath: string;
   readonly #platform: NodeJS.Platform;
@@ -73,7 +55,6 @@ export class MachineMetricsSampler {
   #cpu = Effect.fn("MachineMetrics.cpu")(function* (this: MachineMetricsSampler) {
     let previous = this.#previous;
     let current = yield* readCpu(this.#platform);
-    // A first reading, a reading right after another, or a limit that changed needs a new pair.
     if (!previous || current.at - previous.at < CPU_FIRST_SAMPLE_MS || current.cores !== previous.cores) {
       previous = current;
       yield* Effect.sleep(CPU_FIRST_SAMPLE_MS);
@@ -107,17 +88,9 @@ function machineCpu(): CpuSample {
     idle += times.idle;
     total += times.user + times.nice + times.sys + times.idle + times.irq;
   }
-  // `os.cpus()` counts milliseconds.
   return { at: Date.now(), busy: (total - idle) * 1000, capacity: total * 1000, cores: Math.max(1, cores.length) };
 }
 
-/**
- * The CPU time of main's cgroup and its limit. Two limits apply, and the smaller one counts: the
- * quota in `cpu.max` ("150000 100000" is 1.5 CPUs, from `docker run --cpus`) and the CPUs in
- * `cpuset.cpus.effective` ("0,2-4" is 4 CPUs, from `docker run --cpuset-cpus`). Null when neither
- * limits the server: it can then use every core, and the machine reading applies.
- * `os.availableParallelism` is not used: it rounds a quota of 1.5 down to 1.
- */
 const readCgroupCpu = Effect.fn("MachineMetrics.cgroupCpu")(function* () {
   const root = yield* readCgroupRoot();
   if (!root) return null;
@@ -137,7 +110,6 @@ const readCgroupCpu = Effect.fn("MachineMetrics.cgroupCpu")(function* () {
   return { at: Date.now(), busy: Number(usage), capacity: null, cores: limit };
 });
 
-/** The number of CPUs in a Linux CPU list such as "0,2-4", or null for an empty or unknown list. */
 function cpuListSize(list: string): number | null {
   let size = 0;
   for (const part of list.trim().split(",")) {
@@ -181,7 +153,6 @@ function readMemory(platform: NodeJS.Platform): Effect.Effect<MemoryReading | nu
       Effect.map((text) => darwinMemory(text, totalmem())),
       Effect.catch(() => Effect.succeed(null)),
     );
-  // Windows reports the memory that programs can still use as free.
   return Effect.sync(() => ({ availableBytes: freemem(), totalBytes: totalmem() }));
 }
 
@@ -194,11 +165,6 @@ const readVmStat = Effect.callback<string, Error>((resume) => {
   });
 });
 
-/**
- * Used memory as Activity Monitor counts it: app memory (anonymous pages that cannot be purged),
- * wired memory, and the compressor. The rest, with the file cache, is available. Null when the
- * output has an unknown shape.
- */
 function darwinMemory(text: string, totalBytes: number): MemoryReading | null {
   const pageSize = Number(/page size of (\d+) bytes/u.exec(text)?.[1]);
   const pages = (label: string): number => Number(new RegExp(`^${label}:\\s+(\\d+)\\.`, "mu").exec(text)?.[1]);

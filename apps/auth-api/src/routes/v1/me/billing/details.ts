@@ -13,7 +13,6 @@ import {
   requestUser,
 } from "../../../../server/request-auth";
 
-/** The billing country and the EU VAT ID that decide the VAT of the next Checkout page (`billing-tax.ts`). */
 export const Route = createFileRoute("/v1/me/billing/details")({
   server: {
     handlers: {

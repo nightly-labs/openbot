@@ -1,5 +1,3 @@
-// What main answers for routine results: the places to pick, a routine's destination, and its deliveries.
-
 import {
   isNullableRoutineResultDestination,
   isRoutineResultConnectionOptions,

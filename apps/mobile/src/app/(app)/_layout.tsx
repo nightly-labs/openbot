@@ -49,15 +49,9 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/** How long a notification tap waits for the channel list of its server before it opens the agent chat. */
 const NOTIFICATION_CHANNEL_WAIT_MS = 8_000;
-/** How long the agent's chat waits for the host to say that a tap named a side thread. */
 const THREAD_LOOKUP_MS = 8_000;
 
-/**
- * Android: autoFocus focuses the name field of a form sheet while the sheet opens, and Android does
- * not show the keyboard then. Focusing the field again after the opening shows it.
- */
 const refocusNameField = isAndroid
   ? {
       transitionEnd: (event: { data: { closing: boolean } }) => {
@@ -76,15 +70,11 @@ export const unstable_settings = {
 
 function AuthenticatedStack() {
   const segments = useSegments();
-  // Reduced motion, from the device or from Settings, replaces the full-screen slide with a cross-fade.
   const pushAnimation = useReducedMotion() ? "fade" : "slide_from_right";
-  // Beside the chat list pane, a chat takes the place of the chat before it, so it fades in place.
   const chatAnimation = useSplitLayout() ? "fade" : pushAnimation;
   const { t } = useText();
   const background = useThemeColor("background");
   const sheetBackground = String(useCSSVariable("--openbot-bg-sheet") ?? background);
-  // iOS shows the native bar over a chat and the browser, so its bar items morph with the items of the
-  // screen under it. The screen fills the bar with Back, the title and the buttons. Android draws them.
   const nativeBarOptions = {
     headerShown: isIOS,
     headerBackVisible: false,
@@ -100,7 +90,6 @@ function AuthenticatedStack() {
   } as const;
   const { closeDrawer } = useAppDrawer();
   const { agentId: openAgentId, taskId: openTaskId } = useGlobalSearchParams<{ agentId?: string; taskId?: string }>();
-  /** The chat or the side thread on the screen. `taskId` is null for an agent's own chat. */
   const shown = useRef<{ agentId: string; taskId: string | null } | null>(null);
   const screen = segments.at(-2);
   shown.current =
@@ -115,31 +104,21 @@ function AuthenticatedStack() {
     (agentId: string) => shown.current?.agentId === agentId && shown.current.taskId === null,
     [],
   );
-  /** Shows a chat, or the chat list for `null`. */
   const showChat = useCallback(
     (agentId: string | null) => {
       closeDrawer();
-      // Opening the chat that shows already would mount it again and load it again.
       if (agentId !== null && showsChat(agentId)) return;
-      // The chat opens on top of the main screen, so Back returns there and not to an earlier chat.
       if (router.canDismiss()) router.dismissAll();
       if (agentId === null) return;
-      // The native stack runs the push after the dismissal ends.
       router.push({ pathname: "/chat/[agentId]", params: { agentId } });
     },
     [closeDrawer, showsChat],
   );
-  /**
-   * Shows a side thread of an agent. On the agent's chat it opens on top of the chat, and on another
-   * thread of the agent it takes the place of that thread, both as from the thread menu. Else it opens
-   * on the main screen.
-   */
   const showThread = useCallback(
     ({ serverId, agentId, taskId }: SideThreadDestination) => {
       closeDrawer();
       const current = shown.current;
       if (current?.agentId === agentId) {
-        // Opening the thread that shows already would mount it again and load it again.
         if (current.taskId === taskId) return;
         if (current.taskId !== null) {
           router.setParams<"/task/[taskId]">({ taskId });
@@ -150,14 +129,7 @@ function AuthenticatedStack() {
     },
     [closeDrawer],
   );
-  /** Opens a chat, or the chat list for `null`, from outside the app. */
-  const openFromOutside = useCallback(
-    (agentId: string | null) =>
-      // A locked app opens the chat after the user unlocks it.
-      whenUnlocked(() => showChat(agentId)),
-    [showChat],
-  );
-  /** Opens the screen of a quick action of the app icon, on top of the main screen. */
+  const openFromOutside = useCallback((agentId: string | null) => whenUnlocked(() => showChat(agentId)), [showChat]);
   const openQuickAction = useCallback(
     (target: QuickActionTarget) => {
       if (target.type === "chat") {
@@ -165,7 +137,6 @@ function AuthenticatedStack() {
         return;
       }
       whenUnlocked(() => {
-        // The share sheet opens over the current screen, so the user keeps their place.
         if (target.type === "share") {
           shareOpenBot();
           return;
@@ -181,11 +152,9 @@ function AuthenticatedStack() {
     [closeDrawer, openFromOutside],
   );
   useEffect(() => setQuickActionNavigator(openQuickAction), [openQuickAction]);
-  /** Opens the target of a button on a shortcut card: the chat of an agent, or Settings > Shortcuts. */
   const openShortcutTarget = useCallback(
     (target: ShortcutOpenTarget) => {
       if (target.screen === "chat") {
-        // A message that the shortcut could not send waits in the composer of the chat.
         if (target.draft)
           requestComposerText({ serverId: target.draft.serverId, agentId: target.agentId, text: target.draft.text });
         openFromOutside(target.agentId);
@@ -201,15 +170,12 @@ function AuthenticatedStack() {
   );
   useEffect(() => setShortcutNavigator(openShortcutTarget), [openShortcutTarget]);
   useEffect(() => setShareSheetOpener(() => whenUnlocked(() => router.push("/share"))), []);
-  // Android can give a share without a route change, so the stack looks for one itself.
   useEffect(() => (isAndroid ? watchAndroidShares() : undefined), []);
   const workspace = useMobileWorkspaceReader();
   const queryClient = useQueryClient();
-  // The scope is a new list at each render. The sources read the latest one.
   const scope = useQueryScope();
   const queryScope = useRef(scope);
   queryScope.current = scope;
-  /** What the phone knows, and can ask the host, about the thread of a notification or a Live Activity. */
   const targetSources = useMemo(
     (): OutsideTargetSources => ({
       channels: (serverId) =>
@@ -220,14 +186,11 @@ function AuthenticatedStack() {
         queryClient.getQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope.current, serverId, agentId))
           ?.tasks,
       loadThreads: (serverId, agentId) => {
-        // A host without side threads has none, and its agents have no thread list to read.
         if (!workspace().canUseTasks(serverId)) return Promise.resolve([]);
-        // The thread screen reads the same list, so it has it when the thread opens.
         return queryClient
           .fetchQuery({
             queryKey: queryKeys.agentTasks(queryScope.current, serverId, agentId),
             queryFn: () => workspace().loadAgentTasks(agentId, serverId),
-            // The list that the phone has does not have the thread, so only the host can answer.
             staleTime: 0,
           })
           .then((snapshot) => snapshot.tasks);
@@ -235,21 +198,7 @@ function AuthenticatedStack() {
     }),
     [workspace, queryClient],
   );
-  /** The last conversation opened from outside. An earlier one that still waits opens nothing. */
   const outsideOpens = useRef(0);
-  /**
-   * Opens the conversation of a notification or of a Live Activity, or the chat list for `null`. A
-   * prompt, an approval or a takeover on a channel thread opens the channel, as on desktop. An event
-   * of a side thread of an agent opens that thread. Each other event opens the agent's own chat. A tap
-   * at a cold start comes before the server connects, so it waits a short time for the channel list.
-   *
-   * The phone does not know the thread of an agent's own chat. So a thread that it has not read opens
-   * the agent's chat at once, and the thread then opens on that chat when the host says that it is a
-   * side thread.
-   *
-   * `chatOpened` is true for a link that started the app: its route opened the agent's chat. The
-   * person can leave that chat while the lists load, and nothing then takes them back.
-   */
   const openTarget = useCallback(
     (target: OutsideTarget | null, chatOpened = false) => {
       outsideOpens.current += 1;
@@ -284,9 +233,7 @@ function AuthenticatedStack() {
           });
         void sideThreadDestination(target, targetSources, THREAD_LOOKUP_MS).then((thread) => {
           if (!thread || outsideOpens.current !== order) return;
-          // A locked app holds one action only: the thread then opens in place of the chat.
           whenUnlocked(() => {
-            // The person left the chat while the host answered. The thread does not take them away.
             if (chatShown && !showsChat(agentId)) return;
             showThread(thread);
           });
@@ -296,12 +243,10 @@ function AuthenticatedStack() {
     [targetSources, openFromOutside, showChat, showThread, showsChat, closeDrawer],
   );
   useEffect(() => setLiveActivityNavigator(openTarget), [openTarget]);
-  /** A notification of the chat or the thread on the screen is not shown again. */
   const onScreen = useCallback(
     (target: NotificationTarget) => {
       const current = shown.current;
       if (!current || current.agentId !== target.agentId) return false;
-      // A thread that the phone has not read counts as the agent's own chat.
       return current.taskId === (knownSideThread(target, targetSources)?.taskId ?? null);
     },
     [targetSources],
@@ -311,23 +256,16 @@ function AuthenticatedStack() {
   return (
     <Stack
       screenOptions={(props) => ({
-        // The full screens put the back arrow in the glass circle, as the home buttons are.
         ...androidBackOptions(props, { glass: true }),
         headerBackButtonDisplayMode: "minimal",
         ...headerFontOptions,
         headerShadowVisible: false,
         headerTransparent: isIOS,
         sheetExpandsWhenScrolledToEdge: false,
-        // iOS rounds a sheet by default. Android uses 0, so it gets the Material 3 sheet corner.
         ...(isAndroid && { sheetCornerRadius: 28 }),
       })}
     >
       <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
-      {/* The ask shows over home: the bloub stage drops its header, and the screen slides its panel out
-          from under the edge. The route must stay inside the navigation container, below the stage:
-          a native `transparentModal` draws over the stage, covers its edge and takes the touches of
-          its close button. The close button, "Not now" and Back close the panel before the route
-          leaves, so a swipe is off. */}
       <Stack.Screen
         name="rate-app"
         options={{
@@ -343,8 +281,6 @@ function AuthenticatedStack() {
         options={{
           animation: chatAnimation,
           contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
           fullScreenGestureEnabled: true,
           gestureEnabled: true,
           ...nativeBarOptions,
@@ -352,7 +288,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="side-question/[agentId]"
-        // A side question is a chat of its own beside the agent's chat, so it opens as a thread does.
         options={{
           animation: chatAnimation,
           contentStyle: { backgroundColor: background },
@@ -363,12 +298,9 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="task/[taskId]"
-        // A task is a chat of its own, so it opens as the agent's chat does.
         options={{
           animation: chatAnimation,
           contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
           fullScreenGestureEnabled: true,
           gestureEnabled: true,
           ...nativeBarOptions,
@@ -379,10 +311,8 @@ function AuthenticatedStack() {
         options={{
           animation: pushAnimation,
           contentStyle: { backgroundColor: background },
-          // The diagram pans with one finger, so only the screen edge goes back.
           fullScreenGestureEnabled: false,
           gestureEnabled: true,
-          // The screen draws the app's glass header, as the chat does.
           headerShown: false,
         }}
       />
@@ -393,7 +323,6 @@ function AuthenticatedStack() {
           contentStyle: { backgroundColor: background },
           fullScreenGestureEnabled: true,
           gestureEnabled: true,
-          // The screen draws the app's glass header, as the chat does.
           headerShown: false,
         }}
       />
@@ -402,7 +331,6 @@ function AuthenticatedStack() {
         options={{
           animation: pushAnimation,
           contentStyle: { backgroundColor: background },
-          // Every finger on the page is the page's mouse, so only the screen edge goes back.
           fullScreenGestureEnabled: false,
           gestureEnabled: true,
           ...nativeBarOptions,
@@ -410,7 +338,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="browser-tabs/[agentId]"
-        // No header: the address bar is the sheet's first row, and the page shows above it.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -425,7 +352,6 @@ function AuthenticatedStack() {
         options={{
           animation: pushAnimation,
           contentStyle: { backgroundColor: background },
-          // Every finger on the screen is the computer's pointer, so only the screen edge goes back.
           fullScreenGestureEnabled: false,
           gestureEnabled: true,
           ...nativeBarOptions,
@@ -433,7 +359,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="remote-desktop-stats"
-        // Lower than a form, so the stream that the stats describe stays in view above it.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -445,7 +370,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="remote-desktop-help"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -457,7 +381,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="browser-help"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -472,8 +395,6 @@ function AuthenticatedStack() {
         options={{
           animation: chatAnimation,
           contentStyle: { backgroundColor: background },
-          // A swipe to the right anywhere in the chat goes back. A message bubble keeps its swipe to
-          // reply: react-native-screens is patched so that the back swipe waits for it.
           fullScreenGestureEnabled: true,
           gestureEnabled: true,
           ...nativeBarOptions,
@@ -492,7 +413,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="context-usage/[agentId]"
-        // The context ring of the composer opens it. The header comes from the route's `_layout.tsx`.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -504,7 +424,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="channel-actions/[channelId]"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -516,7 +435,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="add-channel"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -528,7 +446,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="add-agent"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -551,15 +468,11 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="install-agent"
-        // The header comes from the stack in `install-agent/_layout.tsx`: Android draws no header on
-        // a formSheet route, so Close and Add agent would not show there.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
           scrollEdgeEffects: { top: "hidden", bottom: "soft" },
           presentation: "formSheet",
-          // A page to read before adding: full height, as the agent search. On Android a full-height
-          // sheet goes under the status bar and covers its header, so it uses the form height.
           sheetAllowedDetents: isAndroid ? [0.85] : [1],
           sheetInitialDetentIndex: "last",
           sheetGrabberVisible: true,
@@ -567,15 +480,11 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="marketplace-listing"
-        // The header comes from the stack in `marketplace-listing/_layout.tsx`: Android draws no header
-        // on a formSheet route, so Close would not show there.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
           scrollEdgeEffects: { top: "hidden", bottom: "soft" },
           presentation: "formSheet",
-          // A page to read before installing, as a shared agent: full height on iOS. On Android a
-          // full-height sheet goes under the status bar and covers its header.
           sheetAllowedDetents: isAndroid ? [0.85] : [1],
           sheetInitialDetentIndex: "last",
           sheetGrabberVisible: true,
@@ -583,7 +492,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="section-form"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         listeners={refocusNameField}
         options={{
           contentStyle: { backgroundColor: sheetBackground },
@@ -596,7 +504,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="library-folders"
-        // The header comes from the route's `_layout.tsx`. The name page has a field to focus.
         listeners={refocusNameField}
         options={{
           contentStyle: { backgroundColor: sheetBackground },
@@ -609,7 +516,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="thread-rename"
-        // The header comes from the route's `_layout.tsx`, as for the section form.
         listeners={refocusNameField}
         options={{
           contentStyle: { backgroundColor: sheetBackground },
@@ -686,7 +592,6 @@ function AuthenticatedStack() {
           sheetGrabberVisible: true,
         }}
       />
-      {/* Full screens with a big header that the screen draws: the native bar keeps only its buttons. */}
       <Stack.Screen name="server-routines/index" options={largeTitlePage} />
       <Stack.Screen
         name="server-routines/agent-routine"
@@ -720,9 +625,6 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
       <Stack.Screen
         name="workflow-editor"
-        // The editor is a page: it comes in from the right, so a wide flow and a long list have room.
-        // Its pages are in the stack of `workflow-editor/_layout.tsx`. Back, or the swipe from the
-        // edge, leaves it; its discard guard asks before it drops changes.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -735,7 +637,6 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
       <Stack.Screen
         name="share"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -747,7 +648,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="plan-limits"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -770,7 +670,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="pinned-messages"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -793,7 +692,6 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="vault-request"
-        // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
@@ -851,10 +749,6 @@ function AuthenticatedStack() {
   );
 }
 
-/**
- * On a wide window, such as iPad or the open iPhone Duo, the chat list stays in a pane beside the stack,
- * and the chats open beside it. The first-run flow keeps the whole window.
- */
 function AuthenticatedSplit({ children }: PropsWithChildren) {
   const onboarding = useHomeOnboarding();
   const { t } = useText();

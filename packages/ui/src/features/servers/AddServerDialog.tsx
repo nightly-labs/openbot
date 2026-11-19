@@ -63,17 +63,12 @@ import {
   hostedYearlyDiscountPercent,
 } from "./HostedServerPricing";
 
-/**
- * What the consumer reports about the new server after `onCreate` resolves. `payment`: the server
- * waits for the first payment in the browser. The setup starts when Stripe confirms it.
- */
 export type HostedServerSetupStatus = "payment" | "creating" | "starting" | "connecting" | "ready" | "error";
 
 export interface CreateHostedServerInput {
   plan: HostedServerPlanId;
   billing: HostedServerBilling;
   currency: HostedCurrency;
-  /** The license to buy with the server, for work use. The server and the license have one payment. */
   license?: LicenseOrder | undefined;
 }
 
@@ -84,78 +79,30 @@ export interface CreatedHostedServer {
 
 interface AddServerDialogProps {
   plans: readonly HostedServerPlan[];
-  /** The plan that shows the "Best value" badge and the primary button. */
   recommendedPlan: HostedServerPlanId;
-  /**
-   * The currency to show first, from the user's country when the consumer knows it. Without it,
-   * the dialog guesses from the time zone. The user can change it, unless `currencyLocked` is set.
-   */
   currency?: HostedCurrency | undefined;
-  /** True when the account pays its open plans in `currency`. A Stripe customer pays in one currency. */
   currencyLocked?: boolean | undefined;
-  /** Null until the consumer has a server to report on. */
   setupStatus: HostedServerSetupStatus | null;
-  /**
-   * A server that the user created before, such as after a return from the payment page. The
-   * dialog opens on its setup.
-   */
   resume?: CreatedHostedServer | undefined;
   onClose: () => void;
-  /**
-   * For macOS, a Mac mini, or company plans. The consumer opens its contact page or email. Without
-   * it, the dialog does not show the "Contact us" footer.
-   */
   onContactUs?: (() => void) | undefined;
-  /**
-   * The maximum number of servers of the account, when the account has that many. The dialog then
-   * disables the plans and tells the user to delete a server first.
-   */
   serverLimit?: number | null | undefined;
-  /** Opens the list of the account's hosted servers. Without it, the limit notice has no button. */
   onManageServers?: (() => void) | undefined;
-  /** Opens the invite dialog in place of this one. Without it, the "Other options" menu does not show the item. */
   onJoinWithInvite?: (() => void) | undefined;
-  /**
-   * Opens the dialog that creates a server on this computer in place of this one. Without it, the "Other
-   * options" menu does not show the item.
-   */
   onCreateLocal?: (() => void) | undefined;
-  /**
-   * Opens the dialog with the command that installs a server on another computer, in place of this one.
-   * Without it, the "Other options" menu does not show the item.
-   */
   onInstallServer?: (() => void) | undefined;
-  /** The consumer names the server, so the user does not have to. The logo uses the ID as its seed, as the rail does. */
   onCreate: (input: CreateHostedServerInput) => Promise<CreatedHostedServer>;
   onRetry: () => void;
   onOpenServer: () => void;
-  /** Opens the payment page again, for the `payment` status. */
   onOpenPayment: () => Promise<void>;
-  /** Tells the consumer that the user chose another currency. */
   onCurrencyChange?: ((currency: HostedCurrency) => void) | undefined;
-  /** Tells the consumer that the user chose another billing period. */
   onBillingChange?: ((billing: HostedServerBilling) => void) | undefined;
-  /**
-   * Set when the account has no license. The dialog then lets the user choose personal or work use, and
-   * for work use it sells a license with the server. `used` is the number of people who use the account's
-   * servers now. A license bought before `trialEnd` is free until then.
-   */
   licenseOffer?: { used: number; trialEnd?: number | undefined } | undefined;
-  /**
-   * The order from the pricing page. The dialog shows these choices and creates the server at once, so the
-   * user does not choose again. It does not create when the order does not fit the account: another currency
-   * than a locked one, the server limit, or fewer license users than the people who use the servers now.
-   */
   order?: CreateHostedServerInput | undefined;
 }
 
 type Step = "pricing" | "progress";
 
-/**
- * The setup steps, and what each step does, in order. The setup reports
- * only the step, so the detail lines change on a timer. They stop at the last line of the step and
- * do not loop.
- */
 const SETUP_STEPS = [
   {
     label: "server.hosted.step.create",
@@ -189,10 +136,6 @@ const DETAIL_MS = 2_000;
 
 const SETUP_ORDER: readonly HostedServerSetupStatus[] = ["creating", "starting", "connecting", "ready"];
 
-/**
- * The plus button on the server rail opens this dialog. It shows the plans first: one click on a
- * plan creates a hosted server, and the dialog then shows the setup.
- */
 export function AddServerDialog(props: AddServerDialogProps) {
   const { t, errorDetails, format } = useText();
   const [step, setStep] = createSignal<Step>(untrack(() => props.resume) ? "progress" : "pricing");
@@ -202,10 +145,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [chosenCurrency, setCurrency] = createSignal<HostedCurrency | undefined>(
     untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))),
   );
-  /**
-   * The chosen currency when the plans have it, else a guess from the time zone. A locked currency is the
-   * currency of the Stripe customer, so it stays: a guess only gets a refusal.
-   */
   const currency = (): HostedCurrency => {
     const chosen = chosenCurrency();
     return chosen && (props.currencyLocked || currencies().includes(chosen))
@@ -221,13 +160,11 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [opened, setOpened] = createSignal(false);
   const [closing, setClosing] = createSignal(false);
   const [work, setWork] = createSignal(Boolean(order?.license && untrack(() => props.licenseOffer)));
-  /** A license cannot have fewer users than the people who use the account's servers now. */
   const minPeople = () =>
     Math.min(LICENSE_MAX_USERS, licenseOrderFor(Math.max(1, props.licenseOffer?.used ?? 1)).users);
   const [people, setPeople] = createSignal(
     Math.min(LICENSE_MAX_USERS, Math.max(order?.license?.users ?? LICENSE_INCLUDED_USERS, untrack(minPeople))),
   );
-  /** The people that the plans price a license for: 0 is personal use, the server alone. */
   const planPeople = () => (props.licenseOffer ? (work() ? people() : 0) : undefined);
   const longestPrice = () =>
     props.licenseOffer ? hostedLongestOrderPrice(props.plans, currency(), format) : undefined;
@@ -237,9 +174,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
     work()
       ? hostedWorkYearlyDiscountPercent(props.plans, currency())
       : hostedYearlyDiscountPercent(props.plans, currency());
-  // Characters over the 10 that fit in a column at 760 px, with 2 for the space between the old and the
-  // new price. The pricing step gets wider for each one. With a license, the longest old and new prices
-  // share the line.
   const extraPriceChars = () => {
     const longest = longestPrice();
     const length = longest
@@ -257,9 +191,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const serverName = () => created()?.name ?? "";
 
   const paying = () => props.setupStatus === "payment";
-  // The payment is not a setup step: no step runs until Stripe confirms it.
   const running = () => props.setupStatus !== "ready" && props.setupStatus !== "error" && !paying();
-  // The error status does not tell which step failed, so keep the last step that ran.
   const [currentIndex, setCurrentIndex] = createSignal(0);
   createEffect(setupIndex, (index) => {
     if (index >= 0) setCurrentIndex(Math.min(index, SETUP_STEPS.length - 1));
@@ -370,7 +302,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
             aria-busy={creating() ? "true" : undefined}
             onOpenAutoFocus={(event) => {
               event.preventDefault();
-              // A dialog that opens on the setup, as after the payment page, reads the step heading.
               if (step() === "progress") focusHeading();
               else
                 queueMicrotask(() =>
@@ -511,7 +442,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
                       )}
                     </Show>
 
-                    {/* The limit notice above explains a create that failed at the limit. */}
                     <Show when={props.serverLimit == null && createError()}>
                       {(failure) => (
                         <Alert class="join-server-alert" tone="danger" role="alert">
@@ -531,9 +461,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
 
                 <Match when={step() === "progress"}>
                   <div class="add-server-step add-server-progress" data-status={props.setupStatus ?? "creating"}>
-                    {/* One ring segment for each step. The running segment fills slowly, because the
-                        setup does not report how far a step is. At the end the gaps close into one
-                        ring, and the centre changes into a check mark or an X. */}
                     <div
                       ref={(element: HTMLDivElement) => (progressLogo = element)}
                       class="add-server-ring"
@@ -549,8 +476,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
                           )}
                         </For>
                       </svg>
-                      {/* A small server with one light for each step. The light of the running step
-                          flickers like disk activity. */}
                       <span class="add-server-ring-core">
                         <For each={SETUP_STEPS}>
                           {(_step, index) => <span class="add-server-light" data-state={stepState(index())} />}
@@ -583,9 +508,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         when={!running()}
                         fallback={
                           <>
-                            {/* A screen reader hears the step, not each line on the timer. */}
                             <span class="sr-only">{t(setupStep(currentIndex()).label)}</span>
-                            {/* Keyed, so that each new line rolls in from below. */}
                             <Show when={detail()} keyed>
                               {(key) => (
                                 <p class="add-server-ticker" aria-hidden="true">
@@ -668,7 +591,6 @@ export function AddServerDialog(props: AddServerDialogProps) {
   );
 }
 
-/** The ways to add a server without a plan, in the corner across from the close button. */
 export function AddServerOtherOptions(props: {
   disabled: boolean;
   onCreateLocal: (() => void) | undefined;

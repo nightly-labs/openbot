@@ -1,19 +1,15 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("startup", {
-  // The one native error box: the app could not start, so no renderer exists to show it.
   "startup.failedTitle": "OpenBot couldn’t start",
   "startup.failedBody":
     "{message}\n\nYour local data was not reset or overwritten. See the troubleshooting guide for recovery steps.",
-  // Shown while OpenBot runs, when another program changed `app.asar`: the next start would fail with no message.
   "startup.archiveChangedTitle": "OpenBot files were changed",
   "startup.archiveChangedBody":
     "Another program changed the OpenBot file app.asar. OpenBot runs now, but it will not open after you quit it.\n\nTo repair OpenBot, install it again. Your local data stays.",
   "startup.archiveChangedDownload": "Download OpenBot",
-  // The entry of the main process shows this when a program file cannot load, so no OpenBot code can run.
   "startup.filesDamagedBody":
     "Some OpenBot files are damaged or missing.\n\nTo repair OpenBot, install it again. Your local data stays.",
-  // An older OpenBot started over data that a newer one migrated: it installs the latest release.
   "startup.newerDataUpdatingTitle": "Updating OpenBot",
   "startup.newerDataUpdatingBody":
     "A newer version of OpenBot saved your data. OpenBot installs the latest version and then opens again.\n\nYour local data was not reset or overwritten.",
@@ -27,8 +23,6 @@ export const messages = defineMessages("startup", {
   "startup.newerDataLoopBody":
     "A newer version of OpenBot saved your data, and this version ({version}) cannot open it. OpenBot {loopVersion} stopped before it opened several times in a row, so it is not installed again.\n\nInstall a version newer than {loopVersion} when one is available. To get help, open the guide.\n\nYour local data was not reset or overwritten.",
   "startup.newerDataReleases": "Show releases",
-  // The recovery window: one version did not finish its start several times in a row. It shows before
-  // the next start, from the main process, with no renderer.
   "startup.recoveryWindowTitle": "OpenBot recovery",
   "startup.recoveryTitle": "OpenBot did not open",
   "startup.recoveryBody": {

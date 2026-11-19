@@ -5,16 +5,11 @@ import { useText } from "../../text";
 import { blobDataUrl } from "./ProfileShareDialog";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
-/** A new photo, or `null` to remove the photo. `undefined` keeps the saved photo. */
 interface PhotoDraft {
   image: AvatarImageInput | null;
   url: string | null;
 }
 
-/**
- * The photo and the display name, saved together. The caller resets the store's name draft and
- * photo error before it opens the dialog, so each open starts again from the saved profile.
- */
 export function ProfileEditDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,7 +60,6 @@ function ProfileEditForm(props: { store: SettingsProfileStore; account: CentralA
   async function save(event: SubmitEvent) {
     event.preventDefault();
     if (busy()) return;
-    // The name saves first: a new photo refreshes the account, and the refresh resets the name draft.
     await props.store.saveName();
     if (props.store.visibleNameError()) return;
     const draft = photo();

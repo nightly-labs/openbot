@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate":
     "Mettez à jour le client pour utiliser la configuration du bureau à distance.",
   "error.remote.desktopSetupUnavailable": "La configuration du bureau à distance n’est pas disponible.",

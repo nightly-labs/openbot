@@ -18,24 +18,15 @@ interface AccountLoginProps {
   state: CentralAuthState;
   onRetry: () => Promise<void>;
   onRequestEmailCode: (email: string) => Promise<void>;
-  /** `referralCode` is the invite code that the reader typed. The account server uses it only for a new account. */
   onVerifyEmailCode: (challengeId: string, code: string, referralCode?: string) => Promise<void>;
   onReset: () => Promise<void>;
-  /** Opens the company sign-in page again: in the browser on desktop, in this tab on the web. */
   onOpenCompanySignIn?: () => Promise<void>;
-  /** A choice under the send button, such as the analytics box of the web app. */
   consent?: JSX.Element;
-  /** Fine print under the lock line, such as the Terms of Service notice of the web app. */
   notice?: JSX.Element;
-  /** The language the screen is in. The button that opens the language choice again shows its name. */
   language?: TranslatedLocale;
-  /** Opens the language choice again, so a reader who chose a language they cannot read can leave it. */
   onChangeLanguage?: () => void;
-  /** Shows the optional invite code in a corner of the email step. Off where no account can be created. */
   inviteField?: boolean;
-  /** The first invite code, such as the code of an invite link that the web client kept. The screen celebrates it. */
   initialInviteCode?: string | undefined;
-  /** `false` while a loading screen still covers this screen. The invite burst waits for it. */
   revealed?: boolean;
 }
 
@@ -67,9 +58,7 @@ export function AccountLogin(props: AccountLoginProps) {
   const [inviteCode, setInviteCode] = createSignal(
     untrack(() => (props.initialInviteCode ? referralCodeFromInput(props.initialInviteCode) : null)),
   );
-  /** The invite code of the last sent email. */
   let sentInviteCode: string | undefined;
-  /** Each confetti burst on screen. A new object mounts a new burst. */
   const [bursts, setBursts] = createSignal<{ origin: Element | undefined }[]>([]);
   let burstTimer: number | undefined;
   let screen: HTMLElement | undefined;
@@ -91,9 +80,7 @@ export function AccountLogin(props: AccountLoginProps) {
   onCleanup(clearEmailErrorTimers);
   onCleanup(() => window.clearTimeout(burstTimer));
 
-  // An invite link opens the screen with a burst from the logo, once nothing covers the screen.
   let linkCelebrated = !untrack(() => props.inviteField && inviteCode());
-  // The effect runs after the screen is in the document, so the logo has its place.
   createEffect(
     () => props.revealed ?? true,
     (revealed) => {
@@ -109,10 +96,6 @@ export function AccountLogin(props: AccountLoginProps) {
     burstTimer = window.setTimeout(() => setBursts([]), 2_400);
   }
 
-  // `now()` exists for the two countdowns below and nothing else, so the clock
-  // runs only while one of them is on screen. Arming it at creation instead
-  // woke the view once a second for its whole life, including the ordinary case
-  // where there is nothing to count down.
   const countdownUntil = createMemo(() => {
     const resendAt = props.state.status === "code_sent" ? props.state.resendAvailableAt : 0;
     return Math.max(resendAt, issueBlockedUntil());
@@ -125,8 +108,6 @@ export function AccountLogin(props: AccountLoginProps) {
       if (until <= Date.now()) return;
       const clock = window.setInterval(() => {
         setNow(Date.now());
-        // Stop at the deadline rather than wait for the next state change: the
-        // label has reached zero and no later tick can change it.
         if (Date.now() >= until) window.clearInterval(clock);
       }, 1_000);
       return () => window.clearInterval(clock);
@@ -199,7 +180,6 @@ export function AccountLogin(props: AccountLoginProps) {
     const [before = "", after = ""] = t("account.login.codeSent", { email: EMAIL_MARKER }).split(EMAIL_MARKER);
     return [before, after] as const;
   };
-  // Only on a settled email step: a code in flight belongs to the screen that sent it.
   const emailFormShown = () => !connecting() && !unavailable() && loginStep() === "email";
   const languageButtonShown = () =>
     (props.state.status === "signed_out" || props.state.status === "error") && pendingAction() === null;
@@ -309,10 +289,6 @@ export function AccountLogin(props: AccountLoginProps) {
     }, shakeDuration + motionDuration("--revert-hold", 3_000));
   }
 
-  /**
-   * Show a failed action with the code of its cause. When the action already gave a typed issue,
-   * that issue explains the failure, so a general sentence does not replace it.
-   */
   function showActionError(error: unknown, message: string, keepIssue: boolean): void {
     if (keepIssue && displayedIssue()) return;
     setLocalError({ message, reference: errorReference(error) });
@@ -624,7 +600,6 @@ export function AccountLogin(props: AccountLoginProps) {
                       aria-describedby={emailErrorActive() ? "account-email-error" : undefined}
                       autofocus
                       onBlur={() => {
-                        // An empty field is not wrong yet: the user can move to the analytics box first.
                         const value = untrack(email);
                         const validationError = value.trim() ? validateEmail(value) : null;
                         if (validationError) showEmailError(validationError);
@@ -777,7 +752,6 @@ export function AccountLogin(props: AccountLoginProps) {
         </section>
       </div>
 
-      {/* The page corners keep the card short: the language at the top, the invite and the fine print at the bottom. */}
       <Show when={languageButtonShown() && props.onChangeLanguage && props.language}>
         {(language) => (
           <Button
@@ -795,7 +769,6 @@ export function AccountLogin(props: AccountLoginProps) {
           </Button>
         )}
       </Show>
-      {/* Hidden, not removed, after the email step, so the card does not move when the step changes. */}
       <footer class="account-login-page-footer" data-shown={emailFormShown() ? "true" : undefined}>
         <div class="account-login-page-footer-start">
           <Show when={props.inviteField}>
@@ -803,7 +776,6 @@ export function AccountLogin(props: AccountLoginProps) {
           </Show>
         </div>
         <div class="account-login-legal">
-          {/* The account is for sign-in only. A new user asks what leaves the computer. */}
           <p class="account-login-local-data">
             <Lock size={13} aria-hidden="true" />
             {t("account.login.localData")}

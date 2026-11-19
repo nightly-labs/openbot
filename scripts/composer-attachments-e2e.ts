@@ -1,5 +1,3 @@
-// Drives the real dev renderer, preload, IPC and managed attachment files. No provider turn is sent.
-// Run: bun run test:composer-attachments --allow-mutations
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -64,14 +62,11 @@ async function caretAtEnd(editor: Locator): Promise<void> {
   });
 }
 
-// An inline image shows only in the text. Delete on its reference moves the file to the row above the
-// draft, as for any attachment reference; the row's remove button discards the file.
 async function removeImages(editor: Locator, name = "image.png"): Promise<void> {
   const reference = editor.getByRole("button", { name: `Open attached file ${name}`, exact: true });
   while (await reference.count()) {
     const count = await reference.count();
     await reference.first().press("Delete");
-    // Other files can stay in the draft, so count the references of this name only.
     await page.waitForFunction(
       ({ expected, name }) =>
         Array.from(
@@ -126,7 +121,6 @@ async function pasteCopy(editor: Locator, data: Record<string, string>): Promise
   await waitReady(editor);
 }
 
-// The draft as the editor shows it, with each inline attachment as "[name]".
 async function layout(editor: Locator): Promise<string> {
   return editor.evaluate((element) =>
     Array.from(element.childNodes, (node) =>
@@ -159,7 +153,6 @@ try {
   const source = await openAgent("Chief");
   await clearTestDraft(source);
   await source.fill("Before  after");
-  // The copy of the app gives the text and HTML without the app styles, not the native rich text.
   const textCopy = await copy(source);
   assert.equal(textCopy["text/plain"], "Before  after");
   assert.ok(textCopy["text/html"]?.includes("Before"));
@@ -204,7 +197,6 @@ try {
   results.push("Distinct images with the same filename keep their order, IDs and original bytes.");
   await page.screenshot({ path: resolve(out, "source.png") });
 
-  // The source is genuinely discarded through the app before the other agent pastes.
   await removeImages(source);
   await source.fill("");
   const destination = await openAgent("Builder");
@@ -237,7 +229,6 @@ try {
     `window.openbot.agent.importAttachmentData({ paths: ["/etc/passwd"], data: [] }, "local").then(() => null, error => error.message)`,
   );
   assert.ok(typeof refusal === "string" && refusal.includes("Invalid attachment data."));
-  // A list in the right shape, with a path in place of the bytes.
   const pathItem = await page.evaluate(
     `window.openbot.agent.importAttachmentData([{ name: "passwd", mimeType: "text/plain", path: "/etc/passwd" }], "local").then(() => null, error => error.message)`,
   );
@@ -246,7 +237,6 @@ try {
   results.push("The byte-only renderer endpoint rejects a disk-path import payload.");
   await page.screenshot({ path: resolve(out, "destination.png") });
 
-  // A picked file has no bytes in memory. The removal waits until the copy has read the file.
   const picked = [...png, 1];
   const pickedPath = resolve(out, "picked.png");
   writeFileSync(pickedPath, new Uint8Array(picked));
@@ -275,7 +265,6 @@ try {
   results.push("A copied file from disk survives its removal from the source draft.");
   await openAgent("Builder");
 
-  // Exercise the operating system clipboard as well as synthetic clipboard events.
   const destinationLayout = await layout(destination);
   await destination.press("ControlOrMeta+a");
   await destination.press("ControlOrMeta+c");
@@ -295,7 +284,6 @@ try {
   await removeImages(nativeTarget);
   await nativeTarget.fill("");
 
-  // A text paste longer than INPUT_LIMITS.pastedText becomes pasted-text.txt at the caret.
   const longText = `Ünïcödé 😀\ttab\r\nCRLF line\n  indented  \n${"log line 0123456789\n".repeat(300)}`;
   const longTarget = await openAgent("Chief");
   await clearTestDraft(longTarget);
@@ -320,7 +308,6 @@ try {
   results.push("A long text paste keeps the draft text and stores all its text as pasted-text.txt.");
   await page.screenshot({ path: resolve(out, "long-paste.png") });
 
-  // At the attachment limit, the file cannot come: the error shows and the text goes in the message.
   await caretAtEnd(longTarget);
   await pasteImages(
     longTarget,
@@ -341,5 +328,4 @@ try {
   writeFileSync(resolve(out, "report.json"), `${JSON.stringify({ results, passed }, null, 2)}\n`);
   await session.close();
 }
-// Machine-readable: E2E report for the caller.
 process.stdout.write(`${JSON.stringify({ results, passed }, null, 2)}\n`);

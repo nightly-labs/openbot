@@ -10,7 +10,6 @@ import {
 } from "@tanstack/solid-router";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { MarketplaceAgentListing, MarketplaceSkillView } from "../../lib/marketplace";
-// The site's stylesheet, loaded only when a site story opens. See `ArticleMedia.stories.tsx`.
 import "../../styles.css";
 import { MarketplaceIndexPage, type MarketplaceIndexPageProps } from "./MarketplaceIndexPage";
 import { MarketplaceAgentPage, MarketplaceSkillPage } from "./MarketplaceListingPage";
@@ -24,11 +23,6 @@ import {
   PROTOTYPE_SKILLS,
 } from "./marketplace-prototype-fixtures";
 
-/*
- * The real route tree carries Worker-only modules, so each story opens a small stand-in tree at the
- * page's address. The tab and category links then show which one is current. The routers are built at
- * module level: creating a router writes reactive state, which Solid refuses inside a component.
- */
 const STUB_PATHS = [
   "/",
   "/news",
@@ -64,7 +58,6 @@ function AtAddress(props: { address: Address; children: () => JSX.Element }) {
   return <RouterContextProvider router={ROUTERS[props.address]}>{props.children}</RouterContextProvider>;
 }
 
-/** The catalog as the Worker sends it: reviewed agents only, each with its own `verified` flag. */
 const AGENTS: MarketplaceAgentSummary[] = PROTOTYPE_AGENTS.map((agent) => ({
   ...agent,
   verified: isVerifiedAgent(agent),
@@ -80,7 +73,6 @@ function agentListing(id: string): MarketplaceAgentListing {
       verified: isVerifiedAgent(detail),
       pending: detail.id === PROTOTYPE_PENDING_AGENT.id,
       cardUrl: null,
-      // The listing page never receives a routine's instruction.
       routines: detail.routines.map(({ instruction: _instruction, ...routine }) => routine),
     },
     skills: PROTOTYPE_SKILLS.filter((skill) => skillIds.has(skill.id)),
@@ -168,38 +160,28 @@ type Story = StoryObj<typeof meta>;
 
 const PHONE = { viewport: "sitePhone" } as const;
 
-/** `openbot.run/marketplace`: Featured, then each category as rows. */
 export const Agents: Story = {};
 export const AgentsPhone: Story = { globals: PHONE };
 
-/** `openbot.run/marketplace?category=coding`: one category, every agent in it. */
 export const AgentsCategory: Story = { args: { address: "coding", category: "coding" } };
 
-/** A search with no result. */
 export const AgentsNoMatch: Story = { args: { query: "kubernetes" } };
 
-/** `openbot.run/marketplace/skills`. */
 export const Skills: Story = { args: { address: "skills", tab: "skills" } };
 export const SkillsPhone: Story = { args: { address: "skills", tab: "skills" }, globals: PHONE };
 
-/** `openbot.run/marketplace/apps`: the plugins that `/plugins` showed. */
 export const Apps: Story = { args: { address: "apps", tab: "apps" } };
 
-/** A verified agent. "Add to OpenBot" opens the app; "Copy link" copies this page's address. */
 export const AgentVerified: Story = { args: { page: "agent", id: VERIFIED_AGENT } };
 export const AgentVerifiedPhone: Story = { args: { page: "agent", id: VERIFIED_AGENT }, globals: PHONE };
 
-/** An agent by another user: the line before Add says that OpenBot reviewed it before it went live. */
 export const AgentPublic: Story = { args: { page: "agent", id: PUBLIC_AGENT } };
 export const AgentPublicPhone: Story = { args: { page: "agent", id: PUBLIC_AGENT }, globals: PHONE };
 
-/** An agent that waits for review, opened from the link its creator shared. No list shows it. */
 export const AgentPending: Story = { args: { page: "agent", id: PROTOTYPE_PENDING_AGENT.id } };
 export const AgentPendingPhone: Story = { args: { page: "agent", id: PROTOTYPE_PENDING_AGENT.id }, globals: PHONE };
 
-/** A skill. */
 export const Skill: Story = { args: { page: "skill", slug: "sql-review" } };
 export const SkillPhone: Story = { args: { page: "skill", slug: "sql-review" }, globals: PHONE };
 
-/** A removed or rejected listing, or a wrong link. */
 export const Missing: Story = { args: { page: "missing" } };
