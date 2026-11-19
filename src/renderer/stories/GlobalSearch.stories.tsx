@@ -63,7 +63,6 @@ const messages: Array<{ agentId: string; message: AgentMessage }> = [
   },
 ];
 
-/** Pages of 100 from the offset in the cursor, as the conversation database gives them. */
 function page<T>(items: T[], cursor: string | undefined, counted: boolean): GlobalSearchPage<T> {
   const offset = Number(cursor ?? 0);
   const end = offset + 100;
@@ -118,7 +117,6 @@ async function searchFiles(query: string, cursor?: string) {
   );
 }
 
-// Thousands of rows, for the virtual list and paging. Each page takes a moment, as over a network.
 const hues = [30, 55, 100, 150, 185, 215, 245, 280, 320] as const;
 const manyAgents = agents.concat(
   Array.from({ length: 400 }, (_, index) =>
@@ -179,21 +177,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Type "research" to see every group: agents, channels, messages, files, routines and settings. */
 export const Default: Story = {};
 
-/** The message search never answers, so a query shows the searching state. */
 export const SearchingMessages: Story = {
   args: {
     onSearchMessages: fn(() => new Promise<GlobalSearchPage<{ agentId: string; message: AgentMessage }>>(() => {})),
   },
 };
 
-/**
- * 400 more agents, 2,500 messages and 800 files. Only the rows in view render. Type "research" and
- * open Messages or Files: the next page loads as the list comes near its end. Files do not count
- * their results, so the count shows "100+" until the last page.
- */
 export const ManyResults: Story = {
   args: {
     agents: manyAgents,
@@ -220,12 +211,10 @@ export const ManyResults: Story = {
   },
 };
 
-/** Only agents and messages, as on a web client host with no channels: no other filter shows. */
 export const AgentsAndMessagesOnly: Story = {
   args: { channels: undefined, routines: undefined, actions: undefined, onSearchFiles: undefined },
 };
 
 export const NoAgents: Story = { args: { agents: [] } };
 
-/** No agents and no channels, so the search finds nothing. Type any text: the plush watches the caret, then looks for a result. */
 export const NothingFound: Story = { args: { agents: [], channels: [] } };

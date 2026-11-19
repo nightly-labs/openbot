@@ -9,10 +9,6 @@ import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/
 export { CONNECTOR_IDS, type ConnectorId } from "@openbot/contracts/ipc";
 
 export interface ConnectorDefinition {
-  /**
-   * The capability that lets a joined server run the connector for an owner or admin. Null when the
-   * connector works only on the computer that runs OpenBot, because its app or browser runs there.
-   */
   server: TeamCurrentCapability | null;
 }
 
@@ -20,7 +16,6 @@ export const CONNECTORS: Readonly<Record<ConnectorId, ConnectorDefinition>> = {
   slack: { server: CONNECTORS_CAPABILITY },
   discord: { server: CONNECTORS_CAPABILITY },
   telegram: { server: CONNECTORS_CAPABILITY },
-  // The host's session gets the link code, and the admin's computer shows it.
   whatsapp: { server: WHATSAPP_CONNECTOR_CAPABILITY },
   github: { server: CONNECTORS_CAPABILITY },
   onepassword: { server: ONEPASSWORD_CONNECTOR_CAPABILITY },

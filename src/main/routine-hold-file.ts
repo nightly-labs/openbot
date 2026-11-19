@@ -1,7 +1,3 @@
-// The routines that a restart when idle held must not be lost in the restart: the next start would
-// skip them as missed. Main writes the hold window just before it restarts or quits, and reads it
-// once at the next start. The writes are synchronous because the process quits right after them.
-
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isMissingFileError } from "../backend/file-errors";
@@ -20,7 +16,6 @@ export function clearRoutineHold(path: string): void {
   rmSync(path, { force: true });
 }
 
-/** Reads the window and removes the file, so a later start does not run the same routines again. */
 export function takeRoutineHold(path: string, log: (message: string) => void): RoutineHoldWindow | undefined {
   let text: string;
   try {

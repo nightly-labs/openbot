@@ -1,12 +1,9 @@
-/** A prompt step: a text input for the steps after it. */
-
 import { CopyButton, LabelTooltipTrigger, Textarea } from "@openbot/ui";
 import { untrack } from "solid-js";
 import { useText } from "../../text";
 import { Hint } from "./workflow-board";
 import { Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
 
-/** A text input for the steps after it. One field fills the card; the output is text. */
 export function PromptNode(props: { id: string; text?: string }) {
   const { t } = useText();
   const [text, setText] = useTextField(

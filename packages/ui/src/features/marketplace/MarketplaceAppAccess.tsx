@@ -32,14 +32,11 @@ import { createSignal, createStore, For, Show } from "solid-js";
 import { AgentSearchList } from "./MarketplaceAgentsDialog";
 import type { MarketplaceAgent, MarketplaceMcpAccess } from "./marketplace-model";
 
-/** One MCP row of an app: the row of an account, or the one row of an app or a custom server. */
 export interface AppAccessRow {
-  /** The id of the MCP row. */
   id: string;
   name: string;
 }
 
-// One array for the life of the page: a new array on each read makes the select start again.
 const LEVELS: McpAccessLevel[] = [...MCP_ACCESS_LEVELS];
 
 const LEVEL_LABELS = {
@@ -53,7 +50,6 @@ const allows = (access: McpServerAccess, agentId: string) => access.agents === n
 const higher = (left: McpAccessLevel, right: McpAccessLevel) =>
   mcpAccessRank(right) > mcpAccessRank(left) ? right : left;
 
-/** Chooses the agents of one MCP row, with a search. The change waits for Save. */
 function AccessAgentsDialog(props: {
   access: MarketplaceMcpAccess;
   agents: readonly MarketplaceAgent[];
@@ -61,7 +57,6 @@ function AccessAgentsDialog(props: {
   onClose: () => void;
 }) {
   const { t } = useText();
-  /* Only the user's choices. An agent with no choice keeps what the host holds. */
   const [draft, setDraft] = createStore<{ on: Record<string, boolean> }>({ on: {} });
   const entry = () => props.access.entry(props.row.id);
   const checked = (agentId: string) => draft.on[agentId] ?? allows(entry(), agentId);
@@ -69,7 +64,6 @@ function AccessAgentsDialog(props: {
   const save = () => {
     const shown = new Set(props.agents.map((agent) => agent.id));
     const on = props.agents.filter((agent) => checked(agent.id)).map((agent) => agent.id);
-    // An agent that this list does not show keeps its place. All agents: also each agent added later.
     const kept = (entry().agents ?? []).filter((agentId) => !shown.has(agentId));
     const agents = on.length === props.agents.length ? null : [...kept, ...on];
     void props.access.set([{ mcpServerId: props.row.id, access: { ...entry(), agents } }]);
@@ -92,7 +86,6 @@ function AccessAgentsDialog(props: {
           ref={(element) => {
             content = element;
           }}
-          // The dialog opens on the agent search, not on Close.
           onOpenAutoFocus={(event) => {
             const search = content?.querySelector<HTMLElement>("input[type=search]");
             if (!search) return;
@@ -144,7 +137,6 @@ function AccessAgentsDialog(props: {
   );
 }
 
-/** The agents of one MCP row: the first three faces and a count. The button opens the agents dialog. */
 function AccessAgentsButton(props: {
   access: MarketplaceMcpAccess;
   agents: readonly MarketplaceAgent[];
@@ -193,7 +185,6 @@ function AccessAgentsButton(props: {
   );
 }
 
-/** The level menu of one role. A role cannot go below the level that Everyone gives. */
 function AccessLevelSelect(props: {
   label: string;
   level: McpAccessLevel;
@@ -215,7 +206,6 @@ function AccessLevelSelect(props: {
       optionDisabled={below}
       disallowEmptySelection={true}
       onChange={(option) => {
-        // The select also reports the value it already has.
         if (option && option !== props.level) props.onChange(option);
       }}
       itemComponent={(item) => <SelectItem item={item.item}>{t(LEVEL_LABELS[item.item.rawValue])}</SelectItem>}
@@ -240,17 +230,10 @@ function AccessLevelSelect(props: {
   );
 }
 
-/**
- * Who gets a connected app: the agents of each MCP row, and the level of each role. A level change
- * goes to each row of the app. The rows can differ, for example after a new account, which starts
- * with the default: the page then shows the highest level that a row gives, so it does not show an
- * open row as closed.
- */
 export function AppAccessSections(props: {
   access: MarketplaceMcpAccess;
   agents: readonly MarketplaceAgent[];
   rows: readonly AppAccessRow[];
-  /** The name of the app in the label of a level menu. */
   name: string;
 }) {
   const { t } = useText();
@@ -271,7 +254,6 @@ export function AppAccessSections(props: {
     setLevels((access) => ({
       ...access,
       everyone: level,
-      // A role keeps only a level above the new one of Everyone.
       roles: Object.fromEntries(
         Object.entries(access.roles).filter(([, own]) => mcpAccessRank(own) > mcpAccessRank(level)),
       ),

@@ -11,10 +11,6 @@ import { StageBackButton } from "@/shared/components/bloub-stage/stage-back-butt
 import { headerTitleFont } from "@/shared/lib/app-font";
 import { useText } from "@/shared/lib/text";
 
-// An inner page of the add-server sheet, or of the plans sheet. The preview fills the whole sheet.
-// The add-server sheet has no header, so the title and the close control ride over the camera. The
-// plans sheet keeps its native header on this page too: a page without the header makes iOS hide the
-// bar during the push, and the page under it jumps when its header inset changes.
 export function ScanInviteScreen({
   joinPath = "/add-server",
   underHeader = false,
@@ -35,13 +31,11 @@ export function ScanInviteScreen({
         } catch {
           throw new Error(t("mobile.server.scan.notInvitation"));
         }
-        // The one-use token stays out of navigation params, as deep links do.
         const request = rememberIncomingLink({ kind: "invite", url: data });
         router.dismissTo({ pathname: joinPath, params: { request } });
       }}
       renderOverlay={(camera) =>
         underHeader ? (
-          // White over the camera, as the overlay title; the theme color over the permission page.
           <Stack.Screen
             options={{
               headerTintColor: camera ? "white" : String(foreground),

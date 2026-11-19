@@ -2,13 +2,6 @@ import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { GITHUB_REPOSITORY_NAME_PATTERN } from "./signal-protocol/github-route";
 
-/**
- * GitHub triggers and outputs of workflows. A GitHub trigger starts a run when the OpenBot GitHub App
- * sends an event of a repository; a GitHub output acts on GitHub as the App's bot. The node fields are
- * in `WorkflowFields`. These types cross the Team API only through `workflows-github-v1`.
- */
-
-/** The events that a GitHub trigger can start on. */
 export const WORKFLOW_GITHUB_EVENTS = [
   "issue.opened",
   "issue.closed",
@@ -25,11 +18,9 @@ export const WORKFLOW_GITHUB_EVENTS = [
 ] as const;
 export type WorkflowGitHubEvent = (typeof WORKFLOW_GITHUB_EVENTS)[number];
 
-/** The filters of a GitHub trigger, besides its labels. `title` and `branch` read a field of the same name. */
 export const WORKFLOW_GITHUB_FILTERS = ["notBot", "firstTime", "title", "branch"] as const;
 export type WorkflowGitHubFilter = (typeof WORKFLOW_GITHUB_FILTERS)[number];
 
-/** What a GitHub output can do. */
 export const WORKFLOW_GITHUB_ACTIONS = [
   "comment",
   "label.add",
@@ -44,7 +35,6 @@ export const WORKFLOW_GITHUB_ACTIONS = [
 ] as const;
 export type WorkflowGitHubAction = (typeof WORKFLOW_GITHUB_ACTIONS)[number];
 
-/** The actions that GitHub has only on pull requests. */
 export const WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS = [
   "review.request",
   "review.approve",
@@ -54,7 +44,6 @@ export const WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS = [
 export const WORKFLOW_GITHUB_CLOSE_REASONS = ["completed", "notPlanned"] as const;
 export type WorkflowGitHubCloseReason = (typeof WORKFLOW_GITHUB_CLOSE_REASONS)[number];
 
-/** What an event can start on: issues only, pull requests only, or both. */
 export type WorkflowGitHubItemKind = "issue" | "pullRequest" | "both";
 
 export function workflowGitHubEventItemKind(event: WorkflowGitHubEvent): WorkflowGitHubItemKind {
@@ -62,7 +51,6 @@ export function workflowGitHubEventItemKind(event: WorkflowGitHubEvent): Workflo
   return event.startsWith("pr.") ? "pullRequest" : "both";
 }
 
-/** The value of a list field, such as `labels` or `filters`: one name a line, without empty lines. */
 export function workflowListField(value: unknown): string[] {
   if (!isString(value)) return [];
   return value
@@ -71,17 +59,10 @@ export function workflowListField(value: unknown): string[] {
     .filter(Boolean);
 }
 
-/** `owner/name`, in the characters that GitHub allows. */
 export function isGitHubRepositoryName(value: unknown): value is string {
   return isString(value) && GITHUB_REPOSITORY_NAME_PATTERN.test(value);
 }
 
-/**
- * The repositories of a GitHub trigger, without repeats. `repositories` holds the list, one name a line,
- * and `repository` holds its first name, so hosts and phones that know one repository keep working. When
- * the first line of `repositories` is not `repository`, such a client changed `repository` last, and that
- * one repository is the list.
- */
 export function workflowGitHubTriggerRepositories(fields: {
   readonly repository?: unknown;
   readonly repositories?: unknown;
@@ -99,7 +80,6 @@ export function workflowGitHubTriggerRepositories(fields: {
   });
 }
 
-/** The fields that keep `repositories` as the trigger's list. Read them with `workflowGitHubTriggerRepositories`. */
 export function workflowGitHubTriggerRepositoryFields(repositories: readonly string[]): {
   repository: string;
   repositories: string;
@@ -107,7 +87,6 @@ export function workflowGitHubTriggerRepositoryFields(repositories: readonly str
   return { repository: repositories[0] ?? "", repositories: repositories.join("\n") };
 }
 
-/** An issue or a pull request. */
 export interface WorkflowGitHubItem {
   repository: string;
   number: number;
@@ -118,72 +97,49 @@ export interface WorkflowGitHubItem {
 export const WORKFLOW_GITHUB_DELIVERY_OUTCOMES = ["started", "waiting", "skipped"] as const;
 export type WorkflowGitHubDeliveryOutcome = (typeof WORKFLOW_GITHUB_DELIVERY_OUTCOMES)[number];
 
-/**
- * Why an event did not start a run:
- * - `filter`: a filter of the trigger refused it.
- * - `self`: a step of this workflow caused it.
- * - `chain`: runs that the bot caused went on too long on one item.
- * - `offline`: the host was offline, so GitHub's events of that time are lost.
- * - `refused`: the workflow cannot start, such as one with a node of a newer version.
- */
 export const WORKFLOW_GITHUB_SKIP_REASONS = ["filter", "self", "chain", "offline", "refused"] as const;
 export type WorkflowGitHubSkipReason = (typeof WORKFLOW_GITHUB_SKIP_REASONS)[number];
 
-/** One event that GitHub sent to a trigger, or a time when the host could not get them. */
 export interface WorkflowGitHubDelivery {
   id: string;
   nodeId: string;
   event: WorkflowGitHubEvent;
-  /** Null for a time when the host was offline. */
   item: WorkflowGitHubItem | null;
   receivedAt: string;
   outcome: WorkflowGitHubDeliveryOutcome;
-  /** Set only when the event was skipped. */
   reason: WorkflowGitHubSkipReason | null;
-  /** The run that the event started. */
   runId: string | null;
 }
 
-/** The item of a run that a GitHub event started. */
 export interface WorkflowGitHubRunItem {
   runId: string;
   item: WorkflowGitHubItem;
 }
 
-/** The newest events of the GitHub triggers of a workflow, newest first, and the items of their runs. */
 export interface WorkflowGitHubHistory {
   deliveries: WorkflowGitHubDelivery[];
   runs: WorkflowGitHubRunItem[];
 }
 
-/** A repository that the host's GitHub connection reaches. */
 export interface WorkflowGitHubRepository {
-  /** `owner/name`. */
   fullName: string;
   private: boolean;
-  /** Whether the App can change issues and pull requests there. */
   canWrite: boolean;
-  /** Whether the App's installation sends the events that triggers need. */
   events: boolean;
 }
 
-/** The GitHub connection of the host, as the trigger and output nodes need it. */
 export interface WorkflowGitHubCatalog {
   connected: boolean;
-  /** Sorted by `fullName`. */
   repositories: WorkflowGitHubRepository[];
 }
 
 export interface WorkflowGitHubLabel {
   name: string;
-  /** Six hexadecimal digits, as GitHub gives it. */
   color: string;
 }
 
-/** The labels and the people that an output can choose in one repository. */
 export interface WorkflowGitHubRepositoryOptions {
   labels: WorkflowGitHubLabel[];
-  /** The logins that can be assigned or asked for a review. */
   people: string[];
 }
 
@@ -191,17 +147,13 @@ export interface WorkflowGitHubRepositoryInput {
   repository: string;
 }
 
-/** Runs a GitHub trigger with the newest item that matches it, as GitHub has it now. */
 export interface WorkflowGitHubLastEventInput {
   workflowId: string;
   nodeId: string;
-  /** Repeats of one request start one run. */
   requestId: string;
 }
 
-/** The most labels or people that a repository's options carry. */
 export const WORKFLOW_GITHUB_OPTION_LIMIT = 500;
-/** The newest events that a GitHub trigger keeps. */
 export const WORKFLOW_GITHUB_DELIVERY_LIMIT = 50;
 
 const LABEL_NAME = 100;

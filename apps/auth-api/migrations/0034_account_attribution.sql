@@ -1,6 +1,3 @@
--- The first website visit that the account service learned for an account: from a sign-in on the
--- web or from the page after a desktop checkout. The first row wins and is never replaced.
--- A new table only: the Worker that runs before this deploy does not read it.
 CREATE TABLE IF NOT EXISTS account_attribution (
   user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   acquisition_source TEXT NOT NULL CHECK(acquisition_source IN ('direct', 'search', 'social', 'github', 'other')),

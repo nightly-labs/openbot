@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "작업 중이에요…",
-  "status.messaging.queued": "대기 중: OpenBot이 다른 요청을 처리하고 있어요. 답변은 여기에 올라와요.",
+  "status.messaging.queued": "대기 중: 이전 요청이 끝나기를 기다리고 있어요. 답변은 여기에 올라와요.",
   "status.messaging.busy": "대기 중인 요청이 너무 많아요. 나중에 다시 시도해 주세요.",
   "status.messaging.failed": "OpenBot이 이 요청을 끝내지 못했어요. 자세한 내용은 OpenBot 호스트에서 확인하세요.",
   "status.messaging.noAnswer": "OpenBot이 텍스트 답변 없이 작업을 마쳤어요.",
@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "중지됨",
   "status.messaging.stop": "중지",
   "status.messaging.approvalTitle": "OpenBot이 계속 진행하려면 승인이 필요해요.",
+  "status.messaging.approvalTitleTeammate": "팀원 {agent}이(가) 계속 진행하려면 승인이 필요해요.",
   "status.messaging.approvalCommand": "명령 실행",
   "status.messaging.approvalFileChange": "파일 변경",
   "status.messaging.approvalPermissions": "추가 권한 받기",
@@ -52,6 +53,10 @@ export const messages = {
     "👋 *OpenBot이 연결되었습니다*\n\n여기에 써서 에이전트에게 요청하세요. WhatsApp Orchestrator가 답하거나 알맞은 에이전트에게 작업을 넘깁니다.\n\n요청을 중지하려면 *stop*을 보내세요.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot이 연결되었습니다*\n\nOpenBot에서 허용한 사람은 이제 이 번호로 쓸 수 있습니다. 새로운 사람은 코드를 받습니다. OpenBot의 요청에서 승인하세요.\n\n요청을 중지하려면 *stop*을 보내세요.",
+  "status.messaging.whatsappOtherOpenBot":
+    "이 WhatsApp 번호에 다른 OpenBot도 연결되어 있어 답변이 두 개 올 수 있습니다. 해결하려면 휴대폰의 WhatsApp에서 ‘연결된 기기’를 열고 사용하지 않는 OpenBot을 로그아웃하세요.",
+  "status.messaging.whatsappPaused":
+    "짧은 시간에 메시지가 너무 많이 와서 OpenBot이 10분 동안 여기서 답변을 멈췄습니다. 이 번호에 다른 OpenBot도 연결되어 있다면 휴대폰의 WhatsApp에서 ‘연결된 기기’를 열고 사용하지 않는 OpenBot을 로그아웃하세요.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp에서 답변하고 팀에 요청해요",
 } as const satisfies PartialTranslation<typeof source>;

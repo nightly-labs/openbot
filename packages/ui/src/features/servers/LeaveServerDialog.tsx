@@ -27,23 +27,16 @@ const LEAVE_TEXT = {
   },
 } as const;
 
-/**
- * Asks before the user leaves a joined server, or deletes a server on this computer. A failed leave
- * stays in the dialog. The dialog closes when `onLeave` resolves.
- */
 export function LeaveServerDialog(props: {
   server: Pick<ServerSummary, "name"> | null;
   onClose: () => void;
   removeOwned?: boolean;
-  /** A server on this computer: the action deletes it and moves its data to the trash. */
   deleteLocal?: boolean;
   onLeave: () => Promise<void>;
-  /** The element that opened the dialog. A menu item is gone when the dialog closes. */
   restoreFocusTarget?: HTMLElement | null | undefined;
 }) {
   const { t, errorMessage } = useText();
   const [error, setError] = createSignal<string | null>(null);
-  // The server can leave the list while the dialog is open, so the next open starts without an error.
   createEffect(
     () => props.server !== null,
     (open) => {
@@ -67,7 +60,6 @@ export function LeaveServerDialog(props: {
       error={error() ?? undefined}
       onCancel={close}
       onConfirm={async () => {
-        // Read now: a successful leave takes the server out of the list.
         const name = props.server?.name ?? "";
         const done = LEAVE_TEXT[mode()].done;
         setError(null);

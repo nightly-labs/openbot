@@ -6,15 +6,10 @@ import { holdFlag } from "../utils";
 import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
 
-/** The default is also the minimum: a narrower panel breaks the avatar editor and the setting rows. */
 export const SETTINGS_PANEL_DEFAULT = 360;
 export const SETTINGS_PANEL_MAX = 1600;
-/** What the chat under the panel keeps for itself, however far the panel is dragged. */
 const CONVERSATION_PANEL_MIN = 96;
 
-/** Shared right-panel shell; caller owns per-owner sections. */
-
-/** How wide the panel may be drawn before the chat beside it is squeezed out of readability. */
 export function settingsPanelMaxWidth(host: HTMLElement | undefined): number {
   const available = (host?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN;
   return Math.min(SETTINGS_PANEL_MAX, Math.max(SETTINGS_PANEL_DEFAULT, available));
@@ -27,13 +22,13 @@ export interface SettingsPanelProps {
   maxWidth: number | (() => number);
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
+  preferredWidth?: (() => number) | undefined;
   children: JSX.Element;
 }
 
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
   const { t } = useText();
   let panel!: HTMLElement;
-  // The chat beside the panel makes room for it (`panel-layout.css`).
   onSettled(() => {
     const conversation = panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "settings-panel") : undefined;
@@ -51,13 +46,17 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
         max={props.maxWidth}
         onResize={props.onResize}
         onResizeEnd={props.onResizeEnd}
+        onParentResize={() => {
+          const max = typeof props.maxWidth === "function" ? props.maxWidth() : props.maxWidth;
+          const next = Math.round(Math.min(max, props.preferredWidth?.() ?? props.width));
+          if (next !== props.width) props.onResize(next);
+        }}
       />
       {props.children}
     </aside>
   );
 }
 
-/** Header glyphs stay here to stop agent/channel drift. */
 export function SettingsBackIcon(): JSX.Element {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 settings-back-icon fill-none stroke-current">
@@ -84,11 +83,9 @@ export interface SettingsPanelHeaderProps {
   backLabel?: string;
   onClose: () => void;
   closeLabel: string;
-  /** The first page of a side panel pane. There, the tab names and closes the pane, so this header hides. */
   paneRoot?: boolean;
 }
 
-/** Fixed 3-column header keeps title centred. */
 export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Element {
   const { t } = useText();
   return (
@@ -120,13 +117,11 @@ export function SettingsPanelHeader(props: SettingsPanelHeaderProps): JSX.Elemen
   );
 }
 
-/** The scrolling body of the panel. It fades at an edge that has more content past it. */
 export function SettingsPanelContent(props: { children: JSX.Element }): JSX.Element {
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   return (
     <div class={["settings-panel-content", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-      {/* A page change or an opened section changes the scroll height while the body keeps its size. */}
       <div ref={fades.watch}>{props.children}</div>
     </div>
   );
@@ -138,7 +133,6 @@ export interface SettingsFieldProps {
   children: JSX.Element;
 }
 
-/** Label over caller control via shared field id. */
 export function SettingsField(props: SettingsFieldProps): JSX.Element {
   const controlId = `${createUniqueId()}-control`;
   return (
@@ -152,15 +146,12 @@ export function SettingsField(props: SettingsFieldProps): JSX.Element {
 }
 
 export interface SettingsLinkGroupProps {
-  /** A heading above the rows. A titled group is a region with that name. */
   title?: JSX.Element;
-  /** Draws the rows in one bordered card, for a panel with several groups one after another. */
   inset?: boolean;
   class?: string;
   children: JSX.Element;
 }
 
-/** The bordered stack the link rows sit in; the rows draw the dividers between themselves. */
 export function SettingsLinkGroup(props: SettingsLinkGroupProps): JSX.Element {
   const titleId = createUniqueId();
   const rows = () => (
@@ -181,19 +172,14 @@ export function SettingsLinkGroup(props: SettingsLinkGroupProps): JSX.Element {
 }
 
 export interface SettingsLinkRowProps {
-  /** A 16 px glyph before the label. Rows in one group either all have one or none do. */
   icon?: JSX.Element;
   label: JSX.Element;
-  /** The state on the right of the row, such as `3 saved`. A row with none shows only the chevron. */
   value?: JSX.Element;
   onClick: (trigger: HTMLButtonElement) => void;
   ref?: (element: HTMLButtonElement) => void;
 }
 
-/** One row of the group: what it opens on the left, where that stands on the right. */
 export function SettingsLinkRow(props: SettingsLinkRowProps): JSX.Element {
-  // Resolved once: each read of a JSX prop builds it again. Only plain text can end in an ellipsis;
-  // a value made of elements keeps the row's flex gap between them.
   const value = children(() => props.value);
   return (
     <Button

@@ -2,10 +2,10 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { connect, createServer, isIP, type Server, type Socket } from "node:net";
 import type { Duplex } from "node:stream";
 import type { BrowserProxyFailure } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
 
-/** A SOCKS5 proxy that needs a user name and a password (RFC 1929). */
 export interface SocksUpstream {
   host: string;
   port: number;
@@ -13,63 +13,51 @@ export interface SocksUpstream {
   password: string;
 }
 
-/** A site that the browser asks for: a DNS name or an IP address, and a port. */
 interface RelayTarget {
   host: string;
   port: number;
 }
 
-/** The SOCKS5 proxy refused the saved sign-in, or it does not take a sign-in. */
 class ProxySignInRefused extends Error {}
 
-/** A connection to a site, and the bytes that came from the site before the relay joined it. */
+export class RelayAddressRefused extends Error {}
+
+export type RelayExitFailure = BrowserProxyFailure | "address";
+
 interface RelayExitConnection {
   stream: Duplex;
   early: Buffer;
 }
 
-/**
- * Where the relay sends each connection. It opens a connection to the site, or rejects. An abort
- * stops the attempt: the browser went away or the relay stops.
- */
 export type RelayExit = (target: RelayTarget, signal: AbortSignal) => Promise<RelayExitConnection>;
 
-/**
- * An HTTP proxy on 127.0.0.1 that Chromium can sign in to. It sends each request through its exit:
- * a SOCKS5 proxy with the saved sign-in, which Chromium cannot sign in to itself, or the computer of a
- * member. Its own sign-in is random, so other programs on the computer cannot use it.
- */
 export interface BrowserProxyRelay {
   readonly host: "127.0.0.1";
   readonly port: number;
   readonly username: string;
   readonly password: string;
-  /**
-   * Why the last connection through the relay failed, or null when it connected. Chromium sees only
-   * that the tunnel failed; the relay knows when the proxy refused the sign-in.
-   */
-  readonly exitFailure: () => BrowserProxyFailure | null;
-  /** Stops the relay and closes each connection through it. */
+  readonly exitFailure: () => RelayExitFailure | null;
   readonly close: Effect.Effect<void>;
 }
 
 const RELAY_USERNAME = "openbot";
-/** The request head that a browser sends is much smaller. A larger one is not a browser. */
 const HEAD_MAX_BYTES = 64 * 1024;
 const HEAD_TIMEOUT_MS = 30_000;
 const SOCKS_TIMEOUT_MS = 20_000;
 const MAX_CONNECTIONS = 256;
-/** Request headers that are for the relay, not for the site. */
 const HOP_HEADERS = new Set(["proxy-authorization", "proxy-connection", "connection", "keep-alive"]);
 
 const BAD_GATEWAY = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+function addressRefusedResponse(): string {
+  const body = sourceText("error.backend.browserProxyComputerLocalAddress");
+  return `HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`;
+}
 const BAD_REQUEST = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 const SIGN_IN_REQUIRED =
   'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="OpenBot"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n';
 
 interface RelayRequest {
   target: RelayTarget;
-  /** The bytes to send to the site first: nothing for a tunnel, the request head for plain HTTP. */
   head: Buffer;
   tunnel: boolean;
 }
@@ -80,7 +68,6 @@ function parsePort(text: string): number | null {
   return port >= 1 && port <= 65_535 ? port : null;
 }
 
-/** Reads `host:port` or `[v6]:port`. */
 function parseAuthority(text: string, defaultPort: number | null): RelayTarget | null {
   const match = /^(?:\[([0-9a-fA-F:.]+)\]|([^:[\]\s/]+))(?::(\d{1,5}))?$/u.exec(text);
   if (!match) return null;
@@ -90,7 +77,6 @@ function parseAuthority(text: string, defaultPort: number | null): RelayTarget |
   return { host, port };
 }
 
-/** Reads the request head that Chromium sends to an HTTP proxy. */
 function parseRequest(head: string, expectedAuthorization: Buffer): RelayRequest | "signIn" | null {
   const lines = head.split("\r\n");
   const [method, target, version, ...rest] = (lines[0] ?? "").split(" ");
@@ -113,7 +99,6 @@ function parseRequest(head: string, expectedAuthorization: Buffer): RelayRequest
     const authority = parseAuthority(target, null);
     return authority === null ? null : { target: authority, head: Buffer.alloc(0), tunnel: true };
   }
-  // A plain http:// request comes in the absolute form. https:// and wss:// always use CONNECT.
   let url: URL;
   try {
     url = new URL(target);
@@ -123,12 +108,10 @@ function parseRequest(head: string, expectedAuthorization: Buffer): RelayRequest
   if (url.protocol !== "http:") return null;
   const authority = parseAuthority(url.host, 80);
   if (authority === null) return null;
-  // One request for each connection: the next request can be for a different site.
   const requestHead = [`${method} ${url.pathname}${url.search} ${version}`, ...headers, "Connection: close", "", ""];
   return { target: authority, head: Buffer.from(requestHead.join("\r\n"), "latin1"), tunnel: false };
 }
 
-/** The eight 16-bit words of an IPv6 address that `isIP` accepts, also with an IPv4 end. */
 function ipv6Words(host: string): number[] | null {
   let text = host.split("%")[0] ?? "";
   const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/u.exec(text);
@@ -164,7 +147,6 @@ function socksAddress(host: string): Buffer | null {
   return Buffer.concat([Buffer.from([0x03, name.length]), name]);
 }
 
-/** Collects the bytes of a socket until a step of the SOCKS5 exchange has all of them. */
 function socksExchange(
   socket: Socket,
   steps: readonly ((data: Buffer) => number | "fail" | "signIn" | null)[],
@@ -178,7 +160,6 @@ function socksExchange(
       socket.off("close", closed);
       clearTimeout(timer);
       if (error) return reject(error);
-      // The tunnel reads the rest. Until it does, no byte may go to a socket without a reader.
       socket.pause();
       resolve(data);
     };
@@ -204,7 +185,6 @@ function socksExchange(
   });
 }
 
-/** Opens a connection to a site through the SOCKS5 proxy. The promise gives the bytes the proxy sent early. */
 async function openSocksConnection(upstream: SocksUpstream, target: RelayTarget, socket: Socket): Promise<Buffer> {
   const address = socksAddress(target.host);
   const username = Buffer.from(upstream.username);
@@ -224,12 +204,10 @@ async function openSocksConnection(upstream: SocksUpstream, target: RelayTarget,
   });
   const port = Buffer.alloc(2);
   port.writeUInt16BE(target.port);
-  // Each step writes the next message when the proxy accepts the one before it.
   const exchange = socksExchange(socket, [
     (data) => {
       if (data.length < 2) return null;
       if (data[0] !== 0x05) return "fail";
-      // 0xff: the proxy takes no sign-in, or a different kind of sign-in.
       if (data[1] !== 0x02) return "signIn";
       socket.write(
         Buffer.concat([Buffer.from([0x01, username.length]), username, Buffer.from([password.length]), password]),
@@ -251,15 +229,12 @@ async function openSocksConnection(upstream: SocksUpstream, target: RelayTarget,
       return data.length < length ? null : length;
     },
   ]);
-  // Offer only the user name and password method: without the sign-in, the proxy must refuse.
   socket.write(Buffer.from([0x05, 0x01, 0x02]));
   return exchange;
 }
 
-/** A SOCKS5 proxy with a sign-in as the exit of a relay. */
 export function socksExit(upstream: SocksUpstream): RelayExit {
   return async (target, signal) => {
-    // The address keeps an IPv6 host in brackets; a socket takes it without them.
     const site = connect({ host: upstream.host.replace(/^\[(.*)\]$/u, "$1"), port: upstream.port });
     site.setNoDelay(true);
     const abort = () => site.destroy(new Error("The connection was stopped"));
@@ -276,13 +251,12 @@ export function socksExit(upstream: SocksUpstream): RelayExit {
   };
 }
 
-/** Reads the request head of one browser connection, then joins it to the site through the exit. */
 function relayConnection(
   client: Socket,
   exit: RelayExit,
   authorization: Buffer,
   open: Set<() => void>,
-  noteExit: (failure: BrowserProxyFailure | null) => void,
+  noteExit: (failure: RelayExitFailure | null) => void,
 ): void {
   let head = Buffer.alloc(0);
   const fail = (response: string) => {
@@ -335,25 +309,29 @@ function relayConnection(
       },
       (error: unknown) => {
         open.delete(stop);
-        // An attempt that the browser or the relay stopped says nothing about the proxy.
-        if (!attempt.signal.aborted) noteExit(error instanceof ProxySignInRefused ? "signIn" : "unreachable");
-        fail(BAD_GATEWAY);
+        if (!attempt.signal.aborted)
+          noteExit(
+            error instanceof ProxySignInRefused
+              ? "signIn"
+              : error instanceof RelayAddressRefused
+                ? "address"
+                : "unreachable",
+          );
+        fail(error instanceof RelayAddressRefused && !request.tunnel ? addressRefusedResponse() : BAD_GATEWAY);
       },
     );
   };
   client.on("data", received);
 }
 
-/** Starts a relay on a free port of 127.0.0.1 for one exit. */
 export const openBrowserProxyRelay = Effect.fn("openBrowserProxyRelay")(function* (
   exit: RelayExit,
 ): Effect.fn.Return<BrowserProxyRelay, BrowserOperationError> {
   const password = randomBytes(24).toString("base64url");
   const authorization = Buffer.from(`Basic ${Buffer.from(`${RELAY_USERNAME}:${password}`).toString("base64")}`);
-  // A stop function for each browser connection, attempt, and site connection.
   const open = new Set<() => void>();
-  let exitFailure: BrowserProxyFailure | null = null;
-  const noteExit = (failure: BrowserProxyFailure | null) => {
+  let exitFailure: RelayExitFailure | null = null;
+  const noteExit = (failure: RelayExitFailure | null) => {
     exitFailure = failure;
   };
   const server: Server = createServer((client) => {
@@ -369,7 +347,6 @@ export const openBrowserProxyRelay = Effect.fn("openBrowserProxyRelay")(function
     server.once("error", failed);
     server.listen(0, "127.0.0.1", () => {
       server.off("error", failed);
-      // A connection that the computer cannot accept fails alone. The relay keeps its port.
       server.on("error", () => {});
       const address = server.address();
       if (address === null || typeof address === "string") {

@@ -1,19 +1,19 @@
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { Effect } from "effect";
 import type { LocalSkillTools } from "../backend/agent/skill-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
+import { MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTools {
   const library = skills.requireLocalLibrary();
   return {
-    list: () => library.list().pipe(toToolOperationFailed),
+    list: () => library.listWithUnreadable().pipe(toToolOperationFailed),
     get: (input) =>
       Effect.gen(function* () {
         const detail = yield* library.get(input.skillId, input.revision).pipe(toToolOperationFailed);
         return { ...detail, archivePath: join(library.root, detail.id, String(detail.version), "bundle.zip") };
       }),
-    // The calling agent gets its own revision, as `create` does. Other agents keep their copies.
     revise: (input) =>
       Effect.gen(function* () {
         const installed = yield* skills.installedRevision(input.agentId, input.skillId).pipe(toToolOperationFailed);
@@ -40,12 +40,14 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
     create: (input) =>
       Effect.gen(function* () {
         const skill = yield* library.create(input.agentId, input.sourcePath).pipe(toToolOperationFailed);
+        const source = posix.normalize(input.sourcePath);
+        if (MANAGED_SKILL_FOLDERS.some((folder) => source === `${folder}/${skill.slug}`)) return skill;
         yield* skills.installLocal({ agentId: input.agentId, skillId: skill.id, revision: skill.version }).pipe(
           Effect.mapError(
-            () =>
+            (failure) =>
               new ToolOperationFailed({
                 cause: new Error(
-                  `Skill ${skill.id} was saved as revision ${skill.version}, but installation failed. Read it and retry install_local_skill; do not create it again.`,
+                  `Skill ${skill.id} was saved as revision ${skill.version}, but installation failed${failure.cause instanceof Error ? `: ${failure.cause.message}` : "."} Read it and retry install_local_skill; do not create it again.`,
                 ),
               }),
           ),

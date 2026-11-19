@@ -1,11 +1,3 @@
-import type { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Storage: what the files, chats and caches of the local host or a joined server take on disk.
-//
-// Every method takes the server explicitly, because Server Settings can be open for a server that
-// is not the selected one. A remote host that predates `storage-v1` answers 404, so a read returns
-// null before the request and the surface says the host needs an update; a change is refused.
-
 import {
   assertStorageUsageScope,
   decodeChannelStorageUsage,
@@ -36,8 +28,13 @@ import {
   STORAGE_CHANNEL_ROUTES,
 } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { StorageAgent, StorageUsageService } from "../../backend/storage-usage";
 import type { LibraryFoldersService } from "../library-folders-service";
@@ -45,12 +42,12 @@ import type { MachineAlertMonitor } from "../machine-alerts";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import { agentRequest } from "./agent-inputs";
 import { type OpenAttachmentDependencies, openAttachmentForServer } from "./attachment-handlers";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
-/** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface StorageRemoteServers extends Pick<OpenAttachmentDependencies["remoteServers"], "downloadAttachment"> {
   forgetCachedAttachments(serverId: string): void;
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
@@ -72,7 +69,6 @@ export interface StorageIpcDependencies extends Omit<OpenAttachmentDependencies,
   openPath: (path: string) => Promise<string>;
 }
 
-/** Delete and clear answer an empty object. The transport codec has already checked its shape. */
 function decodeStorageChange(value: unknown): undefined {
   if (value !== undefined && value !== null && !(isDynamicRecord(value) && Object.keys(value).length === 0))
     throw new Error("The remote server returned data.");
@@ -97,7 +93,6 @@ export function storageIpcHandlers({
     try {
       await runCauseEffect(remoteServers.request(serverId, path, decodeStorageChange, { method: "POST", body }));
     } finally {
-      // A failed answer can still follow a delete that the host completed.
       remoteServers.forgetCachedAttachments(serverId);
     }
   }
@@ -130,6 +125,13 @@ export function storageIpcHandlers({
       getDisk: scopedQueryHandler({
         local: () => runCauseEffect(storage.disk()),
         remote: (serverId) => {
+          if (remoteServers.supportsCapability(serverId, STORAGE_USER_FILES_CAPABILITY))
+            return runCauseEffect(
+              remoteServers.request(serverId, STORAGE_USER_FILES_ROUTES.disk, decodeStorageDisk, {
+                method: "POST",
+                body: {},
+              }),
+            );
           if (!remoteServers.supportsCapability(serverId, STORAGE_DISK_CAPABILITY)) return null;
           return runCauseEffect(
             remoteServers.request(serverId, STORAGE_DISK_ROUTES.disk, decodeStorageDisk, { method: "POST", body: {} }),
@@ -151,7 +153,6 @@ export function storageIpcHandlers({
       deleteFile: scopedHandler(parseDeleteStoredFileInput, {
         local: async (parsed) => {
           await runCauseEffect(storage.deleteFile(parsed.fileId));
-          // A deleted file leaves its Library folder. A joined server does this in its route.
           await runCauseEffect(libraryFolders.removeFiles([parsed.fileId]));
         },
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.deleteFile, parsed),
@@ -160,7 +161,6 @@ export function storageIpcHandlers({
         local: (parsed) => runCauseEffect(storage.clear(parsed.category)),
         remote: (parsed, serverId) => remoteChange(serverId, STORAGE_ROUTES.clear, parsed),
       }),
-      // A stored file is a sent or generated attachment, so the chat's open path serves it.
       openFile: payloadHandler(agentRequest(parseOpenStoredFileInput), (scoped) => {
         const parsed = scoped.payload;
         return openAttachmentForServer({ mailbox, remoteServers, getMainWindow, translate }, scoped.serverId, {
@@ -168,8 +168,6 @@ export function storageIpcHandlers({
           action: parsed.action,
         });
       }),
-      // The folders of the Library. A host before `library-folders-v1` has none, so the read answers
-      // null and the Library shows no folders.
       getLibraryFolders: scopedQueryHandler({
         local: () => libraryFolders.snapshot(),
         remote: (serverId) => {
@@ -195,7 +193,6 @@ export function storageIpcHandlers({
           );
         },
       }),
-      // Local only: a remote host's workspace is a path on another computer.
       openLocation: payloadHandler(parseOpenStorageLocationInput, async ({ agentId }) => {
         const agent = agents().find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error(sourceText("error.storage.agentMissing"));

@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Cerrar {name}",
   "browser.tab.closeUnnamed": "Cerrar pestaña del navegador",
   "browser.newTab": "Nueva pestaña del navegador",
-  "browser.hide": "Ocultar navegador",
+  "browser.backToChat": "Volver al chat",
   "browser.goBack": "Retroceder",
   "browser.goForward": "Avanzar",
   "browser.reload": "Recargar página",
@@ -67,6 +67,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Este texto es demasiado largo para pegarlo. Pega menos de 100.000 caracteres.",
   "browser.liveView.copyTooLarge": "La selección es demasiado larga para copiarla. Selecciona menos texto.",
   "browser.liveView.copyFailed": "No se pudo copiar el texto. Haz clic en la página e inténtalo de nuevo.",
+  "browser.liveView.pageCopied": "La página copió texto. Elige Copiar para ponerlo en tu portapapeles.",
   "browser.previews.label": "Vistas previas del navegador",
   "browser.previews.resize": "Cambiar tamaño del panel derecho",
   "browser.previews.empty": "No hay pestañas del navegador",
@@ -91,6 +92,18 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Intervenir",
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente eligió un campo incorrecto en la página.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot no usó ningún inicio de sesión guardado porque el agente no eligió ninguno de los guardados para este sitio. Dile al agente qué cuenta debe usar.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene contraseña para este sitio.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene clave de autenticador.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot no usó ningún inicio de sesión guardado porque no pudo leer tu gestor de contraseñas.",
   "browser.error.openAddress": "No se pudo abrir la dirección en esta pestaña.",
   "browser.error.channelNoBrowserMember": "Ningún miembro puede abrir una pestaña nueva en este canal.",
   "browser.error.closeTab": "No se pudo cerrar la pestaña del navegador.",

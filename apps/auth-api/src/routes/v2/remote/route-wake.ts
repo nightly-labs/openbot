@@ -31,9 +31,6 @@ const routeWakeSchema = z.object({
   wake: z.boolean(),
 });
 
-// Signal has a Slack, Discord, Telegram or generic webhook event for a route whose host has no socket.
-// A hosted server that sleeps starts with `wake`, and the answer tells Signal whether to keep the event
-// until the host connects. Signal never keeps a generic webhook: its sender sends it again.
 export const Route = createFileRoute("/v2/remote/route-wake")({
   server: {
     handlers: {
@@ -56,7 +53,6 @@ export const Route = createFileRoute("/v2/remote/route-wake")({
             const hosting = requestHostedServerService();
             const state = yield* hosting.routeState(hostId);
             if (!parsed.data.wake || (state !== "sleeping" && state !== "starting")) return json({ hostId, state });
-            // Slack waits at most 3 seconds, and a resume can take longer: the start runs after the answer.
             schedule(hosting.startForRoute(hostId));
             return json({ hostId, state: "starting" });
           }),

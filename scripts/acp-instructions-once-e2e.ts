@@ -1,11 +1,3 @@
-// Runs the real `acp` provider driver over two fake agents to check that a session gets the OpenBot
-// instructions once and not with every prompt. The instructions are 20-30 k characters, so each
-// prompt that repeats them costs thousands of input tokens. The "context" agent reports its context
-// size as OpenCode does: the instructions must come again after a change, a compaction, a failed
-// prompt and a restart. The "silent" agent reports nothing: the instructions come every 10 prompts.
-// The "memory" agent is a "context" agent whose thread has saved memories: a memory edit sends one
-// small update block with the next prompt, not the instructions again.
-// `bun run test:acp-instructions-once`. Writes .openbot-build/acp-instructions-once-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -91,7 +83,6 @@ try {
     developerInstructions,
   });
 
-  // The context agent: one thread through each event that can take the instructions out of context.
   {
     const model = "context/default";
     const steps: Step[] = [];
@@ -101,12 +92,13 @@ try {
       const result = await runTurn(client, thread, { model, text });
       steps.push({ text, instructions, status: result.status });
     };
+    await turn("/review", false);
     await turn("one", true);
     await turn("two", false);
-    // A memory change reaches the held session through a resume, as `ThreadLifecycle` does.
     await runCauseEffect(
       client.request("thread/resume", { threadId: thread, ...threadParams(model, CHANGED) }, (v) => v),
     );
+    await turn("/swarm count the files", false);
     await turn("three", true);
     await turn("four", false);
     await turn("compact-now", false);
@@ -116,7 +108,6 @@ try {
     await turn("fail-now", false);
     await turn("seven", true);
     await turn("eight", false);
-    // A new process opens the saved session, which may have lost its context.
     await runCauseEffect(client.stop());
     client = open();
     await runCauseEffect(
@@ -134,16 +125,16 @@ try {
       "failed",
       "context: the failing prompt fails.",
     );
-    assert.ok(prompts[0]?.instructionsText?.includes(INSTRUCTIONS), "context: the first prompt has the instructions.");
+    const one = prompts.find((prompt) => prompt.text === "one");
+    assert.ok(one?.instructionsText?.includes(INSTRUCTIONS), "context: the first prompt has the instructions.");
     assert.ok(
-      !prompts[0]?.instructionsText?.includes("Kraków"),
+      !one?.instructionsText?.includes("Kraków"),
       "context: the first prompt has the instructions before the change.",
     );
-    for (const prompt of prompts.slice(2).filter((entry) => entry.instructions))
+    for (const prompt of prompts.slice(3).filter((entry) => entry.instructions))
       assert.ok(prompt.instructionsText?.includes("Kraków"), `context: "${prompt.text}" has the changed instructions.`);
   }
 
-  // The silent agent cannot show a compaction, so the instructions come again after 10 prompts.
   {
     const model = "silent/default";
     const steps: Step[] = [];
@@ -160,13 +151,11 @@ try {
     check("silent", steps, prompts);
   }
 
-  // The memory agent: a memory edit keeps the instructions, so the session cache stays valid.
   {
     const model = "memory/default";
     const steps: Step[] = [];
     const client = open();
     const memory = (id: string, text: string) => ({ id, text, origin: "manual" as const });
-    // Enough memories that an update block is shorter than the full list, as in a real agent.
     const facts = [
       "The user likes short answers.",
       "The user writes TypeScript and reviews pull requests every morning.",
@@ -197,7 +186,6 @@ try {
     );
     await turn("three", false);
     await turn("four", false);
-    // A slash command must start the prompt, and it can clear the context.
     await turn("/review", false);
     await turn("after-command", false);
     await turn("compact-now", false);
@@ -244,7 +232,6 @@ try {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
 
-/** Compares the prompts that the agent got with the expected steps, one prompt for each step. */
 function check(mode: Mode, steps: readonly Step[], prompts: readonly Prompt[]): void {
   assert.deepEqual(
     prompts.map((prompt) => prompt.text),

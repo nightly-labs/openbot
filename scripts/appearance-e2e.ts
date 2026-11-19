@@ -1,12 +1,3 @@
-// Switches a running dev app through each theme in Settings, and checks that the window takes the
-// palette of the choice: the root attribute, the canvas token and the page background. Light and Dark
-// must not change `prefers-color-scheme`, because visited websites follow it. For System, it emulates
-// a light and a dark system, because main cannot change the computer's setting.
-// On macOS it then turns on Transparent window: the page background is clear, and while it is on,
-// `prefers-color-scheme` follows Light and Dark, because the blur takes its shade from it. It captures
-// the window with the blur, then turns the switch off and checks that the window is solid again.
-// Restores the saved preference at the end. Writes .openbot-build/appearance/report.json and Settings and
-// workspace screenshots per theme. Needs `--allow-mutations`, because it changes the theme setting.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -19,7 +10,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -27,7 +17,6 @@ declare global {
 }
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/appearance");
-// The canvas of each palette, as tokens.css and tokens-light.css give it.
 const CANVAS = { dark: "#1a1a1a", light: "#f5f5f6" } as const;
 const LABEL = {
   system: en["settings.appearance.theme.system"],
@@ -63,7 +52,6 @@ function settingsTitle(page: Page) {
   return page.getByRole("heading", { level: 1, name: en["app.settingsPage.title"], exact: true });
 }
 
-/** The Theme button. Its name is the title and then the selected theme. */
 function themeButton(page: Page) {
   return page.getByRole("button", { name: new RegExp(`^${en["settings.appearance.theme.title"]} `) });
 }
@@ -72,13 +60,12 @@ async function openSettings(page: Page) {
   if (!(await settingsTitle(page).isVisible()))
     await page.keyboard.press(process.platform === "darwin" ? "Meta+Comma" : "Control+Comma");
   await settingsTitle(page).waitFor();
-  const general = page.getByRole("tab", { name: en["settings.tab.general.title"], exact: true });
-  if (await general.isVisible()) await general.click();
+  const appearance = page.getByRole("tab", { name: en["settings.appearance.title"], exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   await themeButton(page).waitFor();
 }
 
 async function closeSettings(page: Page) {
-  // A focused settings tab keeps Escape for itself, so Escape goes from the title.
   await settingsTitle(page).focus();
   await page.keyboard.press("Escape");
   await settingsTitle(page).waitFor({ state: "hidden" });
@@ -94,7 +81,6 @@ async function chooseAppearance(page: Page, next: AppAppearance) {
   );
 }
 
-/** Turns Transparent window on or off with its Settings switch. */
 async function chooseTransparentWindow(page: Page, next: boolean) {
   await openSettings(page);
   const toggle = page.getByRole("switch", { name: en["settings.appearance.transparentWindow.title"] });
@@ -110,7 +96,6 @@ async function chooseTransparentWindow(page: Page, next: boolean) {
   );
 }
 
-/** Captures the window as the screen shows it, with the blur behind the page. */
 async function captureWindow(page: Page, name: string): Promise<string> {
   const bounds = await page.evaluate(() => [window.screenX, window.screenY, window.outerWidth, window.outerHeight]);
   const path = resolve(OUT, `${name}.png`);
@@ -118,7 +103,6 @@ async function captureWindow(page: Page, name: string): Promise<string> {
   return path;
 }
 
-/** What the window shows: the root attribute, the canvas token and the painted page background. */
 function shownPalette(page: Page) {
   return page.evaluate(() => {
     const root = document.documentElement;
@@ -143,8 +127,6 @@ async function waitForScheme(page: Page, scheme: "light" | "dark") {
 
 mkdirSync(OUT, { recursive: true });
 const page = session.page;
-// Chromium sends `prefers-color-scheme` changes in a rendering step, and a hidden or covered window
-// has none. It takes the new colors when it shows again, so this check needs the window in front.
 assert.equal(
   await page.evaluate(() => document.visibilityState),
   "visible",
@@ -154,7 +136,6 @@ const original = await savedPreference(page);
 const results = [];
 const glass = [];
 try {
-  // Transparent window changes `prefers-color-scheme`, so the theme checks start with it off.
   if (original.transparentWindow)
     await page.evaluate(() => window.openbot.setAppAppearancePreference({ transparentWindow: false }));
   for (const appearance of ["light", "dark"] as const) {
@@ -171,8 +152,6 @@ try {
     dark?.shown.systemLight,
     "The theme choice changed prefers-color-scheme, so visited websites change with it.",
   );
-  // System follows `prefers-color-scheme`, which main sets from the computer. The emulation changes
-  // it for this window only, so the window must follow the media query with no restart.
   await chooseAppearance(page, "system");
   for (const system of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: system });

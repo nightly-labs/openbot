@@ -1,3 +1,4 @@
+import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
 import { currentText } from "@/shared/lib/text";
@@ -11,7 +12,15 @@ function directory(editId: string): string {
 }
 
 export function restoredQueueAttachments(editId: string, files: StoredQueueAttachment[]): ChatAttachment[] {
-  return files.map(({ fileName, ...file }) => ({ ...file, base64: "", uri: `${directory(editId)}${fileName}` }));
+  return files.map(({ fileName, ...file }) => {
+    const uri = `${directory(editId)}${fileName}`;
+    return {
+      ...file,
+      base64: "",
+      uri,
+      ...(file.size > MOBILE_ATTACHMENT_BYTES ? { file: { ref: uri, size: file.size } } : {}),
+    };
+  });
 }
 
 export async function writeQueueAttachment(editId: string, file: ChatAttachment): Promise<StoredQueueAttachment> {
@@ -24,9 +33,11 @@ export async function writeQueueAttachment(editId: string, file: ChatAttachment)
       ?.replace(/[^a-zA-Z0-9]/gu, "") || "bin"
   }`;
   try {
-    await FileSystem.writeAsStringAsync(`${root}${fileName}`, file.base64, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    if (file.file) await FileSystem.copyAsync({ from: file.file.ref, to: `${root}${fileName}` });
+    else
+      await FileSystem.writeAsStringAsync(`${root}${fileName}`, file.base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
   } catch (error) {
     await FileSystem.deleteAsync(`${root}${fileName}`, { idempotent: true }).catch(() => {});
     throw error;
@@ -34,10 +45,14 @@ export async function writeQueueAttachment(editId: string, file: ChatAttachment)
   return { id: file.id, name: file.name, mimeType: file.mimeType, size: file.size, fileName };
 }
 
-export async function readQueueAttachment(editId: string, file: StoredQueueAttachment): Promise<string> {
-  return FileSystem.readAsStringAsync(`${directory(editId)}${file.fileName}`, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+export async function queueAttachmentUpload(
+  editId: string,
+  stored: StoredQueueAttachment,
+  file: ChatAttachment,
+): Promise<ChatAttachment> {
+  const uri = `${directory(editId)}${stored.fileName}`;
+  if (stored.size > MOBILE_ATTACHMENT_BYTES) return { ...file, base64: "", file: { ref: uri, size: stored.size } };
+  return { ...file, base64: await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }) };
 }
 
 export async function removeQueueAttachment(editId: string, file: StoredQueueAttachment): Promise<void> {

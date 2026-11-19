@@ -1,9 +1,5 @@
 #!/usr/bin/env node
 // @ts-check
-// Runs a task on an agent of the OpenBot app that runs on this computer, through the Local scripts
-// API (docs/automation.md). It needs only Node 18 or later. It reads the URL and the token from the
-// automation folder each time it runs and sends the token only in a request header, so the token is
-// never in a command line, in the output or in a log.
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -35,12 +31,10 @@ class CliError extends Error {
   constructor(message, exitCode, stale = false) {
     super(message);
     this.exitCode = exitCode;
-    /** True when the URL or the token can be old: OpenBot restarted, or Local scripts went off and on. */
     this.stale = stale;
   }
 }
 
-/** The automation folder: `OPENBOT_AUTOMATION_DIR`, or the folder of the installed app. */
 function automationDir() {
   const override = process.env.OPENBOT_AUTOMATION_DIR;
   if (override) return override;
@@ -112,13 +106,9 @@ async function requestOnce(target, method, path, body) {
   let value = null;
   try {
     value = text ? JSON.parse(text) : null;
-  } catch {
-    // An answer that is not JSON keeps its status as the reason below.
-  }
+  } catch {}
   if (response.ok) return value;
   const reason = value && typeof value.error === "string" ? value.error : `HTTP ${response.status}`;
-  // 403 means that the agent has Local scripts off. A 404 after the agent was found is an unknown
-  // delivery or an agent that was deleted since, so it is a refusal, not a missing app.
   if (response.status === 401) throw new CliError(reason, EXIT.unreachable, true);
   throw new CliError(reason, response.status === 403 ? EXIT.unreachable : EXIT.failed);
 }
@@ -210,15 +200,12 @@ async function waitForDelivery(target, agent, deliveryId, timeoutMs) {
       if (ENDED.has(delivery.status)) {
         return { result: delivery, exitCode: delivery.status === "completed" ? EXIT.done : EXIT.failed };
       }
-      // A queued delivery can wait behind an earlier turn of the agent that waits for a person.
       if (delivery.status === "running" || delivery.status === "queued") {
         const pending = await request(target, "GET", `${base}/pending`);
         const waiting = pending.prompts.length + pending.approvals.length + pending.browserTakeovers.length;
         if (waiting > 0) return { result: { ...delivery, state: "needs-person", pending }, exitCode: EXIT.needsPerson };
       }
     } catch (error) {
-      // OpenBot restarts: its files are gone or name a new port and token. The delivery stays in the
-      // database, so the wait continues until the deadline.
       if (!(error instanceof CliError) || !error.stale || Date.now() >= deadline) throw error;
     }
     if (Date.now() >= deadline) return { result: { ...delivery, state: "timed-out" }, exitCode: EXIT.timedOut };
@@ -234,8 +221,6 @@ async function waitForDelivery(target, agent, deliveryId, timeoutMs) {
 async function main(positional, flags) {
   const [command, ...rest] = positional;
   if (!command || flags.has("--help")) throw new CliError(USAGE, command ? EXIT.done : EXIT.usage);
-  // Every flag and argument is checked before the connection is read, so a wrong one never leaves a
-  // task queued and is a usage error also when OpenBot is off.
   const timeout = flags.get("--timeout");
   const timeoutMs = duration(typeof timeout === "string" ? timeout : "30m");
   if (command === "list") {

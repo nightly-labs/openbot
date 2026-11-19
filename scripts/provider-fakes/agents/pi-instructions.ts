@@ -1,7 +1,3 @@
-// The Pi of `pi-long-instructions-e2e.ts`, on Pi's JSONL RPC (`pi --mode rpc`). At start it logs
-// its own command line and how the developer instructions arrive: the `--append-system-prompt`
-// value as a file (short line) or as the raw text (long line). A prompt answers at once with a
-// fixed reply. Each request is logged to `FAKE_LOG`.
 import { appendFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";

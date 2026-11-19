@@ -1,6 +1,5 @@
 import { isAgentAnalyticsRoute, isAgentProfileRoute, isConversationUnreadRoute, isHostAnalyticsRoute } from "./current";
 import { isQueueEditRoute } from "./queue-edit-v1";
-import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
 import {
   decodeTeamProtocolV2CurrentHttpRequest,
   decodeTeamProtocolV2CurrentHttpResponse,
@@ -13,11 +12,8 @@ import {
   encodeTeamProtocolV3CurrentHttpRequest,
   encodeTeamProtocolV3CurrentHttpResponse,
 } from "./v3-adapter";
+import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./webrtc-framing";
 
-// The two directions call different halves of the v3 adapter. Both used to call the decoder, which was
-// harmless while encoding and decoding produced the same words -- and stopped being harmless the moment
-// the agent gained a current spelling distinct from its frozen wire one. What leaves this process is wire
-// vocabulary; what a handler receives is current vocabulary.
 export function encodeTeamProtocolV3WebRtcHttpRequest(
   method: string,
   path: string,
@@ -63,7 +59,6 @@ export function decodeTeamProtocolV3WebRtcHttpResponse(
     : decodeTeamProtocolV2CurrentHttpResponse(method, path, status, value);
 }
 
-// The host's local HTTP protocol selection must match the WebRTC codec selection.
 export function isTeamProtocolV3OnlyRoute(method: string, path: string): boolean {
   if (
     isAgentAnalyticsRoute(method, path) ||

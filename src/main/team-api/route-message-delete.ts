@@ -10,16 +10,6 @@ import { readJson, requireAgentLevel, stringField } from "./request-helpers";
 
 const REFUSED_STATUS = { forbidden: 403, "not-found": 404, busy: 409 } as const;
 
-/**
- * Deletes one message from the chat of an agent, of one of its open tasks, or of a channel, for a
- * member of a joined server. Frozen by `message-delete-v1`.
- *
- * A member deletes the messages they sent: in an agent chat with `chat` on the agent, in a channel
- * as any member. With `manage` on the agent, or as an owner or admin for a channel, they delete any
- * message. The agent id is in the body, so the router's check of the path does not see it, and this
- * module refuses an agent hidden from the caller. A host without channels answers the channel route
- * as it answers every channel route.
- */
 export async function routeMessageDelete(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "deleteConversationMessage" | "listAgents">,
@@ -37,7 +27,6 @@ export async function routeMessageDelete(
     return "unmatched";
   if (!capabilities.has(MESSAGE_DELETE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.messageDeleteUnsupported"));
-  // `readJson` has already run the body through the message-delete wire codec.
   const body = await readJson(request);
   const messageId = stringField(body, "messageId");
   try {
@@ -68,7 +57,6 @@ export async function routeMessageDelete(
       ),
     );
   } catch (error) {
-    // A refusal is a sentence for the member. Any other error is a host fault.
     if (error instanceof MessageDeleteRefusedError) throw new HttpError(REFUSED_STATUS[error.reason], error.message);
     throw error;
   }

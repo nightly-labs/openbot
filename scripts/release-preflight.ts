@@ -49,7 +49,6 @@ for (const name of [
     failures.push(`GitHub release secret ${name} is missing`);
   }
 }
-// The Discord post mentions this role. Without it, the post job fails after the release.
 try {
   const roleId = run("gh", [
     "variable",
@@ -74,7 +73,6 @@ try {
   if (!run("gh", ["variable", "get", "CLOUDFLARE_ACCOUNT_ID", "--env", "cloudflare-production"])) {
     failures.push("GitHub cloudflare-production variable CLOUDFLARE_ACCOUNT_ID is missing");
   }
-  // Production previously admitted only main. The hosted release also needs stable tags.
   const environment = JSON.parse(run("gh", ["api", "repos/{owner}/{repo}/environments/cloudflare-production"]));
   if (!isDynamicRecord(environment)) throw new Error("Invalid production environment response.");
   const policy = environment.deployment_branch_policy;

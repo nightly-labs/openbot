@@ -2,10 +2,8 @@ import type { MobileWorkspaceActions, MobileWorkspaceState } from "../workspace/
 import { attachmentSizeBucket } from "./events";
 import { mobileAnalytics } from "./mobile-analytics";
 
-/** Instrument user commands, never background reads or host lifecycle broadcasts. */
 export function trackWorkspaceActions(
   workspace: MobileWorkspaceActions,
-  /** The workspace state when a command runs. */
   state: () => Pick<MobileWorkspaceState, "agents" | "pinnedAgentIds">,
 ): MobileWorkspaceActions {
   const run = mobileAnalytics.operation.bind(mobileAnalytics);
@@ -48,7 +46,7 @@ export function trackWorkspaceActions(
         {
           action: "upload",
           attachment_count: 1,
-          size_bucket: attachmentSizeBucket(Math.floor((input.base64.length * 3) / 4)),
+          size_bucket: attachmentSizeBucket(input.file?.size ?? Math.floor((input.base64.length * 3) / 4)),
         },
         () => workspace.uploadAttachment(id, input, server, onProgress),
       ),

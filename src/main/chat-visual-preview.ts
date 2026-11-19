@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CHAT_VISUAL_MAX_HEIGHT,
   CHAT_VISUAL_MIN_HEIGHT,
+  type ChatVisualAppearance,
   chatVisualAppTheme,
   chatVisualFrameUrl,
 } from "@openbot/contracts/chat-visual";
@@ -15,15 +16,7 @@ import {
   type ChatVisualPreviewResult,
 } from "../backend/agent/chat-visual-preview";
 import { chatVisualResponse } from "./chat-visual-protocol";
-
-/**
- * Draws a visual reply page for `html_preview` in a window that is never shown.
- *
- * The window has its own session in memory, so the page cannot read the app's cookies, storage or
- * attachments. The page gets the same sandbox and frame script as in the chat, and it can load files
- * from the network, as it can there. It cannot ask for a permission, download a file, open a window
- * or leave its address.
- */
+import { usesX11Windows } from "./linux-wayland-output";
 
 const PREVIEW_PARTITION = "openbot-visual-preview";
 const PREVIEW_HOST = "preview";
@@ -31,11 +24,8 @@ const PREVIEW_TIMEOUT = "20 seconds";
 const INITIAL_HEIGHT = 600;
 const CONSOLE_LINE_LIMIT = 40;
 const CONSOLE_LINE_LENGTH = 500;
-/** The same bound as a browser screenshot: a larger image costs the model more than it shows it. */
 const MAX_CAPTURE_PIXELS = 4_194_304;
-/** A script in its own world, so the page cannot replace the functions that it calls. */
 const SCRIPT_WORLD = 1_017;
-/** The measure of the frame script in the chat: `scrollHeight` is never less than the window. */
 const SETTLED_HEIGHT_SCRIPT = `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() =>
   setTimeout(() => resolve(Math.ceil(document.documentElement.getBoundingClientRect().height)), 250))))`;
 const NEXT_FRAME_SCRIPT =
@@ -67,8 +57,7 @@ function boundedPng(image: NativeImage): string {
 }
 
 export class ChatVisualPreviewer implements ChatVisualPreviewHost {
-  readonly #pages = new Map<string, Uint8Array>();
-  /** One page at a time: each one is a renderer process. */
+  readonly #pages = new Map<string, { bytes: Uint8Array; appearance: ChatVisualAppearance }>();
   readonly #lock = Semaphore.makeUnsafe(1);
   #session: Session | null = null;
 
@@ -78,7 +67,9 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
     session.protocol.handle("openbot-visual", (request) => {
       const url = new URL(request.url);
       const page = url.hostname === PREVIEW_HOST ? this.#pages.get(url.pathname.slice(1)) : undefined;
-      return page ? chatVisualResponse(page) : new Response("Not found", { status: 404 });
+      return page
+        ? chatVisualResponse(page.bytes, { appearance: page.appearance })
+        : new Response("Not found", { status: 404 });
     });
     session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     session.setPermissionCheckHandler(() => false);
@@ -96,24 +87,26 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
         Effect.try({
           try: () => {
             this.#previewSession();
-            // Not `offscreen`: after a resize, its capture loses every canvas that does not draw again,
-            // so a chart comes out empty.
+            const backgroundColor = chatVisualAppTheme(request.appearance)["--background"];
+            const offscreen = process.platform === "linux" && !usesX11Windows();
             const window = new BrowserWindow({
               show: false,
               width: request.width,
               height: INITIAL_HEIGHT,
               useContentSize: true,
               enableLargerThanScreen: true,
+              ...(backgroundColor ? { backgroundColor } : {}),
               webPreferences: {
                 sandbox: true,
                 contextIsolation: true,
                 nodeIntegration: false,
                 backgroundThrottling: false,
+                offscreen,
                 partition: PREVIEW_PARTITION,
               },
             });
             const token = randomUUID();
-            this.#pages.set(token, new TextEncoder().encode(request.html));
+            this.#pages.set(token, { bytes: new TextEncoder().encode(request.html), appearance: request.appearance });
             return { token, window };
           },
           catch: () => previewFailure("OpenBot could not open a window to draw the page."),
@@ -137,41 +130,45 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
     const contents = window.webContents;
     const console: string[] = [];
     contents.on("console-message", (event) => {
-      // A development build warns about its own policy on every page; the agent did not write it.
       if (console.length >= CONSOLE_LINE_LIMIT || event.message.startsWith("%cElectron Security Warning")) return;
       const level = CONSOLE_LEVELS[event.level] ?? "log";
-      // The lines go to the provider, so a key that the page logs is removed first.
       console.push(`[${level}] ${redactText(event.message).slice(0, CONSOLE_LINE_LENGTH)}`);
     });
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event) => event.preventDefault());
     contents.on("will-redirect", (event) => event.preventDefault());
     const theme = chatVisualAppTheme(request.appearance);
-    const url = chatVisualFrameUrl(`openbot-visual://${PREVIEW_HOST}/${token}`, theme);
-    return yield* Effect.gen(function* () {
-      yield* Effect.tryPromise({
-        try: () => contents.loadURL(url),
-        catch: () => previewFailure("The page did not load."),
-      });
-      // The agent sees the page on the chat canvas, so the capture has the canvas colour. A page has
-      // a transparent canvas, and a window, unlike a frame, has no chat behind it. The user origin
-      // lets a page that sets its own background keep it.
-      yield* Effect.tryPromise({
-        try: () => contents.insertCSS(`html{background:${theme["--background"]}}`, { cssOrigin: "user" }),
-        catch: () => previewFailure("The page did not load."),
-      });
-      const contentHeight = settledHeight(
+    const pageUrl = `openbot-visual://${PREVIEW_HOST}/${token}`;
+    const load = (url: string) =>
+      Effect.gen(function* () {
         yield* Effect.tryPromise({
-          try: () => contents.executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: SETTLED_HEIGHT_SCRIPT }]),
-          catch: () => previewFailure("The page did not finish drawing."),
-        }),
-      );
+          try: () => contents.loadURL(chatVisualFrameUrl(url, theme)),
+          catch: () => previewFailure("The page did not load."),
+        });
+        yield* Effect.tryPromise({
+          try: () => contents.insertCSS(`html{background:${theme["--background"]}}`, { cssOrigin: "user" }),
+          catch: () => previewFailure("The page did not load."),
+        });
+        return settledHeight(
+          yield* Effect.tryPromise({
+            try: () => contents.executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: SETTLED_HEIGHT_SCRIPT }]),
+            catch: () => previewFailure("The page did not finish drawing."),
+          }),
+        );
+      });
+    return yield* Effect.gen(function* () {
+      const contentHeight = yield* load(pageUrl);
       const height = Math.min(Math.max(contentHeight, CHAT_VISUAL_MIN_HEIGHT), CHAT_VISUAL_MAX_HEIGHT);
       window.setContentSize(request.width, height);
-      yield* Effect.tryPromise({
-        try: () => contents.executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: NEXT_FRAME_SCRIPT }]),
-        catch: () => previewFailure("The page did not finish drawing."),
-      });
+      if (contents.isOffscreen()) {
+        console.length = 0;
+        yield* load(`${pageUrl}?redraw`);
+      } else {
+        yield* Effect.tryPromise({
+          try: () => contents.executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: NEXT_FRAME_SCRIPT }]),
+          catch: () => previewFailure("The page did not finish drawing."),
+        });
+      }
       const image = yield* Effect.tryPromise({
         try: () => contents.capturePage(),
         catch: () => previewFailure("OpenBot could not capture the page."),

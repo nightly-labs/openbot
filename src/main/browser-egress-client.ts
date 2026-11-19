@@ -5,25 +5,16 @@ import { isPublicAddress, systemAddressLookup } from "../backend/network-address
 import { BrowserEgressMux, type BrowserEgressRequest } from "./browser-egress-mux";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 
-// The client end of `browser-egress-v1`: this computer shares its internet connection with a joined
-// server while its user lets it. The host asks for site connections; this end connects only to a
-// public internet address that it resolved and checked itself, so a server cannot reach this
-// computer, its network, or a name that resolves into it. It logs nothing: targets and bytes are
-// user data.
-
-/** A site that does not answer in this time is refused. The browser has its own, longer deadline. */
 const CONNECT_TIMEOUT_MS = 20_000;
 
 interface BrowserEgressServers {
   serverIds(): readonly string[];
-  /** Sharing is on for the server, the host has the capability, and the connection is up. */
   browserEgressWanted(serverId: string): boolean;
 }
 
 export class BrowserEgressClient {
   readonly #bridge: TeamWebRtcBridge;
   readonly #servers: BrowserEgressServers;
-  /** Servers for which this end asked for the channel. The bridge peer id is the server id. */
   readonly #requested = new Set<string>();
   readonly #muxes = new Map<string, BrowserEgressMux>();
 
@@ -36,7 +27,6 @@ export class BrowserEgressClient {
     bridge.on("disconnected", this.#onClosed);
   }
 
-  /** Opens the channel of each server that must have one, and closes the others. */
   readonly reconcile = (): void => {
     const wanted = new Set(this.#servers.serverIds().filter((serverId) => this.#servers.browserEgressWanted(serverId)));
     for (const serverId of wanted) {
@@ -74,7 +64,6 @@ export class BrowserEgressClient {
     this.#muxes.set(peerId, mux);
   };
 
-  // The next change of the server list opens a new channel when sharing is still on.
   readonly #onClosed = (peerId: string): void => {
     if (this.#requested.has(peerId)) this.#stop(peerId);
   };
@@ -90,7 +79,6 @@ export class BrowserEgressClient {
   }
 }
 
-/** Connects one stream to its site, or refuses it. */
 function openSite({ stream, host, port }: BrowserEgressRequest): void {
   const attempt = new AbortController();
   const stop = () => attempt.abort();
@@ -124,7 +112,6 @@ class SiteRefused extends Error {
   }
 }
 
-/** A TCP connection to the first public address of `host`. Rejects with a `SiteRefused`. */
 async function connectPublic(host: string, port: number, signal: AbortSignal): Promise<Socket> {
   const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
   let addresses: readonly string[];

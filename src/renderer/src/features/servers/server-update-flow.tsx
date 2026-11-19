@@ -14,16 +14,9 @@ import { createEffect, createRoot, createSignal, createStore, onSettled, untrack
 import type { HostRestartView } from "../updates/host-restart-toast";
 import type { HostUpdateCalls } from "./ServerUpdatePanel";
 
-/**
- * The OpenBot update of a joined server (`host-update-v1`), from the offer to the server back online.
- * The host sends no progress event, so the status is read again while the update runs. The update
- * outlives Server Settings and the dialog: a hidden update keeps a notice that opens it again.
- */
-
 export interface ServerUpdateTarget {
   serverId: string;
   name: string;
-  /** A member can only request an update that waits for idle agents. */
   canManage: boolean;
   calls: Pick<HostUpdateCalls, "getUpdateStatus" | "startUpdate" | "cancelUpdate">;
 }
@@ -32,12 +25,9 @@ interface Flow {
   name: string;
   canManage: boolean;
   status: HostUpdateStatus;
-  /** The version that the update installs. */
   version: string;
-  /** When the download or the restart started; null while the update waits for the user. */
   startedAt: number | null;
   elapsedSeconds: number;
-  /** The host announced the restart, or its connection dropped while the update ran. */
   restarting: boolean;
   wentDown: boolean;
   result: "online" | "failed" | null;
@@ -48,7 +38,6 @@ interface Flow {
 
 interface Runtime {
   calls: ServerUpdateTarget["calls"];
-  /** Bumped when the flow ends, so a late answer is dropped. */
   generation: number;
   poll: ReturnType<typeof setTimeout> | undefined;
   clock: ReturnType<typeof setInterval> | undefined;
@@ -56,23 +45,16 @@ interface Runtime {
   disposeNotice: (() => void) | undefined;
 }
 
-/** How often the status is read while the update runs. */
 const POLL_MS = 1000;
-/** How often an offer reads the status, so a download that runs by itself shows. */
 const OFFER_POLL_MS = 15_000;
-/** The wait after a read failed, so a host that restarts is not asked every second. */
 const RETRY_MS = 5000;
-/** A host that is not back online by then did not restart. */
 const RESTART_LIMIT_MS = 10 * 60_000;
 
 const [flows, setFlows] = createStore<Record<string, Flow>>({});
 const [openId, setOpenId] = createSignal<string | null>(null);
 const runtimes = new Map<string, Runtime>();
-/** The version that each joined server can update to, from its last status read. The header shows it. */
 const [available, setAvailable] = createStore<Record<string, string>>({});
-/** The calls and the last status of each server in `available`, so the header can open its update. */
 const known = new Map<string, { target: ServerUpdateTarget; status: HostUpdateStatus }>();
-/** The server that the user entered last. An offer for an earlier server is dropped. */
 let entered: string | null = null;
 
 const noticeId = (serverId: string) => `server-update:${serverId}`;
@@ -81,7 +63,6 @@ function offerable(status: HostUpdateStatus): boolean {
   if (status.remoteUpdates !== "allowed" || status.restart || !status.availableVersion) return false;
   return (
     status.phase === "available" ||
-    // The host checks for a new version again on a timer, and keeps the version it found.
     status.phase === "checking" ||
     status.phase === "downloading" ||
     status.phase === "ready" ||
@@ -89,17 +70,14 @@ function offerable(status: HostUpdateStatus): boolean {
   );
 }
 
-/** True while this session follows the update of `serverId`. Its restart notices then stay quiet. */
 export function followsServerUpdate(serverId: string): boolean {
   return flows[serverId] !== undefined;
 }
 
-/** The last status that the update of `serverId` read, so Server Settings shows the same one. */
 export function serverUpdateStatus(serverId: string): HostUpdateStatus | null {
   return flows[serverId]?.status ?? null;
 }
 
-/** True when the host can install `status.availableVersion`, also while it does so. */
 function updatable(status: HostUpdateStatus): boolean {
   return (
     status.remoteUpdates === "allowed" &&
@@ -129,12 +107,10 @@ async function readStatus(target: ServerUpdateTarget): Promise<HostUpdateStatus 
     note(target, status);
     return status;
   } catch {
-    // A host that restarts or goes offline cannot answer; its next connection reads again.
     return null;
   }
 }
 
-/** The header state of `serverId`: the version that it can update to, and whether the update runs. */
 export function serverUpdateBadge(serverId: string): { version: string; running: boolean } | null {
   const flow = flows[serverId];
   if (flow && running(flow)) return { version: flow.version, running: true };
@@ -142,27 +118,20 @@ export function serverUpdateBadge(serverId: string): { version: string; running:
   return version ? { version, running: false } : null;
 }
 
-/** Reads the update status of a joined server for the header, with no dialog. */
 export async function checkServerUpdate(target: ServerUpdateTarget): Promise<void> {
   await readStatus(target);
 }
 
-/**
- * The user entered a server: its update dialog opens each time while the host has a new version.
- * Null is a server with no update access; it drops the offer of the server entered before.
- */
 export async function offerServerUpdate(target: ServerUpdateTarget | null): Promise<void> {
   entered = target?.serverId ?? null;
   if (!target) return;
   const id = target.serverId;
-  // A running update keeps its notice and the header button.
   if (runtimes.has(id)) return;
   const status = await readStatus(target);
   if (!status || entered !== id || runtimes.has(id) || !offerable(status)) return;
   begin(target, status);
 }
 
-/** Opens the update dialog of `target`, or shows the update that already runs there. */
 export function openServerUpdate(target: ServerUpdateTarget, status: HostUpdateStatus): void {
   note(target, status);
   if (runtimes.has(target.serverId)) {
@@ -173,7 +142,6 @@ export function openServerUpdate(target: ServerUpdateTarget, status: HostUpdateS
   begin(target, status);
 }
 
-/** The header action: shows the update of `serverId`, or reads its status again and offers it. */
 export async function showServerUpdate(serverId: string): Promise<void> {
   if (runtimes.has(serverId)) {
     show(serverId);
@@ -212,7 +180,6 @@ function begin(target: ServerUpdateTarget, status: HostUpdateStatus): void {
   setFlows((draft) => {
     draft[id] = { ...flow };
   });
-  // The store shows the new flow in a later read only.
   apply(id, status, flow);
   show(id);
 }
@@ -241,13 +208,11 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
   if (!stored || stored.result) return;
   const runtime = runtimes.get(id);
   if (runtime) note({ serverId: id, name: stored.name, canManage: stored.canManage, calls: runtime.calls }, status);
-  // A store write shows in a later read only, so the checks below read this copy.
   const flow: Flow = {
     ...stored,
     status,
     version: stored.wentDown ? stored.version : (status.availableVersion ?? stored.version),
   };
-  // A server switch or a short drop also reads as down. A host that still waits to restart did not restart.
   if (flow.wentDown && status.restart && status.phase !== "installing") {
     flow.wentDown = false;
     if (runtime?.limit !== undefined && !flow.restarting) {
@@ -259,7 +224,6 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
       if (current) current.wentDown = false;
     });
   }
-  // The first answer after the restart tells whether the new version runs.
   if (flow.wentDown) {
     setFlows((draft) => {
       const current = draft[id];
@@ -284,7 +248,6 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
     finish(id, "failed", "download");
     return;
   }
-  // An update that ends before this session started it, such as one installed from the host.
   if (!running(flow) && !offerable(status) && status.phase !== "error") {
     end(id);
     return;
@@ -322,7 +285,6 @@ async function read(id: string, generation: number): Promise<void> {
     const status = await runtime.calls.getUpdateStatus(id);
     if (runtime.generation === generation) apply(id, status);
   } catch {
-    // A host that restarts cannot answer. Its connection tells when it is back.
     if (runtime.generation === generation) schedulePoll(id, flows[id], RETRY_MS);
   }
 }
@@ -356,7 +318,6 @@ function stopClock(id: string): void {
     });
 }
 
-/** The restart has a limit from the moment it starts. */
 function startRestartLimit(id: string): void {
   const runtime = runtimes.get(id);
   if (!runtime || runtime.limit !== undefined) return;
@@ -389,7 +350,6 @@ function finish(id: string, result: "online" | "failed", failure: ServerUpdateFa
     current.busy = null;
   });
   if (openId() === id) return;
-  // The dialog is hidden, so its notice reports the result.
   const name = flow.name;
   const version = flow.version;
   const description = failureText({ ...flow, failure });
@@ -421,7 +381,6 @@ function failureText(flow: Flow): string | undefined {
   }
 }
 
-/** Stops following the update. The update itself continues on the host. */
 function end(id: string): void {
   const runtime = runtimes.get(id);
   if (runtime) {
@@ -449,7 +408,6 @@ function closeNotice(id: string, runtime: Runtime): void {
   toast.dismiss(noticeId(id));
 }
 
-/** Later ends an offer. Hide keeps a running update in a notice with its live status. */
 function hide(id: string): void {
   const flow = flows[id];
   if (!flow) return;
@@ -460,8 +418,6 @@ function hide(id: string): void {
   setOpenId(null);
   const runtime = runtimes.get(id);
   if (!runtime || runtime.disposeNotice) return;
-  // An explicit root, because the notice outlives the dialog. A write to the Toaster from an owner
-  // throws, so the notice is raised outside the root.
   const parts = createRoot((dispose) => ({ dispose, line: <span>{noticeLine(id)}</span> }));
   runtime.disposeNotice = parts.dispose;
   setTimeout(() => {
@@ -473,7 +429,6 @@ function hide(id: string): void {
       duration: Number.POSITIVE_INFINITY,
       action: { label: t("server.update.dialog.show"), onClick: () => show(id) },
       onDismiss: () => {
-        // The user closed the notice: the restart notices tell the rest.
         if (runtime.disposeNotice === parts.dispose) end(id);
       },
     });
@@ -520,7 +475,6 @@ async function act(id: string, busy: ServerUpdateBusy, call: (runtime: Runtime) 
       const current = draft[id];
       if (current) current.busy = null;
     });
-    // A drop or a server switch after the call makes its answer old. The next read gives the status.
     if (runtime.generation === generation) apply(id, status);
   } catch (error) {
     if (runtimes.get(id) !== runtime) return;
@@ -537,7 +491,6 @@ async function act(id: string, busy: ServerUpdateBusy, call: (runtime: Runtime) 
 function start(id: string, mode: UpdateRestartMode): void {
   const flow = flows[id];
   if (!flow) return;
-  // A retry after a failure starts a new update.
   if (flow.result)
     setFlows((draft) => {
       const current = draft[id];
@@ -550,10 +503,6 @@ function start(id: string, mode: UpdateRestartMode): void {
   void act(id, "start", (runtime) => runtime.calls.startUpdate(mode, id));
 }
 
-/**
- * Follows each server's connection: a host that drops or announces its restart is restarting, and a
- * host that is back online answers with its new version.
- */
 function follow(hosts: readonly HostRestartView[]): void {
   for (const id of [...runtimes.keys()]) {
     const flow = flows[id];
@@ -577,7 +526,6 @@ function follow(hosts: readonly HostRestartView[]): void {
         if (current) current.wentDown = true;
       });
       startRestartLimit(id);
-      // A read that left before the drop answers for the old version.
       const runtime = runtimes.get(id);
       if (runtime) {
         runtime.generation += 1;
@@ -606,12 +554,7 @@ function viewOf(flow: Flow): ServerUpdateView {
   };
 }
 
-/**
- * The update dialog of the open update. Mount it once per workspace. `hosts` are the joined servers
- * and their connections, as the restart notices read them.
- */
 export function ServerUpdateDialogHost(props: { hosts: readonly HostRestartView[] }) {
-  // Each mount shows the entered server as not loaded. Only a host that was online in this mount can drop.
   const seenOnline = new Set<string>();
   createEffect(
     () => props.hosts.map((host) => ({ ...host })),
@@ -621,7 +564,6 @@ export function ServerUpdateDialogHost(props: { hosts: readonly HostRestartView[
         follow(hosts.map((host) => ({ ...host, online: host.online || !seenOnline.has(host.id) })));
       }),
   );
-  // A server switch mounts the workspace again, and the update continues. Only its reads pause.
   onSettled(() => {
     for (const id of runtimes.keys()) schedulePoll(id);
     return () => {
