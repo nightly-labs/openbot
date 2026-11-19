@@ -16,15 +16,10 @@ const KIND_DESCRIPTIONS = {
 
 interface RoutineTriggerMenuProps {
   value: RoutineDraftKind;
-  /** The schedule frequencies the menu offers. */
   kinds: RoutineDraftKindOption[];
   onSelect: (choice: RoutineDraftKind) => void;
 }
 
-/**
- * The menu that changes the schedule frequency. Each choice has an icon, a name and one line that
- * tells when the routine runs. The switch above the schedule chooses between a schedule and a webhook.
- */
 export function RoutineTriggerMenu(props: RoutineTriggerMenuProps) {
   const { t } = useText();
   return (

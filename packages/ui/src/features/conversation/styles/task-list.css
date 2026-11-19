@@ -1,9 +1,6 @@
-/* Task list: the chat block of a plan an agent works through. */
-
 .task-list {
   --task-list-glyph: var(--openbot-icon-sm);
   --task-list-ease: var(--openbot-ease-out);
-  /* The open is slower than the close: rows settle in one after another, and leave together. */
   --task-list-open: 320ms;
   --task-list-close: 200ms;
   --task-list-close-ease: cubic-bezier(0.32, 0.08, 0.24, 1);
@@ -18,9 +15,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The ghost button is the whole header row, so it takes the card corners and the row height.
- * An open list is not a pressed control: the transparent background overrides the expanded
- * ghost fill, and the ghost hover rule still wins. */
 .task-list .task-list-header {
   display: flex;
   background: transparent;
@@ -68,7 +62,6 @@
   transition: stroke-dashoffset var(--openbot-duration-slow) var(--task-list-ease);
 }
 
-/* The title and the running task share one cell, and swap with a blur when the list closes. */
 .task-list-title {
   display: grid;
   min-width: 0;
@@ -111,7 +104,6 @@
   transform: translateY(var(--openbot-space-1));
 }
 
-/* The next task enters from below while the list stays closed. */
 .task-list-title-task-text {
   animation: task-list-title-in var(--task-list-open) var(--task-list-ease);
 }
@@ -132,7 +124,6 @@
   transition: transform var(--openbot-duration-normal) var(--task-list-ease);
 }
 
-/* The closed chevron points to the end side: right in LTR, left in RTL. */
 :dir(rtl) .task-list-chevron {
   transform: rotate(90deg);
 }
@@ -141,7 +132,6 @@
   transform: rotate(0deg);
 }
 
-/* The panel animates its row from 0fr to 1fr, so the chat below moves with it. */
 .task-list-panel {
   display: grid;
   grid-template-rows: 0fr;
@@ -168,8 +158,6 @@
   transition: padding var(--task-list-open) var(--task-list-ease);
 }
 
-/* A closing list blurs and lifts away as one; an opening list focuses in row by row. The delay
- * stops growing after the eighth row, so a long plan does not wait for its last rows. */
 .task-list-item {
   display: flex;
   min-width: 0;
@@ -227,7 +215,6 @@
   color: var(--openbot-text-dim);
 }
 
-/* The strike line draws from the start of the text when the task is done. */
 .task-list-item-text {
   position: relative;
 }
@@ -245,7 +232,6 @@
   transition: transform var(--openbot-duration-slow) var(--task-list-ease);
 }
 
-/* The strike-through grows from the start of the text. */
 :dir(rtl) .task-list-item-text::after {
   transform-origin: right center;
 }
@@ -273,7 +259,6 @@
   animation-play-state: var(--task-list-play-state, running);
 }
 
-/* The same roll as the update island: each settled value lifts in from below and sharpens. */
 .task-list-item-progress {
   --digit-dur: var(--openbot-duration-overlay);
   --digit-distance: var(--openbot-space-1);
@@ -293,7 +278,6 @@
   padding: 0 var(--openbot-space-1-5);
 }
 
-/* One glyph for all states. Each layer shows for its own state, so a change animates in place. */
 .task-list-mark {
   width: var(--task-list-glyph);
   height: var(--task-list-glyph);
@@ -362,7 +346,6 @@
   opacity: 1;
 }
 
-/* Rotate the outer SVG so Chromium can composite the animation. */
 .task-list-mark[data-state="active"] {
   animation: task-list-turn 0.9s linear infinite;
   animation-play-state: var(--task-list-play-state, running);
@@ -377,7 +360,6 @@
   fill: var(--openbot-danger);
 }
 
-/* The check and the cross draw after the disc has filled. */
 .task-list-mark[data-state="done"] .task-list-mark-check,
 .task-list-mark[data-state="failed"] .task-list-mark-cross {
   stroke-dashoffset: 0;
@@ -398,14 +380,12 @@
   }
 }
 
-/* Opacity avoids the per-frame text paint of an animated clipped gradient. */
 @keyframes task-list-pulse {
   50% {
     opacity: 0.6;
   }
 }
 
-/* Closed rows remain mounted for the close transition, but need no idle animation. */
 .task-list:not([data-open]) .task-list-panel {
   --task-list-play-state: paused;
 }

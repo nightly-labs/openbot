@@ -1,8 +1,3 @@
-// Routine results: where an agent routine's answers go outside OpenBot, and what became of each one.
-// A joined server's owner or admin reads the host's connections and reads and sets a destination
-// through `routine-results-v1`. That contract keeps the deliveries and a second send on the host's
-// own computer, so `deliveries` and `resend` reach this computer only.
-
 import { decodeRoutineResultConnectionOptions, decodeRoutineResultDestinationAnswer } from "@openbot/contracts/ipc";
 import {
   ROUTINE_RESULTS_CAPABILITY,
@@ -31,7 +26,6 @@ export function routineResultIpcHandlers({
   routineResults,
   remoteServers,
 }: RoutineResultIpcDependencies): Pick<IpcGroupHandlers, "routineResults"> {
-  /** The renderer offers a joined server's destinations only while the host serves `routine-results-v1`. */
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, ROUTINE_RESULTS_CAPABILITY))
       throw new Error(sourceText("error.team.routineResultsUnsupported"));

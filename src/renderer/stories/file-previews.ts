@@ -2,11 +2,6 @@ import type { FilePreview } from "@openbot/contracts/ipc";
 import { strToU8, zipSync } from "fflate";
 import { INLINE_SVG_CHART } from "./chat-visual-fixtures";
 
-/**
- * File previews for the Storybook stories of the file preview panel. The panel takes
- * the bytes that the main process read, so each fixture is written here as text.
- */
-
 const encode = (value: string) => new TextEncoder().encode(value);
 
 const filePreview = (
@@ -53,8 +48,6 @@ Set the provider in \`~/OpenBot/config.json\`:
 3. Open it externally when you need the full application
 `;
 
-// Text keeps its spacing and does not wrap. The long lines show the horizontal
-// scroll, and the indented lines show that the spacing stays as it is in the file.
 const TEXT = `2026-09-13T09:12:04.118Z  info   provider.claude-code   session started  id=sess_8f31c2
 2026-09-13T09:12:04.402Z  debug  ipc.attachments        preview requested  name=RELEASE-NOTES.md kind=markdown bytes=1043
 2026-09-13T09:12:05.907Z  warn   team-api.host          adapter v2 client asked for a v3 field; the response keeps the v2 shape and drops "routines"
@@ -90,9 +83,6 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width
 </svg>
 `;
 
-// A one-page PDF, written here so the stories need no binary asset. Each offset in
-// the cross-reference table must give the byte position of its object, so the table
-// is built after the objects. All bytes are ASCII: a string index is a byte offset.
 const buildPdf = () => {
   const stream = "BT /F1 18 Tf 24 150 Td (OpenBot file preview) Tj ET";
   const objects = [
@@ -115,12 +105,6 @@ const buildPdf = () => {
   return `${body}xref\n0 ${size}\n0000000000 65535 f \n${entries}trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
 };
 
-/**
- * A silent MPEG-1 Layer III stream: 40 frames of 417 bytes at 128 kbit/s and 44.1 kHz, which is
- * about one second. Only the four header bytes of each frame carry meaning; the rest stays zero,
- * so the decoder reads silence. A QuickTime container has no equally short honest form, so there
- * is no video fixture: point the panel at a real .mov to check that kind.
- */
 const buildMp3 = (): Uint8Array => {
   const frameBytes = 417;
   const frames = 40;
@@ -150,7 +134,6 @@ const buildXlsx = (): Uint8Array =>
     ),
   });
 
-// Expected row 2: $1,234.50 | USD 1234.50 | Gain 12.5% | 2.50 kg | 1,234.50 | 12.5% | 1234.5 | % 1.00 | 2024-01-01 | 12:00 | -$1,234.50 | Total.
 const buildLiteralPrefixesXlsx = (): Uint8Array =>
   zipSync({
     "[Content_Types].xml": strToU8(
@@ -220,7 +203,6 @@ export const XLSX_LITERAL_PREFIXES_PREVIEW: FilePreview = {
 
 const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
 
-/** A kind that the panel cannot show. The user opens the file externally. */
 export const UNSUPPORTED_PREVIEW: FilePreview = {
   name: "archive.zip",
   size: 68 * 1024,
@@ -229,7 +211,6 @@ export const UNSUPPORTED_PREVIEW: FilePreview = {
   bytes: null,
 };
 
-/** The workspace files that the chat story links to, in the order that the chat names them. */
 export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   MARKDOWN_PREVIEW,
   TEXT_PREVIEW,
@@ -242,7 +223,6 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   HTML_PREVIEW,
 ];
 
-/** Find the preview for a file path, as the main process does for a file link in a message. */
 export function filePreviewForPath(path: string): FilePreview | null {
   const name = path.replaceAll("\\", "/").split("/").pop();
   return WORKSPACE_FILE_PREVIEWS.find((preview) => preview.name === name) ?? null;

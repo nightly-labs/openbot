@@ -1,12 +1,3 @@
-// Checks issue #4995 on the real Codex driver and `ProviderRuntime`, with a fake Codex app-server.
-// 1. A launch of two providers gives Codex the long start timeout: a first `initialize` that takes
-//    longer than the request timeout connects on the same process. A stop at the request timeout made Codex keep
-//    the lease of its state database backfill for 15 minutes.
-// 2. A start that exits with "timed out waiting for state db backfill" shows
-//    `error.provider.codexStateBusy`, not the CLI's words.
-// 3. An update whose new copy fails the same way keeps the copy, and does not report
-//    `error.provider.cliUpdateFailed`.
-// `bun run test:codex-state-busy`. Writes .openbot-build/codex-state-busy-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +7,6 @@ import { Effect, Result } from "effect";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-state-busy-e2e");
 const REQUEST_TIMEOUT_MS = 1_000;
-/** Longer than the request timeout, and shorter than the long start timeout below. */
 const SLOW_INITIALIZE_MS = 2_500;
 const LONG_START_TIMEOUT_MS = 8_000;
 const root = await mkdtemp(join(tmpdir(), "openbot-codex-state-busy-"));
@@ -24,14 +14,11 @@ const home = join(root, "home");
 const logPath = join(root, "protocol.jsonl");
 const modePath = join(root, "mode.json");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_FAKE_CODEX_LOG = logPath;
 process.env.OPENBOT_FAKE_CODEX_MODE = modePath;
 delete process.env.OPENBOT_CODEX_PATH;
-// A second provider that is on makes the launch a start of several providers, as on a hosted server.
-// Its CLI path names no file, so it fails at once and starts no process.
 process.env.OPENBOT_OPENCODE_PATH = join(root, "no-opencode");
 mkdirSync(home, { recursive: true });
 
@@ -42,9 +29,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
-// The mode applies to each process that starts while it is set: `slow` answers `initialize` late,
-// `busy` exits at once with the Codex 0.160 backfill error, and another mode answers at once. The version is
-// high, so the managed copy runs and not a Codex on this computer.
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -124,7 +108,6 @@ function protocol(): ProtocolLine[] {
   }
 }
 
-/** Writes the fake Codex as a managed copy under `directory`, and returns its path. */
 async function installFakeCodex(directory: string): Promise<string> {
   const path = join(directory, "bin", "codex");
   await mkdir(join(directory, "bin"), { recursive: true });
@@ -172,7 +155,6 @@ function runtime(executable: string) {
   return { providers, store };
 }
 
-/** `dispose` hands the running clients to its caller, which stops them, as `AgentService` does. */
 async function stopAll(providers: InstanceType<typeof ProviderRuntime>): Promise<void> {
   for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
 }
@@ -184,7 +166,6 @@ const executable = await installFakeCodex(join(root, "codex", "1"));
 const updatedExecutable = await installFakeCodex(join(root, "codex", "2"));
 
 try {
-  // 1. A slow first `initialize` at launch connects on the first process.
   setMode("slow");
   const slow = runtime(executable);
   await runCauseEffect(slow.providers.start());
@@ -197,14 +178,12 @@ try {
   };
   await stopAll(slow.providers);
 
-  // 2. A start that meets the backfill lease shows the catalog text.
   setMode("busy");
   const busy = runtime(executable);
   await runCauseEffect(busy.providers.start());
   const busyRow = codexRow(busy.providers);
   report.busyStart = { state: busyRow?.state ?? null, message: busyRow?.message ?? null };
 
-  // 3. An update whose new copy meets the lease keeps the copy.
   const update = await Effect.runPromise(
     Effect.result(
       busy.providers.updateProviderCli(
@@ -236,7 +215,6 @@ try {
     report.busyStart.message === busyText &&
     report.busyUpdate.succeeded &&
     report.busyUpdate.message === busyText &&
-    // One start for the failed start, and one for the new copy.
     report.busyUpdate.starts === 2;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

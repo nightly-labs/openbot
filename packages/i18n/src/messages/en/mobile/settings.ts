@@ -502,7 +502,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.elevenLabs.model.v3": "Expressive · slow",
   "mobile.settings.voice.elevenLabs.model.v4Turbo": "90+ languages · fast",
   "mobile.settings.voice.elevenLabs.model.v4": "Best quality · 90+ languages · slow",
-  // Settings > Agents: the agent defaults of a server where the reader is an owner or admin.
   "mobile.settings.agents.title": "Agents",
   "mobile.settings.agents.serversFooter":
     "Choose a server. Only the servers where you are an owner or admin show here.",

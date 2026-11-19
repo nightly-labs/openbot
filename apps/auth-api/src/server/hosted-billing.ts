@@ -39,25 +39,16 @@ export type HostedBillingBindings = HostedServerBindings &
     >
   >;
 
-/**
- * Billing and hosted servers, linked in both directions: a server starts a Checkout, and a stored
- * subscription starts or stops its server. Billing is null when the deployment has no Stripe key.
- */
 export function createHostedBilling(
   bindings: HostedBillingBindings,
   options: Pick<HostedServerServiceOptions, "removeHost" | "developerKey"> & {
-    /** Tells the members of a host that its plan, and so its member limit, can be different. */
     planChanged: (hostId: string) => Effect.Effect<void, RemoteFailure>;
-    /** Tells the members of an account's servers that its license, and so their member limit, can be different. */
     licenseChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
-    /** Keeps the Worker alive until an analytics send or a server start command ends (`waitUntil`). */
     schedule: (work: Effect.Effect<void>) => void;
-    /** The network of Stripe, boat, OpenPanel and the operator webhook. A test gives its own. */
     fetch?: (input: string, init: RequestInit) => Promise<Response>;
   },
 ): { billing: BillingService | null; hosting: HostedServerService } {
   const send = options.fetch ?? ((input, init) => fetch(input, init));
-  // The operator webhook of the pool alerts also gets each new subscription (docs/hosted-servers.md#pool-alerts).
   const operatorAlert = createHostedPoolAlert(bindings.HOSTED_POOL_ALERT_WEBHOOK_URL, send);
   const analytics = createAccountAnalytics({
     clientId: bindings.OPENPANEL_CLIENT_ID,
@@ -129,10 +120,6 @@ export function createHostedBilling(
   return { billing, hosting };
 }
 
-/**
- * A deployment without SMTP sends no billing email. A failed send is not sent again. Each result logs
- * one line with no address.
- */
 function sendBillingEmail<Message>(
   name: "welcome email" | `license email ${LicenseEmailInput["kind"]}`,
   createDelivery: () => { send(message: Message): Effect.Effect<void, EmailDeliveryError | SmtpFailure> } | null,

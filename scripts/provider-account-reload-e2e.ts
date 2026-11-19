@@ -1,6 +1,3 @@
-// Checks saved accounts through the real runtime, account store, and provider adapters with local CLI fixtures.
-// Run: bun scripts/provider-account-reload-e2e.ts
-// Report: .openbot-build/provider-update-busy-e2e/account-reload-report.json
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -31,7 +28,6 @@ export async function checkProviderAccountReload(): Promise<void> {
     OPENBOT_CLAUDE_PATH: process.env.OPENBOT_CLAUDE_PATH,
   };
 
-  // Account status comes from a file in the selected account folder, never from a real sign-in.
   const FAKE_CLI = `#!${process.execPath}
 const fs = require("node:fs");
 const path = require("node:path");
@@ -256,8 +252,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       runtime = undefined;
     }
 
-    // An account that lost its login after its check: the start of an agent on it must say so and
-    // change the row, which stayed "connected" (#8277).
     const lostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(lostLogin.load());
     runtime = createRuntime(lostLogin);
@@ -282,8 +276,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await stop(runtime);
     runtime = undefined;
 
-    // A login that ends while the agent's process runs: the turn fails, and the row must not stay
-    // "connected" (#12479). A refusal without the sign-in expired text keeps it connected.
     const turnLostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(turnLostLogin.load());
     runtime = createRuntime(turnLostLogin);
@@ -312,7 +304,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await stop(runtime);
     runtime = undefined;
 
-    // A provider that reports no account must finish its check without removing the saved account.
     const signedOut = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(signedOut.load());
     for (const account of signedOut.list()) await saveAccount(signedOut.home(account), null);

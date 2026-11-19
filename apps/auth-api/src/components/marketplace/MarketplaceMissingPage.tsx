@@ -8,7 +8,6 @@ import type { MarketplaceMissingText } from "./marketplace-page-text";
 
 export type MarketplaceMissingData = Pick<PageText<MarketplaceMissingText>, "lang" | "text">;
 
-/** The data a listing route throws with `notFound`. A not-found error from anywhere else has none. */
 export function isMarketplaceMissingData(value: unknown): value is MarketplaceMissingData {
   if (typeof value !== "object" || value === null || !("text" in value) || !("lang" in value)) return false;
   const text = value.text;
@@ -25,10 +24,6 @@ export function isMarketplaceMissingData(value: unknown): value is MarketplaceMi
   );
 }
 
-/**
- * A listing that is not in the Marketplace: the creator removed it, OpenBot rejected it, or the
- * link is wrong. The page does not say which, so a rejected listing looks like a wrong link.
- */
 export function MarketplaceMissingPage(props: { data?: unknown }) {
   const page = () => (isMarketplaceMissingData(props.data) ? props.data : undefined);
   const siteNotFound = () => <NotFoundPage />;

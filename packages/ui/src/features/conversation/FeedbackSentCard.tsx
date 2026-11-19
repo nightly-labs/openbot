@@ -4,7 +4,6 @@ import { Badge, Button, buttonVariants, Check, ExternalLink, Pencil, Trash2 } fr
 import { createSignal, createUniqueId, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** What the card says when a removal does not end with the report off GitHub. */
 const WITHDRAW_FAILURES = {
   signedOut: "chat.feedbackSent.removeSignedOut",
   notYours: "chat.feedbackSent.removeNotYours",
@@ -16,30 +15,14 @@ const WITHDRAW_FAILURES = {
 
 type Step = "closed" | "choosing" | "confirming";
 
-/**
- * The chat card after the OpenBot team got the user's feedback: a thank-you, the title, and a link to
- * the public issue. It comes in where the offer card was, with a short entrance.
- *
- * With `onFix`, Fix or remove offers two choices. A corrected report goes through the agent: the
- * composer gets the request, with a notice that can cancel it, and the user completes and sends it.
- * Remove asks in the card first,
- * because it cannot be undone, then calls `onWithdraw`. Without `onWithdraw`, such as for a joined
- * server, Remove puts a request for the agent in the composer too. A removed report shows a Removed
- * card with no link.
- */
 export function FeedbackSentCard(props: {
   title: string;
   number: number;
   url: string;
-  /** True after the user took the report off GitHub. */
   withdrawn?: boolean | undefined;
-  /** Opens the issue outside the app. Absent, the link opens a new browser tab. */
   onOpenLink?: ((url: string) => void) | undefined;
-  /** Puts a request for a corrected report in the composer. Absent, the card offers no change. */
   onFix?: (() => void) | undefined;
-  /** Takes the report off GitHub. Absent, Remove puts a request for the agent in the composer. */
   onWithdraw?: (() => Promise<WithdrawFeedbackStatus>) | undefined;
-  /** Puts a request to remove the report in the composer, where this client cannot remove it. */
   onAskRemove?: (() => void) | undefined;
 }) {
   const { t } = useText();
@@ -49,7 +32,6 @@ export function FeedbackSentCard(props: {
   const [removed, setRemoved] = createSignal(false);
   const [composerFilled, setComposerFilled] = createSignal(false);
   const [failure, setFailure] = createSignal<AppTextKey | null>(null);
-  // The chat update comes after the answer, so the card shows the removal at once.
   const withdrawn = () => props.withdrawn === true || removed();
   const canChange = () => props.onFix !== undefined && (props.onWithdraw ?? props.onAskRemove) !== undefined;
 

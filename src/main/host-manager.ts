@@ -17,11 +17,9 @@ import {
 } from "./host-update-files";
 
 export interface HostManagerOperations {
-  /** Fixed release source; never accepts a tenant URL, path, command or version. */
   stageLatest: () => Promise<string | null>;
   install: (version: string) => Promise<void>;
   installedVersion: () => Promise<string>;
-  /** Enumerates executable paths and UIDs, never process arguments or tenant files. */
   runningTenants: () => Promise<Array<{ uid: number; pid: number }>>;
   applicationInUse: () => Promise<boolean>;
 }
@@ -52,7 +50,6 @@ class HostInstallation extends Context.Service<
   }
 }
 
-/** Owned by one launchd system job. No tenant election and no tenant-supplied control input. */
 export class HostManager {
   readonly #directory: string;
   readonly #installation: typeof HostInstallation.Service;
@@ -109,7 +106,6 @@ export class HostManager {
     this: HostManager,
     error: string,
   ): Effect.fn.Return<void, HostMaintenanceError, HostInstallation> {
-    // A shutdown can be partial. Only a verified, untouched installation may restart those tenants.
     const version =
       this.#state.phase === "stopping"
         ? yield* HostInstallation.use((service) => service.installedVersion()).pipe(
@@ -143,7 +139,6 @@ export class HostManager {
         if (!isMissingFileError(error)) return yield* new HostMaintenanceError({ cause: error });
       }
       this.#initialized = true;
-      // No replay of an interrupted install. An administrator must verify and recover it.
       if (["stopping", "installing", "failed"].includes(this.#state.phase)) {
         yield* this.#publishEffect("failed", sourceText("error.host.maintenanceInterrupted"));
         return;
@@ -175,7 +170,6 @@ export class HostManager {
     }).pipe(
       Effect.catch(() =>
         Effect.gen({ self: this }, function* () {
-          // Deliberately omit exception text: OS command output and tenant input are not diagnostics.
           const message = sourceText("error.host.updateFailed", { phase: this.#state.phase });
           if (this.#state.phase === "installing") yield* this.#publishEffect("failed", message);
           else yield* this.#abortEffect(message);
@@ -217,7 +211,6 @@ export class HostManager {
       this.#idle.clear();
       return;
     }
-    // Every registered tenant must participate. Missing, logged-out or malformed status blocks.
     for (const uid of config.tenants) {
       const status = yield* this.#statusEffect(uid);
       const matching = running.filter((process) => process.uid === uid);
@@ -252,7 +245,6 @@ export class HostManager {
       yield* this.#abortEffect(sourceText("error.host.tenantShutdownTimeout"));
       return;
     }
-    // A stopped marker is not proof. Wait for the real OS process list, including unregistered users.
     if (yield* HostInstallation.use((service) => service.applicationInUse())) {
       yield* this.#publishEffect("stopping");
       return;

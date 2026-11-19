@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/messaging";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "error.messaging.notConnected": "Это рабочее пространство Slack не подключено.",
   "error.messaging.unsupported": "Этот компьютер не может подключиться к Slack.",

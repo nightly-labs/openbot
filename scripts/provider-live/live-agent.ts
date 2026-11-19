@@ -1,5 +1,3 @@
-// The steps that each live provider test shares: wait for the provider of the profile, choose its
-// low-cost model, and start with no agents.
 import type { Browser } from "@e2e-dev/web";
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { expect } from "e2e";
@@ -12,12 +10,9 @@ declare global {
 }
 
 const POLL_MS = 500;
-/** A first run downloads the provider CLI before the provider can start. */
 const PROVIDER_READY_MS = 300_000;
-/** The states in which a provider does not change without the user. */
 const SETTLED_STATES = ["available", "sign-in-required", "error", "outdated"];
 
-/** Reads `read` again until `ready` accepts the value. The app sends no event to the test. */
 export async function waitFor<T>(
   label: string,
   limitMs: number,
@@ -33,10 +28,6 @@ export async function waitFor<T>(
   }
 }
 
-/**
- * Waits until the provider of the profile is available, and returns it with its test model. It deletes
- * the agents that an earlier run that stopped early left in the profile.
- */
 export async function readyProvider(browser: Browser): Promise<{ provider: LiveProvider; model: string }> {
   const provider = await waitFor(
     "the app bridge",
@@ -46,7 +37,6 @@ export async function readyProvider(browser: Browser): Promise<{ provider: LiveP
   );
   if (!isLiveProvider(provider)) throw new Error(`The profile names no live provider: ${String(provider)}`);
 
-  // The provider must have its CLI and the user's sign-in. Only the download can be started here.
   let downloadStarted = false;
   const status = await waitFor(
     `${provider} is available`,

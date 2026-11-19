@@ -44,7 +44,6 @@ export const Password: Story = {
     vault: { server: null },
   },
 };
-/** An owner or admin of a joined server: the box starts unchecked. */
 export const PasswordJoinedServer: Story = {
   args: { ...Password.args, vault: { server: "Studio Mac mini" } },
 };
@@ -54,7 +53,6 @@ export const PasswordMember: Story = {
 export const PasswordOlderHost: Story = {
   args: { ...Password.args, vault: { server: "Studio Mac mini", blocked: "version" } },
 };
-/** A saved login fits the site, but OpenBot did not fill it: the card says why. */
 export const PasswordVaultSkipped: Story = {
   args: {
     ...Password.args,
@@ -75,7 +73,6 @@ export const Failed: Story = {
     },
   },
 };
-// The narrowest chat: a pop-out chat window at its 380px minimum width.
 const renderNarrow: NonNullable<Story["render"]> = (args) => (
   <div style={{ width: "340px", "max-width": "100%" }}>
     <BrowserSecretCard {...args} />

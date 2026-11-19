@@ -158,12 +158,10 @@ export const OneProvider: Story = {
   args: { rows: oneProviderRows },
 };
 
-/** A Gemini plan for which Google sends no Gemini group: the one group still shows its name. */
 export const AntigravityClaudeGroupOnly: Story = {
   args: { rows: claudeGroupOnlyRows },
 };
 
-/** Each group has a 5-hour and a weekly window: the group name shows once, above its windows. */
 export const AntigravityTwoWindowGroups: Story = {
   args: { rows: twoWindowGroupRows },
 };

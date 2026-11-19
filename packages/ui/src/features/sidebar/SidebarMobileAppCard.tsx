@@ -1,10 +1,6 @@
 import { Button, IconButton, Smartphone, X } from "@openbot/ui";
 import { useText } from "../../text";
 
-/**
- * The announcement of the mobile app at the bottom of the sidebar. "How to install" opens Mobile
- * Connect, which shows the install steps for iPhone and Android and then the sign-in code.
- */
 export function SidebarMobileAppCard(props: { onOpenInstall: () => void; onDismiss: () => void }) {
   const { t } = useText();
   return (

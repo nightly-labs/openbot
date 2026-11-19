@@ -49,31 +49,20 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { SPLASH_HANDOFF_DEADLINE_MS, SplashContentReadyContext } from "@/shared/lib/use-splash-gate";
 
-// The widest sign-in column: the field, both buttons and the eight code slots share this width.
 const COLUMN_MAX_WIDTH = 420;
 const SIDE_MARGIN = 24;
-// The block stops this far above the sign-in title.
 const PANE_GAP = 40;
-// The block under the status bar on the email and code steps, and the gap to their title.
 const COMPACT_HEADER = 146;
 const FORM_GAP = 26;
-// The largest share of the screen that the header takes on the first step.
 const OPTIONS_HEADER_SHARE = 0.5;
-// The smallest header on the first step, when large text needs the room.
 const MIN_OPTIONS_HEADER = 150;
-// Space between the lowest control and the keyboard. The header never shrinks past this point.
 const KEYBOARD_GAP = 24;
 const MIN_LIFTED_HEADER = 64;
-// The keyboard rises while the email pane comes in, as the block settles.
 const EMAIL_FOCUS_MS = 380;
-// The sad face after a refused value.
 const SAD_MS = 1100;
-// "Connected" stays on the block this long before the app takes over.
 const DONE_HOLD_MS = 900;
-// The camera stays under the block until the block has come back over it.
 const SCANNER_RELEASE_MS = 400;
 
-/** A link that waits for sign-in, such as an invitation. A banner above the sign-in content names it. */
 export interface SignInNotice {
   icon: LucideIcon;
   title: string;
@@ -129,11 +118,6 @@ interface ScanState {
   status: ScanStatus;
 }
 
-/**
- * The sign-in screen. The stage's lilac block is its header: the block covers the screen at
- * launch, rises to make room for the choices, shrinks for the email steps, covers the screen again
- * for the camera and fades so the camera shows through, while the eyes become the scanner frame.
- */
 export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const { t } = useText();
   const reportContentReady = useContext(SplashContentReadyContext);
@@ -144,7 +128,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const { lift, look } = useBloubStage();
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
-  // A new session first shows "Connected" on the block, then the app takes over under it.
   const [finished, setFinished] = useState<MobileSession | null>(null);
   const connectRef = useRef(connect);
   connectRef.current = connect;
@@ -158,7 +141,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     };
     const hold = AppState.currentState !== "active" ? 0 : reduced ? DONE_HOLD_MS / 2 : BLOUB_MOVE_MS + DONE_HOLD_MS;
     const timer = setTimeout(attach, hold);
-    // A redeemed session must never be lost, also when the screen leaves first.
     return () => {
       clearTimeout(timer);
       attach();
@@ -170,7 +152,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   const emailInput = useRef<TextInputInstance>(null);
   const codeInput = useRef<EmailCodeInputHandle>(null);
 
-  // The scanner keeps its camera under the block until the block covers it again.
   const [scan, setScan] = useState<ScanState | null>(null);
   const [scannerMounted, setScannerMounted] = useState(false);
   useEffect(() => {
@@ -185,7 +166,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     setScannerMounted(true);
   }, []);
   const closeScanner = useCallback(() => {
-    // A redeemed code ends in the app: closing now could lose its session.
     setScan((current) => (current?.status === "connecting" ? current : null));
   }, []);
   const onModeChange = useCallback(
@@ -198,7 +178,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     [],
   );
 
-  // A refused value makes the eyes sad for a moment.
   const [sad, setSad] = useState(false);
   useEffect(() => {
     if (signIn.rejection === 0) return;
@@ -207,20 +186,15 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     return () => clearTimeout(timer);
   }, [signIn.rejection]);
 
-  // Layout of the first step. A copy that nobody sees measures the pane before the block moves, so
-  // the block and the pane can move together.
   const [optionsHeight, setOptionsHeight] = useState(0);
   const [helpHeight, setHelpHeight] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
-  // The column stays in the middle of the space between the side insets (the iPhone Duo rail).
   const safeWidth = viewport.width - insets.left - insets.right;
   const columnWidth = Math.max(0, Math.min(COLUMN_MAX_WIDTH, safeWidth - 2 * SIDE_MARGIN));
   const columnLeft = insets.left + (safeWidth - columnWidth) / 2;
   const closedHeight = optionsHeight - helpHeight;
   const bottomPad = Math.max(insets.bottom + 8, 24);
   const minOptionsTop = insets.top + MIN_OPTIONS_HEADER + PANE_GAP;
-  // The block takes at most half the screen, as in the design. Short content then sits under the
-  // block, and tall content (large text) pushes the block up.
   const maxOptionsTop = Math.round(viewport.height * OPTIONS_HEADER_SHARE) + PANE_GAP;
   const optionsTop = Math.max(minOptionsTop, Math.min(maxOptionsTop, viewport.height - bottomPad - closedHeight));
   const measured = viewport.height > 0 && optionsHeight > 0;
@@ -237,7 +211,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     if (step !== "options") setHelpOpen(false);
   }, [step]);
 
-  // Uncover the app once the first step can be placed. A lost layout must not keep the splash.
   useEffect(() => {
     if (measured) {
       reportContentReady();
@@ -267,7 +240,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
           shape: { kind: "cover" },
           mood: "happy",
           caption: { title: t("mobile.auth.done.title"), text: t("mobile.auth.done.body") },
-          // "Connected" covers the screen like the loader that follows it, so it dims in dark mode.
           loader: true,
         }
       : scan
@@ -278,7 +250,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
             : { shape: { kind: "cover" }, mood: "think", back: close }
         : scannerMounted
           ? // The block covers the camera again before it moves to the header, so the camera never
-            // shows below a rising edge.
             { shape: { kind: "cover" }, mood: "idle" }
           : step === "options"
             ? { shape: measured ? { kind: "header", bottom: optionsBottom } : { kind: "cover" }, mood: "idle" }
@@ -293,13 +264,11 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
                 },
               };
   const active = useBloubStageRequest(request, BLOUB_PRIORITY.screen);
-  // The content comes in when the stage first shows this screen, not under the splash.
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
     if (active) setRevealed(true);
   }, [active]);
 
-  // The eyes follow the text cursor while the user types.
   const emailLength = signIn.email.length;
   const codeLength = signIn.code.length;
   const looking = !finished && !scan;
@@ -309,8 +278,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     else look(-22 + Math.min(codeLength, 7) * 6.4, 9);
   }, [codeLength, emailLength, look, looking, step]);
 
-  // The pane on the screen follows the target one render later, so the leaving pane knows where
-  // the next one comes from and leaves the other way.
   const target: PaneKey = !revealed || finished || scan || scannerMounted ? "none" : step;
   const [pane, setPane] = useState<{ key: PaneKey; from: PaneDirection }>({ key: "none", from: "vertical" });
   useEffect(() => {
@@ -323,7 +290,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     reduced,
   };
 
-  // The keyboard opens while the email pane comes in. From the code step it is already open.
   useEffect(() => {
     if (pane.key !== "email") return;
     const timer = setTimeout(
@@ -332,13 +298,10 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
     );
     return () => clearTimeout(timer);
   }, [pane.from, pane.key, reduced]);
-  // A new code unlocks the slots again. Put the cursor back in them.
   useEffect(() => {
     if (pane.key === "code" && signIn.challenge && !signIn.needsNewCode) codeInput.current?.focus();
   }, [pane.key, signIn.challenge, signIn.needsNewCode]);
 
-  // The keyboard covers the lower half. The email steps lift their pane and shrink the header just
-  // enough to keep the lowest control above it, frame by frame on the UI thread.
   const [formHeight, setFormHeight] = useState(0);
   const formStep = pane.key === "email" || pane.key === "code";
   const formBottom = useSharedValue(0);
@@ -363,7 +326,6 @@ export function SignInScreen({ notice }: { notice?: SignInNotice }) {
   useEffect(() => () => lift.set(0), [lift]);
   const liftStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -lift.get() }] }));
 
-  // The Android back button closes the scanner, then returns one step before it leaves the screen.
   const back = useRef(signIn.back);
   back.current = signIn.back;
   const scanning = scan !== null;

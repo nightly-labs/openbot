@@ -1,8 +1,3 @@
-// Two-step (TOTP) codes in the Vault: the live code of a login in the list and in its dialog, and the
-// setup steps that take the key from the site. Main makes the codes of saved keys; the key never comes
-// to this window after it is saved. The window makes codes only from a key that the user typed in the
-// setup step and has not saved yet, so the user can check the key on the site before saving it.
-
 import type { VaultTwoStepCodes } from "@openbot/contracts/ipc";
 import {
   groupedTwoStepCode,
@@ -32,16 +27,12 @@ import {
 import { createMemo, createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** A code and the time when the next one starts. */
 export interface LiveTwoStepCode {
   code: string;
-  /** Seconds that one code is valid. */
   period: number;
-  /** Milliseconds since 1970. */
   expiresAt: number;
 }
 
-/** The time, once a second while the component is open. */
 function createSecondClock(onTick?: (now: number) => void) {
   const [now, setNow] = createSignal(Date.now());
   onSettled(() => {
@@ -57,13 +48,8 @@ function createSecondClock(onTick?: (now: number) => void) {
   return now;
 }
 
-/** The time after a failed load before the codes load again. */
 const RETRY_MS = 30_000;
 
-/**
- * The codes of the saved logins, from main. They load again when the first one runs out, and when the
- * list of logins with a key is a new one: a saved change can replace the key of a login.
- */
 export function createSavedTwoStepCodes(
   load: () => (() => Promise<VaultTwoStepCodes>) | undefined,
   keyedLogins: () => readonly string[],
@@ -83,7 +69,6 @@ export function createSavedTwoStepCodes(
       return;
     }
     const expired = [...codes().values()].some((code) => code.expiresAt <= at);
-    // The same list waits for the first code to run out, or after a failed load for the next try.
     const waiting = loadedFor === logins && (retryAt > 0 ? at < retryAt : !expired);
     if (loading || waiting) return;
     loading = true;
@@ -103,7 +88,6 @@ export function createSavedTwoStepCodes(
           ),
         );
       })
-      // After a failed load the rows show no code until the next try.
       .catch(() => {
         if (current !== run) return;
         loadedFor = logins;
@@ -117,7 +101,6 @@ export function createSavedTwoStepCodes(
   return { code: (id: string) => codes().get(id), now };
 }
 
-/** The code of a key that the user typed and has not saved. Undefined for no key or an invalid one. */
 export function createDraftTwoStepCode(keyText: () => string) {
   const key = createMemo(() => (keyText().trim() ? parseTwoStepKey(keyText()) : null));
   const [code, setCode] = createSignal<LiveTwoStepCode | undefined>(undefined);
@@ -139,7 +122,6 @@ export function createDraftTwoStepCode(keyText: () => string) {
         shownKey = current;
         setCode({ code: value, period: current.period, expiresAt: at + twoStepRemainingMs(current.period, at) });
       })
-      // Without Web Crypto (a page that is not a secure context) the check step shows no code.
       .catch(() => {
         if (ticket === run) setCode(undefined);
       });
@@ -147,10 +129,8 @@ export function createDraftTwoStepCode(keyText: () => string) {
   return { code, now, valid: () => key() !== null };
 }
 
-/** Whole seconds until the next code. */
 const secondsLeft = (code: LiveTwoStepCode, now: number) => Math.max(0, Math.ceil((code.expiresAt - now) / 1000));
 
-/** The seconds until the next code, as a small ring. */
 function CodeTimer(props: { code: LiveTwoStepCode; now: number }) {
   const { t } = useText();
   const seconds = () => secondsLeft(props.code, props.now);
@@ -164,7 +144,6 @@ function CodeTimer(props: { code: LiveTwoStepCode; now: number }) {
   );
 }
 
-/** The live code at the end of a list row, as an authenticator app shows it. A click copies it. */
 export function TwoStepRowCode(props: {
   code: LiveTwoStepCode;
   now: number;
@@ -187,7 +166,6 @@ export function TwoStepRowCode(props: {
   );
 }
 
-/** The current code with its timer and a copy button. */
 function LiveCode(props: { code: LiveTwoStepCode; now: number; onCopy: (code: string) => void }) {
   const { t } = useText();
   return (
@@ -201,9 +179,7 @@ function LiveCode(props: { code: LiveTwoStepCode; now: number; onCopy: (code: st
   );
 }
 
-/** One row of the login dialog that tells whether the login has a two-step code. */
 export function TwoStepRow(props: {
-  /** Whether the login has a key: saved and not removed, or typed in the setup step. */
   on: boolean;
   code: LiveTwoStepCode | undefined;
   now: number;
@@ -252,17 +228,14 @@ type QrDetectorClass = new (options: {
 
 declare global {
   interface Window {
-    /** Chromium's Shape Detection API; the TypeScript DOM library does not have it yet. */
     BarcodeDetector?: QrDetectorClass;
   }
 }
 
-/** The browser's barcode reader, where the platform has one. Chromium on Windows and Linux has none. */
 function qrDetectorClass() {
   return typeof window === "undefined" ? undefined : window.BarcodeDetector;
 }
 
-/** Reads the QR code in an image. Null when there is none. */
 async function readQrImage(Detector: QrDetectorClass, file: File): Promise<string | null> {
   const bitmap = await createImageBitmap(file);
   try {
@@ -273,10 +246,8 @@ async function readQrImage(Detector: QrDetectorClass, file: File): Promise<strin
   }
 }
 
-/** The shape of a setup key, in the groups that sites show. A key is not translated. */
 const EXAMPLE_KEY = "JBSW Y3DP EHPK 3PXP";
 
-/** Setup, step 1: the key, pasted or read from a screenshot of the QR code. */
 export function TwoStepKeyStep(props: {
   site: string;
   keyText: string;
@@ -343,7 +314,6 @@ export function TwoStepKeyStep(props: {
   );
 }
 
-/** Setup, step 2: the user enters the code on the site, so a wrong key shows before it is saved. */
 export function TwoStepCheckStep(props: { site: string; code: LiveTwoStepCode | undefined; now: number }) {
   const { t } = useText();
   return (

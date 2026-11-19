@@ -16,20 +16,14 @@ export interface WebhookRelayOptions {
   account: WebhookRelayAccount;
   ingress: SignalIngress;
   hostId(): string | null;
-  /**
-   * Registers this host for the account when it has no ID or no machine token, without publishing
-   * it. A failure leaves the route without a URL for the next sync.
-   */
   ensureHost(): Effect.Effect<void>;
 }
 
-/** The account service keeps a revoked route ID, and one that another host or account owns, for good. */
 function isRouteConflict(failure: CentralAuthOperationError): boolean {
   const { cause } = failure;
   return cause instanceof Error && "code" in cause && cause.code === "webhook_route_conflict";
 }
 
-/** Owns route metadata calls and the ingress lease. Payloads never enter the account service. */
 export class WebhookRelay implements HostWebhookRelay {
   readonly #options: WebhookRelayOptions;
   #release: (() => void) | null = null;
@@ -56,17 +50,10 @@ export class WebhookRelay implements HostWebhookRelay {
   }
 
   setAccountActive(active: boolean): void {
-    // Reconnect before releasing the webhook hold. Signal then builds its next hello with the
-    // current principal and route set. Releasing afterwards closes the socket when no other
-    // ingress consumer holds it.
     if (this.#release) this.#options.ingress.reconnect();
     if (!active) this.setEnabled(false);
   }
 
-  /**
-   * Opens a new socket, so Signal issues a route ticket with the current routes. Without the hold,
-   * `setEnabled(true)` opens that socket, so a second reconnect here is not necessary.
-   */
   refresh(): void {
     if (this.#release) this.#options.ingress.reconnect();
   }

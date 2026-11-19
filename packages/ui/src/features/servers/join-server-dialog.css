@@ -35,7 +35,6 @@
 }
 
 .join-server-pages {
-  /* The pages have fixed heights for the slide, so an error code adds its row here. */
   --join-server-reference: 0px;
   width: 100%;
   height: 336px;

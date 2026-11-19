@@ -10,13 +10,11 @@ import { clamp, mix, prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, flush, omit, onCleanup, Show, untrack } from "solid-js";
 
-/** The small capsule beyond the edge that the pill grows out of and goes back into. */
 const BUD = { width: 64, height: 22 };
 
 const px = (value: number) => `${value}px`;
 const ms = (spring: Spring) => spring.response * 1000;
 
-/** Brings content in with a blur, as the island does. `motion` gives the transform for the rest of the way. */
 export function contentIn(element: HTMLElement, delay = 0, motion = (rest: number) => `scale(${1 - 0.04 * rest})`) {
   element.animate(
     springKeyframes(ISLAND_CONTENT, (progress) => ({
@@ -30,29 +28,19 @@ export function contentIn(element: HTMLElement, delay = 0, motion = (rest: numbe
 
 export interface MorphPillProps extends Omit<JSX.HTMLAttributes<HTMLElement>, "class" | "children" | "ref"> {
   open: boolean;
-  /** The class of the shell. The shell must clip its content, so the content does not show past the spring. */
   class: string;
-  /** The class of the face, the content that keeps its own width. */
   faceClass: string;
-  /** A key: a new key brings the new content in with a blur. */
   face?: string | undefined;
-  /** Content of the shell behind the face, such as a progress fill. */
   backdrop?: JSX.Element;
   children: JSX.Element;
 }
 
-/**
- * A pill that is in the page while it is open or closing. It grows out of a small capsule below the
- * bottom edge of its frame (the offset parent) and goes back into it. The width follows the content
- * on a spring. Other attributes, such as `aria-label` and `data-*`, go on the shell.
- */
 export function MorphPill(props: MorphPillProps) {
   const shellProps = omit(props, "open", "class", "faceClass", "face", "backdrop", "children");
   const [present, setPresent] = createSignal(false);
   let shell: HTMLElement | undefined;
   let face: HTMLElement | undefined;
   let sizing: Animation | undefined;
-  /** The width that the shell goes to now. The observer sees the new face first: that must not stop the bud. */
   let target = 0;
   let closing: Animation[] = [];
   let lastFace = untrack(() => props.face);
@@ -65,9 +53,7 @@ export function MorphPill(props: MorphPillProps) {
     closing = [];
   });
 
-  // The face has its own width; 2 px are the border of the shell.
   const contentWidth = () => (face ? face.offsetWidth + 2 : 0);
-  /** From the pill to past the bottom edge of its frame, so the capsule starts out of view. */
   const travel = () => {
     if (!shell?.offsetParent) return 48;
     const parent = shell.offsetParent.getBoundingClientRect();
@@ -164,7 +150,6 @@ export function MorphPill(props: MorphPillProps) {
   createEffect(
     () => props.open,
     (open) => {
-      // The pill must be in the page before it can measure its face.
       queueMicrotask(() => {
         if (open && !untrack(present)) {
           setPresent(true);
@@ -198,7 +183,6 @@ export function MorphPill(props: MorphPillProps) {
         <div
           class={props.faceClass}
           ref={(element) => {
-            // The face is made again each time the pill opens; the observer must not keep the old one.
             if (face) observer.unobserve(face);
             face = element;
             observer.observe(element);

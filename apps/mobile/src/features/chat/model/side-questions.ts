@@ -3,7 +3,6 @@ import type { AskSideQuestionInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { create } from "zustand";
 
-/** One question of a side question. The answer is null while the agent writes it. */
 export interface SideQuestionExchange {
   id: string;
   question: string;
@@ -12,25 +11,15 @@ export interface SideQuestionExchange {
   answeredAt: string | null;
 }
 
-/** The side question of one agent, as the desktop pane keeps it. */
 export interface SideQuestion {
   serverId: string;
   agentId: string;
   draft: string;
   exchanges: readonly SideQuestionExchange[];
-  /** Why the last question got no answer. The question is back in the draft. */
   error: string | null;
-  /** The questions that got no answer. Each one lets the composer send the returned draft again. */
   failures: number;
 }
 
-/**
- * The side question of each agent, keyed by `sideQuestionKey`.
- *
- * It stays in memory only, as on desktop: the host keeps nothing of it, and it is not part of the
- * phone's workspace copy. Leaving the screen keeps it, so the person can open it again. Delete in its
- * header, a change of account, server removal and a closed app delete it.
- */
 const useSideQuestions = create<{ questions: Readonly<Record<string, SideQuestion>> }>(() => ({ questions: {} }));
 
 function sideQuestionKey(serverId: string, agentId: string): string {
@@ -43,13 +32,11 @@ function write(serverId: string, agentId: string, change: (current: SideQuestion
     const current = questions[key] ?? { serverId, agentId, draft: "", exchanges: [], error: null, failures: 0 };
     const next = change(current);
     const { [key]: _previous, ...rest } = questions;
-    // An empty side question is not kept, so it does not show as one that waits.
     const empty = next === null || (next.exchanges.length === 0 && !next.draft && next.error === null);
     return { questions: empty ? rest : { ...rest, [key]: next } };
   });
 }
 
-/** The side question of one agent, or undefined when it has none. */
 export function useSideQuestion(serverId: string, agentId: string): SideQuestion | undefined {
   return useSideQuestions((state) => state.questions[sideQuestionKey(serverId, agentId)]);
 }
@@ -58,11 +45,6 @@ export function setSideQuestionDraft(serverId: string, agentId: string, draft: s
   write(serverId, agentId, (current) => (current.draft === draft ? current : { ...current, draft }));
 }
 
-/**
- * Asks the question and writes the answer when it comes, also while the screen is closed. A failed
- * question goes back to the draft, before text typed since, so Send asks it again. An answer to a
- * side question that was deleted in the meantime finds no question and is dropped.
- */
 export function askSideQuestion(
   serverId: string,
   agentId: string,
@@ -78,7 +60,6 @@ export function askSideQuestion(
       ? []
       : [
           {
-            // The prompt reads only the start of each turn, as on desktop. A longer answer still shows in full here.
             question: exchange.question.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
             answer: exchange.answer.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
           },
@@ -117,12 +98,10 @@ export function askSideQuestion(
   );
 }
 
-/** Delete in the side question's header. */
 export function deleteSideQuestion(serverId: string, agentId: string): void {
   write(serverId, agentId, () => null);
 }
 
-/** Deletes the side questions of these servers, when the account leaves or removes them. */
 export function deleteServerSideQuestions(serverIds: ReadonlySet<string>): void {
   useSideQuestions.setState(({ questions }) => {
     const kept = Object.entries(questions).filter(([, question]) => !serverIds.has(question.serverId));
@@ -130,7 +109,6 @@ export function deleteServerSideQuestions(serverIds: ReadonlySet<string>): void 
   });
 }
 
-/** Deletes every side question, when the account changes or signs out. */
 export function deleteSideQuestions(): void {
   useSideQuestions.setState({ questions: {} });
 }

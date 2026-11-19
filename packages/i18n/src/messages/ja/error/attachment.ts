@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/attachment";
 
 export const messages = {
-  // Attachment and file preview errors.
   "error.attachment.notFound": "添付ファイルが見つかりませんでした。",
   "error.attachment.fileTooLarge": "100 MB の上限を超えるファイルがあります。",
   "error.attachment.namedFileTooLarge": "{name} は 100 MB の上限を超えています。",

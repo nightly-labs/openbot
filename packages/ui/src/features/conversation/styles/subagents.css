@@ -1,13 +1,9 @@
-/* The subagents of one turn: the chat card and the side panel pane. */
-
 .subagents-elapsed {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
-
-/* The live line: the icon of the current step and its text. */
 
 .subagents-live {
   display: flex;
@@ -38,8 +34,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The group: the header with the progress, and the list. */
-
 .subagents-group {
   display: flex;
   width: 100%;
@@ -63,7 +57,6 @@
   text-align: start;
 }
 
-/* The open list is not a lit toggle, so the header has no fill. */
 .subagents-group .subagents-group-header[aria-expanded="true"]:not(:hover) {
   background: transparent;
   color: inherit;
@@ -118,11 +111,6 @@
   }
 }
 
-/*
- * The dock: while the reader is away from a card whose subagents work, its header hangs under the
- * chat header, in the chat column and as wide as the card. The dock takes no height, so the chat
- * does not move when the bar shows.
- */
 .subagents-dock {
   position: relative;
   z-index: 3;
@@ -172,8 +160,6 @@
   rotate: 90deg;
 }
 
-/* The list: one quiet card, as wide as the agent's message bubble. */
-
 .subagents-list {
   display: flex;
   width: var(--message-wide-bubble-width);
@@ -186,8 +172,6 @@
   list-style: none;
 }
 
-/* Two lines on one grid: the status and step icons share the first column, so both texts start
-   at the same x. */
 .subagents-list .subagents-row {
   display: grid;
   width: 100%;
@@ -273,8 +257,6 @@
     transition: none;
   }
 }
-
-/* The side panel pane: the steps of one subagent. */
 
 .subagents-panel {
   overflow: hidden;
@@ -392,8 +374,6 @@
   margin-top: 2px;
 }
 
-/* Status icons: the same icons and colours as the chat action markers. */
-
 .subagents-status {
   display: inline-flex;
   width: var(--openbot-icon-sm);
@@ -434,7 +414,6 @@
   }
 }
 
-/* In RTL the right chevron points left, so the open group turns it the other way to point down. */
 :dir(rtl) svg[class~="lucide-chevron-right"].subagents-group-chevron {
   transform: scaleX(-1);
 }

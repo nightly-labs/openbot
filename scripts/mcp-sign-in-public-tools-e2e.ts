@@ -1,9 +1,3 @@
-// Drives the MCP probe and McpOAuth against a local MCP server for issue #1932.
-// bun scripts/mcp-sign-in-public-tools-e2e.ts
-// The server lists its tools with no token, as Google's MCP servers do, and names an authorization
-// server in its protected-resource metadata. A Sign in must open the authorization page, take the
-// grant, and connect again with the token. A server with no such metadata opens no page, and a Test
-// opens no page.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -20,7 +14,6 @@ const CLIENT_ID = "e2e-client";
 
 interface FakeServer {
   url: string;
-  /** Whether each `tools/list` carried the token, in order. */
   toolLists: boolean[];
   tokenRequests: number;
   close: () => Promise<void>;
@@ -58,7 +51,6 @@ function json(response: ServerResponse, status: number, value: unknown): void {
   response.end(JSON.stringify(value));
 }
 
-/** What the server publishes about its sign-in. */
 type Metadata = "published" | "absent" | "refused" | "unreadable" | "busy" | "unanswered";
 
 async function fakeServer(metadata: Metadata): Promise<FakeServer> {
@@ -67,7 +59,6 @@ async function fakeServer(metadata: Metadata): Promise<FakeServer> {
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", base).pathname;
-      // A refusal at the path and at the root is an answer: the server takes no sign-in.
       if (
         request.method === "GET" &&
         path.startsWith("/.well-known/oauth-protected-resource") &&
@@ -76,14 +67,11 @@ async function fakeServer(metadata: Metadata): Promise<FakeServer> {
         return json(response, 403, { error: "forbidden" });
       if (request.method === "GET" && path.startsWith("/.well-known/oauth-protected-resource") && metadata === "busy")
         return json(response, 429, { error: "too many requests" });
-      // The path is not found, and the root gives no answer: the 404 must not count for the root.
       if (request.method === "GET" && path === "/.well-known/oauth-protected-resource" && metadata === "unanswered") {
         request.socket.destroy();
         return;
       }
       if (request.method === "GET" && path === "/.well-known/oauth-protected-resource/mcp") {
-        // A read that fails says nothing about the server. The sign-in must not end as if the server
-        // asked for none.
         if (metadata === "unreadable") return json(response, 500, { error: "server error" });
         if (metadata === "published")
           return json(response, 200, { resource: `${base}/mcp`, authorization_servers: [`${base}/`] });
@@ -172,7 +160,6 @@ function httpConfig(url: string): McpServerConfig {
 async function runCase(name: string, metadata: Metadata, signIn: boolean): Promise<Case> {
   const server = await fakeServer(metadata);
   const records = new Map<string, McpOAuthRecord>();
-  // A saved sign-in app, as in the issue: the server offers no client registration.
   records.set(server.url, { app: { clientId: CLIENT_ID, clientSecret: "e2e-secret" } });
   let pagesOpened = 0;
   const oauth: McpOAuth = new McpOAuth({
@@ -181,7 +168,6 @@ async function runCase(name: string, metadata: Metadata, signIn: boolean): Promi
       write: (resource, record) => Effect.sync(() => void records.set(resource, record)),
       clear: (resource) => Effect.sync(() => void records.delete(resource)),
     },
-    // The browser: the page goes to the authorization server, which sends the grant back.
     openExternal: async (page) => {
       pagesOpened += 1;
       const url = new URL(page);
@@ -248,7 +234,6 @@ async function main(): Promise<void> {
     check(refused, refused.tokenRequests === 0, "a server that refused the metadata read got a token request");
     report.cases.push(refused);
 
-    // A server error, a busy server, and no answer say nothing about the sign-in.
     for (const metadata of ["unreadable", "busy", "unanswered"] as const) {
       const unreadable = await runCase(`sign-in-metadata-${metadata}`, metadata, true);
       check(

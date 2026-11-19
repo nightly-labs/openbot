@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.mcpConfig":
     "OpenBot 无法在 Codex 配置中注册 MCP 服务器。请确认 Codex 的 config.toml 有效且可写，然后重启 OpenBot。",
   "error.provider.computerUseConfig":

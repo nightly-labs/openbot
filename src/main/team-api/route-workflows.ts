@@ -78,7 +78,6 @@ function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
 }
 
-/** The wire codec has already checked the body, so only a malformed payload fails here, in English. */
 function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   try {
     return decode(body);
@@ -87,10 +86,6 @@ function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   }
 }
 
-/**
- * A workflow refused by the store, such as a cycle, or a schedule that cannot run, is the member's
- * sentence. Anything else is a host fault.
- */
 async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
   try {
     return await runCauseEffect(operation);
@@ -101,7 +96,6 @@ async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>):
   }
 }
 
-/** The messaging place of each output node that posts to one, by node. */
 function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   const places = new Map<string, string>();
   for (const node of graph.nodes) {
@@ -111,16 +105,8 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
-/** The fields that put a node in a group of the canvas. Any member that can change the workflow sets them. */
 const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
 
-/**
- * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
- * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
- * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`). The group
- * fields are not settings.
- */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
@@ -149,10 +135,6 @@ function fitted<A>(value: A): A {
   return value;
 }
 
-/**
- * `whole`, with the step texts of `lists` emptied in order while it would not fit one frame. Each list
- * belongs to `whole`, and it changes in place.
- */
 function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   let bytes = bytesOf(whole);
   for (const steps of lists)
@@ -165,19 +147,6 @@ function trimmed<A>(whole: A, lists: readonly WorkflowStep[][]): A {
   return fitted(whole);
 }
 
-/**
- * The workflows of a server, their versions and their runs, for a member. A member reads and uses a
- * workflow only when every agent of its agent steps, and every provider of its model steps, is visible
- * to them; otherwise it answers as missing. The answer filter in `provider-visibility.ts` would drop
- * the settings of such a node, and the member's save would then lose them. An owner or admin also
- * sees a workflow whose agent was deleted, so that they can fix or delete it. A run or a decision
- * needs the chat level for each of those agents; a change, a delete or a restore needs the manage
- * level, before and after the change. A graph that names no agent needs no level, by product decision.
- * A change to an output that posts to a messaging place needs an owner or admin, as routine results
- * do. Frozen by `workflows-v1`. A GitHub trigger or a GitHub output, and the GitHub catalog and
- * options, need an owner or admin; the GitHub event history needs a member who reads the workflow, and
- * a run with the last event needs the chat level, as a start does. Frozen by `workflows-github-v1`.
- */
 export async function routeWorkflows(
   context: TeamApiRequestContext,
   workflows: TeamApiWorkflows | undefined,
@@ -212,7 +181,6 @@ export async function routeWorkflows(
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
-  // `readJson` has already run the body through the workflows wire codec.
   const body = await readJson(request);
   const admin = canAdministerServer(member.role);
   const listed = () => new Set(agents.listAgents().map((agent) => agent.id));
@@ -222,7 +190,6 @@ export async function routeWorkflows(
   const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) =>
     visibleAgents(graphAgentIds(graph), known) &&
     graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, protocol));
-  /** A graph that the member can read and use at `level`, or a 404 as for a missing workflow. */
   const requireUsable = (graph: WorkflowGraph, level: Exclude<AgentAccessLevel, "none">) => {
     if (!visibleGraph(graph, listed())) workflowMissing();
     for (const agentId of graphAgentIds(graph)) requireAgentLevel(context, agentId, level);
@@ -245,10 +212,6 @@ export async function routeWorkflows(
     requireUsable(detail.graph, level);
     return detail;
   };
-  /**
-   * The workflow of a run or a step that the member can run: its current graph, and the
-   * agents of the run graph that a retry or a decision moves on. Otherwise a 404 as for a missing run.
-   */
   const usableRunOf = async (ref: { runId: string } | { stepId: string }) => {
     const missing = () =>
       new HttpError(404, sourceText("runId" in ref ? "error.workflow.runMissing" : "error.workflow.stepMissing"));
@@ -267,7 +230,6 @@ export async function routeWorkflows(
       throw new HttpError(413, sourceText("error.workflow.tooLargeToSend"));
     return result;
   };
-  /** A step's texts, clipped. The answer filter drops a step of an agent hidden from the member. */
   const memberStep = (step: WorkflowStep): WorkflowStep => ({
     ...step,
     output: clip(step.output),
@@ -277,25 +239,18 @@ export async function routeWorkflows(
     run: { ...detail.run, error: clip(detail.run.error) },
     steps: detail.steps.slice(-WORKFLOW_RUN_STEP_LIMIT).map(memberStep),
   });
-  /** The run, with the texts of its oldest steps emptied first while it would not fit one frame. */
   const fittedRun = (detail: WorkflowRunDetail): WorkflowRunDetail => {
     const result = memberRun(detail);
     return trimmed(result, [result.steps]);
   };
-  /** The page, with the step texts of the oldest runs emptied first while it would not fit one frame. */
   const memberPage = (page: WorkflowRunPage): WorkflowRunPage => {
     const result: WorkflowRunPage = {
       runs: page.runs.map(memberRun),
       soloSteps: page.soloSteps.map(memberStep),
       nextBefore: page.nextBefore,
     };
-    // The page lists the newest run first.
     return trimmed(result, [...result.runs.map((detail) => detail.steps).reverse(), result.soloSteps]);
   };
-  /**
-   * One step for the member. The answer filter would empty the whole answer for a step of an agent
-   * hidden from them, so that step answers as missing.
-   */
   const soleStep = (step: WorkflowStep): WorkflowStep => {
     if (step.agentId !== null && hiddenAgentIds.has(step.agentId))
       throw new HttpError(404, sourceText("error.workflow.stepMissing"));
@@ -334,7 +289,6 @@ export async function routeWorkflows(
       requireChange(current.graph, input.graph);
       const result = await run(workflows.saveGraph(input));
       if (result.ok) return json(200, result);
-      // Another device saved first. Its graph can name an agent that this member cannot see.
       if (!visibleGraph(result.conflict.graph, listed())) workflowMissing();
       return json(200, { ok: false, conflict: memberDetail(result.conflict) });
     }
@@ -398,7 +352,6 @@ export async function routeWorkflows(
       const runId = stringField(body, "runId");
       const workflowId = (await run(workflows.workflowOf({ runId })))?.workflowId;
       if (!workflowId) throw new HttpError(404, sourceText("error.workflow.runMissing"));
-      // The answer filter drops the steps of agents hidden from the member.
       await visibleDetail(workflowId);
       return json(200, fittedRun(await run(workflows.run(runId))));
     }
@@ -409,30 +362,20 @@ export async function routeWorkflows(
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
     }
   }
-  // Each member can keep a picture, as each member can send a draft. The draft id is known only to
-  // its sender.
   if (path === WORKFLOWS_MEDIA_ROUTES.keepPicture) {
     return json(200, { fileId: await run(workflows.keepPicture(stringField(body, "draftId"))) });
   }
-  // Each member who can use workflows can read it: it says only whether the host has a Sunra sign-in.
-  // Each route answers the field of its own frozen capability only.
   if (path === WORKFLOWS_SUNRA_ROUTES.providers) return json(200, { sunra: workflows.mediaProviders().sunra });
-  // The same members can read the credits: they spend them when they run a Sunra step.
   if (path === WORKFLOWS_SUNRA_ROUTES.credits)
     return json(200, { sunra: (await run(workflows.mediaCredits("sunra"))).sunra });
-  // The same for Higgsfield.
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.providers)
     return json(200, { higgsfield: workflows.mediaProviders().higgsfield });
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.credits)
     return json(200, { higgsfield: (await run(workflows.mediaCredits("higgsfield"))).higgsfield });
-  // The same members can read the accounts and their credits: they choose the account that pays for a
-  // step. The answer has the name and the row id only, never a token or an address.
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts)
     return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
     return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
-  // The same members can read the live models and a price: they choose a model and run its steps. Both
-  // are reads that never give a token or an account, and never start a job.
   if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
   if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price)
     return json(200, await run(workflows.mediaPrice(parse(parseWorkflowMediaPrice, body))));

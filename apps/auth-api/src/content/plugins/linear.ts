@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Linear here is taken from linear.app. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const LINEAR_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

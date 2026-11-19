@@ -28,7 +28,6 @@ export function DeletedChatsScreen() {
     [agents, serverId],
   );
   const online = showsOnline(server);
-  // As on desktop, the people who can delete a channel can restore it. The host checks the role again.
   const canRestore = online && server?.role !== "member" && state.canDelete;
   const [restoring, setRestoring] = useState<string | null>(null);
   const pending = useRef(false);
@@ -56,7 +55,6 @@ export function DeletedChatsScreen() {
   };
   return (
     <SheetScrollView contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-7">
-      {/* A sheet of the home menu, as Hidden chats: it has no native header. */}
       <View className="items-center gap-2 px-4">
         <Typography.Heading type="h4" align="center">
           {t("mobile.app.route.deletedChannels")}

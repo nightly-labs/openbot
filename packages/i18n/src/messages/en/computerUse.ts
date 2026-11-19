@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("computerUse", {
-  // Computer Use settings, the permission help window, and the window highlight.
   "computerUse.permission.screenRecording.title": "Screen Recording",
   "computerUse.permission.screenRecording.description": "Lets OpenBot see app windows.",
   "computerUse.permission.screenRecording.pane": "Screen & System Audio Recording",

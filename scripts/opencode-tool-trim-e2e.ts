@@ -1,13 +1,3 @@
-// Runs the real `opencode` provider driver and the real OpenCode binary against a fake
-// OpenAI-compatible server (`opencode-agent-harness.ts`), to check the Code Mode catalog that each
-// request carries. OpenBot denies OpenCode's `session_*` and `worktree_*` tools: OpenBot names its own
-// chats, and `session_move` would move the session out of the agent's workspace. `worktree_remove`
-// stays, because OpenCode checks it with the `edit` permission. OpenBot's MCP servers serve no
-// resources, so `opencode-agent-defaults.ts` also denies the two MCP resource tools. The user's own
-// config denies `opencode_models`, so the catalog also shows that OpenCode keeps the user's rules
-// beside OpenBot's.
-// `OPENCODE_CLI=<opencode> bun scripts/opencode-tool-trim-e2e.ts`.
-// Writes .openbot-build/opencode-tool-trim-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -25,12 +15,10 @@ const DENIED = [
   "read_mcp_resource",
 ];
 const KEPT = ["worktree_remove"];
-/** Denied by the user's own config. */
 const USER_DENIED = "models";
 
 interface Request {
   bytes: number;
-  /** The names after `tools.opencode.` in the system prompt. */
   catalog: string[];
 }
 

@@ -1,6 +1,3 @@
-// Slug to guide body, on the same terms as the news bodies: eager, so the prose
-// is in the server's HTML rather than arriving after hydration.
-
 import type { ArticleBody } from "../body";
 import { AgenticAIDefinition } from "./agentic-ai-definition";
 import { AIAgentWorkflow } from "./ai-agent-workflow";

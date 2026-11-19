@@ -7,7 +7,6 @@ import { ThreadStatusMark, ThreadStatusText, ThreadTabIcon, threadAttention } fr
 import { ThreadTitle } from "./ThreadTitle";
 import type { ThreadHeaderProps, ThreadRowMode } from "./thread-types";
 
-/** The threads in the menu. The list scrolls without a scrollbar, and fades at an edge with more threads. */
 function ThreadMenuList(props: ThreadHeaderProps) {
   const { format } = useText();
   const fades = createScrollFades();
@@ -42,15 +41,10 @@ function ThreadMenuList(props: ThreadHeaderProps) {
   );
 }
 
-/**
- * The menu button: a chevron after the tabs, or in a narrow header the open thread with a chevron. In
- * a header too narrow for a title, only the chevron shows, and the menu marks the open thread.
- */
 function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   const { t } = useText();
   const active = () => props.tabs.find((thread) => thread.id === props.activeId);
   const switcher = () => (props.mode === "compact" ? active() : undefined);
-  // A thread with unread replies that the header does not show: without a tab, or behind a narrow header.
   const unreadInMenu = () =>
     props.threads.some(
       (thread) =>
@@ -87,7 +81,6 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           aria-label={t("conversation.threads.current", { title: thread().title })}
           aria-description={unreadInMenu() ? t("conversation.threads.allUnread") : undefined}
         >
-          {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
           <span class="agent-threads-switcher-icon" aria-hidden="true">
             <ThreadTabIcon status={thread().status} />
           </span>
@@ -103,7 +96,6 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   );
 }
 
-/** Every side thread of the agent. A thread without a tab opens in a new tab. */
 export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   const { t, format } = useText();
   return (
@@ -129,7 +121,6 @@ export function ThreadMenu(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
               </DropdownMenu.SubTrigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.SubContent class="ui-action-menu agent-context-menu agent-context-submenu agent-threads-archived">
-                  {/* Opening an archived thread restores it. */}
                   <For each={props.archived}>
                     {(thread) => (
                       <DropdownMenu.Item

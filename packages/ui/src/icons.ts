@@ -147,7 +147,6 @@ export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";
 export { default as Repeat } from "lucide-solid/icons/repeat";
 export { default as Repeat2 } from "lucide-solid/icons/repeat-2";
 export { default as RotateCcw } from "lucide-solid/icons/rotate-ccw";
-// `history` is an alias. The import names the icon file, so check:ui reads its class, `lucide-rotate-ccw-clock`.
 export { default as History } from "lucide-solid/icons/rotate-ccw-clock";
 export { default as Scan } from "lucide-solid/icons/scan";
 export { default as ScanLine } from "lucide-solid/icons/scan-line";

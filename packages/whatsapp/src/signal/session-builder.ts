@@ -1,21 +1,15 @@
-// X3DH session setup (signal.org/docs/specifications/x3dh) as WhatsApp uses it: the initiator builds a
-// state from a prekey bundle, and the responder builds the same state from a PreKeySignalMessage.
-
 import { concatBytes } from "./crypto";
 import { type CurveKeyPair, sharedKey, verify, withKeyType } from "./curve";
 import { initialRootKey, rootStep } from "./kdf";
 import type { PreKeySignalMessage } from "./messages";
 import type { SessionState } from "./session-record";
 
-/** Makes a new key pair. Tests give a fixed sequence; production uses random keys. */
 export type KeyPairSource = () => CurveKeyPair;
 
 export interface PreKeyBundle {
   registrationId: number;
-  /** 32 or 33 bytes. */
   identityKey: Uint8Array;
   signedPreKey: { keyId: number; publicKey: Uint8Array; signature: Uint8Array };
-  /** Undefined, or ID 0, means no one-time prekey. */
   preKey: { keyId: number; publicKey: Uint8Array } | undefined;
 }
 
@@ -26,13 +20,8 @@ export class InvalidSignedPreKeyError extends Error {
   }
 }
 
-/** The X3DH "F" prefix for X25519: 32 bytes of 0xFF. */
 const DISCONTINUITY = new Uint8Array(32).fill(0xff);
 
-/**
- * Initiator side. Checks the signed prekey signature (X3DH requires it), draws the base key and
- * then the first sending ratchet key, and returns a state with pending prekey data.
- */
 export function initiateSession(
   identityPrivateKey: Uint8Array,
   bundle: PreKeyBundle,
@@ -74,10 +63,6 @@ export function initiateSession(
   };
 }
 
-/**
- * Responder side. The state has no sending chain: the first decrypted message makes a ratchet step.
- * `oneTimePreKey` must be the key that the message names.
- */
 export function respondSession(
   identityPrivateKey: Uint8Array,
   signedPreKey: CurveKeyPair,

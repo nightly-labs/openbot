@@ -11,10 +11,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-/**
- * A host sends one sealed Live Activity update for a member's phone. The body has the host
- * credential, the push token, and sealed bytes. Nothing of it is stored or logged.
- */
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/live-activity")({
   server: {
     handlers: {

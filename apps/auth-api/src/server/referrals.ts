@@ -17,12 +17,9 @@ import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { type BillingError, BillingOperationError, billingCall, OPEN_STATUSES_SQL } from "./billing-errors";
 
-/** The letters of an invite code: no 0, 1, i, l or o, which a reader can confuse. */
 const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const CODE_LENGTH = 8;
-/** Two accounts can get the same random code. A new code is tried this many times. */
 const CODE_ATTEMPTS = 4;
-/** The invite link, the friend counts and one page of friends of an account. Billing adds the credit. */
 export interface ReferralPage {
   link: string;
   earned: ReferralMoney[];
@@ -51,10 +48,6 @@ interface FriendCreditRow {
   amount: number;
 }
 
-/**
- * The friends of each account with the status of their plans, newest first. A friend pays while a plan or
- * a license is open, stopped after a paid invoice or an ended plan, and has no plan before that.
- */
 const FRIENDS_SQL = `
   WITH friends AS (
     SELECT r.referred_user_id AS id, u.name AS name, r.created_at AS joined_at,
@@ -81,10 +74,6 @@ const FRIENDS_SQL = `
     CASE WHEN open THEN 'paying' WHEN ended OR paid_since IS NOT NULL THEN 'stopped' ELSE 'no-plan' END AS status
   FROM friends`;
 
-/**
- * Invite links and the friends who signed up with them. It holds no money: `BillingReferral` gives the
- * discount and the credit.
- */
 export class Referrals {
   readonly #database: D1Database;
   readonly #now: () => number;
@@ -94,10 +83,6 @@ export class Referrals {
     this.#now = options.now ?? Date.now;
   }
 
-  /**
-   * Links a new account to the account whose invite code it used. A code that does not exist, a code of
-   * the same account, and an account that already has a referrer change nothing.
-   */
   readonly record = Effect.fn("Referrals.record")(function* (
     this: Referrals,
     referredUserId: string,
@@ -116,10 +101,6 @@ export class Referrals {
     return result.meta.changes === 1;
   }).bind(this);
 
-  /**
-   * True when the account signed up with an invite link and the referral was not blocked: a friend who paid
-   * with a card of the referrer gets no discount (`BillingReferral`).
-   */
   readonly isReferred = Effect.fn("Referrals.isReferred")(function* (
     this: Referrals,
     userId: string,
@@ -133,10 +114,6 @@ export class Referrals {
     return row !== null;
   }).bind(this);
 
-  /**
-   * The link, the friend counts and one page of friends with the credit of each. A page after the last one
-   * gives the last one.
-   */
   readonly page = Effect.fn("Referrals.page")(function* (
     this: Referrals,
     userId: string,
@@ -208,8 +185,6 @@ export class Referrals {
       const creditRows = yield* billingCall(() =>
         this.#database
           .prepare(
-            // Credit after the second payment that waits for the minimum is in the account's `ready` total
-            // only. `pending` of a friend is the credit that waits for the friend's second payment.
             `SELECT referred_user_id AS id, currency, balance_transaction_id IS NULL AS waiting,
                SUM(amount - reversed_amount) AS amount
              FROM referral_credits
@@ -247,7 +222,6 @@ export class Referrals {
     };
   }).bind(this);
 
-  /** The invite code of the account. The first call makes it. */
   readonly #code = Effect.fn("Referrals.code")(function* (
     this: Referrals,
     userId: string,
@@ -260,8 +234,6 @@ export class Referrals {
           .first<{ code: string }>(),
       );
       if (existing) return existing.code;
-      // A code that another account has, or a second request at the same time, writes nothing; the next
-      // read finds the code of this account or tries a new one.
       yield* billingCall(() =>
         this.#database
           .prepare("INSERT OR IGNORE INTO referral_codes(user_id, code, created_at) VALUES (?, ?, ?)")
@@ -273,10 +245,6 @@ export class Referrals {
   }).bind(this);
 }
 
-/**
- * The state of Invite friends. `credit` is null when this deployment has no Stripe key: the link and the
- * friends still show, and the app says that the discount and the credit are not available.
- */
 export const referralState = Effect.fn("referralState")(function* (
   referrals: Pick<Referrals, "page">,
   credit: ((userId: string) => Effect.Effect<ReferralMoney[], BillingError | BillingOperationError>) | null,
@@ -288,7 +256,6 @@ export const referralState = Effect.fn("referralState")(function* (
   return { available: credit !== null, credit: credit ? yield* credit(userId) : [], ...page };
 });
 
-/** The filter and the page in the query of a read. A missing or wrong value gives all friends, page 0. */
 export function referralPageQuery(url: URL): ReferralPageRequest {
   const page = Number(url.searchParams.get("page") ?? "0");
   return (
@@ -312,10 +279,6 @@ function friend(
   };
 }
 
-/**
- * The first name and the initial of the last name, for example "Marta K.". An account with no name gives
- * an empty name: the app shows its own text. The email never goes to the referrer.
- */
 function shortName(name: string | null): string {
   const words = (name ?? "").trim().split(/\s+/u).filter(Boolean);
   const first = words[0]?.slice(0, 40) ?? "";
@@ -325,7 +288,6 @@ function shortName(name: string | null): string {
 
 function randomCode(): string {
   const letters: string[] = [];
-  // Bytes from 248 up are not used, so each letter has the same chance (248 = 8 × 31).
   while (letters.length < CODE_LENGTH) {
     for (const byte of crypto.getRandomValues(new Uint8Array(CODE_LENGTH * 2))) {
       if (byte < 248 && letters.length < CODE_LENGTH) letters.push(CODE_ALPHABET[byte % CODE_ALPHABET.length] ?? "");

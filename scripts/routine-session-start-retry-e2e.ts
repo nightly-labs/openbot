@@ -1,11 +1,3 @@
-// Checks that a routine run whose Codex session does not open in time waits and tries again, and that
-// after its last try it fails with text that says what to do (#12480). Runs the real agent service on
-// a temporary profile with a fake Codex app-server. While the hang file exists, the fake gives no
-// answer to `thread/start`, but it still answers every other request, as a Codex that stops opening
-// new sessions while its open chats still answer. The routine start waits (5, 15 and 30 minutes) run
-// 300 times faster here; the 30 s request timeout stays as it is.
-// `bun scripts/routine-session-start-retry-e2e.ts`. Writes
-// .openbot-build/routine-session-start-retry-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,10 +13,8 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
-/** While this file exists, the fake does not answer `thread/start`. */
 const fakeHang = join(root, "hang");
 
-/** The waits of `RoutineStartRetry`. Only these run faster; each other timer keeps its time. */
 const ROUTINE_WAITS_MS = new Set([5 * 60_000, 15 * 60_000, 30 * 60_000]);
 const SPEED = 300;
 const nativeSetTimeout = globalThis.setTimeout;
@@ -155,7 +145,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs: number): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -231,13 +220,11 @@ try {
     agents.listRoutineRuns({ agentId: agent.id, routineId: routine.id }).find((run) => run.deliveryId === deliveryId)
       ?.status ?? "missing";
 
-  // 1. Codex stops opening sessions, then answers again while the run waits.
   await writeFile(fakeHang, "");
   const first = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
   assert.ok(first.deliveryId, "first run: no delivery");
   const firstId = first.deliveryId;
   await waitFor("the first session start to hang", () => hungStarts() === 1, 10_000);
-  // The request timeout is 30 s. The run goes back to the queue instead of failing.
   const waitingStatus = await waitFor(
     "the run to wait after the timeout",
     () => (status(firstId) === "queued" ? "queued" : ended(firstId) ? `ended:${status(firstId)}` : null),
@@ -263,7 +250,6 @@ try {
     mailbox.getDelivery(firstId)?.delivery.error ?? firstEnd,
   );
 
-  // 2. Codex never opens the session: the run tries 4 times, then fails with text that says what to do.
   const hungBefore = hungStarts();
   await writeFile(fakeHang, "");
   const second = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));

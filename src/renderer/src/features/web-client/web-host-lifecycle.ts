@@ -13,10 +13,8 @@ import {
 } from "@openbot/team-client/hosted-server-wake";
 import { createWebHostedServerWake } from "./web-hosted-server-wake";
 
-/** A sleeping server is asked again after this long, also with no input. */
 const SLEEP_RECHECK_MS = 5 * 60_000;
 
-/** Hosted state owns wake and sleep. The workspace recovery controller owns connection attempts. */
 export function createWebHostLifecycle(options: {
   accountFetch: typeof fetch;
   hostId: () => string | null;
@@ -32,12 +30,9 @@ export function createWebHostLifecycle(options: {
   let hosted = createWebHostedServerWake(options.accountFetch);
   let revision = 0;
   let expired = false;
-  /** The next status read while the server starts. */
   let startTimer: ReturnType<typeof setTimeout> | undefined;
   let start: HostedServerStart | null = null;
-  /** When the account server first reported the server `running`: OpenBot on it starts. */
   let runningSince: number | null = null;
-  /** The status reads in a row that failed. */
   let failedReads = 0;
   let sleepTimer: ReturnType<typeof setTimeout> | undefined;
   let removeInput: (() => void) | undefined;
@@ -72,7 +67,6 @@ export function createWebHostLifecycle(options: {
     options.setHostedSleep(null);
     options.setIssue("start_timeout");
   }
-  /** The client waits while the server starts. Only OpenBot on a running machine has a time limit. */
   function setStep(startedAt: number, step: HostedServerStartStep): boolean {
     if (step !== "openbot") runningSince = null;
     else runningSince ??= Date.now();
@@ -105,9 +99,7 @@ export function createWebHostLifecycle(options: {
         } else options.setIssue("wake_failed");
         return;
       }
-      // A wake starts a stopped server, and sends a refused start again when its delay ends.
       if (step === "provider_limit" || status?.state === "stopped") void runTeamEffect(hosted.wake(id));
-      // A failed read is also a reason the host is offline. The client reads again, up to a limit.
       failedReads = status ? 0 : failedReads + 1;
       if (failedReads >= HOSTED_START_FAILED_READS) {
         expire();
@@ -198,7 +190,6 @@ export function createWebHostLifecycle(options: {
   function cancelPending() {
     revision += 1;
     clearSleep();
-    // The start stays. `resume` reads its state again.
     clearTimeout(startTimer);
     startTimer = undefined;
     hosted.dispose();

@@ -7,10 +7,6 @@ import {
   AccountServicePlatform,
 } from "./account-service-platform";
 
-/**
- * Invite friends: the invite link of the account, the credit from friends, and one page of the friends
- * who joined. It is an account feature: the account server answers, not an OpenBot host.
- */
 export class ReferralDesktopService {
   readonly #platform: Layer.Layer<AccountServicePlatform>;
 

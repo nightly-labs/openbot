@@ -39,12 +39,9 @@ import { workflowCache as cache, type StoredWorkflow } from "./workflow-cache";
 import type { WorkflowHost } from "./workflows-port";
 
 const RUN_PAGE = 20;
-/** The workflows that the cache of one host keeps. */
 const CACHED_WORKFLOWS = 20;
-/** The pause after the last edit before the canvas saves. */
 const SAVE_DELAY_MS = 400;
 
-/** The options of a repository that the host could not read. */
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
 const FAILURE_CODES = {
@@ -62,22 +59,15 @@ const FAILURE_CODES = {
   rotate_webhook_secret: "update_failed",
 } as const satisfies Record<WorkflowAnalyticsAction, string>;
 
-/** A workflow that the page must open, and the call that marks the request as taken. */
 export interface WorkflowRequest {
   workflowId: () => string | undefined;
   taken: () => void;
 }
 
-/** The revision and the graph of the host that the canvas edits are on. */
 type WorkflowBase = { revision: number; graph: WorkflowGraph };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
-/**
- * The id of the workflow that the page of a host showed last, on this device, so that the first read
- * after a restart gets it with the library. Reading `window.localStorage` throws when the browser
- * blocks storage, so each read and write is in a guard.
- */
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
 function readLastWorkflow(hostKey: string): string | undefined {
   try {
@@ -91,22 +81,9 @@ function rememberLastWorkflow(hostKey: string, workflowId: string): void {
     if (window.localStorage.getItem(lastWorkflowKey(hostKey)) !== workflowId) {
       window.localStorage.setItem(lastWorkflowKey(hostKey), workflowId);
     }
-  } catch {
-    // The next first read gets the library before the workflow.
-  }
+  } catch {}
 }
 
-/**
- * The state and the callbacks of the canvas over one host. The canvas keeps its edits; this saves
- * them after a pause, one save at a time, each on the revision of the one before. A change from
- * another device or a restore loads the graph again. The first workflow of the host opens; a host
- * with none gets a new one, as the canvas needs a workflow.
- *
- * `analytics` gives the scope of the account that acts. Stories give none. `requested` names a
- * workflow to open in place of the first one, such as the one of a clicked notification. A new
- * request opens its workflow on the open page too. `hostKey` names the host, so that the page shows
- * the workflow of its last visit while it reads the host again.
- */
 export function createWorkflowsController(
   host: WorkflowHost,
   analytics?: () => DesktopAnalyticsScope,
@@ -114,7 +91,6 @@ export function createWorkflowsController(
   hostKey?: string,
 ) {
   const { t, errorMessage } = useText();
-  /** Reports how a user action ended. No title, text or ID leaves the app. */
   const tracked = async <T>(
     action: WorkflowAnalyticsAction,
     call: () => Promise<T>,
@@ -142,20 +118,15 @@ export function createWorkflowsController(
   const report = (error: unknown) => {
     toast.error(errorMessage(error, t("workflow.page.failed")));
   };
-  /** Shows the error of a call whose caller undoes what it showed. */
   const reported = <T>(call: Promise<T>) =>
     call.catch((error: unknown) => {
       report(error);
       throw error;
     });
 
-  // The workflow of the last visit, or the requested one, shows at once from the cache. The first read
-  // replaces it, and a newer revision of the host merges into the canvas. The signals start with it:
-  // a write in the body of a component halts Solid.
   const hostCache = hostKey === undefined ? undefined : cache.get(hostKey);
   const firstId = untrack(() => requested?.workflowId()) ?? hostCache?.last;
   const visited = firstId === undefined ? undefined : hostCache?.workflows.get(firstId);
-  /** The open workflow as the host has it. Replaced whole after each read. */
   const [stored, setStored] = createSignal<StoredWorkflow | undefined>(visited);
   const [summaries, setSummaries] = createSignal<readonly WorkflowSummary[]>(hostCache?.library ?? []);
   const [places, setPlaces] = createSignal<readonly WorkflowPlace[]>([]);
@@ -163,46 +134,28 @@ export function createWorkflowsController(
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
   const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
-  /** The Library pictures that an asset step can use. */
   const [libraryPictures, setPictures] = createSignal<readonly StoredFileRow[]>([]);
-  /** Set at the first read of the pictures. The host scans its whole Library for them, which is slow. */
   let picturesWanted = false;
-  /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(hostCache?.levels ?? null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
-  /** The last change of an agent that the canvas plays. */
   const [build, setBuild] = createSignal<WorkflowBuild>();
-  /** Plays a change of `agentId` on the canvas, from `before`, or from an empty canvas for a new workflow. */
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
-  /** The open workflow. A plain value, so that a callback reads the new one at once. */
   let current = visited?.detail.summary.id ?? "";
-  /**
-   * The revision and the graph of the host that the canvas edits of each workflow are on: the graph that
-   * the canvas loaded or merged last, or the last save of the canvas. A save sends this revision.
-   */
   const bases = new Map<string, WorkflowBase>();
   const setBase = (detail: WorkflowDetail) =>
     bases.set(detail.summary.id, { revision: detail.revision, graph: detail.graph });
   if (visited) setBase(visited.detail);
   let limit = RUN_PAGE;
   let disposed = false;
-  /** The edit that waits for the pause, and its timer. */
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Counts each edit and each save, so that a read that started before one does not reset the canvas. */
   let edits = 0;
   let writing = 0;
-  /** Counts each preview request, so that the graph of an older one does not show. */
   let previewRequest = 0;
 
-  /**
-   * Saves, restores and opens go one at a time, so that each save has the revision of the one before.
-   * The queue shows the error of a task. `queued` gives the task's promise, so a caller that showed a
-   * change can undo it when the task fails.
-   */
   let writes: Promise<void> = Promise.resolve();
   const queued = <T>(task: () => Promise<T>): Promise<T> => {
     writing += 1;
@@ -224,7 +177,6 @@ export function createWorkflowsController(
     setPreview(undefined);
   };
 
-  /** Keeps a workflow that this window read or saved in the cache of the host. */
   const remember = (value: StoredWorkflow) => {
     if (hostKey === undefined) return;
     let entry = cache.get(hostKey);
@@ -242,7 +194,6 @@ export function createWorkflowsController(
   };
   const cached = (workflowId: string) =>
     hostKey === undefined ? undefined : cache.get(hostKey)?.workflows.get(workflowId);
-  /** Changes the detail of a workflow on the canvas and in the cache. */
   const putDetail = (workflowId: string, change: (detail: WorkflowDetail) => WorkflowDetail) => {
     const open = stored();
     const value = open?.detail.summary.id === workflowId ? open : cached(workflowId);
@@ -251,40 +202,27 @@ export function createWorkflowsController(
     if (value === open) setStored(next);
     remember(next);
   };
-  /**
-   * Shows a workflow. A workflow that the canvas does not show yet opens on its graph, so the edits are
-   * on that graph from then on.
-   */
   const show = (value: StoredWorkflow) => {
     if (stored()?.detail.summary.id !== value.detail.summary.id) setBase(value.detail);
     setStored(value);
     remember(value);
   };
-  /** Drops the edit of a workflow that waits, as the canvas sends it again on a newer graph. */
   const dropPending = (workflowId: string) => {
     if (pending?.workflowId !== workflowId) return;
     pending = undefined;
     clearTimeout(timer);
     timer = undefined;
   };
-  /**
-   * Counts the graphs of other devices that each workflow took. A save that waited in the queue while
-   * one came is on an older graph, and must not replace the edits of the other device.
-   */
   const foreign = new Map<string, number>();
   const foreignCount = (workflowId: string) => foreign.get(workflowId) ?? 0;
-  /** Puts the edits on a newer graph of another device. */
   const takeForeign = (next: WorkflowDetail) => {
     setBase(next);
     foreign.set(next.summary.id, foreignCount(next.summary.id) + 1);
     dropPending(next.summary.id);
   };
-  /** The graph of the save that runs, so that the read of its own revision does not drop the next edit. */
   let saving: { workflowId: string; json: string } | undefined;
-  /** Whether the canvas shows a workflow. The canvas then merges each newer graph and sends it again. */
   const canvasShows = (workflowId: string) => !disposed && stored()?.detail.summary.id === workflowId;
 
-  /** Shows `next` in place of the canvas edits. Undo on the canvas gets them back. */
   const reset = (next: WorkflowDetail) => {
     if (disposed) return;
     takeForeign(next);
@@ -293,10 +231,6 @@ export function createWorkflowsController(
     setResetKey((key) => key + 1);
   };
 
-  /**
-   * The GitHub events of the open workflow. A failed read shows no events rather than no workflow:
-   * the Events row is a view of the triggers, and the next change reads it again.
-   */
   const readGitHubHistory = (workflowId: string) =>
     host.githubSupported()
       ? host.workflows.githubHistory(workflowId).catch(() => EMPTY_GITHUB_HISTORY)
@@ -306,14 +240,11 @@ export function createWorkflowsController(
     () => host.githubConnector,
     () => host.hostName(),
   );
-  /** Undefined while it is read, and for an account that may not read it: only an admin adds GitHub steps. */
   const [githubCatalog, setGitHubCatalog] = createSignal<WorkflowGitHubCatalog>();
-  /** The labels and people of each repository that a card asked for, by lower-case name, for this page. */
   const [githubOptions, setGitHubOptions] = createSignal<ReadonlyMap<string, WorkflowGitHubRepositoryOptions>>(
     new Map(),
   );
   const askedOptions = new Set<string>();
-  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let catalogRead = 0;
   const readGitHubCatalog = () => {
     if (!host.githubSupported()) return;
@@ -325,13 +256,11 @@ export function createWorkflowsController(
       () => undefined,
     );
   };
-  /** A change on GitHub can give or take repositories, labels and people, so all are read again. */
   const refreshGitHub = () => {
     askedOptions.clear();
     setGitHubOptions(new Map());
     readGitHubCatalog();
   };
-  // A connection that starts or ends changes the repositories that the host reaches.
   let connectionState: string | undefined;
   createEffect(
     () => connector.detail.props.status.state,
@@ -341,7 +270,6 @@ export function createWorkflowsController(
       if (before !== undefined && state !== before) refreshGitHub();
     },
   );
-  /** Set when GitHub opened to change the installation. The next window focus reads the repositories again. */
   let awaitingInstall = false;
   const onFocus = () => {
     if (!awaitingInstall) return;
@@ -349,17 +277,9 @@ export function createWorkflowsController(
     refreshGitHub();
   };
 
-  /**
-   * Reads the library and, for the open workflow, its detail, runs and versions. `agentId`: the agent
-   * whose change the read is for. When the change replaces the canvas, the canvas plays it. `listed`:
-   * the library that the caller read just before, so that the read does not wait for it again.
-   */
-  /** The library of the last read. A plain value: a signal gives the new value only after the flush. */
   let library: readonly WorkflowSummary[] | undefined;
   const read = async (workflowId: string, agentId?: string, listed?: readonly WorkflowSummary[]) => {
     const seen = edits;
-    // The open workflow is read with the library, not after it, which saves one round trip to a
-    // joined server. A workflow that is gone fails its read, and the library then says so.
     const details = workflowId === current ? readDetail(workflowId) : undefined;
     details?.catch(() => undefined);
     const list = listed ?? (await host.workflows.list());
@@ -371,14 +291,12 @@ export function createWorkflowsController(
       if (entry) entry.library = list;
       else cache.set(hostKey, { library: list, workflows: new Map() });
     }
-    // A delete changes the library too: the delete then opens another workflow.
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
     if (disposed || workflowId !== current) return;
     const open = stored()?.detail;
     const shown = open?.summary.id === workflowId ? open : undefined;
     const known = shown && bases.get(workflowId);
-    // A read that a save of this canvas overtook is older than the host: the saved graph stays.
     const detail = shown && known && next.revision < known.revision ? shown : next;
     const newer = known !== undefined && next.revision > known.revision;
     const idle = seen === edits && writing === 0 && pending === undefined;
@@ -388,7 +306,6 @@ export function createWorkflowsController(
       if (entry) entry.last = workflowId;
     }
     const value = { detail, runs: page, versions, github };
-    // A change of an agent on a canvas with no edit plays on the canvas, which then loads it again.
     if (newer && idle && agentId !== undefined && shown) {
       playBuild(workflowId, agentId, shown.graph);
       show(value);
@@ -396,8 +313,6 @@ export function createWorkflowsController(
       return next;
     }
     if (newer) {
-      // The echo of the save that runs only moves the base: the edit that waits is on it. The canvas
-      // merges another graph with its edits, and sends the merged graph again.
       if (saving?.workflowId === workflowId && saving.json === stableJson(next.graph)) setBase(next);
       else takeForeign(next);
     }
@@ -413,10 +328,6 @@ export function createWorkflowsController(
       readGitHubHistory(workflowId),
     ]);
 
-  /**
-   * Opens a workflow: the cache shows it at once, and the read then gets it from the host. Its new
-   * summary id resets the canvas, so the key stays.
-   */
   const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
     current = workflowId;
     limit = RUN_PAGE;
@@ -425,19 +336,12 @@ export function createWorkflowsController(
     await read(workflowId, undefined, listed);
   };
 
-  /**
-   * Saves an edit on the revision that the canvas edits are on. When another device saved first, the
-   * open canvas merges the newer graph with its edits and saves again. The edit of a workflow that the
-   * canvas no longer shows merges here. `queuedOn`: the base and the count of other graphs when the
-   * edit went into the queue.
-   */
   const save = async (
     edit: { workflowId: string; graph: WorkflowGraph },
     queuedOn: { from: WorkflowBase | undefined; seen: number },
   ): Promise<void> => {
     const { workflowId } = edit;
     if (foreignCount(workflowId) !== queuedOn.seen) {
-      // A graph of another device came while the edit waited. The canvas merged it and sends again.
       if (canvasShows(workflowId)) return;
       const now = bases.get(workflowId);
       if (!now || !queuedOn.from) return;
@@ -453,14 +357,12 @@ export function createWorkflowsController(
       result = await host.workflows.saveGraph({ workflowId, baseRevision: from.revision, graph: edit.graph });
     } catch (error) {
       saving = undefined;
-      // The canvas counts the edit as sent, so it saves with the next edit, or when the page closes.
       pending ??= edit;
       throw error;
     }
     saving = undefined;
     const known = bases.get(workflowId) ?? from;
     if (result.ok) {
-      // A read of a newer revision that came first stays.
       if (result.revision <= known.revision) return;
       bases.set(workflowId, { revision: result.revision, graph: edit.graph });
       putDetail(workflowId, (detail) => ({ ...detail, revision: result.revision, graph: edit.graph }));
@@ -470,7 +372,6 @@ export function createWorkflowsController(
     if (newer.revision <= known.revision) return;
     takeForeign(newer);
     putDetail(workflowId, () => newer);
-    // After the page closes, the canvas does not send again, so the merge is here.
     if (canvasShows(workflowId)) return;
     const merged = mergeWorkflowGraphs(from.graph, edit.graph, newer.graph);
     if (stableJson(merged) !== stableJson(newer.graph)) {
@@ -478,7 +379,6 @@ export function createWorkflowsController(
     }
   };
 
-  /** Starts the save of the edit that waits. */
   const flush = () => {
     clearTimeout(timer);
     timer = undefined;
@@ -489,7 +389,6 @@ export function createWorkflowsController(
     write(() => save(edit, queuedOn));
   };
 
-  /** Opens a workflow after the save of the one before. */
   const open = (workflowId: string) => {
     flush();
     closePreview();
@@ -529,10 +428,6 @@ export function createWorkflowsController(
       if (!disposed) setPictures(next);
     }, report);
   };
-  /**
-   * The pictures are read when a step first asks for them, not when the page opens: the scan of the
-   * host's Library slows the other calls of the host while it runs, and most workflows have no asset step.
-   */
   const pictures = () => {
     if (!picturesWanted) {
       picturesWanted = true;
@@ -542,9 +437,6 @@ export function createWorkflowsController(
   };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
-    // A workflow that an agent makes opens, so the person sees the agent build it. While the person's
-    // edit saves, the open workflow stays, and the new one only goes into the library. A request from
-    // another device does not change the workflow that this device shows (#11072).
     if (
       workflowId !== null &&
       agentId !== undefined &&
@@ -572,20 +464,17 @@ export function createWorkflowsController(
     return () => {
       stop();
       window.removeEventListener("focus", onFocus);
-      // A pending edit still saves after the page closes.
       flush();
       disposed = true;
     };
   });
 
-  // The host reads the server role once for each call; a change event reads again.
   untrack(() => {
     readPlaces();
     readLevels();
     readGitHubCatalog();
   });
   write(async () => {
-    // A known workflow is read with the library. Without one, the library names the first workflow.
     const asked = untrack(() => requested?.workflowId());
     const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
     const known = asked ?? (current === "" ? remembered : current);
@@ -595,14 +484,10 @@ export function createWorkflowsController(
       limit = RUN_PAGE;
       const shown = cached(known);
       if (shown && stored()?.detail.summary.id !== known) show(shown);
-      // A newer revision of the host merges into the canvas, with an edit that the person made on the
-      // last visit while the read ran.
       if (await read(known)) return;
       if (disposed) return;
     }
-    // A gone workflow: the read got the library already.
     const list = library ?? (await host.workflows.list());
-    // Read after the list, so that a request that comes while the list loads opens.
     const wanted = untrack(() => requested?.workflowId());
     if (wanted !== undefined) requested?.taken();
     const found = list.find((summary) => summary.id === wanted) ?? list[0];
@@ -610,12 +495,9 @@ export function createWorkflowsController(
       if (!disposed) await load(found.id, list);
       return;
     }
-    // The list does not have the new workflow, so the read gets the library again.
     const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
     if (!disposed) await load(created.summary.id);
   });
-  // A request after the first workflow opened. Before that, the first load reads the request. The
-  // list is read again, as a workflow that an agent just made may not be in the library yet.
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -631,10 +513,6 @@ export function createWorkflowsController(
     },
   );
 
-  /**
-   * Why the open workflow is read-only, or undefined when this account may change it: it has steps
-   * that only a newer app knows, or an agent that this account does not manage. The host checks again.
-   */
   const lock = createMemo((): AppTextKey | undefined => {
     const detail = stored()?.detail;
     if (!detail) return undefined;
@@ -644,8 +522,6 @@ export function createWorkflowsController(
       ? "workflow.page.manageOnly"
       : undefined;
   });
-  // The reason shows once each time a workflow opens read-only. The memo stops a read of the same
-  // workflow: an effect runs on each change of what its compute function reads.
   const lockToken = createMemo(() => {
     const reason = lock();
     return reason && `${current}\u0000${reason}`;
@@ -655,7 +531,6 @@ export function createWorkflowsController(
     if (token && reason) toast.info(t(reason));
   });
 
-  /** Starts a run of the open workflow after the save of its edits. */
   const start = (
     action: WorkflowAnalyticsAction,
     call: (workflowId: string) => Promise<unknown>,
@@ -683,7 +558,6 @@ export function createWorkflowsController(
           if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, next));
         },
         (error: unknown) => {
-          // The menus stop loading and show no options. A change on GitHub reads them again.
           if (!disposed && askedOptions.has(key)) setGitHubOptions((map) => new Map(map).set(key, NO_OPTIONS));
           report(error);
         },
@@ -741,7 +615,6 @@ export function createWorkflowsController(
       );
     },
     onRunStep: (nodeId) => {
-      // The kind as the host has it: a node that is not saved yet has none.
       const kind = stored()?.detail.graph.nodes.find((node) => node.id === nodeId)?.kind;
       start(
         "run_step",
@@ -760,7 +633,6 @@ export function createWorkflowsController(
     },
     onDecide: (stepId, approved) =>
       reported(tracked(approved ? "approve" : "reject", () => host.workflows.decide({ stepId, approved }))),
-    // The host makes the address of a trigger that it has, so the secret waits for the save before it.
     onRotateWebhookSecret: (nodeId) => {
       flush();
       const workflowId = current;
@@ -773,7 +645,6 @@ export function createWorkflowsController(
       read(current).catch(report);
     },
     onRestoreVersion: (versionId) => {
-      // The edit that waits saves first, so the version that the restore keeps has it.
       flush();
       const workflowId = current;
       write(async () => {
@@ -819,7 +690,6 @@ export function createWorkflowsController(
     },
   };
 
-  /** Sends a picture to the host and puts it first in the Library. The toast shows why it failed. */
   const uploadPicture = (file: File) =>
     reported(host.uploadPicture(file)).then((row) => {
       setPictures((list) => [row, ...list.filter((candidate) => candidate.id !== row.id)]);
