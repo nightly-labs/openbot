@@ -33,30 +33,21 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-/** A removed variable fades, and the cards under it slide up. */
 const ROW_EXIT = FadeOut.duration(150).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const ROW_LAYOUT = LinearTransition.duration(200).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 
-/** The content of a list, to tell whether the user changed it. */
 function snapshot(list: readonly Omit<Row, "id">[]): string {
   return JSON.stringify(list.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
 }
 
 interface Row {
-  /** A key for the list, so a typed character does not make the card again. */
   id: number;
   name: string;
   value: string;
   sensitive: boolean;
-  /** The host has the value of this sensitive name; an empty field keeps it. */
   stored: boolean;
 }
 
-/**
- * Server settings > Providers > a provider > Variables (`provider-environment-v1`): the environment
- * variables that each process of the provider starts with, on the host. A sensitive value goes to the
- * host and does not come back; the phone does not keep it.
- */
 export function ServerProviderEnvironmentScreen() {
   const { t } = useText();
   const params = useLocalSearchParams<{ serverId: string; provider: string }>();
@@ -94,10 +85,7 @@ function EnvironmentForm({
   const locked = useRef(false);
   const name = agentProviderName(provider);
   const loaded = current.data;
-  /** The answer that the rows started from, so a new answer does not replace a change of the user. */
   const lastLoaded = useRef<string | null>(null);
-  // The form starts from the host's answer. A status event reads the variables again; the rows that the
-  // user changed stay.
   useEffect(() => {
     if (!loaded) return;
     const previous = lastLoaded.current;
@@ -150,7 +138,6 @@ function EnvironmentForm({
       .filter((row) => row.name.trim() !== "" || row.value !== "")
       .map((row) => ({
         name: row.name.trim(),
-        // An empty field of a stored sensitive value keeps it.
         value: row.sensitive && row.stored && row.value === "" ? null : row.value,
         sensitive: row.sensitive,
       }));
@@ -219,7 +206,6 @@ function EnvironmentForm({
               editable={!saving}
               maxLength={PROVIDER_ENVIRONMENT_LIMITS.name}
               value={row.name}
-              // A new name needs its own value: the stored one belongs to the old name.
               onChangeText={(value) => update(row.id, { name: value, stored: false })}
             />
             <SheetFormField

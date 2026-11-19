@@ -13,8 +13,7 @@
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
 }
-/* One row per series: mark, name, value. The value column takes the remaining width so
-   the numbers line up under each other however long the names are. */
+
 .ui-chart-tooltip-row {
   display: grid;
   grid-template-columns: var(--openbot-space-4) auto 1fr;

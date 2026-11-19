@@ -24,14 +24,12 @@ import { ProfileEditDialog } from "./ProfileEditDialog";
 import { ProfileShareDialog } from "./ProfileShareDialog";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
-/** The host's report of the past year, and the agents it names. */
 export interface ProfileActivityState {
   phase: ProfileActivityPhase;
   report: HostAnalytics | null;
   agents: readonly ClientAgentSummary[];
   errorReference: string | null;
   onRetry: () => void;
-  /** Draws the image that the Share dialog shows. The Share button is hidden without it. */
   onCreateShareImage?: ((stats: ProfileStats) => Promise<Blob>) | undefined;
 }
 
@@ -40,13 +38,10 @@ interface SettingsProfileTabProps {
   account: CentralAuthUser;
   canListSessions: boolean;
   canRevokeSession: boolean;
-  /** Signs this computer out of the account. The button is hidden without it. */
   onSignOut?: (() => Promise<void>) | undefined;
-  /** The activity of this computer. Nothing shows without it. */
   activity?: ProfileActivityState | undefined;
 }
 
-/** `Date.prototype.toLocaleString()` with no options: the date and the time, each field numeric. */
 const SESSION_TIME_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
   month: "numeric",
@@ -61,7 +56,6 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
   const { t, format, errorMessage } = useText();
   const [signingOut, setSigningOut] = createSignal(false);
   const [signOutError, setSignOutError] = createSignal<string | null>(null);
-  /** The session that the Disconnect confirmation is open for. */
   const [disconnectTarget, setDisconnectTarget] = createSignal<string | null>(null);
   const [editing, setEditing] = createSignal(false);
   const [sharing, setSharing] = createSignal(false);
@@ -82,7 +76,6 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
       ? t("settings.profile.sessions.kind.desktop")
       : t("settings.profile.sessions.kind.mobile");
   };
-  // The reset runs in the click, not in the dialog's render: Solid refuses a store write there.
   function editProfile() {
     props.store.resetName();
     props.store.clearAvatarError();
@@ -231,7 +224,6 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
             onConfirm={async () => {
               const sessionId = disconnectTarget();
               if (sessionId === null) return;
-              // The store shows a failure under the section heading, so the dialog closes either way.
               await props.store.revokeSession(sessionId);
               setDisconnectTarget(null);
             }}

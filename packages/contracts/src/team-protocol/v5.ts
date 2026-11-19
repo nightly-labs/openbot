@@ -9,10 +9,6 @@ import {
 } from "./v5-base";
 
 export const TEAM_PROTOCOL_V5 = 5 as const;
-/**
- * A peer that reads Gemini (`antigravity`) and custom ACP agents (`acp`). The host answers it on
- * protocol 5; a peer without it stays on protocol 4, which never names these providers.
- */
 export const TEAM_LOCAL_PROVIDERS_CAPABILITY = "local-providers";
 export const TEAM_PROTOCOL_V5_CAPABILITIES = [
   ...TEAM_PROTOCOL_V5Base_CAPABILITIES,

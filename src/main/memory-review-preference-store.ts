@@ -8,14 +8,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * How many completed turns of one conversation pass between two background memory reviews; `0` is
- * off. The backend reads it at the end of each turn, so it is held in memory after `load` rather
- * than read from disk each time.
- *
- * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default. Writes are chained for the reason `update-preference-store.ts` chains its own.
- */
 export class MemoryReviewPreferenceStore {
   readonly #path: string;
   #preference: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };

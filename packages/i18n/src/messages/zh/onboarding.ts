@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
-  // The saved setup could not be read. Retry, or set up again with no saved state.
   "onboarding.readFailed.title": "OpenBot 无法读取你的设置。",
   "onboarding.readFailed.description": "你的本地数据没有变化。请重试；如果问题仍然存在，请重新设置 OpenBot。",
   "onboarding.readFailed.setUpAgain": "重新设置",

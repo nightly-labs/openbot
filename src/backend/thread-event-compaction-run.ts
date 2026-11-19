@@ -1,32 +1,23 @@
 import { Duration, Effect, Schema } from "effect";
 import type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 
-/** The bound of one batch is in the controller; this pause lets other work run between them. */
 const COMPACTION_PAUSE = Duration.millis(5);
 
-/** A batch failed outside the transaction of a thread, for example when the database closed. */
 export class ThreadEventCompactionFailed extends Schema.TaggedError<ThreadEventCompactionFailed>()(
   "ThreadEventCompactionFailed",
   { cause: Schema.Defect() },
 ) {}
 
 export interface ThreadEventCompactionResult {
-  /** The threads that this run finished. */
   threads: number;
   events: number;
   rewritten: number;
   bytesBefore: number;
   bytesAfter: number;
   batches: number;
-  /** The threads that wait for the next start, by the name of their error. Names only, no text. */
   failedThreads: Record<string, number>;
 }
 
-/**
- * Removes the message copies that a replay does not need from the old thread events of a database,
- * one small transaction at a time (`ThreadEventCompaction`). The writes of this release keep no
- * copies, so after the first complete run each start only finds the new threads done.
- */
 export function compactThreadEvents(
   database: { compactThreadEvents(): ThreadEventCompactionBatch },
   pause: Duration.Duration = COMPACTION_PAUSE,

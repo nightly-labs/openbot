@@ -26,7 +26,6 @@ import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The name of a choice. A profile that the list does not hold any more is "Deleted profile". */
 function useChoiceLabel() {
   const { t } = useText();
   return (choice: AgentBrowserProfile, profiles: readonly BrowserProfileSummary[] | undefined) => {
@@ -38,10 +37,6 @@ function useChoiceLabel() {
   };
 }
 
-/**
- * Agent info > Advanced > Browser profile: the profile of the agent's browser tabs, for an owner or
- * admin of a host that serves `browser-profiles-v1`. The value follows a change made on any device.
- */
 export function AgentBrowserProfileRow({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const label = useChoiceLabel();
@@ -67,12 +62,6 @@ export function AgentBrowserProfileRow({ agent }: { agent: MobileAgent }) {
   );
 }
 
-/**
- * Agent info > Advanced > Browser profile: Shared, each named profile with its color, and the
- * agent's own session while the agent still uses it (desktop no longer offers it). A choice saves at
- * once; the host closes the agent's open tabs. "New profile" makes a profile and gives it to the
- * agent, and "Manage profiles" opens the list of the host.
- */
 export function AgentBrowserProfileScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -121,7 +110,6 @@ export function AgentBrowserProfileScreen() {
     { kind: "shared" },
     ...(current.kind === "agent" ? [current] : []),
     ...profiles.map((profile): AgentBrowserProfile => ({ kind: "profile", profileId: profile.id })),
-    // A profile that another device deleted stays until the host moves the agent.
     ...(current.kind === "profile" && !profiles.some((profile) => profile.id === current.profileId) ? [current] : []),
   ];
   const hue = (choice: AgentBrowserProfile) =>

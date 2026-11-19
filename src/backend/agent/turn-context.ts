@@ -11,35 +11,19 @@ import {
   sectionTeammatesUpdate,
 } from "./developer-instructions";
 
-/**
- * The essential memories, the section-mates, the instruction file text (Claude only), the
- * saved-logins rule and the style reminder of each
- * thread, for a client that sends them with the user turns (`AgentClient.turnContext`). In the
- * system prompt, each memory change would change the prefix, and the provider would write the full
- * conversation to its cache again. With the turns, a change is one small block.
- *
- * Kept by thread, not by process: a restarted or reopened session resumes a conversation that
- * already holds the blocks it was sent.
- */
 export class TurnContext {
-  /** The latest memories that OpenBot gave, and the last that a turn sent. */
   readonly #memories = new Map<string, { current: MemoryContext; delivered: MemoryContext | null }>();
-  /** The same for the section-mates. `undefined` as `delivered`: the context can hold any earlier list. */
   readonly #teammates = new Map<
     string,
     { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
   >();
-  /** The same for the instruction file text. `undefined` as `delivered`: the context can hold any earlier text. */
   readonly #instructionsFiles = new Map<
     string,
     { current: InstructionsFileText | null; delivered: InstructionsFileText | null | undefined }
   >();
-  /** The same for the saved-logins rule. `undefined` as `delivered`: the context can hold any earlier block. */
   readonly #savedLogins = new Map<string, { current: boolean; delivered: boolean | undefined }>();
-  /** The threads whose turns repeat the natural style's first-line rule (`NATURAL_TURN_REMINDER`). */
   readonly #styleReminders = new Set<string>();
 
-  /** Takes the context from the params of a thread start or resume. */
   set(threadId: string, params: unknown, resume: boolean): void {
     if (isDynamicRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
     else this.#styleReminders.delete(threadId);
@@ -52,29 +36,21 @@ export class TurnContext {
     if (isDynamicRecord(params) && typeof params.savedLogins === "boolean") {
       const logins = this.#savedLogins.get(threadId);
       if (logins) logins.current = params.savedLogins;
-      // A new conversation holds no block, as if logins were not shared.
       else this.#savedLogins.set(threadId, { current: params.savedLogins, delivered: resume ? undefined : false });
     }
     if (isDynamicRecord(params) && "instructionsFile" in params) {
       const file = readInstructionsFile(params.instructionsFile);
       const known = this.#instructionsFiles.get(threadId);
       if (known) known.current = file;
-      // A new conversation holds no text, so no file needs no block.
       else this.#instructionsFiles.set(threadId, { current: file, delivered: resume ? undefined : null });
     }
     if (!isDynamicRecord(params) || !("sectionTeammates" in params)) return;
     const section = readSectionTeammates(params.sectionTeammates);
     const teammates = this.#teammates.get(threadId);
     if (teammates) teammates.current = section;
-    // A new conversation holds no list, so no section needs no block.
     else this.#teammates.set(threadId, { current: section, delivered: resume ? undefined : null });
   }
 
-  /**
-   * The blocks for the next user turn, each a text block of its own so that history readers can
-   * tell them from the user's text, and marks them as sent. A slash command gets none: a CLI can
-   * drop the blocks before it, and `/clear` empties the context, so the next turn sends them in full.
-   */
   take(threadId: string, command = false): string[] {
     const memory = this.#memories.get(threadId);
     const teammates = this.#teammates.get(threadId);
@@ -96,10 +72,6 @@ export class TurnContext {
     return blocks;
   }
 
-  /**
-   * The context can have lost the blocks: a compaction summary can leave them out, and a failed
-   * prompt may not be kept. The next turn sends them in full.
-   */
   resend(threadId: string): void {
     const memory = this.#memories.get(threadId);
     if (memory) memory.delivered = null;
@@ -143,7 +115,6 @@ function readSectionTeammates(value: unknown): SectionTeammates | null {
   return members.length > 0 ? { name: value.name, members } : null;
 }
 
-/** An empty file gives no text, as in the system prompt. */
 function readInstructionsFile(value: unknown): InstructionsFileText | null {
   if (!isDynamicRecord(value) || !isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName)) return null;
   if (!isString(value.text) || value.text.length === 0 || typeof value.truncated !== "boolean") return null;

@@ -1,21 +1,7 @@
-/**
- * Liquid shapes, as the agent dock and the voice conversation have them: shapes that flow out of an
- * edge of the window frame and back into it. The shapes are one liquid under an SVG "goo" filter, and
- * a small spring engine moves them.
- */
-
 import { prefersReducedMotion } from "./utils";
 
-/**
- * A liquid layer starts this far before the frame edge, so the goo joins a shape to the frame
- * that is drawn in this band.
- */
 export const LIQUID_PAD = 40;
 
-/**
- * Blurs the shapes under it and then cuts the blur at about half its alpha, so shapes that touch
- * flow into one. A shape that uses it sets `filter: url(#id)`.
- */
 export function GooFilter(props: { id: string; class?: string }) {
   return (
     <svg class={props.class} aria-hidden="true" width="0" height="0">
@@ -27,19 +13,8 @@ export function GooFilter(props: { id: string; class?: string }) {
   );
 }
 
-/* ---------- The open curve ---------- */
-
-/**
- * The open progress at which a shape is clear of the frame. Before it, the shape slides out and swells;
- * after it, the shape grows to its full size.
- */
 export const SLIDE_END = 0.42;
 
-/**
- * A smooth curve through `start` at 0, `middle` at SLIDE_END and `end` at 1. It eases out of `start`,
- * keeps one speed through `middle` (no overshoot), and past 1 it continues in a straight line for the
- * spring's overshoot.
- */
 export function stagedCurve(progress: number, start: number, middle: number, end: number) {
   const first = (middle - start) / SLIDE_END;
   const second = (end - middle) / (1 - SLIDE_END);
@@ -61,8 +36,6 @@ export function stagedCurve(progress: number, start: number, middle: number, end
   return end + second * (progress - 1);
 }
 
-/* ---------- A small spring engine ---------- */
-
 export interface SpringConfig {
   stiffness: number;
   damping: number;
@@ -71,7 +44,6 @@ export interface SpringConfig {
 export const SOFT: SpringConfig = { stiffness: 170, damping: 19 };
 export const SNAPPY: SpringConfig = { stiffness: 320, damping: 24 };
 export const WOBBLY: SpringConfig = { stiffness: 210, damping: 13 };
-/** A shape opens with a small overshoot and closes with none, so it does not snap into the frame. */
 export const LIQUID_OPEN: SpringConfig = { stiffness: 190, damping: 19 };
 export const LIQUID_CLOSE: SpringConfig = { stiffness: 280, damping: 33 };
 
@@ -100,7 +72,6 @@ export class Spring {
     this.velocity = 0;
   }
 
-  /** Advances by `dt` seconds. Returns true while the spring still moves. */
   step(dt: number): boolean {
     const force = -this.config.stiffness * (this.value - this.target) - this.config.damping * this.velocity;
     this.velocity += force * dt;
@@ -117,10 +88,6 @@ export class Spring {
   }
 }
 
-/**
- * Steps every spring each frame and calls `render`, until all of them rest. `onActivity` is told when
- * the springs start to move and when all of them rest again.
- */
 export function createMotion(render: () => void, onActivity?: (moving: boolean) => void) {
   const springs = new Set<Spring>();
   let frame = 0;
@@ -129,7 +96,6 @@ export function createMotion(render: () => void, onActivity?: (moving: boolean) 
     const dt = Math.min(1 / 30, (now - last) / 1000 || 1 / 60);
     last = now;
     let moving = false;
-    // Small sub-steps keep stiff springs stable.
     for (const spring of springs) {
       let springMoving = false;
       for (let i = 0; i < 4; i++) springMoving = spring.step(dt / 4) || springMoving;

@@ -39,11 +39,6 @@ export const createHostedMobileConnectLink = Effect.fn("MobileConnectHost.create
   return yield* withRegisteredHost(host, (binding) => centralAuth.createMobileConnectLink(binding));
 });
 
-/**
- * A start of a running host does not register it, so the account service can keep another key for it,
- * for example after a key change whose answer was lost. Then the host registers again, which sends that
- * change first, and the request runs one more time (#9369).
- */
 function withRegisteredHost<A, R>(
   host: MobileConnectHostDependencies<never>["host"],
   request: (binding: MobileConnectHostBinding) => Effect.Effect<A, CentralAuthOperationError, R>,
@@ -67,7 +62,6 @@ function isHostMismatch(error: CentralAuthOperationError | RemoteWorkflowError):
   return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "mobile_host_mismatch";
 }
 
-/** Starts the host, so the phone that uses the code can reach it, and returns its identity. */
 const publishMobileConnectHost = Effect.fn("MobileConnectHost.publish")(function* (
   host: MobileConnectHostDependencies<never>["host"],
 ) {

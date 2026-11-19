@@ -6,9 +6,7 @@ import { useEffect, useRef, useState } from "react";
 interface HtmlPreviewProps {
   source: string;
   title: string;
-  /** `card` draws the page as a small, still picture at a phone width; `screen` is the live page. */
   mode: "card" | "screen";
-  /** The space that the floating header and the home indicator cover on the preview screen. */
   topInset?: number;
   bottomInset?: number;
   background: string;
@@ -16,16 +14,9 @@ interface HtmlPreviewProps {
   dom?: import("expo/dom").DOMProps;
 }
 
-/** The width that a card lays the page out at before it scales it down, so it looks like a phone screen. */
 const CARD_PAGE_WIDTH = 390;
 
-/**
- * A ```html page from a reply. The page is in a sandboxed frame with no scripts and no requests,
- * as on desktop: nothing that an agent writes runs in this web view, which can call back into the
- * app. `allow-same-origin` is safe without `allow-scripts`; it lets this view open the page's links.
- */
 export default function HtmlPreview({
-  // Empty in Expo Go on Android until the props come again; see expo-go-dom.ts.
   source = "",
   title = "",
   mode,
@@ -42,8 +33,6 @@ export default function HtmlPreview({
     return () => window.removeEventListener("resize", resize);
   }, []);
 
-  // The page runs under the glass header, as the chat does, so it starts below the header and
-  // scrolls behind it. The space is padding of the page itself: the frame fills the screen.
   useEffect(() => placePage(frame.current, topInset, bottomInset), [topInset, bottomInset]);
 
   const attachLinks = () => {
@@ -100,10 +89,6 @@ export default function HtmlPreview({
   );
 }
 
-/**
- * Adds the header and home indicator space to the page body's own padding. The body background
- * then fills the space under the header, and the page keeps the padding that it set itself.
- */
 function placePage(frame: HTMLIFrameElement | null, top: number, bottom: number): void {
   const body = frame?.contentDocument?.body;
   if (!body) return;

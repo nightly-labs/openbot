@@ -19,10 +19,6 @@ import type { CustomProviderPresetId, LocalServerProbe } from "./custom-provider
 
 interface CustomProviderPresetDialogProps {
   open: boolean;
-  /**
-   * What the host found at each local server's default address. A missing entry shows no status,
-   * so a host that does not probe shows the plain list.
-   */
   probes?: Partial<Record<"ollama" | "lmstudio", LocalServerProbe>>;
   onChoose: (preset: CustomProviderPresetId) => void;
   onCancel: () => void;

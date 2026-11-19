@@ -38,7 +38,6 @@ export interface RegistryPrepared {
   env: Record<string, string>;
 }
 
-/** Rejects paths before archive or package metadata can select an executable. */
 function registryRelativePath(value: string): string {
   const path = value.replace(/^\.\//u, "");
   if (
@@ -67,7 +66,6 @@ const packageCommand = Effect.fn("AcpRegistry.packageCommand")(function* (
   yield* runRegistryInstaller(executable, args, cwd, env);
 });
 
-/** Stages in a unique permanent path: uv's virtual environments cannot be moved after installation. */
 export const prepareRegistryAgent = Effect.fn("AcpRegistry.prepare")(function* (
   agent: RegistryAgent,
   distribution: AcpRegistryDistribution,

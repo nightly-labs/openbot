@@ -1,21 +1,3 @@
-// Checks what a visual reply's page can do in the desktop app, with a real provider turn.
-// Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/chat-visual-e2e.ts --allow-mutations`. It uses the first visible agent, or
-// `--agent=<id>`. `--provider=<id>` moves that agent to a model of a signed-in provider for the run,
-// and moves it back at the end.
-//
-// Through the desktop bridge it makes a channel and asks the agent to publish a page with a counter,
-// an image, a "Pick B" button, a context button and a note. Then, on the desktop, it checks that:
-// 1. the chat shows the live page, full screen and back keeps its state, Quote in it quotes the page
-//    file, and its side panel button opens the page as a side panel tab;
-// 2. in the side panel, a click on the image opens the image viewer;
-// 3. "Pick B" puts its text in the composer, with no reply block, and sends nothing;
-// 4. the context shows as a quote chip in the composer, and the sent message starts with it;
-// 5. a selection in the page shows Quote, and Quote and the quote shortcut put quote chips of the
-//    page file in the composer;
-// 6. after the panel closes, a click on the quote chip opens the page again;
-// 7. Cmd+K (Ctrl+K off macOS) in the page opens the global search.
-// It deletes its channel at the end. Writes .openbot-build/chat-visual-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { isAgentProvider } from "@openbot/contracts/agent-providers";
@@ -26,7 +8,6 @@ import { argument, ChannelClient, connectChannelE2e, WAIT_MS, waitFor, writeRepo
 
 declare global {
   interface Window {
-    /** The helper that the page gets from the app. */
     openbotPage?: { displayMode: "inline" | "fullscreen" };
   }
 }
@@ -102,10 +83,6 @@ const panel = (page: Page) => page.getByRole("complementary", { name: english("p
 const quoteChip = (page: Page, text: string) =>
   composer(page).getByLabel(english("composer.token.quote", { name: text }), { exact: true });
 
-/**
- * Clicks an element of the page with a mouse event at the place where it shows. Playwright places a
- * frame's content at the frame's border box and misses by the frame's padding.
- */
 async function clickInPage(frame: Locator, target: Locator): Promise<void> {
   const [x, y] = await target.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -122,7 +99,6 @@ async function clickInPage(frame: Locator, target: Locator): Promise<void> {
   await desktop.mouse.click(left + x, top + y);
 }
 
-/** Selects a passage of the note in the page, as a drag of the user does. */
 async function selectInNote(page: FrameLocator, text: string): Promise<void> {
   await page.locator("#note").evaluate((note, passage) => {
     const node = note.firstChild;
@@ -136,14 +112,11 @@ async function selectInNote(page: FrameLocator, text: string): Promise<void> {
   }, text);
 }
 
-/** The quote id that a chip in the composer keeps. */
 const chipQuoteId = (chip: Locator) => chip.evaluate((element) => element.getAttribute("data-quote-message-id") ?? "");
 
-/** Whether the page's box is in the top layer, as full screen puts it. */
 const inFullScreen = (frame: Locator) =>
   frame.evaluate((element) => element.closest("[popover]")?.matches(":popover-open") === true);
 
-/** Sends one request to the agent and waits until its task ends. */
 async function ask(channelId: string, agentId: string, text: string, label: string) {
   const before = (await client.read(channelId)).tasks.length;
   await client.send(channelId, text, agentId);
@@ -184,7 +157,6 @@ try {
 
   await sidebarRow(desktop).click();
 
-  // 1. The chat shows the live page. Quote in it quotes the page file, and its button opens the side panel tab.
   const inlineFrame = conversation(desktop).getByRole("article").locator("iframe").last();
   await inlineFrame.waitFor({ timeout: UI_WAIT_MS });
   const framesInChat = await conversation(desktop).getByRole("article").locator("iframe").count();
@@ -197,13 +169,11 @@ try {
   assert.equal(inlineCount, "Count: 1", "The page in the chat does not run its script.");
   await shot("inline", conversation(desktop));
 
-  // Full screen and back keeps the page state, so the page does not load again.
   await inlineFrame.hover();
   await conversation(desktop)
     .getByRole("button", { name: english("chat.visual.fullScreen"), exact: true })
     .click();
   await waitFor(desktop, "the page goes full screen", () => inFullScreen(inlineFrame), Boolean, UI_WAIT_MS);
-  // The page hears of full screen after the app, and then has the size of the full frame.
   await waitFor(
     desktop,
     "the page has the full-screen size",
@@ -211,7 +181,6 @@ try {
     Boolean,
     UI_WAIT_MS,
   );
-  // The browser sends a click to the frame from the last drawn frame, so the moved page must be drawn.
   await desktop.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(undefined)))),
   );
@@ -250,18 +219,15 @@ try {
   const page: FrameLocator = frame.contentFrame();
   const counter = page.getByRole("button", { name: /^Count: / });
   await counter.waitFor({ timeout: UI_WAIT_MS });
-  // The chat gets narrower and the page reports its selection again, but the quoted text shows no action.
   await desktop.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
   const quoteAgain = await quoteButton.count();
   assert.equal(quoteAgain, 0, "Quote shows again for the quoted text after the side panel opens.");
   report.inline = { framesInChat, count: inlineCount, quoteId: inlineQuoteId, openedInPanel: true };
-  // The panel slides in, and a click in a moving frame misses its target.
   await desktop.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
   for (let click = 0; click < 3; click += 1) await clickInPage(frame, counter);
   assert.equal(await counter.innerText(), "Count: 3");
   await shot("panel", desktop.locator("body"));
 
-  // 2. A click on the image opens the image viewer.
   await clickInPage(frame, page.getByRole("img", { name: "Chart" }));
   const closeViewer = desktop.getByRole("button", { name: english("chat.image.lightbox.close"), exact: true });
   await closeViewer.waitFor({ timeout: UI_WAIT_MS });
@@ -271,7 +237,6 @@ try {
   await closeViewer.click();
   await closeViewer.waitFor({ state: "detached", timeout: UI_WAIT_MS });
 
-  // 3. "Pick B" writes its text in the composer, with no reply block, and sends nothing.
   const messagesBefore = (await client.read(channel.id)).messages.length;
   await clickInPage(frame, page.getByRole("button", { name: "Pick B" }));
   await waitFor(
@@ -293,7 +258,6 @@ try {
   assert.equal(messagesAfter, messagesBefore, "The page sent a message itself.");
   await shot("composer-reply", conversation(desktop));
 
-  // 4. The context shows as a quote chip at the start of the draft, and the send keeps it first.
   await clickInPage(frame, page.getByRole("button", { name: "Share count" }));
   const chip = composer(desktop).getByLabel(english("composer.token.quote", { name: CONTEXT_TEXT }), { exact: true });
   await chip.waitFor({ timeout: UI_WAIT_MS });
@@ -322,7 +286,6 @@ try {
   );
   await chip.waitFor({ state: "detached", timeout: UI_WAIT_MS });
 
-  // 5. A selection in the page shows Quote. Quote and the shortcut quote it as a passage of the page file.
   await selectInNote(page, NOTE_TEXT);
   await quoteButton.waitFor({ timeout: UI_WAIT_MS });
   await shot("quote-action", desktop.locator("body"));
@@ -344,7 +307,6 @@ try {
   assert.equal(inlineQuoteId, button, "The chat and the side panel quote different files.");
   await shot("quote-chips", conversation(desktop));
 
-  // 6. After the side panel closes, the quote chip opens the page again.
   await conversation(desktop)
     .getByRole("button", { name: english("conversation.sidePanel.close"), exact: true })
     .click();
@@ -354,7 +316,6 @@ try {
   await counter.waitFor({ timeout: UI_WAIT_MS });
   report.quote = { action: true, button, shortcut, reopened: true };
 
-  // 7. The search shortcut works while the page has the focus.
   await clickInPage(frame, counter);
   await desktop.keyboard.press(`${shortcutModifier}+K`);
   const search = desktop.getByRole("dialog", { name: english("conversation.globalSearch.title") });

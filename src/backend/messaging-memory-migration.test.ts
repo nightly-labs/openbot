@@ -5,9 +5,6 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
-// or its marker; a newer or incomplete history is accepted; a memory can point to no connection; a
-// connection with memories can be deleted and leave them behind. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -28,7 +25,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A Slack connection with a link, the rows that migration 36 must keep, from schema 25 on. */
 function seedConnection(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_messaging_connections
     (connection_id, platform, workspace_id, workspace_name, enabled, bot_user_id, app_id, orchestrator_agent_id,
@@ -47,7 +43,6 @@ function seed(db: DatabaseSync, version: number): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -59,7 +54,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
 function withNoMemorySite(before: Contents): Contents {
   return {
     ...before,
@@ -82,7 +76,6 @@ describe("messaging memory migration", () => {
     "preserves every row from released schema %i",
     (version) => {
       const db = databaseAtWithSeed(version);
-      // The earlier migrations run first; the rows after them are what v36 must keep.
       if (version < 35) migrateUpTo(db, 35);
       if (version < 25) seedConnection(db);
       const before = contents(db);

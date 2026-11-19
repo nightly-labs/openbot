@@ -18,36 +18,24 @@ export interface ComposerAddMenuProps {
   onOpenChange: (open: boolean) => void;
   disabled: boolean;
   attachDisabled?: boolean | undefined;
-  /** Opens the file picker. Without it, the menu has no attach item. */
   onAttach?: (() => void) | undefined;
-  /** Opens the skill picker of the editor, after the menu gave the focus back. Without it, no skill item. */
   onPickSkill?: (() => void) | undefined;
-  /** Starts the recording of a task that the user shows in the browser. Without it, no teach item. */
   onTeach?: (() => void) | undefined;
-  /** Without it, no side question item. */
   onSideQuestion?: (() => void) | undefined;
-  /** Without it, no voice conversation item. */
   onVoice?: (() => void) | undefined;
-  /**
-   * The New chat action, which asks first. Without it, no New chat item. The context ring has it too,
-   * but the ring shows only after the provider reports usage, so this item keeps New chat in reach (#8725).
-   */
   newChat?:
     | {
         agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
         start: () => Promise<void>;
-        /** A running compaction: the ring's New chat row is disabled for the same reason. */
         disabled?: boolean | undefined;
       }
     | undefined;
 }
 
-/** The "+" menu of a message box: files, skills, the side panes of the agent, and New chat. */
 export function ComposerAddMenu(props: ComposerAddMenuProps) {
   const { t } = useText();
   const [confirmingNewChat, setConfirmingNewChat] = createSignal(false);
   let skillPickerChosen = false;
-  // The browser opens a file picker only in the event of the click or the key.
   const attach = () => {
     props.onOpenChange(false);
     props.onAttach?.();
@@ -64,7 +52,6 @@ export function ComposerAddMenu(props: ComposerAddMenuProps) {
           const chosen = skillPickerChosen;
           skillPickerChosen = false;
           if (open || !chosen) return;
-          // The menu gives the focus back to its trigger two frames after it closes; open the picker after that.
           requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => props.onPickSkill?.())));
         }}
         placement="top-start"
@@ -115,8 +102,6 @@ export function ComposerAddMenu(props: ComposerAddMenuProps) {
                   <DropdownMenu.Separator />
                   <DropdownMenu.Item
                     onSelectAfterClose={() => {
-                      // The menu gives the focus back first. A side panel tab that gets it selects its
-                      // pane, so open the side question after that.
                       requestAnimationFrame(() => open()());
                     }}
                   >
@@ -126,12 +111,10 @@ export function ComposerAddMenu(props: ComposerAddMenuProps) {
                 </>
               )}
             </Show>
-            {/* Only where a side question is: after its separator. */}
             <Show when={props.onVoice}>
               {(open) => (
                 <DropdownMenu.Item
                   onSelectAfterClose={() => {
-                    // As for the side question: open the pane after the menu gives the focus back.
                     requestAnimationFrame(() => open()());
                   }}
                 >
@@ -144,7 +127,6 @@ export function ComposerAddMenu(props: ComposerAddMenuProps) {
               {(newChat) => (
                 <>
                   <DropdownMenu.Separator />
-                  {/* The menu gives the focus back to its trigger first; the dialog then gives it back there. */}
                   <DropdownMenu.Item
                     disabled={newChat().disabled ?? false}
                     onSelectAfterClose={() => setConfirmingNewChat(true)}

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/attachment";
 
 export const messages = {
-  // Attachment and file preview errors.
   "error.attachment.notFound": "La pièce jointe est introuvable.",
   "error.attachment.fileTooLarge": "Un fichier dépasse la limite de 100 Mo.",
   "error.attachment.namedFileTooLarge": "{name} dépasse la limite de 100 Mo.",

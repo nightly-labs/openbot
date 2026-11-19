@@ -1,16 +1,3 @@
-import { TEAM_QUEUE_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/current";
-import {
-  decodeQueueEditRequest,
-  QueueEditRejectedError,
-  TEAM_QUEUE_EDIT_CAPABILITY,
-} from "@openbot/contracts/team-protocol/queue-edit-v1";
-import { HttpError } from "./http-error";
-// One agent's outgoing queue, and the ways a member can change their mind about it.
-//
-// Cancel, steer, update and reorder all name the delivery they mean, and `steer` also names the
-// turn it expected to be running. The agent service rejects a stale expectation; these routes only
-// see that the field arrived.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   QueueDelivery,
@@ -19,10 +6,17 @@ import type {
   SteerQueuedMessageInput,
   UpdateQueuedMessageInput,
 } from "@openbot/contracts/ipc";
+import { TEAM_QUEUE_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  decodeQueueEditRequest,
+  QueueEditRejectedError,
+  TEAM_QUEUE_EDIT_CAPABILITY,
+} from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { SteerUnsupportedError } from "../../backend/agent/queue-controls";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents } from "./dependencies";
+import { HttpError } from "./http-error";
 import type { AgentRouteTarget, RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
   memberSender,
@@ -99,7 +93,6 @@ export async function routeAgentQueue(
         } satisfies SteerQueuedMessageInput),
       );
     } catch (error) {
-      // A client shows a refusal's text, but only "Request failed" for a 500.
       if (error instanceof SteerUnsupportedError) throw new HttpError(409, error.message);
       throw error;
     }
@@ -141,18 +134,9 @@ export async function routeAgentQueue(
   return "unmatched";
 }
 
-/** The completed deliveries a queue-window-v1 snapshot keeps at most. */
 const QUEUE_WINDOW_COMPLETED_LIMIT = 100;
 const ACTIVE_STATUSES = new Set<QueueDelivery["status"]>(["queued", "starting", "running"]);
 
-/**
- * queue-window-v1: the queue without its old history. The store keeps every finished delivery, so a
- * long-lived agent's full snapshot passes one WebRTC frame and a remote client cannot read it.
- * Every active delivery stays, because the composer, the queue and the edit lock act on them. Then
- * every failed, interrupted and cancelled delivery stays, newest first, while it fits in the frame:
- * the clients show its failure reason or hide its message, at any age. Only completed deliveries
- * leave: the newest 100 stay, for receipts, while they fit.
- */
 function queueWindow(snapshot: QueueSnapshot): QueueSnapshot {
   const newestFirst = snapshot.deliveries
     .map((delivery, index) => ({ delivery, index }))

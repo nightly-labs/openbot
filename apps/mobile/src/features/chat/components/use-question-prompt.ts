@@ -13,7 +13,6 @@ interface PromptState {
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
-  /** The person chose to answer the current question with the chat composer. */
   replyInChat: boolean;
 }
 
@@ -38,7 +37,6 @@ export function useQuestionPrompt(
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
-  // A new form never inherits drafts (especially private answers) from its predecessor.
   const state = stored.scope === scope ? stored : initialState(scope);
   if (stored.scope !== scope) setState(state);
   const submitting = useRef(new Set<string>());

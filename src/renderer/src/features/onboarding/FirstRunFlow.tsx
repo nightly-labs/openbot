@@ -20,20 +20,9 @@ import { createSetupNext } from "./setup-next";
 export interface FirstRunFlowProps extends SetupProviderProps {
   state: AppSetupState;
   platform: DesktopPlatform;
-  /**
-   * Records the choice. The model is `null` for a built-in provider, which keeps its own default, and
-   * names the endpoint the user just described when they chose their own.
-   */
   onSave: (provider: AgentProviderId, model: AgentModelId | null, journey: OnboardingJourney) => Promise<void>;
-  /**
-   * Records the product analytics choice when the user answers the first question. The box starts
-   * ticked only in a region that allows it; a setup that never records a choice saves "off".
-   * `chosen` is true when the user changed the box, so the account keeps only a real answer.
-   */
   onAnalyticsChoice: (enabled: boolean, chosen: boolean) => void;
-  /** Runs when the provider step is shown. First run scans once, so the host ignores a repeat. */
   onProviderStepShown?: () => void;
-  /** The logo colour of this build, for the splash that shows while the app opens. */
   logoVariant?: AppLogoVariant;
 }
 
@@ -42,28 +31,18 @@ const TERMS_URL = "https://openbot.run/terms";
 const PRIVACY_URL = "https://openbot.run/privacy";
 
 type FirstRunStep = "choose" | "plan" | "computer";
-/** How the user starts: on free models, or on a plan they connect. `null` until they choose. */
 type FirstRunPath = "free" | "plan" | null;
 
 interface FirstRunState {
   step: FirstRunStep;
   path: FirstRunPath;
   saving: boolean;
-  /** The user asked to open OpenBot before the provider was ready, so setup ends when it is. */
   finishWhenReady: boolean;
-  /** The user left the plan step with "Use free models instead". */
   skipped: boolean;
-  /** Clear until main says that the region of this computer allows analytics by default. */
   analytics: boolean;
-  /** The user changed the box, so a late regional default does not replace their choice. */
   analyticsTouched: boolean;
 }
 
-/**
- * First run with one question first: start free, or connect a plan. The free path needs no
- * sign-in. Its provider downloads from the moment first run opens, so it is often ready when the
- * user chooses. Only macOS asks for the Computer Use permissions; other systems have none.
- */
 export function FirstRunFlow(props: FirstRunFlowProps) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<FirstRunState>({
@@ -75,7 +54,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     analytics: false,
     analyticsTouched: false,
   });
-  // A failed read keeps the box clear, which is the consent answer.
   void onboardingPort()
     .getAnalyticsDefault()
     .then(({ enabled }) =>
@@ -84,21 +62,13 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
       }),
     )
     .catch(() => undefined);
-  /**
-   * The first-run screen sits on the dialog layer, so a row menu portalled to `body` would paint
-   * behind it. Menus mount here instead.
-   */
   const [screenElement, setScreenElement] = createSignal<HTMLElement | undefined>();
   const providers = createSetupProviders(props, undefined, { includeFree: () => state.path !== "plan" });
   const next = createSetupNext(providers);
   const nextReasonId = createUniqueId();
   const computerAvatar = createOnboardingAvatarVariant(onboardingSessionSeed(), "computer");
-  // The first screen and the splash show the same team, so the agents that greet the user also jump
-  // while the app opens.
   const team = createOnboardingTeam(onboardingSessionSeed(), TEAM_SIZE);
-  /** The free provider downloads once on its own. A failed download waits for the user. */
   let freeDownloadRequested = false;
-  /** The free provider is started once on its own. A failed start waits for the user. */
   let freeStartRequested = false;
 
   const stepsFor = (path: FirstRunPath): FirstRunStep[] => {
@@ -118,10 +88,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     },
   );
 
-  // Most users start free, so its download starts before they choose. It waits until the status says
-  // there is no OpenCode CLI: a user with their own gets no download. It goes to the host directly,
-  // because the row action would also choose the provider and fix the plan rows before the user saw
-  // them. A failed request leaves the provider not downloaded; "Use free models" tries again and says why.
   createEffect(
     () => {
       const free = option(FREE_PROVIDER);
@@ -134,9 +100,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     },
   );
 
-  // The free provider starts when its runtime is on disk. The first connection only asks the CLI
-  // for its models, and the permission step gives it time to answer. A provider refresh ignores a
-  // connection, so the start waits for it to end.
   createEffect(
     () => {
       const free = state.path === "free" ? option(FREE_PROVIDER) : undefined;
@@ -155,8 +118,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     },
   );
 
-  // Open waits for the provider; a failed download or start stops the wait, and the reason says why.
-  // A request that fails before either begins stops it in `stopWaitUnlessSent`.
   createEffect(
     () => ({
       waiting: state.finishWhenReady,
@@ -175,7 +136,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     },
   );
 
-  /** Records an action on the step shown now, with the path the user chose. */
   function trackStep(action: "viewed" | "next" | "back" | "skipped", path: FirstRunPath = state.path): void {
     desktopAnalytics.track("onboarding_step", { step: state.step, action, ...(path ? { path } : {}) });
   }
@@ -193,7 +153,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     });
   }
 
-  // A write shows in reads only after the next flush, so this reads no state that it writes.
   function startFree(): void {
     const fromPlan = state.step === "plan";
     if (!fromPlan) props.onAnalyticsChoice(state.analytics, state.analyticsTouched);
@@ -204,14 +163,11 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
       if (fromPlan) current.skipped = true;
     });
     retryFree();
-    // The step after the first question; the plan step's "Use free models instead" also lands there.
     const following = stepsFor("free")[1];
     if (following) {
       moveTo(following);
       return;
     }
-    // With no other step, the first question is where the user waits for the free provider. The
-    // wait opens the app when it is ready, at once if it is ready now.
     if (state.step !== "choose") moveTo("choose");
     setState((current) => {
       current.finishWhenReady = true;
@@ -228,10 +184,8 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     moveTo("plan");
   }
 
-  /** Only the plan step and Open wait for the provider: the free path continues while it starts. */
   function nextStep(): void {
     const following = steps()[stepNumber()];
-    // A blocked plan step only starts the connection, so it is not a "next".
     if (following && state.step === "plan" && !providers.selectedProviderConnected()) {
       next.connectSelected();
       return;
@@ -256,7 +210,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     });
   }
 
-  /** Downloads the free provider again, or starts it again, after it failed. */
   function retryFree(): void {
     const free = option(FREE_PROVIDER);
     const phase = free?.runtimeStatus?.phase;
@@ -271,7 +224,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     }
   }
 
-  /** A rejected request changes no provider status, so the wait for the provider stops here. */
   function stopWaitUnlessSent(sent: boolean): void {
     if (sent) return;
     setState((current) => {
@@ -295,7 +247,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     });
     providers.setError("");
     try {
-      // A built-in provider keeps its own default model, so only the custom row sends one.
       await props.onSave(provider, providers.customSelected() ? providers.customModel() : null, {
         ...(state.path ? { path: state.path } : {}),
         skipped: state.skipped,
@@ -309,11 +260,9 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
   }
 
   const busy = () => state.saving || state.finishWhenReady;
-  /** While first run waits to open the app, the splash covers the steps. It comes and goes in a transition. */
   const [launchShown, setLaunchShown] = createSignal(false);
   createEffect(busy, (waiting) => {
     if (waiting === launchShown()) return;
-    // The update runs a frame later. Saving can fail before it, so it reads the state it applies then.
     void firstRunTransition("open", () => {
       setLaunchShown(busy());
     });
@@ -326,7 +275,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
   const mainLabel = () => {
     if (lastStep()) return t("onboarding.action.open");
     if (state.step === "plan" && !providers.selectedProviderConnected()) {
-      // The button then starts the download, so it says so.
       const phase = option(providers.selectedProvider())?.runtimeStatus?.phase;
       return phase === "not-downloaded" || phase === "download-error"
         ? t("common.download")
@@ -334,10 +282,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     }
     return t("onboarding.action.next");
   };
-  /**
-   * The reason shows only where the user waits for the provider. The free path does not wait on
-   * the permission step, and the first question waits only when it is also the last step.
-   */
   const blockedReason = () => {
     if (state.step === "choose" ? state.path !== "free" || !lastStep() : state.path === "free" && !lastStep()) {
       return "";
@@ -437,7 +381,6 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
               >
                 {mainLabel()}
               </Button>
-              {/* Named by the button above, so the reason is read out with it rather than hunted for. */}
               <Show when={blockedReason()}>
                 {(reason) => (
                   <p class="onboarding-next-reason" id={nextReasonId}>

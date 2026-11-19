@@ -1,15 +1,6 @@
 import { integerInRange, isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * CRM: the leads and customers of a server, the plans they bought, and their payments. The data is in
- * the host's `openbot.db`. Only an owner or admin reads and changes it. An agent that an owner or
- * admin lets in reads it through its tools, with private fields hidden, and only proposes changes;
- * an owner or admin approves each one. A connected payment source (Stripe) adds and updates the
- * rows that it owns; people and agents only read them. These IPC types also cross the Team API
- * through the `crm-v1` codec (`team-protocol/crm-v1.ts`), so change both together.
- */
-
 export const CRM_LIMITS = {
   name: 200,
   text: 500,
@@ -22,13 +13,10 @@ export const CRM_LIMITS = {
   customerTags: 50,
   customerPlans: 50,
   agents: 500,
-  /** The most rows in one page of customers, payments or activity. */
   page: 500,
-  /** The most payments that one change marks as paid. */
   paymentIds: 500,
   splitParts: 24,
   pendingProposals: 500,
-  /** The largest amount, in minor units (one trillion). */
   amountMinor: 1_000_000_000_000,
 } as const;
 
@@ -45,44 +33,36 @@ export const CRM_TONES = [
 ] as const;
 export type CrmTone = (typeof CRM_TONES)[number];
 
-/** How a customer pays. OpenBot keeps no card numbers: Stripe holds the card. */
 export const CRM_METHODS = ["stripe", "transfer", "crypto", "paypal", "cash"] as const;
 export type CrmMethod = (typeof CRM_METHODS)[number];
 
 export const CRM_EVERY = ["month", "quarter", "year", "once"] as const;
 export type CrmEvery = (typeof CRM_EVERY)[number];
 
-/** The payment sources that the host can sync from. */
 export const CRM_SOURCE_KINDS = ["stripe"] as const;
 export type CrmSourceKind = (typeof CRM_SOURCE_KINDS)[number];
 
 export const CRM_SOURCE_STATES = ["syncing", "ok", "error"] as const;
 export type CrmSourceSyncState = (typeof CRM_SOURCE_STATES)[number];
 
-/** Why the last sync failed. The source's own error text never crosses. */
 export const CRM_SOURCE_ERRORS = ["invalid-key", "permission", "rate-limited", "network", "stripe"] as const;
 export type CrmSourceError = (typeof CRM_SOURCE_ERRORS)[number];
 
-/** A connected payment source. The key never crosses: only its last 4 characters. */
 export interface CrmSource {
   id: string;
   kind: CrmSourceKind;
-  /** A test-mode key: the rows are test data. */
   testMode: boolean;
-  /** The account name at the source, or "" when the key cannot read it. */
   accountLabel: string;
   keyHint: string;
   state: CrmSourceSyncState;
   errorCode: CrmSourceError | null;
   syncedAt: string | null;
   connectedAt: string;
-  /** Rows that the last full sync did not import: another currency, an interval the CRM has not, or a limit. */
   skipped: { currency: number; interval: number; limit: number };
 }
 
 export interface CrmSourceConnectInput {
   kind: CrmSourceKind;
-  /** A restricted read-only key. */
   key: string;
 }
 
@@ -90,17 +70,12 @@ export interface CrmSourceInput {
   sourceId: string;
 }
 
-/**
- * The CRM switch of a server, in Server Settings > Experimental. Off by default. While it is off, the
- * clients show no CRM, agents cannot use it and the payment sources do not sync. The data stays.
- */
 export interface CrmSettings {
   enabled: boolean;
 }
 
 export const DEFAULT_CRM_SETTINGS: CrmSettings = { enabled: false };
 
-/** The customer text fields. Each one can be private: agents then do not see its value. */
 export const CRM_TEXT_FIELDS = [
   "name",
   "contactName",
@@ -115,10 +90,6 @@ export const CRM_TEXT_FIELDS = [
 ] as const;
 export type CrmTextField = (typeof CRM_TEXT_FIELDS)[number];
 
-/**
- * What an owner or admin can hide from agents: each text field, and these parts of a customer. One
- * part covers each sheet column that shows it, so "amounts" hides the amount, owed and paid columns.
- */
 export const CRM_PRIVATE_PARTS = ["amounts", "dates", "status", "tags", "plans", "method", "owner"] as const;
 export const CRM_PRIVATE_FIELDS = [...CRM_TEXT_FIELDS, ...CRM_PRIVATE_PARTS] as const;
 export type CrmPrivateField = (typeof CRM_PRIVATE_FIELDS)[number];
@@ -127,7 +98,6 @@ export type CrmCustomerText = Record<CrmTextField, string>;
 
 export interface CrmStatus {
   id: string;
-  /** null for a built-in status: the client shows its catalog name. */
   label: string | null;
   tone: CrmTone;
 }
@@ -143,43 +113,33 @@ export interface CrmPlan {
   name: string;
   amountMinor: number;
   every: CrmEvery;
-  /** The due date of the first payment, `YYYY-MM-DD`. */
   startsOn: string;
-  /** The last day of the plan, `YYYY-MM-DD`. No payment is due after it. */
   endsOn: string | null;
-  /** The connected source that owns the plan: then it is read-only. */
   source: CrmSourceKind | null;
 }
 
 export interface CrmCustomer extends CrmCustomerText {
   id: string;
-  /** Stable and unique on the host. Agents see `Customer <number>` when the name is private. */
   number: number;
   statusId: string;
-  /** The agent that looks after the customer. null: the people of the server. */
   ownerAgentId: string | null;
   method: CrmMethod | null;
-  /** ISO 4217, such as "EUR". Plans and payments of the customer use it. */
   currency: string;
   tagIds: string[];
   plans: CrmPlan[];
   createdAt: string;
   updatedAt: string;
-  /** Goes up with each change; an update names the revision it read. */
   revision: number;
   paidMinor: number;
   openMinor: number;
   lateMinor: number;
-  /** The earliest due date of an open payment. */
   nextDueOn: string | null;
   lastPaidAt: string | null;
-  /** The connected source that links the customer: then `stripeCustomerId` is read-only. */
   source: CrmSourceKind | null;
 }
 
 export interface CrmPayment {
   id: string;
-  /** The invoice number, unique on the host. */
   number: number;
   customerId: string;
   planId: string | null;
@@ -189,7 +149,6 @@ export interface CrmPayment {
   dueOn: string;
   paidAt: string | null;
   method: CrmMethod | null;
-  /** The connected source that owns the payment: then it is read-only. */
   source: CrmSourceKind | null;
 }
 
@@ -198,24 +157,16 @@ export type CrmActorKind = (typeof CRM_ACTOR_KINDS)[number];
 
 export interface CrmActor {
   kind: CrmActorKind;
-  /**
-   * The agent id, the member id of a person on a joined server, or the source kind. null: the owner on
-   * this computer.
-   */
   id: string | null;
-  /** The person's name when the change came over the Team API. */
   name: string | null;
 }
 
-/** What happened to a customer. The client writes the sentence from `kind` and `details`. */
 export interface CrmActivity {
   id: string;
   customerId: string;
   actor: CrmActor;
-  /** A short name such as "payment-paid". A newer host can add kinds; a client shows an unknown one plainly. */
   kind: string;
   details: Record<string, string | number | null>;
-  /** The agent whose proposal the person approved. */
   proposedBy: string | null;
   createdAt: string;
 }
@@ -223,9 +174,7 @@ export interface CrmActivity {
 export interface CrmProposal {
   id: string;
   agentId: string;
-  /** null when the agent proposes a new customer. */
   customerId: string | null;
-  /** The chat the agent proposed it from. */
   threadId: string | null;
   reason: string;
   change: CrmProposedChange;
@@ -236,14 +185,12 @@ export interface CrmOverview {
   statuses: CrmStatus[];
   tags: CrmTag[];
   privateFields: CrmPrivateField[];
-  /** The agents that may read the CRM and propose changes. */
   agentIds: string[];
   proposals: CrmProposal[];
   sources: CrmSource[];
 }
 
 export interface CrmCustomerPageInput {
-  /** The `number` of the last customer of the previous page. */
   after?: number;
 }
 
@@ -258,7 +205,6 @@ export type CrmPaymentState = (typeof CRM_PAYMENT_STATES)[number];
 export interface CrmPaymentPageInput {
   state: CrmPaymentState;
   customerId?: string;
-  /** The cursor of the previous page. */
   after?: string;
 }
 
@@ -303,7 +249,6 @@ export interface CrmPlanInput {
 
 export interface CrmPlanPatch {
   name?: string;
-  /** Also changes the open payments of the plan. */
   amountMinor?: number;
   every?: CrmEvery;
 }
@@ -314,7 +259,6 @@ export interface CrmPaymentInput {
   amountMinor: number;
   dueOn: string;
   method?: CrmMethod | null;
-  /** Set to record a payment that is already paid. */
   paidAt?: string | null;
 }
 
@@ -330,7 +274,6 @@ export interface CrmSplitPart {
   dueOn: string;
 }
 
-/** A change that an agent can propose. A person applies the same kinds directly. */
 export type CrmProposedChange =
   | { kind: "customer-create"; customer: CrmCustomerInput }
   | { kind: "customer-update"; customerId: string; patch: CrmCustomerPatch }
@@ -356,7 +299,6 @@ export const CRM_PROPOSED_KINDS = [
   "payment-split",
 ] as const satisfies readonly CrmProposedChange["kind"][];
 
-/** A change by an owner or admin. */
 export type CrmChange =
   | Exclude<CrmProposedChange, { kind: "customer-update" }>
   | { kind: "customer-update"; customerId: string; patch: CrmCustomerPatch; baseRevision: number }
@@ -365,7 +307,6 @@ export type CrmChange =
   | { kind: "tag-delete"; tagId: string }
   | { kind: "status-create"; label: string }
   | { kind: "status-rename"; statusId: string; label: string }
-  /** The customers with the status move to `replaceWith`. */
   | { kind: "status-delete"; statusId: string; replaceWith: string }
   | { kind: "plan-delete"; planId: string }
   | { kind: "payment-delete"; paymentId: string }
@@ -390,14 +331,10 @@ export const CRM_CHANGE_KINDS = [
 
 export type CrmApplyResult =
   | { ok: true /** The id of a new customer, tag, status, plan or payment. */; id: string | null }
-  /** The customer changed after `baseRevision`; the client reads it again. */
   | { ok: false; conflict: "revision" };
-
-// --- Values ------------------------------------------------------------------------------------
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 
-/** A real calendar date as `YYYY-MM-DD`. */
 export function isCrmDate(value: unknown): value is string {
   if (!isString(value) || !DATE.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
@@ -643,8 +580,6 @@ export function isCrmChange(value: unknown): value is CrmChange {
   }
 }
 
-// --- Responses ---------------------------------------------------------------------------------
-
 function isStatus(value: unknown): value is CrmStatus {
   return (
     isDynamicRecord(value) &&
@@ -837,8 +772,6 @@ export function isCrmApplyResult(value: unknown): value is CrmApplyResult {
   return value.ok === true ? isNullable(value.id, isIdentifier) : value.ok === false && value.conflict === "revision";
 }
 
-// --- Requests ----------------------------------------------------------------------------------
-
 export function isCrmCustomerPageInput(value: unknown): value is CrmCustomerPageInput {
   return (
     isDynamicRecord(value) &&
@@ -866,7 +799,6 @@ export function isCrmActivityPageInput(value: unknown): value is CrmActivityPage
   );
 }
 
-/** A source key is at most 255 characters; the host checks its form and its permissions. */
 export function isCrmSourceConnectInput(value: unknown): value is CrmSourceConnectInput {
   return (
     isDynamicRecord(value) &&

@@ -9,26 +9,22 @@ const OLDER_CHARACTERS = 4_000;
 const STEPS_CHARACTERS = 2_000;
 const HEADER_CHARACTERS = 2_000;
 const RECENT_CHARACTERS = 24_000;
-/** A routine run reads the end of the agent's chat only. Its prompt names the work. */
 const ROUTINE_HANDOFF_CHARACTERS = 8_000;
 const ROUTINE_MESSAGE_CHARACTERS = 2_000;
 type HistoryRow = ReturnType<OpenBotDatabase["readAgentHistory"]>["messages"][number];
 
-/** A cut at `index` would leave a lone surrogate, which a provider's JSON parser rejects. */
 function splitsPair(text: string, index: number): boolean {
   const before = text.charCodeAt(index - 1);
   const after = text.charCodeAt(index);
   return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
 }
 
-/** Cuts redacted text at both ends, so a large request keeps its final instructions. */
 function historyExcerpt(text: string, limit: number): string {
   if (text.length <= limit) return text;
   const marker = "\n[... omitted; use history_read with this messageId ...]\n";
   const headEnd = limit <= marker.length ? Math.max(0, limit) : Math.ceil((limit - marker.length) / 2);
   const head = text.slice(0, splitsPair(text, headEnd) ? headEnd - 1 : headEnd);
   if (limit <= marker.length) return head;
-  // An explicit start index: `slice(-0)` would keep the whole text.
   const tailStart = text.length - Math.floor((limit - marker.length) / 2);
   return `${head}${marker}${text.slice(splitsPair(text, tailStart) ? tailStart + 1 : tailStart)}`;
 }
@@ -37,7 +33,6 @@ function render(message: ConversationMessage, names: ReadonlyMap<string, string>
   return redactSecrets(`[messageId: ${message.id}]\n${renderHandoffMessage(message, names)}`);
 }
 
-/** Reads only enough recent pages for the packet. The complete history stays in SQLite. */
 export function readHandoffHistory(
   database: OpenBotDatabase,
   agentId: string,
@@ -56,7 +51,6 @@ export function readHandoffHistory(
     if (!page.messages.length) break;
     for (const row of page.messages) {
       recent.push(row);
-      // The selected role bookends can use at most half the recent allocation each.
       size += Math.min(render(row.message, names).length, RECENT_CHARACTERS / 2);
       before = row.message.id;
       if (size >= RECENT_CHARACTERS + OLDER_CHARACTERS) {
@@ -69,7 +63,6 @@ export function readHandoffHistory(
   return { recent, latest, hasOlder };
 }
 
-/** The note of a branch: its copied history does not roll back the files that later turns of the source changed. */
 const BRANCH_NOTE =
   "This conversation is a branch: a copy of an earlier conversation up to one message. Workspace files were not rolled back, so they can include changes from after that message.";
 
@@ -109,7 +102,6 @@ export function renderProviderHandoff(
   }
   const older: string[] = [];
   let olderSize = 0;
-  // Header space is reserved for all section labels and omission notices.
   const recentBudget = RECENT_CHARACTERS + (STEPS_CHARACTERS - stepSize);
   for (const row of history.recent) {
     if (kept.has(row.message.id)) continue;
@@ -123,7 +115,6 @@ export function renderProviderHandoff(
       olderSize += excerpt.length + 2;
     }
   }
-  // Any spare header/excerpt space can hold more of the two important role bookends.
   let spare = HANDOFF_CHARACTERS - HEADER_CHARACTERS - stepSize - olderSize - recentSize;
   for (const row of history.latest) {
     const previous = kept.get(row.message.id) ?? "";
@@ -135,7 +126,6 @@ export function renderProviderHandoff(
     ...history.recent,
     ...history.latest.filter((row) => !history.recent.some((candidate) => candidate.message.id === row.message.id)),
   ];
-  // The selected role anchors can fall outside the page; use conversation order for the union.
   const recentText = sortConversationMessages(ordered.toReversed().map((row) => row.message))
     .flatMap((message) => (kept.has(message.id) ? [kept.get(message.id)] : []))
     .join("\n\n");
@@ -153,7 +143,6 @@ export function renderProviderHandoff(
   return packet;
 }
 
-/** The newest messages of one history that fit `budget`, in conversation order, and their size. */
 function newestMessages(
   history: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
@@ -161,7 +150,6 @@ function newestMessages(
 ): { text: string; size: number } {
   const kept = new Map<string, string>();
   let size = 0;
-  // Newest first, so a long history keeps its end.
   for (const row of history.recent) {
     const text = historyExcerpt(render(row.message, names), ROUTINE_MESSAGE_CHARACTERS);
     if (size + text.length + 2 > budget) break;
@@ -174,12 +162,6 @@ function newestMessages(
   return { text, size };
 }
 
-/**
- * The start of a routine run's own provider session: the newest messages of the agent's chat and,
- * for a routine with its own thread, the newest messages of that thread, up to
- * `ROUTINE_HANDOFF_CHARACTERS` together. The earlier runs get at most half, and the chat gets the
- * rest. The run reads more through the history tools when it needs more.
- */
 export function renderRoutineHandoff(
   chat: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
@@ -188,8 +170,6 @@ export function renderRoutineHandoff(
   const header = [
     HANDOFF_START,
     "This routine run has its own session. These are the newest messages of your conversation. Do not repeat completed work.",
-    // The routine task is saved text, so a reminder told the user to do what the chat had since
-    // found impossible (#12440).
     "When a newer message shows that what the routine task asks for is done, has changed, or is not possible, do not repeat the outdated request or steps. Unless the user asked to stop or skip it, still give a requested reminder, and say that newer result in it.",
     "Omitted details remain available: discover openbot.history_search and openbot.history_read.",
   ].join("\n");
@@ -214,11 +194,6 @@ const ROUTINE_DIGEST_CHARACTERS = 1_500;
 const ROUTINE_DIGESTS_CHARACTERS = 6_000;
 const ROUTINE_DIGEST_MARKER = "\n\n--- routine run in its own session (also in the conversation history) ---\n";
 
-/**
- * Adds the answer of a routine run to the handoff that the agent's own session reads with its next
- * turn, so that session knows what the run did. A handoff with a history packet keeps it, and the
- * digests go before its last line. Past `ROUTINE_DIGESTS_CHARACTERS`, the oldest digests go.
- */
 export function appendRoutineDigest(existing: string | undefined, routineName: string, answer: string): string {
   const digest = redactSecrets(
     historyExcerpt(`[routine: ${routineName}]\n${answer.trim()}`, ROUTINE_DIGEST_CHARACTERS),
@@ -229,11 +204,6 @@ export function appendRoutineDigest(existing: string | undefined, routineName: s
   return handoffPacket(history, digests);
 }
 
-/**
- * What stays of a handoff after a turn sent `sent`, or undefined when nothing stays. A routine run
- * that ends while a turn starts adds its digest after the turn read the handoff: that digest stays
- * for the next turn, and the part that the turn sent does not repeat.
- */
 export function unsentHandoff(current: string, sent: string | undefined): string | undefined {
   if (current === sent) return undefined;
   const now = handoffParts(current);
@@ -243,10 +213,6 @@ export function unsentHandoff(current: string, sent: string | undefined): string
   return unsent.length > 0 ? handoffPacket(HANDOFF_START, unsent) : undefined;
 }
 
-/**
- * Whether a handoff holds the conversation history: the first turn of a new session sends it. A
- * handoff with only routine digests goes to a session that already had turns.
- */
 export function handoffHasHistory(handoff: string): boolean {
   const { packet, history } = handoffParts(handoff);
   return packet && history !== HANDOFF_START;

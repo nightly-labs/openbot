@@ -30,24 +30,16 @@ import { LandingFace } from "./LandingFace";
 import { LandingIcon } from "./LandingIcon";
 import { useLandingText } from "./LandingText";
 
-// Loaded after the page is in the browser, as on the agent template page: the
-// avatar engine is too large for the first load of the home page.
 const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
 
-/** The second marquee row runs the other way, so it starts from the other end of the list. */
 const PROVIDER_ROWS = [LANDING_PROVIDERS, [...LANDING_PROVIDERS].reverse()];
 
-/**
- * The second marquee row and the second copy in each track (the copy closes the loop) are hidden
- * from screen readers, so they read each provider once.
- */
 function hiddenFromReaders(hidden: boolean) {
   return hidden ? "true" : undefined;
 }
 
-/** Tiles whose avatars move when the pointer is on the tile. */
 const AVATAR_HOVER_FEATURES: ReadonlySet<LandingFeatureId> = new Set(["team", "multiplayer", "workflows", "persist"]);
 
 export function FeaturesSection() {
@@ -56,7 +48,6 @@ export function FeaturesSection() {
   const landing = useLandingText();
   const text = () => landing().features;
   const picture = () => landing().picture;
-  // The Worker renders an empty circle of each avatar's size, and the browser fills it in.
   const [mounted, setMounted] = createSignal(false);
   onSettled(() => {
     setMounted(true);
@@ -73,7 +64,6 @@ export function FeaturesSection() {
     </Show>
   );
 
-  /** A person has a drawn face, so people and agents are easy to tell apart. */
   const personAvatar = (person: LandingPerson, size: "large" | "small") => (
     <LandingFace person={person} class={`landing-team-avatar landing-team-avatar-${size}`} />
   );
@@ -102,7 +92,6 @@ export function FeaturesSection() {
       words,
     );
 
-  /** Where a step of the workflow picture is, and when it runs on hover. */
   const workflowStep = (id: LandingWorkflowStepId, column: number) => {
     const timing = workflowTiming(id);
     return {
@@ -112,7 +101,6 @@ export function FeaturesSection() {
     };
   };
 
-  /** A ring that turns while the step runs, and a check when it is done. */
   const workflowStatus = () => (
     <span class="landing-workflow-status">
       <span class="landing-workflow-spinner" />
@@ -359,7 +347,6 @@ export function FeaturesSection() {
       aria-labelledby="features-title"
       data-revealed={revealed() ? "true" : "false"}
     >
-      {/* The Gemini mark is a gradient, and CSS can fill a path with one only from an SVG paint server. */}
       <svg class="landing-paint-servers" aria-hidden="true">
         <linearGradient id="landing-gemini-gradient" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#439ddf" />
@@ -401,7 +388,6 @@ export function FeaturesSection() {
   );
 }
 
-/** A tile's sentence. A part with a slug links to its provider page. */
 function FeatureDescription(props: { parts: readonly FeatureDescriptionPart[] }) {
   return (
     <For each={props.parts}>

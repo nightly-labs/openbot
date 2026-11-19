@@ -29,10 +29,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * The settings of a Discord trigger, read-only. The Discord servers, their channels and their roles
- * are on the computer that runs OpenBot only, so a joined device shows what the trigger keeps.
- */
 export function DiscordTriggerFields({ node }: { node: WorkflowNode }) {
   const { t, format } = useText();
   const roles = workflowListField(node.fields.roles);
@@ -59,7 +55,6 @@ export function DiscordTriggerFields({ node }: { node: WorkflowNode }) {
   );
 }
 
-/** The settings of a Discord output, read-only, for the same reason as the trigger's. */
 export function DiscordOutputFields({ node }: { node: WorkflowNode }) {
   const { t } = useText();
   const action = discordAction(node);

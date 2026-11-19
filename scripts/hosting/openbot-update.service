@@ -1,7 +1,3 @@
-# Downloads and unpacks a newer OpenBot release next to the running one. openbot-update.timer starts
-# it each hour, and `check` stages about each 6 hours; openbot-update-apply.service moves the release
-# into place at the next start of the server. When OpenBot stopped its start loop, `check` stages,
-# moves the release into place at once and starts OpenBot.
 [Unit]
 Description=Stage an OpenBot update
 Wants=network-online.target

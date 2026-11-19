@@ -31,7 +31,6 @@ interface SettingsHostedServersTabProps {
   store: SettingsHostedServersStore;
   excludedServerIds?: readonly string[];
   inBilling?: boolean;
-  /** Opens the add server dialog, where the user picks a plan and pays. */
   onAddServer?: (() => void) | undefined;
 }
 
@@ -72,7 +71,6 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
   const { t } = useText();
   const state = () => props.store.state;
   const servers = () => state().servers.filter((server) => !props.excludedServerIds?.includes(server.serverId));
-  // Also a server whose setup failed: it has no sandbox to stop, so it stays in `error`.
   const planEnded = (server: HostedServerSummary) => server.error === "plan_ended";
   const description = (server: HostedServerSummary) => {
     if (server.state === "awaiting_payment") return t("settings.hostedServers.paymentDescription");
@@ -83,7 +81,6 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
       plan: t(PLAN_NAMES[server.plan]),
       vcpu: size.vcpu,
       memory: size.memoryGb,
-      // The storage of the server, not the machine disk, which can be larger.
       disk: serverStorageGb(server),
     });
   };

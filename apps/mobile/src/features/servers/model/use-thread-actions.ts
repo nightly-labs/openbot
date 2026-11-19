@@ -28,10 +28,8 @@ const CONTROL_TEXT = {
   },
 } as const satisfies Record<ControlAction, { label: MobileTextKey; error: MobileTextKey; icon: string }>;
 
-/** A turn runs or waits in the thread. As on desktop, the person stops it before a delete. */
 const threadBusy = (task: AgentTask) => task.state === "running" || task.state === "queued";
 
-/** As on desktop: a running or waiting thread can stop, another open thread can archive, and an archived one can restore. */
 function controlAction(task: AgentTask): ControlAction {
   if (threadBusy(task)) return "stop";
   return task.state === "closed" ? "reopen" : "close";
@@ -40,21 +38,14 @@ function controlAction(task: AgentTask): ControlAction {
 const isThreadAction = (id: string): id is ThreadAction =>
   id === "stop" || id === "close" || id === "reopen" || id === "rename" || id === "delete";
 
-/**
- * The actions of a thread, for its ⋯ menu and the long press on its row: stop, archive or restore,
- * and rename and delete on a host with `agent-threads-v1`. A delete asks first, because it removes
- * the thread for good. `onDeleted` runs after the host deleted the thread.
- */
 export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask) => void) {
   const { t } = useText();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  // Only what the menu needs, so a change elsewhere in the workspace does not render the thread list again.
   const { controlAgentTask, deleteAgentThread } = useMobileWorkspaceActions();
   const [acting, setActing] = useState<ReadonlySet<string>>(() => new Set());
   const editable = useMobileWorkspaceSelector((workspace) => workspace.canEditThreads(serverId));
 
-  // The threads with a request on the way. The ref answers at once; the state draws the menu.
   const pending = useRef(new Set<string>());
   const track = useCallback(async (task: AgentTask, error: MobileTextKey, run: () => Promise<void>) => {
     if (pending.current.has(task.id)) return false;
