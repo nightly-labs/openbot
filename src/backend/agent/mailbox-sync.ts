@@ -5,6 +5,7 @@ import {
   type ConversationMessage,
   type ConversationSnapshot,
   modelSwitchReason,
+  type QueueDeliveryStatus,
   type QueueHold,
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
@@ -15,6 +16,8 @@ import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import type { RoutineScheduler } from "./routine-scheduler";
+
+const OPEN_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
@@ -120,12 +123,33 @@ export class MailboxSync {
         snapshot.messages.push(mailboxMessage);
       }
     }
+    // The read gives each open request, but a finished one only among the newest. A request that
+    // ended after newer messages came keeps its copy from when it ran, so "Waiting for replies"
+    // showed its teammate as working (#12554).
+    const read = new Set(mailboxCopies.map((message) => message.id));
+    for (const message of snapshot.messages) if (!read.has(message.id)) this.#refreshOpenRequest(message);
     const reactions = this.#mailbox.reactionsFor(snapshot.agentId);
     for (const message of snapshot.messages) {
       message.reactions = reactions.get(message.id) ?? [];
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Puts the current state of each delivery on a request whose copy has one still open. */
+  #refreshOpenRequest(message: ConversationMessage): void {
+    const exchange = message.exchange;
+    if (exchange?.direction !== "outgoing" || !exchange.deliveries.some(({ status }) => OPEN_STATUSES.has(status)))
+      return;
+    message.exchange = {
+      ...exchange,
+      deliveries: exchange.deliveries.map((delivery) => {
+        const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
+        return current
+          ? { ...delivery, status: current.status, position: current.position, error: current.error }
+          : delivery;
+      }),
+    };
   }
 
   /** Sends the thread list of each agent whose side-thread requests changed since the last list. */
