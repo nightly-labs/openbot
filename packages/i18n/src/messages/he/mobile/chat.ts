@@ -590,6 +590,12 @@ export const messages = {
     other: "{name}, שרשורים. {count} שרשורים צריכים אותך",
   },
   "mobile.chat.threads.main": "הצ'אט הראשי",
+  "mobile.chat.threads.count": { one: "שרשור אחד", two: "שני שרשורים", other: "{count} שרשורים" },
+  "mobile.chat.threads.unreadCount": {
+    one: "שרשור אחד שלא נקרא",
+    two: "שני שרשורים שלא נקראו",
+    other: "{count} שרשורים שלא נקראו",
+  },
   "mobile.chat.threads.branchedFrom": "הסתעף מ-{title}",
   "mobile.chat.threads.branchedFromDeleted": "הסתעף משרשור שנמחק",
   "mobile.chat.threads.new": "שרשור חדש",

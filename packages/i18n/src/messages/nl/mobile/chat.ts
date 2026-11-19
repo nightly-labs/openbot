@@ -562,6 +562,8 @@ export const messages = {
     other: "{name}, threads. {count} threads wachten op je",
   },
   "mobile.chat.threads.main": "Hoofdchat",
+  "mobile.chat.threads.count": { one: "{count} thread", other: "{count} threads" },
+  "mobile.chat.threads.unreadCount": { one: "{count} ongelezen thread", other: "{count} ongelezen threads" },
   "mobile.chat.threads.branchedFrom": "Afgetakt van {title}",
   "mobile.chat.threads.branchedFromDeleted": "Afgetakt van een verwijderde thread",
   "mobile.chat.threads.new": "Nieuwe thread",

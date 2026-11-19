@@ -679,6 +679,18 @@ export const messages = {
     other: "{name}, ветки. {count} ветки ждут вас",
   },
   "mobile.chat.threads.main": "Основной чат",
+  "mobile.chat.threads.count": {
+    one: "{count} ветка",
+    few: "{count} ветки",
+    many: "{count} веток",
+    other: "{count} ветки",
+  },
+  "mobile.chat.threads.unreadCount": {
+    one: "{count} непрочитанная ветка",
+    few: "{count} непрочитанные ветки",
+    many: "{count} непрочитанных веток",
+    other: "{count} непрочитанной ветки",
+  },
   "mobile.chat.threads.branchedFrom": "Ответвление от: {title}",
   "mobile.chat.threads.branchedFromDeleted": "Ответвление от удалённой ветки",
   "mobile.chat.threads.new": "Новая ветка",

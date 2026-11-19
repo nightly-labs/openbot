@@ -595,6 +595,8 @@ export const messages = {
     other: "{name}, hilos. {count} hilos te necesitan",
   },
   "mobile.chat.threads.main": "Chat principal",
+  "mobile.chat.threads.count": { one: "{count} hilo", other: "{count} hilos" },
+  "mobile.chat.threads.unreadCount": { one: "{count} hilo sin leer", other: "{count} hilos sin leer" },
   "mobile.chat.threads.branchedFrom": "Ramificado de {title}",
   "mobile.chat.threads.branchedFromDeleted": "Ramificado de un hilo eliminado",
   "mobile.chat.threads.new": "Nuevo hilo",

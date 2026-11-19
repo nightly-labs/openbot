@@ -3,7 +3,6 @@ import { router, Stack } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Trash from "lucide-react-native/icons/trash";
 import { memo, useMemo } from "react";
@@ -32,6 +31,8 @@ import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useVerticalBarShown } from "@/shared/lib/vertical-bar";
 import type { ChatTarget } from "../model/chat-target";
+
+const TITLE_PILL_MAX_WIDTH = 200;
 
 interface ChatHeaderProps {
   target: ChatTarget;
@@ -106,41 +107,65 @@ export const ChatHeader = memo(function ChatHeader({
     [target],
   );
   const iconColor = String(foreground);
-  const identity = (
-    <>
-      {target.kind === "channel" ? (
-        <ChannelAvatar
-          channel={channelPicture}
-          agents={members}
-          size={28}
+  const threadSubtitle = threadMenu
+    ? threadMenu.inThread
+      ? (title ?? "")
+      : threadMenu.attention > 0
+        ? t("mobile.chat.threads.unreadCount", { count: threadMenu.attention })
+        : threadMenu.threadCount > 0
+          ? t("mobile.chat.threads.count", { count: threadMenu.threadCount })
+          : t("mobile.chat.threads.main")
+    : kicker
+      ? (title ?? "")
+      : null;
+  const unreadThreadsShown = threadMenu !== undefined && !threadMenu.inThread && threadMenu.attention > 0;
+  const picture =
+    target.kind === "channel" ? (
+      <ChannelAvatar
+        channel={channelPicture}
+        agents={members}
+        size={32}
+        serverId={target.serverId}
+        disconnected={disconnected}
+      />
+    ) : (
+      <AgentPinAvatar agentId={target.id} location="chat" size={32}>
+        <BloubAvatar
+          agentId={target.id}
           serverId={target.serverId}
-          disconnected={disconnected}
+          hue={target.avatarHue}
+          color={target.avatarColor}
+          seed={target.avatarSeed}
+          size={32}
         />
-      ) : (
-        <AgentPinAvatar agentId={target.id} location="chat" size={28}>
-          <BloubAvatar
-            agentId={target.id}
-            serverId={target.serverId}
-            hue={target.avatarHue}
-            color={target.avatarColor}
-            seed={target.avatarSeed}
-            size={28}
-          />
-        </AgentPinAvatar>
-      )}
-      {kicker ? (
-        <>
+      </AgentPinAvatar>
+    );
+  const identity =
+    threadSubtitle === null ? (
+      <>
+        {picture}
+        <Typography.Paragraph className="font-semibold min-w-0 shrink" numberOfLines={1} style={typeScale.rowTitle}>
+          {title ?? target.name}
+        </Typography.Paragraph>
+      </>
+    ) : (
+      <>
+        {picture}
+        <View className="min-w-0 shrink">
           <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.rowTitle}>
-            {kicker}
+            {kicker ?? target.name}
           </Typography.Paragraph>
-          <View className="size-1 rounded-full bg-muted" />
-        </>
-      ) : null}
-      <Typography.Paragraph className="font-semibold min-w-0 shrink" numberOfLines={1} style={typeScale.rowTitle}>
-        {title ?? target.name}
-      </Typography.Paragraph>
-    </>
-  );
+          <View className="min-w-0 flex-row items-center gap-1.5">
+            {unreadThreadsShown ? (
+              <View className="size-2 rounded-full" style={{ backgroundColor: threadMenu?.color }} />
+            ) : null}
+            <Typography.Paragraph className="min-w-0 shrink text-muted" numberOfLines={1} style={typeScale.small}>
+              {threadSubtitle}
+            </Typography.Paragraph>
+          </View>
+        </View>
+      </>
+    );
 
   const openBrowser = () => {
     if (!browserAgent) return;
@@ -239,7 +264,10 @@ export const ChatHeader = memo(function ChatHeader({
     </MenuView>
   );
 
-  const titleReserve = verticalBar ? 32 : 40 + (splitDetailRoot ? 0 : 56) + (actionsMenu === null ? 0 : 56);
+  const titleMaxWidth = Math.min(
+    TITLE_PILL_MAX_WIDTH,
+    width - insets.left - insets.right - 2 * (16 + BAR_BUTTON_SIZE + 12),
+  );
   const pillHeight = isIOS && !verticalBar ? NATIVE_BAR_HEIGHT : BAR_BUTTON_SIZE;
   const titlePill = (
     <GlassView
@@ -251,7 +279,7 @@ export const ChatHeader = memo(function ChatHeader({
         borderCurve: "continuous",
         borderRadius: pillHeight / 2,
         flexDirection: "row",
-        maxWidth: kicker ? undefined : 220,
+        maxWidth: titleMaxWidth,
         flexShrink: 1,
         overflow: "hidden",
       }}
@@ -271,17 +299,10 @@ export const ChatHeader = memo(function ChatHeader({
                 ? t("mobile.chat.threads.menuAttention", { name: target.name, count: threadMenu.attention })
                 : t("mobile.chat.threads.menu", { name: target.name })
             }
-            className="min-w-0 flex-row items-center gap-2 pr-3 pl-2.5"
-            style={{ height: pillHeight, maxWidth: kicker ? width - insets.left - insets.right - titleReserve : 220 }}
+            className="min-w-0 flex-row items-center gap-2 pr-4 pl-2.5"
+            style={{ height: pillHeight, maxWidth: titleMaxWidth }}
           >
             {identity}
-            <ChevronDown color={iconColor} size={16} strokeWidth={2.5} />
-            {threadMenu.attention > 0 ? (
-              <View
-                className="absolute top-1.5 right-2 size-2.5 rounded-full"
-                style={{ backgroundColor: threadMenu.color }}
-              />
-            ) : null}
           </View>
         </MenuView>
       ) : (
@@ -360,14 +381,14 @@ export const ChatHeader = memo(function ChatHeader({
             hidden={splitDetailRoot || accessibilityHidden}
             onPress={goBack}
           />
-          {verticalBar ? null : (
-            <Stack.Toolbar.View hidesSharedBackground hidden={accessibilityHidden}>
-              <View className="flex-row" style={{ height: NATIVE_BAR_HEIGHT }}>
-                {titlePill}
-              </View>
-            </Stack.Toolbar.View>
-          )}
         </Stack.Toolbar>
+        {verticalBar ? null : (
+          <Stack.Title asChild>
+            <View className="flex-row" style={{ height: NATIVE_BAR_HEIGHT }}>
+              {accessibilityHidden ? null : titlePill}
+            </View>
+          </Stack.Title>
+        )}
         <Stack.Toolbar placement="right">
           {deleteAction ? (
             <Stack.Toolbar.Button
@@ -404,7 +425,7 @@ export const ChatHeader = memo(function ChatHeader({
         />
         {verticalBar ? (
           <View
-            className="absolute z-20 flex-row"
+            className="absolute z-20 flex-row justify-center"
             pointerEvents="box-none"
             accessibilityElementsHidden={accessibilityHidden}
             importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
@@ -426,10 +447,14 @@ export const ChatHeader = memo(function ChatHeader({
         importantForAccessibility={accessibilityHidden ? "no-hide-descendants" : "auto"}
         style={{
           top: topInset + (splitShown ? NATIVE_BAR_BUTTON_TOP : 8),
+          minHeight: BAR_BUTTON_SIZE,
           paddingLeft: insets.left + 16,
           paddingRight: insets.right + 16,
         }}
       >
+        <View pointerEvents="box-none" className="absolute inset-0 flex-row items-center justify-center">
+          {titlePill}
+        </View>
         {splitDetailRoot ? null : (
           <ChatGlassIconButton
             accessibilityLabel={t("common.back")}
@@ -440,9 +465,6 @@ export const ChatHeader = memo(function ChatHeader({
             <ArrowLeft color={iconColor} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
           </ChatGlassIconButton>
         )}
-
-        {titlePill}
-
         <View className="flex-1" />
         {deleteButton ?? trailingButtons}
       </View>

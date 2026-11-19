@@ -591,6 +591,8 @@ export const messages = {
     other: "{name}, tópicos. {count} tópicos precisam de você",
   },
   "mobile.chat.threads.main": "Chat principal",
+  "mobile.chat.threads.count": { one: "{count} tópico", other: "{count} tópicos" },
+  "mobile.chat.threads.unreadCount": { one: "{count} tópico não lido", other: "{count} tópicos não lidos" },
   "mobile.chat.threads.branchedFrom": "Ramificado de {title}",
   "mobile.chat.threads.branchedFromDeleted": "Ramificado de um tópico excluído",
   "mobile.chat.threads.new": "Novo tópico",

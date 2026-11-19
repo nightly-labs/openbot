@@ -563,6 +563,8 @@ export const messages = {
   "mobile.chat.threads.menu": "{name}，话题",
   "mobile.chat.threads.menuAttention": { other: "{name}，话题。{count} 个需要你" },
   "mobile.chat.threads.main": "主聊天",
+  "mobile.chat.threads.count": { other: "{count} 个话题" },
+  "mobile.chat.threads.unreadCount": { other: "{count} 个未读话题" },
   "mobile.chat.threads.branchedFrom": "分支自 {title}",
   "mobile.chat.threads.branchedFromDeleted": "分支自已删除的话题",
   "mobile.chat.threads.new": "新话题",

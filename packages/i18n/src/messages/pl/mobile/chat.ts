@@ -686,6 +686,18 @@ export const messages = {
     other: "{name}, wątki. {count} wątku czeka na ciebie",
   },
   "mobile.chat.threads.main": "Główny czat",
+  "mobile.chat.threads.count": {
+    one: "{count} wątek",
+    few: "{count} wątki",
+    many: "{count} wątków",
+    other: "{count} wątku",
+  },
+  "mobile.chat.threads.unreadCount": {
+    one: "{count} nieprzeczytany wątek",
+    few: "{count} nieprzeczytane wątki",
+    many: "{count} nieprzeczytanych wątków",
+    other: "{count} nieprzeczytanego wątku",
+  },
   "mobile.chat.threads.branchedFrom": "Odgałęzienie z: {title}",
   "mobile.chat.threads.branchedFromDeleted": "Odgałęzienie z usuniętego wątku",
   "mobile.chat.threads.new": "Nowy wątek",
