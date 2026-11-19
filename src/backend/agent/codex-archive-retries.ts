@@ -2,7 +2,7 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Option, Result, Schema, Semaphore } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
-import { isCodexActiveWriterError, isMissingProviderSessionError } from "./thread-items";
+import { isCodexThreadInUse, isMissingProviderSessionError } from "./thread-items";
 
 const logger = createOpenBotLogger("codex-archive-retries");
 
@@ -31,7 +31,7 @@ export class CodexArchiveRetries {
   ) {
     const failure = yield* this.#tryArchive(client, threadId);
     if (failure === null) return;
-    if (!isCodexActiveWriterError(failure) || !client.newestTurnId) return this.#logFailure(client.provider, failure);
+    if (!isCodexThreadInUse(failure) || !client.newestTurnId) return this.#logFailure(client.provider, failure);
     const newest = yield* Effect.result(client.newestTurnId(threadId));
     if (Result.isFailure(newest)) return this.#logFailure(client.provider, newest.failure.cause);
     yield* this.#writes.withPermit(
@@ -74,7 +74,7 @@ export class CodexArchiveRetries {
     }
     const failure = yield* this.#tryArchive(client, threadId);
     if (failure === null || isMissingProviderSessionError(failure, client.provider)) return true;
-    if (!isCodexActiveWriterError(failure)) this.#logFailure(client.provider, failure);
+    if (!isCodexThreadInUse(failure)) this.#logFailure(client.provider, failure);
     return false;
   });
 

@@ -56,12 +56,6 @@ export function isArchivedThreadError(error: unknown): boolean {
   return error instanceof AppServerError && /\bis archived\b/i.test(error.message);
 }
 
-export function isCodexActiveWriterError(error: unknown): boolean {
-  return (
-    error instanceof AppServerError && error.code === -32600 && error.message.includes("already has an active writer")
-  );
-}
-
 export function isCodexMissingRollout(error: unknown): boolean {
   return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
 }
