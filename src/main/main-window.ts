@@ -203,7 +203,7 @@ export function createMainWindowController({
   }
 
   function askAfterRendererStopped(window: BrowserWindow): void {
-    if (rendererStoppedDialogOpen || window.isDestroyed()) return;
+    if (rendererStoppedDialogOpen || window.isDestroyed() || !window.webContents.isCrashed()) return;
     if (!window.isVisible()) {
       window.once("show", () => askAfterRendererStopped(window));
       return;
