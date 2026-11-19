@@ -22,11 +22,12 @@ interface Report {
   checks: string[];
   handoffs: { agentId: string; deliveryId: string; text: string; sourcePaths: readonly string[] }[];
   stopped: { agentId: string; deliveryId: string }[];
+  modelRequests: { prompt: string; images: readonly string[] }[];
   passed: boolean;
   failure?: string;
 }
 
-const report: Report = { checks: [], handoffs: [], stopped: [], passed: false };
+const report: Report = { checks: [], handoffs: [], stopped: [], modelRequests: [], passed: false };
 const check = (name: string, ok: boolean, detail?: unknown) => {
   assert.ok(ok, `${name}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
   report.checks.push(name);
@@ -58,7 +59,31 @@ const picturesGraph = (agentId: string): WorkflowGraph => ({
 });
 const GENERATED_FILE = "generated-file";
 const DELETED_FILE = "deleted-file";
-const storedPath = (attachmentId: string) => `/stored/${attachmentId}`;
+const NOTES_FILE = "notes-file";
+const storedPath = (attachmentId: string) => `/stored/${attachmentId}.${attachmentId === NOTES_FILE ? "txt" : "png"}`;
+
+const modelGraph = (task: string, pictures: readonly string[]): WorkflowGraph => ({
+  nodes: [
+    { id: "prompt", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Compare the pictures." } },
+    { id: "image", kind: "image", at: { x: 0, y: 200 }, fields: { prompt: "A red bicycle." } },
+    ...pictures.map((fileId, index) => ({
+      id: `asset-${index}`,
+      kind: "asset" as const,
+      at: { x: 0, y: 400 + index * 200 },
+      fields: { fileId },
+    })),
+    { id: "model", kind: "llm", at: { x: 300, y: 0 }, fields: { prompt: task } },
+  ],
+  edges: [
+    { id: "text", from: "prompt", to: "model", type: "text" },
+    ...(pictures.length > 0 ? [{ id: "image-image", from: "image", to: "model", type: "image" as const }] : []),
+    ...pictures.flatMap((_, index) => [
+      { id: `asset-${index}-image`, from: `asset-${index}`, to: "model", type: "image" as const },
+      { id: `asset-${index}-file`, from: `asset-${index}`, to: "model", type: "file" as const },
+    ]),
+  ],
+  strokes: [],
+});
 
 const assetsGraph = (agentId: string, fileIds: readonly string[]): WorkflowGraph => ({
   nodes: [
@@ -104,7 +129,11 @@ async function open() {
         Effect.sync(() => {
           report.stopped.push({ agentId, deliveryId });
         }),
-      generateText: () => Effect.fail({ message: "No model step runs in this test." }),
+      generateText: (request) =>
+        Effect.sync(() => {
+          report.modelRequests.push({ prompt: request.prompt, images: request.images });
+          return "Seen";
+        }),
       generateMedia: () => Effect.succeed(GENERATED_FILE),
       filePath: (attachmentId) => Effect.succeed(attachmentId === DELETED_FILE ? null : storedPath(attachmentId)),
       notify: () => {},
@@ -139,6 +168,8 @@ async function runUntil(
   }
 }
 const agentStep = (detail: WorkflowRunDetail) => detail.steps.find((step) => step.nodeId === "agent");
+const modelStep = (detail: WorkflowRunDetail) => detail.steps.find((step) => step.nodeId === "model");
+const requestFor = (task: string) => report.modelRequests.find((request) => request.prompt.includes(task));
 const answering = (detail: WorkflowRunDetail) => agentStep(detail)?.status === "running";
 
 async function startRun(workflows: WorkflowsHandle, title: string, agentId: string, graph = graphOf(agentId)) {
@@ -268,6 +299,52 @@ try {
     !report.handoffs.some((handoff) => handoff.agentId === "agent-many"),
     report.handoffs,
   );
+
+  const modelRun = async (title: string, task: string, pictures: readonly string[]) => {
+    const run = await startRun(workflows, title, "unused", modelGraph(task, pictures));
+    return runUntil(workflows, run.runId, (detail) => detail.run.status !== "running");
+  };
+
+  const seen = await modelRun("Model pictures", "Describe the pictures.", ["asset-file", "asset-file"]);
+  check("a model step with pictures is done", modelStep(seen)?.status === "done", modelStep(seen));
+  check(
+    "the model step gets the files of the image step and the asset, each one time",
+    JSON.stringify(requestFor("Describe the pictures.")?.images) ===
+      JSON.stringify([storedPath(GENERATED_FILE), storedPath("asset-file")]),
+    requestFor("Describe the pictures."),
+  );
+
+  const plain = await modelRun("Model text", "Summarize the text.", []);
+  check(
+    "a model step with only a text edge gets no picture",
+    modelStep(plain)?.status === "done" && requestFor("Summarize the text.")?.images.length === 0,
+    requestFor("Summarize the text."),
+  );
+
+  const notes = await modelRun("Model notes", "Read the notes.", [NOTES_FILE]);
+  check(
+    "a file that is not a picture fails the model step with the picture-type reason",
+    modelStep(notes)?.status === "failed" && modelStep(notes)?.error === sourceText("error.workflow.modelImageType"),
+    modelStep(notes),
+  );
+  check("the model of a file that is not a picture gets no request", requestFor("Read the notes.") === undefined);
+
+  const gone = await modelRun("Model lost picture", "Find the lost picture.", [DELETED_FILE]);
+  check(
+    "a deleted picture fails the model step with the missing-picture reason",
+    modelStep(gone)?.status === "failed" && modelStep(gone)?.error === sourceText("error.workflow.mediaInputMissing"),
+    modelStep(gone),
+  );
+  check("the model of a deleted picture gets no request", requestFor("Find the lost picture.") === undefined);
+
+  const crowd = await modelRun("Model many pictures", "Count the pictures.", fileIds);
+  check(
+    "too many pictures fail the model step with the attachment limit",
+    modelStep(crowd)?.status === "failed" &&
+      modelStep(crowd)?.error === sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }),
+    modelStep(crowd),
+  );
+  check("the model of too many pictures gets no request", requestFor("Count the pictures.") === undefined);
 
   report.passed = true;
 } catch (error) {

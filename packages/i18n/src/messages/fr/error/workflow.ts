@@ -24,6 +24,10 @@ export const messages = {
     "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",
   "error.workflow.modelToolUse":
     "Le modèle a essayé d’utiliser un outil, mais cette étape ne peut répondre qu’avec du texte. Relancez l’étape ou choisissez un autre modèle pour elle.",
+  "error.workflow.modelImageUnsupported":
+    "Le modèle de cette étape ne peut pas lire les images. Choisissez un modèle qui le peut, ou supprimez la connexion de l’image.",
+  "error.workflow.modelImageType":
+    "Une étape de modèle ne lit que les images PNG, JPEG, GIF et WebP. Connectez une image de l’un de ces types.",
   "error.workflow.modelUnavailable":
     "Le modèle de cette étape n’est pas disponible. Choisissez un autre modèle pour cette étape.",
   "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",

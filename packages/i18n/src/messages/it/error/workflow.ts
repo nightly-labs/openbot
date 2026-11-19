@@ -24,6 +24,10 @@ export const messages = {
     "Il modello non ha risposto in tempo. Scegli un impegno più basso o un modello più veloce per questo passaggio, poi eseguilo di nuovo.",
   "error.workflow.modelToolUse":
     "Il modello ha provato a usare uno strumento, ma questo passaggio può rispondere solo con testo. Esegui di nuovo il passaggio o scegli un altro modello.",
+  "error.workflow.modelImageUnsupported":
+    "Il modello di questo passaggio non può leggere le immagini. Scegli un modello che può farlo, oppure rimuovi il collegamento dell’immagine.",
+  "error.workflow.modelImageType":
+    "Un passaggio di modello può leggere solo immagini PNG, JPEG, GIF e WebP. Collega un’immagine di uno di questi tipi.",
   "error.workflow.modelUnavailable":
     "Il modello di questo passaggio non è disponibile. Scegli un altro modello per questo passaggio.",
   "error.workflow.providerBusy": "Il provider è occupato. Attendi qualche minuto, poi esegui di nuovo il passaggio.",

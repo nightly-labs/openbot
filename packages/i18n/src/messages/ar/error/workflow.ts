@@ -22,6 +22,9 @@ export const messages = {
     "لم يُجب النموذج في الوقت المحدد. اختر جهدًا أقل أو نموذجًا أسرع لهذه الخطوة، ثم شغّلها مرة أخرى.",
   "error.workflow.modelToolUse":
     "حاول النموذج استخدام أداة، لكن هذه الخطوة لا تجيب إلا بنص. شغّل الخطوة مرة أخرى، أو اختر نموذجًا آخر لها.",
+  "error.workflow.modelImageUnsupported":
+    "لا يستطيع نموذج هذه الخطوة قراءة الصور. اختر نموذجًا يستطيع ذلك، أو أزل اتصال الصورة.",
+  "error.workflow.modelImageType": "يمكن لخطوة النموذج قراءة صور PNG وJPEG وGIF وWebP فقط. صِل صورة من أحد هذه الأنواع.",
   "error.workflow.modelUnavailable": "نموذج هذه الخطوة غير متاح. اختر نموذجًا آخر لهذه الخطوة.",
   "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.providerOffline":

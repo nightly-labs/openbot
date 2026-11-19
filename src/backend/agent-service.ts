@@ -2788,6 +2788,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         model: string | null;
         effort: AgentReasoningEffort | null;
         prompt: string;
+        images: readonly string[];
       },
     ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
@@ -2820,6 +2821,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           { ...model, defaultReasoningEffort: input.effort ?? model.defaultReasoningEffort },
           input.prompt,
           workflowUsageObserver(this.#store.database.usage, provider, model.id),
+          input.images,
         )
         .pipe(
           Effect.tapError((failure) =>

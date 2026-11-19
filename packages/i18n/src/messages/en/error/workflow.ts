@@ -21,6 +21,10 @@ export const messages = defineMessages("error.workflow", {
     "The model did not answer in time. Choose a lower effort or a faster model for this step, then run it again.",
   "error.workflow.modelToolUse":
     "The model tried to use a tool, but this step can only answer with text. Run the step again, or choose a different model for it.",
+  "error.workflow.modelImageUnsupported":
+    "The model of this step cannot read pictures. Choose a model that can, or remove the picture connection.",
+  "error.workflow.modelImageType":
+    "A model step can read only PNG, JPEG, GIF and WebP pictures. Connect a picture of one of these types.",
   "error.workflow.modelUnavailable": "The model of this step is not available. Choose a different model for this step.",
   "error.workflow.providerBusy": "The provider is busy. Wait a few minutes, then run the step again.",
   "error.workflow.providerOffline":

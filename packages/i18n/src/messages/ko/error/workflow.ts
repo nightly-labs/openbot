@@ -23,6 +23,10 @@ export const messages = {
     "모델이 제때 답하지 않았어요. 이 단계의 강도를 낮추거나 더 빠른 모델을 고른 다음 다시 실행해 주세요.",
   "error.workflow.modelToolUse":
     "모델이 도구를 쓰려고 했지만 이 단계는 텍스트로만 답할 수 있어요. 단계를 다시 실행하거나 다른 모델을 골라 주세요.",
+  "error.workflow.modelImageUnsupported":
+    "이 단계의 모델은 이미지를 읽을 수 없습니다. 이미지를 읽을 수 있는 모델을 선택하거나 이미지 연결을 제거하세요.",
+  "error.workflow.modelImageType":
+    "모델 단계는 PNG, JPEG, GIF, WebP 이미지만 읽을 수 있습니다. 이 형식 중 하나의 이미지를 연결하세요.",
   "error.workflow.modelUnavailable": "이 단계의 모델을 사용할 수 없어요. 이 단계에 다른 모델을 골라 주세요.",
   "error.workflow.providerBusy": "제공자가 바빠요. 몇 분 기다린 다음 단계를 다시 실행해 주세요.",
   "error.workflow.providerOffline":
