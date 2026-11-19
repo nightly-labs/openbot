@@ -494,7 +494,7 @@ const TOOL_RESULT_PROGRESS = sourceText("status.agent.toolResultReviewing");
  * it, a Claude item names it `mcp__openbot__<tool>`, and a `tool_call` bridge item names it in its
  * arguments. A tool of another MCP server with the same name is not OpenBot's.
  */
-function openBotTool(item: ThreadItem): string | null {
+export function openBotTool(item: ThreadItem): string | null {
   const bridged = bridgedToolName(item);
   if (bridged) return bridged.startsWith("openbot.") ? bridged.slice("openbot.".length) : null;
   if (item.type === "toolCall") return /^mcp__openbot__(.+)$/u.exec(getString(item, "name") ?? "")?.[1] ?? null;

@@ -104,6 +104,7 @@ import { shellReadPaths, shellWorkFolders, ThreadFileHistory } from "./thread-fi
 import {
   isNonActionableCodexWarning,
   isToolItem,
+  openBotTool,
   refusedSessionFailure,
   type ToolUsageSignal,
   toolActivity,
@@ -463,6 +464,8 @@ export class TurnLifecycle {
       firstOutputAt: number | null;
       produced: boolean;
       acted: boolean;
+      /** A step other than the agent's reaction to the user's message ran in the turn. */
+      workedBesidesReaction: boolean;
       /** A compaction ran in the turn. Codex can end such a turn with no answer. */
       compacted: boolean;
       /** The id of the narration that Codex wrote after the turn's last tool step, if any. */
@@ -1076,7 +1079,15 @@ export class TurnLifecycle {
       return false;
     }
     if (running.acted) {
-      this.#noteNoAnswerAfterSteps(agentId, threadId, turnId, source, deliveries, messages);
+      this.#noteNoAnswerAfterSteps(
+        agentId,
+        threadId,
+        turnId,
+        source,
+        deliveries,
+        messages,
+        running.workedBesidesReaction,
+      );
       return false;
     }
     // The first message that another agent gave a new agent can ask it to wait. The agent that made
@@ -1103,7 +1114,8 @@ export class TurnLifecycle {
    * Codex can end a turn after its steps with no answer, or with its text only as thinking. The user
    * then saw a blank reply (#8810). The turn stays completed, so its memory changes are kept and its
    * steps do not run again. In the agent's own chat, when the user wrote the turn's messages and the
-   * turn shows nothing, a notice says so. A teammate gets its own note (`noResultNote`).
+   * turn shows nothing, a notice says so. A teammate gets its own note (`noResultNote`). A turn whose
+   * only step reacted to the user's message shows that reaction, so it gets no notice (#12382).
    */
   #noteNoAnswerAfterSteps(
     agentId: string,
@@ -1112,11 +1124,16 @@ export class TurnLifecycle {
     source: AgentClient,
     deliveries: readonly DeliveryContext[],
     messages: readonly ConversationMessage[],
+    workedBesidesReaction: boolean,
   ): void {
     if (
       this.#conversation.isExecutionThread(this.#conversation.publicThreadId(agentId, threadId)) ||
       !deliveries.every(({ delivery, channelId }) => delivery.sender.kind === "user" && channelId === undefined) ||
-      messages.some((message) => message.turnId === turnId && showsOutput(message))
+      messages.some((message) => message.turnId === turnId && showsOutput(message)) ||
+      (!workedBesidesReaction &&
+        deliveries.some(
+          ({ delivery }) => this.#mailbox.reactionFor(agentId, delivery.id, { kind: "agent", agentId }) !== null,
+        ))
     )
       return;
     logger.info("A turn ended with no answer after its steps.", { agentId, turnId, provider: source.provider });
@@ -1359,6 +1376,7 @@ export class TurnLifecycle {
           firstOutputAt: null,
           produced: false,
           acted: false,
+          workedBesidesReaction: false,
           compacted: false,
           narration: null,
           openTools: new Set(),
@@ -1430,13 +1448,15 @@ export class TurnLifecycle {
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
+        const running = this.#runningTurns.get(turnId);
         // Codex starts each turn with the echo of the user's message, which the model did not produce.
         // Counted, it blocked the one run again of each refused Codex turn (#9915). Claude completes
         // each failed turn with an empty answer, which is not output either: a session that Claude
         // cannot find then also runs again (#9928).
-        if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item)))
-          this.#markProduced(turnId, isRepeatedWork(item));
-        const running = this.#runningTurns.get(turnId);
+        if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item))) {
+          const acted = isRepeatedWork(item);
+          this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
+        }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
             notification.method === "item/completed" &&
@@ -3022,12 +3042,16 @@ export class TurnLifecycle {
     });
   }, Effect.uninterruptible);
 
-  /** `streamed`: text, thinking or a tool step, which marks when the provider first answered. */
-  #markProduced(turnId: string, acted: boolean, streamed = acted): void {
+  /**
+   * `streamed`: text, thinking or a tool step, which marks when the provider first answered.
+   * `reaction`: the step is the agent's reaction to the user's message, which shows on that message.
+   */
+  #markProduced(turnId: string, acted: boolean, streamed = acted, reaction = false): void {
     const running = this.#runningTurns.get(turnId);
     if (!running) return;
     running.produced = true;
     if (acted) running.acted = true;
+    if (acted && !reaction) running.workedBesidesReaction = true;
     if (streamed) running.firstOutputAt ??= Date.now();
   }
 
@@ -3732,6 +3756,12 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.type !== "agentMessage") return true;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
+}
+
+/** Whether an item calls the OpenBot tool that reacts to the user's message. The reaction shows on that message. */
+function isUserReactionCall(item: DynamicRecord): boolean {
+  const threadItem = toThreadItem(item);
+  return threadItem !== null && openBotTool(threadItem) === "react_to_user_message";
 }
 
 /** An answer item, not thinking, with no text: it shows nothing. */
