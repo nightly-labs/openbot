@@ -10,7 +10,7 @@ import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
  * Brand names: they are not translated. The first account of a service has no name of its own, and
  * Apps names it by the app, so the canvas and the rail do the same.
  */
-export const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
   sunra: "Sunra",
   higgsfield: "Higgsfield",
 };
