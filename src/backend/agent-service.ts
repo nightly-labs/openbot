@@ -5443,6 +5443,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       concurrency: "unbounded",
       discard: true,
     });
+    this.#tasks.dispose();
     yield* this.#warmGenerations.dispose();
     yield* Fiber.join(channelStop);
     yield* this.#mcp.close();
