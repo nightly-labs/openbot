@@ -7,6 +7,7 @@ import {
   WORKFLOW_DISCORD_EVENTS,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_MAX_COORDINATE,
+  WORKFLOW_MEDIA_MODELS,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
@@ -18,9 +19,13 @@ import {
   type WorkflowNodeKind,
   type WorkflowPoint,
   type WorkflowRunDetail,
+  type WorkflowStep,
+  type WorkflowStepSettings,
+  workflowCatalogProvider,
   workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
   workflowListField,
+  workflowMediaKind,
 } from "@openbot/contracts/ipc";
 
 import { isOneOf } from "@openbot/contracts/runtime-values";
@@ -36,14 +41,25 @@ import type { WorkflowsHandle } from "./workflows";
 
 export type WorkflowTools = Pick<
   WorkflowsHandle,
-  "list" | "get" | "create" | "rename" | "remove" | "saveGraph" | "startRun" | "runs" | "run"
+  | "list"
+  | "get"
+  | "create"
+  | "rename"
+  | "remove"
+  | "saveGraph"
+  | "startRun"
+  | "runStep"
+  | "runs"
+  | "run"
+  | "stepSettings"
 >;
 
 const identifier = z.string().min(1).max(INPUT_LIMITS.identifier);
 const point = z.object({ x: z.number(), y: z.number() }).strict();
 const fieldValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const schedule = z.object({ kind: z.string() }).catchall(z.unknown());
-const AGENT_NODE_KINDS = WORKFLOW_NODE_KINDS.filter((kind) => kind !== "asset" && kind !== "image");
+const AGENT_NODE_KINDS = WORKFLOW_NODE_KINDS.filter((kind) => kind !== "asset");
+const MEDIA_KINDS = ["image", "video"] as const;
 
 const OPS = ["add", "update", "move", "remove", "connect", "disconnect"] as const;
 const opSchema = z
@@ -81,6 +97,7 @@ const runSchema = z
     input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional(),
   })
   .strict();
+const stepSchema = z.object({ workflowId: identifier, nodeId: identifier }).strict();
 const runsSchema = z
   .object({ workflowId: identifier, runId: identifier.optional(), limit: z.number().int().min(1).max(5).optional() })
   .strict();
@@ -114,9 +131,14 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
     shape: runSchema.shape,
   },
   {
+    name: "run_workflow_step",
+    description: "Run one node of a workflow with its current fields and the newest answers before it.",
+    shape: stepSchema.shape,
+  },
+  {
     name: "read_workflow_runs",
     description:
-      "Read the newest runs of a workflow, or one run, with the kind, label, status and output of each step.",
+      "Read the newest runs and single steps of a workflow, or one run: the kind, label, status and output of each step, and the settings and inputs it used.",
     shape: runsSchema.shape,
   },
 ] as const;
@@ -127,6 +149,7 @@ export const WORKFLOW_CHANGE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "edit_workflow",
   "delete_workflow",
   "run_workflow",
+  "run_workflow_step",
 ]);
 
 const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
@@ -370,6 +393,21 @@ function newNodeFields(kind: WorkflowNodeKind): WorkflowNode["fields"] {
   return {};
 }
 
+function checkMedia(node: WorkflowNode, op: number): void {
+  if (node.kind !== "image") return;
+  const { media, model } = node.fields;
+  if (media !== undefined && !isOneOf(MEDIA_KINDS, media))
+    refuse(`Op ${op}: media "${String(media)}" is unknown. Set media to one of: ${MEDIA_KINDS.join(", ")}.`);
+  if (model === undefined || model === "") return;
+  if (typeof model === "string" && workflowCatalogProvider(model)) return;
+  const kind = workflowMediaKind(node.fields);
+  const known = WORKFLOW_MEDIA_MODELS.filter((item) => item.kinds.includes(kind)).map((item) => item.id);
+  if (typeof model === "string" && known.includes(model)) return;
+  refuse(
+    `Op ${op}: model "${String(model)}" cannot make ${kind}. Leave out model, or set one of: ${known.join(", ")}.`,
+  );
+}
+
 function edgeId(from: string, to: string, type: string, branch: string | undefined): string {
   return `${from}${branch ? `.${branch}` : ""}>${to}:${type}`;
 }
@@ -415,6 +453,7 @@ function applyWorkflowOps(
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
+        checkMedia(node, n);
         if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
@@ -434,7 +473,9 @@ function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        replace(withSchedule({ ...node, fields }, scheduled));
+        const next = withSchedule({ ...node, fields }, scheduled);
+        checkMedia(next, n);
+        replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
         return;
       }
@@ -572,25 +613,44 @@ function stepLabel(node: WorkflowNode | undefined) {
     : { kind: node.kind };
 }
 
-function compactRun(detail: WorkflowRunDetail, nodes: ReadonlyMap<string, WorkflowNode>) {
+const cut = (text: string) => (text.length > OUTPUT_CHARS ? `${text.slice(0, OUTPUT_CHARS)}… (cut)` : text);
+
+function compactSettings(saved: WorkflowStepSettings | undefined) {
+  if (!saved?.settings) return {};
+  const settings = Object.fromEntries(
+    Object.entries(saved.settings).map(([key, value]) => [key, typeof value === "string" ? cut(value) : value]),
+  );
+  const inputs = (saved.sources ?? []).map((source) => ({
+    from: source.from,
+    type: source.type,
+    ...(source.stepId ? { stepId: source.stepId } : {}),
+  }));
+  return { settings, ...(inputs.length > 0 ? { inputs } : {}) };
+}
+
+type SavedSettings = ReadonlyMap<string, WorkflowStepSettings>;
+
+function compactStep(step: WorkflowStep, nodes: ReadonlyMap<string, WorkflowNode>, saved: SavedSettings) {
+  return {
+    stepId: step.id,
+    nodeId: step.nodeId,
+    ...stepLabel(nodes.get(step.nodeId)),
+    status: step.status,
+    ...(step.branch ? { branch: step.branch } : {}),
+    ...(step.error ? { error: step.error } : {}),
+    ...(step.output ? { output: cut(step.output) } : {}),
+    ...compactSettings(saved.get(step.id)),
+  };
+}
+
+function compactRun(detail: WorkflowRunDetail, nodes: ReadonlyMap<string, WorkflowNode>, saved: SavedSettings) {
   return {
     runId: detail.run.id,
     number: detail.run.number,
     status: detail.run.status,
     ...(detail.run.error ? { error: detail.run.error } : {}),
     startedAt: detail.run.startedAt,
-    steps: detail.steps.map((step) => ({
-      nodeId: step.nodeId,
-      ...stepLabel(nodes.get(step.nodeId)),
-      status: step.status,
-      ...(step.branch ? { branch: step.branch } : {}),
-      ...(step.error ? { error: step.error } : {}),
-      ...(step.output
-        ? {
-            output: step.output.length > OUTPUT_CHARS ? `${step.output.slice(0, OUTPUT_CHARS)}… (cut)` : step.output,
-          }
-        : {}),
-    })),
+    steps: detail.steps.map((step) => compactStep(step, nodes, saved)),
   };
 }
 
@@ -709,16 +769,29 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       );
       return openBotToolResult({ runId: detail.run.id, number: detail.run.number, status: detail.run.status });
     }
+    if (tool === "run_workflow_step") {
+      const input = yield* toolStep(() => stepSchema.parse(args));
+      const step = yield* workflows.runStep({ workflowId: input.workflowId, nodeId: input.nodeId, requestId: callKey });
+      return openBotToolResult({ stepId: step.id, status: step.status });
+    }
     const input = yield* toolStep(() => runsSchema.parse(args));
     const nodes = new Map((yield* workflows.get(input.workflowId)).graph.nodes.map((node) => [node.id, node]));
+    const settingsOf = (steps: readonly WorkflowStep[]) =>
+      Effect.forEach(steps, (step) =>
+        Effect.map(workflows.stepSettings(step.id), (saved) => [step.id, saved] as const),
+      ).pipe(Effect.map((entries): SavedSettings => new Map(entries)));
     if (input.runId !== undefined) {
       const detail = yield* workflows.run(input.runId);
       if (detail.run.workflowId !== input.workflowId)
         return openBotToolFailure(`No run ${input.runId} in this workflow.`);
-      return openBotToolResult(compactRun(detail, nodes));
+      return openBotToolResult(compactRun(detail, nodes, yield* settingsOf(detail.steps)));
     }
     const page = yield* workflows.runs({ workflowId: input.workflowId, limit: input.limit ?? 1 });
-    return openBotToolResult({ runs: page.runs.map((detail) => compactRun(detail, nodes)) });
+    const saved = yield* settingsOf([...page.runs.flatMap((detail) => detail.steps), ...page.soloSteps]);
+    return openBotToolResult({
+      runs: page.runs.map((detail) => compactRun(detail, nodes, saved)),
+      ...(page.soloSteps.length > 0 ? { steps: page.soloSteps.map((step) => compactStep(step, nodes, saved)) } : {}),
+    });
   });
 
   return yield* operation.pipe(

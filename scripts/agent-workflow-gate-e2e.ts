@@ -132,6 +132,7 @@ process.stdin.on("data", (chunk) => {
 
 interface WorkflowToolArgs {
   workflowId?: string;
+  nodeId?: string;
   title?: string;
   brief?: string;
   ops?: (
@@ -370,6 +371,7 @@ try {
   for (const [tool, args] of [
     ["edit_workflow", { workflowId, title: "Changed by a run" }],
     ["run_workflow", { workflowId }],
+    ["run_workflow_step", { workflowId, nodeId: "trigger-gate" }],
     ["delete_workflow", { workflowId }],
   ] as const) {
     const refused = await callFromRoutine(`${tool} from a routine run`, agent.id, tool, args);

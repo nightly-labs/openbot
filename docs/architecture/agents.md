@@ -375,17 +375,27 @@ changed, on this computer and on a joined host.
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
   post that was on its way fails as uncertain, and the user retries the step.
-- Image, asset, file output and message trigger nodes are kept in the graph but do not run yet; a
-  run that reaches one fails with `nodeUnsupported`.
-- Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
-  `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
+- An asset node with no file, a file output node and a message trigger node are kept in the graph but
+  do not run yet (`unsupportedNode` in `workflow-walk.ts`); a run that reaches one fails with
+  `nodeUnsupported`.
+- Agents use workflows with seven `openbot` tools (`workflow-tools.ts`): `list_workflows`,
+  `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow`, `run_workflow_step` and
+  `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
-  word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
+  word `workflow` or `workflows` gives the schemas of all seven, and no other schema or guidance, so one
   search covers a build, a run and a delete. The release notes call the Workflows board the Canvas, so
-  `canvas` or `canvases` also gives the six schemas, but keeps the other results: the word can also
+  `canvas` or `canvases` also gives the seven schemas, but keeps the other results: the word can also
   mean the Routines canvas or a canvas on a web page. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
-  (the agent id, prompt, rule or question), so the agent does not read the workflow again.
+  (the agent id, prompt, rule or question), so the agent does not read the workflow again. Each step
+  also has its id and, when the step saved them, the settings it used (long text cut at 600
+  characters) and its inputs: the node, the port type and the step that gave the text. The newest
+  steps that `run_workflow_step` or "Run step" started, with no run, come in `steps`.
+  `run_workflow_step` runs one node with the newest answers before it (`Workflows.runStep`); the call
+  key is the request id, so a repeated call starts no second step. An agent can add `image` nodes:
+  `media` must be `image` or `video`, and `model` must be empty, a catalog model (`sunra-` or
+  `higgsfield-`), or a `WORKFLOW_MEDIA_MODELS` id that can make that media. The tool refuses any other
+  value and names the ids to use. `asset` nodes stay out: they need a file that the person uploads.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
   them as one graph with `saveGraph`; a `ref` names a new node for later operations in the same call.
   The host places nodes, so the agent sends no coordinates. The layout uses the card width of each
@@ -406,8 +416,8 @@ changed, on this computer and on a joined host.
   while the page is open. A click on the canvas, reduced motion or an agent that the catalog does not
   know stops or skips the play. `workflows-v1` still sends only `workflowId`, and its decoder drops
   the agent id, so a joined desktop reloads the graph with no play.
-- As for channels, only a person's message can use `edit_workflow`, `delete_workflow` or
-  `run_workflow`, in the agent's own chat or in a side thread that the person opened or branched
+- As for channels, only a person's message can use `edit_workflow`, `delete_workflow`,
+  `run_workflow` or `run_workflow_step`, in the agent's own chat or in a side thread that the person opened or branched
   (`AgentTasks.isPersonThread`: origin `user`, no routine, no messaging link or channel). A routine or
   workflow run, an external chat, a thread that the agent started, an agent message or a team
   member's message gets a tool failure: a run can carry text from outside, such as a webhook body, and

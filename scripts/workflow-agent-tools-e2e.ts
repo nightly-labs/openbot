@@ -19,6 +19,7 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-agent-tools-e2e");
 const WAIT_MS = 5_000;
 const AGENTS = new Set(["agent-research"]);
+const TITLE_ANSWER = "A red bicycle at dawn";
 const CALLER = "agent-builder";
 
 const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
@@ -50,6 +51,21 @@ const laidOut = z.object({
 });
 const runStarted = z.object({ runId: z.string() });
 const runList = z.object({ runs: z.array(z.object({})) });
+const stepStarted = z.object({ stepId: z.string(), status: z.string() });
+const stepList = z.object({
+  steps: z
+    .array(
+      z.object({
+        stepId: z.string(),
+        nodeId: z.string(),
+        status: z.string(),
+        output: z.string().optional(),
+        settings: z.record(z.string(), z.unknown()).optional(),
+        inputs: z.array(z.object({ from: z.string(), type: z.string(), stepId: z.string().optional() })).optional(),
+      }),
+    )
+    .optional(),
+});
 const runRead = z.object({
   steps: z.array(
     z.object({
@@ -162,7 +178,10 @@ try {
           return `delivery-${crypto.randomUUID()}`;
         }),
       stopDelivery: () => Effect.void,
-      generateText: () => Effect.fail({ message: "No model step runs in this test." }),
+      generateText: (request) =>
+        request.prompt.includes("Write a title")
+          ? Effect.succeed(TITLE_ANSWER)
+          : Effect.fail({ message: "Only the title step runs a model in this test." }),
       notify: () => {},
       connectionOn: () => false,
       post: () => Effect.die(new Error("No output step runs in this test.")),
@@ -176,8 +195,8 @@ try {
   report.bytes.search = Buffer.byteLength(JSON.stringify(search));
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
   check(
-    "a workflow search gives all 6 workflow tools with schemas, and the guidance",
-    ready.filter((name) => name.includes("workflow")).length === 6 &&
+    "a workflow search gives all 7 workflow tools with schemas, and the guidance",
+    ready.filter((name) => name.includes("workflow")).length === 7 &&
       (search.guidance ?? []).some((text) => text.includes("Fields by kind")),
     search,
   );
@@ -189,8 +208,8 @@ try {
   );
   const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
   check(
-    "a canvas search gives all 6 workflow tools with schemas",
-    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    "a canvas search gives all 7 workflow tools with schemas",
+    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 7,
     canvas.tools.map((tool) => tool.name),
   );
   const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
@@ -623,6 +642,113 @@ try {
     runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),
     triggerRun.value,
   );
+  const badModel = await call("failure-media-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A poster", model: "no-such-model" } }],
+  });
+  check(
+    "an image node with an unknown model is refused with the models to use",
+    !badModel.ok && JSON.stringify(badModel.value).includes("gpt-image"),
+    badModel.value,
+  );
+  const videoModel = await call("failure-media-kind", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A clip", media: "video", model: "gpt-image" } }],
+  });
+  check(
+    "an image model that cannot make video is refused for a video node",
+    !videoModel.ok && JSON.stringify(videoModel.value).includes("grok-imagine"),
+    videoModel.value,
+  );
+  const badMedia = await call("failure-media", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "image", fields: { prompt: "A song", media: "audio" } }],
+  });
+  check(
+    "an unknown media kind is refused",
+    !badMedia.ok && JSON.stringify(badMedia.value).includes("video"),
+    badMedia.value,
+  );
+  const media = await call("media", "edit_workflow", {
+    workflowId,
+    ops: [
+      { op: "add", ref: "idea", kind: "prompt", fields: { text: "A bicycle poster for a spring sale." } },
+      { op: "add", ref: "title", kind: "llm", from: "idea", fields: { prompt: "Write a title for this poster." } },
+      {
+        op: "add",
+        ref: "poster",
+        kind: "image",
+        from: "title",
+        fields: { prompt: "Draw the poster.", media: "image", model: "gpt-image", aspect: "16:9" },
+      },
+    ],
+  });
+  check("edit_workflow adds an image step after a model step", media.ok, media.value);
+  const mediaIds = z.object({ ids: created.shape.ids }).parse(media.value).ids;
+  const poster = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find(
+    (node) => node.id === mediaIds.poster,
+  );
+  check(
+    "the image step keeps its media, model and aspect",
+    poster?.kind === "image" && poster.fields.model === "gpt-image" && poster.fields.aspect === "16:9",
+    poster,
+  );
+  const missingStep = await call("failure-step-missing", "run_workflow_step", { workflowId, nodeId: "no-such-node" });
+  check("run_workflow_step on a missing node is a tool failure", !missingStep.ok, missingStep.value);
+  const stepDeadline = Date.now() + WAIT_MS;
+  const soloSteps = async (label: string) =>
+    stepList.parse((await call(label, "read_workflow_runs", { workflowId })).value).steps ?? [];
+  const ideaRun = await call("run-step-idea", "run_workflow_step", { workflowId, nodeId: mediaIds.idea });
+  const ideaStepId = stepStarted.parse(ideaRun.value).stepId;
+  while ((await soloSteps("runs-steps")).find((step) => step.stepId === ideaStepId)?.status !== "done") {
+    if (Date.now() > stepDeadline) throw new Error("The prompt step did not end.");
+    await new Promise((done) => setImmediate(done));
+  }
+  const stepRun = await call("run-step", "run_workflow_step", { workflowId, nodeId: mediaIds.title }, "run-step-call");
+  check("run_workflow_step starts one step", stepRun.ok, stepRun.value);
+  const { stepId } = stepStarted.parse(stepRun.value);
+  const stepAgain = await call(
+    "run-step-repeated",
+    "run_workflow_step",
+    { workflowId, nodeId: mediaIds.title },
+    "run-step-call",
+  );
+  check(
+    "a repeated run_workflow_step call starts no second step",
+    stepAgain.ok && stepStarted.parse(stepAgain.value).stepId === stepId,
+    stepAgain.value,
+  );
+  let answered = (await soloSteps("runs-steps")).find((step) => step.stepId === stepId);
+  while (answered?.status !== "done") {
+    if (Date.now() > stepDeadline) throw new Error(`The single step did not end: ${JSON.stringify(answered)}`);
+    await new Promise((done) => setImmediate(done));
+    answered = (await soloSteps("runs-steps")).find((step) => step.stepId === stepId);
+  }
+  check("read_workflow_runs lists the single step with its output", answered.output === TITLE_ANSWER, answered);
+  check(
+    "the single step gives the settings that it used",
+    answered.settings?.prompt === "Write a title for this poster.",
+    answered,
+  );
+  check(
+    "the single step names the node and the step that gave its input",
+    answered.inputs?.some(
+      (source) => source.from === mediaIds.idea && source.type === "text" && source.stepId === ideaStepId,
+    ) === true,
+    answered,
+  );
+  const changedTitle = await call("media-update", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: mediaIds.title, fields: { prompt: "Write a short title." } }],
+  });
+  check("edit_workflow changes the model step after its run", changedTitle.ok, changedTitle.value);
+  const keptStep = (await soloSteps("runs-steps-after-edit")).find((step) => step.stepId === stepId);
+  check(
+    "a step keeps the settings that it used after the node changes",
+    keptStep?.settings?.prompt === "Write a title for this poster.",
+    keptStep,
+  );
+
   const list = await call("list", "list_workflows", {});
   check(
     "list_workflows shows the workflow with its last run",
