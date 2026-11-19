@@ -199,7 +199,12 @@ and `mcpAuthorization()` gives it a fresh bearer at each hand-off. An enabled se
 with the name `github` wins. For `gh` and `git`, the service writes the token to
 `<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
 `GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
-token. Codex gets these values through `shell_environment_policy.set` in the thread config.
+token. The helper gives the `openbotgit[bot]` token for a repository that has one. For other
+repositories, it first asks the git credential helpers that the computer had before (with the original
+`GH_CONFIG_DIR` and no prompts), and gives the connector's user token only when they have no
+credential. The OpenBot GitHub App reaches only the repositories where it is installed, so this keeps
+git working on private repositories that the user's own login reaches. The fallback only reads: git
+does not send a store or an erase to the helpers of the computer. Codex gets these values through `shell_environment_policy.set` in the thread config.
 
 A user token makes GitHub show "user with OpenBotGit". To show `openbotgit[bot]`, the desktop sends
 the user token to `POST /v1/github/installation-tokens` on the account Worker
