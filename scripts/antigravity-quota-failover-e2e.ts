@@ -25,8 +25,11 @@
 //      again on the backup.
 //  10. A model that the account cannot use now, set to switch without asking: the message runs again
 //      on the backup.
+//  11. Quota on a channel task, set to switch without asking: the task fails, and the agent's next
+//      channel task runs on the backup (#12484).
 // `bun run test:antigravity-quota-failover`. Writes .openbot-build/antigravity-quota-failover-e2e/report.json.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -71,7 +74,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -397,6 +400,98 @@ try {
     );
     credits.passed = true;
   }
+
+  // A channel task is not run again on the backup: its channel shows the failure. The channel's next
+  // task for the agent ran on the spent model again, and failed again (#12484).
+  const channelCase: CaseReport = {
+    name: "quota on a channel task, switch without asking",
+    status: "",
+    model: undefined,
+    prompts: [],
+    errors: 0,
+    passed: false,
+  };
+  report.cases.push(channelCase);
+  const member = await runCauseEffect(
+    agents.createAgent({
+      name: channelCase.name,
+      description: "Checks a spent Gemini quota.",
+      avatarSeed: "gemini-quota-e",
+      avatarHue: null,
+      provider: "antigravity",
+      model: "gemini-quota-e",
+      initialMessage: "Hello.",
+    }),
+  );
+  await waitFor(`${channelCase.name}: the first turn`, () => idle(member.id));
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: member.id,
+      backupModels: { automatic: true, order: [{ provider: "antigravity", model: BACKUP }] },
+    }),
+  );
+  const channelId = randomUUID();
+  const actor = { id: "local", name: "Alex" };
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId,
+        draft: {
+          name: "Quota",
+          title: "",
+          instructions: "Finish the assigned work.",
+          members: [{ agentId: member.id }],
+          leadAgentId: member.id,
+        },
+      },
+      actor,
+    ),
+  );
+  const channelBefore = prompts().length;
+  const ended = new Set<string>();
+  for (const text of ["QUOTA-NOW first", "QUOTA-NOW second"]) {
+    await runCauseEffect(
+      agents.channels.command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId,
+          text,
+          recipientAgentId: member.id,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
+    );
+    const task = await waitFor(`${channelCase.name}: the channel task "${text}" to end`, () =>
+      agents.channels.store
+        .tasks(channelId)
+        .find((item) => !ended.has(item.id) && ["completed", "failed", "paused"].includes(item.state)),
+    );
+    ended.add(task.id);
+    channelCase.status = task.state;
+  }
+  channelCase.model = store.list().find((candidate) => candidate.id === member.id)?.model;
+  channelCase.prompts = prompts()
+    .slice(channelBefore)
+    .map((prompt) => ({
+      model: prompt.model,
+      quota: prompt.quota,
+      rate: prompt.rate,
+      continuation: prompt.text.includes(CONTINUATION),
+      workSteps: prompt.text.includes("Read notes.txt"),
+    }));
+  assert.deepEqual(
+    channelCase.prompts.map((prompt) => prompt.model),
+    ["gemini-quota-e", BACKUP],
+    "The next channel task runs on the backup, not on the spent model.",
+  );
+  assert.equal(channelCase.status, "completed", `${channelCase.name}: the next channel task completes`);
+  assert.equal(channelCase.model, BACKUP, `${channelCase.name}: the agent is on the backup model`);
+  channelCase.passed = true;
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

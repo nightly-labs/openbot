@@ -2479,7 +2479,16 @@ export class TurnLifecycle {
         return;
       }
       // A thread turn that does not run again still makes the agent leave the failing model before its next turn (#5220).
-      if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
+      // So does a channel task that a backup would take in the agent's own chat: the channel gives the
+      // task to the agent again, and a spent Gemini quota failed each try on the same model (#12484).
+      if (
+        failover &&
+        failedKey !== null &&
+        ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) ||
+          (channelTask &&
+            (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
+              (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)))))
+      )
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as
       // it does with no backup.
