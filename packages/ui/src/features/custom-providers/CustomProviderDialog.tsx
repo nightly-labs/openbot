@@ -250,6 +250,16 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       const at = model.reasoningEfforts.indexOf(effort);
       if (checked && at < 0) model.reasoningEfforts.push(effort);
       if (!checked && at >= 0) model.reasoningEfforts.splice(at, 1);
+      if (model.reasoningEfforts.length === 0) delete model.reasoningEfforts;
+    });
+  }
+
+  function setNoEffort(index: number, on: boolean): void {
+    setDraft((state) => {
+      const model = state.models[index];
+      if (!model) return;
+      if (on) model.reasoningEfforts = [];
+      else delete model.reasoningEfforts;
     });
   }
 
@@ -287,6 +297,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
         <ModelChoiceMenu
           label={t("customProvider.model.efforts", { number: index() + 1 })}
           empty={noEfforts()}
+          none={harness() === "pi" ? undefined : t("customProvider.model.effortsNone")}
+          noneChosen={row.reasoningEfforts?.length === 0}
+          onNone={(on) => setNoEffort(index(), on)}
           choices={CUSTOM_PROVIDER_REASONING_EFFORTS}
           name={(effort) => t(REASONING_LABEL[effort])}
           chosen={modelEfforts(row)}

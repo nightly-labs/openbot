@@ -238,6 +238,8 @@ export const messages = {
     'O endpoint "{provider}" recusou a solicitação. A chave de API ou os cabeçalhos podem estar incorretos, ou a conta não pode usar este modelo. Verifique-os em Configurações do servidor → Provedores ou escolha outro modelo. Depois tente novamente.',
   "error.provider.customEndpointKeyMissing":
     'O endpoint "{provider}" precisa de uma chave de API. Adicione a chave em Configurações do servidor → Provedores e tente novamente.',
+  "error.provider.customEndpointEffortRefused":
+    'O endpoint "{provider}" recusou o esforço de raciocínio deste modelo. Em Configurações do servidor → Provedores, edite "{provider}". Em Esforço, mantenha só os níveis que este modelo aceita, ou selecione Sem raciocínio. Depois tente novamente.',
   "error.provider.opencodeKeyExpired":
     "Sua chave de API do OpenCode expirou. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
   "error.provider.opencodeKeyRefused":

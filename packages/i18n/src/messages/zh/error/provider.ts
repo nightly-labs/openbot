@@ -203,6 +203,8 @@ export const messages = {
     "端点“{provider}”拒绝了请求。它的 API 密钥或请求头可能有误，或者它的账户无法使用此模型。请在“服务器设置 → 服务商”中检查，或选择其他模型，然后重试。",
   "error.provider.customEndpointKeyMissing":
     "端点“{provider}”需要 API 密钥。请在“服务器设置 → 服务商”中添加密钥，然后重试。",
+  "error.provider.customEndpointEffortRefused":
+    "端点“{provider}”拒绝了此模型的推理强度。请在“服务器设置 → 服务商”中编辑“{provider}”。在“推理强度”中只保留此模型接受的强度，或选择“不推理”。然后重试。",
   "error.provider.opencodeKeyExpired":
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeKeyRefused":
