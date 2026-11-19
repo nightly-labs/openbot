@@ -353,7 +353,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     port: MessagePortMain,
   ) {
     let misses = 0;
-    while (misses < LIVENESS_MISSES) {
+    while (this.#port === port) {
       yield* Effect.sleep(LIVENESS_INTERVAL_MS);
       if (this.#port !== port) return;
       const answered = yield* this.#command({ type: "ping", peerId: "all" }).pipe(
@@ -362,21 +362,26 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       );
       if (this.#port !== port) return;
       misses = answered ? 0 : misses + 1;
+      if (misses < LIVENESS_MISSES) continue;
+      const stopped = yield* remoteDecode(() => {
+        if (this.#port !== port || window.webContents.isDestroyed()) return true;
+        const processId = window.webContents.getOSProcessId();
+        const shared = webContents
+          .getAllWebContents()
+          .some(
+            (other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId,
+          );
+        if (shared) return false;
+        logger.warn(
+          `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
+        );
+        window.webContents.forcefullyCrashRenderer();
+        return true;
+      });
+      if (stopped) return;
+      if (misses === LIVENESS_MISSES)
+        logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
     }
-    const shared = yield* remoteDecode(() => {
-      const processId = window.webContents.getOSProcessId();
-      return webContents
-        .getAllWebContents()
-        .some((other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId);
-    });
-    if (shared) {
-      logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
-      return;
-    }
-    logger.warn(
-      `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
-    );
-    yield* remoteDecode(() => window.webContents.forcefullyCrashRenderer());
   });
 
   readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
