@@ -36,6 +36,8 @@ export const messages = {
     "Acquisizione della finestra {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureRegion":
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
+  "status.agent.vaultCardFill":
+    "Compila la carta salvata {card} su {site}. Dopo la tua approvazione, gli agenti possono usare questa carta su questo sito senza nuova approvazione. Rimuovi il sito in Impostazioni server > Vault.",
   "status.agent.reportProblem":
     "Diventerà una issue pubblica su GitHub, con la versione dell'app e il tuo sistema. Il tuo nome non viene mostrato.",
   "status.agent.reportPhoneProblem":
@@ -66,6 +68,9 @@ export const messages = {
   "status.agent.workflowDelete":
     "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
   "status.agent.deleteAgents": "Elimina {agents} con le loro chat e i loro file. Non puoi annullare l'operazione.",
+  "status.agent.vaultCardFillFrames": "I campi della carta sono in frame da {origins}.",
+  "status.agent.linkCardFill":
+    "Compila la carta Link monouso {card} su {site}. Hai approvato questo pagamento in Link per {merchant}.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
   "status.agent.screenCaptureReviewing": "Analisi dell'acquisizione dello schermo…",
   "status.agent.browserOpening": "Apertura di una pagina web…",
@@ -114,8 +119,42 @@ export const messages = {
   "status.agent.memoryChanges": "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate.",
   "status.agent.memoryChangesWithConflicts":
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
+  "status.agent.mcpServerAdd":
+    "Aggiungi il server MCP {name}: {target}. Ogni agente su questo server ottiene i suoi strumenti. OpenBot si connette per provarlo.",
+  "status.agent.mcpServerChange":
+    "Modifica il server MCP {name} in {target}. Ogni agente su questo server ottiene i suoi strumenti. OpenBot si connette per provarlo.",
+  "status.agent.mcpServerHeaders": "Modifica anche queste intestazioni: {names}.",
+  "status.agent.mcpServerEnable": "Attiva il server MCP {name} per ogni agente su questo server.",
+  "status.agent.mcpServerDisable": "Disattiva il server MCP {name} per ogni agente su questo server.",
+  "status.agent.mcpServerRemove": "Rimuovi il server MCP {name} e il suo accesso da ogni agente su questo server.",
   "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
+  "status.agent.mcpSignInRequested": "Il server MCP {name} richiede l'accesso. Accedi da Impostazioni server, MCP.",
   "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
+  "status.agent.vaultAdded": "Salvato nel Vault: {name}",
+  "status.agent.vaultUpdated": "Modificato nel Vault: {name}",
+  "status.agent.vaultDeleted": "Eliminato dal Vault: {name}",
+  "status.agent.vaultSave": "Salva nel Vault",
+  "status.agent.apiKeyScope.label": "Salva per",
+  "status.agent.apiKeyScope.vault": "Tutti gli agenti (Vault)",
+  "status.agent.apiKeyScope.agent": "Solo questo agente",
+  "status.agent.vaultExpiryHint": "MM/AA",
+  "status.agent.vaultField.website": "Sito web",
+  "status.agent.vaultField.username": "Nome utente o email",
+  "status.agent.vaultField.password": "Password",
+  "status.agent.vaultField.label": "Etichetta",
+  "status.agent.vaultField.nameOnCard": "Nome sulla carta",
+  "status.agent.vaultField.number": "Numero carta",
+  "status.agent.vaultField.expiry": "Scadenza",
+  "status.agent.vaultField.securityCode": "Codice di sicurezza",
+  "status.agent.vaultField.fullName": "Nome completo",
+  "status.agent.vaultField.address": "Indirizzo",
+  "status.agent.vaultField.address2": "Seconda riga indirizzo",
+  "status.agent.vaultField.city": "Città",
+  "status.agent.vaultField.region": "Provincia o regione",
+  "status.agent.vaultField.postalCode": "CAP",
+  "status.agent.vaultField.country": "Codice paese",
+  "status.agent.vaultField.phone": "Telefono",
+  "status.agent.vaultField.email": "Indirizzo email",
   "status.agent.finishCheckContinues":
     "La richiesta non è ancora completata. L’agente continua ({current} di {limit}).",
   "status.agent.nextStepContinues":
@@ -126,4 +165,5 @@ export const messages = {
     "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
   "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
+  "status.agent.importedChatTitle": "Chat importata",
 } as const satisfies PartialTranslation<typeof source>;

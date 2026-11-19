@@ -155,6 +155,11 @@ export const messages = {
   "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
+  "error.team.agentAccessUnsupported": "I ruoli non sono supportati da questa connessione.",
+  "error.team.agentAccessStale": "Qualcuno ha cambiato i ruoli. Aprili di nuovo e ripeti la modifica.",
+  "error.team.serverAuditUnsupported": "Il registro di controllo non è supportato da questa connessione.",
+  "error.team.agentViewOnly": "Puoi solo visualizzare questo agente.",
+  "error.team.agentManageDenied": "Non puoi modificare questo agente.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
   "error.team.attachmentNotFound": "Allegato non trovato.",
   "error.team.sharedFileTooLarge": "Il file condiviso supera il limite di 100 MB.",
@@ -197,6 +202,8 @@ export const messages = {
   "error.team.signInRelayUnsupported": "Questo server non può inoltrare gli accessi. Aggiorna OpenBot sull'host.",
   "error.team.connectorsUnsupported":
     "Questo server non può gestire le proprie connessioni da qui. Aggiorna OpenBot sull'host.",
+  "error.team.vaultUnsupported": "Questo server non può aprire il suo Vault da qui. Aggiorna OpenBot sull'host.",
+  "error.team.vaultResetReadable": "Il Vault su questo server è leggibile, quindi non è stato reimpostato.",
   "error.team.discordAccessUnsupported":
     "Questo server non può impostare i ruoli di Discord. Aggiorna OpenBot sul server.",
   "error.team.connectorPageRefused": "Il server ha inviato una pagina che OpenBot non apre.",

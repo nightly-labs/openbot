@@ -485,6 +485,8 @@ export const messages = {
   "error.provider.customAgentRemoveBusy":
     "Attendi che il turno attivo e la coda finiscano prima di rimuovere questo agente personalizzato.",
   "error.provider.customAgentNone": "Nessun agente personalizzato salvato.",
+  "error.provider.customAgentsUnavailable":
+    "Questo server non può modificare i suoi agenti personalizzati. Aggiorna OpenBot su di esso.",
   "error.provider.customAgentMissing": "Questo agente personalizzato non è più salvato. Scegli un altro modello.",
   "error.provider.customAgentSignIn": "Accedi con il comando dell'agente stesso, poi riprova.",
   "error.provider.customAgentsReadOnly":

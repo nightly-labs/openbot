@@ -12,6 +12,15 @@ export const messages = {
   "error.connector.githubExpired": "La connessione a GitHub è scaduta. Connetti di nuovo GitHub.",
   "error.connector.githubFileUnreadable": "Il file di connessione a GitHub non è leggibile.",
   "error.connector.githubFileTooLarge": "Il file di connessione a GitHub è troppo grande.",
+  "error.connector.linkDenied": "L'accesso con Link è stato rifiutato.",
+  "error.connector.linkCodeExpired": "L'accesso con Link è scaduto. Connetti di nuovo Link.",
+  "error.connector.linkUnexpected": "Link ha inviato una risposta inattesa: {detail}",
+  "error.connector.linkUnreachable": "OpenBot non riesce a raggiungere Link: {detail}",
+  "error.connector.linkExpired": "La connessione Link è scaduta. Connetti di nuovo Link.",
+  "error.connector.linkNotConnected": "Link non è connesso. Connettilo in Impostazioni server > Vault > Carte.",
+  "error.connector.linkNoCard": "L'account Link non ha una carta. Aggiungi una carta in Link.",
+  "error.connector.linkFileUnreadable": "Il file di connessione Link non è leggibile.",
+  "error.connector.linkFileTooLarge": "Il file di connessione Link è troppo grande.",
   "error.connector.onePasswordCliMissing":
     "OpenBot non trova la CLI di 1Password. Installala e attiva la sua integrazione nell'app 1Password, oppure usa un token di service account.",
   "error.connector.onePasswordCliInstallFailed":

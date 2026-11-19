@@ -37,6 +37,7 @@ export const messages = {
   "mobile.app.route.routine": "Routine",
   "mobile.app.route.threads": "Thread",
   "mobile.app.route.usage": "Utilizzo",
+  "mobile.app.route.remoteDesktop": "Controlla il computer",
   "mobile.app.route.marketplace": "Marketplace",
   "mobile.app.route.library": "Libreria",
   "mobile.app.quickAction.search": "Cerca",

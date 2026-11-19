@@ -190,8 +190,19 @@ export const messages = {
     "L'acquisizione dello schermo non funziona in una conversazione Slack, Discord o Telegram, perché altre persone ricevono i suoi file.",
   "error.agent.screenCaptureDeclined":
     "L'utente non ha permesso questa acquisizione dello schermo. Non è stato acquisito nulla.",
+  "error.agent.mcpServerDeclined": "L'utente non ha consentito questa modifica al server MCP. Non è cambiato nulla.",
   "error.agent.mcpToolDeclined":
     "L'utente non ha permesso questa chiamata allo strumento MCP. Lo strumento non è stato eseguito.",
+  "error.agent.mcpServerNotSaved": "Il server MCP non ha risposto, quindi non è stato salvato. {error}",
+  "error.agent.mcpServerKeysMove":
+    "Il server MCP {name} contiene chiavi per il suo server attuale. Chiedi all'utente di cambiare indirizzo, comando, argomenti o trasporto in Impostazioni server > MCP.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "Il server MCP {name} esegue un comando locale, quindi non accetta intestazioni. Chiedi all'utente di inserire le chiavi in Marketplace, App, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Solo l'utente di questo OpenBot, in una chat con te, può fornire le chiavi del server MCP {name}. Chiedi all'utente di inserirle in Marketplace, App, {name}.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} fa parte di OpenBot, quindi gli strumenti MCP non possono testarlo, attivarlo, disattivarlo o rimuoverlo. L'utente lo controlla sul computer che esegue OpenBot: la connessione GitHub in Marketplace, App, GitHub e Controllo del computer in Impostazioni > Controllo del computer.",
+  "error.agent.mcpServerUnknown": "Nessun server MCP ha il nome {name}. Chiama list_mcp_servers per i nomi.",
   "error.agent.screenCaptureWindowMissing":
     "Quella finestra ora non è aperta. Chiama list_capture_sources per ottenere gli id attuali delle finestre.",
   "error.agent.screenCaptureDisplayMissing":

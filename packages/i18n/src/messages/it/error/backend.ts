@@ -10,6 +10,9 @@ export const messages = {
     "Incolla il segreto di firma completo del mittente. Ha da 16 a 1024 caratteri e nessuno spazio.",
   "error.backend.webhookRouteUnavailable":
     "Il percorso pubblico del webhook non è pronto. Controlla la connessione all'host e riprova.",
+  "error.backend.webhookTestUnavailable":
+    "L'host non può ricevere l'evento di test ora. Assicurati che sia connesso, poi riprova.",
+  "error.backend.webhookTestFailed": "L'evento di test non ha raggiunto la routine. Riprova.",
   "error.backend.browserViewRemoteOnly": "La vista in diretta del browser è disponibile solo per un host remoto.",
   "error.backend.browserViewUnsupported": "Questo host remoto non supporta la vista in diretta del browser.",
   "error.backend.browserViewLimit": "Su questo host ci sono troppe viste del browser aperte.",
@@ -175,6 +178,9 @@ export const messages = {
   "error.backend.agentIdUnknown": "Nessun agente ha l'ID {id}. Ottieni gli ID con openbot.list_agents, poi riprova.",
   "error.backend.agentIdNear":
     "Nessun agente ha l'ID {id}. L'agente {name} ha l'ID {nearId}, quasi uguale. Se intendi quell'agente, riprova con il suo ID.",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} non corrisponde a nessun messaggio. Usa l'ID del messaggio a cui rispondi, oppure ometti replyToMessageId.",
+  "error.backend.replyReferenceRequests": "Messaggi di questi destinatari in questo turno: {ids}.",
   "error.backend.attachBetween": "Allega da 1 a {limit} file.",
   "error.backend.attachmentNotFile": "L'allegato non è un file: {path}",
   "error.backend.generatedImageTooLarge": "L'immagine generata supera il limite di 100 MB.",
@@ -303,12 +309,22 @@ export const messages = {
     "{provider} non è riuscito ad avviare il server MCP {name}. I suoi strumenti non sono disponibili per {provider}. {provider} avvia il server da solo, quindi la prova di connessione in OpenBot può riuscire. Avvia una nuova chat per riprovare.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} non è riuscito ad avviare il server MCP {name}, perché il server non ha risposto in tempo. Avvia una nuova chat per riprovare.",
+  "error.backend.mcpAppReconnect":
+    "{name} su ChatGPT chiede di accedere di nuovo. Ricollega {name} su ChatGPT, poi chiedi di nuovo all'agente.",
+  "error.backend.mcpServerSignInPage":
+    "Il server MCP {name} ha chiesto l'accesso su una pagina web. OpenBot non apre questa pagina per un server, quindi ha rifiutato. Apri le impostazioni MCP e accedi a {name}, poi chiedi di nuovo all'agente.",
+  "error.backend.mcpServerRequestDeclined":
+    "Il server MCP {name} ha chiesto qualcosa che OpenBot non può mostrare, quindi OpenBot ha rifiutato.",
+  "error.backend.mcpRequestDeclined":
+    "Un server MCP ha chiesto qualcosa che OpenBot non può mostrare, quindi OpenBot ha rifiutato.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot non è riuscito ad avviare la connessione di accesso locale per questo server. Riavvia OpenBot e riprova.",
   "error.backend.mcpOAuthSignInNeeded":
     "L'accesso a questo server MCP è terminato. L'utente deve accedere di nuovo in OpenBot.",
   "error.backend.mcpOAuthRenewalFailed":
     "OpenBot non è riuscito a rinnovare ora l'accesso a questo server MCP. L'accesso resta salvato e la prossima richiesta riproverà. Se l'errore continua, l'utente può disconnettersi dal server in OpenBot e accedere di nuovo.",
+  "error.backend.mcpOAuthRequestRefused":
+    "Il server MCP ha rifiutato questa richiesta, ma l'accesso è ancora attivo. Forse l'account non può usare questo strumento, oppure l'accesso non include tutti i permessi necessari. L'utente può verificare piano e permessi del servizio, oppure accedere di nuovo al server in OpenBot e concedere tutti gli accessi richiesti.",
   "error.backend.mcpServerUnreachable": "OpenBot non è riuscito a raggiungere il server. Controlla l'URL e la rete.",
   "error.backend.mcpLocalServerOff":
     "Nessun server risponde all'indirizzo {address} su questo computer. Avvia il server, o attivalo nell'app che lo esegue, poi riprova.",
@@ -367,13 +383,18 @@ export const messages = {
   "error.backend.steerQueuedOnly": "Si possono indirizzare solo i messaggi in coda.",
   "error.backend.promptInactive": "Questo prompt non è più attivo.",
   "error.backend.promptAnswerMismatch": "La risposta al prompt non corrisponde a una domanda attiva.",
+  "error.backend.uiBlockAnswerInvalid": "Questa risposta non è valida per il blocco dell'agente.",
+  "error.backend.uiBlockActionNotAllowed":
+    "Solo il proprietario del server o un amministratore può scegliere questa azione.",
   "error.backend.approvalInactive": "Questa approvazione non è più attiva.",
+  "error.backend.approvalOwnerOnly": "Solo il proprietario del server può approvare questa azione.",
   "error.backend.feedbackNeedsPhone":
     "Solo l'app OpenBot del telefono può inviare questa segnalazione, perché aggiunge la versione e il log di assistenza del telefono. Apri questa chat sul telefono. Se vedi questo messaggio lì, aggiorna l'app del telefono.",
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
   "error.backend.apiKeySaving": "La chiave API è già in fase di salvataggio.",
+  "error.backend.vaultItemSaving": "L'elemento del Vault è già in salvataggio.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot non è riuscito a leggere la chiave API. Inserisci una chiave di massimo 8.000 caratteri e scegli chi può usarla.",
   "error.backend.authRequestInactive": "Questa richiesta di autenticazione sicura non è più attiva.",
@@ -426,6 +447,14 @@ export const messages = {
   "error.backend.browserViewProtected": "La vista del browser è protetta durante l'autenticazione.",
   "error.backend.browserPreviewPageChanged": "La pagina del browser è cambiata durante l'anteprima. Riprova.",
   "error.backend.browserInputProtected": "L'input del browser è protetto durante l'autenticazione.",
+  "error.backend.browserClickMoved":
+    "Nessun clic eseguito. La pagina ha spostato il bersaglio quando il puntatore si è avvicinato e la pressione è finita su {element}. Acquisisci un nuovo snapshot.",
+  "error.backend.browserTypingFocusMoved":
+    "La pagina ha spostato il focus dal bersaglio prima della digitazione. Non è stato digitato nulla. Acquisisci un nuovo snapshot.",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "La pagina ha spostato il focus prima che tutto il testo fosse digitato. Solo la prima parte è nel campo. Acquisisci un nuovo snapshot e controlla il campo prima di digitare di nuovo.",
+  "error.backend.browserTypingSubmitSkipped":
+    "Il testo è nel campo, ma la pagina ha spostato il focus, quindi Invio non è stato inviato. Non digitare di nuovo il testo. Acquisisci un nuovo snapshot.",
   "error.backend.mcpServerHttpCredentials":
     "Il server ha risposto {status}. Controlla la chiave API o le altre credenziali.",
   "error.backend.mcpServerHttpUrl":

@@ -55,6 +55,17 @@ export const messages = {
     "{name}: il server ha già la skill «{skill}», quindi l'agente usa quella skill. Chiedi a un amministratore di aggiornarla.",
   "error.import.skillRenamed":
     "{name}: il nome della skill «{skill}» è troppo simile a quello di un'altra skill, quindi viene salvata come «{renamed}».",
+  "error.import.hermesNoProfiles":
+    "Questa cartella non ha profili Hermes. Scegli la cartella Hermes, che contiene config.yaml o SOUL.md.",
+  "error.import.hermesClosed": "I profili Hermes non sono più aperti. Leggili di nuovo.",
+  "error.import.hermesProfileMissing": "La selezione indica un profilo Hermes che non è stato letto.",
+  "error.import.hermesSoulLong":
+    "{name}: SOUL.md supera i {limit} caratteri, quindi le istruzioni conservano solo l'inizio. Il file completo è in imported/hermes/SOUL.md.",
+  "error.import.hermesSkillSkipped": "{name}: la skill «{skill}» viene saltata. {reason}",
+  "error.import.hermesSkillCodeAdded":
+    "Contiene codice che non c'era quando i profili sono stati letti. Leggili di nuovo per consentirlo.",
+  "error.import.hermesLinkNotSaved":
+    "{name}: OpenBot non è riuscito a salvare quale agente proviene da questo profilo, quindi la prossima importazione lo aggiunge come nuovo agente.",
   "error.import.transferRemoteTooLarge":
     "Un file di trasferimento per un server a cui ti sei unito deve pesare meno di 100 MB. Disattiva i file del workspace o esporta meno agenti.",
   "error.import.transferNotFile": "Questo file non è un file di trasferimento OpenBot.",
@@ -68,6 +79,9 @@ export const messages = {
     "Le impostazioni dell'app nel file non sono valide, quindi non vengono importate.",
   "error.import.transferModelMissing":
     "{name}: il modello «{model}» non è ancora disponibile qui, quindi l'agente usa il modello predefinito. Scegli di nuovo il modello quando il suo provider è pronto.",
+  "error.import.transferAgentSettingSkipped": "{name}: un'impostazione dell'agente non viene applicata. {reason}",
+  "error.import.transferChannelInstructionsCut":
+    "{name}: nel file ci sono solo i primi {limit} caratteri delle istruzioni del canale, perché un canale nuovo può averne {limit}.",
   "error.import.transferSettingSkipped": "Importazione di {name} saltata. {reason}",
   "error.import.transferRunsSkipped":
     "{name}: la cronologia delle esecuzioni della routine «{routine}» non viene importata.",
@@ -100,4 +114,32 @@ export const messages = {
     "{number} file della cartella condivisa sono già presenti qui, quindi restano come sono.",
   "error.import.transferPartSkipped":
     "Alcune parti del file non sono state importate. Le altre parti sono su questo server, quindi non importare di nuovo il file.",
+  "error.import.transferChannelInvalid": "Il canale {number} nel file non è valido, quindi viene saltato.",
+  "error.import.transferChannelLimit": "Nel file ci sono solo i primi {limit} canali.",
+  "error.import.transferWorkflowInvalid": "Un flusso di lavoro nel file non è valido, quindi viene saltato.",
+  "error.import.transferRoutineWebhook":
+    "{name}: la routine «{routine}» ha un nuovo indirizzo webhook. Aprila, crea un nuovo segreto e comunica entrambi al mittente.",
+  "error.import.transferWorkflowWebhook":
+    "{name}: il flusso di lavoro ha bisogno di un nuovo indirizzo webhook. Aprilo, ricrea l'indirizzo e comunicalo al mittente.",
+  "error.import.transferWorkflowConnection":
+    "{name}: scegli di nuovo la connessione Slack, Discord o Telegram del flusso di lavoro dopo averla collegata qui.",
+  "error.import.transferHistorySkipped":
+    "{name}: la cronologia chat nel file non è valida, quindi non viene importata.",
+  "error.import.transferChatsSkipped": {
+    one: "{name}: {count} chat non viene importata.",
+    other: "{name}: {count} chat non vengono importate.",
+  },
+  "error.import.transferLocalScripts":
+    "{name}: «Script locali» era attivo per questo agente. Riattivalo nelle sue impostazioni se ti fidi del file.",
+  "error.import.transferAgentNewChats":
+    "{name}: «L'agente avvia nuove chat» era attivo per questo agente. Riattivalo nelle sue impostazioni se ti fidi del file.",
+  "error.import.transferAlwaysAllow":
+    "{name}: su altro computer consentivi sempre questo agente. Qui chiede prima finché non lo consenti di nuovo.",
+  "error.import.transferFolders":
+    "{name}: usava {number} cartelle fuori dal suo workspace. Aggiungile di nuovo nelle impostazioni, in Cartelle.",
+  "error.import.transferPartsClosed": "Il trasferimento con il server si è interrotto. Riprova.",
+  "error.import.transferPartInvalid": "Una parte del file di trasferimento non è arrivata correttamente. Riprova.",
+  "error.import.transferStepFailed": "Questo server non l'ha salvato.",
+  "error.import.transferNoSpace":
+    "Non c'è abbastanza spazio libero su disco sul server per questo file di trasferimento.",
 } as const satisfies PartialTranslation<typeof source>;

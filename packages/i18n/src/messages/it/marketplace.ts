@@ -81,6 +81,22 @@ export const messages = {
   "marketplace.agent.updateAvailable": "Aggiornabile",
   "marketplace.agent.update": "Aggiorna",
   "marketplace.agent.openChat": "Apri chat",
+  "marketplace.agentUpdate.title": "Aggiornare {name}?",
+  "marketplace.agentUpdate.body": {
+    one: "{count} skill ha modifiche locali. Resta com'è a meno che tu scelga Sostituisci.",
+    other: "{count} skill hanno modifiche locali. Restano com'è a meno che tu scelga Sostituisci.",
+  },
+  "marketplace.agentUpdate.listLabel": "Skill con modifiche locali",
+  "marketplace.agentUpdate.keep": "Le tue modifiche restano",
+  "marketplace.agentUpdate.lost": "Perderai le tue modifiche",
+  "marketplace.agentUpdate.choiceLabel": "Mantieni o sostituisci {name}",
+  "marketplace.agentUpdate.keepOption": "Mantieni",
+  "marketplace.agentUpdate.replace": "Sostituisci",
+  "marketplace.agentUpdate.others": {
+    one: "Si aggiorna anche {count} altra skill.",
+    other: "Si aggiornano anche altre {count} skill.",
+  },
+  "marketplace.agentUpdate.confirm": "Aggiorna agente",
 
   "marketplace.app.connect": "Connetti",
   "marketplace.app.reconnect": "Riconnetti",

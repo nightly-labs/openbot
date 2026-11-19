@@ -266,12 +266,15 @@ export const messages = {
   "routine.settings.name": "Nome",
   "routine.settings.namePlaceholder": "Riepilogo del mattino",
   "routine.settings.whenToRun": "Quando eseguirla",
+  "routine.settings.nameRequired": "Assegna un nome alla routine.",
+  "routine.settings.instructionRequired": "Descrivi cosa fare quando la routine viene eseguita.",
   "routine.settings.triggerWebhook": "Webhook",
   "routine.settings.webhookSummary": "Quando arriva {eventType}",
   "routine.settings.webhookSummaryAny": "Quando arriva un webhook",
-
   "routine.trigger.change": "Cambia attivazione",
   "routine.trigger.groupSchedule": "Pianificazione",
+
+  "routine.trigger.kind": "Cosa avvia la routine",
   "routine.trigger.onceDescription": "In una data e un'ora a scelta",
   "routine.trigger.hourlyDescription": "Ogni ora, nelle ore scelte",
   "routine.trigger.dailyDescription": "Ogni giorno a un'ora scelta",
@@ -327,6 +330,30 @@ export const messages = {
   "routine.webhook.giveSecretFailed": "Impossibile dare il segreto di firma a {name}.",
   "routine.webhook.secretGiven": "{name} ha il nuovo segreto di firma.",
   "routine.webhook.statusFailed": "Impossibile verificare se l'host è connesso al relay.",
+  "routine.webhook.stepDone": "Fatto",
+  "routine.webhook.stepUrl": "Copia l'endpoint nel servizio mittente",
+  "routine.webhook.stepUrlHint": "Il mittente invia una richiesta POST con un corpo JSON di al massimo 64 KiB.",
+  "routine.webhook.saveForUrl": "Salva e ottieni l'endpoint",
+  "routine.webhook.stepSecret": "Aggiungi il segreto di firma al mittente",
+  "routine.webhook.stepSecretHint":
+    "Il mittente firma ogni richiesta con questo segreto. OpenBot rifiuta le richieste senza firma valida.",
+  "routine.webhook.howToSign": "Come firmare una richiesta",
+  "routine.webhook.howToSignHint":
+    "Conserva il segreto in OPENBOT_WEBHOOK_SECRET sul mittente. Non metterlo nel codice.",
+  "routine.webhook.stepTest": "Invia un evento di test",
+  "routine.webhook.stepTestHint":
+    "OpenBot firma un evento che corrisponde a questa routine e lo riceve come richiesta reale. La routine viene eseguita una volta.",
+  "routine.webhook.sendTest": "Invia evento di test",
+  "routine.webhook.sendingTest": "Invio…",
+  "routine.webhook.testStarted":
+    "L'evento di test {eventType} ha avviato un'esecuzione. Compare nella cronologia delle esecuzioni.",
+  "routine.webhook.testIgnoredInactive": "La routine è in pausa, quindi l'evento di test non ha avviato un'esecuzione.",
+  "routine.webhook.testIgnoredEventType":
+    "L'evento di test non corrispondeva al tipo di evento, quindi nessuna esecuzione è partita.",
+  "routine.webhook.testIgnoredFilter":
+    "L'evento di test non ha superato i filtri, quindi nessuna esecuzione è partita.",
+  "routine.webhook.testFailed": "Impossibile inviare l'evento di test.",
+  "routine.webhook.pointerInvalid": 'Il pointer deve iniziare con "/", ad esempio /order/status.',
 
   "routine.settings.instruction": "Istruzione",
   "routine.settings.instructionPlaceholderAgent": "Descrivi cosa deve fare questo agente.",

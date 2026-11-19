@@ -28,4 +28,20 @@ export const messages = {
     "La connessione si è interrotta prima che OpenBot confermasse la consegna. Controlla la consegna per evitare di inviare un altro codice.",
   "error.auth.deliveryUnknown":
     "OpenBot non ha potuto confermare se il codice di accesso è stato inviato. Controlla la consegna prima di inviarlo di nuovo.",
+  "error.auth.companySignInFailed": "L'accesso aziendale non è terminato. Riprova.",
+  "error.auth.companySignInCancelled": "L'accesso aziendale è stato annullato.",
+  "error.auth.companySignInTimeout":
+    "L'accesso aziendale ha richiesto troppo tempo. Apri di nuovo la pagina di accesso.",
+  "error.auth.companySignInRefused": "L'accesso presso la tua azienda è stato annullato o rifiutato.",
+  "error.auth.companySignInDomainMismatch":
+    "L'account aziendale ha un'email in un dominio non incluso nella configurazione.",
+  "error.auth.companySignInAccountDisabled": "La tua azienda ha disattivato questo account. Chiedi all'amministratore.",
+  "error.auth.companySignInOff": "L'accesso aziendale è disattivato per questa email.",
+  "error.auth.companySignInEmailMissing": "Il tuo account aziendale non ha fornito un indirizzo email verificato.",
+  "error.auth.companySignInUnavailable": "Questo OpenBot non può aprire un browser per l'accesso aziendale.",
+  "error.auth.companySignInProviderRejected": "Il provider non ha accettato l'ID client o il secret.",
+  "error.auth.companySignInTokenInvalid": "Il provider ha restituito un accesso che OpenBot non può verificare.",
+  "error.auth.companySignInProviderUnreachable": "Il provider dell'accesso aziendale non ha risposto.",
+  "error.auth.companySignInDomainTaken": "Uno di questi domini accede già tramite un altro server.",
+  "error.auth.companySignInNoServer": "Avvia questo server prima di configurare l'accesso aziendale.",
 } as const satisfies PartialTranslation<typeof source>;
