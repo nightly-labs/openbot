@@ -9506,14 +9506,29 @@ try {
         bitwardenCalls.length === 0,
       summary(plainHttp),
     );
+    const wrongKeySettled = bitwardenSettled(bitwardenConnector);
+    const wrongKey = await connectAs(adaToken, { ...input, clientSecret: "wrong-client-secret" });
+    const wrongKeyStatus = await wrongKeySettled;
+    check(
+      "a wrong API key names the sign-in step, does not unlock, and leaves no CLI data",
+      field(wrongKey.body, "state") === "connecting" &&
+        !wrongKeyStatus.connected &&
+        wrongKeyStatus.error === sourceText("error.connector.bitwardenHostSignInFailed") &&
+        bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        !bitwardenCalls.some((entry) => entry.args[0] === "unlock") &&
+        !existsSync(bitwardenFile) &&
+        !existsSync(bitwardenData),
+      { wrongKey: summary(wrongKey), wrongKeyStatus },
+    );
+    bitwardenCalls.length = 0;
     const wrongSettled = bitwardenSettled(bitwardenConnector);
     const wrong = await connectAs(adaToken, { ...input, masterPassword: "wrong-master-password" });
     const wrongStatus = await wrongSettled;
     check(
-      "a wrong master password leaves no connection, no stored file and no signed-in CLI data",
+      "a wrong master password names the unlock step and leaves no connection, no stored file and no signed-in CLI data",
       field(wrong.body, "state") === "connecting" &&
         !wrongStatus.connected &&
-        wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
+        wrongStatus.error === sourceText("error.connector.bitwardenHostUnlockFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
         bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&

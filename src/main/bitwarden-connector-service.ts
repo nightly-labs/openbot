@@ -82,6 +82,12 @@ export interface BitwardenHostOptions {
 function failure(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFailed")) });
 }
+/** A failed host sign-in step. Its text names the input to check, and the log shows the step. */
+function stepFailure(
+  key: "error.connector.bitwardenHostSignInFailed" | "error.connector.bitwardenHostUnlockFailed",
+): PasswordVaultError {
+  return new PasswordVaultError({ cause: new Error(sourceText(key)) });
+}
 function cliMissing(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
 }
@@ -522,7 +528,7 @@ export class BitwardenConnectorService implements PasswordVault {
         yield* this.#call(session, ["login", "--apikey"], {
           BW_CLIENTID: record.clientId,
           BW_CLIENTSECRET: record.clientSecret,
-        });
+        }).pipe(Effect.mapError(() => stepFailure("error.connector.bitwardenHostSignInFailed")));
       }
       const unlock = this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
         BW_PASSWORD: record.masterPassword,
@@ -535,8 +541,9 @@ export class BitwardenConnectorService implements PasswordVault {
             return unlock;
           },
         ),
+        Effect.mapError(() => stepFailure("error.connector.bitwardenHostUnlockFailed")),
       )).trim();
-      if (!key) return yield* failure();
+      if (!key) return yield* stepFailure("error.connector.bitwardenHostUnlockFailed");
       registerSecretValue(key);
       session.env = { ...env, BW_SESSION: key };
       yield* this.#openFolder(session);
@@ -664,10 +671,14 @@ function registerRecord(record: BitwardenConnectorRecord): void {
   registerSecretValue(record.masterPassword, { allowShort: true });
 }
 
-/** The install failure names itself; every other host failure gets one sentence about the inputs. */
+/** A failure of a known step names itself; every other host failure gets one sentence about all the inputs. */
 function hostError(cause: unknown): string {
-  const install = sourceText("error.connector.bitwardenCliInstallFailed");
-  return cause instanceof Error && cause.message === install
-    ? install
-    : sourceText("error.connector.bitwardenHostFailed");
+  const named = [
+    sourceText("error.connector.bitwardenCliInstallFailed"),
+    sourceText("error.connector.bitwardenHostSignInFailed"),
+    sourceText("error.connector.bitwardenHostUnlockFailed"),
+    sourceText("error.connector.bitwardenFolderMissing"),
+  ];
+  const message = cause instanceof Error ? cause.message : null;
+  return named.find((text) => text === message) ?? sourceText("error.connector.bitwardenHostFailed");
 }
