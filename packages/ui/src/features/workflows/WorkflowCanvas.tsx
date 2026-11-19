@@ -85,7 +85,6 @@ import {
   WorkflowCanvasHeader,
 } from "./WorkflowCanvasHud";
 import { ConditionNode } from "./WorkflowConditionNode";
-import { WorkflowDeletedState } from "./WorkflowDeletedState";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
 import { ImageNode } from "./WorkflowImageNode";
 import { LlmNode } from "./WorkflowLlmNode";
@@ -97,6 +96,7 @@ import { PromptNode } from "./WorkflowPromptNode";
 import { WorkflowSearch } from "./WorkflowSearch";
 import { SHAPES, ShapeIcon, ShapeNode, ShapeSurface, shapeSize } from "./WorkflowShapeNode";
 import { type SwitcherAction, type SwitcherWorkflow, WorkflowSwitcher } from "./WorkflowSwitcher";
+import { nextWorkflowAfterDelete, WorkflowsEmpty } from "./WorkflowsEmpty";
 import { TextNode } from "./WorkflowTextNode";
 import { TriggerNode } from "./WorkflowTriggerNode";
 import { WorkflowVersionBar } from "./WorkflowVersionBar";
@@ -1074,7 +1074,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         : { id: workflow.id, title: workflow.title, steps: workflow.steps },
     );
   };
-  const remaining = () => listed().filter((workflow) => workflow.id !== openId());
   const onSwitcher = (action: SwitcherAction) => {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
@@ -3404,8 +3403,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           </div>
         </Show>
         <Show when={deleted()}>
-          <WorkflowDeletedState
-            workflows={remaining()}
+          <WorkflowsEmpty
+            next={nextWorkflowAfterDelete(listed(), openId())}
             onOpen={(workflowId) => onSwitcher(`open:${workflowId}`)}
             onCreate={() => onSwitcher("new")}
           />
