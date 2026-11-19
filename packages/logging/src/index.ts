@@ -51,6 +51,21 @@ const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
 const registeredSecrets = new Set<string>();
 let registeredSecretPattern: RegExp | null = null;
+const publicValues = new Set<string>();
+
+export function registerPublicValues(values: Iterable<string>): void {
+  for (const value of values) if (value) publicValues.add(value);
+}
+
+function isPublicValueAround(candidate: string, secret: string): boolean {
+  return candidate.length > secret.length && candidate.includes(secret) && publicValues.has(candidate);
+}
+
+function isPublicToken(token: string, secret: string): boolean {
+  if (publicValues.size === 0) return false;
+  if (isPublicValueAround(token, secret)) return true;
+  return token.endsWith(".") && isPublicValueAround(token.replace(/\.+$/u, ""), secret);
+}
 
 export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {
   registerSecretValues([value], options);
@@ -118,6 +133,7 @@ function markRegisteredSecrets(value: string): string {
     while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
     while (end < value.length && !hosts?.[end] && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    if (isPublicToken(value.slice(start, end), match[0])) continue;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
