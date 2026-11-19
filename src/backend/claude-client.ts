@@ -3463,8 +3463,13 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
  * capability-restricted; caller must provide CAP_SYS_ADMIN): Permission denied` under Ubuntu's
  * AppArmor profile `bwrap-userns-restrict` (Claude Code 2.1.323, #9909). The CLI's own start-up check
  * passes on such a host, so the turn continues and the user saw only failed commands.
+ * On a host that does not let `bwrap` itself make its namespaces or mounts, such as a Docker
+ * container, the command stops earlier with the stderr of `bwrap`, for example `bwrap: Failed to make
+ * / slave: Operation not permitted` (Claude Code 2.1.327, #12611). These are the texts that the Codex
+ * client finds (`LINUX_SANDBOX_FAILURE`); the CLI's start-up check passes there too.
  */
-const CLAUDE_SANDBOX_BLOCKED = /^apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)/mu;
+const CLAUDE_SANDBOX_BLOCKED =
+  /^(?:apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)|bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK)))/mu;
 
 /**
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
