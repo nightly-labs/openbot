@@ -56,7 +56,13 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
-import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
+import {
+  type ImageCopies,
+  ImageGallery,
+  ImageLightbox,
+  type ImageLightboxOpening,
+  isLightboxImage,
+} from "./ImageLightbox";
 import {
   MarkdownInlineText,
   MarkdownMessageText,
@@ -346,6 +352,8 @@ export function MessageBody(props: {
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The small copies of a joined server's images, for the gallery and the viewer. */
+  imageCopies?: ImageCopies | undefined;
   /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   /**
@@ -695,7 +703,12 @@ export function MessageBody(props: {
   const imageBlock = () => (
     <Switch>
       <Match when={standaloneImageAttachments().length > 1}>
-        <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
+        <ImageGallery
+          images={standaloneImageAttachments()}
+          onOpen={openAttachment}
+          onDownload={props.onDownload}
+          copies={props.imageCopies}
+        />
       </Match>
       <Match when={standaloneImageAttachments().length === 1}>
         <div class="message-image-attachments">
@@ -731,6 +744,7 @@ export function MessageBody(props: {
               : !opening().markdown && Boolean(props.onDownload)
           }
           macWindowControls={props.macWindowControls}
+          copies={opening().markdown ? undefined : props.imageCopies}
           onClose={() => setLightbox(null)}
         />
       )}

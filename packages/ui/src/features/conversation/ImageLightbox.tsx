@@ -32,6 +32,20 @@ import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
 
+/**
+ * The small copies of the images of a joined server (`attachment-preview-v1`). A tile shows the copy, so
+ * a batch of large images does not wait for each whole file (#12562). The viewer shows the copy at once
+ * and the full image when that has loaded.
+ */
+export interface ImageCopies {
+  /** The small copy of an image. Undefined when it has none: the image then shows its `previewUrl`. Reactive. */
+  copyUrl(image: AttachmentSummary): string | undefined;
+  /** The full image. Undefined until `loadFull` gets it. Reactive. */
+  fullUrl(image: AttachmentSummary): string | null | undefined;
+  /** Gets the full image when `fullUrl` does not have it. Resolves false when it cannot. */
+  loadFull?(image: AttachmentSummary): Promise<boolean>;
+}
+
 /** The images that the viewer steps through, the one it opens on, and the thumbnail it grows from. */
 export interface ImageLightboxOpening {
   images: AttachmentSummary[];
@@ -67,10 +81,22 @@ function galleryRatio(width: number, height: number): number {
   return Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, width / height));
 }
 
+/** The ratios of the small copies that tiles showed. A copy has the shape of its image, not its size. */
+const copyRatios = new Map<string, number>();
+const COPY_RATIOS_LIMIT = 500;
+
+function rememberCopyRatio(attachmentId: string, ratio: number): void {
+  copyRatios.delete(attachmentId);
+  copyRatios.set(attachmentId, ratio);
+  if (copyRatios.size <= COPY_RATIOS_LIMIT) return;
+  const oldest = copyRatios.keys().next();
+  if (!oldest.done) copyRatios.delete(oldest.value);
+}
+
 /** A tile is square until its image loads, unless the image loaded before in this window. */
 function rememberedGalleryRatio(attachmentId: string): number {
   const size = rememberedMediaSize(attachmentId);
-  return size ? galleryRatio(size.width, size.height) : 1;
+  return size ? galleryRatio(size.width, size.height) : (copyRatios.get(attachmentId) ?? 1);
 }
 
 /** Several images of one message, laid out in justified rows. */
@@ -79,6 +105,7 @@ export function ImageGallery(props: {
   onOpen: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   /** A tile whose preview fails downloads the file, so the file stays reachable. */
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
+  copies?: ImageCopies | undefined;
 }) {
   const { t } = useText();
   // By position: a sent message's images get new ids and URLs when the host stores them, and each
@@ -122,7 +149,8 @@ export function ImageGallery(props: {
           const box = () => layout().boxes[index];
           // Once the tile draws an image, a new URL draws over it when it loads, with no spinner.
           const [loaded, setLoaded] = createSignal(false);
-          const url = createSteadyImageUrl(() => image().previewUrl);
+          const copy = () => props.copies?.copyUrl(image());
+          const url = createSteadyImageUrl(() => copy() ?? image().previewUrl);
           // Keyed by the drawn URL: a new URL for the same attachment gets a new try.
           const key = () => url() ?? image().id;
           const isMissing = () => missing[key()] === true;
@@ -130,8 +158,9 @@ export function ImageGallery(props: {
           const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
             setLoaded(true);
             if (naturalWidth <= 0 || naturalHeight <= 0) return;
-            rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
             const ratio = galleryRatio(naturalWidth, naturalHeight);
+            if (copy()) rememberCopyRatio(image().id, ratio);
+            else rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
             setRatios((state) => {
               state[index] = ratio;
             });
@@ -250,11 +279,16 @@ const screenPixelRatio = () => window.devicePixelRatio || 1;
  * natural CSS size, a display scale above 100% spreads each image pixel over more screen pixels and
  * blurs a screenshot. A vector image scales without loss, so it keeps its natural CSS size.
  */
-function fitScreenPixels(image: HTMLImageElement, mimeType: string): void {
+function fitScreenPixels(
+  image: HTMLImageElement,
+  mimeType: string,
+  width = image.naturalWidth,
+  height = image.naturalHeight,
+): void {
   if (mimeType === "image/svg+xml") return;
   const ratio = screenPixelRatio();
-  image.style.setProperty("--image-lightbox-screen-width", `${image.naturalWidth / ratio}px`);
-  image.style.setProperty("--image-lightbox-screen-height", `${image.naturalHeight / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-width", `${width / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-height", `${height / ratio}px`);
 }
 
 /** A web client on plain HTTP has no clipboard that takes images. */
@@ -320,6 +354,7 @@ export function ImageLightbox(props: {
   macWindowControls?: boolean | undefined;
   /** Names the strip of images. Absent, the images are the ones of one message. */
   stripLabel?: string | undefined;
+  copies?: ImageCopies | undefined;
   onClose: () => void;
 }) {
   const { t } = useText();
@@ -337,6 +372,17 @@ export function ImageLightbox(props: {
   const [closing, setClosing] = createSignal(false);
   const [loaded, setLoaded] = createStore<Record<string, boolean>>({});
   const [failed, setFailed] = createStore<Record<string, boolean>>({});
+  // An image with a small copy shows the copy until its full image has loaded and decoded. Only the
+  // shown image gets its full file, so a neighbour does not wait in front of it.
+  const [fullReady, setFullReady] = createStore<Record<string, boolean>>({});
+  const [fullFailed, setFullFailed] = createStore<Record<string, boolean>>({});
+  const copyOf = (entry: AttachmentSummary) => {
+    const copy = props.copies?.copyUrl(entry);
+    return copy && copy !== props.copies?.fullUrl(entry) ? copy : undefined;
+  };
+  const showsCopy = (entry: AttachmentSummary) => fullReady[entry.id] !== true && copyOf(entry) !== undefined;
+  const sourceOf = (entry: AttachmentSummary) =>
+    (showsCopy(entry) ? copyOf(entry) : props.copies?.fullUrl(entry)) ?? entry.previewUrl;
   const images = () => props.opening.images;
   const current = createMemo(() => images()[Math.min(index(), images().length - 1)]);
   const downloadable = () => {
@@ -345,7 +391,7 @@ export function ImageLightbox(props: {
   };
   const shownImageLoaded = () => {
     const image = current();
-    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true;
+    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true && !showsCopy(image);
   };
   const imageElements = new Map<string, HTMLImageElement>();
   const copyable = canCopyImages();
@@ -370,9 +416,9 @@ export function ImageLightbox(props: {
   const pointers = new Map<number, Point>();
   let gesture: { camera: Camera; point: Point; distance: number } | undefined;
 
-  /** The loaded image of `entry`, which the zoom moves. */
+  /** The loaded image of `entry`, which the zoom moves. A small copy does not zoom: its full image comes. */
   const zoomImage = (entry = current()) => {
-    const image = entry ? imageElements.get(entry.id) : undefined;
+    const image = entry && !showsCopy(entry) ? imageElements.get(entry.id) : undefined;
     return image?.isConnected && image.complete && image.naturalWidth ? image : undefined;
   };
   /** The scale over the fitted size, from the fitted size to MAX_SCALE times the natural size. */
@@ -437,7 +483,8 @@ export function ImageLightbox(props: {
   const copy = () => {
     const entry = current();
     const image = entry ? imageElements.get(entry.id) : undefined;
-    if (!entry || !image?.isConnected || !copyable) return;
+    // A small copy is not the image: the copy waits for the full image.
+    if (!entry || showsCopy(entry) || !image?.isConnected || !copyable) return;
     // The item takes the PNG as a promise, so the write keeps the press's permission while it draws.
     navigator.clipboard.write([new ClipboardItem({ "image/png": pngImage(image) })]).then(
       () => {
@@ -577,6 +624,50 @@ export function ImageLightbox(props: {
     }
   });
   onCleanup(() => tiles.cancel());
+
+  // The full image replaces the copy only once it is decoded, so the copy stays until it can show.
+  createEffect(
+    () => {
+      const entry = current();
+      return entry && showsCopy(entry) && fullFailed[entry.id] !== true ? entry : undefined;
+    },
+    (entry) => {
+      if (!entry) return;
+      let done = false;
+      const full = new Image();
+      // The copy stays when the full image does not load. It shows the image, and the download works.
+      const fail = () => {
+        if (!done)
+          setFullFailed((state) => {
+            state[entry.id] = true;
+          });
+      };
+      const show = (url: string) => {
+        full.src = url;
+        void full.decode().then(() => {
+          if (done) return;
+          const element = imageElements.get(entry.id);
+          if (element) fitScreenPixels(element, entry.mimeType, full.naturalWidth, full.naturalHeight);
+          setFullReady((state) => {
+            state[entry.id] = true;
+          });
+        }, fail);
+      };
+      const url = props.copies?.fullUrl(entry);
+      if (url) show(url);
+      else if (!props.copies?.loadFull) fail();
+      else
+        void props.copies.loadFull(entry).then((ready) => {
+          const next = ready ? props.copies?.fullUrl(entry) : undefined;
+          if (next) show(next);
+          else fail();
+        }, fail);
+      return () => {
+        done = true;
+        full.src = "";
+      };
+    },
+  );
 
   /** Where a slide sits on the track: -1, 0 or 1 is before, on or after the stage; others do not mount. */
   const slideOffset = (position: number): -1 | 0 | 1 | undefined => {
@@ -833,14 +924,31 @@ export function ImageLightbox(props: {
                         >
                           <img
                             ref={(element) => imageElements.set(entry.id, element)}
-                            class={["image-lightbox-image", { "image-lightbox-image-pending": !loaded[entry.id] }]}
-                            src={entry.previewUrl ?? ""}
+                            class={[
+                              "image-lightbox-image",
+                              {
+                                "image-lightbox-image-pending": !loaded[entry.id],
+                                "image-lightbox-image-copy": showsCopy(entry),
+                              },
+                            ]}
+                            src={sourceOf(entry) ?? ""}
                             alt={entry.name}
                             referrerpolicy="no-referrer"
                             draggable={false}
                             onLoad={(event) => {
-                              fitScreenPixels(event.currentTarget, entry.mimeType);
-                              reveal(entry, event.currentTarget);
+                              const element = event.currentTarget;
+                              if (showsCopy(entry)) {
+                                // The copy fills the box of the full image, in the shape of the image.
+                                element.style.setProperty(
+                                  "--image-lightbox-ratio",
+                                  `${element.naturalWidth} / ${element.naturalHeight}`,
+                                );
+                              } else {
+                                fitScreenPixels(element, entry.mimeType);
+                              }
+                              // The full image after its copy keeps the open view; it does not open again.
+                              if (!loaded[entry.id] || !copyOf(entry)) reveal(entry, element);
+                              else if (entry.id === current()?.id) move(camera);
                             }}
                             onError={() => {
                               if (entry.id === current()?.id) opened = true;
@@ -898,7 +1006,7 @@ export function ImageLightbox(props: {
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
                     <img
-                      src={entry.previewUrl ?? ""}
+                      src={props.copies?.copyUrl(entry) ?? entry.previewUrl ?? ""}
                       alt=""
                       decoding="async"
                       referrerpolicy="no-referrer"

@@ -4,7 +4,7 @@ import { base64ToBytes, bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { createSignal } from "solid-js";
-import type { WebWorkspaceRuntime } from "./web-runtime";
+import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
 /** An image above this size keeps its file icon: a thumbnail must not cost a large download. */
 const WEB_THUMBNAIL_BYTES = 2 * 1024 * 1024;
@@ -58,6 +58,10 @@ export interface WebAttachmentMedia extends AttachmentMediaSource {
   file(attachmentId: string): Promise<WebMediaFile | null>;
   /** Holds the bytes of a file that the caller read from the host, so the chat and a later open use them. */
   keep(attachment: AttachmentSummary, bytes: Uint8Array<ArrayBuffer>): void;
+  /** The loaded small copy of an image (`attachment-preview-v1`). Reactive. */
+  copyUrl(attachmentId: string): string | undefined;
+  /** The loaded whole file of an attachment. Reactive. */
+  fullUrl(attachmentId: string): string | undefined;
   /** Revokes every object URL. */
   dispose(): void;
 }
@@ -74,14 +78,19 @@ interface Entry {
 /**
  * Object URLs for the images, audio and video of host attachments. The browser client gets no
  * `previewUrl`, so each file is read through the host connection when the chat shows it.
+ *
+ * With `copies`, an image that a card or a tile shows loads as the host's small copy, and the viewer
+ * loads the whole file (#12562). `file` gives only whole files, so an open or a save never gets a copy.
  */
 export function createWebAttachmentMedia(
-  remote: Pick<WebWorkspaceRuntime, "download">,
+  remote: Pick<WebWorkspaceRuntime, "download"> & Partial<Pick<WebWorkspaceRuntime, "downloadPreview">>,
   hostId: () => string,
   urls: { create(blob: Blob): string; revoke(url: string): void } = {
     create: (blob) => URL.createObjectURL(blob),
     revoke: (url) => URL.revokeObjectURL(url),
   },
+  /** Whether the host serves small copies of its images (`attachment-preview-v1`). */
+  copies?: () => boolean,
 ): WebAttachmentMedia {
   // Insertion order is the use order: the first entry is the least recently used.
   const entries = new Map<string, Entry>();
@@ -145,15 +154,19 @@ export function createWebAttachmentMedia(
   const limitFor = (type: string, size: "thumbnail" | "generated") =>
     playableMediaKind(type) ? WEB_MEDIA_BYTES : size === "generated" ? WEB_GENERATED_IMAGE_BYTES : WEB_THUMBNAIL_BYTES;
 
-  async function download(attachment: AttachmentSummary, type: string, limit: number, key: string) {
+  async function download(attachment: AttachmentSummary, type: string, limit: number, key: string, copy = false) {
     const started = generation;
     await slot();
     try {
       if (generation !== started) return false;
-      const file = await remote.download(attachment.id);
+      const file: WebFile =
+        copy && remote.downloadPreview
+          ? await remote.downloadPreview(attachment.id)
+          : await remote.download(attachment.id);
       const bytes = base64ToBytes(file.base64);
       if (bytes.byteLength > limit || generation !== started) return false;
-      store(key, entryFor(attachment, type, bytes));
+      // A small copy is a JPEG or a PNG file, whatever the type of its image.
+      store(key, entryFor(attachment, copy && MEDIA_TYPES.has(file.mimeType) ? file.mimeType : type, bytes));
       return true;
     } catch {
       // The card keeps its icon and its download button.
@@ -163,31 +176,46 @@ export function createWebAttachmentMedia(
     }
   }
 
+  /** A held or running load of `key`, or a new one. */
+  const loadOnce = (key: string, start: () => Promise<boolean>) => {
+    const entry = entries.get(key);
+    if (entry) {
+      entries.delete(key);
+      entries.set(key, entry);
+      return Promise.resolve(true);
+    }
+    const running = loading.get(key);
+    if (running) return running;
+    const job = start().finally(() => {
+      if (loading.get(key) === job) loading.delete(key);
+    });
+    loading.set(key, job);
+    return job;
+  };
+  const copyKey = (host: string, attachmentId: string) => `${host}:copy:${attachmentId}`;
+  const shownUrl = (key: string) => (disposed ? undefined : shown().get(key));
+
   return {
     thumbnailLimit: WEB_THUMBNAIL_BYTES,
     generatedImageLimit: WEB_GENERATED_IMAGE_BYTES,
     mediaLimit: WEB_MEDIA_BYTES,
-    url: (id) => (disposed ? undefined : shown().get(`${hostId()}:${id}`)),
+    url: (id) => shownUrl(`${hostId()}:${id}`) ?? shownUrl(copyKey(hostId(), id)),
+    copyUrl: (id) => shownUrl(copyKey(hostId(), id)),
+    fullUrl: (id) => shownUrl(`${hostId()}:${id}`),
     load(attachment, size = "thumbnail") {
       const host = currentHost();
       const key = `${host}:${attachment.id}`;
-      const entry = entries.get(key);
-      if (entry) {
-        entries.delete(key);
-        entries.set(key, entry);
-        return Promise.resolve(true);
-      }
-      const running = loading.get(key);
-      if (running) return running;
       const type = mediaType(attachment);
       if (!type) return Promise.resolve(false);
       const limit = limitFor(type, size);
       if (attachment.size > limit) return Promise.resolve(false);
-      const job = download(attachment, type, limit, key).finally(() => {
-        if (loading.get(key) === job) loading.delete(key);
-      });
-      loading.set(key, job);
-      return job;
+      const whole = () => loadOnce(key, () => download(attachment, type, limit, key));
+      // A held whole file shows as it is. A host without copies, or one without a copy of this
+      // image (a large GIF or WebP file), sends the whole file, as before.
+      const copied = size === "thumbnail" && Boolean(remote.downloadPreview) && copies?.() === true;
+      if (!copied || entries.has(key) || playableMediaKind(type) || type === SVG_TYPE) return whole();
+      const copy = copyKey(host, attachment.id);
+      return loadOnce(copy, () => download(attachment, type, limit, copy, true)).then((shown) => shown || whole());
     },
     async file(attachmentId) {
       if (disposed) return null;

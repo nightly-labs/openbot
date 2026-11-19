@@ -13,6 +13,7 @@ import type {
   WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { AgentSkillCalls, SkillCatalogCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
@@ -96,6 +97,8 @@ export interface ConversationRuntime {
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;
+  /** The small copies of the host's images. Absent, the images show whole. */
+  imageCopies?: ImageCopies | undefined;
   /**
    * The HTML of a visual reply page, for a client that has no page URL. Only the browser client
    * has it: the frame shows the page as `srcdoc`, which the desktop renderer policy would block.

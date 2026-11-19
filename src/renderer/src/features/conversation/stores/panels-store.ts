@@ -6,14 +6,17 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
+import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { createAttachmentDownloads } from "../attachment-downloads";
 import { attachmentFilePreview } from "../attachment-preview";
 import { releaseFilePreviewPage } from "../conversation-port";
@@ -373,6 +376,22 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
   });
   const attachmentDownloads = attachmentFiles.downloads;
+  // A joined server's image tile shows the host's small copy, and the viewer the whole file (#12562).
+  // Main gets the copy for `?preview=1`. A browser client's runtime gives its own copies.
+  const remoteImageCopies: ImageCopies = {
+    copyUrl: (image) => {
+      const server = deps.props.server;
+      const url = image.previewUrl;
+      return server?.kind === "remote" &&
+        serverSupportsCapability(server, ATTACHMENT_PREVIEW_CAPABILITY) &&
+        url?.startsWith("openbot-remote-attachment:") &&
+        !url.includes("?")
+        ? `${url}?preview=1`
+        : undefined;
+    },
+    fullUrl: (image) => image.previewUrl,
+  };
+  const imageCopies = () => (deps.props.runtime ? deps.props.runtime.imageCopies : remoteImageCopies);
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     // A runtime has no app to open a file in, so a file it can preview opens in the panel.
@@ -810,6 +829,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openSharedFile,
     openThreadFile,
     openWorkspaceFile,
