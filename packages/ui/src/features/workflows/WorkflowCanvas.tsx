@@ -1887,13 +1887,16 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         return other !== undefined && overlaps(area, other);
       });
     const hud = hudBoxes();
-    const underHud = (area: Box) => hud.some((other) => overlaps(area, other));
+    const top = toWorld({ x: 0, y: 0 }).y;
+    const bottom = top + (viewport?.clientHeight ?? 0) / camera.scale;
+    const blocked = (area: Box) =>
+      area.y < top || area.y + area.height > bottom || hud.some((other) => overlaps(area, other));
     const above = zone(box.y - (TOOLBAR_GAP / camera.scale + height));
     const room = board.results(id).length > 1 ? STRIP_ROOM : TOOLBAR_GAP;
     const below = zone(box.y + box.height + room / camera.scale);
-    if (underHud(above)) return !underHud(below);
+    if (blocked(above)) return !blocked(below);
     if (!onNode(above)) return false;
-    return !onNode(below) && !underHud(below);
+    return !onNode(below) && !blocked(below);
   };
 
   const groupBox = createMemo(() => {

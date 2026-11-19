@@ -7,4 +7,5 @@
 
 ### Fixed
 
-- The toolbar of a workflow node no longer opens under the canvas tools or the workflow header.
+- The toolbar of a workflow node no longer opens under the canvas tools, under the workflow header, or
+  out of view below the canvas.
