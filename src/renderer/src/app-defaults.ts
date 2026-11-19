@@ -7,13 +7,6 @@ import {
   type UpdateStatus,
 } from "@openbot/contracts/ipc";
 
-/**
- * What the renderer shows before main has answered, and what it falls back to
- * when a call fails. Every one of these is a projection of "nothing known yet",
- * never durable state.
- */
-
-/** No runtime known yet. One object, because the fallback is the same for every provider. */
 const NO_PROVIDER_RUNTIME = { phase: "not-downloaded", progress: null, message: null, version: null } as const;
 
 export const FALLBACK_STATUS: AgentStatus = {

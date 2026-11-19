@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/kind";
 
-/** classifyUserError'ın belirlediği her tür için cümle. Eşleme @openbot/user-errors paketine aittir. */
 export const messages = {
   "error.kind.network": "Bağlanılamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
   "error.kind.timeout": "İstek çok uzun sürdü. Tekrar denemeden önce eylemin tamamlanıp tamamlanmadığını kontrol edin.",
@@ -18,4 +17,5 @@ export const messages = {
   "error.kind.permission": "Bu eylemi tamamlamak için izniniz yok. Sahibinden erişim isteyin.",
   "error.kind.rateLimit": "Çok fazla istek. Bir süre bekleyin, ardından tekrar deneyin.",
   "error.kind.service": "Hizmet kullanılamıyor. Bir süre bekleyin, ardından tekrar deneyin.",
+  "error.kind.interrupted": "Yanıt bitmeden bağlantı kapandı. Mesajınızı yeniden gönderin.",
 } as const satisfies PartialTranslation<typeof source>;

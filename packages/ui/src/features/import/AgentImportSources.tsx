@@ -5,23 +5,18 @@ import { createUniqueId, Show } from "solid-js";
 import { useText } from "../../text";
 import { HermesLogo } from "./HermesImportView";
 
-/** Product names, the same in each language. */
 const HERMES_AGENT = "Hermes Agent";
 const GROK_BOT = "Grok Bot";
 
 export interface AgentImportSourcesProps {
-  /** The Transfer tab is there: this computer, or a server the user administers. */
   transfer: boolean;
-  /** Where the Hermes folder is read: this computer, or the joined server. Not set: Hermes offers only the export. */
   hermesFolder?: "computer" | "server" | undefined;
-  /** The agents go to a joined server, not to this computer. */
   onServer?: boolean | undefined;
   onHermes: () => void;
   onGrok: () => void;
   onTransfer: () => void;
 }
 
-/** Server settings > Import, first: where the agents are now. Each source has its own steps after this. */
 export function AgentImportSources(props: AgentImportSourcesProps) {
   const { t } = useText();
   const headingId = `agent-import-sources-${createUniqueId()}`;

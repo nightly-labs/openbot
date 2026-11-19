@@ -24,6 +24,8 @@ export const messages = {
   "mcp.signIn.waiting": "正在等待浏览器…",
   "mcp.signIn.continue": "前往 {name}",
   "mcp.signIn.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
+  "mcp.signIn.copyHint": "如果页面无法加载，请复制链接并在其他浏览器中打开。",
+  "mcp.signIn.copyLink": "复制链接",
   "mcp.test.connected": { one: "已连接 · {count} 个工具", other: "已连接 · {count} 个工具" },
   "mcp.status.testing": "测试中…",
   "mcp.status.failed": "失败",

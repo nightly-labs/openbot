@@ -1,18 +1,3 @@
-// `bun run dev:bench`: repeatable RAM, CPU and renderer-work scenarios on the
-// built app.
-//
-// Each run seeds the bench's own profile, starts the built app on it, samples
-// the process tree from spawn to exit, reads the startup marks, drives one
-// scenario over CDP while it records the app window's work (see
-// `render-metrics.ts`), collects garbage, reads the settled state and stops
-// the app. Several runs reduce to a
-// median with its spread, and `--compare` prints the deltas against an earlier
-// report, which is what a fix PR quotes.
-//
-// Everything this touches is the bench profile (`OpenBot Dev wt-<hash of
-// this worktree>#bench`) and the process group it started. It never reaches a
-// dev instance, another worktree, or the developer's own profile.
-
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -49,20 +34,12 @@ const logger = createOpenBotLogger("dev-bench", (line) => process.stderr.write(`
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BENCH_ROOT = join(PROJECT_ROOT, ".openbot-build", "dev-automation", "bench");
 const READY_TIMEOUT_MS = 90_000;
-// The signed-in session, encrypted with the OS keychain. A reseed keeps it, so
-// each run opens the workspace the way a returning user does, without a new
-// sign-in inside the measured window.
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 
-// The bench profile. Its own instance id, so a bench never seeds over the
-// isolated dev profile of this worktree.
 const INSTANCE_ID = developmentInstanceIdForWorktree(`${PROJECT_ROOT}#bench`);
 
-// Seeded agents run on Claude: the bench never starts Codex, and a turn
-// scenario switches the agent to the provider it measures.
 const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-sonnet-5", reasoningEffort: "low" } as const;
 
-// How long `--cpu-profile` records the app window once a scenario has settled.
 const CPU_PROFILE_MS = 15 * SECOND;
 const TRACE_MS = 5 * SECOND;
 const TRACE_CATEGORIES = ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink", "cc", "v8.execute"];
@@ -97,7 +74,6 @@ async function replaceProfile(plan: SeedPlan): Promise<void> {
     });
     return;
   }
-  // The bench's own profile, named from this worktree: nothing else writes it.
   try {
     await lstat(profile);
   } catch {
@@ -113,9 +89,7 @@ async function waitFor<T>(what: string, timeoutMs: number, probe: () => Promise<
     try {
       const value = await probe();
       if (value !== null) return value;
-    } catch {
-      // Not up yet.
-    }
+    } catch {}
     if (Date.now() > deadline) throw new Error(`Timed out after ${timeoutMs} ms waiting for ${what}.`);
     await wait(250);
   }
@@ -138,8 +112,6 @@ async function connect(app: BenchApp): Promise<{ browser: Browser; page: Page }>
     const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/version`);
     return response.ok ? true : null;
   });
-  // The window exists before it loads the app page. A Playwright connection made in that time keeps
-  // the empty page and does not see the load, so the connection waits for the page in the target list.
   await waitFor("the app page", READY_TIMEOUT_MS, async () => {
     const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/list`);
     const targets = response.ok ? await response.json() : null;
@@ -154,20 +126,16 @@ async function connect(app: BenchApp): Promise<{ browser: Browser; page: Page }>
     throw new Error(`The browser on :${app.remoteDebuggingPort} is not the bench app this run started.`);
   }
   const page = await waitFor("the app window", READY_TIMEOUT_MS, () => findAppPage(browser));
-  // Ready means the backend answers, not only that the window painted.
   const agentCount = await waitFor("the agent list", READY_TIMEOUT_MS, () =>
     page.evaluate<number>("window.openbot.agent.listAgents().then((agents) => agents.length)"),
   );
   await signInBenchAccount(page, logger);
-  // The workspace, not the sign-in or connecting screen, is what a run measures.
   if (agentCount > 0) {
-    // A row of the "Unread" or "Needs you" group has no `data-chat-id`, and a seed can put every chat there.
     await page.locator(".sidebar-agent-item").first().waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
   }
   return { browser, page };
 }
 
-/** Counts the running animations in the page by name and element, such as `3× pulse on span.dot`. */
 const RUNNING_ANIMATIONS = `(() => {
   const counts = new Map();
   for (const animation of document.getAnimations()) {
@@ -180,8 +148,6 @@ const RUNNING_ANIMATIONS = `(() => {
   return [...counts].map(([key, count]) => count + "× " + key);
 })()`;
 
-/** Counts the `requestAnimationFrame` calls in one second. A loop that asks for a frame each time keeps the
- * renderer drawing at the display rate even when nothing changes on screen. */
 const ANIMATION_FRAME_REQUESTS = `new Promise((resolve) => {
   const original = window.requestAnimationFrame;
   let count = 0;
@@ -195,7 +161,6 @@ const ANIMATION_FRAME_REQUESTS = `new Promise((resolve) => {
   }, 1000);
 })`;
 
-/** Records what the app window's JavaScript does while the scenario is otherwise idle. */
 async function writeCpuProfile(browser: Browser, page: Page, path: string): Promise<void> {
   const session = await page.context().newCDPSession(page);
   try {
@@ -206,10 +171,8 @@ async function writeCpuProfile(browser: Browser, page: Page, path: string): Prom
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, JSON.stringify(profile));
     logger.info(`CPU profile written to ${path}`);
-    // Compositor and style work for an animation shows in the profile only as "(program)".
     const animations = await page.evaluate<string[]>(RUNNING_ANIMATIONS);
     logger.info(`running animations: ${animations.length === 0 ? "none" : animations.join(", ")}`);
-    // A timeline trace names the native work: style, layout, paint, observers and timers.
     const tracePath = path.replace(/\.cpuprofile$/u, ".trace.json");
     await browser.startTracing(page, { path: tracePath, categories: TRACE_CATEGORIES });
     await wait(TRACE_MS);
@@ -234,12 +197,15 @@ async function runOnce(
   { label, authApiUrl, cpuProfile, frames, callCounts }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
+  const scenarioEnvironment = scenario.prepare
+    ? await scenario.prepare(join(BENCH_ROOT, "scenarios", `${label}-${scenario.id}`))
+    : {};
   const spawnedAt = Date.now();
   const app = await launchBenchApp({
     projectRoot: PROJECT_ROOT,
     instanceId: INSTANCE_ID,
     logger,
-    environment: { OPENBOT_AUTH_API_URL: authApiUrl },
+    environment: { ...scenarioEnvironment, OPENBOT_AUTH_API_URL: authApiUrl },
     logPath: join(BENCH_ROOT, "logs", `${label}-${scenario.id}-${index + 1}.log`),
   });
   let browser: Browser | null = null;
@@ -258,8 +224,6 @@ async function runOnce(
     browser = connected.browser;
     page = connected.page;
     const readyMs = Date.now() - spawnedAt;
-    // A render error can leave the window empty, which reads as a large saving. Count errors, so
-    // the report shows a broken run.
     const pageErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") pageErrors.push(message.text());
@@ -286,8 +250,6 @@ async function runOnce(
     });
     const actMs = Date.now() - actStarted;
     const renderWork = await stopRenderRecording();
-    // A click leaves the pointer on its target, and a hovered avatar animates until the pointer leaves.
-    // A user who waits does not usually keep the pointer on a row, so the settled numbers must not count it.
     await appWindow.mouse.move(-1, -1);
     const samples = await sampler.stop();
     const settled: MetricValues = {
@@ -328,8 +290,6 @@ async function runOnce(
     await app.stop();
   }
 }
-
-// --- command line ----------------------------------------------------------
 
 const USAGE = [
   "Usage: bun run dev:bench --scenario=<id|prefix|all> [--runs=<n>] [--label=<name>] [--compare=<report.json>]",
@@ -389,7 +349,6 @@ async function main(): Promise<void> {
   await mkdir(BENCH_ROOT, { recursive: true });
   const jsonPath = join(BENCH_ROOT, `${label}.json`);
   const authApi = await ensureBenchAuthApi(PROJECT_ROOT, BENCH_ROOT, logger);
-  // A long `all` run continues past a scenario that fails, and names it at the end.
   const failed: string[] = [];
   try {
     for (const scenario of selectScenarios(selector)) {
@@ -412,7 +371,6 @@ async function main(): Promise<void> {
         runs: results,
         metrics: summarizeRuns(results),
       });
-      // After each scenario, so a long `all` run that fails late keeps what it measured.
       await writeFile(jsonPath, `${JSON.stringify(report(), null, 2)}\n`);
     }
   } finally {

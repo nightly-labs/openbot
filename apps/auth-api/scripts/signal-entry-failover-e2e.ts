@@ -1,11 +1,3 @@
-// Runs the Signal entry check against two real local HTTP servers, which stand for the two Signal
-// machines, and a fake Cloudflare DNS API. The entry name stays while its machine answers, moves to
-// the other machine when its machine fails two checks, and stays when no machine answers or the
-// records are not clear. The Worker cron runs the check only on its own cron, and its log never holds
-// the token.
-//
-// Run: bun apps/auth-api/scripts/signal-entry-failover-e2e.ts
-// It writes .openbot-build/signal-entry-failover-e2e/report.json and exits non-zero on a failure.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -33,8 +25,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-// The two Signal machines: `/health/ready` answers 200 while the machine is up.
-// `fail-once` answers 503 one time, then works as `up`.
 type Health = "up" | "down" | "fail-once" | "stopped";
 const health: Record<"a" | "b", Health> = { a: "up", b: "up" };
 function serveSignal(id: "a" | "b", port = 0) {
@@ -51,9 +41,7 @@ function serveSignal(id: "a" | "b", port = 0) {
   });
 }
 const servers = { a: serveSignal("a"), b: serveSignal("b") };
-// A stopped server does not keep its port, so a restart uses the port from the start.
 const PORT = { a: Number(servers.a.port), b: Number(servers.b.port) };
-// Each machine has its own name, so the DNS API can give each one its own record.
 const HOMES = `a=ws://localhost:${PORT.a}/v1/signal,b=ws://127.0.0.1:${PORT.b}/v1/signal`;
 const HOST = { a: "localhost", b: "127.0.0.1" } as const;
 
@@ -63,7 +51,6 @@ async function setHealth(id: "a" | "b", next: Health) {
   health[id] = next;
 }
 
-// The fake Cloudflare DNS API: A records by name, and the requests it got.
 interface FakeRecord {
   id: string;
   name: string;
@@ -126,7 +113,6 @@ const patches = () => apiRequests.filter((request) => request.method === "PATCH"
 const entryAddress = () => records.find((record) => record.name === ENTRY)?.content;
 
 try {
-  // Off: no token, no zone, or fewer than two homes. No request goes to Cloudflare.
   resetDns(ADDRESS.a);
   const offResults = [
     await run({ ...bindings, SIGNAL_ENTRY_DNS_TOKEN: "" }),
@@ -141,7 +127,6 @@ try {
     { offResults, apiRequests: apiRequests.length },
   );
 
-  // Healthy entry: no change.
   resetDns(ADDRESS.a);
   const healthy = await run();
   check(
@@ -159,7 +144,6 @@ try {
     apiRequests,
   );
 
-  // The entry machine stops: the record moves to the other machine.
   resetDns(ADDRESS.a);
   await setHealth("a", "stopped");
   const moved = await run();
@@ -180,7 +164,6 @@ try {
     patches(),
   );
 
-  // After the move, the first machine starts again. The name does not go back.
   await setHealth("a", "up");
   apiRequests.length = 0;
   const noFailback = await run();
@@ -194,7 +177,6 @@ try {
     noFailback,
   );
 
-  // One failed answer, then the machine answers before the second check: no move.
   resetDns(ADDRESS.a);
   await setHealth("a", "fail-once");
   const recovered = await run();
@@ -207,7 +189,6 @@ try {
     recovered,
   );
 
-  // Both machines fail: the record stays, because no machine can take the entry.
   resetDns(ADDRESS.a);
   await setHealth("a", "down");
   await setHealth("b", "down");
@@ -219,7 +200,6 @@ try {
   );
   await setHealth("b", "up");
 
-  // Records that do not show one entry machine: the check changes nothing.
   resetDns(ADDRESS.a, true);
   const proxied = await run();
   resetDns("198.51.100.9");
@@ -239,7 +219,6 @@ try {
     { proxied, foreign, two },
   );
 
-  // A refused API request: a typed error with the status, and no change.
   resetDns(ADDRESS.a);
   apiFailure = 403;
   const refused = await run();
@@ -254,8 +233,6 @@ try {
     Result.isFailure(refused) ? { operation: refused.failure.operation, status: refused.failure.status } : refused,
   );
 
-  // The Worker cron: the entry cron runs only the check, the other cron never calls Cloudflare, and
-  // the log of a failed check holds no token.
   await setHealth("a", "down");
   resetDns(ADDRESS.a);
   apiFailure = 403;

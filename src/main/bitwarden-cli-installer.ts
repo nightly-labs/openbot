@@ -1,6 +1,3 @@
-// Installs the Bitwarden CLI into a folder that OpenBot owns, so a server with no `bw` on its PATH,
-// such as the Docker image, can connect Bitwarden or Vaultwarden.
-
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -14,10 +11,6 @@ import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
 const { io: vaultCall } = causeHelpers(PasswordVaultError);
 
-/**
- * The release that the host installs. Each archive's SHA-256 is pinned here, taken from the GitHub
- * release of Bitwarden's own repository. A new release is a code change.
- */
 const BITWARDEN_CLI_VERSION = "2026.9.1";
 
 const ARCHIVES: Record<RuntimeTarget, { name: string; sha256: string }> = {
@@ -56,10 +49,6 @@ function managedCliPath(directory: string, target: RuntimeTarget): string {
   return join(directory, BITWARDEN_CLI_VERSION, executableName(target));
 }
 
-/**
- * The installed CLI, or a new install of the pinned release: downloaded, checked against its hash,
- * and unpacked into `<directory>/<version>`. A failed or stopped install leaves nothing in that folder.
- */
 export const managedBitwardenCli = Effect.fn("BitwardenCli.managed")(function* (options: {
   directory: string;
   target: RuntimeTarget;

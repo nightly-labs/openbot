@@ -1,11 +1,3 @@
-// Drives the agent MCP tools of issue #2673 on the real modules: the MCP tools, McpGateway, the
-// SQLite MCP store and the probe, against local MCP servers. The approval and the sign-in card are
-// recorded where the router would show them. No provider or account is used. It also checks what
-// suggest_marketplace_app answers for a Marketplace app that is already installed, and that a
-// startup moves an app installed from an earlier catalog pin to the current pin, and that the
-// built-in GitHub connection is listed as the agents get it (#7088), and that tool_call runs a tool that
-// Antigravity left out of the model's tool list on the agent's saved row (#7427).
-// bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -37,7 +29,6 @@ const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
 const HTML_LOGIN_TOKEN = "html-login-token-4b6e12";
 
-/** How each local server answers a request without a token. */
 type Mode = "open" | "sign-in" | "key" | "guarded" | "html-login" | "html-direct";
 
 async function body(request: IncomingMessage): Promise<string> {
@@ -55,8 +46,6 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
-      // A Bearer challenge on every path, its OAuth documents included: the server wants its key
-      // even there, so it has no sign-in (#10547).
       if (mode === "guarded")
         return json(
           response,
@@ -64,8 +53,6 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
           { error: "a valid API key is required" },
           { "www-authenticate": 'Bearer realm="e2e"' },
         );
-      // A Bearer challenge without `resource_metadata` wants a sign-in only when the origin publishes
-      // OAuth metadata. Without it, the server takes a key, as Coolify does (#9176).
       if (mode === "sign-in" && path === "/.well-known/oauth-authorization-server") {
         const origin = `http://${request.headers.host}`;
         return json(response, 200, {
@@ -90,8 +77,6 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
           return;
         }
       }
-      // A login page with no redirect at all. It stays the "not an MCP server" answer on purpose:
-      // an HTML reply can be a page the user reached by mistake, so only a redirect names a login.
       if (mode === "html-direct" && path === "/mcp") {
         response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         response.end("<!doctype html><title>login</title>");
@@ -153,14 +138,12 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   };
 }
 
-/** A port nothing listens on: the server is down. */
 async function closedUrl(): Promise<string> {
   const server = await mcpServer("open");
   await server.close();
   return server.url;
 }
 
-/** The JSON of an MCP tool result, as the agent reads it. */
 interface ToolAnswer {
   status?: string;
   error?: string;
@@ -254,7 +237,6 @@ try {
     calls.push(entry);
     return entry;
   };
-  /** suggest_marketplace_app for an app whose server is saved, after the router finds that server. */
   const appStatus = async (name: string, appId: string, app: MarketplaceAppServer) => {
     const signInCards: string[] = [];
     const response = await runCauseEffect(
@@ -347,15 +329,12 @@ try {
   assert.equal(accepted.result.status, "ready");
   assert.deepEqual(accepted.result.tools, ["search", "read_page", "create_page"]);
 
-  // A 200 HTML page with no redirect is not a login the probe can name: the same address could be a
-  // website the user pasted. It keeps the "not an MCP server" answer, and this case holds that choice.
   const htmlDirect = await call("a page answers with HTML and no redirect", "save_mcp_server", {
     name: "html-direct",
     url: servers["html-direct"].url,
   });
   assert.equal(htmlDirect.success, false);
   assert.equal(htmlDirect.signInCards.length, 0);
-  // `save_mcp_server` prefixes the sentence, so the answer is inside it rather than equal to it.
   assert.ok(
     String(htmlDirect.result.error).includes(sourceText("error.backend.mcpServerIncompatible")),
     "the 200 HTML page keeps the not-an-MCP-server answer",
@@ -369,7 +348,6 @@ try {
   assert.equal(down.success, false);
   assert.equal(row("down"), undefined);
 
-  // The user enters a key in Server settings; an agent's edit keeps it.
   const crm = row("crm");
   assert.ok(crm);
   store.save({ ...crm, headers: [{ key: "Authorization", value: `Bearer ${HEADER_SECRET}` }] });
@@ -388,7 +366,6 @@ try {
   assert.equal(transport.success, false);
   assert.deepEqual(row("crm")?.headers, keys);
 
-  // A stdio row's environment keys belong to its program, which the arguments also choose.
   const program = store.save({
     ...crm,
     id: "",
@@ -421,7 +398,6 @@ try {
   assert.deepEqual(crmListed?.headerNames, ["Authorization"]);
   assert.equal(crmListed?.forYou, true, "A server with no selected agents goes to every agent.");
 
-  // The user selected other agents for crm (#10992): the list tells the agent that it does not get crm.
   const crmId = row("crm")?.id;
   const limited = mcpServersFromGateway(gateway, undefined, undefined, (mcpServerId, agentId) =>
     mcpServerId === crmId ? agentId === "agent-b" : true,
@@ -483,8 +459,6 @@ try {
   assert.equal(removed.success, true);
   assert.equal(row("calendar"), undefined);
 
-  // The GitHub connection is not a row, but the agents get it: the list shows it, and the other
-  // tools say that it is part of OpenBot (#7088).
   const githubGateway = new McpGateway({
     servers: store,
     credentials: NO_PROVIDER_CREDENTIALS,
@@ -541,8 +515,6 @@ try {
   assert.equal(reserved.success, false);
   assert.equal(reserved.approvals.length, 0, "an invalid server is corrected before the user is asked");
 
-  // An app installed from an earlier catalog pin runs the current pin after the next start and is
-  // still the Marketplace app (#7004). A renamed row and changed arguments are the user's own.
   const catalog = await Effect.runPromise(
     loadCatalogPluginServers(resolve(import.meta.dirname, "../resources/plugin-catalog")),
   );
@@ -585,8 +557,6 @@ try {
     }
   }
 
-  // Antigravity 1.5 leaves the tools over its schema budget out of the model's tool list (#7427).
-  // openbot.tool_call names one, and OpenBot runs it on the agent's saved row.
   const fallback = store.save({ ...calendar, id: "", name: "Product Hunt", url: servers.open.url });
   const agentTools = mcpServersFromGateway(gateway, undefined, () => [fallback]);
   for (const name of ["Product_Hunt.get_leaderboard", "Product Hunt.get_leaderboard"]) {
@@ -608,8 +578,6 @@ try {
   const unreachable = await runCauseEffect(agentTools.callTool(offline, "get_leaderboard", {}));
   assert.ok("error" in unreachable, "a server that is down is a sentence");
 
-  // A stdio row runs for a Full access agent, with its environment, as the Test button starts it
-  // (#10146). A Workspace only agent keeps it out: its provider starts the row in its sandbox.
   const stdioProgram = join(root, "stdio-mcp-server.js");
   await writeFile(
     stdioProgram,
@@ -654,7 +622,6 @@ process.stdin.on("data", (chunk) => {
   });
   store.remove(stdioRow.id);
 
-  // Nothing an agent reads names a key: not the query of an address, not a header value.
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));
   assert.ok(!everything.includes(URL_SECRET), "the address query reached the agent");
   assert.ok(!everything.includes(HEADER_SECRET), "a header value reached the agent");
@@ -668,7 +635,6 @@ process.stdin.on("data", (chunk) => {
   database.close();
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
-  // Windows can keep the SQLite directory locked after close. The report is already written.
   await rm(root, { recursive: true, force: true }).catch(() => undefined);
 }
 

@@ -16,11 +16,8 @@ import { useCSSVariable } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-/** The plot height. The zero line is at the bottom edge. */
 const HEIGHT = 160;
-/** Room above the highest value, so its line and dot are not cut. */
 const HEADROOM = 8;
-/** The value labels sit at the right of the plot, as on iOS charts. */
 const AXIS_WIDTH = 52;
 const MORPH_MS = 320;
 const POINT_RADIUS = 3;
@@ -29,17 +26,14 @@ const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 export interface UsageChartSeries {
   key: string;
   color: string;
-  /** One value per day. Null is a day whose value is unknown, which draws a gap. */
   values: (number | null)[];
 }
 
-/** The provider colors of the desktop chart. An unknown provider takes the muted series color. */
 export function useUsageSeriesColor(): (provider: string) => string {
   const codex = String(useCSSVariable("--openbot-chart-series-codex"));
   const claude = String(useCSSVariable("--openbot-chart-series-claude"));
   const grok = String(useCSSVariable("--openbot-chart-series-grok"));
   const other = String(useCSSVariable("--openbot-chart-series-other"));
-  // Stable while the theme stays, so the chart series it colors do not change on every render.
   return useCallback(
     (provider: string) => {
       const colors: Readonly<Record<string, string | undefined>> = { codex, claude, grok };
@@ -49,7 +43,6 @@ export function useUsageSeriesColor(): (provider: string) => string {
   );
 }
 
-/** Four grid lines at round values: the top is three round steps. */
 function scale(max: number): { top: number; ticks: number[] } {
   if (max <= 0) return { top: 1, ticks: [0] };
   const rough = max / 3;
@@ -58,7 +51,6 @@ function scale(max: number): { top: number; ticks: number[] } {
   return { top: step * 3, ticks: [0, step, step * 2, step * 3] };
 }
 
-/** A missing day, like a day whose value is unknown, is NaN: the chart draws it as a gap. */
 function valueAt(values: readonly number[], index: number): number {
   "worklet";
   return values[index] ?? Number.NaN;
@@ -69,7 +61,6 @@ function between(start: number, target: number, progress: number): number {
   return Number.isNaN(target) || Number.isNaN(start) ? target : start + (target - start) * progress;
 }
 
-/** The values of `values` at `count` evenly spaced points, so a range of another length can morph into this one. */
 function resample(values: number[], count: number): number[] {
   if (values.length === 0) return new Array<number>(count).fill(HEIGHT);
   return Array.from({ length: count }, (_, index) => {
@@ -86,11 +77,6 @@ function shownValues(from: number[], to: number[], progress: number): number[] {
   return to.map((target, index) => between(valueAt(from, index), target, progress));
 }
 
-/**
- * A monotone cubic line through each run of known values, as the desktop chart's `monotone` areas
- * draw it, and the area under it down to the zero line. A run of one known value, such as a one-day
- * range or a day between two unknown days, has no line, so it is a dot.
- */
 function seriesPaths(
   from: number[],
   to: number[],
@@ -131,7 +117,6 @@ function seriesPaths(
       else if (after === undefined) tangents.push(before);
       else tangents.push(before * after <= 0 ? 0 : (before + after) / 2);
     }
-    // Fritsch-Carlson: limit the tangents so the curve never overshoots a day's value.
     for (let segment = 0; segment < slopes.length; segment++) {
       const slope = slopes[segment] ?? 0;
       if (slope === 0) {
@@ -162,10 +147,6 @@ function seriesPaths(
   return { line, area, points };
 }
 
-/**
- * One provider's area. It keeps the shape on screen and morphs into the next range, agent or
- * metric; a range of another length is resampled first. A provider that appears rises from zero.
- */
 function SeriesArea({ ys, width, color, enter }: { ys: number[]; width: number; color: string; enter: boolean }) {
   const baseline = ys.map((y) => (Number.isNaN(y) ? y : HEIGHT));
   const from = useSharedValue(enter ? baseline : ys);
@@ -202,10 +183,6 @@ function SeriesArea({ ys, width, color, enter }: { ys: number[]; width: number; 
   );
 }
 
-/**
- * The daily usage chart of the desktop report: one area per provider over a shared zero line,
- * the largest drawn first. Touch or drag across the chart to select a day.
- */
 export function UsageChart({
   dates,
   series,
@@ -218,13 +195,11 @@ export function UsageChart({
 }: {
   dates: string[];
   series: UsageChartSeries[];
-  /** The value labels of the grid. */
   formatValue: (value: number) => string;
   formatDate: (date: string) => string;
   selected: number | null;
   onSelect: (index: number | null) => void;
   label: string;
-  /** What VoiceOver reads for the chart: the selected day, or a hint. */
   value: string;
 }) {
   const gridColor = String(useCSSVariable("--openbot-border-strong"));
@@ -242,7 +217,6 @@ export function UsageChart({
       })),
     [series, top],
   );
-  // A provider that arrives after the chart is drawn rises from zero; the first areas do not animate in.
   const drawn = useRef(false);
   useEffect(() => {
     if (plotWidth > 0) drawn.current = true;
@@ -307,8 +281,6 @@ export function UsageChart({
         onSelect(Math.min(dates.length - 1, Math.max(0, start + step)));
       }}
       className="gap-2"
-      // The plot, its axis and its dates are drawn in screen points, oldest day at the left, in
-      // every language.
       style={{ direction: "ltr" }}
     >
       <GestureDetector gesture={gesture}>

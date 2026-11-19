@@ -15,31 +15,19 @@ import {
   type UpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 
-/** The saved proxies of one server, and the proxy of each named profile (`browser-proxies-v1`). */
 interface BrowserProxyCalls {
-  /** Null: the server has no proxy routes. */
   list(): Promise<BrowserProxyList | null>;
   save(input: SaveBrowserProxyInput): Promise<BrowserProxySummary>;
   remove(input: DeleteBrowserProxyInput): Promise<void>;
   setProfileProxy(input: SetBrowserProfileProxyInput): Promise<void>;
-  /**
-   * Whether this desktop app shares its connection with the server. Absent on the web client and for
-   * this computer's own server.
-   */
   computerSharing?: BrowserComputerSharingCalls;
 }
 
 interface BrowserComputerSharingCalls {
-  /** Null: the server cannot use the connection of this computer. */
   read(): Promise<BrowserComputerSharing | null>;
-  /** On also adds the computer of this member to the proxies of the server. */
   set(sharing: boolean): Promise<void>;
 }
 
-/**
- * The browser profiles of one server, and the profile of each of its agents. Desktop reaches them
- * through main for this computer and for a joined server; the web client asks the host directly.
- */
 export interface BrowserProfileCalls {
   list(): Promise<BrowserProfileList>;
   create(name: string): Promise<BrowserProfileSummary>;
@@ -48,18 +36,11 @@ export interface BrowserProfileCalls {
   remove(profileId: string): Promise<void>;
   readAgent(agentId: string): Promise<AgentBrowserProfile>;
   updateAgent(input: UpdateAgentBrowserProfileInput): Promise<AgentBrowserProfile>;
-  /** The profile of each open tab that is not in the shared session. */
   tabProfiles(): Promise<BrowserTabProfile[]>;
-  /** Absent when this client cannot change the proxies of the server. */
   proxies?: BrowserProxyCalls;
-  /**
-   * Calls `listener` each time the host reports a change of its profiles or of an agent's profile,
-   * also one made on another device. Absent when the host does not report changes.
-   */
   onChanged?(listener: () => void): () => void;
 }
 
-/** The desktop calls for one server. Reads `window.openbot` on each call: stories replace it per case. */
 export function desktopBrowserProfileCalls(serverId?: string): BrowserProfileCalls {
   const agent = () => window.openbot.agent;
   const eventServerId = serverId ?? LOCAL_SERVER_ID;

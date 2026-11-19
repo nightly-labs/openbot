@@ -1,17 +1,3 @@
-// Checks that an agent sets and changes the window backdrop by itself, with real provider turns.
-// Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/agent-backdrop-e2e.ts --allow-mutations`. It uses the first visible agent, or
-// `--agent=<id>`.
-//
-// In the agent's own chat it asks the agent to call `set_backdrop`, and on the desktop it checks that:
-// 1. the page shows behind the window, in the agent's one backdrop slot, with "Undo" in a notice;
-// 2. "Undo" puts back the backdrop from before;
-// 3. a second call replaces the page in the same slot, and the window shows the new page with its
-//    bubble colors on the user's and the agent's bubbles; its "Undo" puts back the backdrop from before
-//    the run and the bubble colors from before;
-// 4. in a channel, the agent cannot set the backdrop.
-// At the end it removes the agent's slot and the channel.
-// Writes .openbot-build/agent-backdrop-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { CHAT_BACKDROP_ITEM_TYPE } from "@openbot/contracts/chat-visual";
@@ -26,7 +12,6 @@ const DATABASE = "openbot-backdrops";
 const STORE = "backdrops";
 const CHANGED_CHANNEL = "openbot:custom-backdrops";
 
-/** A full-frame page that names its scene in a hidden mark, so the check can tell the two apart. */
 const scene = (mark: string, color: string) =>
   `<!doctype html><html><body style="margin:0;height:100vh;background:${color}"><div id="scene" data-scene="${mark}" hidden></div></body></html>`;
 const FIRST = { title: "Teal field", mark: "one", html: scene("one", "teal") };
@@ -43,7 +28,6 @@ interface SlotState {
   createdAt: number;
 }
 
-/** The chat rows that show each backdrop bubble color. */
 interface BubbleCount {
   yours: number;
   agents: number;
@@ -76,7 +60,6 @@ const client = new ChannelClient(desktop);
 
 const choice = (page: Page) => page.evaluate((key) => window.localStorage.getItem(key), CHOICE_KEY);
 
-/** The saved backdrop of one slot, read from the store that the window uses. */
 const slot = (page: Page, id: string): Promise<SlotState | null> =>
   page.evaluate(
     ({ database, store, id }) =>
@@ -118,7 +101,6 @@ const slotCount = (page: Page): Promise<number> =>
     { database: DATABASE, store: STORE },
   );
 
-/** Removes the slot and tells each window that the list changed. */
 const removeSlot = (page: Page, id: string) =>
   page.evaluate(
     ({ database, store, channel, id }) =>
@@ -141,10 +123,8 @@ const removeSlot = (page: Page, id: string) =>
     { database: DATABASE, store: STORE, channel: CHANGED_CHANNEL, id },
   );
 
-/** The backdrop frame behind the window, found by the page title. */
 const backdropFrame = (page: Page, title: string) => page.locator(`iframe[title="${title}"]`);
 
-/** The scene mark in the backdrop frame of `title`. */
 const shownScene = async (page: Page, title: string): Promise<string> => {
   const mark = backdropFrame(page, title).contentFrame().locator("#scene");
   await mark.waitFor({ state: "attached", timeout: UI_WAIT_MS });
@@ -166,7 +146,6 @@ async function shot(label: string): Promise<void> {
   report.screenshots.push(path);
 }
 
-/** Asks the agent in its own chat, and waits for the new backdrop message and the end of the turn. */
 async function askOwnChat(agentId: string, text: string, label: string): Promise<string> {
   const before = new Set(
     (await desktop.evaluate((id) => window.openbot.agent.readConversation(id), agentId)).messages.map(
@@ -206,7 +185,6 @@ try {
   agentSlotId = `agent-${agent.id}`;
   const expectedChoice = `custom:${agentSlotId}`;
 
-  // 1. The agent sets the backdrop. The window shows it, and a notice offers "Undo".
   const firstId = await askOwnChat(agent.id, prompt(FIRST), "the first backdrop message shows");
   await waitFor(
     desktop,
@@ -232,7 +210,6 @@ try {
   assert.equal(report.set.slot?.name, FIRST.title, "The agent's slot does not keep the first page.");
   assert.ok(notice, "No notice with Undo shows.");
 
-  // 2. "Undo" puts back the backdrop from before.
   await undoButton(desktop).click();
   await waitFor(
     desktop,
@@ -244,7 +221,6 @@ try {
   await backdropFrame(desktop, FIRST.title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   report.undo = { choice: await choice(desktop), frameGone: true };
 
-  // 3. A second call replaces the page in the same slot.
   const slotsBefore = await slotCount(desktop);
   const secondId = await askOwnChat(agent.id, prompt(SECOND), "the second backdrop message shows");
   await waitFor(
@@ -279,7 +255,6 @@ try {
     "The second page did not replace the first one.",
   );
   assert.equal(report.replace.slots, slotsBefore, "The second page added a slot.");
-  // The Undo of this notice puts back the backdrop from before the run.
   await undoButton(desktop).click({ timeout: UI_WAIT_MS });
   await waitFor(
     desktop,
@@ -296,7 +271,6 @@ try {
     UI_WAIT_MS,
   );
 
-  // 4. In a channel, the agent cannot set the backdrop.
   const channel = await client.create(`E2E backdrop ${crypto.randomUUID().slice(0, 4)}`, [agent.id], agent.id);
   const before = (await client.read(channel.id)).tasks.length;
   await client.send(channel.id, prompt({ title: "Channel field", html: scene("channel", "olive") }), agent.id);
@@ -320,7 +294,6 @@ try {
   report.passed = true;
 } finally {
   await client.cleanup();
-  // Puts back the backdrop from before with the Undo of the last notice, while it shows.
   if ((await choice(desktop).catch(() => original)) !== original)
     await undoButton(desktop)
       .click({ timeout: 2_000 })

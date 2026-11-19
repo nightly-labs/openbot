@@ -1,10 +1,3 @@
-// Runs the real `pi` provider driver and the real Pi binary in the Workspace only sandbox, against a fake
-// OpenAI-compatible server. A stdio MCP server must start although it writes outside the workspace, as
-// `npx` writes its cache in `~/.npm` (#6191): OpenBot starts it outside the sandbox and gives Pi a local
-// URL. The fake model answers with a `tool_search` call, so the second request must declare the
-// server's tool. After the client stops, the server process must be gone.
-// macOS only. `PI_CLI=<pi> bun scripts/pi-mcp-workspace-only-e2e.ts`.
-// Writes .openbot-build/pi-mcp-workspace-only-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -24,8 +17,6 @@ const NL = String.fromCharCode(10);
 const TOOL = "ping_fixture";
 if (process.platform !== "darwin") throw new Error("The Workspace only sandbox runs on macOS only.");
 
-// A stdio MCP server with one tool. Like `npx`, it stops when it cannot write its cache, which is
-// outside the workspace. It writes its process id there.
 const STDIO_SERVER = `
 const { writeFileSync } = require("node:fs");
 writeFileSync(process.argv[2], String(process.pid));
@@ -48,7 +39,6 @@ interface ChatRequest {
   messages?: Array<{ role?: string; content?: string | Array<{ text?: string }> }>;
 }
 
-/** Whether a process with this id runs. */
 function running(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -58,7 +48,6 @@ function running(pid: number): boolean {
   }
 }
 
-/** Waits until the process exits, for at most `timeoutMs`. */
 async function exited(pid: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (running(pid)) {
@@ -72,7 +61,6 @@ interface Report {
   passed: boolean;
   piVersion?: string;
   requests: string[][];
-  /** The text that Pi's `tool_search` answered. */
   search?: string;
   serverPid?: number;
   serverStopped?: boolean;
@@ -91,7 +79,6 @@ async function body(request: IncomingMessage): Promise<ChatRequest> {
   return text ? JSON.parse(text) : {};
 }
 
-/** The `delta` of a streamed chat completion chunk. */
 interface Delta {
   role?: "assistant";
   content?: string;
@@ -109,12 +96,10 @@ function event(delta: Delta, finish: string | null): string {
   return `data: ${JSON.stringify(value)}${NL}${NL}`;
 }
 
-// The first turn request gets a `tool_search` call for the fixture tool; every later request gets text.
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
     const parsed = await body(request);
     const names = (parsed.tools ?? []).flatMap((tool) => tool.function?.name ?? []).sort();
-    // Pi also sends side requests with no tools, such as a session title. They are not turns.
     if (names.length > 0) {
       report.requests.push(names);
       const last = parsed.messages?.at(-1);
@@ -143,7 +128,6 @@ try {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
 
-  // Pi must not read the developer's own providers, keys and MCP servers.
   const agentDirectory = join(root, "agent");
   await mkdir(agentDirectory, { recursive: true });
   await writeFile(join(agentDirectory, "settings.json"), "{}\n");
@@ -151,7 +135,6 @@ try {
   process.env.PI_CODING_AGENT_DIR = agentDirectory;
   const workspace = join(root, "workspace");
   await mkdir(workspace, { recursive: true });
-  // Not in the temporary folders, which the sandbox lets every process write.
   const cache = join(OUT, "cache");
   await rm(cache, { recursive: true, force: true });
   await mkdir(cache, { recursive: true });

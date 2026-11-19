@@ -94,7 +94,6 @@ export const NarrowAudioTakes: Story = {
 
 const videoClip = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
 
-/** A video file plays in the same player as a generated video. */
 export const VideoFile: Story = {
   name: "Inline video",
   args: {
@@ -112,7 +111,6 @@ export const VideoFile: Story = {
   },
 };
 
-/** The web client loads the file on Play. The player shows that it waits for the host. */
 export const VideoFromHost: Story = {
   name: "Inline video that loads from a host",
   args: {
@@ -129,7 +127,6 @@ export const VideoFromHost: Story = {
     ],
     mediaSource: {
       url: () => undefined,
-      // Never settles, so the story keeps the waiting state after a click on Play.
       load: () => new Promise<boolean>(() => undefined),
       thumbnailLimit: 2 * 1024 * 1024,
       mediaLimit: 25 * 1024 * 1024,
@@ -150,7 +147,6 @@ function downloadsOf(state: AttachmentDownloadState) {
   return { state: () => state, stop: fn(), retry: fn() };
 }
 
-/** A file from a joined server downloads; a click on the ring stops it. */
 export const Downloading: Story = {
   name: "Download from a joined server",
   args: {

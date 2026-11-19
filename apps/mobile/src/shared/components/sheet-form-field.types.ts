@@ -7,7 +7,6 @@ export interface SheetFormFieldProps {
   autoFocus?: boolean;
   editable?: boolean;
   hint?: string;
-  /** A problem with the value. It shows under the field, and the field has the danger border. */
   error?: string;
   trailing?: ReactNode;
   inputMode?: TextInputProps["inputMode"];
@@ -15,17 +14,14 @@ export interface SheetFormFieldProps {
   label: string;
   maxLength?: number;
   multiline?: boolean;
-  /** A multiline field of about 14 lines instead of 4, for a long text such as an instructions file. */
   tall?: boolean;
   appearance?: "default" | "soft";
   hideLabel?: boolean;
-  /** React Native 0.88 adds `start` and `end`, which the iOS field does not take. */
   textAlign?: "left" | "center" | "right";
   onChangeText: (value: string) => void;
   onSubmitEditing?: () => void;
   placeholder?: string;
   returnKeyType?: TextInputProps["returnKeyType"];
-  /** Hides the text, for a key or a password. */
   secureTextEntry?: boolean;
   value: string;
 }

@@ -101,6 +101,21 @@ const claudeGroupOnlyRows = accountUsageProviderRows({
     },
   ],
 });
+const twoWindowGroupRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "antigravity",
+      primary: { usedPercent: 0, windowDurationMins: 300, resetsAt: fiveHourReset },
+      secondary: { usedPercent: 0, windowDurationMins: 10_080, resetsAt: weeklyReset },
+      groups: ["Gemini Models", "Claude and GPT models"].map((name) => ({
+        name,
+        models: [],
+        primary: { usedPercent: 0, windowDurationMins: 300, resetsAt: fiveHourReset },
+        secondary: { usedPercent: 0, windowDurationMins: 10_080, resetsAt: weeklyReset },
+      })),
+    },
+  ],
+});
 const warningRows = accountUsageProviderRows({
   limits: [
     {
@@ -143,9 +158,12 @@ export const OneProvider: Story = {
   args: { rows: oneProviderRows },
 };
 
-/** A Gemini plan for which Google sends no Gemini group: the one group still shows its name. */
 export const AntigravityClaudeGroupOnly: Story = {
   args: { rows: claudeGroupOnlyRows },
+};
+
+export const AntigravityTwoWindowGroups: Story = {
+  args: { rows: twoWindowGroupRows },
 };
 
 export const Warning: Story = {

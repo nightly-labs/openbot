@@ -1,11 +1,3 @@
-// Runs the silent MCP OAuth paths end to end on the real `McpOAuth`: the real SDK exchange, the real
-// `secureOAuthFetch` and the real logger, against a local OAuth server on the loopback address. The
-// storage is a map that decodes each record as the store on disk does. No account or key is used.
-//
-// The proxy cases run the real `McpGateway` and its `McpOAuthProxy` on a temporary database, with
-// the SDK MCP client as the provider and an SDK Streamable HTTP server as the signed-in MCP server.
-// The provider payload is the one `codexMcpServers` and `claudeMcpServers` build for a spawn.
-// `bun scripts/mcp-oauth-e2e.ts`. Writes .openbot-build/mcp-oauth-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -38,7 +30,12 @@ import {
   secureOAuthFetch,
 } from "../src/backend/mcp-oauth-provider";
 import type { McpOAuthProxySettings } from "../src/backend/mcp-oauth-proxy";
-import { claudeMcpServers, codexMcpServers, usableMcpServers } from "../src/backend/mcp-provider-shapes";
+import {
+  claudeMcpServers,
+  codexMcpServerKey,
+  codexMcpServers,
+  usableMcpServers,
+} from "../src/backend/mcp-provider-shapes";
 import { McpServerStore } from "../src/backend/mcp-server-store";
 import { AddressLookupError, isPublicAddress } from "../src/backend/network-address";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -56,13 +53,11 @@ interface Hit {
   body: Record<string, string>;
 }
 
-/** The authorization server and the MCP resource's metadata. Each case sets how `/token` answers. */
 async function startAuthorizationServer() {
   const hits: Hit[] = [];
   const waiters: Array<{ done: () => boolean; resolve: () => void }> = [];
   let tokenMode: TokenMode = "rotate";
   let revokeStatus = 200;
-  // Runs when a refresh reaches `/token`, before the answer: a case puts a sign-in in that wait.
   let beforeToken: () => void = () => undefined;
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", base);
@@ -89,15 +84,12 @@ async function startAuthorizationServer() {
       return json(response, 200, { resource: `${base}/mcp`, authorization_servers: [base] });
     if (path === "/register") return json(response, 201, { client_id: "registered", redirect_uris: [REDIRECT_URL] });
     if (path === "/revoke") return json(response, revokeStatus, {});
-    // Larger than the OAuth body limit: one with a declared length, one counted as it arrives.
     if (path === "/big-declared") return json(response, 200, { padding: "x".repeat(2 * 1024 * 1024) });
-    // A redirect status with no `Location` is an answer, not a hop, so the limit applies to it.
     if (path === "/big-streamed" || path === "/big-redirect") {
       response.writeHead(path === "/big-redirect" ? 302 : 200, { "content-type": "application/json" });
       for (let chunk = 0; chunk < 32; chunk++) response.write("x".repeat(64 * 1024));
       return response.end();
     }
-    // MCP traffic that leaves for another origin.
     if (path === "/redirect-away") {
       response.writeHead(307, { location: `${base.replace("127.0.0.1", "localhost")}/big-streamed` });
       return response.end();
@@ -138,7 +130,6 @@ async function startAuthorizationServer() {
       hits.splice(0);
       beforeToken = () => undefined;
     },
-    /** Resolves when the hits satisfy `done`, and fails at the deadline. */
     waitFor: (done: () => boolean) =>
       new Promise<void>((resolveWait, reject) => {
         if (done()) return resolveWait();
@@ -171,7 +162,6 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.end(JSON.stringify(value));
 }
 
-/** A store that decodes what it is given, as the JSON store does, so unknown fields are dropped. */
 function memoryStorage() {
   const records = new Map<string, McpOAuthRecord>();
   return {
@@ -190,7 +180,6 @@ function memoryStorage() {
   };
 }
 
-/** A signed-in record whose access token is past its lifetime, so the next read refreshes it. */
 function expiredRecord(base: string): McpOAuthRecord {
   return mcpOAuthRecordSchema.parse({
     client: {
@@ -221,7 +210,6 @@ async function main() {
   const mcpUrl = `${auth.base}/mcp`;
   const logLines: string[] = [];
   let onLog: () => void = () => undefined;
-  /** Resolves when `count` revocation warnings are in the log, and fails at the deadline. */
   const warnings = () => logLines.filter((line) => line.includes("An MCP token was not revoked."));
   const waitForWarnings = (count: number) =>
     new Promise<void>((done, reject) => {
@@ -234,7 +222,6 @@ async function main() {
       onLog();
     });
 
-  /** One `McpOAuth` per case with a fresh store holding `record`. */
   async function withOAuth<T>(
     record: McpOAuthRecord,
     run: (oauth: McpOAuth, records: Map<string, McpOAuthRecord>) => Promise<T>,
@@ -261,7 +248,6 @@ async function main() {
   }
   const registrations = () => auth.hits.filter((hit) => hit.path === "/register").length;
 
-  // A refresh the server accepts stores the rotated token set and hands on the new access token.
   auth.setTokenMode("rotate");
   const refreshed = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const token = await runCauseEffect(oauth.accessToken(mcpUrl));
@@ -273,7 +259,6 @@ async function main() {
     return { token: "access-rotated", needsSignIn: false, registrations: 0 };
   });
 
-  // `invalid_grant`: the grant ended. No token is handed on, the client stays, the row asks again.
   auth.setTokenMode("invalid_grant");
   const invalidGrant = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const token = await runCauseEffect(oauth.accessToken(mcpUrl));
@@ -289,8 +274,6 @@ async function main() {
     return { token, clientKept: true, discoveryKept: true, needsSignIn: true, registrations: 0 };
   });
 
-  // A sign-in that ends while a refresh waits stores a new grant. The refusal of the old grant
-  // that follows does not delete it.
   auth.setTokenMode("invalid_grant");
   const signInDuringRefresh = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const fresh = expiredRecord(auth.base);
@@ -316,7 +299,6 @@ async function main() {
     return { newGrantKept: true, needsSignIn: false };
   });
 
-  // `invalid_client`: the registration goes too, and nothing registers a new one in the background.
   auth.setTokenMode("invalid_client");
   const invalidClient = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const token = await runCauseEffect(oauth.accessToken(mcpUrl));
@@ -330,7 +312,6 @@ async function main() {
     return { token, clientDropped: true, needsSignIn: true, registrations: 0 };
   });
 
-  // A dropped connection says nothing about the grant: everything stays and the stored token answers.
   auth.setTokenMode("drop");
   const networkError = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const token = await runCauseEffect(oauth.accessToken(mcpUrl));
@@ -344,8 +325,6 @@ async function main() {
     return { token: "access-on-file", tokensKept: true, needsSignIn: false };
   });
 
-  // An OAuth error that comes back on each refresh, such as `unsupported_grant_type`, cannot pass
-  // later: the server's refusal of the token ends the sign-in (#10135). A thread start alone does not.
   auth.setTokenMode("unsupported_grant_type");
   const refusedForGood = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     assert.equal(await runCauseEffect(oauth.accessToken(mcpUrl)), "access-on-file");
@@ -360,7 +339,6 @@ async function main() {
     return { token, signedIn: false, needsSignIn: true };
   });
 
-  // `temporarily_unavailable` can pass later: the refused token keeps its sign-in.
   auth.setTokenMode("server_error");
   const unavailable = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     const token = await runCauseEffect(oauth.refreshAccessToken(mcpUrl, "access-on-file"));
@@ -372,7 +350,6 @@ async function main() {
     return { token, tokensKept: true, needsSignIn: false };
   });
 
-  // Sign-out deletes the tokens first, then revokes the refresh token and the access token.
   auth.setRevokeStatus(200);
   const signOut = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
     await runCauseEffect(oauth.signOut(mcpUrl));
@@ -392,12 +369,10 @@ async function main() {
     return { cleared: true, revoked: revoked().map((hit) => hit.body.token_type_hint) };
   });
 
-  // A revocation the server refuses is logged by status only: no token reaches the log.
   auth.setRevokeStatus(503);
   logLines.splice(0);
   const revokeRefused = await withOAuth(expiredRecord(auth.base), async (oauth) => {
     await runCauseEffect(oauth.forget(mcpUrl));
-    // The scope close in `withOAuth` would interrupt a revocation that has not logged yet.
     await waitForWarnings(2);
     for (const line of logLines)
       for (const secret of ["refresh-on-file", "access-on-file", "client-secret-on-file"])
@@ -434,20 +409,12 @@ interface ResourceHit {
   userAgent: string | undefined;
 }
 
-/**
- * The signed-in MCP server: an SDK Streamable HTTP server with one session per client, behind a
- * bearer check that answers 401 as a real server does. `/moved` redirects on the same origin and
- * `/away` to another origin. Each path has its own protected-resource metadata, which a refresh
- * checks against the row's URL.
- */
 async function startResourceServer(authorizationServer: string) {
   const hits: ResourceHit[] = [];
   const waiters: Array<() => void> = [];
   const valid = new Set(["access-on-file"]);
-  /** Refuses valid tokens too, as a server does for a tool that the account cannot use. */
   let refusing = false;
   const sessions = new Map<string, StreamableHTTPServerTransport>();
-  /** The `clientInfo` of each session, in the order the sessions started. */
   const clients: Array<ReturnType<Server["getClientVersion"]>> = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", base);
@@ -509,7 +476,6 @@ async function startResourceServer(authorizationServer: string) {
     setRefusing: (refuse: boolean) => {
       refusing = refuse;
     },
-    /** Resolves when the hits satisfy `done`, and fails at the deadline. */
     waitFor: (done: () => boolean, what: string) =>
       new Promise<void>((resolveWait, reject) => {
         const timer = setTimeout(() => reject(new Error(`The MCP server did not see ${what}.`)), DEADLINE_MS);
@@ -528,7 +494,6 @@ async function startResourceServer(authorizationServer: string) {
   };
 }
 
-/** `echo` answers with its text; `notify` sends a list change on the session's GET stream. */
 function mcpServer() {
   const server = new Server(
     { name: "e2e-resource", version: "1.0.0" },
@@ -542,7 +507,6 @@ function mcpServer() {
   }));
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (request.params.name === "notify") {
-      // No related request: the SDK sends it on the standalone GET stream.
       await server.sendToolListChanged();
       return { content: [{ type: "text", text: "sent" }] };
     }
@@ -551,7 +515,6 @@ function mcpServer() {
   return server;
 }
 
-/** A signed-in record for `url` that is still fresh, so the proxy hands the stored token on unchanged. */
 function freshRecord(base: string, url: string): McpOAuthRecord {
   const record = expiredRecord(base);
   const { origin, pathname } = new URL(url);
@@ -573,7 +536,6 @@ const INITIALIZE = JSON.stringify({
   params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1.0.0" } },
 });
 
-/** The status of one raw POST, with headers that `fetch` would not send, such as another `Host`. */
 function rawPost(url: string, headers: Record<string, string>): Promise<number> {
   return new Promise((done, reject) => {
     const request = httpRequest(
@@ -597,10 +559,6 @@ function textOf(result: Awaited<ReturnType<Client["callTool"]>>): string {
   return first && typeof first === "object" && "text" in first ? String(first.text) : "";
 }
 
-/**
- * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
- * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
- */
 function asTransport(inner: {
   start(): Promise<void>;
   send: Transport["send"];
@@ -624,11 +582,6 @@ function asTransport(inner: {
   return transport;
 }
 
-/**
- * The proxy end to end: the provider payload, a tool call and a GET-stream notification through
- * it, a token the server ends during the session, a sign-out, the refused requests, and the
- * address after a restart.
- */
 async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServer>>) {
   auth.setTokenMode("rotate");
   auth.setRevokeStatus(200);
@@ -668,7 +621,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       redirectUrl: REDIRECT_URL,
       logger: createOpenBotLogger("mcp-oauth", (line) => logLines.push(line)),
     });
-    // A holder, so the type is not narrowed to `null` across the writes in the callbacks.
     const saved: { value: McpOAuthProxySettings | null } = { value: null };
     const settings = {
       read: () => saved.value,
@@ -677,7 +629,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
           saved.value = next;
         }),
     };
-    // Read at each `initialize`, so a rename here shows in the next session.
     const agents = [
       { id: "agent-research", name: "Research Bot" },
       { id: "chief", name: "Ops\u0007\n\u202eBot" },
@@ -720,7 +671,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     };
     let gateway = startGateway();
 
-    // The payload a provider is spawned with names the proxy only: no token, no header of the row.
     const usable = await runCauseEffect(
       usableMcpServers(
         gateway.enabled(),
@@ -741,7 +691,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const port = saved.value?.port;
     assert.ok(port);
     assert.match(directRoute.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}$`, "u"));
-    const codexDirect = codex.servers.Resource;
+    const codexDirect = codex.servers[codexMcpServerKey(direct)];
     assert.ok(codexDirect && "url" in codexDirect);
     assert.match(codexDirect.url, new RegExp(`^http://127\\.0\\.0\\.1:${port}/mcp/[0-9a-f]{32}/[0-9a-f]{32}$`, "u"));
     assert.equal(codexDirect.url, chiefRoute.url);
@@ -751,7 +701,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(!redactText(redacted).includes(directRoute.bearer));
     const handoff = { proxiedRows: Object.keys(codex.servers).length, tokensInPayload: false, bearerRedacted: true };
 
-    // A tool call goes through, and the server gets the row's header and the token from this process.
     const client = await connect(directRoute.url, directRoute.bearer);
     const notified = new Promise<void>((done) =>
       client.setNotificationHandler(ToolListChangedNotificationSchema, () => done()),
@@ -762,7 +711,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(upstream.every((hit) => hit.authorization === "Bearer access-on-file" && hit.rowKey === "row-secret"));
     const echo = { text: "through", upstreamToken: "access-on-file", rowHeaderUpstream: true };
 
-    // The server sees OpenBot as the client, not the provider, and the agent of the route by name.
     const openbotClient = (title: string) => ({
       name: "openbot",
       title,
@@ -770,7 +718,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       websiteUrl: "https://openbot.run",
     });
     assert.deepEqual(resource.clients.at(-1), openbotClient("OpenBot"));
-    // n8n answers each `User-Agent` with "bot" in it with an empty 204 (#6497).
     assert.ok(upstream.every((hit) => !/bot/iu.test(hit.userAgent ?? "")));
     const titleOf = async (route: { url: string; bearer: string }) => {
       const before = resource.clients.length;
@@ -790,7 +737,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     research.name = "Renamed Bot";
     assert.equal(await titleOf(researchRoute), "Renamed Bot (OpenBot)");
     assert.equal(await titleOf(await endpointOf(gateway, direct, "removed-agent")), "OpenBot");
-    // The bearer of a route opens neither the same row for another agent nor the row with no agent.
     const hitsBeforeCross = resource.hits.length;
     assert.equal(await rawPost(researchRoute.url, { authorization: `Bearer ${directRoute.bearer}` }), 403);
     assert.equal(await rawPost(directRoute.url, { authorization: `Bearer ${researchRoute.bearer}` }), 403);
@@ -806,7 +752,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       crossAgentBearers: 403,
     };
 
-    // The GET stream stays open through the proxy and carries a server notification.
     await resource.waitFor(
       () => resource.hits.some((hit) => hit.path === "/mcp" && hit.method === "GET"),
       "a GET stream",
@@ -818,7 +763,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     ]);
     const getStream = { notification: "notifications/tools/list_changed" };
 
-    // Refused at the proxy: another Host, a bearer of another route, and a redirect to another origin.
     const movedRoute = await endpointOf(gateway, moved);
     const awayRoute = await endpointOf(gateway, away);
     const hitsBefore = resource.hits.length;
@@ -836,7 +780,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(textOf(await movedClient.callTool({ name: "echo", arguments: { text: "moved" } })), "moved");
     const refused = { otherHost: 403, otherRouteBearer: 403, crossOriginRedirect: 502, sameOriginRedirect: "followed" };
 
-    // The server ends the token during the session: one refresh, and the call still succeeds.
     resource.valid.clear();
     resource.valid.add("access-rotated");
     auth.reset();
@@ -845,8 +788,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(resource.hits.at(-1)?.authorization, "Bearer access-rotated");
     const midSessionRefresh = { refreshes: 1, text: "renewed" };
 
-    // An added account on the same address: a refused token refreshes the sign-in of that account,
-    // not the sign-in of the plain row, whose token the server still takes.
     const account = row("Resource Work", "/mcp#account-e2e-work");
     const accountRecord = freshRecord(auth.base, account.url);
     records.set(
@@ -871,8 +812,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(!resource.hits.some((hit) => hit.path.includes("account")), "The account fragment went upstream.");
     const accountRefresh = { ownSignInRefreshed: true, fragmentUpstream: false };
 
-    // The server refuses a call with a sign-in that is still good (#6914): it refuses the renewed
-    // token too. The agent reads that the sign-in is active, not that it ended, and the row keeps it.
     const staleToken = () => {
       const current = records.get(direct.url);
       assert.ok(current?.tokens);
@@ -890,8 +829,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(refusal.code, -32001);
     assert.ok(refusal.message.includes(sourceText("error.backend.mcpOAuthRequestRefused")), refusal.message);
     assert.equal(records.get(direct.url)?.tokens?.access_token, "access-rotated", "The refusal ended the sign-in.");
-    // A renewal that does not reach the authorization server fails for now: the sign-in stays, the
-    // agent reads that the next request tries again, and it does.
     staleToken();
     auth.setTokenMode("drop");
     const unrenewed = await refusedCall("unrenewed");
@@ -904,8 +841,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "again" } })), "again");
     const refusedWithSignIn = { code: refusal.code, signInKept: true, unrenewedKeepsSignIn: true };
 
-    // A sign-in that cannot be renewed - here no client is on file - ends at the refusal (#10135). The
-    // row then asks for a new sign-in, so the test of the server shows the Sign in card.
     const beforeUnusable = records.get(direct.url);
     assert.ok(beforeUnusable?.tokens);
     const { client: _client, ...withoutClient } = beforeUnusable;
@@ -924,7 +859,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "restored" } })), "restored");
     const unusableSignInEnded = { tokenRequests: 0, signedIn: false, needsSignIn: true };
 
-    // After a sign-out the call gets a JSON-RPC error, never a 401 that would start a sign-in.
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
     const postsBefore = resource.hits.filter((hit) => hit.method === "POST").length;
@@ -939,7 +873,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.ok(!resource.hits.slice(hitsAtSignOut).some((hit) => hit.path.startsWith("/.well-known")));
     const signedOut = { code: failure.code, upstreamRequests: 0, discoveryRequests: 0 };
 
-    // An expired token with no refresh token is not a current sign-in, but the row stays on its route.
     const fingerprintBeforeExpiry = await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled()));
     const fresh = freshRecord(auth.base, away.url);
     records.set(
@@ -951,8 +884,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       }),
     );
     assert.equal(oauth.signedIn(away.url), false);
-    // The 502 above was a failed `initialize` on this route: the next hand-off has a new address
-    // with the same bearer, so a provider that keeps a failed server connects again (#9526).
     assert.deepEqual(await endpointOf(gateway, away), { ...awayRoute, url: `${awayRoute.url}?attempt=1` });
     assert.equal(await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled())), fingerprintBeforeExpiry);
     const expiredWithoutRefresh = { sameRoute: true, sameFingerprint: true };
@@ -968,7 +899,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       ])
         assert.ok(!line.includes(secret), "A log line quoted a credential.");
 
-    // A restart keeps the address and the bearers, so a resumed Codex session still reaches them.
     const movedResearch = await endpointOf(gateway, moved, "agent-research");
     for (const open of clients.splice(0)) await open.close();
     const fingerprint = await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled()));
@@ -981,7 +911,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled())), fingerprint);
     await runCauseEffect(gateway.close());
 
-    // A program holds the saved port: a new port and a new secret, and the manifest changes.
     const blocker = createServer();
     await new Promise<void>((done) => blocker.listen(port, "127.0.0.1", done));
     try {
@@ -1021,11 +950,6 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
 
 await main();
 
-/**
- * The network limits of every OAuth request: a public MCP server whose OAuth endpoint is on a
- * private address is refused before any connection, and a body above the limit is not read. The
- * lookup is injected, so the public names resolve without DNS.
- */
 async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationServer>>) {
   const addressTable = {
     "93.184.216.34": true,
@@ -1046,11 +970,13 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
     "::ffff:10.0.0.5": false,
     "::ffff:93.184.216.34": true,
     "[::ffff:a00:5]": false,
+    "::127.0.0.1": false,
+    "::a9fe:a9fe": false,
+    "::ffff:0:a00:5": false,
   };
   for (const [address, expected] of Object.entries(addressTable))
     assert.equal(isPublicAddress(address), expected, `isPublicAddress(${address})`);
 
-  // `localhost` is a name, so the lookup decides it; the server behind it is the real loopback one.
   const localBase = auth.base.replace("127.0.0.1", "localhost");
   const publicUrl = "https://mcp.public.example/mcp";
   const names: Record<string, readonly string[]> = {
@@ -1076,8 +1002,6 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
     throw new Error("The request was not refused.");
   };
 
-  // A public server whose discovery names a loopback endpoint: the refresh never reaches it, and
-  // the tokens stay, as for any refresh that did not get an answer.
   auth.reset();
   const resource = normalizeResource(publicUrl);
   assert.ok(resource);
@@ -1105,38 +1029,30 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
   assert.equal(mixed, sourceText("error.backend.mcpOAuthPrivateEndpoint", { origin: "https://mixed.example" }));
   assert.equal(auth.hits.length, 0, "A refused OAuth endpoint was reached.");
 
-  // A server the user typed on a loopback address keeps its loopback authorization server.
   const local = await secureOAuthFetch({ resource: `${localBase}/mcp`, lookup })(
     `${localBase}/.well-known/oauth-authorization-server`,
   );
   assert.equal(local.status, 200);
 
-  // A body above the limit is refused, with or without a declared length.
   const declared = await refusal(secureOAuthFetch()(`${auth.base}/big-declared`));
   const streamed = await refusal(secureOAuthFetch()(`${auth.base}/big-streamed`));
   const tooLarge = sourceText("error.backend.oauthResponseTooLarge", { origin: auth.base });
   assert.equal(declared, tooLarge);
   assert.equal(streamed, tooLarge);
   assert.equal(await refusal(secureOAuthFetch()(`${auth.base}/big-redirect`)), tooLarge);
-  // MCP traffic to the server itself has no limit: the probe sends it through the same fetch.
   const mcpTraffic = await secureOAuthFetch({ resource: `${auth.base}/big-streamed`, mcpTraffic: true })(
     `${auth.base}/big-streamed`,
   );
   assert.equal((await mcpTraffic.text()).length, 2 * 1024 * 1024);
-  // A sign-in exchange sends no MCP traffic: an endpoint at the MCP URL itself still has the limit.
   const exchange = await refusal(
     secureOAuthFetch({ resource: `${auth.base}/big-streamed` })(`${auth.base}/big-streamed`),
   );
   assert.equal(exchange, tooLarge);
-  // A redirect to another origin leaves the MCP server, so that hop has the limit again.
   const away = await refusal(
     secureOAuthFetch({ resource: `${auth.base}/redirect-away`, mcpTraffic: true })(`${auth.base}/redirect-away`),
   );
   assert.equal(away, sourceText("error.backend.oauthResponseTooLarge", { origin: localBase }));
 
-  // A sign-in request follows a 308 to its own `www.` host, as Lunch Flow's token endpoint sends
-  // (#8436). It still stops at another origin, at a 302 that drops the body, and at a second
-  // `www.` label. A stand-in network gives the https answers of the `.example` hosts.
   const realFetch = globalThis.fetch;
   const moves: Record<string, [status: number, host: string]> = {
     "lunch.example": [308, "www.lunch.example"],

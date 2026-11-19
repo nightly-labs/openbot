@@ -1,11 +1,3 @@
-import { Effect, Semaphore } from "effect";
-
-// The user's own ACP agents: list, save, delete, check and the answers to their usage prompts. An
-// owner or admin of a joined server lists, saves and deletes the host's agents through
-// `custom-agents-v1`. That contract keeps the trial start and the usage answers on the host's own
-// computer, so `check` and `usage` reach this computer only. `custom-agent-changes.ts` owns the
-// order of the writes.
-
 import {
   type CustomAgentResult,
   type CustomAgentSummary,
@@ -14,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { CUSTOM_AGENTS_CAPABILITY, CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Semaphore } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { ResponseDecoder } from "../remote-host-decoding";
@@ -31,13 +24,7 @@ export function customAgentIpcHandlers({
   changes,
   remoteServers,
 }: CustomAgentIpcDependencies): Pick<IpcGroupHandlers, "customAgents"> {
-  /**
-   * One check at a time. A check starts a program and waits up to 20 seconds for its answer and 10
-   * more for its models, so a renderer that sent many at once would start many; the next one waits
-   * for the one before.
-   */
   const checks = Semaphore.makeUnsafe(1);
-  /** The renderer offers the host's agents only while the host serves `custom-agents-v1`. */
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, CUSTOM_AGENTS_CAPABILITY))
       throw new Error(sourceText("error.provider.customAgentsUnavailable"));
@@ -66,7 +53,6 @@ export function customAgentIpcHandlers({
   };
 }
 
-/** The transport has already run the response through the `custom-agents-v1` codec. */
 function decodeRemoteCustomAgents(value: unknown): CustomAgentSummary[] {
   if (!Array.isArray(value) || !value.every(isCustomAgentSummary)) throw new Error("Invalid custom agent list.");
   return value;

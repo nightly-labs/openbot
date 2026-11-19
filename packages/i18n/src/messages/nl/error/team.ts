@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Te veel inlogpogingen. Probeer het later opnieuw.",
   "error.team.clientUpdateRequired": "Werk deze OpenBot-client bij voordat je verbinding maakt met deze host.",
   "error.team.hostUpdateRequired": "Werk OpenBot bij op de host voordat je verbinding maakt.",
+  "error.team.serverSafeMode": "Deze server staat in de veilige modus, omdat OpenBot er niet start.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} op deze server kan de gegevens niet openen, omdat een nieuwere OpenBot-versie ze heeft opgeslagen. Een nieuwere OpenBot-release op de server lost dit op.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} op deze server is gestopt nadat het starten vaak is mislukt. Een nieuwere OpenBot-release op de server lost dit op.",
   "error.team.sidebarLayoutUnavailable": "De indeling van de zijbalk is niet beschikbaar.",
   "error.team.providersUnsupported": "Deze verbinding ondersteunt geen instellingen voor aanbieders.",
   "error.team.providerNotManaged": "OpenBot beheert de CLI van deze aanbieder niet.",
@@ -75,6 +80,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
   "error.team.routinePauseReasonsUnsupported": "Deze verbinding kan niet tonen waarom een routine is gepauzeerd.",
+  "error.team.activeQueuesUnsupported": "Deze verbinding kan de wachtrijen van alle agents niet tonen.",
   "error.team.routinesOnceUnsupported": "Deze verbinding kan geen eenmalige routines opslaan.",
   "error.team.routineRunCommandUnsupported": "Deze verbinding kan de uitvoeropdracht van een routine niet geven.",
   "error.team.threadQueueUnsupported": "Deze verbinding kan de wachtrij van een zijthread niet tonen.",

@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Обновите OpenBot на {name}",
   "server.compatibility.unsafeDataTitle": "Хост вернул небезопасные данные",
   "server.compatibility.cannotConnectTitle": "Не удаётся подключиться к {name}",
+  "server.compatibility.safeModeTitle": "{name} не запускается",
   "server.compatibility.updateClientDescription":
     "Это приложение поддерживает только более старые протоколы, чем хост. Обновите приложение и повторите попытку.",
   "server.compatibility.updateHostDescription":
@@ -118,6 +119,8 @@ export const messages = {
   "server.local.create": "Создать сервер",
   "server.local.creating": "Создание сервера…",
   "server.local.createFailed": "Не удалось создать сервер.",
+  "server.local.createFailedRetry":
+    "Что-то пошло не так. Повторите попытку. Если ошибка повторится, перезапустите OpenBot.",
   "server.local.limitReached":
     "На этом компьютере может быть не больше {limit} серверов. Удалите один, чтобы создать новый.",
   "server.local.deleteConfirmTitle": "Удалить {name}?",

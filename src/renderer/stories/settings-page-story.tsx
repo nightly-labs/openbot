@@ -5,11 +5,9 @@ import { createSignal } from "solid-js";
 import { SettingsPageFrame } from "../src/features/window/SettingsPageFrame";
 import "./settings-page-story.css";
 
-/** A settings page as the window shows it: the frame, and the placement that the settings panel shows in. */
 export function SettingsPageStory(props: {
   title: string;
   class?: string | undefined;
-  /** Controls above the section list, such as a button that opens the panel again. */
   controls?: JSX.Element;
   onEscape?: () => void;
   children: (page: () => SettingsPagePlacement | undefined) => JSX.Element;

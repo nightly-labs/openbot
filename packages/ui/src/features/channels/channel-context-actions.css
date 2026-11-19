@@ -1,5 +1,3 @@
-/* Each description says what the action does to the members, so it wraps instead of ending in an
-   ellipsis, as in the settings window. */
 .channel-context-actions .ui-item-description {
   overflow: visible;
   text-overflow: clip;

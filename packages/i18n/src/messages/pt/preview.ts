@@ -20,6 +20,8 @@ export const messages = {
   "preview.unsupported.title": "Prévia indisponível",
   "preview.unsupported.description": "Este tipo de arquivo pode ser aberto no aplicativo padrão.",
   "preview.unsupported.openExternally": "Abrir externamente",
+  "preview.tooLarge.title": "Arquivo grande demais para a prévia",
+  "preview.tooLarge.description": "A prévia vai até 100 MB. Você pode abrir este arquivo no aplicativo padrão.",
   "preview.spreadsheet.readFailed": "Não foi possível ler esta planilha.",
   "preview.spreadsheet.truncated": "Prévia limitada às primeiras {rows} linhas e {columns} colunas.",
 } as const satisfies PartialTranslation<typeof source>;

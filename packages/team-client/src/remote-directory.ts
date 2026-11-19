@@ -32,28 +32,14 @@ export interface RemoteTeamHost {
   hostId: string;
   name: string;
   logoKey: string | null;
-  /**
-   * The shape and colour that the server shows with no logo; null for the automatic look. An older
-   * account server sends none, and a bad value is dropped.
-   */
   appearance?: ServerAppearance | null;
   devicePublicKey: string;
   membershipId: string;
   role: "owner" | "admin" | "member";
-  /** The active members that the host's plan allows. An account server from before plans sends none. */
   memberLimit?: number;
-  /**
-   * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
-   */
   hosted?: boolean;
-  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
   restartAvailable?: boolean;
-  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
   storageGb?: number;
-  /**
-   * When the host last changed its key, from a handover that both keys signed. Absent when the host
-   * kept its first key or the account service sends no handovers.
-   */
   keyChangedAt?: number;
 }
 
@@ -64,7 +50,6 @@ export interface RemoteTeamMember {
   role: "owner" | "admin" | "member";
   status: "active" | "revoked";
   avatarUrl?: string | null;
-  /** Epoch milliseconds. */
   createdAt?: number;
 }
 
@@ -93,7 +78,6 @@ export interface RemoteInvitePreview {
   emailBound: boolean;
   permanent: boolean;
   devicePublicKey: string | null;
-  /** The host's signed key handovers. An account service from before handovers sends none. */
   keyHandovers: HostKeyHandover[];
 }
 
@@ -102,11 +86,6 @@ export interface RemoteHostKeyStore {
   set(hostId: string, publicKey: string): Promise<void>;
 }
 
-/**
- * A refusal from the account service. `code` is the service's error code, such as `invite_not_found`,
- * or null when the service sent none. `reference` is the code a user can copy: the service's own
- * reference when it sent one, otherwise `http/<status>[/<code>]`.
- */
 export class RemoteDirectoryError extends Schema.TaggedError<RemoteDirectoryError>()("RemoteDirectoryError", {
   status: Schema.Number,
   message: Schema.String,
@@ -126,7 +105,6 @@ function directoryFailure(message: string, reference: string | null = null): Rem
   return new RemoteDirectoryOperationError({ message, reference });
 }
 
-/** The account service codes that have their own sentence. Any other code keeps the service's text. */
 const DIRECTORY_ERROR_TEXT = new Map<string, string>([
   ["invite_already_used", sourceText("error.remote.inviteAlreadyUsed")],
   ["invite_not_found", sourceText("error.remote.inviteNotFound")],
@@ -168,9 +146,7 @@ export class RemoteTeamDirectoryClient {
       fetch: TeamClientFetch;
       hostKeys?: RemoteHostKeyStore;
       pairedHost?: MobileConnectHostBinding;
-      /** A development client passes `allowLocalDevelopmentApiUrl` to use a local account service. */
       inviteLinks?: InviteLinkOptions;
-      /** Checks the signatures of a host key handover, usually `verifyEd25519Base64Url`. */
       verifyHostKeySignature: HostKeySignatureCheck;
     } & ({ token: string; authentication?: never } | { token?: never; authentication: { kind: "browser" } }),
   ) {
@@ -180,8 +156,6 @@ export class RemoteTeamDirectoryClient {
     this.#fetch = input.fetch;
     this.#pairedHost = input.pairedHost;
     this.#verifyHostKeySignature = input.verifyHostKeySignature;
-    // A self-hosted account service accepts invitations that name it. `previewInvite` still refuses
-    // an invitation for any other service.
     this.#inviteLinks = { selfHostedApiOrigin: selfHostedApiOrigin(input.apiUrl), ...input.inviteLinks };
     const keys = new Map<string, string>();
     this.#hostKeys = input.hostKeys ?? {
@@ -240,10 +214,8 @@ export class RemoteTeamDirectoryClient {
                 membershipId: candidate.membershipId,
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
-                // A bad value drops only the flag, so the server stays in the list.
                 ...(isBoolean(hosted) ? { hosted } : {}),
                 ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
-                // A bad value drops only the storage, as for the flag.
                 ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
               },
@@ -305,7 +277,6 @@ export class RemoteTeamDirectoryClient {
     > {
       if (input.permanent && input.email)
         return yield* directoryFailure(sourceText("error.remote.permanentInviteNoEmail"));
-      // Validate the URL before creating an invitation.
       const payload = {
         apiUrl: yield* directoryDecode(() => this.#inviteApiUrl()),
         serverId: host.hostId,
@@ -313,7 +284,6 @@ export class RemoteTeamDirectoryClient {
         token: "x".repeat(32),
       };
       yield* directoryDecode(() => createInviteUrl(payload, this.#inviteLinks));
-      // The account service cannot email links for a self-hosted service.
       if (input.email && selfHostedApiOrigin(payload.apiUrl))
         return yield* directoryFailure(sourceText("error.remote.selfHostedInviteNoEmail"));
       const value = yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(host.hostId)}/invites`, {
@@ -386,15 +356,9 @@ export class RemoteTeamDirectoryClient {
           method: "DELETE",
         },
       );
-      // Keep the identity pin: leaving a team must not silently trust a substituted key on rejoin.
     });
   }
 
-  /**
-   * Removes a host that this account owns from the account service, for all of its members. The host
-   * can be offline. A refused retry for a host that the list no longer has is a removal that already
-   * happened, as when the first answer was lost.
-   */
   removeOwnedHost(hostId: string): Effect.Effect<void, DirectoryFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, DirectoryFailure> {
       yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/`, { method: "DELETE" }).pipe(
@@ -439,10 +403,6 @@ export class RemoteTeamDirectoryClient {
     });
   }
 
-  /**
-   * The logical session of this account session on a host. The account service gives the active one
-   * again while it has not ended, so a client can ask before it has the key for the ticket.
-   */
   startSession(hostId: string): Effect.Effect<string, DirectoryFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<string, DirectoryFailure> {
       const value = yield* this.#request("/v2/remote/sessions/", { method: "POST", body: { hostId } });
@@ -450,11 +410,6 @@ export class RemoteTeamDirectoryClient {
     });
   }
 
-  /**
-   * The account service an invitation names. The public website serves the same Worker as
-   * `api.openbot.run`, but an invitation must name `api.openbot.run`: the desktop and mobile apps
-   * accept only that address.
-   */
   #inviteApiUrl(): string {
     const url = new URL(this.#apiUrl);
     return this.#authentication.kind === "browser" && url.origin === OPENBOT_INVITE_ORIGIN
@@ -473,7 +428,6 @@ export class RemoteTeamDirectoryClient {
       const invite = yield* directoryDecode(() => parseInviteUrl(inviteUrl, this.#inviteLinks));
       const inviteOrigin = new URL(invite.apiUrl).origin;
       const origin = new URL(this.#apiUrl).origin;
-      // These production origins serve the same account Worker. Requests still use this client's origin.
       const publicWebsiteInvite =
         this.#authentication.kind === "browser" &&
         origin === "https://openbot.run" &&
@@ -487,8 +441,6 @@ export class RemoteTeamDirectoryClient {
         authenticated: false,
       });
       const preview = yield* directoryDecode(() => decodeInvitePreview(value, invite.serverId));
-      // An invitation names the key that the host had when it made the invitation. A handover chain
-      // from that key keeps the invitation valid after the host rotates its key.
       if (
         !preview.devicePublicKey ||
         (remoteHostFingerprint(preview.devicePublicKey) !== invite.fingerprint &&
@@ -511,7 +463,6 @@ export class RemoteTeamDirectoryClient {
       const invite = yield* directoryDecode(() => parseInviteUrl(inviteUrl, this.#inviteLinks));
       const preview = yield* this.previewInvite(inviteUrl);
       if (!preview.devicePublicKey) return yield* directoryFailure(sourceText("error.remote.inviteHostKeyMissing"));
-      // Save the pin before consuming the one-use token, including across app restarts.
       yield* this.#trustedHostKey(invite.serverId, preview.devicePublicKey, preview.keyHandovers);
       yield* this.#pinHostKey(invite.serverId, preview.devicePublicKey);
       const accepted = yield* this.#request("/v2/remote/invites/accept", {
@@ -537,12 +488,6 @@ export class RemoteTeamDirectoryClient {
     });
   }
 
-  /**
-   * The key to use for a listed host. A pinned key is replaced only when a signed handover chain leads
-   * from it to the advertised key. Otherwise the pinned key stays, so only the connection to that host
-   * fails, not the whole list, as on desktop. A host with no pin is pinned to the key seen first, so a
-   * later key change also needs a handover.
-   */
   #trustedHostKey(
     hostId: string,
     advertisedPublicKey: string,
@@ -627,7 +572,6 @@ export class RemoteTeamDirectoryClient {
                   : {}),
                 signal: controller.signal,
               }),
-            // The request timer aborts the request, so an aborted signal is a timeout, not a lost network.
             catch: () =>
               controller.signal.aborted
                 ? directoryFailure(sourceText("error.remote.directoryTimeout"), "timeout/directory")
@@ -670,11 +614,6 @@ function decodeInvitePreview(value: unknown, expectedHostId: string): RemoteInvi
   };
 }
 
-/**
- * The refusal in an account service error body: `{ error: "text" }`, or
- * `{ error: { code, message, reference? } }`. A code or reference that is not a fixed identifier is
- * left out. A server from before references sends none.
- */
 function directoryError(status: number, value: unknown): RemoteDirectoryError {
   const body = isDynamicRecord(value) ? value.error : undefined;
   if (isString(body)) return new RemoteDirectoryError(status, body);
@@ -735,7 +674,6 @@ function decodeInvite(value: unknown): RemoteTeamInvite {
 
 export const REMOTE_ACCOUNT_CHECK_INTERVAL_MS = 15 * 60_000;
 
-/** The caller starts this watcher in the foreground and stops it on background entry. */
 export function watchRemoteDirectory<E>(refresh: () => Effect.Effect<void, E>): () => void {
   const timer = setInterval(
     () => void runTeamEffect(refresh()).catch(() => undefined),
@@ -744,7 +682,6 @@ export function watchRemoteDirectory<E>(refresh: () => Effect.Effect<void, E>): 
   return () => clearInterval(timer);
 }
 
-/** Refresh on demand or foreground entry; coalesce requests and rate-limit automatic retries. */
 export function createRemoteDirectoryRefresh<E, R>(load: () => Effect.Effect<void, E, R>, now = Date.now) {
   let pending: Deferred.Deferred<void, E> | null = null;
   let lastAttempt = Number.NEGATIVE_INFINITY;

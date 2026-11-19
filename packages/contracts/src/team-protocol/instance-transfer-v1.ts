@@ -1,14 +1,3 @@
-// Frozen optional instance-transfer-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server, never a member, can move the server's agents and server settings to or from an OpenBot
-// transfer file. `summary` lists the host's agents with their counts. `export` answers the transfer
-// file as an attachment, at most 100 MB, with no secret in it. `stage` takes such a file, at most
-// 100 MB, as the raw body, keeps it under a token that only the caller can apply or discard, and
-// answers a preview with no avatars. `apply` creates the chosen agents and, when asked, adds the MCP
-// servers (turned off), custom providers, sidebar sections and routine flows that the host does not
-// have. The response names the new agents only; the client reads them with the agent list. Widening
-// any of it needs a second capability string.
 import {
   adminRoute,
   boolean,
@@ -24,7 +13,6 @@ import {
 
 export const INSTANCE_TRANSFER_CAPABILITY = "instance-transfer-v1";
 
-/** The largest transfer file that goes to or from a host: one WebRTC file transfer. */
 export const INSTANCE_TRANSFER_REMOTE_BYTES = 100 * 1024 * 1024;
 
 export const INSTANCE_TRANSFER_ROUTES = {
@@ -57,7 +45,6 @@ const summary = fields({
   ),
 });
 
-/** The stage preview. `instance-transfer-chunks-v1` finish answers the same shape. */
 export const INSTANCE_TRANSFER_PREVIEW = fields({
   token: identifier,
   appVersion: string(64),
@@ -90,12 +77,10 @@ export const INSTANCE_TRANSFER_RESULT = fields({
 
 export const INSTANCE_TRANSFER_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [INSTANCE_TRANSFER_ROUTES.summary, adminRoute(empty, summary)],
-  // The response is the `.zip` itself, sent as an attachment; only an error envelope is JSON.
   [
     INSTANCE_TRANSFER_ROUTES.export,
     adminRoute(fields({ agentIds: list(identifier, 100), includeFiles: boolean, includeSettings: boolean }), empty),
   ],
-  // The request body is the raw `.zip`, so its decoder never reads it.
   [INSTANCE_TRANSFER_ROUTES.stage, adminRoute(empty, INSTANCE_TRANSFER_PREVIEW)],
   [
     INSTANCE_TRANSFER_ROUTES.apply,

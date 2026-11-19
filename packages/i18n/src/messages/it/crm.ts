@@ -223,7 +223,7 @@ export const messages = {
   "crm.customer.paidOn": "Pagato il {date}",
   "crm.customer.billing": "Fatturazione",
   "crm.customer.details": "Dettagli",
-  "crm.customer.since": "Cliente dal",
+  "crm.customer.added": "Aggiunto",
   "crm.customer.activity": "Attività",
   "crm.customer.loading": "Caricamento…",
 

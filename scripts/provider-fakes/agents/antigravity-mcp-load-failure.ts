@@ -1,8 +1,3 @@
-// The agent of `antigravity-mcp-load-failure-e2e.ts`. Antigravity 1.4.4 ends the whole turn when one
-// MCP server does not start (#3824). It logs "Antigravity SDK error processing prompt for session <id>"
-// on stderr, sends `mcp_load_failed_message` as answer text and ends the turn as a success. This fake
-// does the same for a session that has the server `higgsfield`, and for the server `cloudflare` when
-// the prompt is "fail cloudflare", as a server from the user's own `mcp_config.json`.
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -39,7 +34,6 @@ serveFakeAcpAgent({
   },
   "session/new": (request, peer) => {
     sessions += 1;
-    // Unique across processes, as Antigravity's own IDs are: each session has a process of its own.
     const sessionId = `s-${process.pid}-${sessions}`;
     record(request, sessionId);
     peer.reply(request, { sessionId, models: MODELS });
@@ -60,16 +54,12 @@ serveFakeAcpAgent({
       peer.reply(request, { stopReason: "end_turn" });
       return;
     }
-    // `FAKE_STDOUT_FIRST`: the message arrives before the stderr line, which the two pipes allow.
     if (process.env.FAKE_STDOUT_FIRST) {
       peer.say(sessionId, failure(failed));
       peer.reply(request, { stopReason: "end_turn" });
       process.stderr.write(`E Antigravity SDK error processing prompt for session ${sessionId}\n`);
       return;
     }
-    // Antigravity logs the failure before it sends the message. stderr and stdout are two pipes, so
-    // the answer waits until the test has seen the client read the stderr line: it then writes a file
-    // named for the session in `FAKE_RELEASE`.
     process.stderr.write(`E Antigravity SDK error processing prompt for session ${sessionId}\n`);
     const release = join(process.env.FAKE_RELEASE ?? "", sessionId);
     const answer = setInterval(() => {

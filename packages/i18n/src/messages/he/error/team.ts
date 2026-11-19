@@ -52,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "יותר מדי ניסיונות התחברות. אפשר לנסות שוב מאוחר יותר.",
   "error.team.clientUpdateRequired": "יש לעדכן את לקוח OpenBot הזה לפני ההתחברות למארח הזה.",
   "error.team.hostUpdateRequired": "יש לעדכן את OpenBot במארח לפני ההתחברות.",
+  "error.team.serverSafeMode": "השרת הזה במצב בטוח כי OpenBot לא מופעל בו.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} בשרת הזה לא יכול לפתוח את הנתונים שלו, כי גרסה חדשה יותר של OpenBot שמרה אותם. גרסה חדשה יותר של OpenBot בשרת תפתור את זה.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} בשרת הזה נעצר אחרי שההפעלה נכשלה פעמים רבות. גרסה חדשה יותר של OpenBot בשרת תפתור את זה.",
   "error.team.sidebarLayoutUnavailable": "פריסת סרגל הצד אינה זמינה.",
   "error.team.providersUnsupported": "הגדרות ספקים אינן נתמכות בחיבור הזה.",
   "error.team.providerNotManaged": "OpenBot אינו מנהל את ה-CLI של הספק הזה.",
@@ -72,6 +77,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "צבעי צ'אטים אינם נתמכים בחיבור הזה.",
   "error.team.routineRunPlaceUnsupported": "החיבור הזה אינו יכול לשנות היכן שגרה רצה.",
   "error.team.routinePauseReasonsUnsupported": "החיבור הזה אינו יכול להציג מדוע שגרה מושהית.",
+  "error.team.activeQueuesUnsupported": "חיבור זה לא יכול להציג את התורים של כל הסוכנים.",
   "error.team.routinesOnceUnsupported": "החיבור הזה אינו יכול לשמור שגרות חד-פעמיות.",
   "error.team.routineRunCommandUnsupported": "החיבור הזה אינו יכול לתת את פקודת ההרצה של שגרה.",
   "error.team.threadQueueUnsupported": "החיבור הזה אינו יכול להציג את התור של שרשור צדדי.",

@@ -5,9 +5,9 @@ import {
   type SidebarPin,
   sidebarPinKey,
 } from "@openbot/contracts/ipc";
+import { samePinList } from "./agent-pins";
 import { moveSidebarChat } from "./sidebar-layout";
 
-/** A chat that the user drags: an agent or a channel, from the pinned tiles or from the list. */
 export interface DraggedChat {
   chat: SidebarPin;
   pinned: boolean;
@@ -20,28 +20,20 @@ export interface DragRect {
   height: number;
 }
 
-/**
- * Where a dragged chat goes. In the pins, before the pin `beforeKey`, or after the last pin of its
- * kind when it is `null`. In the list, into a section before the chat `beforeChatId`, or at the end of
- * the section when it is `null`.
- */
 export type ChatDropTarget =
   | { area: "pins"; beforeKey: string | null }
   | { area: "list"; sectionId: string; beforeChatId: string | null };
 
-/** The mark of a drop target, in window coordinates: a line between rows or tiles, or the pin area. */
 export interface DropMark {
   shape: "line" | "bar" | "zone";
   rect: DragRect;
 }
 
-/** A pinned tile as the grid shows it: the agents, then the channels. */
 export interface PinnedTileFrame {
   chat: SidebarPin;
   rect: DragRect;
 }
 
-/** An entry of the list, in list order. A chat of "Needs you" has no section and takes no drop. */
 export type ListFrame =
   | { kind: "section"; id: string; rect: DragRect; open: boolean }
   | { kind: "chat"; chat: SidebarPin; sectionId: string | null; rect: DragRect };
@@ -52,7 +44,6 @@ export interface DropFrames {
   list: readonly ListFrame[];
 }
 
-/** What a drop changes: the new pin list, a move in the layout of the host, or both. */
 export interface DropChange {
   pins?: SidebarPin[];
   move?: Extract<SidebarLayoutAction, { type: "move-agent" }>;
@@ -71,10 +62,6 @@ function line(rect: DragRect, y: number): DropMark {
   return { shape: "line", rect: { x: rect.x, y: y - LINE_HEIGHT / 2, width: rect.width, height: LINE_HEIGHT } };
 }
 
-/**
- * The drop target under the finger at (`x`, `y`). `canPin` is false when the pin limit stops a new pin.
- * `sections` is false when the host keeps no layout: then the list takes only a pinned chat, to unpin it.
- */
 export function chatDropTarget(
   frames: DropFrames,
   dragged: DraggedChat,
@@ -90,7 +77,6 @@ export function chatDropTarget(
   return listTarget(frames.list, dragged, y);
 }
 
-/** With no layout, the list has no sections: a pinned chat dropped on it is unpinned, nothing more. */
 function unpinTarget(list: readonly ListFrame[], y: number): { target: ChatDropTarget; mark: DropMark } | null {
   const entry = list.find((candidate) => y >= candidate.rect.y && y < candidate.rect.y + candidate.rect.height);
   const last = list.at(-1);
@@ -117,7 +103,6 @@ function pinTarget(
       ? { target: { area: "pins", beforeKey: null }, mark: { shape: "zone", rect: frames.pinArea } }
       : null;
   }
-  // The tiles wrap in rows, so the row of the finger counts more than the distance along it.
   let nearest = group[0];
   let best = Number.POSITIVE_INFINITY;
   for (const tile of group) {
@@ -151,7 +136,6 @@ function listTarget(
   const draggedKey = sidebarPinKey(dragged.chat);
   const index = list.findIndex((entry) => y >= entry.rect.y && y < entry.rect.y + entry.rect.height);
   if (index < 0) {
-    // Below the last row, the chat goes to the end of the last section.
     const last = list.at(-1);
     if (!last || y < last.rect.y) return null;
     const sectionId = last.kind === "section" ? last.id : last.sectionId;
@@ -176,7 +160,6 @@ function listTarget(
   }
   if (entry.sectionId === null) return null;
   const before = y < entry.rect.y + entry.rect.height / 2;
-  // Over its own row, the chat stays where it is.
   const self = sidebarPinKey(entry.chat) === draggedKey;
   let beforeChatId: string | null = entry.chat.id;
   if (!before || self) {
@@ -191,7 +174,6 @@ function listTarget(
   };
 }
 
-/** The pin list with `chat` put before the pin `beforeKey`, or after the last pin of its kind. */
 function placePin(pins: readonly SidebarPin[], chat: SidebarPin, beforeKey: string | null): SidebarPin[] {
   const key = sidebarPinKey(chat);
   const rest = pins.filter((pin) => sidebarPinKey(pin) !== key);
@@ -204,16 +186,6 @@ function placePin(pins: readonly SidebarPin[], chat: SidebarPin, beforeKey: stri
   return rest;
 }
 
-function samePins(left: readonly SidebarPin[], right: readonly SidebarPin[]): boolean {
-  return (
-    left.length === right.length &&
-    left.every((pin, index) => {
-      const other = right[index];
-      return other !== undefined && sidebarPinKey(pin) === sidebarPinKey(other);
-    })
-  );
-}
-
 function sameLayoutPlace(left: SidebarLayoutSnapshot, right: SidebarLayoutSnapshot, chatId: string): boolean {
   return (
     left.agentAssignments[chatId] === right.agentAssignments[chatId] &&
@@ -222,11 +194,6 @@ function sameLayoutPlace(left: SidebarLayoutSnapshot, right: SidebarLayoutSnapsh
   );
 }
 
-/**
- * What a drop on `target` changes. `pins` is the pin list of the phone, in the order of the host. A
- * drop in the pins pins the chat or moves its pin. A drop of a pinned chat in the list unpins it.
- * A drop in the list moves the chat in the layout, when the host keeps one.
- */
 export function chatDropChange(
   dragged: DraggedChat,
   target: ChatDropTarget,
@@ -235,7 +202,7 @@ export function chatDropChange(
 ): DropChange {
   if (target.area === "pins") {
     const next = placePin(pins, dragged.chat, target.beforeKey);
-    return dragged.pinned && samePins(next, pins) ? {} : { pins: next };
+    return dragged.pinned && samePinList(next, pins) ? {} : { pins: next };
   }
   const key = sidebarPinKey(dragged.chat);
   const change: DropChange = dragged.pinned ? { pins: pins.filter((pin) => sidebarPinKey(pin) !== key) } : {};

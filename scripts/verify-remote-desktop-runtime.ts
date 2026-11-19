@@ -90,12 +90,6 @@ if (platform === "linux") {
 
 logger.info(`Verified the Sunshine and Moonlight Web runtime in ${root}`);
 
-/**
- * Presence and checksums say the runtime is the approved build; only its load commands say whether
- * it can start anywhere else. CMake links Sunshine against Homebrew by absolute path, and a binary
- * that keeps those paths runs on the build runner and on a developer's Mac and nowhere else --
- * which shows up as a session that never produces a frame, with every check green.
- */
 async function verifyMachOLoadPaths(libraries: string[]) {
   const binaries = [...names, ...libraries];
   const unportable = binaries.flatMap((name) =>
@@ -110,12 +104,6 @@ async function verifyMachOLoadPaths(libraries: string[]) {
   }
 }
 
-/**
- * A bundled library is one OpenBot redistributes, and both of the ones that reach the runtime today
- * ask for their notice to travel with the binary. Presence in the tree is what creates the
- * obligation, so this reads the tree rather than a list: a library that starts being bundled arrives
- * here as a failure with its name in it, not as a release that quietly drops a licence.
- */
 function verifyBundledLibraryLicenses(libraries: string[], distributionChecksums: { name: string }[]): void {
   for (const library of libraries) {
     const entry = bundledLibraryLicense(basename(library));

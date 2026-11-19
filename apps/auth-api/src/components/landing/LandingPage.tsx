@@ -19,7 +19,6 @@ import { SiteHeader } from "./SiteHeader";
 import { useSitePath } from "./SiteText";
 import { TeamsSection } from "./TeamsSection";
 
-/** A promise and the function that resolves it. */
 function latch(): { open: () => void; opened: Promise<void> } {
   let open = () => {};
   const opened = new Promise<void>((resolve) => {
@@ -36,8 +35,6 @@ export function LandingPage(props: { text: LandingPageText }) {
   );
 }
 
-// Named accessors, not conditionals in props: a conditional prop moves the SSR hydration keys.
-/** Plain words of the hero sentence, or a provider name with its logo. */
 function HeroDescriptionPart(props: { part: string | HeroProviderPart }) {
   const provider = () => (typeof props.part === "string" ? undefined : props.part);
   const words = () => (typeof props.part === "string" ? props.part : undefined);
@@ -48,7 +45,6 @@ function HeroDescriptionPart(props: { part: string | HeroProviderPart }) {
   );
 }
 
-/** A provider name and its logo. The punctuation after it stays on the same line. */
 function HeroProvider(props: { part: HeroProviderPart }) {
   const name = () => (
     <span class="landing-provider">
@@ -70,7 +66,6 @@ function LandingPageContent() {
   const text = useLandingText();
   const path = useSitePath();
   const hero = () => text().hero;
-  // The beam falls in when the app preview has loaded, and the preview appears as the beam hits it.
   const previewReady = latch();
   const beamImpact = latch();
   let copy: HTMLDivElement | undefined;
@@ -135,8 +130,6 @@ function LandingPageContent() {
             </p>
 
             <h1 id="landing-title" class="landing-title landing-hero-line" style={{ "--landing-hero-line": 1 }}>
-              {/* The spaces do not render in the flex row. They keep the words apart in
-                  the text that search engines read, which was "MeetOpenBot". */}
               <Show when={hero().title.before}>
                 {(before) => (
                   <>

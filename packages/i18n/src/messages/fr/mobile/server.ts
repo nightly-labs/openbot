@@ -718,6 +718,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Dans Proton Pass, créez une clé d’accès qui peut lire uniquement le coffre partagé avec OpenBot, puis collez-la ici. {host} garde la clé ; ce téléphone non.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Votre offre Proton n’inclut pas l’outil en ligne de commande de Proton Pass. Il nécessite une offre Proton qui inclut Pass Plus. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez l’offre de votre compte, puis reconnectez-vous.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} n’est pas disponible sur ce serveur.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Connectez-vous à {name} sur ce téléphone. Ensuite, {host} crée un coffre partagé et une clé d’accès en lecture seule pour ce coffre, et ne garde que cette clé. Les agents ne voient jamais de mot de passe.",
@@ -747,8 +749,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Lecture seule",
   "mobile.server.connectors.passwordManager.keyExpires": "Lecture seule. Expire le {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Expirée le {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "L’outil en ligne de commande de {name} nécessite une offre payante. Changez l’offre de votre compte, puis reconnectez-vous.",
   "mobile.server.connectors.passwordManager.expiredTitle": "La clé {name} a expiré",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Les agents de {host} ne peuvent pas se connecter avec vos identifiants partagés tant que vous ne vous reconnectez pas.",
@@ -996,7 +996,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Ajouter",
   "mobile.server.connectors.whatsapp.groupTitle": "Ajouter un groupe",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "Les membres de ce groupe peuvent confier des tâches à vos agents.",
+    "Les membres de ce groupe peuvent confier des tâches à vos agents en mentionnant le numéro ou en répondant à ses messages.",
   "mobile.server.connectors.whatsapp.groupSearch": "Rechercher des groupes",
   "mobile.server.connectors.whatsapp.groupsLoading": "Lecture des groupes…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot n’a pas pu lire les groupes",
@@ -1499,7 +1499,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} ajouté à {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} retiré de {role}",
   "mobile.server.audit.agentLevel": "{agent} pour {role} : {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importer des agents",
   "mobile.server.route.import": "Importer des agents",
   "mobile.server.import.unsupported": "Mettez à jour OpenBot sur ce serveur pour y importer des agents.",
@@ -1573,7 +1572,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Non importés",
   "mobile.server.import.resultWarnings": "Certains éléments n’ont pas été transférés",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transfert",
   "mobile.server.route.transfer": "Transfert",
   "mobile.server.route.transferExport": "Exporter",
@@ -1649,8 +1647,12 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Vers",
   "mobile.server.transfer.copyNoAgents": "Ce serveur n’a aucun agent.",
   "mobile.server.transfer.copyNotMoved":
-    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "mobile.server.transfer.copySubmit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copier des agents en double ?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copier les doublons",
   "mobile.server.transfer.copying": "Copie…",
   "mobile.server.transfer.copyFailed": "La copie n’a pas abouti.",
   "mobile.server.transfer.copied": {

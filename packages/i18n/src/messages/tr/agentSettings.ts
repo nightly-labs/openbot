@@ -196,6 +196,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Tam erişime izin ver",
   "agentSettings.fullAccess.askConfirm": "Önce sor",
   "agentSettings.links.usage": "Kullanım",
+  "agentSettings.links.apps": "Uygulamalar",
+  "agentSettings.links.appsScope": "Tüm ajanlar",
   "agentSettings.links.memories": "Bellekler",
   "agentSettings.links.memoriesCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "agentSettings.links.skills": "Beceriler",

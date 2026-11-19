@@ -6,13 +6,6 @@ import { redactText } from "@openbot/logging";
 import { type Connection, connectClickHouse, credentials, type QueryResult, runQuery } from "./openpanel-sql";
 import { readScriptArguments } from "./script-arguments";
 
-// Compares the newest desktop release with the release before it, from production analytics in the
-// OpenPanel ClickHouse (read-only user, see scripts/openpanel-sql.ts). It writes the full report to
-// .openbot-build/release-regression/report.json and, with --discord, sends the table to the webhook
-// in RELEASE_REGRESSION_WEBHOOK_URL as colored embeds. The GitHub workflow release-regression.yml runs it with --quiet:
-// the repository is public, so its log must show no numbers, counts or error details. Those go only
-// to the private Discord channel. With --state, the workflow sends only when a status changed, on
-// Monday as a weekly summary, and on a manual run (--always).
 const USAGE = `Usage:
   bun scripts/release-regression-report.ts [options]
 Options:
@@ -25,25 +18,15 @@ const WINDOW_DAYS = 14;
 const MIN_COMPUTERS = 30;
 const MIN_SAMPLES = 20;
 const MIN_TURNS_FOR_SHARE = 200;
-/** Error rates need more turns, because most error codes are rare. */
 const MIN_TURNS_FOR_RATE = 1_000;
-/** An error code needs this many events in the new release before it can rise. */
 const MIN_ERRORS = 5;
-/** An error code needs this many computers in the new release, so one computer in a loop cannot raise it. */
 const MIN_ERROR_COMPUTERS = 3;
 const MAX_ERROR_ROWS = 5;
 const EARLY_DAYS = 2;
-/** A metric regresses when it is this much worse, relative, and also worse by its floor. */
 const RELATIVE_LIMIT = 0.2;
-/** A metric needs watching when it is this much worse, relative, and also worse by half its floor. */
 const WATCH_LIMIT = 0.1;
-/** One-sided z for shares and error rates: p < 0.001 for red and p < 0.05 for yellow. */
 const RED_Z = 3.09;
 const YELLOW_Z = 1.645;
-/**
- * Causes that the user, the provider account or the network decide, not OpenBot. The names are the
- * cause_code values of system_turn_completed.
- */
 const OUTSIDE_CAUSES = [
   "rate_limit",
   "usage_limit",
@@ -56,14 +39,12 @@ const OUTSIDE_CAUSES = [
 const VERSION = /^\d+\.\d+\.\d+$/u;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/u;
 const DISCORD_WEBHOOK = /^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/\d+\/[\w-]+$/u;
-/** Discord allows 6000 characters and 10 embeds in one message, and 4096 characters in a description. */
 const DISCORD_EMBED_CHARACTERS = 5800;
 const DISCORD_EMBEDS = 10;
 const DISCORD_DESCRIPTION = 4096;
 const DISCORD_TIMEOUT_MS = 30_000;
 
 type Unit = "ms" | "mb" | "share" | "per1k";
-/** red: regression. yellow: worse, below the regression limit. waiting: the sample cannot show it yet. */
 type Status = "red" | "yellow" | "green" | "waiting";
 type Section = "turns" | "startup" | "failures" | "errors" | "updates" | "resources";
 
@@ -80,11 +61,9 @@ interface Row {
   readonly next: number | null;
   readonly previousN: number;
   readonly nextN: number;
-  /** How sure the rise is, for shares and error rates; null for times and sizes. */
   readonly z: number | null;
   readonly status: Status;
   readonly regression: boolean;
-  /** False when the sample cannot show a regression yet. */
   readonly judged: boolean;
 }
 
@@ -96,7 +75,6 @@ interface Report {
   readonly early: boolean;
   readonly rows: readonly Row[];
   readonly regressions: readonly Row[];
-  /** Error codes that rose, also the ones over MAX_ERROR_ROWS; null when there are too few turns. */
   readonly risenErrorCodes: number | null;
 }
 
@@ -104,10 +82,8 @@ interface MetricSpec {
   readonly metric: string;
   readonly column: string;
   readonly unit: Unit;
-  /** The smallest absolute change that counts, in the metric's unit. */
   readonly floor: number;
   readonly minN: number;
-  /** The column with the sample size of this metric, when it is not `n`. */
   readonly nColumn?: string;
 }
 
@@ -152,7 +128,6 @@ WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
   AND properties['app_version'] IN (${versionList(versions)})
 GROUP BY version, platform`;
 
-// An update restarts the app, so a start after an update waits for the install too.
 const startupSql = (versions: readonly string[]) => `SELECT
   properties['app_version'] AS version,
   properties['platform'] AS platform,
@@ -200,8 +175,6 @@ WHERE name = 'system_turn_completed' AND ${environment} AND ${window}
   AND properties['status'] = 'failed' AND properties['cause_code'] != ''
 GROUP BY version, code`;
 
-// update_action has no target version. Before the new release was out, every update went to the
-// release before it; after, to the new release. Computers that already run the target do not count.
 const updateSql = (
   pair: { previous: string; next: string },
   previousFirstSeen: string,
@@ -266,7 +239,6 @@ const RESOURCE_METRICS: readonly MetricSpec[] = [
   },
   { metric: "crash loop (computer-days)", column: "crash_loop_share", unit: "share", floor: 0.01, minN: MIN_SAMPLES },
 ];
-/** Error rates are per 1,000 turns: red when 1.5 times and 1 more per 1,000 turns. */
 const ERROR_LIMITS: readonly [Limit, Limit] = [
   { relative: 0.5, floor: 1, z: RED_Z },
   { relative: 0.2, floor: 0.5, z: YELLOW_Z },
@@ -280,7 +252,6 @@ function value(row: ResultRow | undefined, column: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** One-sided two-proportion z: how sure the share rose. */
 function shareZ(previous: number, previousN: number, next: number, nextN: number): number {
   const pooled = (previous * previousN + next * nextN) / (previousN + nextN);
   const error = Math.sqrt(pooled * (1 - pooled) * (1 / previousN + 1 / nextN));
@@ -288,7 +259,6 @@ function shareZ(previous: number, previousN: number, next: number, nextN: number
   return (next - previous) / error;
 }
 
-/** One-sided Poisson z for two event counts per turn: how sure the rate rose. */
 function rateZ(previousCount: number, previousTurns: number, nextCount: number, nextTurns: number): number {
   const error = Math.sqrt(previousCount / previousTurns ** 2 + nextCount / nextTurns ** 2);
   if (error === 0) return 0;
@@ -302,7 +272,6 @@ function defaultLimits(floor: number): readonly [Limit, Limit] {
   ];
 }
 
-/** Every metric is worse when it is higher. A z of null means the metric has no significance test. */
 function status(
   limits: readonly [Limit, Limit],
   previous: number | null,
@@ -356,14 +325,11 @@ function compare(
   });
 }
 
-/** True when the release sends a cause on its failed turns. */
 function sendsCause(result: QueryResult, version: string): boolean {
   return result.data.some((row) => row.version === version && (value(row, "with_cause") ?? 0) > 0);
 }
 
 function failureRows(result: QueryResult, versions: { previous: string; next: string }): Row[] {
-  // The cause is on the turn only from the release that added it. Compare the share without outside
-  // causes only when both releases send causes, or the older release would look worse.
   const specs: MetricSpec[] = [
     { metric: "failed turns", column: "failed_share", unit: "share", floor: 0.02, minN: MIN_TURNS_FOR_SHARE },
   ];
@@ -379,14 +345,12 @@ function failureRows(result: QueryResult, versions: { previous: string; next: st
   return compare("failures", result, "provider", versions, specs);
 }
 
-/** Turns that ended, completed or failed, of each release. */
 function turnTotal(failures: QueryResult, version: string): number {
   return failures.data
     .filter((row) => row.version === version)
     .reduce((total, row) => total + (value(row, "n") ?? 0), 0);
 }
 
-/** Error codes whose rate per 1,000 turns rose, most certain first. */
 function errorRows(
   results: readonly { readonly metric: string; readonly result: QueryResult }[],
   versions: { previous: string; next: string },
@@ -485,7 +449,6 @@ interface Embed {
   readonly timestamp?: string;
 }
 
-/** Group names come from analytics. Keep them from changing the Discord formatting. */
 function escapeMarkdown(text: string): string {
   return text.replace(/[\\*_~`|>#[\]()-]/gu, "\\$&");
 }
@@ -494,7 +457,6 @@ function worst(rows: readonly Row[]): Status {
   return STATUS_ORDER.find((candidate) => rows.some((row) => row.status === candidate)) ?? "green";
 }
 
-/** Only waiting rows give waiting; otherwise waiting rows do not hide a green or yellow result. */
 function overall(rows: readonly Row[]): Status {
   const judged = rows.filter((row) => row.status !== "waiting");
   return judged.length > 0 ? worst(judged) : "waiting";
@@ -595,7 +557,6 @@ function sections(report: Report): Embed[] {
   return embeds;
 }
 
-/** Keeps whole lines within the Discord description limit. */
 function fitDescription(lines: readonly string[]): string {
   const kept: string[] = [];
   let size = 0;
@@ -645,7 +606,6 @@ function embedSize(embed: Embed): number {
   return embed.title.length + embed.description.length + (embed.footer?.text.length ?? 0);
 }
 
-/** Packs the embeds into as few Discord messages as the limits allow. */
 function discordMessages(report: Report): Embed[][] {
   const messages: Embed[][] = [];
   let current: Embed[] = [];
@@ -674,19 +634,15 @@ async function sendDiscord(message: { readonly content?: string; readonly embeds
     response = await fetch(`${url}?wait=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // No mentions. The messages have no links, so they get no link previews.
       body: JSON.stringify({ ...message, allowed_mentions: { parse: [] } }),
       signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
     });
   } catch {
-    // The error text can contain the URL, which holds the webhook token. After a timeout, Discord can
-    // still have posted the message.
     throw new Error("Cannot reach the Discord webhook, or it did not answer in time.");
   }
   if (!response.ok) throw new Error(`The Discord webhook returned HTTP ${response.status}.`);
 }
 
-/** A normal state some time after a release: nothing to compare, and nothing failed. */
 const NO_PAIR = `Fewer than two releases have ${MIN_COMPUTERS} computers in the last ${WINDOW_DAYS} days; nothing to compare.`;
 
 async function buildReport(connection: Connection): Promise<Report | null> {
@@ -704,13 +660,11 @@ async function buildReport(connection: Connection): Promise<Report | null> {
   }
   const pair = { previous, next };
   const both = [previous, next];
-  // The read-only user may run 2 queries at a time, and a person can be using one.
   const turns = await query(turnSql(both));
   const startup = await query(startupSql(both));
   const failures = await query(failureSql(both));
   const errorCodes = await query(errorCodeSql(both));
   const causes = sendsCause(failures, previous) && sendsCause(failures, next) ? await query(causeSql(both)) : null;
-  // The SQL compares whole seconds.
   const updates = await query(updateSql(pair, previousFirstSeen.slice(0, 19), nextFirstSeen.slice(0, 19)));
   const resources = await query(resourceSql(both));
   const firstSeenTime = Date.parse(`${nextFirstSeen.replace(" ", "T")}Z`);
@@ -733,8 +687,6 @@ async function buildReport(connection: Connection): Promise<Report | null> {
     ...failureRows(failures, pair),
     ...risenErrors.slice(0, MAX_ERROR_ROWS),
     ...compare("updates", updates, "platform", pair, UPDATE_METRICS),
-    // system_resources summarizes the previous local day but carries the version that sends it, so the
-    // first days of a release mostly describe the release before it.
     ...compare("resources", resources, "platform", pair, RESOURCE_METRICS, !early),
   ];
   return {
@@ -761,10 +713,6 @@ async function writeReport(report: Report): Promise<string> {
   return path;
 }
 
-/**
- * The state file is in the GitHub Actions cache, which pull requests of this public repository can read.
- * It holds only an HMAC of the statuses, keyed by the private webhook URL, so it shows nothing.
- */
 const FINGERPRINT = /^[0-9a-f]{64}$/u;
 
 function fingerprint(report: Report): string {
@@ -774,7 +722,6 @@ function fingerprint(report: Report): string {
     .digest("hex");
 }
 
-/** The fingerprint of the last report that was sent; null when there is none or after a failure. */
 async function readState(path: string): Promise<string | null> {
   const text = await readFile(path, "utf8").catch(() => "");
   const sent = text.trim();
@@ -786,7 +733,6 @@ async function writeState(path: string, sent: string): Promise<void> {
   await writeFile(path, `${sent}\n`);
 }
 
-/** Without state, every run sends. With state, a run sends on a change and once a week. */
 function shouldSend(sent: string | null, current: string, always: boolean): boolean {
   const monday = new Date(Date.now()).getUTCDay() === 1;
   return always || monday || sent !== current;
@@ -840,13 +786,11 @@ async function main(): Promise<void> {
   } catch (error) {
     const detail = redactText(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-    // A failure clears the state, so the next good run sends the full report again.
     if (statePath) await writeState(statePath, "").catch(() => undefined);
     if (!quiet) {
       process.stderr.write(`${detail}\n`);
       return;
     }
-    // Public log: no detail. The detail goes to the private channel when it can.
     process.stderr.write("The release regression report failed.\n");
     if (discord) {
       await sendDiscord({
