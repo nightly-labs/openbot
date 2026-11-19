@@ -1738,6 +1738,10 @@ system and goes back to the pool for the next new server or the next move. The W
 A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
 so its 14 days start then.
 
+Before the Terms of 2026-11-19, the data was kept for 30 days. The maintainer decided on 2026-11-19
+that the 14 days also apply to a plan that ended before that date, with no 30-day grace. The first cron
+run after the deploy deletes each server whose plan ended 14 to 30 days before.
+
 Tested on 2026-11-12 with the test Worker, its D1 and one VPS in `AMS-01`: `add`, `status`, `sync`
 stop and start, the cron delete of a server whose plan ended 31 days before with a `canceled` Stripe
 test subscription, then `sync`. The reinstall took 51 seconds: the machine started 26 seconds after
