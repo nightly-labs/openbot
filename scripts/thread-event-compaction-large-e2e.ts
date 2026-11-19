@@ -1,25 +1,3 @@
-// Measures the compaction of old thread events on a large database (plan 011, item 23).
-//
-//   bun scripts/thread-event-compaction-large-e2e.ts [--size-gb=1.5]
-//
-// It makes a database with the latest schema and fills `orchestration_events` to `--size-gb` with events
-// of the shape that releases before #8166 and #8794 wrote: each conversation update has every message
-// of its thread. The mix follows a hosted server: `conversation.snapshot-updated` 71%,
-// `conversation.mailbox-reconciled` 13% (with queued deliveries that move), `turn.started` 2%, and
-// streamed flushes and appended messages, which have no message list. One long thread has a quarter of
-// the bytes, so the kill below lands inside a thread.
-//
-// Then it rebuilds each thread from its events (`rebuildThreadProjection`) and keeps a hash of the
-// result. A child process opens the database as a start does and runs the batch loop of a start. The
-// script kills it with SIGKILL after 30 batches, starts it again to the end, and starts it a third time,
-// which must rewrite nothing. It samples the free disk and the WAL during each run. At the end it
-// rebuilds each thread again and compares the hashes, and checks that each event row keeps its sequence,
-// id, command, type, time and every payload key other than `changedMessages`. Last, one VACUUM gives the
-// freed pages back to the disk (item 26); the script records its cost and checks the rows and replays again.
-//
-// Writes `.openbot-build/thread-event-compaction-large/report.json` and exits non-zero on a failure. The
-// report holds sizes, times and counts only, no message text.
-
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
@@ -67,10 +45,6 @@ function numberOf(db: DatabaseSync, sql: string, ...parameters: Array<string | n
   return isNumber(value) ? value : 0;
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Child: open the database as a start does and run the batch loop. One line for each batch, then the
-// result, so the parent can kill it after a number of batches.
-
 interface ChildResult {
   seconds: number;
   threads: number;
@@ -80,7 +54,6 @@ interface ChildResult {
   bytesAfter: number;
   batches: number;
   failedThreads: Record<string, number>;
-  /** Each batch is one write transaction on the main thread of the app. */
   batchMs: { p50: number; p99: number; max: number };
   slowestBatch: { index: number; events: number; rewritten: number; bytesBefore: number };
 }
@@ -124,8 +97,6 @@ if (child === "compact") {
   process.stdout.write(`result ${JSON.stringify(result)}\n`);
   process.exit(0);
 }
-// The compaction leaves the freed pages in the file. One VACUUM gives them back to the disk (plan 011,
-// item 26). SQLite writes its copy to `SQLITE_TMPDIR`, on the same volume.
 if (child === "vacuum") {
   const path = flag("database");
   if (!path) throw new Error("The child needs --database.");
@@ -138,9 +109,6 @@ if (child === "vacuum") {
   process.stdout.write(`result ${JSON.stringify({ seconds, maxRssBytes: process.resourceUsage().maxRSS * 1024 })}\n`);
   process.exit(0);
 }
-
-// ---------------------------------------------------------------------------------------------------
-// Parent.
 
 const sizeGb = Number(flag("size-gb") ?? "1.5");
 if (!(sizeGb > 0)) throw new Error("Usage: bun scripts/thread-event-compaction-large-e2e.ts [--size-gb=<GB>]");
@@ -157,8 +125,6 @@ if (freeBytes(OUT) < targetBytes * 2.5) {
   throw new Error(`This run needs ${((targetBytes * 2.5) / GIB).toFixed(1)} GB of free disk in ${OUT}.`);
 }
 const databasePath = join(root, "openbot.db");
-
-// ----- Generate
 
 const FILL = 'Lorem ipsum dolor sit amet, 界 "quoted" \\ path/to/file.ts:12 '.repeat(40);
 
@@ -231,10 +197,6 @@ async function generate(): Promise<Generated> {
     }
   };
 
-  /**
-   * One thread: a chat that grows to `length` messages, then `extra` updates of the whole chat, and
-   * more of them until all events have `untilBytes`.
-   */
   const writeThread = (threadIndex: number, threadId: string, length: number, extra: number, untilBytes = 0) => {
     const time = new Date(BASE + threadIndex * 86_400_000).toISOString();
     addThread.run(threadId, agent.id, time, time);
@@ -242,7 +204,6 @@ async function generate(): Promise<Generated> {
     for (let step = 0; step < length + extra || total < untilBytes; step++) {
       if (step < length) {
         const added = message(threadIndex, step);
-        // An agent message streams first, and a user message is appended first.
         if (added.author === "agent") {
           add(threadId, "response.delta-flushed", {
             detail: {},
@@ -266,7 +227,6 @@ async function generate(): Promise<Generated> {
           activeTurnId,
         });
       } else if (step % 6 === 0) {
-        // A queue whose position and time move on each reconcile.
         const queued = [1, 2].map((position) => ({
           ...message(threadIndex, 10_000 + position),
           author: "user" as const,
@@ -297,7 +257,6 @@ async function generate(): Promise<Generated> {
   };
 
   db.exec("BEGIN");
-  // The long thread, with a quarter of the bytes. Its id sorts first, so the kill lands in it.
   writeThread(0, "thread-a-long", 120, 400, targetBytes * 0.25);
   let threadIndex = 1;
   while (total < targetBytes) {
@@ -316,12 +275,8 @@ async function generate(): Promise<Generated> {
   };
 }
 
-// ----- Inspect
-
 interface TableSize {
-  /** Pages of `orchestration_events` and its indexes (`dbstat`). */
   tableAndIndexBytes: number;
-  /** Free bytes inside those pages. */
   unusedBytes: number;
   payloadBytes: number;
   rows: number;
@@ -349,7 +304,6 @@ function tableSize(db: DatabaseSync): TableSize {
   };
 }
 
-/** One hash of every event row without its message list: what compaction must not change. */
 function eventRowsHash(db: DatabaseSync): string {
   const hash = createHash("sha256");
   for (const row of db
@@ -365,7 +319,6 @@ function eventRowsHash(db: DatabaseSync): string {
   return hash.digest("hex");
 }
 
-/** The hash of each thread's replay: the chat, and the message, turn, activity and thread rows. */
 async function replayHashes(): Promise<Map<string, string>> {
   const database = new OpenBotDatabase(root);
   await runCauseEffect(database.initialize());
@@ -391,8 +344,6 @@ async function replayHashes(): Promise<Map<string, string>> {
   database.close();
   return hashes;
 }
-
-// ----- Measure
 
 interface Measured {
   result: ChildResult | null;
@@ -436,10 +387,6 @@ interface Sampled {
   wallSeconds: number;
 }
 
-/**
- * Runs a child mode of this script and samples the free disk and the WAL until it ends. `onLine` gets
- * each line of its output and a function that kills it with SIGKILL.
- */
 function runSampled(args: readonly string[], onLine: (line: string, kill: () => void) => void): Promise<Sampled> {
   return new Promise((resolvePromise, reject) => {
     const freeBefore = freeBytes(OUT);
@@ -473,7 +420,6 @@ function runSampled(args: readonly string[], onLine: (line: string, kill: () => 
   });
 }
 
-/** Runs the compaction child to the end, or kills it with SIGKILL after `killAfter` batches. */
 async function runChild(killAfter: number | null): Promise<Measured> {
   let batchesSeen = 0;
   let result: ChildResult | null = null;
@@ -507,10 +453,8 @@ inspect.close();
 const replayStarted = performance.now();
 const replaysBefore = await replayHashes();
 const replaySeconds = (performance.now() - replayStarted) / 1000;
-// The replay writes the projection rows, so the file before compaction is the file after it.
 const fileBytesBeforeCompaction = fileBytes(databasePath);
 
-// On a real computer the file is on disk long before the start.
 spawnSync("sync");
 const killedRun = await runChild(KILL_AFTER_BATCHES);
 const progressAfterKill = (() => {
@@ -540,7 +484,6 @@ after.close();
 const replaysAfter = await replayHashes();
 const replayDifferences = [...replaysBefore].filter(([threadId, hash]) => replaysAfter.get(threadId) !== hash).length;
 
-/** Runs one VACUUM in a child and samples the free disk and the WAL until it ends. */
 async function runVacuum() {
   const results: string[] = [];
   const run = await runSampled(["--child=vacuum", `--database=${databasePath}`], (line) => {
@@ -597,7 +540,6 @@ const report = {
     everyEventRowKept: sizeAfter.rows === before.rows && rowsHashAfter === rowsHashBefore,
     everyReplayTheSame: replayDifferences === 0 && replaysAfter.size === replaysBefore.size,
     payloadsSmaller: sizeAfter.payloadBytes < before.payloadBytes * 0.5,
-    // The freed pages go to the free list; the progress rows and a few index pages can add some.
     fileGrowsAtMost1Mib: sizeAfter.fileBytes - fileBytesBeforeCompaction <= 1024 ** 2,
     integrityAfter: integrityAfter === "ok",
     vacuumGivesBackTheFreePages:

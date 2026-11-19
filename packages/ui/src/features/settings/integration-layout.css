@@ -1,5 +1,3 @@
-/* The shared integration layout: see IntegrationLayout.tsx. */
-
 .integration-logo-tile {
   --integration-tile: 36px;
   display: inline-grid;
@@ -24,7 +22,6 @@
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
-/* An app icon fills its tile. */
 .integration-logo-tile > img {
   width: 100%;
   height: 100%;
@@ -32,7 +29,6 @@
   border-radius: inherit;
 }
 
-/* A connector's icon is a brand tile, so it fills its tile as an app icon does. */
 .integration-logo-tile > .connector-brand-tile {
   width: 100%;
   height: 100%;
@@ -55,9 +51,6 @@
   box-shadow: inset 0 0 0 1px currentColor;
 }
 
-/* ------------------------------------------------ page header */
-
-/* One gap between every part of an integration page. */
 .integration-page {
   display: grid;
   gap: var(--openbot-space-6);
@@ -82,7 +75,6 @@
   align-items: center;
 }
 
-/* A mark after the name, such as a shield, sits on the name's centre line. */
 .integration-detail-name {
   display: inline-flex;
   gap: var(--openbot-space-1-5);
@@ -94,8 +86,6 @@
   flex: none;
   gap: var(--openbot-space-2);
 }
-
-/* ------------------------------------------------ connect dialog */
 
 .integration-wizard {
   display: grid;
@@ -125,7 +115,6 @@
   height: 36px;
 }
 
-/* Dots flow from OpenBot to the other app while the flow runs. */
 .integration-wizard-link {
   width: 40px;
   height: 2px;
@@ -153,7 +142,6 @@
   animation: none;
 }
 
-/* The other app breathes while OpenBot waits for it. */
 .integration-wizard-target {
   display: inline-grid;
   border-radius: var(--openbot-radius-md);
@@ -188,7 +176,6 @@
   gap: var(--openbot-space-3);
 }
 
-/* A body whose parts are all hidden, such as a plugin dialog before a failure, takes no gap. */
 .integration-wizard-body:empty {
   display: none;
 }
@@ -204,13 +191,11 @@
   justify-content: flex-end;
 }
 
-/* CopyButton draws its icon at full size; match the 14px icons of the other footer buttons. */
 .integration-wizard-foot .ui-button > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
 }
 
-/* Above the settings window the flow opens from. */
 .integration-dialog-backdrop {
   z-index: calc(var(--openbot-layer-dialog) + 1);
 }
@@ -227,13 +212,10 @@
   transform: translate(-50%, -50%);
 }
 
-/* A page drawn in the dialog, such as a joined server's sign-in page, needs room to type in. */
 .integration-wizard-dialog[data-wide] {
   width: min(720px, calc(100vw - var(--openbot-space-6) * 2));
 }
 
-/* Over the Marketplace window and the menus it opens. Both portals are children of `body`, so the
-   order of insertion alone cannot put this one on top. */
 :is(.integration-dialog-backdrop, .integration-wizard-dialog)[data-nested] {
   z-index: calc(var(--openbot-layer-dialog-host) + 2);
 }
@@ -247,8 +229,6 @@
   top: var(--openbot-space-3);
   inset-inline-end: var(--openbot-space-3);
 }
-
-/* ------------------------------------------------ stepper */
 
 .integration-stepper {
   display: flex;
@@ -265,7 +245,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The line to a step: quiet until the flow reaches that step, then it fills from the left. */
 .integration-step + .integration-step::before {
   display: block;
   width: 24px;
@@ -342,34 +321,25 @@
   color: var(--openbot-success);
 }
 
-/* ------------------------------------------------ card content */
-
-/* Content of a card that is not rows: a form, a list, information. One body, so no row divider cuts it. */
 .integration-card-body {
   display: grid;
   gap: var(--openbot-space-3);
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* A field in a card has the size of the buttons beside it, as in Server settings. */
 .integration-card-body :where(.ui-input) {
   font-size: var(--openbot-text-lg);
   line-height: var(--openbot-leading-lg);
 }
 
-/* The last line of a card: what the rows above it mean. */
 .integration-card-note {
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* On the card fill, the danger tone needs its text step for contrast. */
 .integration-card-note[data-tone="danger"] {
   color: var(--openbot-danger-text);
 }
 
-/* ------------------------------------------------ disconnect dialog */
-
-/* What a disconnect removes and what it keeps, one line each. */
 .integration-effects {
   display: grid;
   margin: 0;
@@ -418,14 +388,10 @@
   color: var(--openbot-success);
 }
 
-/* The label on the soft danger fill reads the text step, as the shared confirmation does for contrast. */
 .integration-confirm.ui-button-variant-destructive {
   color: var(--openbot-danger-text);
 }
 
-/* ------------------------------------------------ linked rows */
-
-/* The whole row opens the integration, as on Marketplace cards. Buttons in the row stay on top. */
 .integrations-hub-row {
   position: relative;
   border-radius: var(--openbot-radius-md);
@@ -475,7 +441,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* Right to left, the arrow points the other way. */
 .integrations-hub-chevron:dir(rtl) {
   transform: scaleX(-1);
 }
@@ -510,12 +475,10 @@
   --integrations-agent-face-size: 24px;
 }
 
-/* In a list that also has agent faces, an icon stays in the middle of the same column, so the titles align. */
 .ui-item-group:has(.integrations-agent-face:not([data-size="sm"])) .ui-item-media > svg {
   margin-inline: calc((32px - var(--openbot-icon-lg)) / 2);
 }
 
-/* An agent avatar stands low in its box. Lift it to the middle, as the marketplace avatar does. */
 .integrations-agent-face > * {
   --agent-avatar-optical-offset: calc(var(--integrations-agent-face-size) * -0.14);
   width: 100%;

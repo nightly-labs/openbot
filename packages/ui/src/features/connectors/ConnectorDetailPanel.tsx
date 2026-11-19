@@ -43,9 +43,6 @@ import {
   whatsappOrchestrator,
 } from "../settings/WhatsAppIntegrationPanel";
 
-/**
- * The page of one connector, with its live state and actions, as Marketplace › Apps shows it. Read the props through getters, so the page follows them.
- */
 export type ConnectorDetail =
   | { id: "github"; props: GitHubConnectorPanelProps }
   | { id: "onepassword"; props: OnePasswordConnectorPanelProps }
@@ -55,16 +52,13 @@ export type ConnectorDetail =
   | { id: "telegram"; props: TelegramIntegrationPanelProps }
   | { id: "whatsapp"; props: WhatsAppIntegrationPanelProps };
 
-/** What a list of connectors shows for one connector: its status and one line about it. */
 export interface ConnectorSummary {
   status: IntegrationStatus;
   statusLabel: string;
   summary: string;
-  /** The agents that answer through the connector, when some agents do and the others do not. */
   agents?: IntegrationAgent[] | undefined;
 }
 
-/** What a list shows for a connector whose state OpenBot could not read. */
 function unknownSummary(t: TextValue["t"]): ConnectorSummary {
   return { status: UNKNOWN_STATUS.status, statusLabel: t(UNKNOWN_STATUS.label), summary: t("connector.readFailed") };
 }
@@ -212,7 +206,6 @@ export function connectorSummary(detail: ConnectorDetail, t: TextValue["t"]): Co
   }
 }
 
-/** What the connector gives, for its information: the text that its page header shows without a tagline. */
 export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"]): string {
   switch (detail.id) {
     case "github": {
@@ -241,10 +234,6 @@ export function connectorDescription(detail: ConnectorDetail, t: TextValue["t"])
   }
 }
 
-/**
- * The page of the connector that `detail` names. `intro` and `details` are what the page that shows it adds,
- * such as the Marketplace information.
- */
 export function ConnectorDetailPanel(props: { detail: ConnectorDetail } & IntegrationPageSlots) {
   const github = () => (props.detail.id === "github" ? props.detail : undefined);
   const onePassword = () => (props.detail.id === "onepassword" ? props.detail : undefined);

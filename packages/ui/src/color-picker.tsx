@@ -30,10 +30,6 @@ import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack }
 import { type Spring, springKeyframes, springProgress } from "./spring-motion";
 import { useText } from "./text";
 
-// ---------------------------------------------------------------------------
-// Color math (as in beUI)
-// ---------------------------------------------------------------------------
-
 interface Hsv {
   h: number;
   s: number;
@@ -57,7 +53,6 @@ function hsvToRgb({ h, s, v }: Hsv): Rgb {
   return { r: Math.round(f(5) * 255), g: Math.round(f(3) * 255), b: Math.round(f(1) * 255) };
 }
 
-/** `previous` keeps hue for greys and saturation for black, which RGB cannot carry. */
 function rgbToHsv({ r, g, b }: Rgb, previous?: Hsv): Hsv {
   const rn = r / 255;
   const gn = g / 255;
@@ -105,10 +100,6 @@ function formatHex({ r, g, b }: Rgb): AvatarColor {
   return `#${pair(r)}${pair(g)}${pair(b)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Springs. The beUI springs (stiffness, damping, mass) as a period and a damping fraction.
-// ---------------------------------------------------------------------------
-
 function physical(stiffness: number, damping: number, mass: number): Spring {
   const angular = Math.sqrt(stiffness / mass);
   return {
@@ -121,7 +112,6 @@ const SPRING_PRESS = physical(500, 30, 0.6);
 const SPRING_LAYOUT = physical(360, 32, 0.6);
 const LOUPE_LIFT = physical(520, 24, 0.6);
 
-/** A spring as a CSS `linear()` easing, to use with a duration of `spring.response` seconds. */
 function springEasing(spring: Spring, samples = 40): string {
   const end = springProgress(spring.response, spring);
   const points = Array.from({ length: samples + 1 }, (_, index) =>
@@ -141,38 +131,25 @@ const SPRING_STYLE = [
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** A preset swatch: its color and its accessible name. */
 interface ColorPreset {
   value: AvatarColor;
   label: string;
 }
 
-// ---------------------------------------------------------------------------
-// The picker
-// ---------------------------------------------------------------------------
-
 export interface ColorPickerProps {
-  /** Names the panel, for example "Your chat color". */
   label: string;
-  /** The preset swatches after "No color". */
   presets: readonly ColorPreset[];
-  /** The current color, or null for no color. */
   value: AvatarColor | null;
-  /** Live: each drag frame, key, preset and field commit. */
   onChange: (value: AvatarColor | null) => void;
-  /** The name of the first swatch, which gives null. "No color" when it is absent. */
   clearLabel?: string;
 }
 
-/** The area starts on this blue when there is no color yet. */
 const START_COLOR = "#3478f6";
 
 export function ColorPicker(props: ColorPickerProps) {
   const { t } = useText();
-  // The picker owns its state while it is open: the value is read once, as the start value.
   const start = untrack(() => props.value);
   const [hsv, setHsv] = createSignal<Hsv>(rgbToHsv(parseHex(start ?? START_COLOR) ?? { r: 52, g: 120, b: 246 }));
-  // Null shows "No color" selected. The area keeps the last color, so a drag starts from it.
   const [cleared, setCleared] = createSignal(start === null);
   const hex = createMemo(() => formatHex(hsvToRgb(hsv())));
   const [format, setFormat] = createSignal<Format>("hex");
@@ -234,10 +211,6 @@ export function ColorPicker(props: ColorPickerProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Pointer drag shared by the area and the hue slider
-// ---------------------------------------------------------------------------
-
 function createDrag(onPoint: (x: number, y: number) => void) {
   const [dragging, setDragging] = createSignal(false);
   const [tilt, setTilt] = createSignal(0);
@@ -251,7 +224,6 @@ function createDrag(onPoint: (x: number, y: number) => void) {
     if (!rect || rect.width === 0 || rect.height === 0) return;
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     onPoint(x, clamp((event.clientY - rect.top) / rect.height, 0, 1));
-    // The loupe swings against the drag, as a pendulum: ±400 %/s gives ∓16°.
     if (last && event.timeStamp > last.time) {
       const velocity = ((x - last.x) * 100) / ((event.timeStamp - last.time) / 1000);
       setTilt(clamp((-velocity / 400) * 16, -16, 16));
@@ -378,7 +350,6 @@ function Hue(props: { hsv: Hsv; update: (next: Hsv) => void }) {
   return (
     <div class={["chat-color-picker-hue", { "chat-color-picker-dragging": drag.dragging() }]} {...drag.handlers}>
       <span class="chat-color-picker-ring" aria-hidden="true" />
-      {/* The rail is inset by half a thumb, so the thumb never leaves the rounded track. */}
       <span ref={drag.rail} class="chat-color-picker-hue-rail" style={`--chat-color-x: ${(props.hsv.h / 360) * 100}`}>
         <span class="chat-color-picker-track">
           <button
@@ -416,12 +387,10 @@ function Hue(props: { hsv: Hsv; update: (next: Hsv) => void }) {
 
 declare global {
   interface Window {
-    /** Chromium has the EyeDropper API; the TypeScript DOM library does not have it yet. */
     EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> };
   }
 }
 
-/** The EyeDropper API, or undefined in a browser that does not have it, such as Safari. */
 function eyeDropperApi() {
   return typeof window === "undefined" ? undefined : window.EyeDropper;
 }
@@ -441,9 +410,7 @@ function EyeDropper(props: { hsv: Hsv; update: (next: Hsv) => void }) {
               const { sRGBHex } = await new Constructor().open();
               const parsed = parseHex(sRGBHex);
               if (parsed) props.update(rgbToHsv(parsed, props.hsv));
-            } catch {
-              // Dismissed with Escape.
-            }
+            } catch {}
           }}
         >
           <Pipette aria-hidden="true" />
@@ -489,7 +456,6 @@ function HexField(props: { hsv: Hsv; hex: string; cleared: boolean; update: (nex
         onInput={(event) => {
           const next = event.currentTarget.value.replace(/^#/, "");
           setDraft(next);
-          // Live only at six digits, so "abc" on the way to "abcdef" does not flash a short color.
           if (next.length === 6) {
             const parsed = parseHex(next);
             if (parsed) props.update(rgbToHsv(parsed, props.hsv));
@@ -511,10 +477,6 @@ function HexField(props: { hsv: Hsv; hex: string; cleared: boolean; update: (nex
 
 const HASH = "#";
 
-// ---------------------------------------------------------------------------
-// Format switch and channels (as in the beUI preview)
-// ---------------------------------------------------------------------------
-
 const FORMATS = ["hex", "rgb", "hsl"] as const;
 type Format = (typeof FORMATS)[number];
 type ChannelFormat = Exclude<Format, "hex">;
@@ -532,7 +494,6 @@ function FormatButton(props: { format: Format; onCycle: (next: Format) => void }
       })}
       onClick={() => props.onCycle(next())}
     >
-      {/* The new label rises in from below, as the beUI swap does. */}
       <Show when={props.format} keyed>
         {(format) => <span class="chat-color-picker-format-label">{format.toUpperCase()}</span>}
       </Show>
@@ -641,7 +602,6 @@ function Presets(props: {
   const selected = () =>
     props.cleared ? "none" : (props.presets.find((preset) => preset.value === props.hex)?.value ?? null);
 
-  /** Moves the ring to the selected swatch. It hops over a low arc above the row, as in beUI. */
   const place = (key: string | null) => {
     if (!row || !ring) return;
     const target = key ? row.querySelector<HTMLElement>(`[data-preset="${key}"]`) : null;
@@ -668,7 +628,6 @@ function Presets(props: {
     previous = next;
   };
 
-  // A drag or a typed hex that leaves the presets hides the ring; a preset moves it.
   createEffect(selected, place);
 
   return (
@@ -711,16 +670,10 @@ function Presets(props: {
   );
 }
 
-// ---------------------------------------------------------------------------
-// The popover and the select-like trigger
-// ---------------------------------------------------------------------------
-
-/** A duration token in milliseconds, for example `--openbot-duration-dialog: 180ms`. */
 function durationToken(element: Element, name: string): number {
   return Number.parseFloat(getComputedStyle(element).getPropertyValue(name)) || 0;
 }
 
-/** Plays the open backwards, to the dot. A cancelled animation rejects; the popover closes all the same. */
 async function playClose(panel: HTMLElement, shift: number): Promise<void> {
   if (reducedMotion()) return;
   const animation = panel.animate(
@@ -730,7 +683,6 @@ async function playClose(panel: HTMLElement, shift: number): Promise<void> {
   await animation.finished.catch(() => undefined);
 }
 
-/** The trigger that a popover opens from, and the dot that its open grows out of. */
 export interface ColorPickerAnchor {
   trigger: HTMLElement;
   dot: HTMLElement | undefined;
@@ -738,23 +690,15 @@ export interface ColorPickerAnchor {
 
 export interface ColorPickerPopoverProps {
   anchor: ColorPickerAnchor;
-  /** Names the popover. */
   label: string;
-  /** Called when the close animation ends. */
   onClose: () => void;
-  /** Receives the function that plays the close and then calls `onClose`. */
   controls: (close: () => void) => void;
   children: JSX.Element;
 }
 
-/**
- * A popover beside its trigger: below it when it fits, above it when not. Escape, and a press outside
- * the popover and the trigger, close it.
- */
 export function ColorPickerPopover(props: ColorPickerPopoverProps) {
   let panel: HTMLDivElement | undefined;
   let closing = false;
-  /** The 6px that the popover travels: down into place under the row, up into place over it. */
   let shift = -6;
   const close = () => {
     if (closing || !panel) return;
@@ -764,7 +708,6 @@ export function ColorPickerPopover(props: ColorPickerPopoverProps) {
   };
   props.controls(close);
 
-  /** Puts the popover 6px from the row, its end edge on the row's end edge, and below the row when it fits. */
   const place = () => {
     if (!panel || closing) return;
     const gutter = 8;
@@ -788,7 +731,6 @@ export function ColorPickerPopover(props: ColorPickerPopoverProps) {
 
   onSettled(() => {
     if (!panel) return;
-    // Synchronous, so the first frame of the open is already in place.
     place();
     const resize = new ResizeObserver(place);
     resize.observe(panel);
@@ -797,7 +739,6 @@ export function ColorPickerPopover(props: ColorPickerPopoverProps) {
       if (props.anchor.trigger.contains(event.target)) return;
       close();
     };
-    // Captured and stopped, so Escape closes only the popover and not the settings dialog under it.
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || closing) return;
       event.stopPropagation();
@@ -813,8 +754,6 @@ export function ColorPickerPopover(props: ColorPickerPopoverProps) {
     };
   });
 
-  // In a dialog, the popover mounts in it, as the select menus of the settings do. A click on the
-  // popover is then a click in the dialog, and the dialog stays open.
   const mount = () => props.anchor.trigger.closest<HTMLElement>('[role="dialog"]') ?? document.body;
 
   return (
@@ -827,15 +766,12 @@ export function ColorPickerPopover(props: ColorPickerPopoverProps) {
 }
 
 export interface ColorPickerTriggerProps {
-  /** The accessible name of the trigger. */
   label: string;
   expanded: boolean;
   onClick: (trigger: HTMLElement) => void;
-  /** The dot and the color name. */
   children: JSX.Element;
 }
 
-/** A trigger for a color popover that looks like the select triggers beside it. */
 export function ColorPickerTrigger(props: ColorPickerTriggerProps) {
   return (
     <button

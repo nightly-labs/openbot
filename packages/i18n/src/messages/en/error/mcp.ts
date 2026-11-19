@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.mcp", {
-  // MCP sign-in errors, and the sign-in page in the browser.
   "error.mcp.redirectByName": "This address is not reachable by name.",
   "error.mcp.redirectNotSignIn": "This address is not part of a sign-in.",
   "error.mcp.redirectRefused": "The sign-in was refused. Go back to OpenBot and try again.",
@@ -19,6 +18,7 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.signInAppUnsupported": "This server does not support sign-in apps. Update OpenBot on the host.",
   "error.mcp.redirectRelayed": "OpenBot sent the sign-in to the server. You can close this window.",
   "error.mcp.relayEnded": "This sign-in ended. Start it again.",
+  "error.mcp.signInLinkNotReady": "The sign-in page is not open yet. Try again in a moment.",
   "error.mcp.relayNoState":
     "The server's sign-in page does not protect its return address, so OpenBot does not open it on this computer.",
   "error.mcp.relayAddressInvalid":

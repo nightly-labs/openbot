@@ -24,6 +24,10 @@ export const messages = {
     "El host no ha permitido que OpenBot grabe su pantalla. Concede permiso de grabación de pantalla en el host e inténtalo de nuevo.",
   "error.remote.windowsSessionDisconnected":
     "La sesión de Windows del host está desconectada, así que no hay pantalla para compartir. Inicia sesión en Windows en la pantalla del host e inténtalo de nuevo.",
+  "error.remote.streamTooSlowLowerQuality":
+    "La conexión con el host es demasiado lenta para la imagen. Inténtalo de nuevo: la próxima conexión usará una calidad más baja.",
+  "error.remote.streamTooSlow":
+    "La conexión con el host es demasiado lenta para la imagen. Usa una red más rápida e inténtalo de nuevo.",
   "error.remote.teamSessionExpired": "La sesión del equipo caducó.",
   "error.remote.finishTestBeforeSwitch": "Termina la prueba de escritorio remoto antes de cambiar de pantalla.",
   "error.remote.displayNotFound": "No se encontró la pantalla remota.",
@@ -188,6 +192,8 @@ export const messages = {
   "error.remote.iceFailed":
     "No se pudo establecer una conexión directa con el host. Un cortafuegos, una VPN o un proxy pueden bloquearla.",
   "error.remote.iceDisconnected": "Se perdió la conexión directa con el host.",
+  "error.remote.webrtcBlocked":
+    "Este dispositivo bloquea la conexión que necesita OpenBot. Si el modo de aislamiento está activado, desactívalo para OpenBot en Ajustes > Privacidad y seguridad > Modo de aislamiento.",
   "error.remote.directoryUnreachable": "OpenBot no pudo acceder al servicio de OpenBot. Comprueba tu conexión.",
   "error.remote.directoryTimeout": "El servicio de OpenBot no respondió a tiempo. Inténtalo de nuevo.",
   "error.remote.inviteAlreadyUsed": "Esta invitación ya se usó. Pide una nueva invitación.",

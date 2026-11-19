@@ -1,6 +1,5 @@
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 
-/** How long a run took, such as "2 min 14 s", or null while it goes on. */
 export function formatRunDuration(startedAt: string, endedAt: string | null, t: MobileTranslate): string | null {
   if (!endedAt) return null;
   const total = Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000);

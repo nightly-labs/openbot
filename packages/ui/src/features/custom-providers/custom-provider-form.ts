@@ -1,7 +1,3 @@
-// Form side of the user-named endpoint: field names are the form's own (labels/error index),
-// submit produces the contract `SaveCustomProviderInput` verbatim. Every bound/pattern comes
-// from the contract; main rechecks on save, so a drifted copy would pass the form and fail save.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CustomProviderHarness,
@@ -29,20 +25,15 @@ import { currentText } from "../../text";
 export interface CustomModelDraft {
   id: string;
   name: string;
-  /** Tokens, as typed. Blank keeps OpenCode's default. */
   contextWindow?: string;
-  /** The largest completion, as typed. Blank keeps the guess from the context window. */
   maxOutput?: string;
-  /** The checked efforts, in any order. None keeps the harness's own efforts. */
   reasoningEfforts?: CustomProviderReasoningEffort[];
-  /** The checked input kinds beside text, in any order. Empty: text only. Absent: the harness's default. */
   inputs?: CustomProviderInputKind[];
 }
 
 export interface CustomHeaderDraft {
   name: string;
   value: string;
-  /** The name of a saved header. Main holds its value, which an empty field keeps. */
   savedName?: string;
 }
 
@@ -53,17 +44,14 @@ export interface CustomProviderDraft {
   apiKey: string;
   models: CustomModelDraft[];
   headers: CustomHeaderDraft[];
-  /** The provider that runs the endpoint. Absent: the form sends none, and main keeps OpenCode. */
   harness?: CustomProviderHarness;
 }
 
-/** One message per field, plus one per repeatable row, indexed the way the form renders them. */
 export interface CustomProviderErrors {
   providerId?: string;
   displayName?: string;
   baseUrl?: string | undefined;
   apiKey?: string;
-  /** Nothing usable in the whole list, so no single row owns the message. */
   models?: string;
   modelRows: (string | undefined)[];
   headerRows: (string | undefined)[];
@@ -80,17 +68,12 @@ export function emptyCustomProviderDraft(): CustomProviderDraft {
   };
 }
 
-/** The header rows of a saved endpoint: each saved name, with an empty value that keeps the saved one. */
 export function savedHeaderDrafts(names: readonly string[] | undefined): CustomHeaderDraft[] {
   return names && names.length > 0
     ? names.map((name) => ({ name, value: "", savedName: name }))
     : [{ name: "", value: "" }];
 }
 
-/**
- * The form for a saved endpoint. The key and the header values stay in main, so their fields open
- * blank, and blank fields keep them (`customProviderUpdate`).
- */
 export function savedCustomProviderDraft(
   provider: CustomProviderSummary,
   format: Pick<AppFormat, "number">,
@@ -116,7 +99,6 @@ export function savedCustomProviderDraft(
   };
 }
 
-/** A row the user has not filled in yet: carried by the form, ignored by validation and submit. */
 export function blankModel(model: CustomModelDraft): boolean {
   return (
     !model.id.trim() &&
@@ -127,11 +109,6 @@ export function blankModel(model: CustomModelDraft): boolean {
   );
 }
 
-/**
- * A typed token count: undefined when blank, null when it is not a usable count. The text is plain
- * digits, or groups of three digits with one separator, so `128,000`, `128 000` and `128.000` are
- * all 128000. A decimal such as `200000.0` or `1300.5` is refused, not read as a larger number.
- */
 function tokenCount(text: string | undefined, inRange: (value: number) => boolean): number | null | undefined {
   const typed = text?.trim() ?? "";
   if (!typed) return undefined;
@@ -140,25 +117,16 @@ function tokenCount(text: string | undefined, inRange: (value: number) => boolea
   return inRange(value) ? value : null;
 }
 
-/**
- * A token count as the form shows it: in groups of three digits, as `1,048,576`, so a long number is
- * easy to read. Plain digits when the form cannot read the grouped text of the language back.
- */
 export function tokenCountText(value: number, format: Pick<AppFormat, "number">): string {
   const text = format.number(value);
   return tokenCount(text, () => true) === value ? text : value.toString();
 }
 
-/**
- * A token count while the user edits it: plain digits, so the change of one digit is always a valid
- * count. Text that is not a count stays as typed.
- */
 export function tokenCountEditText(text: string): string {
   const value = tokenCount(text, () => true);
   return typeof value === "number" ? value.toString() : text;
 }
 
-/** A token count when the user leaves its field: in groups again. Other text stays as typed. */
 export function tokenCountRestText(text: string, format: Pick<AppFormat, "number">): string {
   const value = tokenCount(text, () => true);
   return typeof value === "number" ? tokenCountText(value, format) : text;
@@ -176,15 +144,10 @@ function blankHeader(header: CustomHeaderDraft): boolean {
   return !header.name.trim() && !header.value.trim();
 }
 
-/** A saved header whose value the user left empty. Main fills it in. */
 export function keepsHeaderValue(header: CustomHeaderDraft): boolean {
   return header.savedName !== undefined && header.name.trim() === header.savedName && !header.value.trim();
 }
 
-/**
- * A locked ID names a saved endpoint, so it has no ID checks: main accepts a saved ID that a later
- * release made a built-in provider name, and the user cannot change a locked field.
- */
 export function validateCustomProvider(
   draft: CustomProviderDraft,
   ids: { taken?: readonly string[] | undefined; locked?: boolean | undefined } = {},
@@ -206,8 +169,6 @@ export function validateCustomProvider(
     } else if (AGENT_PROVIDERS.some((provider) => provider === providerId)) {
       errors.providerId = t("customProvider.error.providerIdBuiltIn", { id: providerId });
     } else if (ids.taken?.includes(providerId)) {
-      // There is no way to overwrite a saved ID: main refuses the save, and this says so before the
-      // round trip.
       errors.providerId = t("customProvider.error.providerIdSaved", { id: providerId });
     }
   }
@@ -262,14 +223,9 @@ export function validateCustomProvider(
       return;
     }
     if (model.maxOutput?.trim() && contextWindowValue(model) === undefined) {
-      // The backend writes a saved output cap into the same `limit` as the window, so a cap with no
-      // window has nowhere to land and would be stored and silently ignored.
       errors.modelRows[index] = t("customProvider.error.maxOutputNeedsWindow");
       return;
     }
-    // OpenCode reports this model as `<provider id>/<model id>`, and both the IPC and Team API list
-    // decoders fail closed on the whole array when one id is malformed - which empties the picker
-    // rather than hiding one row. So the composed id is checked here, where the user can still fix it.
     if (!errors.providerId && !isAgentModel(composedCustomModelId(providerId, id))) {
       errors.modelRows[index] = t("customProvider.error.modelIdInvalid");
     }
@@ -304,7 +260,6 @@ function parseUrl(value: string): URL | null {
   }
 }
 
-/** The base URL rules on their own, for an address that is not part of a full endpoint form. */
 export function endpointUrlError(url: string, t: AppTranslate = currentText().t): string | undefined {
   return baseUrlError(url.trim(), t);
 }
@@ -316,12 +271,7 @@ function baseUrlError(baseUrl: string, t: AppTranslate): string | undefined {
   }
   const parsed = parseUrl(baseUrl);
   if (!parsed) return t("customProvider.error.baseUrlInvalid", { example: "http://127.0.0.1:11434/v1" });
-  // `http:` is the main case, not the exception: a custom provider is usually a model server on this
-  // computer, which has no certificate. Anything else - `file:`, `ws:`, `javascript:` - is not an
-  // endpoint OpenCode can call.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return t("customProvider.error.baseUrlProtocol");
-  // A credential in the URL is stored and listed as plain text, because only the key and the headers
-  // are encrypted. The user is told where it belongs instead.
   if (parsed.username || parsed.password) return t("customProvider.error.baseUrlCredential");
   return undefined;
 }
@@ -338,10 +288,6 @@ export function hasCustomProviderError(errors: CustomProviderErrors): boolean {
   );
 }
 
-/**
- * The wire payload: trimmed, with the blank placeholder rows dropped. A kept saved header has an
- * empty value, which only `customProviderUpdate` sends.
- */
 export function customProviderValue(draft: CustomProviderDraft): SaveCustomProviderInput {
   const models = draft.models
     .filter((model) => !blankModel(model))
@@ -350,19 +296,15 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
       const name = model.name.trim() || id;
       const contextWindow = contextWindowValue(model);
       const maxOutput = maxOutputValue(model);
-      // The contract wants each effort one time, in its own order.
       const reasoningEfforts = CUSTOM_PROVIDER_REASONING_EFFORTS.filter((effort) =>
         model.reasoningEfforts?.includes(effort),
       );
-      // The same for the input kinds, where an empty list means text only. A kind that the harness
-      // cannot send stays saved, so that a change of harness and back loses nothing.
       const inputs = model.inputs && CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) => model.inputs?.includes(kind));
       return {
         id,
         name,
         ...(typeof contextWindow === "number" ? { contextWindow } : {}),
         ...(typeof maxOutput === "number" ? { maxOutput } : {}),
-        // An empty list is a choice: a model that takes no effort (#7500).
         ...(model.reasoningEfforts ? { reasoningEfforts } : {}),
         ...(inputs ? { inputs } : {}),
       };
@@ -371,8 +313,6 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
     id: draft.providerId.trim(),
     name: draft.displayName.trim(),
     baseUrl: draft.baseUrl.trim(),
-    // An empty key is not an empty string downstream: it means "this endpoint needs no key", and a
-    // blank `apiKey` in the OpenCode config would be sent as an empty Authorization header.
     apiKey: draft.apiKey.trim() || null,
     models,
     headers: draft.headers
@@ -382,12 +322,6 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
   };
 }
 
-/**
- * An edit of a saved endpoint: a blank key keeps the stored one, and an empty header value keeps the
- * saved value of that name. The header list replaces the saved one, so a removed row removes its
- * header; main keeps the ciphertext when the list names every saved header unchanged. There is no
- * way to clear the key here, which is the rule of `customProviders.update`.
- */
 export function customProviderUpdate(value: SaveCustomProviderInput): UpdateCustomProviderInput {
   return {
     id: value.id,
@@ -400,29 +334,22 @@ export function customProviderUpdate(value: SaveCustomProviderInput): UpdateCust
   };
 }
 
-/** The address and credentials that a model list request needs. The form does not send it itself. */
 export interface CustomProviderEndpoint {
   baseUrl: string;
   apiKey: string | null;
   headers: CustomHeaderDraft[];
-  /** The saved endpoint that the form edits, so main can use its stored key for the same origin. */
   savedProviderId?: string;
 }
 
 export interface DiscoveredModel {
   id: string;
   name?: string;
-  /** For a saved model: the context window the user set, which Edit must keep. */
   contextWindow?: number;
-  /** For a saved model: the max output the user set, which Edit must keep. */
   maxOutput?: number;
-  /** For a saved model: the efforts the user set, which Edit must keep. */
   reasoningEfforts?: CustomProviderReasoningEffort[];
-  /** For a saved model: the input kinds the user set, which Edit must keep. */
   inputs?: CustomProviderInputKind[];
 }
 
-/** The row holds a value that the list gives for its model, so the form can say where it comes from. */
 export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel): boolean {
   const window = found.contextWindow !== undefined && contextWindowValue(row) === found.contextWindow;
   const inputs = found.inputs !== undefined && row.inputs?.join() === found.inputs.join();
@@ -431,10 +358,6 @@ export function holdsFoundValues(row: CustomModelDraft, found: DiscoveredModel):
   return window || inputs || efforts;
 }
 
-/**
- * Puts what a model list says about a model into the empty fields of its row (#3946). A typed or
- * saved value stays.
- */
 export function fillFoundValues(
   row: CustomModelDraft,
   found: DiscoveredModel,
@@ -443,7 +366,6 @@ export function fillFoundValues(
   if (!row.contextWindow?.trim() && found.contextWindow !== undefined) {
     row.contextWindow = tokenCountText(found.contextWindow, format);
   }
-  // A max output needs a window, as `validateCustomProvider` says, and must leave room for the prompt.
   const window = contextWindowValue(row);
   if (
     !row.maxOutput?.trim() &&
@@ -454,13 +376,11 @@ export function fillFoundValues(
     row.maxOutput = tokenCountText(found.maxOutput, format);
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
-  // No saved efforts is an empty field; an empty list is the user's choice of no effort (#7500).
   if (row.reasoningEfforts === undefined && found.reasoningEfforts !== undefined) {
     row.reasoningEfforts = [...found.reasoningEfforts];
   }
 }
 
-/** The state of one `GET {baseUrl}/models` request, owned by the host that makes it. */
 export type ModelDiscovery =
   | { status: "idle" }
   | { status: "loading" }

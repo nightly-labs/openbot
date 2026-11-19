@@ -226,6 +226,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Сначала спрашивать",
 
   "agentSettings.links.usage": "Использование",
+  "agentSettings.links.apps": "Приложения",
+  "agentSettings.links.appsScope": "Все агенты",
   "agentSettings.links.memories": "Память",
   "agentSettings.links.memoriesCount": {
     one: "Сохранено: {count}",

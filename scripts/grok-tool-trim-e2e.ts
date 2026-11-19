@@ -1,9 +1,3 @@
-// Runs the real `grok` provider driver and the real Grok binary against a fake xAI Responses server,
-// to check which tools each request declares. Grok must not declare `send_feedback`, which sends
-// feedback to xAI, or `workflow`, a background agent fleet that OpenBot does not show. The image and
-// video tools stay: an agent can attach the files they make. Grok runs with a temporary `GROK_HOME`
-// and a fake key, so no account, quota or user setting is used.
-// `bun scripts/grok-tool-trim-e2e.ts`. Writes .openbot-build/grok-tool-trim-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -23,7 +17,6 @@ const KEPT = ["run_terminal_command", "image_gen", "image_to_video"];
 interface Report {
   passed: boolean;
   grokVersion?: string;
-  /** The tool names and the body size of each request that declares tools. */
   requests: Array<{ bytes: number; tools: string[] }>;
   turn?: { error: string | null; status: string | null };
   error?: string;
@@ -48,7 +41,6 @@ interface OutputItem {
   content: Array<{ type: "output_text"; text: string; annotations: [] }>;
 }
 
-/** One server-sent event of a streamed Responses answer. */
 interface StreamEvent {
   type: string;
   output_index?: number;
@@ -70,7 +62,6 @@ interface StreamEvent {
   };
 }
 
-/** A streamed Responses answer with one short text, with each field that Grok requires. */
 function answer(response: ServerResponse): void {
   const item: OutputItem = {
     type: "message",
@@ -130,7 +121,6 @@ try {
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
   const workspace = join(root, "workspace");
   await mkdir(workspace, { recursive: true });
-  // Grok must not read the developer's own sign-in, MCP servers, skills and memory.
   Object.assign(process.env, {
     HOME: root,
     GROK_HOME: join(root, ".grok"),

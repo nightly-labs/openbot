@@ -12,8 +12,6 @@ import {
 
 const removedSchema = z.object({ guildId: z.string().regex(/^[0-9]{1,24}$/u) });
 
-// Signal reports a guild that removed the OpenBot bot. The link goes at once, so another account can
-// connect the guild, and a host that is offline does not keep it.
 export const Route = createFileRoute("/v2/remote/discord-route/removed")({
   server: {
     handlers: {

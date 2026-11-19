@@ -1,5 +1,3 @@
-/** A media step: an image or a video that a model makes from a description. */
-
 import {
   isWorkflowMediaSide,
   WORKFLOW_MEDIA_ASPECTS,
@@ -18,6 +16,7 @@ import {
   workflowMediaResolutions,
   workflowMediaSpecs,
   workflowVideoDurations,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -33,12 +32,14 @@ import {
   Minimize2,
   Play,
   Popover,
+  SliderField,
   Square,
   Textarea,
   Type,
+  Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
@@ -64,11 +65,9 @@ import {
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type Aspect = WorkflowMediaAspect;
-/** The frame of a step: an aspect ratio of the model, or a size of its own in pixels. */
 type Frame = Aspect | typeof WORKFLOW_MEDIA_CUSTOM_ASPECT;
 const FRAMES: readonly Frame[] = [...WORKFLOW_MEDIA_ASPECTS, WORKFLOW_MEDIA_CUSTOM_ASPECT];
 
-/** A length in whole seconds. The model of the step sets which lengths it takes. */
 const asSeconds = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 const asText = (value: unknown): string | undefined => (typeof value === "string" && value ? value : undefined);
@@ -78,7 +77,6 @@ function aspectRatio(aspect: Aspect): string {
   return aspect.replace(":", " / ");
 }
 
-/** The size that a custom frame starts at: the aspect ratio that the step had, in common pixels. */
 const CUSTOM_START = {
   "1:1": { width: 1024, height: 1024 },
   "4:3": { width: 1024, height: 768 },
@@ -97,7 +95,6 @@ const ASPECT_SHAPE = {
   "5:4": "workflow.image.aspect.print",
 } as const satisfies Record<Aspect, AppTextKey>;
 
-/** The background of an image: the model's own, or clear pixels around the subject. */
 const BACKGROUNDS = ["solid", "transparent"] as const;
 type Background = (typeof BACKGROUNDS)[number];
 
@@ -106,7 +103,6 @@ const BACKGROUND_TEXT = {
   transparent: "workflow.image.background.transparent",
 } as const satisfies Record<Background, AppTextKey>;
 
-/** The text of each media kind. */
 const KIND_TEXT = {
   image: {
     title: "workflow.image.title",
@@ -126,7 +122,6 @@ const KIND_TEXT = {
   },
 } as const satisfies Record<WorkflowMediaKind, Record<string, AppTextKey>>;
 
-/** The option of a custom size. Its frame is dashed, as it has no fixed shape. */
 const customOption = (t: AppTranslate): PickerOption<Frame> => ({
   value: WORKFLOW_MEDIA_CUSTOM_ASPECT,
   label: t("workflow.image.aspect.custom"),
@@ -135,10 +130,6 @@ const customOption = (t: AppTranslate): PickerOption<Frame> => ({
   ),
 });
 
-/**
- * Each aspect ratio of the model with its frame, drawn with the longer side one icon long, and Custom
- * when the host can crop a picture to a size of its own.
- */
 const aspectGroups = (t: AppTranslate, aspects: readonly Aspect[], custom: boolean): readonly PickerGroup<Frame>[] => [
   {
     options: [
@@ -162,14 +153,12 @@ const aspectGroups = (t: AppTranslate, aspects: readonly Aspect[], custom: boole
   },
 ];
 
-/** A side that the user typed, kept in range; the side that it had for text that is not a number. */
 function typedSide(text: string, current: number): number {
   const value = Math.round(Number(text));
   if (!text.trim() || !Number.isFinite(value)) return current;
   return Math.min(WORKFLOW_MEDIA_SIZE_MAX, Math.max(WORKFLOW_MEDIA_SIZE_MIN, value));
 }
 
-/** The glass chip of a custom size. It opens a width and a height field. */
 function SizeChip(props: { size: WorkflowMediaSize; disabled: boolean; onChange: (size: WorkflowMediaSize) => void }) {
   const { t } = useText();
   const value = () =>
@@ -216,10 +205,59 @@ function SizeChip(props: { size: WorkflowMediaSize; disabled: boolean; onChange:
   );
 }
 
-/** A time as minutes and seconds, such as 0:07. */
+const CUSTOM_LENGTH = "custom" as const;
+type LengthChoice = `${number}` | typeof CUSTOM_LENGTH;
+
+function LengthChip(props: {
+  seconds: number;
+  lengths: readonly number[];
+  disabled: boolean;
+  onChange: (seconds: number) => void;
+}) {
+  const { t } = useText();
+  const [dragged, setDragged] = createSignal<number | null>(null);
+  const sorted = createMemo(() => [...new Set(props.lengths)].sort((left, right) => left - right));
+  const index = () => dragged() ?? Math.max(sorted().indexOf(props.seconds), 0);
+  const at = (place: number) => sorted()[place] ?? props.seconds;
+  const seconds = (place: number) => t("workflow.video.seconds", { value: String(at(place)) });
+  const commit = (place: number) => {
+    if (at(place) !== props.seconds) props.onChange(at(place));
+    setDragged(null);
+  };
+  return (
+    <Popover.Root placement="top" gutter={6}>
+      <Popover.Trigger
+        class="wfn-chip"
+        aria-label={t("workflow.video.lengthLabel", { value: seconds(index()) })}
+        disabled={props.disabled}
+      >
+        {seconds(index())}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          class="ui-popover-menu-surface wfn-popover wfn-length-popover"
+          aria-label={t("workflow.video.length")}
+          data-wfn-portal=""
+        >
+          <SliderField
+            label={t("workflow.video.length")}
+            value={index()}
+            minValue={0}
+            maxValue={Math.max(sorted().length - 1, 1)}
+            step={1}
+            disabled={props.disabled}
+            formatValue={seconds}
+            onChange={setDragged}
+            onChangeEnd={commit}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-/** The whole seconds since `running` became true, while it stays true. */
 function useElapsed(running: () => boolean) {
   const [now, setNow] = createSignal(0);
   let start = 0;
@@ -232,15 +270,12 @@ function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
-/**
- * The price of one file with the choices of the step, in the credits of the service, or null while
- * there is no quote. It asks again when a choice changes; an answer for older choices is dropped.
- */
+const resolutionName = (value: string) => value.replace(/k$/u, "K");
+
 function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
   const board = useBoard();
   const [credits, setCredits] = createSignal<number | null>(null);
   let asked = 0;
-  /** The choices as one string, so a new object with the same choices does not ask again. */
   const key = () => {
     const next = request();
     return next && board.catalogs().mediaPrice ? JSON.stringify(next) : null;
@@ -262,7 +297,6 @@ function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
   return credits;
 }
 
-/** A glass chip on the media that opens a short list, as the aspect chip does. */
 function ChipMenu<T extends string>(props: {
   label: string;
   title: string;
@@ -286,7 +320,6 @@ function ChipMenu<T extends string>(props: {
   );
 }
 
-/** How a video uses a picture that comes in: as a reference, or as its first frame, its last frame or both. */
 type InputRole = "reference" | "first" | "last" | "both";
 
 const ROLE_TEXT = {
@@ -296,17 +329,12 @@ const ROLE_TEXT = {
   both: "workflow.video.role.both",
 } as const satisfies Record<InputRole, AppTextKey>;
 
-/** The short mark on a picture that is a frame. A reference has none. */
 const ROLE_BADGE = {
   first: "workflow.video.badge.first",
   last: "workflow.video.badge.last",
   both: "workflow.video.badge.both",
 } as const satisfies Record<Exclude<InputRole, "reference">, AppTextKey>;
 
-/**
- * A picture that an image step before this one gives. On a video, a mark shows when it is a frame.
- * The port that the line ends on sets how the video uses it.
- */
 function InputPicture(props: { index: number; url: string | undefined; role: InputRole }) {
   const { t } = useText();
   const badge = () => (props.role === "reference" ? undefined : t(ROLE_BADGE[props.role]));
@@ -322,10 +350,6 @@ function InputPicture(props: { index: number; url: string | undefined; role: Inp
   );
 }
 
-/**
- * The inputs of a video: the description, the first frame, the last frame and the references. The
- * frame ports keep their source in the field of the same name.
- */
 function videoPorts(t: AppTranslate): readonly WfnInputPort[] {
   return [
     { type: "text" },
@@ -335,17 +359,11 @@ function videoPorts(t: AppTranslate): readonly WfnInputPort[] {
   ];
 }
 
-/** The width of a card for a frame of `ratio` (width / height): a tall card is narrow, and a video is wide enough to watch. */
 function cardWidth(kind: WorkflowMediaKind, ratio: number): string | undefined {
   if (ratio < 0.7) return "240px";
   return kind === "video" ? "380px" : undefined;
 }
 
-/**
- * An image or a video that a model makes. The card is the media; on hover or selection a glass panel
- * holds the description, the model and Run, with the specs on the right of the bar above it. While
- * the model works, the dots of the chat frame fill the card at its final size, with the time.
- */
 export function ImageNode(props: { id: string; image?: string | undefined; prompt?: string; aspect?: Aspect }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -362,10 +380,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     untrack(() => props.aspect ?? "1:1"),
     oneOf(FRAMES),
   );
-  /**
-   * A host without `workflows-media-size-v1` reads a custom frame, 4:5 and 5:4 as the first aspect
-   * ratio of the model, so the canvas offers them only on a host with it and shows what an older host makes.
-   */
   const sizeHost = () => board.catalogs().mediaSize === true;
   const customAllowed = () => kind() === "image" && sizeHost();
   const hostAspect = (frame: Frame) =>
@@ -382,14 +396,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     asString,
   );
   const model = () => models().find((candidate) => candidate.id === modelId());
-  /** The account of the model's provider that pays, or "" for the provider's own sign-in. */
   const [account] = useField(() => props.id, "account", "", asString);
-  /** What the model gets: a choice that it does not make shows as the one it makes in its place. */
   const specs = () =>
     workflowMediaSpecs(
       {
         aspect: hostAspect(aspect()),
-        // The stored sides with no default: a missing (0) or out of range side gives no custom size, as on the host.
         width: board.field(props.id, "width") ?? 0,
         height: board.field(props.id, "height") ?? 0,
         duration: duration(),
@@ -400,25 +411,36 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
-  /** A Sunra or Higgsfield step shows what one file costs with its choices. */
+  const lengths = () => workflowVideoDurations(model());
+  const lengthChoices = () => workflowVideoLengthChoices(lengths());
+  const customLengthAllowed = () => lengthChoices().length < lengths().length;
+  const [customLengthModel, setCustomLengthModel] = createSignal<string | null>(null);
+  const customLength = () => customLengthModel() === (model()?.id ?? "");
+  const lengthIsCustom = () => customLengthAllowed() && (customLength() || !lengthChoices().includes(specs().duration));
+  const chooseLength = (choice: LengthChoice) => {
+    if (choice === CUSTOM_LENGTH) {
+      setCustomLengthModel(model()?.id ?? "");
+      return;
+    }
+    const next = lengths().find((option) => String(option) === choice);
+    if (next === undefined) return;
+    setCustomLengthModel(null);
+    setDuration(next);
+  };
   const price = useMediaPrice(() => {
     const chosen = model();
     if (!chosen?.credits || (chosen.provider !== "sunra" && chosen.provider !== "higgsfield")) return null;
     const { aspect, duration, resolution, transparent } = specs();
     return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
   });
-  const runText = () => {
+  const quote = () => {
     const credits = price();
-    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
+    return credits === null ? undefined : { credits };
   };
   const runLabel = () => {
     const credits = price();
     return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
   };
-  /**
-   * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
-   * stays from 9:16 to 16:9, so the card holds its controls; the picture fills the card.
-   */
   const frameRatio = () => {
     const size = specs().size;
     if (size) {
@@ -428,7 +450,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const [w = 1, h = 1] = specs().aspect.split(":").map(Number);
     return { css: aspectRatio(specs().aspect), value: w / h };
   };
-  /** Sets an aspect ratio, or a custom size that starts at the shape of the aspect ratio on view. */
   const chooseFrame = (frame: Frame) => {
     if (frame !== WORKFLOW_MEDIA_CUSTOM_ASPECT) {
       board.setField(props.id, "aspect", frame);
@@ -441,11 +462,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const [firstFrame] = useField(() => props.id, "firstFrame", "", asString);
   const [lastFrame] = useField(() => props.id, "lastFrame", "", asString);
   const [voice, setVoice] = useField(() => props.id, "voice", "", asString);
-  /** The image steps that give this step a picture, in connection order. The host reads them the same way. */
   const inputs = () => board.inputs(props.id, "image");
-  /** A step runs with no description when a text or a picture comes in: the host makes the media from them. */
   const runnable = () => prompt().trim() !== "" || inputs().length > 0 || board.inputs(props.id, "text").length > 0;
-  /** The picture of an image step's newest result, or the file of an asset. */
   const inputUrl = (source: string) => {
     const shown = board.shown(source);
     const file = board.field(source, "fileId");
@@ -466,23 +484,13 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
   const seconds = useElapsed(run.running);
-  /**
-   * The address of a result: the attachment that the step made, else a workspace image by name, as
-   * a host without media results gives it. Undefined while it loads, null when it cannot show.
-   */
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
     return orFile(board.catalogs().media?.(value, kind()), value);
   };
   const orFile = (made: string | null | undefined, value: string) => made ?? fileUrl(value) ?? made;
-  /** A workspace image by name, as a host without media results gives it. */
   const fileUrl = (value: string) =>
     board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined;
-  /**
-   * The small copy of a picture, which the card, its strip and its inputs show. A host that sends
-   * it gives no full file here, so the card does not download both. The viewer and a download read
-   * the file.
-   */
   const pictureUrl = (value: string) => {
     const preview = board.catalogs().mediaPreview;
     return orFile(preview ? preview(value) : board.catalogs().media?.(value, "image"), value);
@@ -497,15 +505,12 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   };
   const shownUrl = () => urlOf(shownValue());
   const shownPicture = () => smallUrlOf(shownValue());
-  /** An image with clear pixels shows on the canvas with no card behind it. The copy keeps clear pixels. */
   const shape = usePictureShape(() => (kind() === "image" ? (shownPicture() ?? undefined) : undefined));
   const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
-  /** The name that a download of the media takes. */
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   let media: HTMLElement | undefined;
-  /** Opens the viewer on the image on view. The arrows step through every image of the step. */
   const openViewer = () => {
     const shown = board.shown(props.id);
     const images = board.results(props.id).flatMap((result) => {
@@ -531,6 +536,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const specsDisabled = () => locked() || making();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => (specs().size ? t("workflow.image.aspect.custom") : specs().aspect);
+  const lengthText = () => (lengthIsCustom() ? t("workflow.video.length.custom") : durationText(specs().duration));
   return (
     <>
       <NodeShell
@@ -587,7 +593,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <Show
             when={shownPicture()}
             fallback={
-              // A result with no address yet still comes from the host. Null: it cannot show here.
               <Show
                 when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
                 fallback={<CardPictureLoading />}
@@ -656,35 +661,44 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 )}
               </Show>
               <Show when={kind() === "video"}>
-                <ChipMenu
-                  label={t("workflow.video.lengthLabel", { value: durationText(specs().duration) })}
+                <ChipMenu<LengthChoice>
+                  label={t("workflow.video.lengthLabel", { value: lengthText() })}
                   title={t("workflow.video.length")}
-                  text={durationText(specs().duration)}
-                  value={String(specs().duration)}
+                  text={lengthText()}
+                  value={lengthIsCustom() ? CUSTOM_LENGTH : `${specs().duration}`}
                   groups={[
                     {
-                      options: workflowVideoDurations(model()).map((value) => ({
-                        value: String(value),
-                        label: durationText(value),
-                      })),
+                      options: [
+                        ...lengthChoices().map((value) => ({ value: `${value}` as const, label: durationText(value) })),
+                        ...(customLengthAllowed()
+                          ? [{ value: CUSTOM_LENGTH, label: t("workflow.video.length.custom") }]
+                          : []),
+                      ],
                     },
                   ]}
                   disabled={specsDisabled()}
-                  onSelect={(value) => {
-                    const next = workflowVideoDurations(model()).find((option) => String(option) === value);
-                    if (next !== undefined) setDuration(next);
-                  }}
+                  onSelect={chooseLength}
                 />
+                <Show when={lengthIsCustom()}>
+                  <LengthChip
+                    seconds={specs().duration}
+                    lengths={lengths()}
+                    disabled={specsDisabled()}
+                    onChange={(seconds) => {
+                      setCustomLengthModel(model()?.id ?? "");
+                      setDuration(seconds);
+                    }}
+                  />
+                </Show>
               </Show>
-              {/* A custom size sets the resolution that the model makes. */}
               <Show when={!specs().size && specs().resolution}>
                 {(current) => (
                   <ChipMenu
-                    label={t("workflow.video.resolutionLabel", { value: current() })}
+                    label={t("workflow.video.resolutionLabel", { value: resolutionName(current()) })}
                     title={t("workflow.video.resolution")}
-                    text={current()}
+                    text={resolutionName(current())}
                     value={current()}
-                    groups={[{ options: resolutions().map((value) => ({ value, label: value })) }]}
+                    groups={[{ options: resolutions().map((value) => ({ value, label: resolutionName(value) })) }]}
                     disabled={specsDisabled()}
                     onSelect={setResolution}
                   />
@@ -784,8 +798,22 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       onClick={run.start}
                       aria-label={runLabel()}
                     >
-                      <Play aria-hidden="true" />
-                      {runText()}
+                      <Show
+                        when={quote()}
+                        fallback={
+                          <>
+                            <Play aria-hidden="true" />
+                            {t("workflow.node.run")}
+                          </>
+                        }
+                      >
+                        {(shown) => (
+                          <>
+                            <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                            {format.number(shown().credits)}
+                          </>
+                        )}
+                      </Show>
                     </Button>
                   }
                 >

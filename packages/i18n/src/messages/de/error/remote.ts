@@ -24,6 +24,10 @@ export const messages = {
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
   "error.remote.windowsSessionDisconnected":
     "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
+  "error.remote.streamTooSlow":
+    "Die Verbindung zum Host ist zu langsam für das Bild. Nutze ein schnelleres Netzwerk und versuche es erneut.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -189,6 +193,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Es konnte keine direkte Verbindung zum Host hergestellt werden. Eine Firewall, ein VPN oder ein Proxy kann sie blockieren.",
   "error.remote.iceDisconnected": "Die direkte Verbindung zum Host wurde unterbrochen.",
+  "error.remote.webrtcBlocked":
+    "Dieses Gerät blockiert die Verbindung, die OpenBot braucht. Wenn der Blockierungsmodus aktiv ist, schalte ihn für OpenBot aus unter Einstellungen > Datenschutz & Sicherheit > Blockierungsmodus.",
   "error.remote.directoryUnreachable": "OpenBot konnte den OpenBot-Dienst nicht erreichen. Prüfe deine Verbindung.",
   "error.remote.directoryTimeout": "Der OpenBot-Dienst hat nicht rechtzeitig geantwortet. Versuche es erneut.",
   "error.remote.inviteAlreadyUsed": "Diese Einladung wurde bereits verwendet. Bitte um eine neue Einladung.",

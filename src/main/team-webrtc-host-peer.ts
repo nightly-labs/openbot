@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -36,6 +37,7 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   addSkillSuggestionNames,
@@ -126,13 +128,7 @@ import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
-/**
- * The total length of the event frames that wait to be sent to one device. One frame can be about
- * 1 MB, so the count limit alone let a device that does not take its events, such as one on a slow
- * relay, keep about 2 GB in the main process (#11429).
- */
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
-/** A Moonlight session and a few browser views, which is more than a member watches at once. */
 const MAXIMUM_DESKTOP_STREAMS = 6;
 
 export interface TeamWebRtcHostPeerOptions {
@@ -141,11 +137,8 @@ export interface TeamWebRtcHostPeerOptions {
   appVersion: string;
   transferDirectory: string;
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
-  /** The path of the session failed or came back. The peer and the session stay open. */
   pathChanged?: (sessionId: string, lost: boolean) => void;
-  /** A session opened for a membership that this host has not read from the account directory yet. */
   unknownMemberConnected?: (membershipId: string) => void;
-  /** The peer is signed in as a membership, or (`null`) it is not signed in any more. */
   peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
@@ -183,12 +176,10 @@ export class TeamWebRtcHostPeer {
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
   readonly #unknownMemberConnected: (membershipId: string) => void;
   readonly #peerMemberChanged: (peerId: string, membershipId: string | null) => void;
-  /** The membership of the open session. */
   #sessionMembershipId: string | null = null;
   readonly #verifyClientTicket:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
-  /** Encoded response frames, so a retry sends the same bytes and an oversized result is not kept. */
   readonly #responses = new Map<string, string>();
   readonly #responsesInFlight = new Map<string, Fiber.Fiber<string, RemoteWorkflowError>>();
   readonly #events = new Map<number, string>();
@@ -203,11 +194,8 @@ export class TeamWebRtcHostPeer {
   #eventsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   #eventsReconnectAttempts = 0;
   #nextEventSequence = 1;
-  // The highest sequence that the event sender sent, skipped, or found dropped.
   #eventsSentThrough = 0;
-  // An event did not reach the client, so it must get `event-reset` before the next event.
   #eventResetPending = false;
-  // The session that an event sender serves. One sender keeps the events in sequence order.
   #eventSender: string | null = null;
   readonly #desktopSockets = new Map<string, Ws.WebSocket>();
   #sessionExpirationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -265,7 +253,6 @@ export class TeamWebRtcHostPeer {
   ) {
     if (sessionId !== this.#localSessionId && sessionId !== this.#pendingConnection?.sessionId) return;
     const peerId = this.#peerId;
-    // An RPC can revoke itself. Start disposal without waiting for that RPC's response.
     yield* this.#beginDisposal();
     if (peerId) yield* this.#bridge.disconnectPeer(peerId).pipe(Effect.catch(() => Effect.void));
   }).bind(this);
@@ -275,12 +262,10 @@ export class TeamWebRtcHostPeer {
     this.#peerMemberChanged(peerId, authenticated ? this.#sessionMembershipId : null);
   }
 
-  /** Whether this device has a file transfer moving right now, either direction. */
   hasActiveTransfers(): boolean {
     return this.#files.hasActiveTransfers();
   }
 
-  // Execution is limited to native bridge and WebSocket callbacks.
   #dispatch(operation: Effect.Effect<void, RemoteWorkflowError, HostPeerTransport>): void {
     const fiber = this.#runtime.runFork(operation);
     this.#operations.add(fiber);
@@ -299,7 +284,6 @@ export class TeamWebRtcHostPeer {
     this.#bridge.off("disconnected", this.#onDisconnected);
     this.#bridge.off("pathLost", this.#onPathLost);
     this.#bridge.off("pathRestored", this.#onPathRestored);
-    // Transport teardown must not revoke a logical session resumed by another peer.
     yield* this.#closeLocalSession(false);
     this.#peerId = null;
     this.#pendingConnection = null;
@@ -358,7 +342,6 @@ export class TeamWebRtcHostPeer {
   ): Effect.fn.Return<void, RemoteWorkflowError, HostPeerTransport> {
     if (peerId !== this.#peerId) return;
     if (connection.sessionId === this.#localSessionId && this.#localSessionToken) return;
-    // incoming already cleared the prior session; retain the active authentication gate.
     this.#events.clear();
     this.#eventCharacters = 0;
     this.#responses.clear();
@@ -381,8 +364,6 @@ export class TeamWebRtcHostPeer {
       this.#dispatch(this.#closeLocalSession());
       return;
     }
-    // Persistent sessions exceed Node's signed 32-bit timer range. Recheck in
-    // bounded intervals instead of overflowing to an immediate disconnect.
     this.#sessionExpirationTimer = setTimeout(
       () => this.#scheduleSessionExpiration(expiresAt),
       Math.min(remaining, 2_147_483_647),
@@ -630,7 +611,6 @@ export class TeamWebRtcHostPeer {
     }).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
-          // A file above the protocol limit is a refusal that the peer can show, not a host failure.
           const status =
             error instanceof GatewayError ? error.status : error instanceof TeamFileTooLargeError ? 413 : 500;
           return yield* remoteDecode(() =>
@@ -675,7 +655,6 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({
         cause: new GatewayError(503, "remote_disconnected", sourceText("error.remote.peerDisconnected")),
       });
-    // A protocol 10 peer sends two lists (`v10.ts`). A malformed list fails closed.
     const baseline = input.capabilities?.includes(TEAM_CAPABILITY_BASELINE_CAPABILITY) ?? false;
     const lists = baseline ? readTeamCapabilitiesV10(input.capabilities, input.absent ?? []) : null;
     if (baseline && !lists)
@@ -683,8 +662,6 @@ export class TeamWebRtcHostPeer {
         cause: new GatewayError(400, "protocol_error", "Invalid Team API protocol headers."),
       });
     const peerCapabilities = new Set(lists ? expandTeamCapabilitiesV10(lists) : (input.capabilities ?? []));
-    // A request with no protocol marker comes from a release before v0.7.0 (2026-09-09), which is
-    // outside the support window. The HTTP gate refuses a request with no protocol header in the same way.
     const protocol = webRtcPeerProtocol(peerCapabilities);
     if (protocol === null)
       return yield* new RemoteWorkflowError({
@@ -702,8 +679,6 @@ export class TeamWebRtcHostPeer {
       protocol,
       preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities),
     };
-    // An uploaded body stays on disk: the request reads it from the file, and the file is removed
-    // after the response is complete.
     if (input.bodyTransferId) {
       return yield* this.#files.useReceived(peerId, input.bodyTransferId, (uploaded) =>
         this.#forwardHttpEffect(input, request, uploaded),
@@ -757,10 +732,6 @@ export class TeamWebRtcHostPeer {
                   preserveSemanticTags,
                   agentCreateModel: peerCapabilities.has(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
                 });
-                // The local Team API decodes the body again, and with semantic tags its frozen projection
-                // reads only the wire keys: `ownerAgentId` is dropped where `ownerBotId` is kept. So the
-                // decoded frame goes back to the wire key names first. The secure authentication answer and
-                // the agent profile routes read `agentId` on the wire, so they keep their keys.
                 const currentKeysOnWire =
                   (input.method === "POST" && input.path === BROWSER_SECRET_RESPONSE_PATH) ||
                   isAgentProfileRoute(input.method, input.path);
@@ -812,8 +783,6 @@ export class TeamWebRtcHostPeer {
           }
           if (response.status !== 204 && (isFile || !contentType.includes("json"))) {
             const name = contentDispositionFileName(response.headers.get("content-disposition"), "remote-file");
-            // The body goes to disk in chunks and not to one buffer, so a 100 MB download does not stay in
-            // main for the minutes that the data channel needs to send it.
             const { transferId, size } = yield* this.#files.sendStream(peerId, {
               name,
               mimeType: contentType || "application/octet-stream",
@@ -825,8 +794,6 @@ export class TeamWebRtcHostPeer {
               file: { transferId, name, mimeType: contentType || "application/octet-stream", size },
             };
           }
-          // A variable, not a literal: only the V7 and V8 encoders declare `historyExtent`, `uiBlocks`,
-          // `subagents`, `promptMultiSelect` and `videoGeneration`.
           const responseOptions = {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
@@ -837,6 +804,7 @@ export class TeamWebRtcHostPeer {
             channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
             channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+            routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -854,7 +822,6 @@ export class TeamWebRtcHostPeer {
               sideRoute
                 ? sideRoute.response(input.path, response.status, body, responseOptions)
                 : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
-                  // A protocol 10 peer reads the two lists of the protocol 10 answer.
                   protocol >= TEAM_PROTOCOL_V10 && isCompatibilityRead(input.method, input.path, response.status)
                   ? { ...decodeTeamProtocolSupportV10(body) }
                   : peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
@@ -887,11 +854,6 @@ export class TeamWebRtcHostPeer {
       if (binary || !this.#peerId) return;
       let frame: string;
       try {
-        // `channels-changed` is outside the frozen v1 vocabulary, so the base event adapter
-        // rejects it and the catch below would drop it without a trace: a remote client would
-        // stop seeing incoming messages and task updates until its next refresh. The optional
-        // protocol validates and envelopes its own event, exactly as the request path does. The
-        // `host-update-v1`, `skills-events-v1`, and `quiet-turn-v1` events take the same path.
         const event = JSON.parse(data.toString());
         const channel = optionalTeamEvent(event, {
           agentTaskUiBlocks: this.#peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
@@ -917,13 +879,12 @@ export class TeamWebRtcHostPeer {
                         : createTeamProtocolV2Event)(this.#nextEventSequence, event, {
                 preserveSemanticTags: supportsTeamSemanticTags(this.#peerCapabilities),
                 preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
-                // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
                 browserVaultSkip: this.#peerCapabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+                backgroundWork: this.#peerCapabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
                 usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
-                // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -939,7 +900,6 @@ export class TeamWebRtcHostPeer {
         return;
       }
       const sequence = this.#nextEventSequence++;
-      // If this removes events that the sender did not send, the sender resets the client.
       if (
         this.#events.size >= MAXIMUM_BUFFERED_EVENTS ||
         this.#eventCharacters + frame.length > MAXIMUM_BUFFERED_EVENT_CHARACTERS
@@ -999,9 +959,6 @@ export class TeamWebRtcHostPeer {
     }
     if (frame.type !== "event-ack")
       return yield* new RemoteWorkflowError({ cause: new Error("The event frame is not client control data.") });
-    // Do not send `event-reset` here. The client can acknowledge an old event after the stream
-    // already reset it, and a second reset would move it back before the newer events it has.
-    // The sender already removed each event that it read, so the acknowledgement frees nothing.
   });
 
   readonly #sendEvents = Effect.fn("TeamHostPeer.sendEvents")(function* (
@@ -1018,23 +975,19 @@ export class TeamWebRtcHostPeer {
       if (sequence >= this.#nextEventSequence) break;
       this.#eventsSentThrough = sequence;
       const frame = this.#events.get(sequence);
-      // No path sends an event again, so the buffer keeps only the events that are not sent yet.
       this.#events.delete(sequence);
       if (frame !== undefined) this.#eventCharacters -= frame.length;
-      // The buffer limit removed this event before it was sent.
       if (frame === undefined) {
         this.#eventResetPending = true;
         continue;
       }
       if (this.#eventResetPending) {
-        // The client loads its state again after the reset, so only the newest event must follow it.
         if (sequence + 1 < this.#nextEventSequence) continue;
         const reset = encodeTeamProtocolV2Frame({ version: 2, type: "event-reset", nextSequence: sequence });
         if (!(yield* send(peerId, reset))) continue;
         if (this.#localSessionId !== sessionId) break;
         this.#eventResetPending = false;
       }
-      // A client disconnects on a sequence gap, so a failed event must be followed by a reset.
       const sent = yield* send(peerId, frame);
       if (this.#localSessionId !== sessionId) break;
       if (!sent) this.#eventResetPending = true;
@@ -1077,11 +1030,6 @@ export class TeamWebRtcHostPeer {
     }
   });
 
-  /**
-   * The tunnel carries more than one stream at a time: a member can watch a browser tab while a
-   * Moonlight session runs. Each stream keeps its own socket, and only the paths named here are
-   * reachable -- the tunnel opens sockets on the host's own port, so its allowlist is the boundary.
-   */
   readonly #openDesktopSocket = Effect.fn("TeamHostPeer.openDesktopSocket")(function* (
     this: TeamWebRtcHostPeer,
     peerId: string,
@@ -1174,7 +1122,6 @@ export class TeamWebRtcHostPeer {
     this.#sessionPreparation = null;
     this.#authenticationCompletion = null;
     if (endLogicalSession && closingSessionId) {
-      // Invalidate local access immediately. Remote logout must not delay the next handshake.
       const closing = yield* Effect.forkIn(
         this.#closeSession(closingSessionId).pipe(Effect.catch(() => Effect.void)),
         this.#runtime.scope,
@@ -1185,7 +1132,6 @@ export class TeamWebRtcHostPeer {
     }
   });
 
-  // Events use #sendEvents, which keeps their sequence order.
   #sendRecoverable(peerId: string, channel: "desktop", data: string | ArrayBuffer): void {
     if (peerId !== this.#peerId) return;
     this.#dispatch(
@@ -1211,16 +1157,9 @@ interface HttpRequestPayload {
   bodyTransferId?: string;
   contentType?: string;
   capabilities?: string[];
-  /** The baseline capabilities that a protocol 10 peer does not serve. Released hosts ignore it. */
   absent?: string[];
 }
 
-/**
- * The protocol of a WebRTC request, from the markers in its capability list. Protocol 9 is the
- * protocol 8 wire. Its marker is in the bootstrap list too, so the first compatibility read of a
- * protocol 9 peer gets the full capability list. Protocol 10 is the protocol 9 wire with the two
- * capability lists. A list with no marker gives `null`: each release since v0.7.0 sends one.
- */
 function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {
   if (capabilities.has(TEAM_CAPABILITY_BASELINE_CAPABILITY)) return TEAM_PROTOCOL_V10;
   if (capabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)) return 9;
@@ -1231,10 +1170,6 @@ function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {
   return capabilities.has("opencode") ? 4 : null;
 }
 
-/**
- * The response encoder of a peer protocol from `webRtcPeerProtocol`. Protocols 9 and 10 use the
- * protocol 8 encoder; each other protocol uses its own. A request of protocols 1-3 gets 426 before this.
- */
 function webRtcResponseEncoder(protocol: number) {
   if (protocol >= 8) return encodeTeamProtocolV8WebRtcHttpResponse;
   if (protocol === 7) return encodeTeamProtocolV7WebRtcHttpResponse;
@@ -1278,10 +1213,6 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
   );
 }
 
-/**
- * A response larger than one JSON frame cannot be sent. The client gets an error for its request and
- * the connection stays open: a dropped connection makes the client reconnect and ask again.
- */
 function encodeRpcResponse(response: TeamProtocolV2RpcFrame): string {
   try {
     return encodeTeamProtocolV2Frame(response);
@@ -1323,11 +1254,6 @@ class GatewayError extends Error {
   }
 }
 
-/**
- * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
- * its Vault request, for a peer with `ui-block-vault-v1`, and the skill name of each skill question,
- * for a peer with `skill-learning-v1`.
- */
 function withBlockExtensions(
   capabilities: ReadonlySet<string>,
   source: unknown,

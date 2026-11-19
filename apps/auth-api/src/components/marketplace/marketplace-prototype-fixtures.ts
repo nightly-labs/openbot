@@ -6,14 +6,6 @@ import type {
   MarketplaceSkillSummary,
 } from "@openbot/contracts/ipc";
 
-/*
- * Catalog data for the public Marketplace stories. Copied from the app's preview fixtures
- * (`src/renderer/src/preview/fixtures.ts`), so the site and the app are reviewed against the same
- * listings. The site must not import the renderer. The site shows no install counts, so each count
- * is 0.
- */
-
-/** A skill icon as the catalog serves one: a square picture. */
 function skillIcon(symbol: string, background: string): string {
   return `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="18" fill="${background}"/><text x="40" y="43" text-anchor="middle" dominant-baseline="middle" font-size="42">${symbol}</text></svg>`,
@@ -473,10 +465,6 @@ const AGENT_CONTENTS: Record<string, { skills: MarketplaceAgentSkill[]; routines
   },
 };
 
-/**
- * An agent that waits for review. Its link works so that its creator can share it, but no list
- * shows it: the index, the categories, the search and a skill's agents show reviewed agents only.
- */
 export const PROTOTYPE_PENDING_AGENT: MarketplaceAgentSummary = {
   id: "00000000-0000-4000-8000-000000000012",
   category: "productivity",
@@ -508,10 +496,6 @@ export const PROTOTYPE_AGENT_DETAILS: Record<string, MarketplaceAgentDetail> = O
   ]),
 );
 
-/**
- * The agent contract has no `verified` flag yet. As in the app prototype, the agents that OpenBot
- * made are the verified ones.
- */
 export function isVerifiedAgent(agent: MarketplaceAgentSummary): boolean {
   return agent.creatorName === "OpenBot";
 }

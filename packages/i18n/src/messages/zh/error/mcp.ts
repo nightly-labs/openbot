@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
-  // MCP sign-in errors, and the sign-in page in the browser.
   "error.mcp.redirectByName": "无法通过名称访问该地址。",
   "error.mcp.redirectNotSignIn": "该地址不属于任何登录流程。",
   "error.mcp.redirectRefused": "登录被拒绝，请返回 OpenBot 重试。",
@@ -18,6 +17,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "该服务器不支持登录应用，请更新主机上的 OpenBot。",
   "error.mcp.redirectRelayed": "OpenBot 已将登录结果发送到服务器，你可以关闭该窗口。",
   "error.mcp.relayEnded": "本次登录已结束，请重新开始。",
+  "error.mcp.signInLinkNotReady": "登录页面尚未打开。请稍后再试。",
   "error.mcp.relayNoState": "该服务器的登录页面未保护其返回地址，因此 OpenBot 不会在这台电脑上打开它。",
   "error.mcp.relayAddressInvalid": "这不是本次登录流程末尾的地址，请从浏览器复制完整地址。",
 } as const satisfies PartialTranslation<typeof source>;

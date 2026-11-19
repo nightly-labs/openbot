@@ -7,7 +7,6 @@ import { haptics } from "@/shared/lib/haptics";
 
 export interface AttachmentPreview {
   name: string;
-  /** The image to show. A file that is not an image shows its type and size instead. */
   uri: string | null;
   type: string;
   size: string;
@@ -20,12 +19,6 @@ export interface AttachmentPreviewAction {
   disabled?: boolean;
 }
 
-/**
- * One attachment at full size, with what can be done to it. iOS presents a native page sheet
- * the user swipes away, and Android closes it with the system back action, so neither needs a
- * separate close button. An action closes the sheet first and runs once it is gone: iOS refuses
- * to present a picker or the share sheet from a sheet that is still leaving.
- */
 export function AttachmentPreviewSheet({
   preview,
   actions,
@@ -37,7 +30,6 @@ export function AttachmentPreviewSheet({
 }) {
   const insets = useSafeAreaInsets();
   const afterClose = useRef<(() => void) | null>(null);
-  // The sheet slides away after `preview` clears, so it keeps drawing what it showed until then.
   const last = useRef(preview);
   if (preview) last.current = preview;
   const shown = preview ?? last.current;

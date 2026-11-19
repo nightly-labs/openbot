@@ -1,11 +1,3 @@
-// Starts the real `ProviderRuntimeManager` the way main does after an app upgrade (#3164), with an
-// older managed copy of some provider CLIs on disk and no network. Checks that the first update check
-// starts the update of each managed CLI with no offer shown first, leaves a CLI the user installed
-// and an off provider alone, and that a start with no upgrade only offers the update. An off provider
-// gets no offer until it is turned on, and loses it when it is turned off again (#3319). Also checks
-// that the stored app version that decides "upgrade" is read back.
-// `bun scripts/provider-update-after-app-upgrade-e2e.ts`.
-// Writes .openbot-build/provider-update-after-app-upgrade-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,11 +11,8 @@ import { ProviderRuntimeManager } from "../src/main/provider-runtime-manager";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-update-after-app-upgrade-e2e");
 const WAIT_MS = 15_000;
 const OLD_VERSION = "0.0.1";
-/** Managed copy, updated after an upgrade. */
 const MANAGED: ManagedProviderId = "opencode";
-/** Managed copy too, but the agent runs a CLI the user installed. */
 const SYSTEM: ManagedProviderId = "claude";
-/** Managed copy of a provider the user turned off. */
 const OFF: ManagedProviderId = "grok";
 
 interface Report {
@@ -45,10 +34,8 @@ interface Report {
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-after-app-upgrade-e2e-"));
 const report: Report = { passed: false };
-/** Whether the user turned `OFF` on, as the provider switch file says. */
 let offTurnedOn = false;
 
-/** The first status that `check` accepts, or a failure after `WAIT_MS`. */
 function nextStatus(
   manager: ProviderRuntimeManager,
   label: string,
@@ -66,7 +53,6 @@ function nextStatus(
   });
 }
 
-/** A manager with no network and an older copy of each named provider in its store. */
 async function startManager(name: string, providers: ManagedProviderId[]) {
   const manager = new ProviderRuntimeManager({
     root: join(root, name),
@@ -116,7 +102,6 @@ try {
   managers.push(upgrade.manager);
   assert.equal(upgrade.manager.getStatus().providers[MANAGED].version, OLD_VERSION);
   upgrade.manager.setSystemVersion(SYSTEM, OLD_VERSION);
-  // Main forwards status to the renderer only from here, as `application-services.ts` does.
   upgrade.snapshots.length = 0;
   const updateEnded = nextStatus(
     upgrade.manager,
@@ -124,7 +109,6 @@ try {
     (snapshot) => snapshot.providers[MANAGED].phase === "download-error",
   );
   upgrade.manager.startUpdateChecks({ updateInstalled: true });
-  // The release check is still on its way: only the CLI that it will update has no offer.
   const duringCheck = upgrade.manager.getStatus().providers;
   assert.equal(duringCheck[MANAGED].availableVersion ?? null, null, "the CLI to update is not offered");
   assert.notEqual(duringCheck[SYSTEM].availableVersion ?? null, null, "a CLI the user installed stays offered");
@@ -150,7 +134,6 @@ try {
   noUpgrade.manager.startUpdateChecks();
   await runCauseEffect(noUpgrade.manager.checkForUpdates()).catch(() => undefined);
   const offOffer = noUpgrade.manager.getStatus().providers[OFF].availableVersion ?? null;
-  // Main sends the offers again when the user turns a provider on or off, as `saveProviderUse` does.
   offTurnedOn = true;
   await runCauseEffect(noUpgrade.manager.providerUseChanged());
   const offerAfterOn = noUpgrade.snapshots.at(-1)?.providers[OFF].availableVersion ?? null;

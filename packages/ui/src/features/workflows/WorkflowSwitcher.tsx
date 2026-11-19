@@ -1,17 +1,7 @@
-/**
- * The workflow switcher in the top row. It uses the menu of the app, as the server and Help menus have
- * it: the opaque sheet, full-size rows, outline icons that fill on the highlighted row, and a check
- * circle on the open workflow. The panel has the 1px edge and no drop shadow.
- *
- * One list with the step count at the end of each row, then New workflow, then the actions on the open
- * workflow. Version history opens a saved version of the canvas to look at, read-only.
- */
-
 import { Check, ChevronRight, CopyPlus, DropdownMenu, History, Pencil, Plus, Trash2 } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** Open a workflow, or act on the open one. */
 export type SwitcherAction =
   | "new"
   | "rename"
@@ -29,23 +19,16 @@ export interface SwitcherWorkflow {
 
 export interface SwitcherVersion {
   id: string;
-  /** When the version was saved. */
   label: string;
-  /** Why it was saved. */
   meta: string;
 }
 
 export function WorkflowSwitcher(props: {
   workflows: readonly SwitcherWorkflow[];
-  /** The id of the open workflow. */
   current: string;
-  /** The saved versions of the open workflow, newest first. */
   versions: readonly SwitcherVersion[];
-  /** The version that the canvas shows, or undefined for the live canvas. */
   viewing: string | undefined;
-  /** A run changes the canvas, so no version opens while it runs. */
   versionsDisabled: boolean;
-  /** A read-only canvas shows the list only. */
   readOnly: boolean;
   onAction: (action: SwitcherAction) => void;
 }) {
@@ -61,7 +44,6 @@ export function WorkflowSwitcher(props: {
             aria-current={workflow().id === props.current ? "true" : undefined}
             onSelect={() => props.onAction(`open:${workflow().id}`)}
           >
-            {/* The check circle of the server menu: filled on the open workflow, an empty ring on the others. */}
             <span
               class="ui-menu-check"
               data-checked={workflow().id === props.current ? "" : undefined}
@@ -117,7 +99,6 @@ export function WorkflowSwitcher(props: {
             </DropdownMenu.Portal>
           </DropdownMenu.Sub>
         </Show>
-        {/* Rename moves the focus to the name field, so it runs after the menu closes. */}
         <DropdownMenu.Item onSelectAfterClose={() => props.onAction("rename")}>
           <Pencil class="agent-context-icon" aria-hidden="true" />
           <span>{t("workflow.canvas.switcher.rename")}</span>
@@ -135,7 +116,6 @@ export function WorkflowSwitcher(props: {
   );
 }
 
-/** A row of the version list, with the check circle of the workflow list on the version that shows. */
 function VersionItem(props: { label: string; meta: string; checked: boolean; onSelect: () => void }) {
   return (
     <DropdownMenu.Item aria-current={props.checked ? "true" : undefined} onSelect={() => props.onSelect()}>

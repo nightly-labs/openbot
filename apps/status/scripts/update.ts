@@ -1,18 +1,3 @@
-// One run of the status checks. The `status-page` workflow runs it about every 5 minutes:
-//   bun apps/status/scripts/update.ts --state <state.json> --out <dir> [--bootstrap | --incidents-only]
-// It probes each service, updates `state.json`, opens or closes the automatic incident issues,
-// reads the `status` issues, and writes `status.json` and `feed.xml` into `--out`.
-//
-// `--incidents-only` (issue events) reads the issues again and keeps the stored checks. It does not
-// probe, count runs, write issues or change `state.json`, because anyone can start an issue event.
-//
-// Smoke and local options:
-//   --dry-run              no issue writes; the planned writes are in the report
-//   --report <path>        write a JSON report of the run
-//   --probe-base <url>     send every probe to <url>/<origin>/... (a local fake server)
-//   --issues-file <path>   read the issues from a JSON file, not from GitHub
-//   --now <iso>            the time of the run
-//   --retry-delay <ms>     the wait before the second attempt (default 10000)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -73,15 +58,11 @@ const SITE_URL = "https://status.openbot.run";
 const BOT_LOGIN = "github-actions[bot]";
 const TIMEOUT_MS = 10_000;
 const SLOW_MS = 5_000;
-/** Runs in a row that open an automatic issue, and that close it again. */
 const RUNS_TO_OPEN = 2;
 const RUNS_TO_RECOVER = 2;
-/** A check covers the time since the check before it, but no more than this. */
 const MAX_CHECK_MINUTES = 15;
 const FIRST_CHECK_MINUTES = 5;
 const MAX_TEXT = 2_000;
-
-// Probes ---------------------------------------------------------------------
 
 const ORIGINS = {
   api: "https://api.openbot.run",
@@ -99,7 +80,6 @@ const isReady = Schema.is(Schema.Struct({ status: Schema.Literal("ready") }));
 const isHostingOk = Schema.is(Schema.Struct({ status: Schema.Literal("ok") }));
 const isSkillList = Schema.is(Schema.Struct({ skills: Schema.Array(Schema.Unknown) }));
 
-/** Whether the body is JSON that passes `test`. */
 const jsonBody = (body: string, test: (value: unknown) => boolean) => {
   try {
     return test(JSON.parse(body));
@@ -113,7 +93,6 @@ const PROBES: Record<ServiceId, Probe> = {
   accounts: { origin: "api", paths: ["/health/ready"], healthy: (b) => jsonBody(b, isReady) },
   connections: {
     origin: "signal",
-    // `/health/turn` allocates a relay: Signal stays ready while coturn refuses every allocation.
     paths: ["/health/ready", "/health/turn"],
     healthy: (b) => jsonBody(b, isReady),
   },
@@ -171,7 +150,6 @@ interface CheckOutcome {
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
-/** A failed attempt is tried again once, so one network error on the runner is not an outage. */
 async function check(probe: Probe): Promise<CheckOutcome> {
   let last = await attempt(probe);
   let attempts = 1;
@@ -184,8 +162,6 @@ async function check(probe: Probe): Promise<CheckOutcome> {
   return { result, durationMs: last.durationMs, reason: last.reason, attempts };
 }
 
-// State ----------------------------------------------------------------------
-
 const emptyService = (): ServiceState => ({
   result: "unknown",
   changedAt: null,
@@ -197,7 +173,6 @@ const emptyService = (): ServiceState => ({
 
 function readState(): StateFile {
   if (!existsSync(STATE_PATH)) {
-    // A missing file after a failed fetch must not start the history again.
     if (!args.bootstrap) throw new Error(`${STATE_PATH} does not exist. Run with --bootstrap only for the first run.`);
     logger.warn("Bootstrap: the history starts empty.");
     return {
@@ -252,9 +227,6 @@ function nextServiceState(previous: ServiceState, outcome: CheckOutcome, minutes
   };
 }
 
-// GitHub ---------------------------------------------------------------------
-
-// Only the fields that the run reads. Decoding ignores the other fields.
 const GitHubUser = Schema.Struct({ login: Schema.String });
 type GitHubUser = typeof GitHubUser.Type;
 
@@ -279,7 +251,6 @@ const GitHubIssue = Schema.Struct({
   closed_at: Schema.NullOr(Schema.String),
   comments: Schema.Int,
   pull_request: Schema.optional(Schema.Unknown),
-  /** Only in `--issues-file`: the comments, so the smoke reads no network. */
   comment_list: Schema.optional(Schema.Array(GitHubComment)),
 });
 type GitHubIssue = typeof GitHubIssue.Type;
@@ -288,13 +259,11 @@ const decodeIssues = Schema.decodeUnknownSync(Schema.Array(GitHubIssue));
 const decodeIssue = Schema.decodeUnknownSync(GitHubIssue);
 const decodeComments = Schema.decodeUnknownSync(Schema.Array(GitHubComment));
 const decodeNumber = Schema.decodeUnknownSync(Schema.Struct({ number: Schema.Int }));
-/** `push` is also true for maintain and admin. */
 const decodeCollaborators = Schema.decodeUnknownSync(
   Schema.Array(Schema.Struct({ login: Schema.String, permissions: Schema.Struct({ push: Schema.Boolean }) })),
 );
 const decodeId = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.Int }));
 
-/** One GitHub API call. `decode` parses the response at this boundary. */
 async function github<A>(method: string, path: string, decode: (value: unknown) => A, body?: unknown): Promise<A> {
   const response = await fetch(`https://api.github.com${path}`, {
     method,
@@ -322,7 +291,6 @@ async function listIssues(): Promise<readonly GitHubIssue[]> {
   if (fromFile) return fromFile;
   const since = new Date(Date.parse(NOW) - HISTORY_DAYS * 86_400_000).toISOString();
   const issues = new Map<number, GitHubIssue>();
-  // Open issues always count. Closed ones count when they changed in the history window.
   for (const query of ["state=open", `state=closed&since=${since}`]) {
     for (const issue of await allPages(`/repos/${REPOSITORY}/issues?labels=status&${query}`, decodeIssues)) {
       if (!issue.pull_request) issues.set(issue.number, issue);
@@ -331,7 +299,6 @@ async function listIssues(): Promise<readonly GitHubIssue[]> {
   return [...issues.values()];
 }
 
-/** Every page of a list, oldest first. A full page means that another page can follow. */
 async function allPages<A>(path: string, decode: (value: unknown) => readonly A[]): Promise<A[]> {
   const items: A[] = [];
   for (let page = 1; page <= 10; page += 1) {
@@ -348,16 +315,13 @@ async function issueComments(issue: GitHubIssue): Promise<readonly GitHubComment
   return allPages(`/repos/${REPOSITORY}/issues/${issue.number}/comments`, decodeComments);
 }
 
-/** A COLLABORATOR can have read access only, so that association gets the permission check too. */
 const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER"]);
 let writers: Promise<ReadonlySet<string>> | null = null;
 
-/** The people with write access, read once for each run, so many commenters cost no extra calls. */
 function writeAccess(): Promise<ReadonlySet<string>> {
   writers ??= allPages(`/repos/${REPOSITORY}/collaborators?affiliation=all`, decodeCollaborators).then(
     (people) => new Set(people.filter((person) => person.permissions.push).map((person) => person.login)),
     (error: unknown) => {
-      // Nobody else is trusted in this run. The next run reads the list again.
       logger.warn(`The collaborator list failed: ${error instanceof Error ? error.message : String(error)}`);
       return new Set<string>();
     },
@@ -365,19 +329,12 @@ function writeAccess(): Promise<ReadonlySet<string>> {
   return writers;
 }
 
-/**
- * The repository is public, and the issue form adds the `status` label for anyone. Only the bot and
- * people with write access can publish on the page. A private organization member can show as
- * CONTRIBUTOR, so a person with another association is checked against the collaborator list.
- */
 async function trusted(user: GitHubUser | null, association: string): Promise<boolean> {
   if (!user) return false;
   if (user.login === BOT_LOGIN || TRUSTED_ASSOCIATIONS.has(association)) return true;
   if (args["issues-file"]) return false;
   return (await writeAccess()).has(user.login);
 }
-
-// Issue form parsing -----------------------------------------------------------
 
 const FORM_LABELS = {
   kind: "Kind",
@@ -394,7 +351,6 @@ const IMPACT_LABELS: Record<string, Exclude<Impact, "maintenance">> = {
   "major outage": "major",
 };
 
-/** The `### Label` sections that GitHub writes for an issue form. */
 function formFields(body: string): Map<string, string> {
   const fields = new Map<string, string>();
   const parts = body.replace(/\r\n/g, "\n").split(/^### /m).slice(1);
@@ -407,7 +363,6 @@ function formFields(body: string): Map<string, string> {
   return fields;
 }
 
-/** Plain text for the page: no HTML comments, and a length limit. */
 const plainText = (text: string) => {
   const clean = text.replace(/<!--[\s\S]*?-->/g, "").trim();
   return clean.length > MAX_TEXT ? `${clean.slice(0, MAX_TEXT - 1)}…` : clean;
@@ -423,10 +378,8 @@ const STAGES: readonly Stage[] = [
   "completed",
 ];
 
-/** "Identified: text" or "**Identified:** text" sets the stage of an update. */
 function stagedUpdate(at: string, text: string, fallback: Stage): IncidentUpdate | null {
   const body = plainText(text);
-  // The stage word needs a mark after it, so "Update the app to fix it" keeps its first word.
   const match = /^\**\s*([a-z]+)\s*\**\s*[:.\-–—]\s*\**\s*/i.exec(body);
   const word = match?.[1]?.toLowerCase();
   const stage = STAGES.find((item) => item === word);
@@ -435,7 +388,6 @@ function stagedUpdate(at: string, text: string, fallback: Stage): IncidentUpdate
   return { at, stage: stage ?? fallback, body: rest };
 }
 
-/** "2026-10-20 06:00" in UTC, or an ISO time. */
 function formTime(value: string | undefined): string | null {
   if (!value) return null;
   const match = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/.exec(value.trim());
@@ -448,7 +400,6 @@ async function toIncident(issue: GitHubIssue): Promise<Incident | null> {
     logger.info(`Issue #${issue.number} is not from a maintainer. The page does not show it.`);
     return null;
   }
-  // A false alarm that a maintainer closes as "not planned" is not an incident.
   if (issue.state === "closed" && issue.state_reason === "not_planned") return null;
   const fields = formFields(issue.body ?? "");
   const kind = /maintenance/i.test(fields.get(FORM_LABELS.kind) ?? "") ? "maintenance" : "incident";
@@ -469,7 +420,6 @@ async function toIncident(issue: GitHubIssue): Promise<Incident | null> {
     const end = formTime(fields.get(FORM_LABELS.end));
     if (start) startedAt = start;
     if (end && (resolvedAt === null || Date.parse(end) < Date.parse(resolvedAt))) resolvedAt = end;
-    // Closed before it started: cancelled.
     if (issue.state === "closed" && issue.closed_at && Date.parse(issue.closed_at) < Date.parse(startedAt)) return null;
   }
   const impact: Impact =
@@ -515,8 +465,6 @@ async function toIncident(issue: GitHubIssue): Promise<Incident | null> {
 const inHistory = (incident: Incident) =>
   incident.resolvedAt === null || Date.parse(incident.resolvedAt) >= Date.parse(NOW) - HISTORY_DAYS * 86_400_000;
 
-// Automatic issues ---------------------------------------------------------------
-
 function autoIssueBody(service: ServiceId, reason: string) {
   return [
     `### ${FORM_LABELS.kind}`,
@@ -550,7 +498,6 @@ function autoIssueBody(service: ServiceId, reason: string) {
 async function openIssue(service: ServiceId, reason: string): Promise<number> {
   if (DRY_RUN) return 0;
   const title = `${serviceName(service)} is not available`;
-  // A run whose POST timed out, or whose history push failed, can have opened the issue already.
   const open = await github(
     "GET",
     `/repos/${REPOSITORY}/issues?labels=status-auto&state=open&per_page=100`,
@@ -566,13 +513,10 @@ async function openIssue(service: ServiceId, reason: string): Promise<number> {
   return issue.number;
 }
 
-/** Closes the automatic issue, or leaves it open for the person who commented on it. */
 async function recoverIssue(service: ServiceId, number: number): Promise<"close-issue"> {
-  // 0 is the issue that a dry run planned to open.
   if (number === 0 || DRY_RUN) return "close-issue";
   const issue = await github("GET", `/repos/${REPOSITORY}/issues/${number}`, decodeIssue);
   if (issue.state === "closed") return "close-issue";
-  // Close first: after a failed close, a comment first would repeat on each run.
   await github("PATCH", `/repos/${REPOSITORY}/issues/${number}`, decodeNumber, {
     state: "closed",
     state_reason: "completed",
@@ -583,12 +527,9 @@ async function recoverIssue(service: ServiceId, number: number): Promise<"close-
   return "close-issue";
 }
 
-// Output -----------------------------------------------------------------------
-
 const xml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** An Atom feed with one entry for each incident update, newest first. */
 function atomFeed(incidents: readonly Incident[]): string {
   const entries = incidents
     .flatMap((incident) => incident.updates.map((update) => ({ incident, update })))
@@ -626,11 +567,8 @@ const writeFile = (path: string, content: string) => {
   writeFileSync(path, content);
 };
 
-// Run --------------------------------------------------------------------------
-
 const previous = readState();
 
-/** Probes the services, counts the runs, opens or closes the automatic issues, and saves the state. */
 async function runChecks() {
   const checked = await Promise.all(SERVICE_IDS.map(async (id) => ({ id, outcome: await check(PROBES[id]) })));
 
@@ -654,15 +592,12 @@ async function runChecks() {
         issue = null;
       }
     } catch (error) {
-      // The next run tries the issue write again. The checks of this run are still saved.
       logger.error(`${id}: the issue write failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     services[id] = { ...next, openIssue: issue };
   }
 
   const state: StateFile = { version: 1, checkedAt: NOW, services };
-  // Before the issue list: when that read fails, the workflow still saves the checks and the number
-  // of an issue that this run opened, so the next run does not open the issue again.
   writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
   return { state, checked, actions };
 }

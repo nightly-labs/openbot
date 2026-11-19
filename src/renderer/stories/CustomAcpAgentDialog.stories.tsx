@@ -40,7 +40,6 @@ export const AgentFilled: Story = {
   args: { draft: goose, onBack: fn() },
 };
 
-/** A saved agent: the ID is locked, and the saved key shows as kept. */
 export const AgentEdit: Story = {
   args: {
     editing: true,

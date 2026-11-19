@@ -1,7 +1,6 @@
 import { HOST_RELEASE_METHODS, HOST_RELEASE_PHASES, type HostReleaseStatus } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
-/** Independent main-to-renderer boundary. Do not import the remote host decoder here. */
 export function decodeHostReleaseStatusFromMain(value: unknown): HostReleaseStatus {
   if (
     !isDynamicRecord(value) ||

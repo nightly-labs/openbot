@@ -12,27 +12,27 @@ function MenuMark(props: { on: boolean }) {
   );
 }
 
-/**
- * One cell of the model table that holds a set of choices, such as the efforts of a model. The field
- * shows the chosen names in one line, and its menu stays open while the user checks items.
- */
 export function ModelChoiceMenu<T extends string>(props: {
-  /** The accessible name of the field, as `Model 1 efforts`. */
   label: string;
-  /** What the field shows when nothing is chosen. */
   empty: string;
+  none?: string;
+  noneChosen?: boolean;
+  onNone?: (on: boolean) => void;
   choices: readonly T[];
   name: (choice: T) => string;
   chosen: readonly T[];
   busy: boolean;
-  /** The dialog element that the menu portals into. */
   mount: HTMLElement | undefined;
   onToggle: (choice: T, on: boolean) => void;
 }) {
   const { t } = useText();
-  // The label names the field, so the chosen names are its description for a screen reader.
   const valueId = createUniqueId();
   const names = () => props.choices.filter((choice) => props.chosen.includes(choice)).map(props.name);
+  const text = () => {
+    if (names().length > 0) return names().join(t("format.list.separator"));
+    return props.noneChosen && props.none !== undefined ? props.none : props.empty;
+  };
+  const unset = () => names().length === 0 && !props.noneChosen;
 
   return (
     <DropdownMenu.Root placement="bottom-start" gutter={4}>
@@ -43,8 +43,8 @@ export function ModelChoiceMenu<T extends string>(props: {
         aria-describedby={valueId}
         disabled={props.busy}
       >
-        <span id={valueId} class="custom-provider-choice-text" data-empty={names().length === 0 ? "" : undefined}>
-          {names().length > 0 ? names().join(t("format.list.separator")) : props.empty}
+        <span id={valueId} class="custom-provider-choice-text" data-empty={unset() ? "" : undefined}>
+          {text()}
         </span>
         <span class="ui-select-trigger-icon">
           <ChevronsUpDown aria-hidden="true" />
@@ -52,6 +52,21 @@ export function ModelChoiceMenu<T extends string>(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content>
+          <Show when={props.none}>
+            {(none) => (
+              <>
+                <DropdownMenu.CheckboxItem
+                  checked={props.noneChosen === true}
+                  closeOnSelect={false}
+                  onChange={(on: boolean) => props.onNone?.(on)}
+                >
+                  <MenuMark on={props.noneChosen === true} />
+                  <span>{none()}</span>
+                </DropdownMenu.CheckboxItem>
+                <DropdownMenu.Separator />
+              </>
+            )}
+          </Show>
           <For each={props.choices}>
             {(choice) => (
               <DropdownMenu.CheckboxItem

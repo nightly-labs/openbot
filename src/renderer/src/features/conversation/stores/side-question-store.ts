@@ -7,10 +7,8 @@ import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import type { ConversationProps } from "../conversation-types";
 
-// Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
 
-/** The side question of one agent. Only this window holds it: nothing on the host keeps it. */
 export interface SideQuestionState {
   draft: string;
   exchanges: SideQuestionExchange[];
@@ -22,17 +20,14 @@ const SIDE_QUESTION_EMPTY: SideQuestionState = { draft: "", exchanges: [], error
 
 export interface SideQuestionStoreDeps {
   props: ConversationProps;
-  /** Owned by the server's conversation state, so that a side question outlives the view of its chat. */
   questions: Store<Record<string, SideQuestionState>>;
   setQuestions: StoreSetter<Record<string, SideQuestionState>>;
-  /** Opens the side question pane of the agent on screen. */
   openPane: () => void;
 }
 
 export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
   const { questions, setQuestions } = deps;
 
-  /** The host that runs the agent answers a side question. A joined server or a web host needs `side-question-v1`. */
   const sideQuestionAvailable = () =>
     deps.props.runtime
       ? Boolean(deps.props.runtime.askSideQuestion)
@@ -41,10 +36,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
     const agentId = deps.props.agent?.id;
     return (agentId && questions[agentId]) || SIDE_QUESTION_EMPTY;
   };
-  /**
-   * One side composer shows the side question of each agent in turn, so a focus request must be higher
-   * than the request of each agent.
-   */
   const nextFocusRequest = () => Math.max(0, ...Object.values(questions).map((state) => state.focusRequest)) + 1;
   function update(agentId: string, change: (state: SideQuestionState) => void) {
     setQuestions((draft) => {
@@ -61,7 +52,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
     });
   }
 
-  /** Opens the pane with the caret in its composer. Text from the chat composer goes to the end of its draft. */
   function openSideQuestion(text = "") {
     const agentId = deps.props.agent?.id;
     if (!agentId || !sideQuestionAvailable()) return;
@@ -83,8 +73,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
         ? []
         : [
             {
-              // The prompt reads only the start of each turn. A shorter body also stays under a host's
-              // request limit. A longer answer still shows in full here.
               question: exchange.question.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
               answer: exchange.answer.slice(0, INPUT_LIMITS.sideQuestionEarlierText),
             },
@@ -97,7 +85,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
       draft.error = null;
     });
     const runtimeAsk = deps.props.runtime?.askSideQuestion;
-    // The server is fixed now, so an answer cannot come from a server the user switches to.
     const serverId = deps.props.server?.id;
     const ask = runtimeAsk
       ? runtimeAsk({ agentId, question, earlier })
@@ -116,7 +103,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
         if (!questions[agentId]) return;
         update(agentId, (draft) => {
           if (!draft.exchanges.some((item) => item.id === id)) return;
-          // The question goes back to the composer, before text typed since, so that Send asks it again.
           draft.exchanges = draft.exchanges.filter((item) => item.id !== id);
           draft.error = errorMessage(error, t("conversation.sideQuestion.error"));
           draft.draft = draft.draft.trim() ? `${question}\n${draft.draft.trim()}` : question;
@@ -126,7 +112,6 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
     );
   }
 
-  /** Closing the pane deletes the side question. An answer that comes later finds no question and is dropped. */
   function deleteSideQuestion() {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;

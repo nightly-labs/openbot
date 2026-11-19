@@ -15,25 +15,6 @@ import { sidebarPort } from "./sidebar-port";
 import { createSidebarPreferences } from "./sidebar-preferences";
 import { defaultSidebarLayout } from "./sidebar-sections";
 
-/**
- * The shape of the agent list: the host's own section layout, plus the three
- * things the user arranges here and this computer remembers - pinned items,
- * people order and collapsed sections.
- *
- * Those three are stored per server and read under `activeServerId()`, so they
- * are *not* torn down on a switch: `localStorage` holds every server's
- * arrangement at once and switching back has to restore it. A server with
- * `sidebar-pins-v1` also keeps the pins for the other devices of the user, and
- * `localStorage` is the copy of this computer. The layout is the
- * opposite - it belongs to the host, is refetched on every mount of the keyed
- * server scope, and so is the only piece of this module a switch discards.
- *
- * `removePinnedItemEverywhere` is the one write that ignores the active server.
- * A deleted agent has to lose its pin on every server that pinned it, because
- * nothing will ever re-render that entry into a valid state again.
- *
- * Ungated - see `app-providers.tsx`.
- */
 const Sidebar = createSimpleContext({
   name: "Sidebar",
   init: () => {
@@ -45,7 +26,6 @@ const Sidebar = createSimpleContext({
     );
     const preferences = createSidebarPreferences({
       scope: activeServerId,
-      // The scope is the server id.
       sync: {
         supports: (serverId) =>
           serverSupportsCapability(
@@ -60,11 +40,6 @@ const Sidebar = createSimpleContext({
 
     const sidebarPeopleOrder = createMemo(() => sidebarPeopleOrderByServer()[activeServerId()] ?? []);
 
-    /**
-     * The layout read for a server load, answering the default where the host has no layout to give.
-     * A remote host that has connected but not yet answered the handshake answers null: its
-     * capabilities are not known, so the current layout stays until the negotiated load reads it.
-     */
     function loadLayout(server: ServerSummary | undefined): Promise<SidebarLayoutSnapshot | null> {
       if (server?.kind === "remote" && server.compatibility?.hostAppVersion === null) return Promise.resolve(null);
       return serverSupportsCapability(server, "sidebar-layout")

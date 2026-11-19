@@ -11,10 +11,6 @@ import { useText } from "@/shared/lib/text";
 
 const HEIGHT = 40;
 
-/**
- * Tells the reader that the agent of this chat set the backdrop, with Undo, as the desktop toast does.
- * It stays until Undo, its close button, or the reader leaving the chat.
- */
 export function ChatBackdropUndo({
   serverId,
   agentId,
@@ -34,9 +30,7 @@ export function ChatBackdropUndo({
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
-  // Agent ids are per server: the same id on another server is another agent.
   const shown = useChatBackdrop((state) => state.undo?.serverId === serverId && state.undo.agentId === agentId);
-  // Leaving the chat ends the offer, as a toast ends on desktop.
   useEffect(
     () => () => {
       const { undo } = useChatBackdrop.getState();

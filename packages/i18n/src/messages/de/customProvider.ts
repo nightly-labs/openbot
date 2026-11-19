@@ -89,6 +89,7 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "Max. Ausgabe",
   "customProvider.model.efforts": "Denkaufwand von Modell {number}",
   "customProvider.model.effortsLabel": "Denkaufwand",
+  "customProvider.model.effortsDefault": "Standard",
   "customProvider.model.effortsNone": "Kein Nachdenken",
   "customProvider.model.inputs": "Eingaben von Modell {number}",
   "customProvider.model.inputsLabel": "Akzeptiert",

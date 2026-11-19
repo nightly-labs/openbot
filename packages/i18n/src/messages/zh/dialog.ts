@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/dialog";
 
 export const messages = {
-  // Native file pickers.
   "dialog.chooseSiteDirectory": "选择静态站点目录",
   "dialog.chooseAgentFolder": "为 {agent} 选择文件夹",
   "dialog.chooseAgentExclusion": "选择 {agent} 不得更改的文件夹",

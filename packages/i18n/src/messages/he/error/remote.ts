@@ -23,6 +23,9 @@ export const messages = {
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
   "error.remote.windowsSessionDisconnected":
     "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
+  "error.remote.streamTooSlowLowerQuality":
+    "החיבור למארח איטי מדי בשביל התמונה. יש לנסות שוב: החיבור הבא ישתמש באיכות נמוכה יותר.",
+  "error.remote.streamTooSlow": "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר ולנסות שוב.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",
@@ -179,6 +182,8 @@ export const messages = {
   "error.remote.relayUnavailable": "Signal לא שלח שרתי ממסר לחיבור הזה. יש לנסות שוב מאוחר יותר.",
   "error.remote.iceFailed": "לא ניתן היה ליצור חיבור ישיר למארח. חומת אש, VPN או שרת proxy יכולים לחסום אותו.",
   "error.remote.iceDisconnected": "החיבור הישיר למארח אבד.",
+  "error.remote.webrtcBlocked":
+    "המכשיר הזה חוסם את החיבור ש-OpenBot צריך. אם מצב נעילה מופעל, כבה אותו עבור OpenBot בהגדרות > פרטיות ואבטחה > מצב נעילה.",
   "error.remote.directoryUnreachable": "OpenBot לא הצליח להגיע לשירות OpenBot. יש לבדוק את החיבור.",
   "error.remote.directoryTimeout": "שירות OpenBot לא ענה בזמן. יש לנסות שוב.",
   "error.remote.inviteAlreadyUsed": "ההזמנה הזו כבר נוצלה. יש לבקש הזמנה חדשה.",

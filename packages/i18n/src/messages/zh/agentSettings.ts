@@ -190,6 +190,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "使用“先询问”",
 
   "agentSettings.links.usage": "用量",
+  "agentSettings.links.apps": "应用",
+  "agentSettings.links.appsScope": "所有助手",
   "agentSettings.links.memories": "记忆",
   "agentSettings.links.memoriesCount": { one: "已保存 {count} 条", other: "已保存 {count} 条" },
   "agentSettings.links.skills": "技能",

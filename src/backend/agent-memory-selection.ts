@@ -3,10 +3,6 @@ import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbo
 import type { MemoryEntry } from "@openbot/contracts/ipc";
 import { databaseRows, requiredStringColumn } from "./database/database-rows";
 
-/**
- * Selects the essential memories of one agent for text-only imports. Call within the caller's transaction.
- * Migration 32 has its own frozen copy (`migrations/0032-agent-memory-selection.ts`).
- */
 export function initializeAgentMemorySelection(db: DatabaseSync, agentId: string): void {
   const rows = databaseRows(
     db

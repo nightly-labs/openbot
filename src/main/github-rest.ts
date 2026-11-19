@@ -1,7 +1,3 @@
-// The GitHub REST calls of workflows: the changes of GitHub outputs, made as the OpenBot GitHub App's
-// bot, the labels and people that an output can choose, and the newest events of a repository for
-// "Run with last event". The backend keeps the rules; this adapter keeps the tokens and the HTTP.
-
 import type {
   WorkflowGitHubCatalog,
   WorkflowGitHubCloseReason,
@@ -32,45 +28,28 @@ import { GitHubOperationError, githubCall } from "./github-effects";
 
 const API = "https://api.github.com";
 const PAGE_SIZE = 100;
-/** The newest items or comments that "Run with last event" reads. */
 const RECENT_LIMIT = 30;
-/** The pull requests whose reviews or checks "Run with last event" reads, one call each. */
 const RECENT_DETAIL_LIMIT = 10;
-/** The longest GitHub message that a failure keeps. */
 const DETAIL_LIMIT = 300;
-/** The `state_reason` that GitHub accepts for each saved close reason. */
 const GITHUB_STATE_REASONS: Record<WorkflowGitHubCloseReason, string> = {
   completed: "completed",
   notPlanned: "not_planned",
 };
 
-/**
- * The branch that keeps the files of GitHub outputs. GitHub has no API that attaches a file to an issue
- * for an App, so the files go to this branch and the text links them. It has no history of the default
- * branch, so it has no workflow files, and a push to it starts no GitHub Actions.
- */
 const FILES_BRANCH = "openbot-attachments";
-/** The largest file that an output copies. A larger one keeps its own link, which expires. */
 const FILE_BYTES_LIMIT = 25 * 1024 * 1024;
-/** The most bytes that one output copies. The files after it keep their own links. */
 const FILES_BYTES_LIMIT = 50 * 1024 * 1024;
-/** The longest time that the download or the upload of one file can take. */
 const FILE_TRANSFER_TIMEOUT_MS = 2 * 60 * 1000;
-/** The largest part of GitHub's limit that the links can use, so that the text stays. */
 const FILES_SECTION_LIMIT = GITHUB_BODY_LIMIT / 2;
-/** The longest file name in the branch. */
 const FILE_NAME_LIMIT = 100;
-/** `[skip ci]` stops other CI services too. */
 const FILES_COMMIT_MESSAGE = "Add files for an OpenBot workflow output [skip ci]";
 
-/** One linked file: on the branch, or at its own address when it could not be copied. */
 interface FileLink {
   name: string;
   url: string;
   image: boolean;
 }
 
-/** The name of a file in the branch: its place in the list, then only characters that need no escape. */
 function branchFileName(name: string, index: number): string {
   const safe = name
     .replace(/[^A-Za-z0-9._-]+/gu, "-")
@@ -79,7 +58,6 @@ function branchFileName(name: string, index: number): string {
   return `${index + 1}-${safe || "file"}`;
 }
 
-/** The address of a file of the source, or null when it is not an `https` address. */
 function sourceUrl(file: WorkflowGitHubFile): string | null {
   try {
     const url = new URL(file.url);
@@ -89,13 +67,11 @@ function sourceUrl(file: WorkflowGitHubFile): string | null {
   }
 }
 
-/** The link of a file at its own address, or null when that is not an `https` address. */
 function ownLink(file: WorkflowGitHubFile): FileLink | null {
   const url = sourceUrl(file);
   return url ? { name: file.name, url, image: file.contentType.startsWith("image/") } : null;
 }
 
-/** The Markdown of the links: an image shows in the text, another file is a link. */
 function filesMarkdown(links: readonly FileLink[]): string {
   return links
     .map((link) => {
@@ -105,10 +81,6 @@ function filesMarkdown(links: readonly FileLink[]): string {
     .join("\n\n");
 }
 
-/**
- * The text with the links of its files below it, in GitHub's limit. When the links are too long, the
- * last links go, not a part of a link.
- */
 function withFiles(body: string, links: readonly FileLink[]): string {
   let kept = links.length;
   while (kept > 0 && filesMarkdown(links.slice(0, kept)).length > FILES_SECTION_LIMIT) kept -= 1;
@@ -118,7 +90,6 @@ function withFiles(body: string, links: readonly FileLink[]): string {
   return [body.slice(0, room).trimEnd(), section].filter(Boolean).join("\n\n").slice(0, GITHUB_BODY_LIMIT);
 }
 
-/** The tokens for one repository: the user's, and the app's where the user can push. */
 interface GitHubRepositoryTokens {
   user: string;
   bot: string | null;
@@ -126,12 +97,7 @@ interface GitHubRepositoryTokens {
 
 export interface GitHubRestOptions {
   fetch: GitHubFetch;
-  /** Null while the GitHub connection is not active. */
   tokens: (repository: string) => Effect.Effect<GitHubRepositoryTokens | null, GitHubOperationError>;
-  /**
-   * The bytes of a file that a change links, such as a Discord attachment. Without it, or when it fails,
-   * the text links the file at its own address.
-   */
   download?: (url: string, maxBytes: number) => Effect.Effect<Uint8Array, MessagingAdapterError>;
 }
 
@@ -146,7 +112,6 @@ const commitSchema = z.object({ sha: z.string().min(1), tree: shaSchema });
 
 type Failure = WorkflowGitHubApiFailure;
 
-/** When the comment or the item of a recent event was made, as GitHub's ISO time. */
 function createdAt(candidate: WorkflowGitHubRecentEvent): string {
   const subject = candidate.body.comment ?? candidate.body.issue ?? candidate.body.pull_request;
   return isDynamicRecord(subject) && typeof subject.created_at === "string" ? subject.created_at : "";
@@ -154,7 +119,6 @@ function createdAt(candidate: WorkflowGitHubRecentEvent): string {
 
 const failure = (code: Failure["code"], message: string): Failure => ({ code, message });
 
-/** A response that is not a success, as the step shows it. GitHub's own words go through redaction. */
 function httpFailure(status: number, body: unknown, rateLimited: boolean): Failure {
   const parsed = messageSchema.safeParse(body);
   const message = parsed.success ? redactText(parsed.data.message).slice(0, DETAIL_LIMIT) : `HTTP ${status}`;
@@ -164,16 +128,13 @@ function httpFailure(status: number, body: unknown, rateLimited: boolean): Failu
     return failure("noWrite", sourceText("error.workflow.githubNoWrite"));
   }
   if (status === 404 || status === 410) return failure("noAccess", sourceText("error.workflow.githubNoAccess"));
-  // A server error can come after GitHub made the change.
   if (status >= 500) return failure("unreachable", sourceText("error.workflow.githubUnreachable"));
   return failure("invalid", sourceText("error.workflow.githubRefused", { detail: message }));
 }
 
-/** The workflow calls to GitHub, over `fetch`, with the connector's tokens. */
 export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi {
   const tokens = (repository: string) =>
     options.tokens(repository).pipe(
-      // Nothing went to GitHub, so the step can say so plainly.
       Effect.mapError(() => failure("notSent", sourceText("error.workflow.githubUnreachable"))),
       Effect.flatMap((found) =>
         found
@@ -182,7 +143,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       ),
     );
 
-  /** One call. Answers the parsed body, or null for an empty one. */
   const call = Effect.fn("GitHubRest.call")(function* (
     token: string,
     method: string,
@@ -229,12 +189,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         Effect.fail(failure("unreachable", sourceText("error.workflow.githubUnreachable")));
   };
 
-  /**
-   * Copies the files to the files branch in one commit, and answers their links. A file that is too
-   * large, that cannot be read or that GitHub refuses keeps its own address; so does each file when the
-   * commit fails, such as in an empty repository or under a rule that protects every branch. A second
-   * try of one change writes the same paths again in a new commit, and the links of each try stay.
-   */
   const copyFiles = Effect.fn("GitHubRest.copyFiles")(function* (
     token: string,
     repository: string,
@@ -252,7 +206,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       if (file.size > room || !own[index]) continue;
       const bytes = yield* download(file.url, room).pipe(Effect.timeout(FILE_TRANSFER_TIMEOUT_MS), Effect.option);
       if (Option.isNone(bytes) || bytes.value.byteLength === 0 || bytes.value.byteLength > room) continue;
-      // A file of 25 MB is about 33 MB of JSON, which a slow upload cannot send in the usual deadline.
       const blob = yield* call(
         token,
         "POST",
@@ -271,7 +224,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       copied.set(index, path);
     }
     if (entries.length === 0) return own.filter((link) => link !== null);
-    // A run of another output can move the branch at the same time: the second try builds on its commit.
     let commit: string | null = null;
     for (let attempt = 0; attempt < 2 && !commit; attempt += 1) {
       const head = refSchema.safeParse(
@@ -303,15 +255,10 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       const path = copied.get(index);
       if (!path) return [link];
       const encoded = path.split("/").map(encodeURIComponent).join("/");
-      // `?raw=true` shows the file itself, also to a person who can read a private repository.
       return [{ ...link, url: `https://github.com/${repository}/blob/${commit}/${encoded}?raw=true` }];
     });
   });
 
-  /**
-   * The change with the links of its files in its text, and no files. A file that cannot be copied does
-   * not stop the issue or the comment: it keeps its own link.
-   */
   const attachFiles = (change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChange> => {
     const files = change.files;
     if (!files) return Effect.succeed(change);
@@ -333,7 +280,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     change: WorkflowGitHubChange,
   ): Effect.fn.Return<WorkflowGitHubChangeResult, Failure> {
     const found = yield* tokens(change.repository);
-    // A change is the app's, so GitHub shows it as the app and the loop guard knows its events.
     if (!found.bot) return yield* Effect.fail(failure("noWrite", sourceText("error.workflow.githubNoWrite")));
     const token = found.bot;
     const repo = `/repos/${change.repository}`;
@@ -352,7 +298,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         yield* call(token, "POST", `${item}/labels`, { labels: change.labels });
         return done();
       case "label.remove":
-        // A label that the item does not have is removed already.
         for (const label of change.labels)
           yield* call(token, "DELETE", `${item}/labels/${encodeURIComponent(label)}`, undefined, [404]);
         return done();
@@ -395,7 +340,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     }
   });
 
-  /** Every page of a list, up to the option limit. */
   const pages = Effect.fn("GitHubRest.pages")(function* <T>(
     token: string,
     path: string,
@@ -435,7 +379,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     const repo = `/repos/${repository}`;
     const list = (path: string, query: string) =>
       call(token, "GET", `${repo}/${path}?per_page=${RECENT_LIMIT}&${query}`).pipe(Effect.map(records));
-    // The REST answers are close to the App's bodies: the item is the subject, and its author the sender.
     const shape = (name: string, action: string, subject: DynamicRecord, extra: DynamicRecord = {}) => {
       const pullRequest = name === "pull_request" || name === "pull_request_review";
       return {
@@ -493,7 +436,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         for (const pull of pulls) {
           const reviews = records(yield* call(token, "GET", `${repo}/pulls/${String(pull.number)}/reviews`));
           const review = reviews.at(-1);
-          // The reviewer is the sender of a review.
           if (review) found.push(shape("pull_request_review", "submitted", pull, { review, sender: review.user }));
         }
         return found;
@@ -548,7 +490,6 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
           });
         }
         if (event === "comment") return found;
-        // A mention is also in the text of a new issue or pull request.
         const opened = (yield* list("issues", "state=all&sort=created&direction=desc")).map((item) =>
           shape(kindOf(item), "opened", item),
         );
@@ -560,13 +501,8 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
   return { attachFiles, change, options: repositoryOptions, recentEvents };
 }
 
-/**
- * What the workflow editor offers from this host's GitHub connection: the repositories, and the labels
- * and people of one of them. Only an owner or admin reads it, as it shows what the sign-in reaches.
- */
 export interface WorkflowGitHubDirectory {
   catalog(): Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>;
-  /** A GitHub failure is a refusal of the workflow store, with the failure's message for the user. */
   options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, GitHubOperationError>;
 }
 

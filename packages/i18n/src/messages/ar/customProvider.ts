@@ -83,6 +83,7 @@ export const messages = {
   "customProvider.model.maxOutputColumn": "أقصى إخراج",
   "customProvider.model.efforts": "جهد التفكير للنموذج {number}",
   "customProvider.model.effortsLabel": "جهد التفكير",
+  "customProvider.model.effortsDefault": "الافتراضي",
   "customProvider.model.effortsNone": "بدون تفكير",
   "customProvider.model.inputs": "ما يقبله النموذج {number}",
   "customProvider.model.inputsLabel": "يقبل",

@@ -23,7 +23,6 @@ const MARK_PATHS: Record<Exclude<MobileConnectorId, "bitwarden">, string> = {
   protonpass: PROTON_MARK_PATH,
 };
 
-/** The connector's mark on a tile, as the desktop Marketplace shows it. */
 export function ConnectorLogo({ id, size = 32 }: { id: MobileConnectorId; size?: number }) {
   const foreground = useThemeColor("foreground");
   const mark = Math.round(size * 0.55);
