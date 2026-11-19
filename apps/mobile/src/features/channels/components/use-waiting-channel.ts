@@ -2,16 +2,6 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 
-/**
- * The channel where this agent waits for the user, or null: its wait is on a channel thread. A host
- * without channel-attention-v1 names no threads, so its waits are not in a channel. The channel
- * list changes while replies stream, so the selector returns a key, and the component renders again
- * only when the channel changes.
- *
- * `activity` is the activity of the agent's own chat (`useAgentActivity`) or the activity of the home
- * list (`useAgentListActivity`). Both give the same thread: the list keeps a wait of the own chat as
- * it is, and a wait of a side thread names no thread. The caller reads it, so a row reads it once.
- */
 export function useWaitingChannel(
   activity: MobileAgentActivity | undefined,
   serverId: string,

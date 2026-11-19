@@ -1,7 +1,3 @@
-// The SCIM 2.0 user endpoint of company sign-in (RFC 7643, RFC 7644), only as much as Entra ID, Okta
-// and Google use for provisioning: find a user by `userName`, add one, and turn one off or on. A
-// user is an OpenBot account at one of the connection's domains, and `userName` is its email.
-
 import { type DynamicRecord, isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import type { ScimUser } from "./company-sign-in";
@@ -38,7 +34,6 @@ export function scimErrorResponse(error: unknown): Response {
     return scimError(error.status, error.message, error.status === 400 ? "invalidValue" : undefined);
   }
   if (error instanceof JsonBodyError) return scimError(error.status, error.message, "invalidSyntax");
-  // The type of the failure only. Its cause can hold provider data.
   console.error("SCIM request failed:", error instanceof Error ? error.name : typeof error);
   return scimError(500, "The request failed.");
 }
@@ -56,14 +51,12 @@ function representation(user: ScimUser, requestUrl: string) {
   };
 }
 
-/** `active` in a SCIM body. Entra ID sends the strings "True" and "False". */
 function readActive(value: unknown): boolean | null {
   if (isBoolean(value)) return value;
   if (isString(value) && /^(?:true|false)$/iu.test(value)) return value.toLowerCase() === "true";
   return null;
 }
 
-/** The new `active` of a PatchOp body, or undefined when the operations do not change it. */
 function patchActive(body: DynamicRecord): boolean | undefined | null {
   if (!Array.isArray(body.schemas) || !body.schemas.includes(PATCH_SCHEMA) || !Array.isArray(body.Operations)) {
     return null;
@@ -95,7 +88,6 @@ export const listScimUsers = Effect.fn("Scim.listUsers")(function* (request: Req
   const connection = yield* scimConnection(request);
   const url = new URL(request.url);
   const filter = url.searchParams.get("filter");
-  // A provider lists users only to find one before it adds it. A list of all users is not offered.
   const match = filter ? USER_NAME_FILTER.exec(filter.trim()) : null;
   if (!match?.[1]) {
     if (filter) return scimError(400, 'Only the filter userName eq "…" is supported.', "invalidFilter");
@@ -138,7 +130,6 @@ export const readScimUser = Effect.fn("Scim.readUser")(function* (request: Reque
   return scimJson(representation(user, request.url));
 });
 
-/** PATCH, PUT and DELETE. Only `active` changes; other attributes belong to the OpenBot account. */
 export const updateScimUser = Effect.fn("Scim.updateUser")(function* (
   request: Request,
   userId: string,

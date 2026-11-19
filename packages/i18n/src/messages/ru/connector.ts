@@ -66,7 +66,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Все агенты потеряют инструменты GitHub, gh и git.",
   "connector.github.disconnectEffectRevoke": "Затем откроется GitHub, где можно отозвать доступ OpenBot.",
   "connector.github.disconnectEffectKept": "Чаты, файлы и память агентов останутся на этом компьютере.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Каждый агент на сервере {host} может работать с вашими репозиториями, задачами и пул-реквестами GitHub, а также с gh и git.",
   "connector.github.connectedSummaryHost": {

@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.team", {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "This host is not linked to an OpenBot owner account.",
   "error.team.ownerEmailRequired": "Sign in with the OpenBot email that created this host.",
   "error.team.hostNotConfigured": "The team host is not configured.",

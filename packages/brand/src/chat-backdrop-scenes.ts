@@ -1,10 +1,5 @@
 import type { AvatarColor } from "@openbot/contracts/ipc";
 
-/**
- * The animated scenes that can play behind a chat, on the desktop, the web client and mobile. Each
- * one has a Light and a Dark look. The identifiers are saved on each device; add one, never rename
- * one: a renamed identifier reads back as no scene. The order is the Settings order.
- */
 export const CHAT_BACKDROP_SCENES = ["pond", "jellyfish", "sunset", "snowfall", "fireflies"] as const;
 export type ChatBackdropScene = (typeof CHAT_BACKDROP_SCENES)[number];
 
@@ -14,12 +9,6 @@ export function isChatBackdropScene(value: unknown): value is ChatBackdropScene 
 
 type Scheme = "light" | "dark";
 
-/**
- * The chat background under each scene. The scene replaces the chat background color, so these go
- * where that color goes, and the bubbles, the composer and the scroll edges match the scene. Each one
- * is in the readability limits of `chat-background.css`: Light has an OKLCH lightness of at least
- * 0.95 and a chroma of at most 0.02, Dark a lightness of at most 0.30 and a chroma of at most 0.05.
- */
 export const CHAT_BACKDROP_BASE = {
   pond: { light: "#e8f6f3", dark: "#0f2426" },
   jellyfish: { light: "#ebf3fa", dark: "#0e1a2b" },
@@ -28,10 +17,6 @@ export const CHAT_BACKDROP_BASE = {
   fireflies: { light: "#f2f5ea", dark: "#121a14" },
 } as const satisfies Record<ChatBackdropScene, Record<Scheme, AvatarColor>>;
 
-/**
- * Where a scene draws. A scene is a mosaic: each cell is one square, and every call fills whole
- * cells with one color at one opacity. The desktop gives a 2D canvas, mobile a Skia canvas.
- */
 export interface ChatBackdropCells {
   fill(x: number, y: number, width: number, height: number, color: string, alpha: number): void;
 }
@@ -40,12 +25,10 @@ export interface ChatBackdropFrame {
   scene: ChatBackdropScene;
   width: number;
   height: number;
-  /** Seconds since the scene started. A still frame uses a fixed time. */
   time: number;
   dark: boolean;
 }
 
-/** A stable value in [0, 1) for each number, so a scene needs no state between frames. */
 function hash(value: number): number {
   const x = Math.sin(value * 127.1 + 311.7) * 43_758.545_3;
   return x - Math.floor(x);
@@ -69,10 +52,6 @@ function disc(cells: ChatBackdropCells, cx: number, cy: number, radius: number, 
   }
 }
 
-/**
- * Draws a sprite. Each character is one cell: `.` is clear, and another character takes its color
- * from `colors`. `flip` mirrors it, for a sprite that moves left.
- */
 function sprite(
   cells: ChatBackdropCells,
   rows: readonly string[],
@@ -93,7 +72,6 @@ function sprite(
   });
 }
 
-/** A line of cells from one point to another. */
 function line(
   cells: ChatBackdropCells,
   x0: number,
@@ -109,7 +87,6 @@ function line(
   }
 }
 
-/** A count that grows with the area, so a large window is not empty and a small one is not full. */
 function countFor(frame: ChatBackdropFrame, cellsEach: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round((frame.width * frame.height) / cellsEach)));
 }
@@ -154,7 +131,6 @@ function pond(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     E: "#1f1f1f",
   };
 
-  // Light on the water.
   const glints = countFor(frame, 140, 16, 120);
   for (let index = 0; index < glints; index += 1) {
     const glow = Math.sin(t * (0.5 + hash(index) * 0.8) + hash(index + 1) * 6.28);
@@ -164,7 +140,6 @@ function pond(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     cell(cells, x + 1, hash(index + 3) * h, water, glow * 0.6);
   }
 
-  // Rings where a drop falls.
   const period = 7;
   for (let index = 0; index < 4; index += 1) {
     const clock = t + (index * period) / 4;
@@ -189,7 +164,6 @@ function pond(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     sprite(cells, tail, x, y, koi, direction < 0);
   }
 
-  // Lily pads in the corners, with a notch, and one flower.
   const pads = [
     [0.07, 0.16, 4.5],
     [0.92, 0.82, 5.5],
@@ -226,7 +200,6 @@ function jellyfish(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     cell(cells, x, y, bubble, 0.8);
   }
 
-  // Kelp that sways at both sides.
   const stalks = Math.max(4, Math.round(w / 30));
   for (let index = 0; index < stalks; index += 1) {
     const side = index % 2 === 0;
@@ -268,7 +241,6 @@ function sunset(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
 
   if (dark) twinklingStars(cells, frame, "#ffffff", horizon * 0.8, 400);
   else {
-    // Clouds that drift across the sky.
     for (let index = 0; index < 4; index += 1) {
       const length = 8 + hash(index + 300) * 10;
       const x = wrap(hash(index + 301) * (w + 30) + t * 0.6, w + 30) - 20;
@@ -278,7 +250,6 @@ function sunset(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     }
   }
 
-  // The sun, with bands that move down into the horizon.
   const radius = Math.max(6, Math.min(22, Math.min(w, h) * 0.18));
   const sx = w * 0.74;
   const sy = horizon - 2;
@@ -295,7 +266,6 @@ function sunset(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     line(cells, sx - half, sy + dy, sx + half, sy + dy, color);
   }
 
-  // Hills in front of the sun.
   for (let x = 0; x < w; x += 1) {
     const far = (Math.sin(x * 0.09 + 2) + Math.sin(x * 0.033)) * h * 0.04 + h * 0.06;
     const near =
@@ -304,7 +274,6 @@ function sunset(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
     line(cells, x, horizon - near, x, horizon, ridge);
   }
 
-  // A floor grid that moves toward the reader. It stays faint: the newest messages are over it.
   const depth = h - horizon;
   const rows = 8;
   for (let row = 0; row < rows; row += 1) {
@@ -338,7 +307,6 @@ function snowfall(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
   const ground = Math.max(2, Math.round(h * 0.03));
   cells.fill(0, h - ground, w, ground, snow, 1);
 
-  // Pines at both sides, with snow on each tier.
   const pines = Math.max(6, Math.round(w / 18));
   for (let index = 0; index < pines; index += 1) {
     const side = index % 2 === 0;
@@ -377,7 +345,6 @@ function fireflies(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
 
   if (dark) twinklingStars(cells, frame, "#d8e2c0", h * 0.4, 600);
 
-  // Grass, taller at the sides, with tips that sway.
   for (let x = 0; x < w; x += 1) {
     const edge = Math.abs(x / w - 0.5) * 2;
     const height = Math.round((2 + hash(x + 700) * 5) * (0.6 + edge * 1.2));
@@ -409,7 +376,6 @@ const PAINTERS: Record<ChatBackdropScene, (cells: ChatBackdropCells, frame: Chat
   fireflies,
 };
 
-/** Paints one frame of the scene on its base color. */
 export function paintChatBackdropScene(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
   cells.fill(0, 0, frame.width, frame.height, CHAT_BACKDROP_BASE[frame.scene][frame.dark ? "dark" : "light"], 1);
   PAINTERS[frame.scene](cells, frame);

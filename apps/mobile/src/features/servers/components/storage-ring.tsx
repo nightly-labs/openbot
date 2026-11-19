@@ -8,18 +8,14 @@ import { useReducedMotion } from "@/shared/lib/motion";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const STROKE = 16;
-/** A selected segment is this much wider, half outside the ring and half inside. */
 const SELECTED_GROWTH = 6;
 const SIZE = 176 + SELECTED_GROWTH;
 const RADIUS = (SIZE - STROKE - SELECTED_GROWTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-/** The space between two segments, along the ring. */
 const GAP = 3;
-/** A small share still shows as a short arc. */
 const MIN_ARC = 2;
 const REVEAL_MS = 700;
 const SELECT_MS = 200;
-/** The opacity of the other segments while one is selected. */
 const DIMMED = 0.25;
 
 export interface StorageRingSegment {
@@ -28,11 +24,6 @@ export interface StorageRingSegment {
   bytes: number;
 }
 
-/**
- * The share of each storage type as one ring, like the stacked bar of the desktop Storage page.
- * The ring is an image with a text summary; the legend rows below it carry the names and sizes.
- * A selected segment is wider and the others dim, so a legend row shows its part of the ring.
- */
 export function StorageRing({
   segments,
   selected,
@@ -41,12 +32,9 @@ export function StorageRing({
   label,
 }: {
   segments: readonly StorageRingSegment[];
-  /** The key of the highlighted segment. Null shows every segment the same. */
   selected: string | null;
-  /** The total, or the size of the selected segment, in the middle of the ring. */
   value: string;
   caption: string;
-  /** The text summary that a screen reader reads in place of the ring. */
   label: string;
 }) {
   const background = String(useCSSVariable("--openbot-bg-grouped"));
@@ -55,7 +43,6 @@ export function StorageRing({
   useEffect(() => {
     progress.set(reducedMotion ? 1 : withTiming(1, { duration: REVEAL_MS, easing: Easing.out(Easing.cubic) }));
   }, [progress, reducedMotion]);
-  // A cover in the section color hides the ring after `progress`, so the ring fills clockwise.
   const cover = useAnimatedProps(() => ({ strokeDashoffset: -CIRCUMFERENCE * progress.get() }));
   const total = segments.reduce((sum, segment) => sum + segment.bytes, 0);
   const gap = segments.length > 1 ? GAP : 0;

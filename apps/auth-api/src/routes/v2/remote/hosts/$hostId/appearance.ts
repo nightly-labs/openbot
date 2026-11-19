@@ -9,8 +9,6 @@ import {
   requestUser,
 } from "../../../../../server/request-auth";
 
-// The host copies the look that its owner or an admin chose for it (`host-appearance-v1`) with the
-// account signed in on it, as it does the logo, so each client shows it in the host list.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/appearance")({
   server: {
     handlers: {
@@ -19,7 +17,6 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/appearance")({
           Effect.gen(function* () {
             const user = yield* requestUser(request);
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-            // A missing `appearance` is refused as invalid; only an explicit `null` clears it.
             const body = yield* readJsonObject(request);
             const appearance = yield* requestRemoteControlPlane().setHostAppearance(
               user.id,

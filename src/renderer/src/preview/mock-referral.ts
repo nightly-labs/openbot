@@ -9,7 +9,6 @@ import {
   referralMinimum,
 } from "@openbot/contracts/referral";
 
-/** The invite code of the mock account. */
 const OWN_CODE = "k7m2p9qx";
 
 const DAY = 24 * 60 * 60_000;
@@ -39,7 +38,6 @@ const FIRST_NAMES = [
 
 const LAST_INITIALS = ["K", "A", "R", "T", "M", "G", "W", "N", "E", "O", "B", "S", "F", "Y", "L", "P", "H"] as const;
 
-/** About 4 in 10 friends pay, 4 have no plan yet, and 2 stopped. */
 function statusAt(index: number): ReferralFriendStatus {
   const slot = (index * 7) % 10;
   if (slot < 4) return "paying";
@@ -47,7 +45,6 @@ function statusAt(index: number): ReferralFriendStatus {
   return "stopped";
 }
 
-/** Friend `index` joined `index * 2 + 1` days ago, so index 0 is the newest. */
 function friendAt(index: number, now: number): ReferralFriend {
   const name = `${FIRST_NAMES[index % FIRST_NAMES.length]} ${LAST_INITIALS[(index * 3) % LAST_INITIALS.length]}.`;
   const status = statusAt(index);
@@ -57,7 +54,6 @@ function friendAt(index: number, now: number): ReferralFriend {
     status === "stopped" && paidSince !== null
       ? Math.round(paidSince + ((now - paidSince) * ((index % 7) + 1)) / 9)
       : null;
-  // 10% of a 19 EUR month for each renewal. The first payment of a friend who still pays waits.
   const months = paidSince === null ? 0 : (index % 5) + 1;
   const earned = status === "paying" ? months - 1 : months;
   return {
@@ -72,10 +68,6 @@ function friendAt(index: number, now: number): ReferralFriend {
   };
 }
 
-/**
- * 45 friends who joined with the invite link, newest first. Like the account server, a page after the
- * last one answers the last page, so a list that got shorter still shows friends.
- */
 export function createMockReferral(friendCount = 45, now = Date.now()): ReferralDesktopApi {
   const friends = Array.from({ length: friendCount }, (_, index) => friendAt(index, now));
   const counts: Record<ReferralFilter, number> = { all: friends.length, paying: 0, "no-plan": 0, stopped: 0 };

@@ -4,7 +4,6 @@ import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
-/** The "+" of the header: the native toolbar on iOS. */
 export function HeaderAddAction({ label, onPress }: { label: string; onPress: () => void }) {
   const press = () => {
     void haptics.impact("light");

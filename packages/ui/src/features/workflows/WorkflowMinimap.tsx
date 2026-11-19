@@ -1,23 +1,18 @@
-/** The minimap: the nodes, the drawn lines and the view, scaled down into one corner of the canvas. */
-
 import type { WorkflowNodeKind } from "@openbot/contracts/ipc";
 import { For } from "solid-js";
 import type { WfnPoint } from "./workflow-board";
 import { type Box, inkPath, type Stroke, strokeBox } from "./workflow-ink";
 import { colorVar } from "./workflow-node-parts";
 
-/** The minimap size. The world fits inside it with its aspect ratio kept. */
 const MINIMAP = { width: 200, height: 128, margin: 8 };
 
 export interface MinimapLayout {
   nodes: readonly ({ id: string; kind: WorkflowNodeKind } & Box)[];
   lines: readonly { id: string; brush: Stroke["brush"]; color: Stroke["color"]; d: string }[];
   view: Box;
-  /** The world point under a minimap point. */
   toWorld: (point: WfnPoint) => WfnPoint;
 }
 
-/** Fits the node boxes, the lines and the box that the view shows, in world pixels, into the minimap. */
 export function minimapLayout(
   boxes: readonly ({ id: string; kind: WorkflowNodeKind } & Box)[],
   strokes: readonly Stroke[],
@@ -61,7 +56,6 @@ export function minimapLayout(
 export function WorkflowMinimap(props: {
   map: MinimapLayout;
   selected: string | null;
-  /** A press, and a drag with the button down, in minimap pixels. */
   onPan: (event: PointerEvent & { currentTarget: SVGSVGElement }) => void;
 }) {
   return (
@@ -79,7 +73,6 @@ export function WorkflowMinimap(props: {
           if (event.buttons === 1) props.onPan(event);
         }}
       >
-        {/* Keyed by node, so a camera move changes the boxes and does not make new ones. */}
         <For each={props.map.nodes} keyed={(box) => box.id}>
           {(box) => (
             <rect

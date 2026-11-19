@@ -15,7 +15,6 @@ import {
 } from "./connector-controller";
 import type { MessagingConnectorOptions } from "./messaging-connector";
 
-/** The WhatsApp requests of one server: this computer's, or a joined server's (`whatsapp-connector-v1`). */
 export type WhatsAppPort = Pick<
   MessagingDesktopApi,
   | "getWhatsAppOverview"
@@ -35,10 +34,8 @@ export type WhatsAppPort = Pick<
   | "setWhatsAppStatusReactions"
 >;
 
-/** This computer's WhatsApp, through main. Read on each call: tests and stories replace `window.openbot`. */
 export const whatsappPort = (): WhatsAppPort => window.openbot.messaging;
 
-/** The `whatsapp-connector-v1` requests to a joined server: main's, or the browser client's. */
 export type HostWhatsAppApi = Pick<
   MessagingDesktopApi,
   | "hostGetWhatsAppOverview"
@@ -58,11 +55,6 @@ export type HostWhatsAppApi = Pick<
   | "hostSetWhatsAppStatusReactions"
 >;
 
-/**
- * The WhatsApp numbers of the joined server that `serverId` names, through main or the browser
- * client's `host`. The orchestrator starts on the host's default provider and model, so a choice is
- * not sent.
- */
 export function hostWhatsAppPort(
   serverId: () => string | undefined,
   host: () => HostWhatsAppApi = () => window.openbot.messaging,
@@ -91,26 +83,17 @@ export function hostWhatsAppPort(
   };
 }
 
-/** How often a page reads the numbers while it shows: a number changes on its own. */
 const POLL_MS = 3_000;
-/** How often the link dialog reads the link: the QR code changes about every 20 seconds. */
 const LINK_POLL_MS = 1_000;
 
-/**
- * The WhatsApp numbers of this computer. Main sends no event for a number or a link, so a page that
- * shows them calls `watch`, and a link that waits for the phone is read every second until it ends.
- * Each action reads the numbers again when it ends.
- */
 export function createWhatsAppConnector(
   port: () => WhatsAppPort,
   options: MessagingConnectorOptions,
 ): ConnectorController {
-  /** The last read. A failed read keeps the overview of an earlier one, and `error` says why it failed. */
   const [loaded, setLoaded] = createSignal<{ overview: WhatsAppOverview | null; error: string | null } | null>(null);
   const [link, setLink] = createSignal<WhatsAppLinkState>(WHATSAPP_LINK_IDLE);
   const overview = () => loaded()?.overview ?? null;
   const actions = createConnectorActions("connector.whatsapp.actionFailed", "whatsapp");
-  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let reads = 0;
 
   const reload = () => {
@@ -130,9 +113,7 @@ export function createWhatsAppConnector(
   const run = (action: () => Promise<unknown>, track?: ConnectorAnalyticsAction) =>
     actions.run(action, { settled: reload, ...(track ? { track } : {}) });
 
-  /** Each link that starts or ends replaces the one before it, and stops its reads. */
   let links = 0;
-  /** True from a start until the dialog ends the link. */
   let linkStarted = false;
   let linkTimer: ReturnType<typeof setInterval> | undefined;
   const stopLinkReads = () => {
@@ -159,7 +140,6 @@ export function createWhatsAppConnector(
         follow(state, current);
         if (state.status !== "waiting" || current !== links) return;
         linkTimer = setInterval(() => {
-          // A failed read is tried again at the next tick; the link ends on its own when it times out.
           void port()
             .getWhatsAppLinkState()
             .then(
@@ -170,7 +150,6 @@ export function createWhatsAppConnector(
       },
     });
   };
-  /** The dialog closed. A link that did not end in `linked` is cancelled, so the phone cannot use its code. */
   const endLink = () => {
     links += 1;
     stopLinkReads();
@@ -178,7 +157,6 @@ export function createWhatsAppConnector(
     setLink(WHATSAPP_LINK_IDLE);
     if (!linkStarted) return;
     linkStarted = false;
-    // It does not wait, so a start still on its way is replaced and its answer ignored.
     if (status !== "linked") actions.run(() => port().cancelWhatsAppLink(), { waits: false });
   };
 

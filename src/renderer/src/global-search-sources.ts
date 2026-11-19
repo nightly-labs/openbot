@@ -28,11 +28,6 @@ import { usePlatform } from "./platform";
 
 const FILE_SEARCH_LIMIT = 50;
 
-/**
- * What global search finds besides agents and messages: channels, routines, files, commands and
- * settings pages. Routines load each time the search opens, as no store keeps every agent's list.
- * A joined server shows the Files filter only while its host serves `conversation-file-search-v1`.
- */
 export function useGlobalSearchSources(open: () => boolean) {
   const { t } = useText();
   const platform = usePlatform();
@@ -52,7 +47,6 @@ export function useGlobalSearchSources(open: () => boolean) {
     return server?.kind === "local" || serverSupportsCapability(server, "conversation-file-search-v1");
   };
 
-  // Lazy: the overlay reads these only while the search is open.
   const searchChannels = createMemo(
     () => (channels.supported() ? globalSearchChannels(channels.state.channels) : undefined),
     { lazy: true },
@@ -109,7 +103,6 @@ export function useGlobalSearchSources(open: () => boolean) {
 
   function selectRoutine(routine: GlobalSearchRoutine): void {
     const agentId = routine.agentId;
-    // As in `editAgent`: the agent cannot change while a new agent is being created.
     if (!agentId || (agentSetupOpen() && creatingAgent())) return;
     selectAgent(agentId);
     setSettingsRequest({ agentId, nonce: Date.now(), routine: { routineId: routine.id, name: routine.name } });
@@ -157,7 +150,6 @@ export function useGlobalSearchSources(open: () => boolean) {
         });
       }
       for (const item of navItems) {
-        // Hosted servers shows only for an account with hosting, which the dialog checks when it opens.
         if (!settingsTabShown(item.value, settingsWindow)) continue;
         list.push({
           id: `settings:${item.value}`,
@@ -187,7 +179,6 @@ export function useGlobalSearchSources(open: () => boolean) {
             run: () => openServerSettings(server.id, globalSearchOpener(), "members"),
           },
         );
-        // Memory shows the row only to an admin of a host that can set it, and only while it is online.
         if (
           serverCanAdminister(server, "agent-memory-limit-v1") &&
           (server.kind === "local" || server.state === "online")

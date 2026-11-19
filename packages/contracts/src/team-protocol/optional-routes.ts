@@ -1,7 +1,4 @@
 import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
-// The optional admin routes, one table. `teamSideRouteCodec` in `side-routes.ts` asks here, so every
-// HTTP and WebRTC transport encodes an admin route with its frozen codec. A path that is not listed
-// goes to the protocol adapter.
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";

@@ -1,16 +1,3 @@
-// Bench of web search in an OpenBot Codex agent: Codex's own inline `web__run` against the deferred
-// `openbot.web_search` tool, which runs each search in a side Codex thread (`AgentService.searchWeb`).
-// Runs the real `codex app-server` with a copy of the user's Codex login (see `codex-agent-harness.ts`),
-// on GPT-6 Luna. Each variant runs the same chat on one thread: three searches, with a plain request
-// before and after each, because inline search results stay in the context of each later request.
-// The correct versions come from the npm registry and nodejs.org at the start of the run.
-//   inline   The settings that OpenBot sends: the agent searches with `web__run` in `exec`.
-//   openbot  `web_search = "disabled"` and the OpenBot catalog of an agent with no web search of its
-//            own: the agent finds `openbot.web_search` there, and each call runs one side search.
-// On 2026-11-07 both used about the same tokens and `openbot` took twice as long, so Codex agents
-// keep `web__run` and do not get `openbot.web_search`.
-// Costs about 30 GPT-6 Luna requests for each run of each variant. `bun run bench:codex-web-search`;
-// `--runs=<n>` (default 2), `--model=<id>`. Writes .openbot-build/codex-web-search-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40,7 +27,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-web-search-ben
 const VARIANTS = ["inline", "openbot"] as const;
 type Variant = (typeof VARIANTS)[number];
 
-/** Fetches JSON from `url` and reads one version from it with `read`. */
 async function fetchVersion(url: string, read: (body: unknown) => string | null | undefined): Promise<string> {
   const response = await fetch(url, { headers: { accept: "application/json", "user-agent": "openbot-bench" } });
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
@@ -101,7 +87,6 @@ interface Totals {
   ms: number;
 }
 
-/** True when `reply` names `version` as a whole version, not as the start of a longer one. */
 function names(reply: string, version: string): boolean {
   const escaped = version.replaceAll(".", "\\.");
   return new RegExp(`(^|[^0-9.])v?${escaped}(?![0-9]|\\.[0-9])`).test(reply);
@@ -148,7 +133,6 @@ async function runChat(variant: Variant, run: number) {
   await makeGitWorkspace(workspace);
   const home = await makeCodexHome(join(root, "home"));
   let current: TurnLog | null = null;
-  // Pi has no web search of its own, so its catalog offers `openbot.web_search`.
   const catalog = variant === "inline" ? "codex" : "pi";
   const agent = await startCodexAgent(cli, home, workspace, async (request) => {
     if (request.method !== "item/tool/call" || !isRecord(request.params)) return undefined;
@@ -212,7 +196,6 @@ async function runChat(variant: Variant, run: number) {
 
 const runs: Awaited<ReturnType<typeof runChat>>[] = [];
 for (let run = 1; run <= RUNS; run++) {
-  // Alternate the order, so neither variant always runs with a warmer prompt cache.
   const order = run % 2 === 1 ? VARIANTS : [...VARIANTS].reverse();
   for (const variant of order) runs.push(await runChat(variant, run));
 }

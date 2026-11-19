@@ -19,17 +19,6 @@ import { useServers } from "../servers/servers-context";
 import { useDynamicIsland } from "./dynamic-island-context";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
-/**
- * Island bridge for the visible server: projects workspace state out to main and handles
- * actions coming back. Split from `dynamic-island.tsx` (which owns the coordinator above the
- * per-server domains) so the coordinator survives a server switch while the projection stays
- * scoped to the active server. See docs/architecture/change-rules.md.
- *
- * Projection waits for scope `loaded()` to avoid publishing a new server id next to a
- * half-filled workspace. Cross-server actions republish through `server-switch.tsx` because
- * the switch disposes this bridge; prompt answers and approval responses resolve directly
- * against the coordinator so the island reflects before the renderer catches up.
- */
 export function DynamicIslandBridge() {
   const { t, errorMessage } = useText();
   const platform = usePlatform();
@@ -53,7 +42,6 @@ export function DynamicIslandBridge() {
   const { unreadReplies, conversations } = useConversation();
   const { selectAgent, openAgentMessage } = useNavigation();
   const { setBrowserTakeoverPageRequest } = useConversationController();
-  /** The handoff this bridge published, so it never consumes or clears its own. */
   let publishedAction: DynamicIslandAction | null = null;
 
   createEffect(
@@ -81,8 +69,6 @@ export function DynamicIslandBridge() {
     },
     (input) => {
       if (!input) return;
-      // The coordinator reads the agent and message stores once; the compute above decides
-      // when it reads them again.
       untrack(() => dynamicIslandCoordinator.replaceServer(input));
       publishDynamicIslandPresentation();
     },
@@ -92,19 +78,11 @@ export function DynamicIslandBridge() {
     () => ({ action: pendingIslandAction(), ready: loaded() }),
     ({ action, ready }) => {
       if (!action) return;
-      // The bridge that published the handoff is still mounted when the signal
-      // changes; consuming or clearing it here would drop the intent before the
-      // switch lands.
       if (action === publishedAction) return;
       if (activeServerId() !== action.serverId) {
-        // Another server landed instead - the selection was superseded, or the
-        // user moved on. The intent named a server that is no longer coming.
         setPendingIslandAction(null);
         return;
       }
-      // The action opens a message or a failure inside this workspace, so it has
-      // to wait for the workspace. Acting on a half-loaded scope reads an agent list
-      // and a conversation window that are still empty.
       if (!ready) return;
       setPendingIslandAction(null);
       void handleDynamicIslandAction(action).catch(() => undefined);
@@ -126,7 +104,6 @@ export function DynamicIslandBridge() {
   });
 
   async function handleDynamicIslandAction(action: DynamicIslandAction): Promise<void> {
-    // Main runs a reply and a stop against the agent. They must not move the main window.
     if (action.type === "open-app" || action.type === "send-message" || action.type === "stop-agent") return;
     if (action.type === "answer-prompt") {
       dynamicIslandCoordinator.resolveAction(action);
@@ -150,38 +127,23 @@ export function DynamicIslandBridge() {
       return;
     }
     if (action.type === "dismiss-failure") {
-      // The island hides the card only. The agent keeps its failed turn until the user opens it.
       dynamicIslandCoordinator.resolveAction(action);
       publishDynamicIslandPresentation();
       return;
     }
     if (activeServerId() !== action.serverId) {
-      // The switch replaces this bridge along with the rest of the scope, so the
-      // action is handed to the one that lands rather than finished here against
-      // domains that are about to be disposed.
       publishedAction = action;
       setPendingIslandAction(action);
-      // A newer action may have replaced this one while the selection was in
-      // flight, and being superseded is exactly why that selection returns
-      // false. Clearing unconditionally would delete the newer intent before
-      // its own switch lands.
       if (!(await selectServer(action.serverId, false)) && pendingIslandAction() === action) {
         setPendingIslandAction(null);
       }
       return;
     }
     if (!loaded()) {
-      // The right workspace, but it has not filled yet. `selectAgent` against an
-      // empty agent list and a read against an empty conversation are the same
-      // half-loaded scope the handoff effect above already waits out, so this
-      // action joins it there. Nothing disposes this bridge in the meantime, so
-      // it is the one that consumes its own entry once `loaded()` turns true -
-      // which is why `publishedAction` stays untouched.
       setPendingIslandAction(action);
       return;
     }
     const opened = selectAgent(action.agentId);
-    // A chat window has no browser. The agent's view here opens the page once its tab is listed.
     if (action.type === "open-browser-takeover" && opened)
       setBrowserTakeoverPageRequest({ agentId: action.agentId, tabId: action.tabId });
     if (action.type === "open-message") await openAgentMessage(action.agentId, action.messageId);

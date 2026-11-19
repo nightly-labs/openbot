@@ -1,6 +1,3 @@
-// The built-in GitHub connection of this computer: one sign-in to the GitHub App, shared by every
-// agent as the GitHub MCP server and as the credential that `gh` and `git` read.
-
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -39,32 +36,21 @@ import { GitHubMcpProxy } from "./github-mcp-proxy";
 
 const logger = createOpenBotLogger("github-connector");
 
-/** A token with less time left than this is refreshed before it is handed out. */
 const REFRESH_MARGIN_MS = 10 * 60_000;
-/**
- * How often the token's time left is read against the wall clock. A timer set for the expiry would
- * fire late after the computer sleeps, and a refresh that failed on the network is tried again at
- * the next check.
- */
 const REFRESH_CHECK_MS = 60_000;
 const GIT_CREDENTIAL_KEY = "credential.https://github.com.helper";
-/** Git then sends the repository path to the helper, which picks the bot token of that repository. */
 const GIT_USE_HTTP_PATH_KEY = "credential.https://github.com.useHttpPath";
-/** The fields of `GET /user` that the status shows. */
 const githubUserSchema = z.object({
   login: z.string().min(1),
   id: z.number(),
   avatar_url: z.string().nullish(),
 });
-/** GitHub's largest page. */
 const GITHUB_PAGE_SIZE = 100;
-/** The list stops here. The status still counts every repository. */
 const MAX_LISTED_REPOSITORIES = 500;
 const githubInstallationsSchema = z.object({
   installations: z.array(z.object({ id: z.number(), events: z.array(z.string()).optional() })),
 });
 
-/** A repository of an installation, and whether that installation sends every event that triggers need. */
 interface InstallationRepository extends GitHubConnectorRepository {
   events: boolean;
 }
@@ -74,15 +60,9 @@ const githubRepositoriesSchema = z.object({
 });
 
 export interface GitHubConnectorServiceOptions {
-  /** Null when this build has no GitHub App. The connection is then not offered. */
   app: GitHubAppConfig | null;
   store: GitHubConnectorStore;
-  /**
-   * A folder that OpenBot owns, outside every root an agent can write. It holds the `gh` hosts file
-   * and the token file that the git credential helper reads, while the connection is active.
-   */
   toolDirectory: string;
-  /** The OpenBot API, which gives the installation tokens that make GitHub show the app as the author. */
   apiUrl: string;
   openExternal: (url: string) => Promise<void>;
   fetch?: GitHubFetch;
@@ -91,24 +71,9 @@ export interface GitHubConnectorServiceOptions {
 
 interface PendingSignIn {
   controller: AbortController;
-  /** Null while GitHub has not answered the device code request. */
   device: GitHubDeviceCode | null;
 }
 
-/**
- * Owns the GitHub sign-in of this computer: the device flow, the stored token set, its refresh, and
- * the files that `gh` and `git` read. It never imports the agent service. The agent service reads
- * `mcpServer`, `accessToken` and `agentEnvironment`, and `onAgentAccessChanged` tells it when that
- * answer changes.
- *
- * The user token never leaves the main process except to GitHub, to the OpenBot API as the proof
- * for the installation tokens, and into the files below for `gh` and `git`. Agents reach GitHub's
- * MCP server through `GitHubMcpProxy`, which adds the token for each call. Each token is registered
- * for redaction before it is used.
- *
- * `gh` has one token for each host, so it keeps the user token: GitHub shows its work as "user with
- * OpenBotGit". `git` and the MCP tools use the bot token of each repository where the user can push.
- */
 export class GitHubConnectorService {
   readonly #app: GitHubAppConfig | null;
   readonly #store: GitHubConnectorStore;
@@ -121,31 +86,20 @@ export class GitHubConnectorService {
   readonly #statusListeners = new Set<(status: GitHubConnectorStatus) => void>();
   readonly #accessListeners = new Set<() => void>();
   #pending: PendingSignIn | null = null;
-  /** The stored sign-in can no longer refresh. The record stays, so the panel can name the account. */
   #expired = false;
   #error: string | null = null;
   #refreshing: Deferred.Deferred<GitHubConnectorRecord | null, GitHubOperationError> | null = null;
   #refreshCheck: ReturnType<typeof setInterval> | null = null;
-  /** Network failures of the refresh in a row. Only the first is logged. */
   #refreshFailures = 0;
-  /**
-   * Changes each time the stored sign-in is replaced or removed. A refresh that started before the
-   * change does not write its answer back.
-   */
   #generation = 0;
   #disposed = false;
   #disposal: Deferred.Deferred<void, GitHubOperationError> | null = null;
-  /** Store writes and the `gh` and `git` files change in this order, one change at a time. */
   #queue = Semaphore.makeUnsafe(1);
-  /** What agents were last told, so a change that does not alter it replaces no session. */
   #agentAccess = false;
   readonly #botTokens: GitHubBotTokens;
   #renewingBotTokens: Deferred.Deferred<void, GitHubOperationError> | null = null;
-  /** The content of the repositories file, or null when it is not there. */
   #repositoriesWritten: string | null = null;
-  /** Null when the loopback server could not start: agents then reach GitHub's server with the user token. */
   #mcpProxy: GitHubMcpProxy | null = null;
-  /** Generated at the first start, then kept in the record. */
   #mcpProxySecret = randomBytes(32).toString("base64url");
 
   constructor(options: GitHubConnectorServiceOptions) {
@@ -175,11 +129,6 @@ export class GitHubConnectorService {
     });
   }
 
-  /**
-   * Reads the stored sign-in and prepares the `gh` and `git` files. Call once, before an agent starts.
-   * A file that cannot be read is logged and treated as no sign-in: a new sign-in replaces it.
-   */
-
   readonly load = Effect.fn("GitHubConnector.load")(
     function* (this: GitHubConnectorService): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
       const error = yield* this.#store.load();
@@ -197,7 +146,6 @@ export class GitHubConnectorService {
             this.#expired = true;
             yield* this.#removeToolFiles();
           } else {
-            // A file that cannot be written must not stop the app. The next refresh writes it again.
             yield* this.#writeToolFilesEffect(record).pipe(
               Effect.catch(({ cause: error }) =>
                 Effect.sync(() => {
@@ -238,17 +186,10 @@ export class GitHubConnectorService {
     return () => this.#statusListeners.delete(listener);
   }
 
-  /** Told when agents gain or lose GitHub. A token refresh alone is not a change. */
   onAgentAccessChanged(listener: () => void): () => void {
     this.#accessListeners.add(listener);
     return () => this.#accessListeners.delete(listener);
   }
-
-  /**
-   * Starts the device flow and opens GitHub's code page. Returns at once with the user code; the
-   * wait for the user runs in the background and reports through `onChanged`. With `opensPage` false
-   * no page opens here: the client of a joined server opens it in its own browser.
-   */
 
   readonly connect = Effect.fn("GitHubConnector.connect")(
     function* (
@@ -294,11 +235,6 @@ export class GitHubConnectorService {
     return this.status();
   }
 
-  /**
-   * Forgets the sign-in. GitHub revokes a token only with the client secret, which OpenBot does not
-   * hold, so the GitHub page where the user can revoke it opens as well, unless `opensPage` is false.
-   */
-
   readonly disconnect = Effect.fn("GitHubConnector.disconnect")(
     function* (
       this: GitHubConnectorService,
@@ -335,18 +271,12 @@ export class GitHubConnectorService {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /**
-   * The repositories that agents reach: those of each installation of the app that the user can use.
-   * Empty while the connection is not active.
-   */
-
   readonly repositories = Effect.fn("GitHubConnector.repositories")(
     function* (
       this: GitHubConnectorService,
     ): Effect.fn.Return<GitHubConnectorRepositories, GitHubOperationError, GitHubPlatform> {
       const token = yield* this.accessToken();
       if (!token) return { repositories: [], total: 0 };
-      // The panel reads the list again after an install, which can add repositories.
       this.#botTokens.invalidate();
       yield* this.#checkRefresh();
       const { repositories, total } = yield* this.#installationRepositories(token);
@@ -360,11 +290,6 @@ export class GitHubConnectorService {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
-
-  /**
-   * The repositories that GitHub triggers and outputs of workflows can use, sorted by name. The App's
-   * bot can change a repository only where it has a bot token, which it has where the user can push.
-   */
 
   readonly workflowCatalog = Effect.fn("GitHubConnector.workflowCatalog")(
     function* (
@@ -390,10 +315,6 @@ export class GitHubConnectorService {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /**
-   * GitHub's page where the user picks the repositories the app may reach, and the page where they
-   * revoke the sign-in. A joined server gives them to a client, which opens them in its own browser.
-   */
   pages(): { installUrl: string | null; revokeUrl: string | null } {
     const app = this.#app;
     if (!app) return { installUrl: null, revokeUrl: null };
@@ -403,8 +324,6 @@ export class GitHubConnectorService {
     };
   }
 
-  /** GitHub's page where the user picks the repositories the app may reach. */
-
   readonly openInstall = Effect.fn("GitHubConnector.openInstall")(
     function* (this: GitHubConnectorService): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
       const { installUrl } = this.pages();
@@ -413,28 +332,16 @@ export class GitHubConnectorService {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /**
-   * The user token, refreshed first when it has less than ten minutes left. Null while the
-   * connection is not active.
-   */
-
   readonly accessToken = Effect.fn("GitHubConnector.accessToken")(
     function* (this: GitHubConnectorService): Effect.fn.Return<string | null, GitHubOperationError, GitHubPlatform> {
       const record = this.#store.read();
       if (!record || !this.#agentConnected()) return null;
       if (!this.#needsRefresh(record)) return record.accessToken;
-      // A sign-in that replaced this one during the refresh gives its own token.
       const current = (yield* this.#refresh()) ?? this.#store.read();
       return current && this.#agentConnected() && !this.#accessTokenExpired(current) ? current.accessToken : null;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
-
-  /**
-   * The tokens of a workflow's GitHub call to `owner/name`: the user token, and the app's token where the
-   * user can push. App tokens that are due are renewed first; a failure leaves the ones still valid.
-   * Null while the connection is not active.
-   */
 
   readonly repositoryTokens = Effect.fn("GitHubConnector.repositoryTokens")(
     function* (
@@ -450,11 +357,6 @@ export class GitHubConnectorService {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /**
-   * The bearer that agents send to the GitHub MCP server: the loopback server's own secret, or the
-   * user token when that server did not start.
-   */
-
   readonly mcpAuthorization = Effect.fn("GitHubConnector.mcpAuthorization")(
     function* (this: GitHubConnectorService): Effect.fn.Return<string | null, GitHubOperationError, GitHubPlatform> {
       if (!this.#agentConnected()) return null;
@@ -463,7 +365,6 @@ export class GitHubConnectorService {
     (operation) => this.#owned(operation),
   ).bind(this);
 
-  /** The GitHub MCP server that agents are given, or null while the connection is not active. */
   mcpServer(): McpServerConfig | null {
     if (!this.#agentConnected()) return null;
     return {
@@ -481,19 +382,6 @@ export class GitHubConnectorService {
     };
   }
 
-  /**
-   * The environment that makes `gh` and `git` use this connection. It holds paths only, never the
-   * token: a provider process runs for many hours, and a new sign-in or a refresh changes the token,
-   * so the token lives in files that each change rewrites.
-   *
-   * The empty helper value clears the helpers from the user's own git configuration for github.com.
-   * Without it, a system helper such as the macOS keychain would store the short-lived token after
-   * the first push, and give it back after it expired. The entries go after the `GIT_CONFIG_*`
-   * entries in `inherited`, the environment the process starts with, so those entries still apply.
-   *
-   * The helper reads the repository path that `useHttpPath` makes git send, and gives the bot token
-   * from the repositories file when that file names the repository. Otherwise it gives the user token.
-   */
   agentEnvironment(inherited: NodeJS.ProcessEnv = process.env): Record<string, string> {
     if (!this.#agentConnected()) return {};
     const tokenFile = shellQuote(this.#credentialFile().replaceAll("\\", "/"));
@@ -502,7 +390,6 @@ export class GitHubConnectorService {
     const helper = [
       '!f() { test "$1" = get || exit 0; p=',
       "while IFS='=' read -r k v; do test \"$k\" = path && p=$v; done",
-      // Git sends `owner/name.git`, and the file holds `owner/name`.
       `t=; test -n "$p" && t=$(awk -F '\\t' -v r="$p" 'BEGIN { sub(/\\/+$/, "", r); sub(/\\.git$/, "", r) } tolower($1) == tolower(r) { print $2; exit }' ${repositoriesFile} 2>/dev/null)`,
       "echo username=x-access-token; printf 'password='",
       `if test -n "$t"; then printf '%s' "$t"; else cat ${tokenFile}; fi; echo; }; f`,
@@ -519,10 +406,6 @@ export class GitHubConnectorService {
     };
   }
 
-  /**
-   * Stops the refresh check and the sign-in, and removes the token files after the change in
-   * progress. The encrypted sign-in stays.
-   */
   readonly dispose = Effect.fn("GitHubConnector.disposeOwned")(function* (this: GitHubConnectorService) {
     if (this.#disposal) return yield* Deferred.await(this.#disposal);
     const done = Deferred.makeUnsafe<void, GitHubOperationError>();
@@ -556,10 +439,6 @@ export class GitHubConnectorService {
     yield* this.#serialize(() => this.#removeToolFiles());
   });
 
-  /**
-   * Whether agents get GitHub. A sign-in that runs while a stored one is still valid does not take
-   * GitHub away: agents keep the old account until the new one replaces it.
-   */
   #agentConnected(): boolean {
     return this.#app !== null && this.#store.read() !== null && !this.#expired;
   }
@@ -588,7 +467,6 @@ export class GitHubConnectorService {
       registerTokenSecrets(tokens);
       const user = yield* this.#readUserEffect(tokens.accessToken, pending.controller.signal);
       const record: GitHubConnectorRecord = { ...tokens, ...user, mcpProxy: this.#mcpProxySettings() };
-      // Checked in the queue: a cancel or disconnect that ran while the last change was written wins.
       const committed = yield* this.#serialize(() =>
         Effect.gen({ self: this }, function* () {
           if (this.#pending !== pending || this.#disposed) return false;
@@ -598,7 +476,6 @@ export class GitHubConnectorService {
           this.#expired = false;
           this.#error = null;
           this.#botTokens.clear();
-          // The sign-in is stored: the MCP server works without the files, so a write failure does not undo it.
           yield* this.#writeToolFilesEffect(record).pipe(
             Effect.catch(({ cause: error }) =>
               Effect.sync(() => {
@@ -646,12 +523,6 @@ export class GitHubConnectorService {
     return { login: user.login, userId: user.id, avatarUrl: user.avatar_url ?? null };
   });
 
-  /** One GitHub API read. A failure is a `GitHubDeviceFlowError` whose message the panel can show. */
-
-  /**
-   * The repositories of each installation of the app that the user can use, sorted by name, at most
-   * `MAX_LISTED_REPOSITORIES`, and how many there are in all.
-   */
   readonly #installationRepositories = Effect.fn("GitHubConnector.installationRepositories")(function* (
     this: GitHubConnectorService,
     token: string,
@@ -664,9 +535,7 @@ export class GitHubConnectorService {
     const repositories: InstallationRepository[] = [];
     let total = 0;
     for (const installation of installations) {
-      // An answer without the list of events does not show that the installation sends them.
       const subscribed = installation.events ?? [];
-      // An installation without one of the events that triggers need cannot start every trigger.
       const events = GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event));
       for (let page = 1; ; page += 1) {
         const answer = yield* this.#getGitHubEffect(
@@ -690,10 +559,6 @@ export class GitHubConnectorService {
     };
   });
 
-  /**
-   * Whether the user token can read `owner/name`, for the hint of the MCP proxy. GitHub answers 404 for a
-   * private repository where the app is not installed. Null for another answer or no answer.
-   */
   readonly #canRead = Effect.fn("GitHubConnector.canRead")(
     function* (
       this: GitHubConnectorService,
@@ -774,10 +639,6 @@ export class GitHubConnectorService {
     );
   }
 
-  /**
-   * Starts a refresh when the user token has less than ten minutes left, so `gh` and `git` keep a
-   * valid one, and asks for new installation tokens when they are due.
-   */
   readonly #checkRefresh = Effect.fn("GitHubConnector.checkRefresh")(function* (this: GitHubConnectorService) {
     const record = this.#store.read();
     if (this.#disposed || !record || !this.#agentConnected()) return;
@@ -785,7 +646,6 @@ export class GitHubConnectorService {
     if (this.#botTokens.due()) yield* Effect.forkIn(this.#owned(this.#renewBotTokens()), this.#scope);
   });
 
-  /** One request at a time. A new set is written to the repositories file for the git helper. */
   readonly #renewBotTokens = Effect.fn("GitHubConnector.renewBotTokensAdmission")(function* (
     this: GitHubConnectorService,
   ) {
@@ -809,7 +669,6 @@ export class GitHubConnectorService {
     const userToken = yield* this.accessToken();
     if (!userToken) return;
     if (yield* this.#botTokens.renew(userToken)) yield* this.#refused(userToken);
-    // Also after a failure: a token that expired while the API was not reachable leaves the file.
     const current = yield* this.#serialize(() =>
       Effect.gen({ self: this }, function* () {
         if (this.#disposed || this.#generation !== generation || !this.#agentConnected()) return false;
@@ -822,17 +681,11 @@ export class GitHubConnectorService {
       yield* this.#mcpProxy.retain(new Set([userToken, ...this.#botTokens.entries().map(([, token]) => token)]));
   });
 
-  /**
-   * GitHub refused `token` with HTTP 401. A revoke on GitHub does not change the expiry time of the
-   * token, so the stored user token is refreshed now. GitHub rejects the refresh of a revoked sign-in,
-   * which then shows as expired with Reconnect. A refusal of another token changes nothing.
-   */
   readonly #refused = Effect.fn("GitHubConnector.refused")(function* (this: GitHubConnectorService, token: string) {
     if (this.#disposed || this.#store.read()?.accessToken !== token || !this.#agentConnected()) return;
     yield* Effect.forkIn(this.#owned(this.#refresh()), this.#scope);
   });
 
-  /** One refresh at a time: a hand-off and the check can ask together, and GitHub rotates the refresh token. */
   readonly #refresh = Effect.fn("GitHubConnector.refreshAdmission")(function* (this: GitHubConnectorService) {
     if (this.#refreshing) return yield* Deferred.await(this.#refreshing);
     const done = Deferred.makeUnsafe<GitHubConnectorRecord | null, GitHubOperationError>();
@@ -847,11 +700,6 @@ export class GitHubConnectorService {
     );
   });
 
-  /**
-   * Resolves with the record to use: the new one, the old one after a network failure, or null when
-   * the sign-in expired or changed during the refresh. It does not reject.
-   */
-
   readonly #runRefresh = Effect.fn("GitHubConnector.runRefresh")(function* (
     this: GitHubConnectorService,
   ): Effect.fn.Return<GitHubConnectorRecord | null, GitHubOperationError, GitHubPlatform> {
@@ -859,7 +707,6 @@ export class GitHubConnectorService {
     const record = this.#store.read();
     const app = this.#app;
     if (!record || !app || this.#expired) return null;
-    // A disconnect, a new sign-in or a shutdown that ran during the refresh wins.
     const current = () => !this.#disposed && this.#generation === generation && this.#store.read() === record;
     return yield* Effect.gen({ self: this }, function* () {
       if (!record.refreshToken || !this.#canRefresh(record)) {
@@ -886,7 +733,6 @@ export class GitHubConnectorService {
         yield* this.#serialize(() =>
           Effect.gen({ self: this }, function* () {
             if (!current()) return;
-            // Saved without the refresh token, so the next start shows the sign-in as expired too.
             const now = this.#now();
             yield* this.#store.write({
               ...record,
@@ -932,8 +778,6 @@ export class GitHubConnectorService {
     );
   });
 
-  /** Runs in the queue. */
-
   readonly #expireEffect = Effect.fn("GitHubConnector.expire")(function* (
     this: GitHubConnectorService,
   ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
@@ -958,12 +802,9 @@ export class GitHubConnectorService {
     return join(this.#toolDirectory, "token");
   }
 
-  /** One line for each repository with a bot token: `owner/name`, a tab, the token. */
   #repositoriesFile(): string {
     return join(this.#toolDirectory, "repositories");
   }
-
-  /** Writes only a change: a renewal runs each 15 minutes while the API is not reachable. */
 
   readonly #writeRepositoriesFileEffect = Effect.fn("GitHubConnector.writeRepositoriesFile")(function* (
     this: GitHubConnectorService,
@@ -976,11 +817,6 @@ export class GitHubConnectorService {
     yield* writeFileAtomically(this.#repositoriesFile(), content).pipe(toGitHubOperationError);
     this.#repositoriesWritten = content;
   });
-
-  /**
-   * Starts the loopback GitHub MCP server on the port it had, so that a resumed session finds it. A
-   * server that cannot start is logged: agents then reach GitHub's server with the user token.
-   */
 
   readonly #startMcpProxyEffect = Effect.fn("GitHubConnector.startMcpProxy")(function* (
     this: GitHubConnectorService,
@@ -1010,7 +846,6 @@ export class GitHubConnectorService {
     this.#mcpProxy = proxy;
     if (!record || record.mcpProxy?.port === port) return;
     if (record.mcpProxy) {
-      // Resumed sessions send the old secret to the old port, where another program now listens.
       this.#mcpProxySecret = randomBytes(32).toString("base64url");
       registerSecretValue(this.#mcpProxySecret);
     }
@@ -1029,16 +864,11 @@ export class GitHubConnectorService {
     return port ? { port, secret: this.#mcpProxySecret } : null;
   }
 
-  /**
-   * Both `hosts.yml` layouts: `users` for `gh` 2.40 and later, the flat keys for older releases. A
-   * `GH_TOKEN` in the user's own environment still wins, as `gh` documents.
-   */
   readonly #writeToolFilesEffect = Effect.fn("GitHubConnector.writeToolFiles")(function* (
     this: GitHubConnectorService,
     record: GitHubConnectorRecord,
   ): Effect.fn.Return<void, GitHubOperationError, GitHubPlatform> {
     yield* githubCall(() => mkdir(this.#ghConfigDirectory(), { recursive: true, mode: 0o700 }));
-    // `mkdir` leaves a directory that is already there as it is. The files are 0600 either way.
     yield* githubCall(() => chmod(this.#toolDirectory, 0o700));
     yield* githubCall(() => chmod(this.#ghConfigDirectory(), 0o700));
     const hosts = [
@@ -1098,12 +928,10 @@ function registerTokenSecrets(tokens: Pick<GitHubTokenSet, "accessToken" | "refr
   if (tokens.refreshToken) registerSecretValue(tokens.refreshToken);
 }
 
-/** The count of `GIT_CONFIG_*` entries already set. Git refuses a count that is not a number. */
 function gitConfigCount(value: string | undefined): number {
   return value && /^\d+$/u.test(value) ? Number(value) : 0;
 }
 
-/** One POSIX shell word. Git runs a `!` helper with `sh`, on Windows too. */
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }

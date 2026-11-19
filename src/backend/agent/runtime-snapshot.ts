@@ -76,8 +76,6 @@ export function compactRuntimeApproval(approval: AgentApproval): AgentRuntimeSna
 function fitRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): AgentRuntimeSnapshot {
   if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
 
-  // The context goes first: only context-usage-v1 carries it, so it never costs a Team client a field
-  // that it had before. The side threads go before the agents' own chats.
   if (snapshot.threadContextStates?.length) {
     snapshot.threadContextStates = [];
     if (runtimeSnapshotBytes(snapshot) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) return snapshot;
@@ -153,11 +151,9 @@ export interface RuntimeSnapshotSources {
   turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
-  /** Whether a held agent waits for its limit: no ready backup model or pool account takes its work. */
   waitsForLimit: (agentId: string) => boolean;
 }
 
-/** The runtime view of every agent: active turns, queued work, latest messages and attention. */
 export function buildRuntimeSnapshot({
   contextStates,
   threadContextStates,
@@ -185,11 +181,9 @@ export function buildRuntimeSnapshot({
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
     const live = conversation.loadedSnapshot(agent.id);
-    // Each change of attention builds this for every agent, so the messages are not copied.
     const liveLatest = live?.messages.findLast(
       (message) =>
         (message.author === "assistant" || message.author === "agent") &&
-        // A message that another agent sent to this one is not a reply to the user.
         !message.senderAgentId &&
         message.itemType !== "commentary" &&
         message.itemType !== "question_prompt" &&
@@ -227,7 +221,6 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
-    // An agent that moves to a ready backup with its next work does not show that it waits (#12360).
     usageLimits: usageLimits.limitedAgents().filter((limit) => waitsForLimit(limit.agentId)),
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),

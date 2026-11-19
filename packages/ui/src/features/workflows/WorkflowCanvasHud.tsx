@@ -1,8 +1,3 @@
-/**
- * The HUD of the workflow canvas: the buttons of its bars, and the top bar with the workflow switcher,
- * the run status, the run history and the Run button.
- */
-
 import type { WorkflowRunStatus } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -28,10 +23,8 @@ import { useText } from "../../text";
 import { Hint, MOD_KEY } from "./workflow-board";
 import { type CanvasColor, colorVar } from "./workflow-node-parts";
 
-/** HUD menus align to the edge of their bar, not to the button inside it. */
 export const hudBarRect = (anchor?: HTMLElement) => anchor?.closest(".wfn-hud")?.getBoundingClientRect();
 
-/** A HUD button with a tooltip, for the tool bar and the zoom bar. A tool with art shows a picture. */
 export function HudButton(props: {
   label: string;
   keys?: readonly string[] | undefined;
@@ -60,7 +53,6 @@ export function HudButton(props: {
   );
 }
 
-/** A row of colour buttons in a sub-bar of the tool bar. The picked colour has a ring. */
 export function ColorButtons<T extends CanvasColor>(props: {
   options: readonly { value: T; label: string }[];
   value: T;
@@ -88,7 +80,6 @@ export function ColorButtons<T extends CanvasColor>(props: {
   );
 }
 
-/** An ISO time as the canvas shows it: "Today, 09:14", or the day and the time on another day. */
 export function timeLabel(t: AppTranslate, format: AppFormat, at: string): string {
   const date = new Date(at);
   const time = format.date(date, { hour: "2-digit", minute: "2-digit" });
@@ -97,18 +88,14 @@ export function timeLabel(t: AppTranslate, format: AppFormat, at: string): strin
     : t("workflow.canvas.time.day", { day: format.date(date, { day: "numeric", month: "short" }), time });
 }
 
-/** A run in the top bar. */
 export interface HudRun {
   number: number;
   at: string;
   status: WorkflowRunStatus;
-  /** How long the run took, in seconds. A run that has not ended has none. */
   seconds: number | null;
-  /** The issue or pull request of a GitHub run, as "#4231". */
   item?: string | undefined;
 }
 
-/** The step that the run is on, and how many other steps are in the same state. */
 export interface HudStep {
   id: string;
   status: "running" | "approval" | "failed";
@@ -121,20 +108,14 @@ export function WorkflowCanvasHeader(props: {
   name: string;
   renaming: boolean;
   menuRef: (element: HTMLButtonElement) => void;
-  /** The content of the switcher menu. */
   switcher: JSX.Element;
   onName: (name: string) => void;
   onEndRename: (keep: boolean) => void;
-  /** A version shows: the run controls hide. */
   previewing: boolean;
-  /** The run whose results the steps show. */
   viewing: number | null;
   onView: (run: number | null) => void;
-  /** The runs that ended, newest first. */
   pastRuns: readonly HudRun[];
-  /** The runs that have not ended, newest first. More than one only for GitHub runs on different items. */
   openRuns: readonly HudRun[];
-  /** The GitHub events that wait for the run of their item. */
   waiting: number;
   olderRuns: boolean;
   onLoadOlderRuns: () => void;
@@ -145,7 +126,6 @@ export function WorkflowCanvasHeader(props: {
   progress: { done: number; total: number };
   onRun: () => void;
   onStop: () => void;
-  /** The people on this canvas, before the run controls. */
   people?: JSX.Element;
 }) {
   const { t, format } = useText();
@@ -160,7 +140,6 @@ export function WorkflowCanvasHeader(props: {
   const viewedRun = () =>
     props.openRuns.find((run) => run.number === props.viewing) ??
     props.pastRuns.find((run) => run.number === props.viewing);
-  /** One open run with nothing waiting shows only its progress, as before GitHub runs. */
   const manyOpen = () => props.openRuns.length > 1 || props.waiting > 0;
   const statusVerb = (status: HudStep["status"]) =>
     status === "approval"
@@ -168,7 +147,6 @@ export function WorkflowCanvasHeader(props: {
       : status === "failed"
         ? t("workflow.canvas.status.failed")
         : t("workflow.canvas.status.running");
-  /** The step and status that the status region reads. A new name or count alone does not speak again. */
   const spoken = createMemo(() => {
     const step = props.previewing ? undefined : props.step;
     return step ? `${step.id}\u0000${step.status}` : "";

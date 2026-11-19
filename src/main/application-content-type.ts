@@ -1,6 +1,5 @@
 import { extname } from "node:path";
 
-/** The content type of a file of the renderer build, for the app protocol and the server setup page. */
 export function applicationContentType(
   path: string,
 ):

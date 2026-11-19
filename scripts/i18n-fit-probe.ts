@@ -1,10 +1,6 @@
-// The fit probe that the i18n E2E scripts run in a page. It finds control text that is cut off,
-// runs past its box, or wraps to a second line.
-
 export type FitKind = "badge" | "select" | "tab" | "menuitem" | "option" | "header" | "button";
 
 export interface FitProblem {
-  /** A DOM path that is the same in every language, so a failure can be matched with English. */
   path: string;
   kind: FitKind;
   reason: "clipped" | "overflows" | "wraps" | "outside";
@@ -12,7 +8,6 @@ export interface FitProblem {
   rect: { x: number; y: number; width: number; height: number };
 }
 
-/** Runs in the page. Measures each visible control under `scope`. */
 export function measureFit(scopeSelector: string): FitProblem[] {
   const CONTROLS = [
     "button",
@@ -26,7 +21,6 @@ export function measureFit(scopeSelector: string): FitProblem[] {
     ".ui-sliding-tabs-trigger",
     "th",
   ].join(",");
-  // Controls that must stay on one line. Other buttons can be rows or cards that wrap on purpose.
   const SINGLE_LINE = ".ui-button,[role=tab],[role^=menuitem],.z-badge,.ui-sliding-tabs-trigger,.ui-select-value";
   const problems: FitProblem[] = [];
   const seen = new Set<string>();
@@ -70,7 +64,6 @@ export function measureFit(scopeSelector: string): FitProblem[] {
     }
     return most;
   };
-  /** The element, or a descendant with text, that holds more than it shows. */
   const clippedPart = (element: Element): Element | null => {
     const candidates = [element, ...Array.from(element.querySelectorAll("*"))];
     for (const candidate of candidates) {
@@ -83,7 +76,6 @@ export function measureFit(scopeSelector: string): FitProblem[] {
     }
     return null;
   };
-  /** The nearest ancestor that cuts off what runs past it, and that is not a scroller. */
   const clipAncestor = (element: Element): Element | null => {
     for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
       const style = getComputedStyle(node);

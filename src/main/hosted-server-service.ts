@@ -32,23 +32,16 @@ import {
   AccountServicePlatform,
 } from "./account-service-platform";
 
-/** A running server that the joined list does not have yet makes the list refresh at most this often. */
 const RUNNING_REFRESH_INTERVAL_MS = 15_000;
 
 export type HostedServerAuthClient = AccountRequestClient;
 
-/**
- * `bun run dev --hosting=test` sets the shared developer key from the encrypted `.env.dev`. This
- * removes it from `environment`, because agents and their tools inherit the environment of this
- * process. A packaged build never sends it.
- */
 export function takeHostingDeveloperKey(environment: NodeJS.ProcessEnv, isPackaged: boolean): string | null {
   const key = environment.OPENBOT_HOSTING_DEVELOPER_KEY?.trim() || null;
   delete environment.OPENBOT_HOSTING_DEVELOPER_KEY;
   return isPackaged ? null : key;
 }
 
-/** Sends the developer key with each hosted server request, so the test Worker lets the account create servers. */
 export function withHostingDeveloperKey(auth: HostedServerAuthClient, key: string | null): HostedServerAuthClient {
   if (!key) return auth;
   return {
@@ -60,11 +53,6 @@ export function withHostingDeveloperKey(auth: HostedServerAuthClient, key: strin
   };
 }
 
-/**
- * The account server's hosted servers, for the signed-in account. A new server waits for its first
- * payment. The renderer never gets or sends the payment URL: this service opens it only when it is an
- * https Stripe Checkout page.
- */
 export class HostedServerDesktopService {
   readonly #platform: Layer.Layer<AccountServicePlatform>;
   readonly #lastRunningAt = new Map<string, number>();
@@ -73,12 +61,6 @@ export class HostedServerDesktopService {
     forget(serverId: string): void;
   };
 
-  /**
-   * `onRunning` gets each running server from a list, so the caller can refresh the joined servers
-   * when a new server is ready and does not wait for the next directory poll. `onWake` gets each server
-   * that starts after a wake request, with the reply, so the caller reconnects to it soon. `onClaim`
-   * gets the expiry of each new install command, so the caller can watch for its server.
-   */
   constructor(
     auth: HostedServerAuthClient,
     openExternal: (url: string) => Promise<void>,
@@ -132,7 +114,6 @@ export class HostedServerDesktopService {
     ).pipe(Effect.provide(this.#platform));
   }
 
-  /** A one-time claim that signs a self-hosted server in to this account. Never log it. */
   createServerClaim(): Effect.Effect<ServerClaim, AccountServiceFailure> {
     return AccountServicePlatform.use((platform) =>
       platform.request("/v2/server-claims", { method: "POST" }, decodeServerClaim),
@@ -159,10 +140,8 @@ export class HostedServerDesktopService {
             plan: input.plan,
             interval: input.interval,
             currency: input.currency,
-            // Analytics only. An older account service ignores it.
             ...(input.entryPoint ? { entryPoint: input.entryPoint } : {}),
             ...(input.license ? { license: input.license } : {}),
-            // An older account service ignores it, and the Checkout page has no record of the request.
             ...(input.earlyStart ? { earlyStart: true } : {}),
           }),
         },
@@ -172,8 +151,6 @@ export class HostedServerDesktopService {
       return yield* this.#open(checkout);
     }).pipe(Effect.provide(this.#platform));
   }
-
-  /** Opens the payment page again for a server that waits for its first payment. */
 
   openCheckout(serverId: string): Effect.Effect<HostedServerSummary, AccountServiceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<
@@ -225,8 +202,6 @@ export class HostedServerDesktopService {
     }).pipe(Effect.provide(this.#platform));
   }
 
-  /** The user starts the server. */
-
   readonly wake = Effect.fn("HostedServer.wake")(
     function* (this: HostedServerDesktopService, serverId: string) {
       this.#statusCheck.forget(serverId);
@@ -235,7 +210,6 @@ export class HostedServerDesktopService {
     (operation) => operation.pipe(Effect.provide(this.#platform)),
   ).bind(this);
 
-  /** The owner or an admin restarts the server. The connection drops when the server stops, and the client reconnects. */
   readonly restart = Effect.fn("HostedServer.restart")(
     function* (this: HostedServerDesktopService, serverId: string) {
       this.#statusCheck.forget(serverId);
@@ -252,7 +226,6 @@ export class HostedServerDesktopService {
     (operation) => operation.pipe(Effect.provide(this.#platform)),
   ).bind(this);
 
-  /** The state of a server that starts. It changes nothing on the account server. */
   readonly status = Effect.fn("HostedServer.status")(
     function* (serverId: string) {
       const platform = yield* AccountServicePlatform;
@@ -285,7 +258,6 @@ export class HostedServerDesktopService {
     return server;
   });
 
-  /** A null URL means that the payment is done already, so there is no page to open. */
   #open(
     checkout: HostedServerCheckout,
   ): Effect.Effect<HostedServerSummary, AccountServiceFailure, AccountServicePlatform> {
@@ -301,7 +273,6 @@ export class HostedServerDesktopService {
   }
 }
 
-/** The account client throws an error with the status and the error code of the answer. The wake helper reads a response. */
 function respond<E extends { cause: unknown }>(
   request: Effect.Effect<unknown, E>,
 ): Effect.Effect<HostedServerWakeResponse, E> {

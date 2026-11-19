@@ -1,6 +1,3 @@
-// The text of the terms and conditions. Legal wording: change it only from the approved source text,
-// and move `TERMS_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 const CONTACT_EMAIL = "hello@openbot.run";

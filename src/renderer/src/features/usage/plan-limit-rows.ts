@@ -8,14 +8,6 @@ import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
 
-/**
- * One row per provider account of the active server, for the rail rings. A model that the plan
- * refused adds a used-up line with its own name to its account, and the ring shows it: a limit of one
- * model, such as a separate weekly limit, is not in the account's 5-hour and weekly windows, which
- * then show usage left. When a spent window of the account's reading stops the model, as the composer
- * reads it, that window is the cause, and the reading shows it with its measured amount: the model gets
- * no line (#10565). The memo reads the clock again with each new reading.
- */
 export function usePlanLimitRows() {
   const text = useText();
   const auth = useAuth();
@@ -28,8 +20,6 @@ export function usePlanLimitRows() {
     const held = usageLimitedModels().filter((limit) => {
       const account = limit.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
       const spent = spentUsageWindow(usage?.limits, limit.provider, account, limit.model, now);
-      // The ring shows only the reading's own windows, not a quota group such as Antigravity's
-      // "Claude and GPT models", so a spent group keeps the model line.
       const ownWindow = usage?.limits.some(
         (reading) => reading.primary === spent?.window || reading.secondary === spent?.window,
       );
@@ -45,7 +35,6 @@ export function usePlanLimitRows() {
             limit.provider === row.provider && (limit.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) === account,
         )
         .map((limit) => {
-          // The reset is the one of an agent that the limit holds.
           const agent = agentList().find(
             (candidate) =>
               candidate.id in limits &&
@@ -65,7 +54,6 @@ export function usePlanLimitRows() {
             resetsAtLabel: formatUsageReset(resetsAt, text),
           };
         });
-      // The used-up model stops work first, so the ring and the chip show it, as for a used-up Cursor window.
       return windows.length
         ? {
             ...row,

@@ -1,15 +1,3 @@
-// Checks the crm-v1 Team API grant. A real `TeamApiServer` runs on loopback with the real team, agent,
-// mailbox, sidebar and roles stores and the real CRM service on a temporary `openbot.db`. Each request
-// and answer goes through the frozen codec. The owner makes a customer, gives it a monthly plan (the
-// first payment), marks the payment paid (the next payment), and a stale revision gets a conflict. The
-// owner makes a status and a tag, and deletes them: the customer moves to the replacement status and
-// loses the tag. The owner sets the private fields and the agents with CRM access. A member gets 403,
-// a client without `crm-v1` gets 400, a protocol 8 client does not see the capability, and a GET gets
-// 404. The CRM is off by default: an agent call is refused, a member cannot turn it on, and the owner
-// turns it on in a file that a new store reads. The owner decides agent proposals. The owner's event socket hears `crm-changed`; the member's
-// socket does not.
-// Run: `bun scripts/crm-team-api-e2e.ts`. Writes .openbot-build/crm-team-api-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -55,7 +43,6 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "crm-team-api-electron-boundary",
   setup(build) {
@@ -105,7 +92,6 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -114,7 +100,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -131,7 +116,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response or a frame. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -203,7 +187,6 @@ const teamBrowser: TeamApiBrowser = {
 const root = await mkdtemp(join(tmpdir(), "openbot-crm-team-api-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
-/** The file of the Server Settings > Experimental switch, as the app names it. */
 const crmPreferencePath = join(userData, "openbot-crm-v1.json");
 
 interface Host {
@@ -218,7 +201,6 @@ interface Host {
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 
-/** Starts the host on the profile, as the app does at each launch, with the real CRM on `openbot.db`. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -227,14 +209,12 @@ async function startHost(): Promise<Host> {
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
   assert.equal(await runCauseEffect(access.load()), true, "The roles file did not load.");
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
-  // As the app does: an agent event, so the sockets of owners and admins hear it.
   const preference = createCrmPreferenceStore(crmPreferencePath);
   await Effect.runPromise(preference.load());
   const crm = await Effect.runPromise(
@@ -270,7 +250,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a desktop client. `capabilities` is what the client advertises. */
 async function call(
   method: string,
   path: string,
@@ -294,7 +273,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A CRM request through the frozen codec, in both directions. */
 async function wire(
   path: string,
   token: string,
@@ -308,7 +286,6 @@ async function wire(
   return { status: response.status, body: codec.response(response.status, response.body) };
 }
 
-/** A 200 answer, as a client decodes it: the frozen codec, then the team-client decoder. */
 async function ok<T>(path: string, token: string, body: unknown, decode: (value: unknown) => T): Promise<T> {
   const response = await wire(path, token, body);
   assert.equal(response.status, 200, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
@@ -317,7 +294,6 @@ async function ok<T>(path: string, token: string, body: unknown, decode: (value:
 
 const apply = (token: string, change: CrmChange) => ok(CRM_ROUTES.apply, token, change, decodeRemoteCrmApplyResult);
 
-/** A change that the host must apply, and the id it answers. */
 async function applied(token: string, change: CrmChange): Promise<string | null> {
   const result = await apply(token, change);
   assert.ok(result.ok, `${change.kind} conflicted.`);
@@ -337,12 +313,10 @@ async function login(credentials: { username: string; password: string }): Promi
   return text(record(response.body, "login").sessionToken, "session token");
 }
 
-/** The type of an event frame, as a list of none or one. */
 function typeOf(value: unknown): string[] {
   return isRecord(value) && typeof value.type === "string" ? [value.type] : [];
 }
 
-/** Opens an event socket that declares crm-v1 and vault-v1, and waits for its first snapshot. */
 async function openEvents(token: string): Promise<{ socket: WebSocket; types: string[] }> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -371,7 +345,6 @@ async function openEvents(token: string): Promise<{ socket: WebSocket; types: st
   return { socket, types };
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -435,7 +408,6 @@ try {
   await step("switch: the CRM is off by default, a member cannot turn it on, and the owner turns it on", async () => {
     const before = await ok(CRM_ROUTES.settings, ownerToken, {}, decodeRemoteCrmSettings);
     assert.equal(before.enabled, false);
-    // An agent reads nothing while the CRM is off, and learns where to turn it on.
     const refused = await Effect.runPromise(Effect.flip(current().crm.agentCustomer("any-agent", "any-customer")));
     assert.equal(refused.message, sourceText("error.crm.off"));
     const member = await wire(CRM_ROUTES.setSettings, memberToken, { enabled: true });
@@ -445,7 +417,6 @@ try {
     const on = await ok(CRM_ROUTES.setSettings, ownerToken, { enabled: true }, decodeRemoteCrmSettings);
     assert.equal(on.enabled, true);
     assert.equal((await ok(CRM_ROUTES.settings, ownerToken, {}, decodeRemoteCrmSettings)).enabled, true);
-    // The next launch reads the switch from its file.
     const saved = createCrmPreferenceStore(crmPreferencePath);
     await Effect.runPromise(saved.load());
     assert.equal(saved.get().enabled, true);
@@ -577,9 +548,7 @@ try {
     const overview = await ok(CRM_ROUTES.overview, ownerToken, {}, decodeRemoteCrmOverview);
     assert.deepEqual([...overview.privateFields].sort(), ["amounts", "notes", "phone"]);
     assert.deepEqual(overview.agentIds, [agent.id]);
-    // A private field stays readable for the owner; only agents get it hidden.
     assert.equal((await customer(ownerToken, customerId)).notes, "Pays on time.");
-    // The agent reads no amount at all, not a "hidden" mark that shows where an amount exists.
     const read = await Effect.runPromise(current().crm.agentCustomer(agent.id, customerId));
     assert.equal(read.notes, "hidden");
     assert.deepEqual(read.hiddenFields, ["phone", "notes", "amounts"]);
@@ -638,7 +607,6 @@ try {
     const owner = await openEvents(ownerToken);
     const member = await openEvents(memberToken);
     const heard = nextMessage(owner.socket, crmEvent);
-    // A later event that both may hear: the member's socket keeps the order of the events it gets.
     const memberMarker = nextMessage(member.socket, (value) =>
       isRecord(value) && value.type === "vault-changed" ? value : null,
     );
@@ -657,8 +625,6 @@ try {
   });
 
   await step("overview: many long proposals are cut to fit one frame, and the rest come back", async () => {
-    // An agent keeps at most 50 pending proposals. Eight full agents make 400 of about 5 KB each,
-    // which do not fit one WebRTC frame.
     const agentIds: string[] = [];
     for (let index = 0; index < 8; index++) {
       const agent = await runCauseEffect(

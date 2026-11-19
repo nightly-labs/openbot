@@ -13,13 +13,8 @@ import { type PaymentReversal, paymentReversal, withoutTax } from "./billing-sal
 import type { Referrals } from "./referrals";
 import type { StripeClient, StripeEvent, StripeRequestError, StripeTransportError } from "./stripe-client";
 
-/** The Stripe coupon of the invite discount. The ID is fixed, so each Worker finds the same coupon. */
 const REFERRAL_COUPON_ID = `openbot-invite-${REFERRAL_SHARE_PERCENT}`;
 
-/**
- * A paid invoice of a plan or a license. An invoice with no subscription gets no credit: a refund finds its
- * invoice through the subscription (`getPaymentInvoice`), so it could not take that credit back.
- */
 const paidInvoiceSchema = Schema.Struct({
   id: Schema.String,
   customer: Schema.String,
@@ -52,18 +47,6 @@ const CREDIT_COLUMNS =
 
 type Failure = BillingError | BillingOperationError;
 
-/**
- * The money part of Invite friends. A friend gets the invite coupon at each Checkout. Each paid invoice of
- * a friend gives the referrer `REFERRAL_SHARE_PERCENT` of its amount without tax as Stripe customer
- * credit, which Stripe takes off the referrer's next invoice. A refund or a lost dispute takes the same
- * share back, but never more than the credit that the referrer still has.
- *
- * The credit waits until the friend pays a second time: the first renewal of a plan, about one month later
- * on a monthly plan. A friend who stops or gets a refund before then gives no credit. At that renewal, the
- * credit of each payment until then is released; after it, each payment is released at once. Released
- * credit collects in D1 and goes to Stripe when the referrer's total in one currency reaches
- * `referralMinimum` ($20). A friend who pays with a card of the referrer ends the invite (`#block`).
- */
 export class BillingReferral {
   readonly #database: D1Database;
   readonly #stripe: StripeClient;
@@ -85,10 +68,6 @@ export class BillingReferral {
     this.#ensureCustomer = options.ensureCustomer;
   }
 
-  /**
-   * The invite coupon for a Checkout of this account, or null when the account has no referrer. A Stripe
-   * failure gives null: the Checkout opens without the discount and does not fail.
-   */
   readonly couponFor = Effect.fn("BillingReferral.couponFor")(function* (
     this: BillingReferral,
     userId: string,
@@ -110,7 +89,6 @@ export class BillingReferral {
       );
   }).bind(this);
 
-  /** The credit that Stripe takes off the next invoice of the account, for each currency. */
   readonly credit = Effect.fn("BillingReferral.credit")(function* (
     this: BillingReferral,
     userId: string,
@@ -125,16 +103,10 @@ export class BillingReferral {
     return credit;
   }).bind(this);
 
-  /**
-   * Applies an `invoice.paid` event or a refund or dispute of a paid invoice; other events change nothing.
-   * Each change is written to D1 before it goes to Stripe with a fixed idempotency key, so a repeated
-   * event gives no second credit. A failure makes Stripe send the event again.
-   */
   readonly record = Effect.fn("BillingReferral.record")(function* (
     this: BillingReferral,
     event: StripeEvent,
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null } | null,
-    /** The account that owns the subscription of the event, or null. */
     ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
     if (event.type === "invoice.paid") return yield* this.#creditInvoice(event);
@@ -170,19 +142,14 @@ export class BillingReferral {
           .first<{ friend: string; referrer: string; email: string; blocked_at: number | null }>(),
       );
       if (!pair) return;
-      // A blocked friend can still have the coupon on another plan; its next invoice takes it off.
       if (pair.blocked_at !== null || (yield* this.#sameCard(pair.referrer, invoice.customer))) {
         const subscription = invoice.parent.subscription_details.subscription;
         return yield* this.#block(pair.friend, typeof subscription === "string" ? subscription : subscription.id);
       }
       const customerId = yield* this.#ensureCustomer({ id: pair.referrer, email: pair.email });
       const customer = yield* this.#stripeCall(() => this.#stripe.getCustomerCredit(customerId));
-      // Stripe keeps one credit for each currency. The referrer's own currency is the one that its next
-      // invoice uses.
       const currency: BillingCurrency =
         customer?.currency && isOneOf(BILLING_CURRENCIES, customer.currency) ? customer.currency : sourceCurrency;
-      // A share that converts to 0 still writes its row: a refund of this invoice then finds it, and the
-      // payment counts toward the friend's second payment.
       const amount = convertReferralAmount(share, sourceCurrency, currency);
       yield* billingCall(() =>
         this.#database
@@ -207,8 +174,6 @@ export class BillingReferral {
         .bind(friend)
         .first<{ payments: number; released: number }>(),
     );
-    // The first renewal after an earlier payment ends the wait. A renewal after a trial is the first payment,
-    // and a plan change or a second plan in the first month does not end it.
     const released =
       (progress?.released ?? 0) > 0 ||
       (invoice.billing_reason === "subscription_cycle" && (progress?.payments ?? 0) >= 2);
@@ -220,14 +185,9 @@ export class BillingReferral {
           .run(),
       );
     }
-    // A repeated event also gets here, so a send that failed before finishes.
     yield* this.#sendReady(row.referrer_user_id);
   }).bind(this);
 
-  /**
-   * True when the friend paid with a card that the referrer also saved or paid with: one person with two
-   * accounts. A referrer with no Stripe customer has no card.
-   */
   readonly #sameCard = Effect.fn("BillingReferral.sameCard")(function* (
     this: BillingReferral,
     referrer: string,
@@ -246,11 +206,6 @@ export class BillingReferral {
     return false;
   }).bind(this);
 
-  /**
-   * Ends the invite of a friend who paid with a card of the referrer. The coupon goes off the plan first, so
-   * a Stripe failure makes Stripe send the event again. The friend's waiting credit never goes to Stripe;
-   * queued credit is on its way and credit that Stripe has stays.
-   */
   readonly #block = Effect.fn("BillingReferral.block")(function* (
     this: BillingReferral,
     friend: string,
@@ -275,11 +230,6 @@ export class BillingReferral {
       console.warn("billing: an invite ended: the friend paid with the referrer's card");
   }).bind(this);
 
-  /**
-   * Sends the released credit of the referrer in each currency where it reached `referralMinimum`. The rows
-   * are queued first, so a send that fails finishes at the next event even if a refund takes the total
-   * below the minimum.
-   */
   readonly #sendReady = Effect.fn("BillingReferral.sendReady")(function* (
     this: BillingReferral,
     referrer: string,
@@ -325,11 +275,6 @@ export class BillingReferral {
     for (const credit of queued.results ?? []) yield* this.#send(credit);
   }).bind(this);
 
-  /**
-   * A referrer with no Stripe currency gets credit in the friend's currency. A plan that the referrer starts
-   * later sets the currency of its Stripe customer, and Stripe takes credit only off invoices in that
-   * currency. Credit that is not queued yet moves to that currency, with its waiting refunds.
-   */
   readonly #followReferrerCurrency = Effect.fn("BillingReferral.followReferrerCurrency")(function* (
     this: BillingReferral,
     referrer: string,
@@ -377,8 +322,6 @@ export class BillingReferral {
             ),
         );
       }
-      // The batch is one transaction. The guards on the old currency keep a second webhook at the same time
-      // from converting the row and its refunds twice.
       statements.push(
         this.#database
           .prepare(
@@ -392,13 +335,11 @@ export class BillingReferral {
     if (statements.length > 0) yield* billingCall(() => this.#database.batch(statements));
   }).bind(this);
 
-  /** Gives one credit to the referrer, less the part that a refund took back while it waited. */
   readonly #send = Effect.fn("BillingReferral.send")(function* (
     this: BillingReferral,
     credit: CreditRow,
   ): Effect.fn.Return<void, Failure> {
     const amount = credit.amount - credit.reversed_amount;
-    // A refund that took all of it back leaves nothing for Stripe.
     let transactionId = "";
     if (amount > 0) {
       const referrerCustomer = yield* this.#customerId(credit.referrer_user_id);
@@ -431,15 +372,9 @@ export class BillingReferral {
   ): Effect.fn.Return<void, Failure> {
     let credit = yield* this.#creditRow(payment.invoiceId);
     const share = referralShare(withoutTax(reversal.amount, payment.total, payment.totalExcludingTax));
-    // Stripe does not keep the order of events, and sends a failed `invoice.paid` again later. A refund of an
-    // invoice of an invited friend that has no credit yet fails, so Stripe sends the refund again after the
-    // credit is written. Otherwise the referrer would keep credit for a refunded payment. A refund is not
-    // more than its payment, so a refund with a share of 0 is of an invoice that gives no credit row.
     if (!credit && share > 0 && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
       return yield* new BillingOperationError({});
     }
-    // A queued credit keeps its amount until Stripe accepts it, because its idempotency key is fixed. It goes
-    // to Stripe first, and the refund then takes the share back from the Stripe credit.
     if (credit && credit.queued_at !== null && credit.balance_transaction_id === null) {
       yield* this.#send(credit);
       credit = yield* this.#creditRow(payment.invoiceId);
@@ -447,7 +382,6 @@ export class BillingReferral {
     if (!credit || !isOneOf(BILLING_CURRENCIES, credit.source_currency)) return;
     if (!isOneOf(BILLING_CURRENCIES, credit.currency)) return;
     if (credit.balance_transaction_id === null) {
-      // The credit still waits: it gets smaller, and nothing goes to Stripe.
       const amount = Math.max(
         0,
         Math.min(
@@ -455,8 +389,6 @@ export class BillingReferral {
           credit.amount - credit.reversed_amount,
         ),
       );
-      // The guard writes nothing when another webhook queued, sent or converted the credit after the read.
-      // Then this refund fails, and the retry takes the share back from the credit as it is then.
       yield* billingCall(() =>
         this.#database.batch([
           this.#database
@@ -474,7 +406,6 @@ export class BillingReferral {
       if (!(yield* this.#reversalRow(reversal.objectId))) return yield* new BillingOperationError({});
       return;
     }
-    // A refund of all of a waiting credit leaves nothing to take back.
     if (credit.balance_transaction_id === "") return;
     const customerId = yield* this.#customerId(credit.referrer_user_id);
     if (!customerId) return;
@@ -496,7 +427,6 @@ export class BillingReferral {
             `INSERT OR IGNORE INTO referral_reversals(reversal_id, invoice_id, amount, balance_transaction_id, created_at)
              VALUES (?, ?, ?, ?, ?)`,
           )
-          // Nothing to take back is done at once.
           .bind(reversal.objectId, payment.invoiceId, amount, amount === 0 ? "" : null, this.#now())
           .run(),
       );
@@ -525,10 +455,6 @@ export class BillingReferral {
     );
   }).bind(this);
 
-  /**
-   * Sets the credit that refunds took back to the sum of the finished reversals: the ones that Stripe
-   * accepted and the ones of a credit that waited. A repeated update gives the same value.
-   */
   #reversedAmount(invoiceId: string): D1PreparedStatement {
     return this.#database
       .prepare(

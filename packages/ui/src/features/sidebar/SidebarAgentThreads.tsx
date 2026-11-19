@@ -1,10 +1,3 @@
-/**
- * The side threads of one agent in the sidebar. The chevron in the corner of the agent row shows them
- * under the row: the threads that need a look first, then the latest others, cut short. A longer
- * hover on the row shows all of them in a card beside the sidebar, with a new thread item at the top.
- * The icon of each thread shows its state, as the tabs of the chat header do.
- */
-
 import { Button, ChevronDown, MessageCirclePlus, Popover } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
@@ -15,19 +8,14 @@ import { sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 import type { SidebarAgentThreads as SidebarAgentThreadsModel } from "./sidebar-types";
 
-/** A pointer that stays this long on an agent row opens its thread card. A pass over the list does not. */
 const CARD_OPEN_DELAY = 700;
-/** Time to move the pointer from the row into the card before it closes. */
 const CARD_CLOSE_DELAY = 220;
-/** The threads that need no look and show under the row before "Show more". */
 const EARLIER_LIMIT = 3;
 
-/** A thread that needs a look: it runs, waits, failed, or has unread messages. */
 function needsLook(thread: ThreadItem): boolean {
   return thread.status.kind !== "idle" || (thread.unread ?? 0) > 0;
 }
 
-/** The latest threads, with the open thread in the list even when it is older. */
 function shownThreads(threads: readonly ThreadItem[], openId: string | undefined, limit: number): ThreadItem[] {
   const latest = threads.slice(0, limit);
   const open = threads.find((thread) => thread.id === openId);
@@ -35,7 +23,6 @@ function shownThreads(threads: readonly ThreadItem[], openId: string | undefined
   return [...latest.slice(0, limit - 1), open];
 }
 
-/** One thread under the agent row: state icon, title, time. */
 function ThreadRow(props: { thread: ThreadItem; current: boolean; index: number; onOpen: () => void }) {
   const { format } = useText();
   return (
@@ -57,7 +44,6 @@ function ThreadRow(props: { thread: ThreadItem; current: boolean; index: number;
   );
 }
 
-/** The threads under the agent row. They open and close in place. */
 function InlineThreads(props: {
   model: SidebarAgentThreadsModel;
   agentId: string;
@@ -111,7 +97,6 @@ function InlineThreads(props: {
   );
 }
 
-/** The card beside the sidebar: a new thread, then every thread of the agent. */
 function ThreadCard(props: {
   model: SidebarAgentThreadsModel;
   agentId: string;
@@ -189,23 +174,16 @@ function ThreadCard(props: {
   );
 }
 
-/**
- * The thread part of an agent's sidebar item: the chevron, the threads under the row, and the card.
- * `row` is the agent row button. It shows nothing for an agent without side threads.
- */
 export function SidebarAgentThreads(threadProps: {
   model: SidebarAgentThreadsModel;
   agentId: string;
   agentName: string;
   row: HTMLElement | undefined;
-  /** The row's context menu is open. The card does not open over it. */
   menuOpen: boolean;
-  /** Tells the row that the card opens or closes, so that the row's own tooltip does not show under it. */
   onCardChange?: ((open: boolean) => void) | undefined;
 }) {
   const { t } = useText();
   const { agentThreadsOpen, toggleAgentThreads } = useSidebarScope();
-  // The list is read once for each change, not again by each part that shows it.
   const threads = createMemo(() => threadProps.model.threads(threadProps.agentId));
   const expanded = () => agentThreadsOpen(threadProps.agentId);
   const [card, setCard] = createSignal(false);
@@ -219,7 +197,6 @@ export function SidebarAgentThreads(threadProps: {
     clear();
     setCard(false);
   };
-  // The list under the row already shows the threads, so the card does not open over it.
   const arm = () => {
     clear();
     threadProps.model.load(threadProps.agentId);
@@ -233,21 +210,18 @@ export function SidebarAgentThreads(threadProps: {
     closeTimer = setTimeout(() => setCard(false), CARD_CLOSE_DELAY);
   };
 
-  // An open list reads its threads when they are not read yet.
   createEffect(expanded, (open) => {
     if (open) threadProps.model.load(threadProps.agentId);
   });
   createEffect(card, (open) => {
     threadProps.onCardChange?.(open);
   });
-  // The card goes with the last thread, and it does not open again by itself when a thread comes back.
   createEffect(
     () => threads().length === 0,
     (empty) => {
       if (empty) close();
     },
   );
-  // The row stops hiding its tooltip when this part goes, such as in a compact sidebar.
   onCleanup(() => {
     clear();
     threadProps.onCardChange?.(false);
@@ -262,12 +236,10 @@ export function SidebarAgentThreads(threadProps: {
     () => threadProps.row,
     (row) => {
       if (!row) return;
-      // A keyboard user gets the chevron too: focus reads the threads, as a hover does.
       const load = () => threadProps.model.load(threadProps.agentId);
       row.addEventListener("pointerenter", arm);
       row.addEventListener("pointerleave", leave);
       row.addEventListener("focus", load);
-      // A click on the row opens the agent's chat; the card is not needed then.
       row.addEventListener("pointerdown", close);
       return () => {
         clear();

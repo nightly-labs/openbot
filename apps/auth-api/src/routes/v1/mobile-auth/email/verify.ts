@@ -7,8 +7,6 @@ import { readJsonObject } from "../../../../server/json-body";
 import { apiError, authErrorResponse, json, requestAuthService } from "../../../../server/request-auth";
 import { requestSourceIp } from "../../../../server/source-ip";
 
-// The phone requests the code through `/v1/auth/email/start`. Only this step makes the session a
-// mobile session; `/v1/auth/email/verify` makes a desktop session.
 export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
   server: {
     handlers: {
@@ -32,7 +30,6 @@ export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
                 code: body.code,
                 sourceIp: requestSourceIp(request),
                 device: { id: body.deviceId, name: body.deviceName, platform: body.platform },
-                // A code that is not valid does not stop the sign-in: the account gets no invite.
                 referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
               }),
             );

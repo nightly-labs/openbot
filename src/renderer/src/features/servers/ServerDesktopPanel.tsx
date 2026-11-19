@@ -29,7 +29,6 @@ const ISSUE_TITLES = {
 } as const satisfies Record<ServerConnectionIssueCode, AppTextKey>;
 const REMOTE_HOST_GATEWAY_NAME = "OpenBot Remote Host Gateway";
 
-/** The Remote desktop section of the server settings. */
 export function ServerDesktopPanel(props: {
   server: ServerSummary;
   platform: "darwin" | "win32" | "linux";

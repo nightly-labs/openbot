@@ -1,12 +1,3 @@
-// Runs the real central auth manager against a local account server. A stored session that the
-// Keychain cannot decrypt at startup, or a later write that fails, must leave the session file on
-// disk: before this, both deleted it and the app was signed out after the next restart. A failed
-// write after an email sign-in must still remove a file that holds the previous session.
-// A start also shows the account from the profile in the file before the account service answers,
-// and a session that the service then refuses signs the device out.
-//
-// Run: bun scripts/central-auth-session-file-e2e.ts
-// It writes .openbot-build/central-auth-session-file-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -22,7 +13,6 @@ const SESSION_TOKEN = "s".repeat(48);
 const NEW_SESSION_TOKEN = "n".repeat(48);
 const HOST_ID = "00000000-0000-4000-8000-000000000001";
 
-/** While set, `/v1/me` does not answer: the account service is slow or out of reach. */
 let meHold: { seen: () => void; release: Promise<void> } | null = null;
 let meRevoked = false;
 
@@ -104,7 +94,6 @@ let error: string | undefined;
 try {
   await writeFile(storagePath, stored);
 
-  // 1. The Keychain cannot decrypt the file at startup.
   const locked = manager({
     decrypt: () => {
       throw new Error("Error while decrypting the ciphertext provided to safeStorage.decryptString.");
@@ -115,18 +104,15 @@ try {
   assert.equal(results.decryptFailure, "signed_out");
   assert.equal(await readFile(storagePath, "utf8"), stored, "a failed decrypt must keep the session file");
 
-  // 2. The next start can decrypt it again.
   const unlocked = manager();
   results.nextStart = (await runCauseEffect(unlocked.initialize())).status;
   assert.equal(results.nextStart, "signed_in");
-  // The start put the profile in the file, beside the same session.
   await runCauseEffect(unlocked.dispose());
   const storedWithProfile = await readFile(storagePath, "utf8");
   const profileFile = JSON.parse(Buffer.from(storedWithProfile, "base64").toString());
   assert.equal(profileFile.sessionToken, SESSION_TOKEN);
   assert.equal(profileFile.user.email, "a@example.com", "the start must store the profile");
 
-  // 3. A write after sign-in fails, as the host registration write does.
   let failWrites = false;
   const failing = manager({
     encrypt: () => {
@@ -143,13 +129,11 @@ try {
   assert.equal(registered.authEpoch, 2);
   assert.equal(await readFile(storagePath, "utf8"), storedWithProfile, "a failed write must keep the session file");
 
-  // 4. The restart after the failed write is still signed in.
   const restarted = manager();
   results.afterWriteFailure = (await runCauseEffect(restarted.initialize())).status;
   await runCauseEffect(restarted.dispose());
   assert.equal(results.afterWriteFailure, "signed_in");
 
-  // 4a. The account service does not answer. The start shows the account from the stored profile.
   const slowService = holdMe();
   const offline = manager();
   const offlineState = await runCauseEffect(offline.initialize());
@@ -161,7 +145,6 @@ try {
   await runCauseEffect(offline.dispose());
   assert.equal(offline.getState().status, "signed_in");
 
-  // 4b. A hosted server waits for the account service, because its claim depends on the answer.
   const hostedService = holdMe();
   const hosted = manager({ confirmSessionAtStart: true });
   const hostedStart = runCauseEffect(hosted.initialize());
@@ -173,7 +156,6 @@ try {
   await runCauseEffect(hosted.dispose());
   assert.equal(results.hostedAfterAnswer, "signed_in");
 
-  // 4c. The account service refuses the stored session. The device signs out and the file goes.
   meRevoked = true;
   const revoked = manager();
   const signedOut = new Promise<void>((done) => {
@@ -189,8 +171,6 @@ try {
   meRevoked = false;
   await writeFile(storagePath, storedWithProfile);
 
-  // 5. An email sign-in cannot store its new session. The file holds the previous one, which the next
-  // start must not sign in to.
   const switching = manager({
     encrypt: () => {
       throw new Error("Error while encrypting the text provided to safeStorage.encryptString.");
@@ -206,7 +186,6 @@ try {
   await runCauseEffect(afterSignIn.dispose());
   assert.equal(results.afterFailedSignInWrite, "signed_out");
 
-  // 6. The account log names each failed stage and holds no token.
   assert.ok(
     logLines.some((line) => line.includes('"decrypt"')),
     "the decrypt failure must be logged",

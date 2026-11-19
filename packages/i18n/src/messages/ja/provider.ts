@@ -8,7 +8,6 @@ export const messages = {
   "provider.custom.description": "自分のモデルエンドポイント",
   "provider.custom.addLabel": "カスタムプロバイダーを追加",
   "provider.custom.installLabel": "カスタムプロバイダーをインストール",
-  // 日本語に単数複数の区別はないので、どの個数でも同じ形です。
   "provider.endpointCount": { other: "エンドポイント {count} 件" },
   "provider.customAgentCount": { other: "カスタムエージェント {count} 件" },
   "provider.manageEndpoints": { other: "エンドポイント {count} 件を管理" },

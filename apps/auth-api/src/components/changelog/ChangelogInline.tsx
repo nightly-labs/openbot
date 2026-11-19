@@ -2,12 +2,10 @@ import { For, Match, Switch } from "solid-js";
 import { type InlineSegment, parseInline } from "../../lib/changelog";
 import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
 
-/** Only links a reader can follow safely. Anything else in the file is shown as its text. */
 function safeHref(href: string): string | undefined {
   return /^(https:\/\/|\/(?![/\\]))/u.test(href) ? href : undefined;
 }
 
-/** One line of release notes, with its code, bold and links drawn as elements rather than as HTML. */
 export function ChangelogInline(props: { text: string }) {
   return (
     <For each={parseInline(props.text)}>

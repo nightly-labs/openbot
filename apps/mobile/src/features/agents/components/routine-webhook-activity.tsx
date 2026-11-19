@@ -14,10 +14,6 @@ const IGNORED_KEYS = {
   inactive: "mobile.agent.webhook.activity.ignoredInactive",
 } as const satisfies Record<WebhookReceiptReason, MobileTextKey>;
 
-/**
- * The webhook requests that one routine ignored. Mobile has no run history, so started runs are not
- * shown. Nothing shows while there is no ignored request.
- */
 export function RoutineWebhookActivity({
   serverId,
   owner,

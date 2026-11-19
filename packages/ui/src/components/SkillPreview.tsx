@@ -17,7 +17,6 @@ export function skillExamplePrompt(
   return skill.examplePrompt?.trim() || t("skill.preview.examplePrompt");
 }
 
-/** The SKILL.md body without its first heading, when that heading only repeats the name. */
 export function skillInstructions(
   skill: Pick<MarketplaceSkillDetail, "name" | "description" | "instructions">,
 ): string {
@@ -31,9 +30,7 @@ export function SkillPreview(props: {
   skill: Pick<MarketplaceSkillDetail, "name" | "description" | "iconUrl" | "instructions" | "examplePrompt">;
   onTry?: (() => void) | undefined;
   unavailableReason?: string;
-  /** The creator line under the name, where the page that shows the preview names one. */
   creatorName?: string;
-  /** What the page offers for this skill, on the name's line. */
   action?: JSX.Element;
 }) {
   const { t } = useText();
@@ -68,9 +65,7 @@ export function SkillPreview(props: {
           url,
           color: `rgb(${Math.round(red / total)} ${Math.round(green / total)} ${Math.round(blue / total)})`,
         });
-    } catch {
-      // Cross-origin artwork can still display when its pixels cannot be sampled.
-    }
+    } catch {}
   };
   const openLink = (url: string) => {
     const safe = safeBrowserUrl(url);

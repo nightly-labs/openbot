@@ -24,17 +24,12 @@ import type { LiveConversation } from "./use-live-conversation";
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const OPEN_MS = 460;
 const CLOSE_MS = 400;
-/** How often the loudness of the microphone or of the reply is read, for the level of the call bar. */
 const METER_MS = 160;
-/** The data channel that the realtime model sends its events on. */
 const EVENTS_CHANNEL = "oai-events";
 
 interface GptLiveConversationInput {
-  /** The user chose GPT live voice, and the server, the app binary and the chat can run it. */
   active: boolean;
-  /** The chat is in front and the user can write here. */
   enabled: boolean;
-  /** The agent's server is connected. */
   online: boolean;
   focused: boolean;
   foreground: boolean;
@@ -42,7 +37,6 @@ interface GptLiveConversationInput {
   voice: CodexLiveVoice | null;
   startSession: (input: LiveVoiceStartRequest) => Promise<LiveVoiceSessionResponse>;
   stopSession: (sessionId: string) => Promise<void>;
-  /** The server of the chat: a live voice event of another server is not for this conversation. */
   serverId: string;
 }
 
@@ -53,7 +47,6 @@ interface GptLiveState {
   caption: string;
   error: string | null;
   exit: "cancel" | null;
-  /** The call to OpenAI is up, so the microphone hears. */
   connected: boolean;
 }
 
@@ -67,14 +60,6 @@ const CLOSED: GptLiveState = {
   connected: false,
 };
 
-/**
- * A voice conversation with an agent through GPT live voice, as Codex live voice on desktop. The
- * microphone and the reply go over WebRTC between the phone and OpenAI; the host opens the call with
- * the Codex sign-in of its computer, and gives each spoken request to the agent as the user's
- * message, so the chat shows the requests and the answers. It has the shape of the conversation that
- * recognizes speech on the phone, so the same call bar shows it. The speech module does not capture
- * or speak while it runs.
- */
 export function useGptLiveConversation(input: GptLiveConversationInput): LiveConversation {
   const [state, setState] = useState(CLOSED);
   const inputRef = useRef(input);
@@ -89,8 +74,6 @@ export function useGptLiveConversation(input: GptLiveConversationInput): LiveCon
     controller.connection(input.online);
   }, [controller, input.online]);
 
-  // As the phone conversation: a screen above the chat, or the app in the background, ends it. While
-  // the call starts, Android reports the app as in the background for the microphone permission dialog.
   const starting = state.phase === "starting";
   useEffect(() => {
     if (state.open && (!input.focused || (!input.foreground && !starting))) controller.end();
@@ -146,19 +129,15 @@ function createController({
   presence: SharedValue<number>;
   level: SharedValue<number>;
 }) {
-  // The copies that the steps read: a state read shows a write only after the next render.
   let open = false;
   let exiting = false;
   let phase: LiveConversationPhase = "starting";
   let muted = false;
-  /** The call failed or ended; an unmute starts a new one. */
   let failed = false;
   let heard = "";
   let said = "";
-  /** Each call, and the end, make the work of the call before them stale. */
   let generation = 0;
   let sessionId: string | null = null;
-  // Sessions that ended before the start returned their id: the end event can arrive first.
   let starting = false;
   const endedEarly = new Map<string, string | null>();
   let peer: RTCPeerConnection | null = null;
@@ -167,7 +146,6 @@ function createController({
   let reply: MediaStreamTrack | null = null;
   let meterTimer: ReturnType<typeof setInterval> | null = null;
   let callAudio = false;
-  // Realtime v3 has no command that stops a reply: an interrupted reply plays on mute until its turn ends.
   let currentReply: string | null = null;
   let silencedTurn: string | null = null;
   let silenceNextReply = false;
@@ -185,7 +163,6 @@ function createController({
     if (reply) reply.enabled = audible;
   }
 
-  /** The loudspeaker, with echo cancellation, for the call. Each call after the first changes nothing. */
   function routeCall(): void {
     callAudio = true;
     speechNative?.setCallAudio?.(true);
@@ -216,7 +193,6 @@ function createController({
     level.set(0);
   }
 
-  /** Ends the call and frees the microphone. The session on the host ends with its own stop. */
   function release(): void {
     generation += 1;
     stopMeter();
@@ -251,12 +227,10 @@ function createController({
     fail(error ? text.sourceText(error) : text.t("mobile.chat.liveVoice.gptEnded"));
   }
 
-  /** The realtime v3 turns give the phase: who speaks, and when the model thinks. */
   function modelEvent(data: unknown): void {
     const turn = gptLiveTurn(data);
     if (!turn || !open || exiting) return;
     if (turn.step === "user-started") {
-      // The next reply answers this turn, so an interrupt of the reply before it does not silence it.
       silenceNextReply = false;
       if (silencedTurn === null) setReplyAudible(true);
       heard = "";
@@ -302,12 +276,9 @@ function createController({
     said = "";
     setPhase("starting");
     update({ error: null, caption: "" });
-    // A reply of the phone voice must not play over the call.
     speechNative?.stop();
     let stream: MediaStream;
     try {
-      // The reply plays while the microphone listens. The native WebRTC audio has echo cancellation,
-      // noise suppression and gain control on by default, and its constraints cannot set them.
       stream = await webRtc.mediaDevices.getUserMedia({ audio: true, video: false });
     } catch (error) {
       if (own !== generation) return;
@@ -332,7 +303,6 @@ function createController({
       return;
     }
     microphone = stream;
-    // The user can mute while the microphone opens.
     for (const track of stream.getAudioTracks()) track.enabled = !muted;
     try {
       const connection = new webRtc.RTCPeerConnection();
@@ -420,7 +390,6 @@ function createController({
         return;
       }
       if (event.kind === "ended") {
-        // The host ended the session: no stop goes back for it.
         sessionId = null;
         if (!exiting) failEnded(event.error);
         return;
@@ -429,7 +398,6 @@ function createController({
       else said = event.final ? event.text : said + event.text;
       if ((event.role === "user") === (phase !== "speaking")) showCaption();
     },
-    /** No request reaches the host while the server is away, so the call stops until it is back. */
     connection(online: boolean): void {
       if (!open || exiting) return;
       if (!online && phase !== "offline") {
@@ -461,17 +429,14 @@ function createController({
         update({ error: currentText().t("mobile.chat.liveVoice.offline") });
       }
     },
-    /** The microphone stays open while it is muted, so an unmute does not start a new call. */
     toggleMute(): void {
       if (!open || exiting || phase === "offline") return;
       muted = !muted;
       for (const track of microphone?.getAudioTracks() ?? []) track.enabled = !muted;
       update({ muted });
       void haptics.selection();
-      // A call that failed starts again on unmute.
       if (!muted && failed) void connect();
     },
-    /** Silences the reply that plays now, or the next one. The model and the agent's turn go on. */
     interrupt(): void {
       if (!open || exiting || (phase !== "thinking" && phase !== "speaking")) return;
       void haptics.impact("light");

@@ -1,27 +1,3 @@
-// Checks that a Codex turn that ends with no answer and no tool step does not stop a team (#7225).
-// Runs the real agent service, tool router and mailbox on a temporary profile with a fake Codex
-// app-server. A lead asks two teammates with `send_message`; their results start one lead turn. The
-// fake ends a lead turn with only its reasoning when the turn's mode says so. Checks:
-//   1. With no backup model, an empty lead turn that started with teammate results runs once more
-//      on the same model, and its answer ends the request. No error shows.
-//   2. A second empty run of the same results shows a plain error, and the results fail.
-//   3. A person's message that gets an empty turn shows the error and does not run again.
-//   4. With backup models, an empty lead turn runs again on the backup model, with no error.
-//   5. A teammate update that wants no answer can end empty: it completes with no error.
-//   6. In a thread, an empty lead turn of a teammate result runs once more too, and its answer ends
-//      the thread's turn (#8503). A second empty run shows the error in the thread.
-//   7. In a WhatsApp conversation, an empty orchestrator turn of a teammate result runs once more too,
-//      and the conversation gets the answer with no "Stopped." end before it (#8573). A second empty
-//      run ends the conversation's request as failed.
-//   8. In a thread, a person's turn that ran a step and wrote its last words as narration, then an
-//      empty answer, shows that narration as its answer (#8837). With narration only before the
-//      step, the turn ends as before: completed, once, with the narration still a step. A teammate's
-//      such turn still sends the note of its work to the agent that asked (#8214).
-//   9. In the agent's own chat, the same turn shows that narration as its answer too, in the
-//      published chat and in the stored page that a reload or a joined client reads (#9422).
-//   10. A person's message that gets a tool step and no answer stays completed, does not run again,
-//       and shows a notice (#8810).
-// `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -53,7 +29,6 @@ const NO_ANSWER_AFTER_STEPS = sourceText("error.provider.noAnswerAfterSteps", {
   provider: agentProviderDescriptor("codex").displayName,
 });
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -72,19 +47,6 @@ interface FakeCall {
 
 const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`;
 
-/**
- * A Codex app-server with the methods that the service calls. Each turn input decides the turn:
- * - `TEAM-RESULT mode:<mode>`: a lead turn with teammate results. It answers "Team done.", or ends
- *   with only its reasoning: always for `empty-always` and `thread-empty-always`, on the first run
- *   for `empty-once` and `thread-empty-once`, and on the primary model for `empty-on-primary`.
- * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
- * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
- * - `EMPTY-TURN`: ends with only its reasoning.
- * - `STEP-THEN-EMPTY`: runs one command, then ends with only its reasoning.
- * - `NARRATION-AFTER-STEP` / `NARRATION-BEFORE-STEP`: runs one command, writes narration after or
- *   before it, then sends an empty answer.
- * Each turn is logged with its model and whether it ended empty.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync, readFileSync, writeFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -104,7 +66,6 @@ process.stdout.on("error", (error) => {
   throw error;
 });
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
-/** Counts the result turns of each mode, across Codex processes. */
 const nextRun = (mode) => {
   const counts = existsSync(COUNTS) ? JSON.parse(readFileSync(COUNTS, "utf8")) : {};
   const run = (counts[mode] ?? 0) + 1;
@@ -267,7 +228,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -336,7 +296,6 @@ async function createAgent(name: string) {
   return agent;
 }
 
-/** The teammate results that reached this agent after the given deliveries. */
 function newResults(agentId: string, before: ReadonlySet<string>): QueueDelivery[] {
   return agents
     .listQueue(agentId)
@@ -345,10 +304,6 @@ function newResults(agentId: string, before: ReadonlySet<string>): QueueDelivery
     );
 }
 
-/**
- * The lead asks both teammates with a request that wants an answer. Returns when the lead's turns
- * for the results have ended: the results ended and no turn of the lead runs.
- */
 async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   const before = new Set(agents.listQueue(leadId).deliveries.map((delivery) => delivery.id));
   const since = events.length;
@@ -376,10 +331,6 @@ async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   };
 }
 
-/**
- * The lead asks one teammate from a new thread. Returns when the thread's turn of the result ended
- * with an answer or a failure, not with a run again.
- */
 async function askTeammateInThread(leadId: string, teammateId: string, mode: string) {
   const since = events.length;
   const task = await runCauseEffect(
@@ -413,10 +364,6 @@ async function askTeammateInThread(leadId: string, teammateId: string, mode: str
   return { turns: turns(), outcome: ended.outcome, error: ended.error, answer, errors: errorsFor(leadId, since) };
 }
 
-/**
- * A WhatsApp message asks the orchestrator, which asks one teammate. Returns when the conversation's
- * request for the teammate's result ended, with each end that the conversation was told of.
- */
 async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode: string) {
   const since = events.length;
   const ends: { status: string; followUp: boolean; answer: string | null }[] = [];
@@ -646,7 +593,6 @@ try {
     return outcome;
   });
 
-  /** A person's message in a new thread. Returns when the thread's turn ended and the thread is idle. */
   const personInThread = async (text: string) => {
     const since = events.length;
     const before = fakeTurns().length;

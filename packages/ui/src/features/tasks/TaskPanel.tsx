@@ -8,24 +8,16 @@ import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 
 interface TaskPanelProps {
-  /** Null for a start that waits for its Undo time. */
   task: AgentTask | null;
-  /** The title of a start that waits. */
   title: string;
   wait?: AgentTaskWait;
   onArchive: () => void;
   onRestore: () => void;
-  /** Opens the task as a thread tab in the agent's chat. Absent where the client cannot. */
   onOpenInChat?: (() => void) | undefined;
   onClose: () => void;
-  /** The thread view of the task. */
   children: JSX.Element;
 }
 
-/**
- * One task beside the list of the Tasks page: its state and title, the actions of a thread tab, and
- * the thread view. A running task is archived after it stops, as in the thread tabs.
- */
 export function TaskPanel(props: TaskPanelProps) {
   const { t } = useText();
   const title = () => props.task?.title ?? props.title;
@@ -97,10 +89,6 @@ export function TaskPanel(props: TaskPanelProps) {
   );
 }
 
-/**
- * The card of a task whose turn waits for a question or a browser takeover. The chat answers them,
- * so the card opens the task there.
- */
 export function TaskAnswerCard(props: { agentName: string; onAnswer?: (() => void) | undefined }) {
   const { t } = useText();
   return (

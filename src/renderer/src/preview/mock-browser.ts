@@ -19,7 +19,6 @@ export interface MockBrowserOptions {
   browserPreviews?: Record<string, BrowserPreview | null>;
 }
 
-/** The embedded browser: its tabs, the live view the preview cannot show, and picture-in-picture. */
 export function createMockBrowser(
   options: MockBrowserOptions,
   { emit }: MockRuntime,
@@ -36,7 +35,6 @@ export function createMockBrowser(
   const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
 
-  // The preview has no agent to wait, so a take only marks the tab, as the host's list does.
   const setUserControl = (tabId: string, held: boolean) => {
     browserTabs = browserTabs.map((tab) => {
       if (tab.id !== tabId) return tab;
@@ -56,10 +54,6 @@ export function createMockBrowser(
         loading: false,
         ownerThreadId: input.ownerThreadId ?? null,
         ownerAgentId: input.ownerAgentId ?? null,
-        // `toPublicTab` in `browser-host.ts` fills all three on every tab it reports, so a mock that
-        // left them undefined would be the only surface where a freshly opened tab has no environment.
-        // These are `defaultBrowserEnvironment()` -- a fill viewport, which the real host then reports
-        // at the view's measured size.
         environment: {
           viewport: { mode: "fill", width: 1200, height: 800, deviceScaleFactor: 1, preset: null },
           colorScheme: "system",
@@ -90,7 +84,6 @@ export function createMockBrowser(
     stop: async () => undefined,
     takeControl: async (tabId) => setUserControl(tabId, true),
     releaseControl: async (tabId) => setUserControl(tabId, false),
-    // The preview has no page to record, so a saved recording gives the page of the tab and one click.
     startTeach: async (tabId) => setUserControl(tabId, true),
     stopTeach: async ({ tabId, save }) => {
       const tab = browserTabs.find((entry) => entry.id === tabId);
@@ -129,8 +122,6 @@ export function createMockBrowser(
       return clone(preview);
     },
     setVisible: async () => undefined,
-    // The preview has no host, so it answers the one thing that is true: there is nothing live to
-    // show. The panel draws its own message for that rather than an empty rectangle.
     startLiveView: async (tabId) => {
       emit(browserLiveViewListeners, { type: "stopped", tabId, reason: "The preview has no host to watch." });
     },

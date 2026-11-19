@@ -19,38 +19,21 @@ import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } fro
 import { SCROLLING_CODE_LINES } from "../model/markdown-preview-parts";
 import { useListSettled } from "./use-list-settled";
 
-/** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
-/**
- * Each highlight reads the whole block again, so a long block waits longer for the next one: the time
- * that the highlight takes stays a small part of the time between two of them.
- */
 const STREAMING_HIGHLIGHT_CHARACTERS_PER_MS = 40;
 
 function streamingHighlightInterval(length: number): number {
   return Math.max(STREAMING_HIGHLIGHT_INTERVAL_MS, Math.round(length / STREAMING_HIGHLIGHT_CHARACTERS_PER_MS));
 }
 
-/**
- * Android makes a set of spans for each coloured run of a text, and each new span is sorted against
- * the spans before it. A block with thousands of runs then blocks the main thread when its text is
- * made, laid out, drawn or read by accessibility services, and Android shows "App isn't responding".
- * Above this many coloured runs, Android draws the code in the colour of the block. iOS keeps all runs.
- */
 const ANDROID_MAX_COLORED_RUNS = 300;
 
-/** A run of code in one colour. `color` is unset for code in the colour of the block. */
 export interface CodeRun {
   offset: number;
   text: string;
   color: ColorValue | undefined;
 }
 
-/**
- * The tokens as runs of one colour. Many token types share a colour, and most tokens have the colour
- * of the block, so a block has far fewer runs than tokens. The list draws a block again each time
- * its row scrolls into view, and each run that has a colour is a text span to make.
- */
 export function codeRuns(
   tokens: readonly CodeToken[],
   colors: Partial<Record<ShjToken, ColorValue>>,
@@ -80,17 +63,11 @@ interface ChatCodeBlockProps {
   text: string;
   language?: string;
   selectable?: boolean;
-  /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
-  /**
-   * The colors of a bubble with a message color. The code is in the bubble's text color: the theme
-   * colors of highlighted code do not read on every message color.
-   */
   tone?: BubbleTone;
 }
 
 export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
-  // A block that mounts during a fast fling of the chat colours its code when the list slows down.
   const settled = useListSettled();
   return <CodeBlockBody {...props} highlight={settled} />;
 });
@@ -111,22 +88,14 @@ const CodeBlockBody = memo(function CodeBlockBody({
   );
 });
 
-/** The line height of the code in a block. */
 const CODE_LINE_HEIGHT = 20;
 
-/**
- * A long code block of a Markdown file: as high as 25 lines, and its code scrolls inside it. The code
- * is a list of pieces of a few thousand characters: iOS draws a text into one bitmap as tall as the
- * text, and a stack trace of a thousand lines in one text ran the app out of memory. The list draws
- * only the pieces near the view. Copy takes the whole block.
- */
 export const ScrollingCodeBlock = memo(function ScrollingCodeBlock({
   text,
   pieces,
   language,
 }: {
   text: string;
-  /** The code in pieces of whole lines, which join into `text`. */
   pieces: readonly string[];
   language?: string;
 }) {
@@ -161,11 +130,6 @@ function CodePiece({ text, language }: { text: string; language?: string }) {
   );
 }
 
-/**
- * The card of a code block: the language and the copy button on a card, and the code on an inset
- * panel of the canvas, drawn as a table. The card is a clear layer of the text color, so it shows on
- * every surface: the screen, an agent's bubble or a card. A message color gives its own surfaces.
- */
 function CodeBlockFrame({
   language,
   copyText,
@@ -199,7 +163,6 @@ function CodeBlockFrame({
   }
   return (
     <View className="overflow-hidden" style={{ borderRadius: 16, borderCurve: "continuous", backgroundColor: card }}>
-      {/* The label lines up with the code on the inset panel, as a table header does with its rows. */}
       <View className="flex-row items-center justify-between gap-3" style={{ paddingStart: 15, paddingEnd: 4 }}>
         <Typography.Paragraph
           type="body-xs"
@@ -238,7 +201,6 @@ function CodeBlockFrame({
   );
 }
 
-/** The highlighted runs of a code text. `highlight` false keeps the code in one colour for now. */
 function useCodeRuns(
   text: string,
   language: string | undefined,
@@ -275,7 +237,6 @@ function useCodeRuns(
         });
     };
     const last = lastHighlight.current;
-    // The text of a finished block does not change again: it gets its colours at once.
     const interval = finished ? STREAMING_HIGHLIGHT_INTERVAL_MS : streamingHighlightInterval(text.length);
     const delay = last === null ? 0 : Math.max(0, interval - (Date.now() - last));
     const timer = delay === 0 ? null : setTimeout(run, delay);
@@ -306,8 +267,6 @@ function CodeText({ runs, foreground, selectable }: { runs: CodeRun[]; foregroun
         run.color === undefined ? (
           run.text
         ) : (
-          // A plain native span in the font of the block around it, not a `Typography`: a long
-          // block has hundreds of runs, and each `Typography` adds four components to the row.
           <Text key={run.offset} style={{ color: run.color }}>
             {run.text}
           </Text>
@@ -317,7 +276,6 @@ function CodeText({ runs, foreground, selectable }: { runs: CodeRun[]; foregroun
   );
 }
 
-/** The colours of highlighted code, shared by the code block in a message and the code view of a preview. */
 export function useCodeTokenColors() {
   const [foreground, muted, keyword] = useThemeColor(["foreground", "muted", "link"]);
   const [string, number, error] = useCSSVariable([

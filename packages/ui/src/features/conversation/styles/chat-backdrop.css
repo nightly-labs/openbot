@@ -1,7 +1,3 @@
-/* The animated scene behind the window (`ChatBackdrop`). It fills the window under all of its content:
- * at -1 it paints before the page rail, the sidebar, the chat and the side panel. The window uses the
- * clear surfaces of the transparent window while it plays (`styles/window-glass.css`). The canvas has
- * one pixel for each mosaic cell, and the browser scales it up with hard edges. */
 .chat-backdrop {
   position: fixed;
   z-index: -1;
@@ -15,8 +11,6 @@
   image-rendering: pixelated;
 }
 
-/* A backdrop that the user added (`CustomBackdrop`). The picture or page covers the window, and a tint
- * in the chat color on top keeps the text readable. The page gets no input: it is only a backdrop. */
 .chat-backdrop-custom {
   background-color: var(--openbot-bg-canvas);
 }

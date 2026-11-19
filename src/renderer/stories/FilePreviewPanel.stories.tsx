@@ -17,9 +17,6 @@ import {
 } from "./file-previews";
 import { STORY_AGENTS } from "./fixtures";
 
-// The panel reports its width but does not apply it: in the app `ConversationView`
-// puts the reported value on `--browser-panel-width`. The story stage does the same,
-// so the resizer moves the panel edge here as it does in a conversation.
 const CONVERSATION_MIN = 320;
 const PANEL_MIN = 220;
 const PANEL_MAX = 900;
@@ -62,58 +59,45 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A markdown file rendered as rich text: headings, lists, code, quote, and a table. */
 export const Markdown: Story = {};
 
-/** A short markdown file, to check the panel with little content. */
 export const MarkdownShort: Story = {
   name: "Markdown (short)",
   args: { preview: MARKDOWN_SHORT_PREVIEW },
 };
 
-/** A plain text file in a monospace block that keeps its spacing and scrolls sideways. The wrap button wraps long lines. */
 export const Text: Story = {
   args: { preview: TEXT_PREVIEW },
 };
 
-/** A source file: the text preview of code, with indentation and long lines. */
 export const TextSource: Story = {
   name: "Text (source)",
   args: { preview: SOURCE_PREVIEW },
 };
 
-/** An image file, scaled to the width of the panel. */
 export const Image: Story = {
   args: { preview: IMAGE_PREVIEW },
 };
 
-/** A PDF rendered by the built-in viewer of the browser, in an iframe. */
 export const Pdf: Story = {
   name: "PDF",
   args: { preview: PDF_PREVIEW },
 };
 
-/** An audio file, played by the built-in controls of the browser. */
 export const Audio: Story = {
   args: { preview: AUDIO_PREVIEW },
 };
 
-/** An XLSX workbook rendered as a scrollable table with sheet tabs. */
 export const Spreadsheet: Story = {
   args: { preview: XLSX_PREVIEW },
 };
 
-/** Quoted prefixes, percent scaling, a suffix, and number format controls in a real XLSX file. */
 export const SpreadsheetLiteralPrefixes: Story = {
   args: { preview: XLSX_LITERAL_PREFIXES_PREVIEW },
 };
 
 const HTML_BYTES = new TextEncoder().encode(INLINE_SVG_CHART);
 
-/**
- * An HTML file: the page with its scripts, in the sandbox of a visual reply. The code button shows
- * the source. The Storybook server serves the page, as the app's page scheme does.
- */
 export const HtmlPage: Story = {
   name: "HTML page",
   args: {
@@ -137,12 +121,10 @@ export const HtmlPage: Story = {
   },
 };
 
-/** A kind that the panel cannot show. The user opens the file externally. */
 export const Unsupported: Story = {
   args: { preview: UNSUPPORTED_PREVIEW },
 };
 
-/** A folder chip from a chat: the files and subfolders with their size and date. */
 export const Folder: Story = {
   args: {
     preview: null,
