@@ -83,7 +83,7 @@ class CompanySignInRequired extends Error {}
 /** Longer than the time that the account service gives an email send, as on desktop. */
 const EMAIL_START_TIMEOUT_MS = 35_000;
 
-/** A session check with no answer in this time shows "Try again", as the server list does after 15 s. */
+/** A start check with no answer in this time shows "Try again", as the server list does after 15 s. */
 const SESSION_CHECK_TIMEOUT_MS = 15_000;
 
 /** The life of a sign-in code. After it, the account service has no send to answer for. */
@@ -422,17 +422,20 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     const generation = sessionGeneration;
     // The workspace code loads beside the session check, not after it.
     void loadWorkspace().catch(() => undefined);
-    // Without a time limit, a request that gets no answer keeps the start screen with no way out.
-    const limit = new AbortController();
+    // The start screen waits for the first check. Without a time limit, a request that gets no answer keeps
+    // it with no way out. A later check, such as on focus, waits as before: the screen stays usable.
+    const limit = state.loaded ? null : new AbortController();
     let timedOut = false;
-    const timer = window.setTimeout(() => {
-      timedOut = true;
-      limit.abort();
-    }, SESSION_CHECK_TIMEOUT_MS);
+    const timer = limit
+      ? window.setTimeout(() => {
+          timedOut = true;
+          limit.abort();
+        }, SESSION_CHECK_TIMEOUT_MS)
+      : null;
     try {
-      const session = await request("session", undefined, { signal: limit.signal }).finally(() =>
-        window.clearTimeout(timer),
-      );
+      const session = await request("session", undefined, limit ? { signal: limit.signal } : undefined).finally(() => {
+        if (timer !== null) window.clearTimeout(timer);
+      });
       markRemoteSync("session");
       const account = await showAccount(accountFrom(session));
       markRemoteSync("workspace-code");
@@ -448,9 +451,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         // Signed in, the workspace stays usable. Signed out, the login screen offers a retry, as on desktop.
         if (state.account)
           toast.error(
-            timedOut
-              ? text.sourceText(sourceText("error.auth.sessionTimeout"))
-              : text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
+            text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
             { report: { operation: "other", source: "system", cause_code: classifyFailure(error) } },
           );
         else

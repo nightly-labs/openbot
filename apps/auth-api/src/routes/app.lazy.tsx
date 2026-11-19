@@ -52,7 +52,7 @@ function BrowserAppPage() {
             <Show when={crew()} fallback={<AppLoadingShell />}>
               {(screen) => <Dynamic component={screen()} />}
             </Show>
-            <WebSlowLoadNotice />
+            <WebSlowLoadNotice visitStart />
           </div>
         }
       >
