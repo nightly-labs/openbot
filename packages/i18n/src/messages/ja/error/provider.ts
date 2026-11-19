@@ -187,7 +187,7 @@ export const messages = {
   "error.provider.stoppedBeforeStart":
     "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
   "error.provider.sessionStartTimedOut":
-    "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。プロバイダーを開き、{provider} を選択して再起動をクリックしてから、もう一度お試しください。",
+    "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
   "error.provider.serviceUnreachable":
     "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
   "error.provider.serviceUnreachableRefresh":

@@ -1057,6 +1057,7 @@ export class DrainScheduler {
               )
               .pipe(toDeliveryStartFailed);
         }
+        this.#startRetry.forget(delivery.id);
         this.#mailboxSync.emitQueue(agent.id);
         return;
       }
@@ -1406,11 +1407,16 @@ export class DrainScheduler {
               for (const item of batch)
                 yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
               this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-              logger.warn("A routine run waits for its provider to start.", {
-                agentId: delivery.recipientAgentId,
-                provider,
-                reason: this.#hooks.redactMcp(error instanceof Error ? error.message : String(error)),
-              });
+              logger.warn(
+                sessionStartTimedOut
+                  ? "A routine run waits for its provider to open a session."
+                  : "A routine run waits for its provider to start.",
+                {
+                  agentId: delivery.recipientAgentId,
+                  provider,
+                  reason: this.#hooks.redactMcp(error instanceof Error ? error.message : String(error)),
+                },
+              );
               return;
             }
           }
@@ -1436,17 +1442,17 @@ export class DrainScheduler {
           const detail = this.#hooks.redactMcp(error instanceof Error ? error.message : String(error));
           // Another Codex app holds the thread. The user reads what to do, and the log keeps the detail.
           const threadInUse = isCodexThreadInUse(error);
-          // After its last try, a message that the stopped provider did not start says what to do.
+          // After its last try, a message that the stopped provider did not start, or whose session did
+          // not open, says what to do.
+          const stoppedKey = providerStopped
+            ? "error.provider.stoppedBeforeStart"
+            : sessionStartTimedOut
+              ? "error.provider.sessionStartTimedOut"
+              : null;
           const stoppedReason =
-            providerStopped && recipient
-              ? sourceText("error.provider.stoppedBeforeStart", {
-                  provider: providerLabel(providerForAgent(recipient)),
-                })
-              : sessionStartTimedOut && recipient
-                ? sourceText("error.provider.sessionStartTimedOut", {
-                    provider: providerLabel(providerForAgent(recipient)),
-                  })
-                : null;
+            stoppedKey && recipient
+              ? sourceText(stoppedKey, { provider: providerLabel(providerForAgent(recipient)) })
+              : null;
           const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : (stoppedReason ?? detail);
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.
@@ -1542,8 +1548,9 @@ export class DrainScheduler {
   }
 
   /**
-   * Whether a routine run whose provider did not start can wait for a new start. Channel work and an
-   * external conversation fail at once, so that their channel or their sender hears of it. An expired
+   * Whether a routine run whose provider did not start, or whose session did not open in time, can
+   * wait for a new start. Channel work and an external conversation fail at once, so that their
+   * channel or their sender hears of it. An expired
    * sign-in waits for the user, not for time, and a run with a message behind it does not hold that
    * message back. Other routine runs behind it can wait: their provider cannot start either.
    */

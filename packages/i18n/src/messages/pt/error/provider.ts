@@ -183,7 +183,7 @@ export const messages = {
     "{provider} não respondeu a tempo. O computador pode estar ocupado. Atualize os provedores para tentar de novo.",
   "error.provider.stoppedBeforeStart": "{provider} parou antes de esta mensagem começar. Envie a mensagem de novo.",
   "error.provider.sessionStartTimedOut":
-    "{provider} não abriu um novo chat a tempo, então esta mensagem não começou. Abra Provedores, selecione {provider}, clique em Reiniciar e tente de novo.",
+    "{provider} não abriu um novo chat a tempo, então esta mensagem não começou. No computador que executa o OpenBot, abra Provedores, selecione {provider} e clique em Reiniciar. Depois tente de novo.",
   "error.provider.serviceUnreachable":
     "{provider} não consegue se conectar ao serviço dele. Verifique sua conexão com a internet. O OpenBot tentará de novo.",
   "error.provider.serviceUnreachableRefresh":
