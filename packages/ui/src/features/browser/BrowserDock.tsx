@@ -58,6 +58,11 @@ function needsAnswer(island: BrowserIslandContent | null | undefined): boolean {
   return island.kind === "secret" || island.kind === "prompt" || island.kind === "approval";
 }
 
+/** The agent asks the user to do a step on the page, such as a sign-in or a CAPTCHA. */
+function asksForPage(island: BrowserIslandContent | null | undefined): boolean {
+  return island?.kind === "activity" && island.control === "request";
+}
+
 function px(value: number): string {
   return `${value}px`;
 }
@@ -167,21 +172,32 @@ export function BrowserDock(props: BrowserDockProps) {
    * The user hid the box to reach the page under it. The glass of the field shrinks into a tab at the
    * bottom centre, in the middle of the box, and grows back out of it. The tab tells what the agent does. A
    * question, a code or an approval shows the box again, and the user can hide it again.
+   * A step that the agent asks for on the page hides the box by itself, because the box is over the page
+   * and a button of the page can be under it (#12206). The box shows again when the step ends.
    */
-  const [phase, setPhase] = createSignal<DockPhase>("open");
+  let foldedForStep = untrack(() => asksForPage(props.island) && !props.value.trim());
+  const [phase, setPhase] = createSignal<DockPhase>(foldedForStep ? "hidden" : "open");
   const tucked = () => phase() === "hidden";
   let tab: HTMLButtonElement | undefined;
   /** A question arrived while the box was shrinking, so the box grows back when it is a tab. */
   let reopen = false;
+  /** The box that grows back after it shrank gives the focus to its field. */
+  let reopenFocus = true;
   /** The tab fades out before the phase changes, so this stops a second `show` in that time. */
   let showing = false;
 
-  /** An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. */
-  function requestShow() {
+  /**
+   * An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. A box that
+   * opens with no request from the user keeps the focus where it is, with `focusField` false.
+   */
+  function requestShow(focusField = true) {
     queueMicrotask(() => {
       const current = untrack(phase);
-      if (current === "hidden") void show();
-      else if (current === "hiding") reopen = true;
+      if (current === "hidden") void show(focusField);
+      else if (current === "hiding") {
+        reopen = true;
+        reopenFocus = focusField;
+      }
     });
   }
 
@@ -192,6 +208,28 @@ export function BrowserDock(props: BrowserDockProps) {
     },
     (key) => {
       if (key) requestShow();
+    },
+  );
+  /**
+   * The box hides when a step on the page starts, and shows again when the step ends, only when it hid by
+   * itself. A box that the user opens or hides during the step stays as the user left it. A box with a
+   * draft stays open, so that the text that the user writes does not hide.
+   */
+  createEffect(
+    () => asksForPage(props.island),
+    (asks) => {
+      if (!asks) {
+        if (foldedForStep) {
+          foldedForStep = false;
+          requestShow(false);
+        }
+        return;
+      }
+      queueMicrotask(() => {
+        if (untrack(phase) !== "open" || untrack(() => !asksForPage(props.island) || props.value.trim())) return;
+        foldedForStep = true;
+        void tuck(false);
+      });
     },
   );
   let focusSeen = untrack(() => props.focusRequest);
@@ -256,8 +294,10 @@ export function BrowserDock(props: BrowserDockProps) {
     });
   }
 
-  async function tuck() {
+  /** The tab gets the focus when the user hid the box, or when the focus was in the box. */
+  async function tuck(byUser = true) {
     if (untrack(phase) !== "open") return;
+    const focusTab = byUser || Boolean(dock?.contains(document.activeElement));
     // A reply waits while the box is a tab, so its close timer stops here.
     clearTimeout(closeTimer);
     if (dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
@@ -265,7 +305,7 @@ export function BrowserDock(props: BrowserDockProps) {
     if (!from || !tab || prefersReducedMotion()) {
       setPhase("hidden");
       flush();
-      tab?.focus({ preventScroll: true });
+      if (focusTab) tab?.focus({ preventScroll: true });
       return;
     }
     setPhase("hiding");
@@ -286,30 +326,31 @@ export function BrowserDock(props: BrowserDockProps) {
     done();
     for (const fade of fades) fade.cancel();
     fadeIn(tabParts(), REVEAL_STAGGER_MS);
-    tab.focus({ preventScroll: true });
+    if (focusTab) tab.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
-      void show();
+      void show(reopenFocus);
     }
   }
 
-  async function show() {
+  async function show(focusField = true) {
     if (untrack(phase) !== "hidden" || showing) return;
     showing = true;
+    foldedForStep = false;
     try {
-      await grow();
+      await grow(focusField);
     } finally {
       showing = false;
     }
   }
 
-  async function grow() {
+  async function grow(focusField: boolean) {
     reopen = false;
     const from = tab?.getBoundingClientRect();
     if (!from || !form || prefersReducedMotion()) {
       setPhase("open");
       flush();
-      fieldText()?.focus({ preventScroll: true });
+      if (focusField) fieldText()?.focus({ preventScroll: true });
       closeLater(false);
       return;
     }
@@ -336,7 +377,7 @@ export function BrowserDock(props: BrowserDockProps) {
     flush();
     fadeIn(boxParts(), 0);
     done();
-    fieldText()?.focus({ preventScroll: true });
+    if (focusField) fieldText()?.focus({ preventScroll: true });
     closeLater(false);
   }
 
@@ -360,7 +401,7 @@ export function BrowserDock(props: BrowserDockProps) {
     }
   };
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
-  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
+  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island) || asksForPage(props.island);
 
   // The tab changes its width with a spring when its text changes. It stays at the bottom centre.
   let tabWidth = 0;
@@ -512,12 +553,17 @@ export function BrowserDock(props: BrowserDockProps) {
     props.onSteer?.(id);
   };
 
-  onSettled(() => () => {
-    mounted = false;
-    clearTimeout(closeTimer);
-    clearTimeout(queueCloseTimer);
-    settleIsland?.();
-    takePending();
+  onSettled(() => {
+    // A box that starts as the tab keeps the width that it has open, as a box that the user hid does.
+    // The overlay over a page is still as wide as the box here: it gets the width of the tab later.
+    if (untrack(phase) === "hidden" && dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
+    return () => {
+      mounted = false;
+      clearTimeout(closeTimer);
+      clearTimeout(queueCloseTimer);
+      settleIsland?.();
+      takePending();
+    };
   });
 
   const placeholder = () =>
