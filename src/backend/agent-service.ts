@@ -3529,13 +3529,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  /**
-   * Ends each task turn that only the task's cached snapshot still holds: no provider runs it, its
-   * normal end does not run, and no message of the task is starting or running. Before, such a turn
-   * held a provider change of the agent until OpenBot restarted (#9755). It ends as interrupted, as a
-   * Stop ends such a turn. A turn that the drain started can wait for its `turn/started` with the
-   * snapshot already on it: its message is still starting or running, so it stays.
-   */
   readonly #settleStaleTaskTurns = Effect.fn("AgentService.settleStaleTaskTurns")(function* (
     this: AgentService,
     agentId: string,
@@ -3545,8 +3538,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         if (!turnId || !threadId) return [];
         if (this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId)) return [];
         if (this.#mailbox.findDeliveriesByTurn(agentId, turnId).length > 0) return [];
-        // A thread can stay a task thread in memory after its task record is gone. Then a message
-        // that starts in any lane of the agent keeps the turn.
         const taskId = this.#tasks.taskForThread(threadId) ?? undefined;
         if (this.#mailbox.startingDeliveriesForAgent(agentId, taskId).length > 0) return [];
         return [{ turnId, threadId }];
@@ -3589,7 +3580,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const refusal = idleRefusal(previous);
       if (refusal !== null) throw new AgentSettingsRefused(refusal);
     };
-    // Before the idle checks, so a task turn that nothing runs does not refuse or hold the change.
     if (input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined)
       yield* this.#settleStaleTaskTurns(input.agentId);
     const { previous, requestedModel, requestedProvider, previousAccount, requestedAccount } = yield* lifecycleStep(
