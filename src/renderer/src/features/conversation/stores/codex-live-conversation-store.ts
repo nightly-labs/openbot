@@ -69,6 +69,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   let currentReply: unknown = null;
   let silencedTurn: unknown = null;
   let silenceNextReply = false;
+  let holding = false;
 
   function setStep(next: LiveStep): void {
     step = next;
@@ -121,6 +122,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (typeof turn !== "object" || turn === null || !("id" in turn) || !("role" in turn)) return;
     if (event.type === "turn.created" && turn.role === "user") {
       silenceNextReply = false;
+      holding = false;
       if (silencedTurn === null) reply.muted = false;
       setStep("listening");
     } else if (event.type === "turn.done" && turn.role === "user") {
@@ -146,7 +148,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   function startMeter(): void {
     const samples = new Float32Array(512);
     meterTimer = setInterval(() => {
-      const analyser = step === "speaking" ? replyMeter : microphoneMeter;
+      const analyser = step === "speaking" && !holding ? replyMeter : microphoneMeter;
       const level = analyser && !(step !== "speaking" && muted) ? loudness(analyser, samples) : 0;
       setState((draft) => {
         draft.levels = [...draft.levels.slice(1), level];
@@ -167,6 +169,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     currentReply = null;
     silencedTurn = null;
     silenceNextReply = false;
+    holding = false;
     reply.muted = false;
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
@@ -251,24 +254,42 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (push === pushToTalk) return;
     pushToTalk = push;
     setTalking(false);
+    endHold(false);
     if (push !== muted) applyMute(push);
   }
 
   function startTalking(): void {
     if (!pushToTalk || talking) return;
     setTalking(true);
-    interrupt();
+    holdReply();
     if (muted) applyMute(false);
   }
 
   function stopTalking(): void {
     if (!pushToTalk || !talking) return;
     setTalking(false);
+    endHold(true);
     if (!muted) applyMute(true);
   }
 
   function cancelTalking(): void {
-    stopTalking();
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    endHold(false);
+    if (!muted) applyMute(true);
+  }
+
+  function holdReply(): void {
+    if (step !== "speaking" && step !== "thinking") return;
+    holding = true;
+    reply.muted = true;
+  }
+
+  function endHold(stopReply: boolean): void {
+    if (!holding) return;
+    holding = false;
+    if (stopReply) interrupt();
+    if (silencedTurn === null && !silenceNextReply) reply.muted = false;
   }
 
   function setTalking(next: boolean): void {
