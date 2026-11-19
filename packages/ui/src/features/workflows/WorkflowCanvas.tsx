@@ -244,7 +244,8 @@ function MenuItem(props: {
   keys?: readonly string[];
   danger?: boolean;
   onAim?: (aimed: boolean) => void;
-  onSelect: () => void;
+  onSelect?: () => void;
+  onSelectAfterClose?: () => void;
 }) {
   return (
     <ContextMenu.Item
@@ -252,6 +253,7 @@ function MenuItem(props: {
       onFocus={() => props.onAim?.(true)}
       onBlur={() => props.onAim?.(false)}
       onSelect={props.onSelect}
+      onSelectAfterClose={props.onSelectAfterClose}
     >
       <span class="wfn-menu-glyph" aria-hidden="true">
         {props.icon}
@@ -3270,14 +3272,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         icon={<ClipboardPaste />}
                         label={t("workflow.canvas.action.paste")}
                         keys={[MOD_KEY, "V"]}
-                        onSelect={() => pasteNodes()}
+                        onSelectAfterClose={() => pasteNodes()}
                       />
                     </Show>
                     <MenuItem
                       icon={<CopyPlus />}
                       label={t("workflow.node.toolbar.duplicate")}
                       keys={[MOD_KEY, "D"]}
-                      onSelect={() => duplicateNodes(targets(id()))}
+                      onSelectAfterClose={() => duplicateNodes(targets(id()))}
                     />
                     <ContextMenu.Separator />
                     <MenuItem

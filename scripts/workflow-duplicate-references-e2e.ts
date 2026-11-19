@@ -33,6 +33,8 @@ interface ClientResult {
   references: string[];
   copiedReferences: string[];
   originalReferences: string[];
+  copySelected: boolean;
+  originalSelected: boolean;
 }
 
 function instance(service: DevInstanceRecord["service"]): DevInstanceRecord {
@@ -157,6 +159,17 @@ async function savedEdges(host: Page, workflowId: string) {
   return saved;
 }
 
+async function selectionAfterDuplicate(page: Page, copyId: string) {
+  await page.locator(`article[data-node-id="${copyId}"][data-selected]`).waitFor({ timeout: WAIT_MS });
+  return page.evaluate(
+    (ids) =>
+      ids.map(
+        (id) => document.querySelector<HTMLElement>(`article[data-node-id="${id}"]`)?.dataset.selected !== undefined,
+      ),
+    [copyId, SOURCE],
+  );
+}
+
 function referencesOf(edges: readonly SavedEdge[], to: string): string[] {
   return edges
     .filter((edge) => edge.to === to && edge.type === "image")
@@ -174,6 +187,7 @@ async function checkClient(client: string): Promise<ClientResult> {
     await openWorkflow(clientSession.page, title);
     await duplicateSource(clientSession.page);
     const { copyId, edges } = await savedEdges(hostSession.page, workflowId);
+    const [copySelected = false, originalSelected = true] = await selectionAfterDuplicate(clientSession.page, copyId);
     const result = {
       client,
       workflowId,
@@ -181,9 +195,12 @@ async function checkClient(client: string): Promise<ClientResult> {
       references,
       copiedReferences: referencesOf(edges, copyId),
       originalReferences: referencesOf(edges, SOURCE),
+      copySelected,
+      originalSelected,
     };
     assert.deepEqual(result.copiedReferences, references, `${client}: the copy has other reference connections.`);
     assert.deepEqual(result.originalReferences, references, `${client}: the original lost a reference connection.`);
+    assert.ok(copySelected && !originalSelected, `${client}: the menu did not select only the copy.`);
     logger.info(`${client}: the copy ${copyId} has ${result.copiedReferences.length} reference connections`);
     return result;
   } finally {
