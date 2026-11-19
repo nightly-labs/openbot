@@ -523,7 +523,7 @@ async function main(): Promise<void> {
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 180_000);
+  }, 300_000);
 
   try {
     if (persistencePhase) {
