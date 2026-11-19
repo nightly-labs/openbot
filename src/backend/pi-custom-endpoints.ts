@@ -160,14 +160,22 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
   };
 }
 
-/** The keys and non-empty header values of the endpoints with a model, which output must not show. */
+/**
+ * The keys and non-empty header values of the endpoints with a model, which output must not show.
+ *
+ * A value that is the endpoint's own ID or display name is left out. A local model server ignores its
+ * key, so a user can type the provider's name there. The name shows in the model list, and masking it
+ * changed it to `•••` in each answer (#12580).
+ */
 export function piCustomEndpointSecrets(endpoints: readonly CustomProviderConfig[]): string[] {
   return endpoints
     .filter((endpoint) => endpoint.models.length > 0)
-    .flatMap((endpoint) => [
-      ...(endpoint.apiKey ? [endpoint.apiKey] : []),
-      ...endpoint.headers.map((header) => header.value).filter((value) => value.length > 0),
-    ]);
+    .flatMap((endpoint) => {
+      const names = new Set([endpoint.id.toLowerCase(), endpoint.name.toLowerCase()]);
+      return [endpoint.apiKey ?? "", ...endpoint.headers.map((header) => header.value)].filter(
+        (value) => value.length > 0 && !names.has(value.toLowerCase()),
+      );
+    });
 }
 
 /**
