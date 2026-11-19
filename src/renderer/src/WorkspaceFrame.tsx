@@ -2,6 +2,7 @@ import type { ServerSummary } from "@openbot/contracts/ipc";
 import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
 import type { JSX } from "@solidjs/web";
 import { omit, type ParentProps, Show } from "solid-js";
+import { olderAppSide } from "./features/servers/server-capabilities";
 import { type WindowPage, windowPageKind } from "./features/window/window-page-context";
 import { useLayout } from "./layout";
 import { LEFT_PANEL_COMPACT } from "./layout-constants";
@@ -91,7 +92,17 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         {props.connection}
         <div class="server-connection-content" hidden={props.initialLoading && !props.blockedServer}>
           <Show when={props.blockedServer} keyed fallback={props.children}>
-            {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
+            {(server) => (
+              <RemoteCompatibilityScreen
+                server={server}
+                olderSide={
+                  server.compatibility?.hostAppVersion
+                    ? olderAppSide(server.compatibility.localAppVersion, server.compatibility.hostAppVersion)
+                    : null
+                }
+                onRetry={() => props.onRetryServer(server.id)}
+              />
+            )}
           </Show>
         </div>
       </div>
