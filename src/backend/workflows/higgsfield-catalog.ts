@@ -139,6 +139,20 @@ function videoDurations(item: DynamicRecord, duration: DynamicRecord | undefined
   return min !== null && max !== null ? range(min, max) : [];
 }
 
+/**
+ * A readable name from a model id: "soul_cinema_studio" is "Soul Cinema Studio", and the version of
+ * "gpt_image_2_6" is "2.6".
+ */
+function idName(id: string): string {
+  const words: string[] = [];
+  for (const word of id.split(/[_-]+/u).filter(Boolean)) {
+    const last = words.at(-1);
+    if (last !== undefined && /\d$/u.test(last) && /^\d+$/u.test(word)) words[words.length - 1] = `${last}.${word}`;
+    else words.push(word.charAt(0).toUpperCase() + word.slice(1));
+  }
+  return words.join(" ") || id;
+}
+
 /** The canvas name of a resolution option: "2k" is "2K", "720p" stays. */
 const canvasResolution = (value: string) => value.replace(/k$/u, "K");
 
@@ -252,7 +266,8 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
         }
       : {}),
   };
-  const name = text(item.name).trim().slice(0, 160) || id;
+  // A model with no name, such as `soul_cinema_studio`, shows its id as words: "Soul Cinema Studio".
+  const name = text(item.name).trim().slice(0, 160) || idName(id);
   const maker = text(item.provider_name).trim().slice(0, 120) || "Higgsfield";
   return {
     model: {

@@ -26,6 +26,7 @@
 //   speak, so a host that raises its minimum still connects, and the side that is too old is named.
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
+
 import assert from "node:assert/strict";
 import { generateKeyPairSync, randomBytes, randomUUID, sign, verify } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -71,6 +72,7 @@ import {
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
@@ -795,10 +797,15 @@ try {
   // agent that the member cannot see.
   const hostAgents = agents;
   const runtimeSnapshot = hostAgents.getRuntimeSnapshot.bind(hostAgents);
+  const sourceBackgroundWork = { agentId: source.id, taskId: null, since: 1_700_000_000_000 };
   hostAgents.getRuntimeSnapshot = () => ({
     ...runtimeSnapshot(),
     contextStates: [sourceContext, contextState(duplicate.copyId, "thread-copy")],
     threadContextStates: [sourceThreadContext, contextState(duplicate.copyId, "thread-copy-side")],
+    backgroundWork: [
+      sourceBackgroundWork,
+      { agentId: duplicate.copyId, taskId: "thread-copy", since: 1_700_000_000_000 },
+    ],
   });
 
   /** The first runtime snapshot on the event socket of a current client that declares `capabilities`. */
@@ -888,6 +895,51 @@ try {
     assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("contextStates"));
     const snapshot = record(wire.snapshot, "snapshot");
     const malformed = { ...wire, snapshot: { ...snapshot, contextStates: [{ botId: source.id, threadId: "t" }] } };
+    assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+    return { relayed: relayed.status, malformed: "invalid" };
+  });
+
+  await step(
+    "agent-background-work-v1: a v10 client gets the background work of each agent that it can see",
+    async () => {
+      const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
+      assert.ok(capabilities.includes(AGENT_BACKGROUND_WORK_CAPABILITY), "A v10 client does not ask for it.");
+      assert.ok(
+        !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(AGENT_BACKGROUND_WORK_CAPABILITY),
+        "A protocol 9 client asks for agent-background-work-v1.",
+      );
+      await setCopyAccess("none");
+      try {
+        const wire = await currentRuntimeSnapshot(capabilities);
+        const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+        assert.ok(
+          decoded.kind === "known" && decoded.event.type === "runtime-snapshot",
+          `The v10 snapshot did not decode: ${JSON.stringify(wire)}.`,
+        );
+        assert.deepEqual(decoded.event.snapshot.backgroundWork, [sourceBackgroundWork], "Not the visible agent only.");
+        const without = await currentRuntimeSnapshot(
+          capabilities.filter((capability) => capability !== AGENT_BACKGROUND_WORK_CAPABILITY),
+        );
+        assert.ok(
+          !Object.hasOwn(record(without.snapshot, "snapshot"), "backgroundWork"),
+          "A client without it got it.",
+        );
+        return { backgroundWork: decoded.event.snapshot.backgroundWork?.length, without: "released" };
+      } finally {
+        await setCopyAccess("manage");
+      }
+    },
+  );
+
+  await step("agent-background-work-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+    const wire = await currentRuntimeSnapshot(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10));
+    const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { backgroundWork: true }));
+    assert.ok(relayed.status === "known" && relayed.event.type === "runtime-snapshot");
+    assert.ok(relayed.event.snapshot.backgroundWork?.some((work) => work.agentId === source.id));
+    const without = createTeamProtocolV8Event(2, wire, {});
+    assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("backgroundWork"));
+    const snapshot = record(wire.snapshot, "snapshot");
+    const malformed = { ...wire, snapshot: { ...snapshot, backgroundWork: [{ botId: source.id, since: "now" }] } };
     assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
     return { relayed: relayed.status, malformed: "invalid" };
   });

@@ -40,6 +40,17 @@ export function isMcpSignInDiagnostic(message: string): boolean {
   );
 }
 
+/**
+ * Whether an MCP diagnostic says that the provider did not start a server because its session was
+ * already closing. Grok CLI writes `session is closing (process scope already reclaimed); MCP server
+ * not started` when it reaches a server's start after the session closed. The server did not fail,
+ * and the next session starts it, so the line goes to the log only (#12320). The sentence is matched
+ * as Grok writes it, as `isMcpSubsystemDiagnostic` matches the `rmcp` worker's sentence.
+ */
+export function isMcpSessionClosingDiagnostic(message: string): boolean {
+  return /\bsession is closing \(process scope already reclaimed\)/u.test(message);
+}
+
 /** The kind of a provider's failed MCP start, as its text says it. */
 export type McpProviderFailureKind = "sign_in" | "timeout" | "failed";
 

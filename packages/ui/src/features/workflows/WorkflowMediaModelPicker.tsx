@@ -193,6 +193,14 @@ export function MediaModelPicker(props: {
         disabled={props.disabled}
       >
         <Show when={props.model}>{(model) => <ProviderLogo provider={model().provider} class="wfn-model-logo" />}</Show>
+        {/* The number of the account, as on its tab in the picker, stays when a short card cuts its name. */}
+        <Show when={currentEntry()?.account}>
+          {(account) => (
+            <span class="wfn-media-account-badge" aria-hidden="true">
+              {account().number}
+            </span>
+          )}
+        </Show>
         <span class="wfn-media-pill-name">{name()}</span>
         <Show when={accountName()}>{(account) => <span class="wfn-media-pill-account">{account()}</span>}</Show>
         <ChevronDown aria-hidden="true" />

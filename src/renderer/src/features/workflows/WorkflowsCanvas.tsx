@@ -1,8 +1,13 @@
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
   WORKFLOW_MEDIA_MODELS,
+  type WorkflowCatalogProvider,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
+  type WorkflowMediaServiceAccount,
   workflowCatalogMediaModel,
+  workflowCatalogProvider,
 } from "@openbot/contracts/ipc";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
@@ -12,8 +17,9 @@ import {
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
@@ -46,6 +52,8 @@ export function WorkflowsCanvas(props: {
   // the window comes back to the front. A failed read keeps the last answer.
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  // The accounts of both services, or null when the host makes each file on the first account.
+  const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
   let disposed = false;
   const readMediaProviders = () => {
@@ -56,6 +64,7 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setServiceAccounts(providers.accounts);
       })
       .catch(() => undefined);
     void props.host.workflows
@@ -77,7 +86,56 @@ export function WorkflowsCanvas(props: {
     const ids = new Set(live.map((model) => model.id));
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
   };
+  /**
+   * The accounts of a service as the picker lists them, when it has more than one: the first is the
+   * step's default, so it saves no account, and each other one saves the id of its Apps row.
+   */
+  const serviceAccountRows = (provider: WorkflowCatalogProvider): readonly ProviderAccountStatus[] | undefined => {
+    const accounts = serviceAccounts()?.filter((account) => account.provider === provider) ?? [];
+    if (accounts.length < 2) return undefined;
+    return accounts.map((account, index) => ({
+      id: index === 0 ? DEFAULT_PROVIDER_ACCOUNT_ID : account.id,
+      label: mediaServiceAccountName(account),
+      email: null,
+      state: "connected",
+      message: null,
+    }));
+  };
   readMediaProviders();
+  // A Sunra or Higgsfield step spends credits, so the rail reads them again when one ends: in a run, or
+  // alone. A fast step can show as ended in the first view after its start, so each end after the
+  // newest time of the first view of the workflow counts. Older runs that "load more" shows do not.
+  // The times come from the host, so the clock of this computer does not matter.
+  let shown: { workflowId: string; since: string; ends: Set<string> } | null = null;
+  createEffect(
+    () => ({ view: workflows.props.runs, workflow: workflows.detail() }),
+    ({ view, workflow }) => {
+      if (!workflow) return;
+      const steps = [...view.runs.flatMap((run) => run.steps), ...view.soloSteps].filter(
+        (step) => step.workflowId === workflow.summary.id,
+      );
+      if (shown?.workflowId !== workflow.summary.id) {
+        const times = steps.flatMap((step) => [step.startedAt ?? "", step.endedAt ?? ""]);
+        shown = {
+          workflowId: workflow.summary.id,
+          since: times.reduce((a, b) => (b > a ? b : a), ""),
+          ends: new Set(),
+        };
+        return;
+      }
+      let ended = false;
+      for (const step of steps) {
+        if (step.endedAt === null || step.endedAt <= shown.since) continue;
+        // A retry ends the same step again, with a new attempt.
+        const end = `${step.id}:${step.attempt}`;
+        if (shown.ends.has(end)) continue;
+        shown.ends.add(end);
+        const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
+        if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
+      }
+      if (ended) noteMediaStepEnded();
+    },
+  );
   window.addEventListener("focus", readMediaProviders);
   onCleanup(() => {
     disposed = true;
@@ -136,12 +194,16 @@ export function WorkflowsCanvas(props: {
         ];
       });
       // An older host ignores the background of a step, so its models make no transparent image.
-      const service = (provider: "sunra" | "higgsfield", on: boolean) =>
-        on
-          ? serviceModels(provider).map(({ transparent, ...rest }) =>
-              transparent && props.host.mediaTransparentSupported() ? { ...rest, transparent } : rest,
-            )
-          : [];
+      // A host that lists the accounts of a service makes the file on the account of the step.
+      const service = (provider: WorkflowCatalogProvider, on: boolean) => {
+        if (!on) return [];
+        const accounts = serviceAccountRows(provider);
+        return serviceModels(provider).map(({ transparent, ...rest }) => ({
+          ...rest,
+          ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+          ...(accounts ? { accounts } : {}),
+        }));
+      };
       return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
     },
     get mediaPrice() {

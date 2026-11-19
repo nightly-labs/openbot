@@ -7,7 +7,7 @@ import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
-import { AgentActivityIndicator } from "@openbot/ui/features/conversation/AgentActivity";
+import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { AgentChatEmptyState } from "@openbot/ui/features/conversation/AgentChatEmptyState";
 import {
   type AgentStep,
@@ -25,6 +25,7 @@ import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conve
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -69,7 +70,6 @@ import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
-import { continuesSenderRun } from "./chat-grouping";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationController } from "./conversation-controller-context";
@@ -114,9 +114,6 @@ function frozenUiBlock(message: AgentMessage | undefined): ConversationUiBlock |
  * draw a card instead of a message row. None shows the header a run continues under, so none can
  * hold a run open.
  */
-/** In the agent chat, a separator with the time stands above a message that comes this long after the one before it. */
-const AGENT_CHAT_TIME_GAP_MS = 60 * 60 * 1000;
-
 function rowDrawsTime(message: AgentMessage): boolean {
   return (
     !markerOnlyMessage(message) &&
@@ -837,6 +834,10 @@ export function ConversationTimeline() {
    * timeline for the queue tray, and the activity line shows only after a delay, so both are read here.
    * Its empty state plays a faint turn from the agent's own routine and skill.
    */
+  // The agent's turn ended, and its background work still runs: the provider starts a turn when it ends.
+  // Not shown: the detail names the wait. The indicator reads it only without a detail.
+  const backgroundWorkLabel = nextAgentActivityLabel();
+  const backgroundWorkSince = () => (props.activeTurnId ? undefined : props.backgroundWorkSince?.(null));
   const emptyAgent = createMemo(() =>
     !channel &&
     timelineMessages().length === 0 &&
@@ -997,7 +998,7 @@ export function ConversationTimeline() {
                     return dayMarkerLabel(previous?.createdAt, current.createdAt, {
                       t,
                       format,
-                      ...(channel || !compactActions() ? {} : { gapMs: AGENT_CHAT_TIME_GAP_MS }),
+                      ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
                     });
                   return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
                 });
@@ -1895,7 +1896,21 @@ export function ConversationTimeline() {
                   </Show>
                 }
               >
-                <Show when={renderedAgentActivity()}>
+                <Show
+                  when={renderedAgentActivity()}
+                  fallback={
+                    <Show when={backgroundWorkSince()}>
+                      {(since) => (
+                        <AgentActivityIndicator
+                          agent={props.agent}
+                          detail={t("chat.activity.backgroundWork")}
+                          label={backgroundWorkLabel}
+                          since={since()}
+                        />
+                      )}
+                    </Show>
+                  }
+                >
                   {(activity) => (
                     <AgentActivityIndicator
                       agent={activity().agent}

@@ -28,7 +28,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import type { ChatFilesSource } from "../files/ChatFilesPanel";
 import { canManageStorage, serverHasChannelStorage, serverHasStorage } from "../files/storage-usage";
-import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
@@ -852,6 +852,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   : undefined
               }
               onOpenUsage={panelProps.onOpenUsage}
+              onOpenApps={serverCanManageMcp(props.server) ? props.onOpenMarketplace : undefined}
               onPublish={canPublish() ? () => publishAgent.open(agent().id) : undefined}
               agent={agent()}
               runtimeSettings={{

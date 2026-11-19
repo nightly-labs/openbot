@@ -29,6 +29,7 @@ import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatC
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
+import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
 import { useTurnTrace } from "./turn-trace";
 
@@ -78,6 +79,8 @@ export function ConversationThread() {
     changeMarkerActions,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
+  const threadBackgroundWorkSince = (taskId: string | undefined) =>
+    taskId === undefined ? undefined : props.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   /** A failed answer shows here, where the person answered, and not in the agent's own chat. */
@@ -103,6 +106,8 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
+  /** The rows, with the agent's text above the question that waits, as in the agent's chat (#12544). */
+  const shownMessages = createMemo(() => withQuestionContext(messages, messages, props.prompt?.turnId));
   // The thread gets only the latest progress line of a running turn, so its steps are the thoughts,
   // and after the turn the tool steps of its stored trace.
   const turnSteps = createTurnSteps({
@@ -287,7 +292,7 @@ export function ConversationThread() {
             limit={current().threads.limit}
             agent={current().agent}
             agents={props.agents}
-            messages={messages}
+            messages={shownMessages()}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
@@ -349,6 +354,7 @@ export function ConversationThread() {
             factsAbove={turnSteps.factsAbove}
             traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
+            backgroundWorkSince={threadBackgroundWorkSince(current().threads.open?.id)}
             stepsOpenByDefault={showAgentSteps()}
             sendShortcut={deviceSendShortcut(props.platform)}
             onCopyMessage={(message) => void copyMessage(message)}

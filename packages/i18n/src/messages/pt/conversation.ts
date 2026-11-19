@@ -90,7 +90,7 @@ export const messages = {
   "conversation.threads.branch.from": "Ramificado de {title}",
   "conversation.threads.branch.fromDeleted": "Ramificado de um tópico excluído",
   "conversation.threads.view.newPlaceholder": "Novo tópico com {name}",
-  "conversation.threads.view.placeholder": "Mensagem para {name} em {title}",
+  "conversation.threads.view.placeholder": "Mensagem para {name} neste tópico",
   "conversation.threads.view.queued": "Mensagens em espera neste tópico",
   "conversation.threads.view.failed": "O tópico falhou",
   "conversation.threads.error.load": "Não foi possível carregar os tópicos deste agente.",

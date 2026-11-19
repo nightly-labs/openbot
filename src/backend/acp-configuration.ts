@@ -91,6 +91,8 @@ export interface AcpConfigurationOptions {
   setsConfigOnlyOnChange?: boolean;
   /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  /** `AcpFlavor.modelConfigId`. */
+  modelConfigId?: string | undefined;
   /** `AcpFlavor.configSetUnsaved`. */
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /**
@@ -435,6 +437,20 @@ export class AcpConfiguration {
           options.find((candidate) => selectValues(candidate).some((entry) => entry.value === value))) ||
         (unlisted && options.find((candidate) => candidate.id === "model")) ||
         options[0];
+      const modelConfigId = category === "model" ? this.options.modelConfigId : undefined;
+      if (modelConfigId) {
+        // Kiro CLI 3 publishes its `model` option after `session/new`, with a shorter list than its
+        // models, and can answer a set without the option. The option or the last set holds the model.
+        const configId = option?.id ?? modelConfigId;
+        if ((option?.currentValue ?? thread.currentModelId) !== value) {
+          const response = yield* this.#setConfigOption(thread, configId, value, () =>
+            this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
+          );
+          thread.configOptions = response.configOptions;
+        }
+        thread.currentModelId = value;
+        continue;
+      }
       if (!option) {
         if (category === "model" && thread.currentModelId !== value) {
           this.#processModel = null;

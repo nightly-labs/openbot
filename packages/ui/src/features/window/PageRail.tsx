@@ -314,26 +314,41 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
 
 /** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
+  /** One for each row: a service can have more than one account. */
+  key: string;
   provider: "sunra" | "higgsfield";
+  /** The name of the account, as Apps shows it. */
   name: string;
   /** The credits that the account can spend now. */
   available: number;
   /** The limit of a team member, or null for an account with no limit of its own. */
   quota: number | null;
+  /**
+   * The number of the account in its service, as on its tab in the workflow model picker. Absent when
+   * the service has one account.
+   */
+  number?: number | undefined;
+}
+
+/** The part of the quota that is left, 0 to 100. A quota of 0 has nothing left. */
+function mediaCreditsPercent(row: MediaCreditsRailRow): number {
+  const quota = row.quota ?? 0;
+  return quota > 0 ? Math.min(100, Math.round((row.available / quota) * 100)) : 0;
+}
+
+/** How low the credits are. An account with no limit of its own is low only when it has no credits. */
+function mediaCreditsTone(row: MediaCreditsRailRow) {
+  if (row.quota !== null) return usageTone(mediaCreditsPercent(row));
+  return row.available > 0 ? "neutral" : "critical";
 }
 
 /**
- * The credits of one media service. A team quota draws a ring with the part that is left, as the
- * plan limits of a provider do. An account with no limit of its own shows the logo with the number of
- * credits under it. The hover card shows the full number.
+ * The credits of one media service: its logo with the number of credits under it, in the warning or
+ * danger color when they run low. The hover card shows the full number and the team quota.
  */
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
-  /** The part of the quota that is left, 0 to 100. A quota of 0 has nothing left. */
-  const percent = () => {
-    const quota = props.row.quota ?? 0;
-    return quota > 0 ? Math.min(100, Math.round((props.row.available / quota) * 100)) : 0;
-  };
+  const percent = () => mediaCreditsPercent(props.row);
   const label = () => {
     const credits = format.number(props.row.available);
     const quota = props.row.quota;
@@ -341,7 +356,6 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       ? t("app.rail.mediaCreditsQuota", { name: props.row.name, credits, quota: format.number(quota) })
       : t("app.rail.mediaCredits", { name: props.row.name, credits });
   };
-  const radius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
       label={label()}
@@ -382,41 +396,19 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
           </li>
         </ul>
       )}
-      class="window-rail-usage"
+      class="window-rail-credits"
       onClick={props.onOpen}
     >
-      <Show
-        when={props.row.quota !== null}
-        fallback={
-          <span class="window-rail-credits" aria-hidden="true">
-            <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
-            <span class="window-rail-credits-count">{format.compact(props.row.available)}</span>
+      <ProviderLogo provider={props.row.provider} class="window-rail-credits-logo" />
+      <span class="window-rail-credits-count" data-usage-tone={mediaCreditsTone(props.row)} aria-hidden="true">
+        {format.compact(props.row.available)}
+      </span>
+      <Show when={props.row.number}>
+        {(number) => (
+          <span class="window-rail-credits-badge" aria-hidden="true">
+            {number()}
           </span>
-        }
-      >
-        <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
-          <circle
-            class="window-rail-usage-track"
-            cx={RING.size / 2}
-            cy={RING.size / 2}
-            r={radius}
-            stroke-width={RING.stroke}
-          />
-          <Show when={percent() > 0}>
-            <circle
-              class="window-rail-usage-arc"
-              data-usage-tone={usageTone(percent())}
-              cx={RING.size / 2}
-              cy={RING.size / 2}
-              r={radius}
-              stroke-width={RING.stroke}
-              stroke-linecap="round"
-              pathLength={100}
-              stroke-dasharray={`${percent()} 100`}
-            />
-          </Show>
-        </svg>
-        <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+        )}
       </Show>
     </RailButton>
   );
@@ -789,7 +781,7 @@ export function PageRail(props: PageRailProps) {
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
           </For>
-          <For each={props.mediaCredits ?? []} keyed={(row) => row.provider}>
+          <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
           <Show when={props.onMarketplace}>

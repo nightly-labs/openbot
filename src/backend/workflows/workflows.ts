@@ -293,7 +293,7 @@ export interface WorkflowsDependencies {
   /** The media services beyond the agent providers that this host can use now. Absent: none. */
   mediaProviders?: () => WorkflowMediaProviders;
   /** The credits of the media services that this host can spend now; with `only`, of that one. Absent: none. */
-  mediaCredits?: (only?: keyof WorkflowMediaCredits) => Effect.Effect<WorkflowMediaCredits>;
+  mediaCredits?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCredits>;
   /** The live models of the signed-in media services; with `only`, of that one. Absent: none. */
   mediaCatalog?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCatalog>;
   /** What one file of a media service model costs with the choices of a step. Absent: no quote. */
@@ -457,7 +457,7 @@ interface WorkflowsShape {
    * The credits that this host's Sunra and Higgsfield sign-ins can spend now. A failed read has none.
    * With `only`, it reads that service alone and the other one is null.
    */
-  mediaCredits(only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits>;
+  mediaCredits(only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits>;
   /**
    * The live models of this host's Sunra and Higgsfield sign-ins. A service that does not answer gives
    * its fixed models. It never fails.
@@ -2008,9 +2008,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const mediaProviders = (): WorkflowMediaProviders =>
-          dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
-        const mediaCredits = (only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits> =>
-          dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null });
+          dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false, accounts: null };
+        const mediaCredits = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits> =>
+          dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null, accounts: null });
         const mediaCatalog = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCatalog> =>
           dependencies.mediaCatalog?.(only) ?? Effect.succeed({ models: [] });
         const mediaPrice = (request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice> =>

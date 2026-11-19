@@ -112,6 +112,7 @@ import {
   isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
+  isMcpSessionClosingDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
   isRustLogBelowErrorDiagnostic,
@@ -418,6 +419,8 @@ export interface ProviderHooks {
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   /** Runs after a change to the accounts of a provider, such as an account that connected. */
   onAccountsChanged?(): void;
+  /** Runs after a provider stops being ready: it was turned off, or it left the available state. */
+  onProvidersUnready?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -4511,6 +4514,15 @@ export class ProviderRuntime implements ProviderPort {
         });
         return;
       }
+      // A server that the provider did not start because its session was closing did not fail, also
+      // when it is a built-in server such as Computer Use (#12320).
+      if (isMcpSessionClosingDiagnostic(redacted)) {
+        stderrLogger.warn("A provider did not start an MCP server of a closing session.", {
+          provider: client.provider,
+          message,
+        });
+        return;
+      }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
       // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
@@ -4619,8 +4631,23 @@ export class ProviderRuntime implements ProviderPort {
       if (notification.method === "mcpServer/startupStatus/updated") {
         this.#reportMcpStartupStatus(client, notification.params);
       }
+      if (notification.method === "error") this.#reportTurnSignedOut(client, notification.params);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
+  }
+
+  /**
+   * Marks the account of an agent's own process signed out when a turn of it found no login (#12479),
+   * as a start that finds no login does (#8277): its row then offers the sign-in again, and no backup
+   * model moves to it. Only the client's sign-in expired text counts, which Claude sends for "Not logged
+   * in". A refusal without it, such as a 403, can pass, so the account keeps its state.
+   */
+  #reportTurnSignedOut(client: AgentClient, params: unknown): void {
+    const expired = sourceText("error.provider.signInExpired", { provider: providerLabel(client.provider) });
+    if (getString(params, "message") !== expired) return;
+    const accountId = [...this.#confined.values()].find((confined) => confined.client === client)?.accountId;
+    const account = accountId ? this.#providerAccounts?.account(client.provider, accountId) : null;
+    if (account) this.#providerAccounts?.foundSignedOut(account);
   }
 
   /**
@@ -5157,6 +5184,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #setStatus(patch: Partial<AgentStatus>): void {
     const available: AgentProvider[] = [];
+    let unready = false;
     if (patch.providers) {
       logProviderStateChanges(this.#status.providers ?? [], patch.providers, this.#redactMcp);
       // A provider with no CLI has nothing left to diagnose, and its row already says why: an error
@@ -5165,6 +5193,8 @@ export class ProviderRuntime implements ProviderPort {
       for (const row of patch.providers) {
         const current = this.#status.providers?.find((candidate) => candidate.id === row.id);
         if (row.state === "available" && current?.state !== "available") available.push(row.id);
+        if (current?.state === "available" && current.off !== true && (row.state !== "available" || row.off === true))
+          unready = true;
       }
     }
     this.#status = {
@@ -5176,6 +5206,7 @@ export class ProviderRuntime implements ProviderPort {
     // The drain holds the messages of a provider that waits for a sign-in, and no other event wakes
     // them. A provider that becomes available again can start them.
     for (const provider of available) this.#hooks.onProviderResumed(provider);
+    if (unready) this.#hooks.onProvidersUnready?.();
   }
 }
 

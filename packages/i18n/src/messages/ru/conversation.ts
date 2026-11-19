@@ -92,7 +92,7 @@ export const messages = {
   "conversation.threads.branch.from": "Ответвление от: {title}",
   "conversation.threads.branch.fromDeleted": "Ответвление от удалённой ветки",
   "conversation.threads.view.newPlaceholder": "Новая ветка с {name}",
-  "conversation.threads.view.placeholder": "Написать {name} в ветке {title}",
+  "conversation.threads.view.placeholder": "Написать {name} в этой ветке",
   "conversation.threads.view.queued": "Сообщения, ожидающие в этой ветке",
   "conversation.threads.view.failed": "Ветка не удалась",
   "conversation.threads.error.load": "Не удалось загрузить ветки этого агента.",

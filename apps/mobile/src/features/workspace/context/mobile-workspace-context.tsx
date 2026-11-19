@@ -158,6 +158,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteServerSideQuestions } from "@/features/chat/model/side-questions";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
 import { usePushNotifications } from "@/features/push-notifications/use-push-notifications";
@@ -621,6 +622,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverIds: ReadonlySet<string>) => {
       if (!serverIds.size) return;
       deleteServerDrafts(serverIds);
+      deleteServerSideQuestions(serverIds);
       const removedAgentIds = new Set<string>();
       for (const serverId of serverIds) {
         removedServers.current.add(serverId);

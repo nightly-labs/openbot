@@ -30,6 +30,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -58,6 +62,8 @@ import {
 import {
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
+  decodeRemoteMediaServiceAccounts,
+  decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
@@ -76,6 +82,8 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  workflowMediaCreditsOf,
+  workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { currentText } from "@openbot/ui/text";
@@ -205,8 +213,18 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
       // A host without `workflows-sunra-v1` does not run the Sunra models, and a host without
-      // `workflows-higgsfield-v1` does not run the Higgsfield models.
+      // `workflows-higgsfield-v1` does not run the Higgsfield models. A host with
+      // `workflows-media-service-account-v1` lists the accounts and their credits, so one read gives
+      // all; a host without it makes each file on the first account, so it lists none.
       mediaProviders: async () => {
+        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+          const accounts = await post(
+            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+            decodeRemoteMediaServiceAccounts,
+            {},
+          );
+          return workflowMediaProvidersOf(accounts);
+        }
         const [sunra, higgsfield] = await Promise.all([
           has(WORKFLOWS_SUNRA_CAPABILITY)
             ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
@@ -215,9 +233,17 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
             ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
             : { higgsfield: false },
         ]);
-        return { ...sunra, ...higgsfield };
+        return { ...sunra, ...higgsfield, accounts: null };
       },
       mediaCredits: async () => {
+        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+          const accounts = await post(
+            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+            decodeRemoteMediaServiceCredits,
+            {},
+          );
+          return workflowMediaCreditsOf(accounts);
+        }
         const [sunra, higgsfield] = await Promise.all([
           has(WORKFLOWS_SUNRA_CAPABILITY)
             ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
@@ -226,7 +252,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
             ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
             : { higgsfield: null },
         ]);
-        return { ...sunra, ...higgsfield };
+        return { ...sunra, ...higgsfield, accounts: null };
       },
       // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
       mediaCatalog: async () =>

@@ -38,6 +38,7 @@ import {
   Square,
   Textarea,
   Type,
+  Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
@@ -296,6 +297,12 @@ function useElapsed(running: () => boolean) {
  * The price of one file with the choices of the step, in the credits of the service, or null while
  * there is no quote. It asks again when a choice changes; an answer for older choices is dropped.
  */
+/**
+ * The shown name of a resolution: Sunra lists "2k", Higgsfield "2K". Only the name changes; the step
+ * keeps the value of the model, which hosts in the support window match exactly.
+ */
+const resolutionName = (value: string) => value.replace(/k$/u, "K");
+
 function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
   const board = useBoard();
   const [credits, setCredits] = createSignal<number | null>(null);
@@ -486,9 +493,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const { aspect, duration, resolution, transparent } = specs();
     return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
   });
-  const runText = () => {
+  /** The price of one run as an object, so that a price of 0 credits also shows. */
+  const quote = () => {
     const credits = price();
-    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
+    return credits === null ? undefined : { credits };
   };
   const runLabel = () => {
     const credits = price();
@@ -771,11 +779,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
               <Show when={!specs().size && specs().resolution}>
                 {(current) => (
                   <ChipMenu
-                    label={t("workflow.video.resolutionLabel", { value: current() })}
+                    label={t("workflow.video.resolutionLabel", { value: resolutionName(current()) })}
                     title={t("workflow.video.resolution")}
-                    text={current()}
+                    text={resolutionName(current())}
                     value={current()}
-                    groups={[{ options: resolutions().map((value) => ({ value, label: value })) }]}
+                    groups={[{ options: resolutions().map((value) => ({ value, label: resolutionName(value) })) }]}
                     disabled={specsDisabled()}
                     onSelect={setResolution}
                   />
@@ -875,8 +883,23 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       onClick={run.start}
                       aria-label={runLabel()}
                     >
-                      <Play aria-hidden="true" />
-                      {runText()}
+                      {/* A step with a price shows the credits of one run; its label says "Run" for screen readers. */}
+                      <Show
+                        when={quote()}
+                        fallback={
+                          <>
+                            <Play aria-hidden="true" />
+                            {t("workflow.node.run")}
+                          </>
+                        }
+                      >
+                        {(shown) => (
+                          <>
+                            <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                            {format.number(shown().credits)}
+                          </>
+                        )}
+                      </Show>
                     </Button>
                   }
                 >

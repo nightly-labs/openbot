@@ -10,7 +10,8 @@
 // event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
 // protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
 // advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
-// into an OpenBot channel. The codec carries kinds and statuses that this app does not know, and
+// into an OpenBot channel. A member puts that output in a canvas group, but a change of its settings
+// still needs an owner. The codec carries kinds and statuses that this app does not know, and
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // The host advertises `workflows-media-v1` to a protocol 9 peer, and a member keeps an uploaded PNG
 // as a picture of the host; a GIF, a used draft and a client without the capability are refused.
@@ -30,6 +31,10 @@
 // The host advertises `workflows-media-catalog-v1` to a protocol 9 peer. A member reads the live models
 // of the signed-in services and the price of a step's choices; a bad price request is refused. A step
 // with a model that only the live list has reaches the media maker with its id at the service.
+// The host advertises `workflows-media-service-account-v1` to a protocol 10 peer only. A member reads
+// each Higgsfield account and its credits in the order of Apps; an old client is refused. A Higgsfield
+// step on an account that the host does not have fails with "account not found" in the real agent
+// service and never makes the file on another account; a step with no account uses the first account.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -42,8 +47,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
+  WORKFLOW_GROUP_FIELDS,
   type WorkflowDetail,
   type WorkflowGraph,
+  type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaPriceRequest,
   type WorkflowNode,
@@ -57,9 +64,10 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { teamCapabilitiesForProtocol, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -73,6 +81,11 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CODECS,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -120,6 +133,8 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2
 let sunraSignedIn = false;
 /** As the app answers: true while an enabled Higgsfield row of the host is signed in. */
 let higgsfieldSignedIn = false;
+/** As the app answers: the signed-in Sunra and Higgsfield accounts in the order of Apps, with their credits. */
+let serviceAccounts: WorkflowMediaAccountCredits[] = [];
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
 /** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
@@ -369,13 +384,18 @@ async function startHost(): Promise<Host> {
           ? Effect.fail({ message: "The e2e crop failed." })
           : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
       },
-      mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
+      mediaProviders: () => ({
+        sunra: sunraSignedIn,
+        higgsfield: higgsfieldSignedIn,
+        accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+      }),
       // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
       // quota after the sign-in. No Sunra or Higgsfield call is made.
       mediaCredits: () =>
         Effect.succeed({
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
+          accounts: serviceAccounts,
         }),
       // As the app answers: the live Higgsfield list after the sign-in. No Sunra or Higgsfield call is made.
       mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
@@ -477,7 +497,7 @@ async function call(
     Accept: "application/json",
     [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
+    ...teamCapabilityHeaders(protocol, input.capabilities ?? teamCapabilitiesForProtocol(protocol)),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -979,6 +999,47 @@ try {
     const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
     assert.ok(nodes.includes("chat-channel") && nodes.includes("channel-e2e"), nodes);
     return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
+  });
+
+  await step("groups: a member groups a channel output, and its settings still need an owner", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const output: WorkflowNode = {
+      id: "chat-channel-output",
+      kind: "output",
+      at: at(600),
+      fields: { target: "chat-channel", channelId: "channel-e2e" },
+    };
+    const group = { [WORKFLOW_GROUP_FIELDS.id]: "group-e2e", [WORKFLOW_GROUP_FIELDS.name]: "Posts" };
+    const grouped = (fields: WorkflowNode["fields"]): WorkflowGraph => {
+      const graph = withOutput(agentGraph(open), { ...output, fields: { ...fields, ...group } });
+      return {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+          node.kind === "agent" ? { ...node, fields: { ...node.fields, ...group } } : node,
+        ),
+      };
+    };
+    const saved = await ok(WORKFLOWS_ROUTES.saveGraph, member, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: grouped(output.fields),
+    });
+    assert.equal(saved.ok, true);
+    const after = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(after.graph, "graph").nodes);
+    assert.ok(nodes.includes("group-e2e") && nodes.includes("Posts"), nodes);
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      {
+        workflowId: ids.open,
+        baseRevision: Number(after.revision),
+        graph: grouped({ ...output.fields, channelId: "other" }),
+      },
+      403,
+      "error.team.adminRequired",
+    );
+    return { grouped: 200, denied };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {
@@ -1783,6 +1844,106 @@ try {
           old: old.status,
         };
       } finally {
+        higgsfieldSignedIn = false;
+      }
+    },
+  );
+
+  await step(
+    "service accounts: the host advertises workflows-media-service-account-v1 to a protocol 10 peer; a member reads each account and its credits; a step on a missing account fails and never falls back",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const read = async (route: string) => {
+        const codec = WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS.get(route);
+        assert.ok(codec, `No workflows-media-service-account-v1 codec for ${route}.`);
+        codec.request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const imageGraph = (account: string): WorkflowGraph => ({
+        nodes: [
+          promptNode,
+          {
+            id: "image",
+            kind: "image",
+            at: at(300),
+            fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 5, resolution: "720p", account },
+          },
+        ],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      });
+      const run = async (account: string) => {
+        const workflow = await hostWorkflow(`Higgsfield ${account || "first"}`, imageGraph(account));
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        return settled(text(record(started.run, "run").id, "run id"), "image");
+      };
+      higgsfieldSignedIn = true;
+      try {
+        serviceAccounts = [];
+        const none = { accounts: await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts) };
+        assert.deepEqual(none.accounts, { accounts: [] });
+        serviceAccounts = [
+          { provider: "sunra", id: "sunra-row", name: null, credits: { available: 120, quota: 500 } },
+          { provider: "higgsfield", id: "higgsfield-row", name: null, credits: { available: 42, quota: null } },
+          { provider: "higgsfield", id: "higgsfield-row-2", name: "Higgsfield 2", credits: null },
+        ];
+        const accounts = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts);
+        assert.deepEqual(accounts, {
+          accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+        });
+        const credits = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits);
+        assert.deepEqual(credits, { accounts: serviceAccounts });
+        // The frozen Higgsfield route keeps its `{ higgsfield }` answer of the first account.
+        const legacy = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.deepEqual(legacy.body, { higgsfield: { available: 42, quota: null } });
+        const old = await raw(
+          WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        // This host has no Higgsfield sign-in in its real agent service, so a named account is missing.
+        const before = mediaAccounts.length;
+        const missing = await run("higgsfield-row-2");
+        assert.equal(missing.status, "failed");
+        assert.equal(
+          missing.error,
+          sourceText("error.provider.accountNotFound", { provider: "Higgsfield" }),
+          JSON.stringify(missing.error),
+        );
+        const first = await run("");
+        assert.equal(first.status, "done", JSON.stringify(first.error));
+        assert.deepEqual(mediaAccounts.slice(before), ["higgsfield-row-2", null]);
+        return {
+          none: none.accounts,
+          accounts,
+          credits,
+          legacy: legacy.body,
+          old: old.status,
+          missing: missing.error,
+          first: first.status,
+        };
+      } finally {
+        serviceAccounts = [];
         higgsfieldSignedIn = false;
       }
     },

@@ -109,6 +109,11 @@ export function ConversationsSettingsScreen() {
           disabled={!chatSwipe.ready}
           options={[
             {
+              value: "question",
+              label: t("mobile.settings.conversations.swipeQuestion"),
+              picture: (play) => <SwipePicture target="question" play={play} />,
+            },
+            {
               value: "threads",
               label: t("mobile.settings.conversations.swipeThreads"),
               picture: (play) => <SwipePicture target="threads" play={play} />,

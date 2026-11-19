@@ -90,7 +90,7 @@ export const messages = {
   "conversation.threads.branch.from": "Ramificado de {title}",
   "conversation.threads.branch.fromDeleted": "Ramificado de un hilo eliminado",
   "conversation.threads.view.newPlaceholder": "Nuevo hilo con {name}",
-  "conversation.threads.view.placeholder": "Escribe a {name} en {title}",
+  "conversation.threads.view.placeholder": "Escribe a {name} en este hilo",
   "conversation.threads.view.queued": "Mensajes en espera en este hilo",
   "conversation.threads.view.failed": "El hilo falló",
   "conversation.threads.error.load": "No se pudieron cargar los hilos de este agente.",

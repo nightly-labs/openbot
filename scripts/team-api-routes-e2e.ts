@@ -391,6 +391,7 @@ import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
@@ -615,6 +616,13 @@ const routineResultOptions: RoutineResultConnectionOption[] = [
     platform: "slack",
     connectionName: "Acme",
     places: [{ id: "C0123", name: "general" }],
+    placesFailed: false,
+  },
+  {
+    connectionId: "whatsapp-ada",
+    platform: "whatsapp",
+    connectionName: "Ada's phone",
+    places: [{ id: "120363000000000000@g.us", name: "Family" }],
     placesFailed: false,
   },
 ];
@@ -2739,9 +2747,12 @@ try {
             record("setRoutineResultDestination", input);
             if (input.agentId !== "agent-ada" || input.routineId !== "routine-ada")
               return Effect.fail({ cause: new RoutineResultError(sourceText("error.backend.routineGone")) });
-            routineDestination = input.destination
-              ? { ...input.destination, platform: "slack", connectionName: "Acme" }
-              : null;
+            const { destination } = input;
+            const connection = routineResultOptions.find((option) => option.connectionId === destination?.connectionId);
+            routineDestination =
+              destination && connection
+                ? { ...destination, platform: connection.platform, connectionName: connection.connectionName }
+                : null;
             return Effect.succeed(routineDestination);
           }),
       },
@@ -11479,9 +11490,11 @@ try {
       capabilities: resultCapabilities,
     });
     check(
-      "an admin reads the connections with their places, and no destination yet",
+      "an admin reads the connections with their places, without WhatsApp for a client of routine-results-v1 alone, and no destination yet",
       options.status === 200 &&
-        isDeepStrictEqual(options.body, { connections: routineResultOptions }) &&
+        isDeepStrictEqual(options.body, {
+          connections: routineResultOptions.filter((option) => option.platform !== "whatsapp"),
+        }) &&
         before.status === 200 &&
         isDeepStrictEqual(before.body, { destination: null }),
       [summary(options), summary(before)],
@@ -11524,6 +11537,54 @@ try {
         isDeepStrictEqual(cleared.body, { destination: null }),
       [summary(gone), summary(cleared)],
     );
+    // routine-results-whatsapp-v1: the client also gets the WhatsApp numbers, and its own codec reads them.
+    const whatsAppCapabilities = [ROUTINE_RESULTS_CAPABILITY, ROUTINE_RESULTS_WHATSAPP_CAPABILITY];
+    const decoded = (path: string, reply: Reply) =>
+      teamSideRouteCodec(path)?.response(path, reply.status, reply.body, { routineResultsWhatsApp: true });
+    const wideOptions = await call("POST", ROUTINE_RESULTS_ROUTES.options, {
+      token: adaToken,
+      json: {},
+      capabilities: whatsAppCapabilities,
+    });
+    const family = { connectionId: "whatsapp-ada", placeId: "120363000000000000@g.us", placeName: "Family" };
+    const wideSet = await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: family },
+      capabilities: whatsAppCapabilities,
+    });
+    const wideAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: whatsAppCapabilities,
+    });
+    const savedFamily = { ...family, platform: "whatsapp", connectionName: "Ada's phone" };
+    check(
+      "a client of routine-results-whatsapp-v1 reads the WhatsApp numbers and sets a WhatsApp destination",
+      wideOptions.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.options, wideOptions), {
+          connections: routineResultOptions,
+        }) &&
+        wideSet.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.setDestination, wideSet), { destination: savedFamily }) &&
+        wideAfter.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.destination, wideAfter), { destination: savedFamily }),
+      [summary(wideOptions), summary(wideSet), summary(wideAfter)],
+    );
+    const narrowAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: resultCapabilities,
+    });
+    check(
+      "a client of routine-results-v1 alone reads no destination when it is WhatsApp",
+      narrowAfter.status === 200 && isDeepStrictEqual(narrowAfter.body, { destination: null }),
+      summary(narrowAfter),
+    );
+    await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: null },
+      capabilities: whatsAppCapabilities,
+    });
   }
 
   // ---- Queue routes ----

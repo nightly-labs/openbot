@@ -78,6 +78,32 @@ function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefin
   return preview(file.id);
 }
 
+/**
+ * The file of an asset node by its id, so two files with one name stay apart. A graph saved before the
+ * id finds it by name.
+ */
+function findFile(board: WfnBoard, fileId: string, name: string): StoredFileRow | undefined {
+  const files = libraryFiles(board);
+  return (
+    (fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
+    (name ? files.find((candidate) => candidate.name === name) : undefined) ??
+    (fileId ? hostPicture(board, fileId, name) : undefined)
+  );
+}
+
+/** The file of an asset node, from its fields. */
+function assetFile(board: WfnBoard, id: string): StoredFileRow | undefined {
+  const fileId = board.field(id, "fileId");
+  const name = board.field(id, "file");
+  return findFile(board, typeof fileId === "string" ? fileId : "", typeof name === "string" ? name : "");
+}
+
+/** The thumbnail address of the picture of an asset node, or undefined when it has no picture to show. */
+export function assetPicture(board: WfnBoard, id: string): string | undefined {
+  const file = assetFile(board, id);
+  return file?.previewKind === "image" ? (thumbUrl(board, file) ?? undefined) : undefined;
+}
+
 /** The picture or the file icon of a file. On a card, a picture pulses until it shows. */
 function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   const board = useBoard();
@@ -330,16 +356,7 @@ export function AssetNode(props: { id: string; file?: string }) {
     asString,
   );
   const [fileId] = useField(() => props.id, "fileId", "", asString);
-  /** The file by its id, so two files with one name stay apart. A graph saved before the id finds it by name. */
-  const file = () => {
-    const files = libraryFiles(board);
-    const id = fileId();
-    return (
-      (id ? files.find((candidate) => candidate.id === id) : undefined) ??
-      files.find((candidate) => candidate.name === fileName()) ??
-      (id ? hostPicture(board, id, fileName()) : undefined)
-    );
-  };
+  const file = () => findFile(board, fileId(), fileName());
   const setFile = (next: StoredFileRow) => board.setFields(props.id, { file: next.name, fileId: next.id });
   /** Files from the computer stay on this computer, so a host that cannot read them does not offer them. */
   const uploads = () => board.features()?.uploads !== false;
@@ -364,13 +381,20 @@ export function AssetNode(props: { id: string; file?: string }) {
       .then(setFile, () => undefined)
       .finally(() => setSending(false));
   };
-  /** A file from the computer, dropped on the card, goes into the library and becomes the asset. */
+  /**
+   * A file from the computer, dropped on the card, goes into the library and becomes the asset. With
+   * more files, the canvas puts the others in new asset nodes beside this one, in one group.
+   */
   const onDrop = (event: DragEvent) => {
     setDropping(false);
-    const [dropped] = draggedFiles(event);
+    const files = draggedFiles(event);
+    const [dropped] = files;
     if (!dropped || locked() || !uploads() || sending()) return;
     event.preventDefault();
-    send(dropped);
+    // The canvas does not take the drop again.
+    event.stopPropagation();
+    if (files.length > 1 && board.dropFiles) board.dropFiles(props.id, files);
+    else send(dropped);
   };
   return (
     <>

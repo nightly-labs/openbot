@@ -87,7 +87,7 @@ export const messages = {
   "conversation.threads.branch.from": "分支自 {title}",
   "conversation.threads.branch.fromDeleted": "分支自已删除的话题",
   "conversation.threads.view.newPlaceholder": "与 {name} 的新话题",
-  "conversation.threads.view.placeholder": "在 {title} 中给 {name} 发消息",
+  "conversation.threads.view.placeholder": "在此话题中给 {name} 发消息",
   "conversation.threads.view.queued": "该话题中等待的消息",
   "conversation.threads.view.failed": "话题失败",
   "conversation.threads.error.load": "无法加载该助手的话题。",

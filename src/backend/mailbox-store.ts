@@ -2212,14 +2212,23 @@ export class MailboxStore {
    * conversation. A request steered into a running turn does not count: the user can watch that turn.
    */
   answersMessagingRequest(agentId: string, turnId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId &&
-        delivery.turnId === turnId &&
-        delivery.steeredAt === undefined &&
-        (delivery.status === "starting" || delivery.status === "running") &&
-        this.#state.messages.some((message) => message.id === delivery.messageId && message.messagingReturn),
-    );
+    return this.messagingRequestOrigin(agentId, turnId) !== null;
+  }
+
+  /** The external conversation of the request that this turn answers. See `answersMessagingRequest`. */
+  messagingRequestOrigin(agentId: string, turnId: string): MessagingOrigin | null {
+    for (const delivery of this.#state.deliveries) {
+      if (
+        delivery.recipientAgentId !== agentId ||
+        delivery.turnId !== turnId ||
+        delivery.steeredAt !== undefined ||
+        (delivery.status !== "starting" && delivery.status !== "running")
+      )
+        continue;
+      const origin = this.#state.messages.find((message) => message.id === delivery.messageId)?.messagingReturn;
+      if (origin) return structuredClone(origin);
+    }
+    return null;
   }
 
   /**

@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "Остановлено.",
   "status.messaging.stop": "Остановить",
   "status.messaging.approvalTitle": "OpenBot просит подтверждения, чтобы продолжить.",
+  "status.messaging.approvalTitleTeammate": "Агент {agent} просит подтверждения, чтобы продолжить.",
   "status.messaging.approvalCommand": "Выполнить команду",
   "status.messaging.approvalFileChange": "Изменить файлы",
   "status.messaging.approvalPermissions": "Получить дополнительные разрешения",

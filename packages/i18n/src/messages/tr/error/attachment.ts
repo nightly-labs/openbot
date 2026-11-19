@@ -5,6 +5,7 @@ export const messages = {
   // Ek ve dosya önizleme hataları.
   "error.attachment.notFound": "Ek bulunamadı.",
   "error.attachment.fileTooLarge": "Bir dosya 100 MB sınırını aşıyor.",
+  "error.attachment.namedFileTooLarge": "{name} 100 MB sınırını aşıyor.",
   "error.attachment.totalTooLarge": "Ekler 250 MB toplam sınırını aşıyor.",
   "error.attachment.unavailable": "Bu dosya artık kullanılamıyor.",
   "error.attachment.tooMany": "En fazla {limit} dosya seçin.",

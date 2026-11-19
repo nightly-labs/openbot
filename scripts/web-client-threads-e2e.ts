@@ -162,7 +162,7 @@ try {
   await tab.waitFor({ timeout: UI_WAIT_MS });
   const tabSelected = (await tab.getAttribute("aria-selected")) === "true";
   const composer = web.getByRole("textbox", {
-    name: english("conversation.threads.view.placeholder", { name: agentName, title }),
+    name: english("conversation.threads.view.placeholder", { name: agentName }),
   });
   await composer.fill(webText);
   await composer.press("Enter");
