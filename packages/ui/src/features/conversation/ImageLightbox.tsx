@@ -108,6 +108,7 @@ export function ImageGallery(props: {
   copies?: ImageCopies | undefined;
 }) {
   const { t } = useText();
+  const copies = createMemo(() => props.copies);
   // By position: a sent message's images get new ids and URLs when the host stores them, and each
   // tile keeps its size and pixels until the stored copy loads.
   const [ratios, setRatios] = createStore<Record<number, number>>({});
@@ -149,7 +150,7 @@ export function ImageGallery(props: {
           const box = () => layout().boxes[index];
           // Once the tile draws an image, a new URL draws over it when it loads, with no spinner.
           const [loaded, setLoaded] = createSignal(false);
-          const copy = () => props.copies?.copyUrl(image());
+          const copy = () => copies()?.copyUrl(image());
           const url = createSteadyImageUrl(() => copy() ?? image().previewUrl);
           // Keyed by the drawn URL: a new URL for the same attachment gets a new try.
           const key = () => url() ?? image().id;
@@ -159,7 +160,7 @@ export function ImageGallery(props: {
             setLoaded(true);
             if (naturalWidth <= 0 || naturalHeight <= 0) return;
             const ratio = galleryRatio(naturalWidth, naturalHeight);
-            if (copy()) rememberCopyRatio(image().id, ratio);
+            if (untrack(copy)) rememberCopyRatio(image().id, ratio);
             else rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
             setRatios((state) => {
               state[index] = ratio;
@@ -376,13 +377,15 @@ export function ImageLightbox(props: {
   // shown image gets its full file, so a neighbour does not wait in front of it.
   const [fullReady, setFullReady] = createStore<Record<string, boolean>>({});
   const [fullFailed, setFullFailed] = createStore<Record<string, boolean>>({});
+  // Read once in an owned scope: an effect callback must not create the memo of a conditional prop.
+  const copies = createMemo(() => props.copies);
   const copyOf = (entry: AttachmentSummary) => {
-    const copy = props.copies?.copyUrl(entry);
-    return copy && copy !== props.copies?.fullUrl(entry) ? copy : undefined;
+    const copy = copies()?.copyUrl(entry);
+    return copy && copy !== copies()?.fullUrl(entry) ? copy : undefined;
   };
   const showsCopy = (entry: AttachmentSummary) => fullReady[entry.id] !== true && copyOf(entry) !== undefined;
   const sourceOf = (entry: AttachmentSummary) =>
-    (showsCopy(entry) ? copyOf(entry) : props.copies?.fullUrl(entry)) ?? entry.previewUrl;
+    (showsCopy(entry) ? copyOf(entry) : copies()?.fullUrl(entry)) ?? entry.previewUrl;
   const images = () => props.opening.images;
   const current = createMemo(() => images()[Math.min(index(), images().length - 1)]);
   const downloadable = () => {
@@ -633,6 +636,7 @@ export function ImageLightbox(props: {
     },
     (entry) => {
       if (!entry) return;
+      const source = untrack(copies);
       let done = false;
       const full = new Image();
       // The copy stays when the full image does not load. It shows the image, and the download works.
@@ -653,12 +657,12 @@ export function ImageLightbox(props: {
           });
         }, fail);
       };
-      const url = props.copies?.fullUrl(entry);
+      const url = untrack(() => source?.fullUrl(entry));
       if (url) show(url);
-      else if (!props.copies?.loadFull) fail();
+      else if (!source?.loadFull) fail();
       else
-        void props.copies.loadFull(entry).then((ready) => {
-          const next = ready ? props.copies?.fullUrl(entry) : undefined;
+        void source.loadFull(entry).then((ready) => {
+          const next = ready ? source.fullUrl(entry) : undefined;
           if (next) show(next);
           else fail();
         }, fail);
@@ -1006,7 +1010,7 @@ export function ImageLightbox(props: {
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
                     <img
-                      src={props.copies?.copyUrl(entry) ?? entry.previewUrl ?? ""}
+                      src={copies()?.copyUrl(entry) ?? entry.previewUrl ?? ""}
                       alt=""
                       decoding="async"
                       referrerpolicy="no-referrer"
