@@ -174,6 +174,8 @@ const ACP_REPEATED_TOOL_FAILURES = 5;
 
 const ACP_STEER_ANSWER_MS = 3_000;
 
+const ACP_THROWAWAY_DELETE_MS = 3_000;
+
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
@@ -778,7 +780,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const connection = thread.transport ? thread.transport.connection : this.#transport.connection;
         if (!connection) return Effect.void;
         return providerCall(() => connection.deleteSession({ sessionId: thread.id })).pipe(
-          this.#backgroundTimeout("session/delete"),
+          Effect.timeout(ACP_THROWAWAY_DELETE_MS),
           Effect.ignore,
         );
       },
