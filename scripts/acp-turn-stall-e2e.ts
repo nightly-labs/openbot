@@ -378,6 +378,7 @@ try {
     sourceText("error.provider.acpUnresponsive", { provider: "Cline" }),
     "A session start that the agent never answers fails after the stall limit.",
   );
+  assert.ok(silentStart.elapsedMs >= STALL_MS, "The session start waits for the stall limit first.");
 
   report.passed = true;
 } catch (error) {
