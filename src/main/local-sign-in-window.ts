@@ -343,7 +343,9 @@ export class LocalSignInWindows {
     contents.on("did-fail-load", (_event, code, _description, _url, isMainFrame) => {
       if (isMainFrame && code !== ERR_ABORTED) this.#fail(pending, window);
     });
-    contents.on("render-process-gone", () => this.#fail(pending, window));
+    contents.on("render-process-gone", (_event, details) => {
+      if (details.reason !== "clean-exit") this.#fail(pending, window);
+    });
     this.#guard(contents, webPreferences);
     void window.loadURL(url).catch(() => undefined);
   }
