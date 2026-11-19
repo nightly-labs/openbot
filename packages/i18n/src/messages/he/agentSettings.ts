@@ -188,6 +188,7 @@ export const messages = {
     "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
+  "agentSettings.newChat.busy": "הסוכן עובד עכשיו. כדי להתחיל צ'אט חדש, צריך לחכות שיסיים או לעצור אותו.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.description": "ההודעות בצ'אט הזה נמחקות והסוכן שוכח אותן. ההגדרות שלו נשארות.",
   "agentSettings.deleteHistory.button": "מחיקה",

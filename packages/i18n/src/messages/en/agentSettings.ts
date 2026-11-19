@@ -182,6 +182,7 @@ export const messages = defineMessages("agentSettings", {
     "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.newChat.confirm": "Start new chat",
   "agentSettings.newChat.failed": "Could not start a new chat.",
+  "agentSettings.newChat.busy": "The agent is working. To start a new chat, wait until it finishes or stop it.",
   "agentSettings.deleteHistory.title": "Delete history",
   "agentSettings.deleteHistory.description":
     "The messages of this chat go, and the agent forgets them. Its setup stays.",

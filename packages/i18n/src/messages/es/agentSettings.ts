@@ -179,6 +179,8 @@ export const messages = {
     "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.newChat.busy":
+    "El agente está trabajando. Para iniciar un nuevo chat, espera a que termine o detenlo.",
   "agentSettings.deleteHistory.title": "Eliminar historial",
   "agentSettings.deleteHistory.description":
     "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",

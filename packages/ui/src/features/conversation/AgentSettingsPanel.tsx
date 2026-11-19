@@ -1547,6 +1547,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     {t("agentSettings.newChat.button")}
                   </Button>
                 </div>
+                <Show when={props.working}>
+                  <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
+                    {t("agentSettings.newChat.busy")}
+                  </Text>
+                </Show>
               </Show>
               <Show when={props.onDeleteHistory}>
                 <div class="agent-settings-notifications">

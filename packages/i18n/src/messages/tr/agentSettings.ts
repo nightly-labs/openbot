@@ -180,6 +180,8 @@ export const messages = {
     "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.newChat.busy":
+    "Ajan çalışıyor. Yeni bir sohbet başlatmak için bitmesini bekleyin veya ajanı durdurun.",
   "agentSettings.deleteHistory.title": "Geçmişi sil",
   "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
   "agentSettings.deleteHistory.button": "Sil",

@@ -172,6 +172,7 @@ export const messages = {
     "助手会重新开始，需要时仍可查找当前对话。消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
+  "agentSettings.newChat.busy": "助手正在工作。要开始新对话，请等待它完成或停止它。",
   "agentSettings.deleteHistory.title": "删除历史记录",
   "agentSettings.deleteHistory.description": "此对话的消息会被删除，智能体也会忘记它们。设置保持不变。",
   "agentSettings.deleteHistory.button": "删除",

@@ -186,6 +186,8 @@ export const messages = {
     "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.newChat.confirm": "Nouvelle discussion",
   "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+  "agentSettings.newChat.busy":
+    "L’agent travaille. Pour commencer une nouvelle discussion, attendez qu’il termine ou arrêtez-le.",
   "agentSettings.deleteHistory.title": "Supprimer l’historique",
   "agentSettings.deleteHistory.description":
     "Les messages de cette discussion sont supprimés et l’agent les oublie. Sa configuration reste.",

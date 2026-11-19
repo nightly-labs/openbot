@@ -173,6 +173,7 @@ export const messages = {
     "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
+  "agentSettings.newChat.busy": "에이전트가 작업 중이에요. 새 채팅을 시작하려면 끝날 때까지 기다리거나 중지하세요.",
   "agentSettings.deleteHistory.title": "기록 삭제",
   "agentSettings.deleteHistory.description": "이 채팅의 메시지가 삭제되고 에이전트도 잊어요. 설정은 그대로예요.",
   "agentSettings.deleteHistory.button": "삭제",
