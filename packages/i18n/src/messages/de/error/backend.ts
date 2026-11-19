@@ -391,7 +391,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
-  "error.backend.apiKeyNotAllowed": "Nur der Serverinhaber oder ein Admin kann einen API-Schlüssel eingeben.",
   "error.backend.apiKeySaving": "Der API-Schlüssel wird bereits gespeichert.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot konnte den API-Schlüssel nicht lesen. Gib einen Schlüssel mit höchstens 8.000 Zeichen ein und wähle, wer ihn nutzen darf.",
