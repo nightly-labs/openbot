@@ -502,6 +502,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Odblokuj wszystko",
   "workflow.canvas.action.runStep": "Uruchom krok",
   "workflow.canvas.action.runFromTrigger": "Uruchom od tego wyzwalacza",
+  "workflow.canvas.action.runFromStep": "Uruchom od tego kroku",
   "workflow.canvas.hud.show": "Pokaż interfejs",
   "workflow.canvas.hud.hide": "Ukryj interfejs",
   "workflow.canvas.presence.label": "Osoby na tej kanwie",

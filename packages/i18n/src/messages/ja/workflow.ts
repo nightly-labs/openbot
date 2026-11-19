@@ -468,6 +468,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "すべてロック解除",
   "workflow.canvas.action.runStep": "ステップを実行",
   "workflow.canvas.action.runFromTrigger": "このトリガーから実行",
+  "workflow.canvas.action.runFromStep": "このステップから実行",
   "workflow.canvas.hud.show": "インターフェースを表示",
   "workflow.canvas.hud.hide": "インターフェースを隠す",
   "workflow.canvas.presence.label": "このキャンバスにいる人",

@@ -466,6 +466,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "모두 잠금 해제",
   "workflow.canvas.action.runStep": "단계 실행",
   "workflow.canvas.action.runFromTrigger": "이 트리거부터 실행",
+  "workflow.canvas.action.runFromStep": "이 단계부터 실행",
   "workflow.canvas.hud.show": "인터페이스 표시",
   "workflow.canvas.hud.hide": "인터페이스 숨기기",
   "workflow.canvas.presence.label": "이 캔버스의 사람",

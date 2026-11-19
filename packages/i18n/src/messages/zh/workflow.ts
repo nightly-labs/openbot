@@ -469,6 +469,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "全部解锁",
   "workflow.canvas.action.runStep": "运行步骤",
   "workflow.canvas.action.runFromTrigger": "从该触发器运行",
+  "workflow.canvas.action.runFromStep": "从该步骤运行",
   "workflow.canvas.hud.show": "显示界面",
   "workflow.canvas.hud.hide": "隐藏界面",
   "workflow.canvas.presence.label": "此画布上的人",

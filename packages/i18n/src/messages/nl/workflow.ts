@@ -453,6 +453,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Alles ontgrendelen",
   "workflow.canvas.action.runStep": "Stap uitvoeren",
   "workflow.canvas.action.runFromTrigger": "Uitvoeren vanaf deze trigger",
+  "workflow.canvas.action.runFromStep": "Uitvoeren vanaf deze stap",
   "workflow.canvas.hud.show": "Interface tonen",
   "workflow.canvas.hud.hide": "Interface verbergen",
   "workflow.canvas.presence.label": "Mensen op dit canvas",

@@ -471,6 +471,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Alle entsperren",
   "workflow.canvas.action.runStep": "Schritt ausführen",
   "workflow.canvas.action.runFromTrigger": "Ab diesem Auslöser ausführen",
+  "workflow.canvas.action.runFromStep": "Ab diesem Schritt ausführen",
   "workflow.canvas.hud.show": "Oberfläche einblenden",
   "workflow.canvas.hud.hide": "Oberfläche ausblenden",
   "workflow.canvas.presence.label": "Personen auf dieser Arbeitsfläche",

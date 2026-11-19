@@ -517,6 +517,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "إلغاء قفل الكل",
   "workflow.canvas.action.runStep": "تشغيل الخطوة",
   "workflow.canvas.action.runFromTrigger": "تشغيل من هذا المشغّل",
+  "workflow.canvas.action.runFromStep": "تشغيل من هذه الخطوة",
   "workflow.canvas.hud.show": "إظهار الواجهة",
   "workflow.canvas.hud.hide": "إخفاء الواجهة",
   "workflow.canvas.presence.label": "الأشخاص على هذه اللوحة",
