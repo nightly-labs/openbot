@@ -530,32 +530,43 @@ listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
 
 /**
  * Each file is its own import, so a failed file does not drop the others and can be sent again. A
- * set over the count or size limit stays one import, so main refuses it whole, as before.
+ * set over the count or total size limit stays one import, so main refuses it whole, as before. The
+ * total counts only the files under the file size limit: the files over it do not come.
  */
 async function importFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const serverId = selectedServerId;
-  const overLimit =
-    files.length > INPUT_LIMITS.attachments ||
-    files.reduce((sum, file) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   // A pasted image has no name. It gets one here, so the chip and the server show the same name.
   const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
+  const fits = ({ file }: NamedFile) => file.size <= ATTACHMENT_LIMITS.fileBytes;
+  const fitting = named.filter(fits);
+  const tooLarge = named.filter((file) => !fits(file));
+  const overLimit =
+    files.length > INPUT_LIMITS.attachments ||
+    fitting.reduce((sum, { file }) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   if (overLimit) {
     await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  const imports = fitting.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true));
+  // A retry of a file over the size limit cannot pass, so the file gets no chip: main refuses it, and
+  // the banner says why. The refusal waits for the other files, because a file that lands clears the banner.
+  if (tooLarge.length > 0)
+    imports.push(runAttachmentImport(crypto.randomUUID(), serverId, tooLarge, false, Promise.all(imports)));
+  await Promise.all(imports);
 }
 
 /**
  * `retryable` imports name their files, so the composer shows a chip for each, and keep them for a
- * retry. A set over a limit names none: a retry cannot pass, and the banner says why.
+ * retry. A set over a limit names none: a retry cannot pass, and the banner says why. A failure is
+ * reported after `reportAfter` settles.
  */
 async function runAttachmentImport(
   requestId: string,
   serverId: string,
   named: NamedFile[],
   retryable: boolean,
+  reportAfter: Promise<unknown> = Promise.resolve(),
 ): Promise<void> {
   if (retryable) attachmentImportFiles.set(requestId, { serverId, files: named });
   emitAttachmentImport({
@@ -586,6 +597,7 @@ async function runAttachmentImport(
     attachmentImportFiles.delete(requestId);
     emitAttachmentImport({ type: "completed", requestId, serverId, attachments });
   } catch (error) {
+    await reportAfter;
     emitAttachmentImport({
       type: "error",
       requestId,
