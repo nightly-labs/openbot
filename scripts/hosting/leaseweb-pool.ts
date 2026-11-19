@@ -254,6 +254,14 @@ function writeFileCommand(path: string, content: string) {
   return `base64 -d >'${path}' <<'OPENBOT_FILE'\n${Buffer.from(content).toString("base64")}\nOPENBOT_FILE\n`;
 }
 
+function scriptOutput(stdout: string, marker: string, sandbox: string) {
+  const start = stdout.indexOf(`${marker}\n`);
+  if (start === -1) throw new Error(`The output of a command in sandbox ${sandbox} has no start.`);
+  const from = start + marker.length + 1;
+  const end = stdout.lastIndexOf(`\n${marker}`);
+  return end < from - 1 ? stdout.slice(from) : stdout.slice(from, end);
+}
+
 function seconds(milliseconds: number) {
   return Math.round(milliseconds / 1000);
 }
@@ -1313,9 +1321,12 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
   }
 
   async #sandboxRun(sandbox: string, script: string, timeoutSeconds = 120) {
+    const marker = `OPENBOT_OUTPUT_${randomBytes(12).toString("hex")}`;
     const command = `f=$(mktemp)
-${writeFileCommand("$f", script).replace("'$f'", '"$f"')}sudo -n bash "$f"
+${writeFileCommand("$f", script).replace("'$f'", '"$f"')}printf '%s\\n' '${marker}'
+sudo -n bash "$f"
 status=$?
+printf '\\n%s\\n' '${marker}'
 rm -f "$f"
 exit "$status"`;
     const result = commandSchema.parse(
@@ -1331,7 +1342,7 @@ exit "$status"`;
         `A command in sandbox ${sandbox} failed with ${result.exitCode}: ${(result.stderr ?? "").slice(-2000)}`,
       );
     }
-    return result.stdout ?? "";
+    return scriptOutput(result.stdout ?? "", marker, sandbox);
   }
 
   #moveCandidates(product: string, currency: string | null) {
