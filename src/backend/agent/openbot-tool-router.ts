@@ -2246,7 +2246,12 @@ export class OpenBotToolRouter {
       );
     }
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcpForAgent);
+    const memoryResult = this.#memories.handleTool(
+      params,
+      senderAgentId,
+      this.#hooks.redactMcpForAgent,
+      this.#hooks.turnActivity(senderAgentId, params.turnId).startedAt !== null,
+    );
     if (memoryResult) return memoryResult;
 
     const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
