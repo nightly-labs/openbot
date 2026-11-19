@@ -531,7 +531,6 @@
   "error.backend.replyReferenceUnknown": ["ar", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.uiBlockActionNotAllowed": ["de", "es", "fr", "it", "ja", "pl", "pt", "tr"],
   "error.backend.uiBlockAnswerInvalid": ["de", "es", "fr", "it", "ja", "pl", "pt", "tr"],
-  "error.backend.vaultItemNotAllowed": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "error.backend.vaultItemSaving": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
   "error.backend.webhookTestFailed": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.backend.webhookTestUnavailable": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],

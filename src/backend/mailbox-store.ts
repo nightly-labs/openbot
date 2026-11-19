@@ -1747,7 +1747,7 @@ export class MailboxStore {
     if (this.laneActive(agentId, taskId)) return null;
     const messages = this.#messagesById();
     const delivery = this.#queuedFor(agentId).find(
-      (candidate) => this.#laneOf(candidate, messages) === taskId && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === taskId && !this.#isHeldReply(candidate, messages),
     );
     return delivery && this.#mayStart(delivery) ? this.#context(delivery, undefined, messages) : null;
   }
@@ -1778,7 +1778,7 @@ export class MailboxStore {
     if (!isChatMessageFromPerson(first)) return [];
     const lane = this.#laneOf(next, messages);
     const queued = this.#queuedFor(next.recipientAgentId).filter(
-      (candidate) => this.#laneOf(candidate, messages) === lane && !this.#isHeldReply(candidate),
+      (candidate) => this.#laneOf(candidate, messages) === lane && !this.#isHeldReply(candidate, messages),
     );
     const start = queued.findIndex((candidate) => candidate.id === next.id);
     if (start < 0) return [];
@@ -1816,14 +1816,15 @@ export class MailboxStore {
         (delivery) =>
           delivery.messageId === requestId &&
           (delivery.status === "failed" || delivery.status === "interrupted" || delivery.status === "cancelled") &&
-          !this.#state.messages.some(
-            (message) =>
-              isAnswer(message) &&
-              message.sender.agentId === delivery.recipientAgentId &&
-              message.replyToMessageId === requestId,
-          ),
+          !this.#hasAnswered(requestId, delivery.recipientAgentId),
       )
       .map((delivery) => delivery.recipientAgentId);
+  }
+
+  #hasAnswered(requestId: string, agentId: string): boolean {
+    return this.#state.messages.some(
+      (message) => isAnswer(message) && message.sender.agentId === agentId && message.replyToMessageId === requestId,
+    );
   }
 
   #queuedFor(agentId: string): StoredDelivery[] {
@@ -1851,18 +1852,45 @@ export class MailboxStore {
     return hold !== undefined && hold.editId === delivery.editId && Date.now() - hold.startedAt < QUEUE_EDIT_HOLD_MS;
   }
 
-  #isHeldReply(delivery: StoredDelivery): boolean {
-    const reply = this.#requireMessage(delivery.messageId);
+  #isHeldReply(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): boolean {
+    const reply = this.#requireMessage(delivery.messageId, messages);
     if (!isAnswer(reply)) return false;
     const request = this.#answeredRequestOf(delivery.recipientAgentId, reply);
     if (!request) return false;
     const answeredBy = reply.sender.agentId;
+    return (
+      this.#state.deliveries.some(
+        (candidate) =>
+          candidate.messageId === request.id &&
+          candidate.recipientAgentId !== answeredBy &&
+          isActiveDelivery(candidate),
+      ) && !this.#laterTurnEnded(delivery, messages)
+    );
+  }
+
+  #laterTurnEnded(held: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): boolean {
+    const lane = this.#laneOf(held, messages);
     return this.#state.deliveries.some(
       (candidate) =>
-        candidate.messageId === request.id &&
-        candidate.recipientAgentId !== answeredBy &&
-        (candidate.status === "queued" || candidate.status === "starting" || candidate.status === "running"),
+        candidate.recipientAgentId === held.recipientAgentId &&
+        candidate.turnId !== null &&
+        candidate.steeredAt === undefined &&
+        !isActiveDelivery(candidate) &&
+        candidate.createdAt > held.createdAt &&
+        this.#laneOf(candidate, messages) === lane,
     );
+  }
+
+  stillWorkingRecipients(agentId: string, requestId: string): string[] {
+    if (!this.#answeredRequestOf(agentId, { replyToMessageId: requestId })) return [];
+    return this.#state.deliveries
+      .filter(
+        (delivery) =>
+          delivery.messageId === requestId &&
+          isActiveDelivery(delivery) &&
+          !this.#hasAnswered(requestId, delivery.recipientAgentId),
+      )
+      .map((delivery) => delivery.recipientAgentId);
   }
 
   joinsChatTurn(deliveryId: string): boolean {

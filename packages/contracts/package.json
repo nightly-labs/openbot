@@ -224,6 +224,7 @@
     "./team-protocol/workspace-only-process-limit-v1": "./src/team-protocol/workspace-only-process-limit-v1.ts",
     "./team-protocol/mac-apps-limit-v1": "./src/team-protocol/mac-apps-limit-v1.ts",
     "./team-protocol/vault-import-v1": "./src/team-protocol/vault-import-v1.ts",
+    "./team-protocol/vault-member-save-v1": "./src/team-protocol/vault-member-save-v1.ts",
     "./team-protocol/vault-v1": "./src/team-protocol/vault-v1.ts",
     "./team-protocol/vault-v2": "./src/team-protocol/vault-v2.ts",
     "./team-protocol/vault-v3": "./src/team-protocol/vault-v3.ts",
