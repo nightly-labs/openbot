@@ -89,6 +89,36 @@ describe("CardValueScrub", () => {
     expect(raw.elements[0]?.value).toBe("4242 4242 4242 4242");
   });
 
+  it("hides a typed password and its address form until the document goes", () => {
+    const scrub = new CardValueScrub();
+    const password = "fixture pass+word/964301";
+    scrub.addDocumentSecret(password, true);
+    const raw = snapshot(`Strength of ${password}`, [element("e1", "Password", password)]);
+    raw.url = `https://shop.example.test/verify?p=${encodeURIComponent(password)}`;
+    const serialized = JSON.stringify(scrub.snapshot(raw));
+    expect(serialized).not.toContain(password);
+    expect(serialized).not.toContain(encodeURIComponent(password));
+    expect(scrub.reveals(password)).toBe(true);
+    expect(scrub.documentSecretShown).toBe(true);
+    scrub.endDocument();
+    expect(scrub.text(password)).toBe(password);
+    expect(scrub.documentSecretShown).toBe(false);
+  });
+
+  it("hides a password in a form-encoded address and a code only as a whole number", () => {
+    const scrub = new CardValueScrub();
+    scrub.addDocumentSecret("my pass!word", false);
+    expect(scrub.text("/verify?p=my+pass%21word")).toBe("/verify?p=•••");
+    scrub.addDocumentSecret("4829", false);
+    expect(scrub.text("Code 4829, order 1482903")).toBe("Code •••, order 1482903");
+  });
+
+  it("hides a short typed password only where it stands alone", () => {
+    const scrub = new CardValueScrub();
+    scrub.addDocumentSecret("a1", false);
+    expect(scrub.text("Key a1 is wrong, see a12 and ba1")).toBe("Key ••• is wrong, see a12 and ba1");
+  });
+
   it("returns the snapshot unchanged before a card is filled", () => {
     const raw = snapshot(NUMBER, []);
     expect(new CardValueScrub().snapshot(raw)).toBe(raw);

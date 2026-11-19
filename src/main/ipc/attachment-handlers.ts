@@ -64,6 +64,7 @@ import {
   parseOpenAttachment,
   parseOpenSharedFile,
   parseOpenWorkspaceFile,
+  parsePreviewPageHtml,
   parsePreviewSharedFile,
   parsePreviewWorkspaceFile,
 } from "./agent-inputs";
@@ -151,6 +152,12 @@ export function attachmentIpcHandlers({
         remote: (data, serverId) => runCauseEffect(uploadRemoteImports(remoteServers, serverId, { paths: [], data })),
       }),
       releaseFilePreview: payloadHandler(parseFilePreviewPageUrl, (pageUrl) => filePreviewPages.release(pageUrl)),
+      // The page gets the same sandbox as a visual reply, so HTML from the renderer reaches nothing more.
+      addPreviewPage: payloadHandler(
+        parsePreviewPageHtml,
+        (html) =>
+          filePreviewPages.add("text/html", new TextEncoder().encode(html), filePreviewPages.generation) ?? null,
+      ),
       chooseAttachments: payloadHandler(agentRequest(parseChooseAttachments), async (parsed) => {
         const mainWindow = getMainWindow();
         const {
@@ -241,7 +248,7 @@ export function attachmentIpcHandlers({
         local: async (parsed) => {
           // A chat link can name a folder. The file manager shows it; nothing opens it.
           const sharedFile = await runCauseEffect(
-            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal" }),
+            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal", followLinks: true }),
           );
           // A member upload lands in the shared folder too, so a shared file opens only when its type is safe.
           await deliverLocalFile(sharedFile.path, sharedFile.name, parsed.action, () =>
@@ -287,7 +294,7 @@ export function attachmentIpcHandlers({
       previewSharedFile: scopedHandler(parsePreviewSharedFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path));
+          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path, { followLinks: true }));
           return runCauseEffect(
             localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size, generation, parsed.maxBytes),
           );

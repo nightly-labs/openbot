@@ -1,28 +1,32 @@
 import { isWorkflowStepKind, type WorkflowNode } from "@openbot/contracts/ipc";
 import * as Clipboard from "expo-clipboard";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { Button, Typography } from "heroui-native";
-import Pin from "lucide-react-native/icons/pin";
-import PinOff from "lucide-react-native/icons/pin-off";
+import { Typography } from "heroui-native";
+import EllipsisVertical from "lucide-react-native/icons/ellipsis-vertical";
+import Play from "lucide-react-native/icons/play";
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { Alert, Pressable, View } from "react-native";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { WorkflowFlowView } from "@/features/workflows/components/workflow-flow-view";
 import { WorkflowGitHubEventRow } from "@/features/workflows/components/workflow-github-event-row";
+import { AndroidBarIcon, viewMenuActions } from "@/features/workflows/components/workflow-header-actions";
 import { WorkflowRunRow } from "@/features/workflows/components/workflow-run-row";
 import { WorkflowRunStepRow } from "@/features/workflows/components/workflow-run-step-row";
 import { type WorkflowStepMenu, workflowStepRows } from "@/features/workflows/components/workflow-steps-list";
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
 import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-step-actions";
 import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
+import { useWorkflowEditorView } from "@/features/workflows/model/workflow-editor-view";
 import { githubTrigger as githubTriggerSettings, triggerDeliveries } from "@/features/workflows/model/workflow-github";
-import { workflowOutline } from "@/features/workflows/model/workflow-outline";
 import { latestSteps, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { LargeTitleScrollView } from "@/shared/components/large-title";
+import { type MenuAction, MenuView } from "@/shared/components/menu-view";
+import { toolbarMenuItems } from "@/shared/components/toolbar-menu-items";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
@@ -37,7 +41,8 @@ const LATEST_EVENTS = 3;
 
 /**
  * Drawer > Workflows > one workflow: run it, edit it, pin it to the drawer, and read its steps,
- * its trigger and its newest runs.
+ * its trigger and its newest runs. The header has Run and a menu with Edit, Pin and the layout of the
+ * steps: a flow from top to bottom, or a list.
  */
 export function WorkflowScreen() {
   const { t, format, errorMessage } = useText();
@@ -52,6 +57,10 @@ export function WorkflowScreen() {
   const { deleteWorkflow } = useMobileWorkspaceActions();
   const commands = useWorkflowCommands(serverId);
   const [starting, setStarting] = useState(false);
+  const { theme } = useUniwind();
+  const foreground = String(useCSSVariable("--openbot-text-primary"));
+  const view = useWorkflowEditorView((state) => state.view);
+  const setView = useWorkflowEditorView((state) => state.setView);
   const workflow = detail.data;
   const title = workflow?.summary.title ?? t("mobile.app.route.workflow");
   const runList = runs.data?.runs ?? [];
@@ -112,26 +121,70 @@ export function WorkflowScreen() {
     ]);
   };
 
-  const PinIcon = pinned ? PinOff : Pin;
   const pinLabel = pinned ? t("mobile.workflow.action.unpin") : t("mobile.workflow.action.pin");
+  const menuActions: MenuAction[] = [
+    ...(workflow?.needsNewerApp
+      ? []
+      : [{ id: "edit", title: t("mobile.workflow.action.edit"), image: "pencil" } satisfies MenuAction]),
+    { id: "pin", title: pinLabel, image: pinned ? "pin.slash" : "pin" },
+    ...viewMenuActions(view, t),
+  ];
+  const onMenu = (id: string) => {
+    if (id === "edit") commands.edit(workflowId);
+    else if (id === "pin") commands.togglePin(workflowId);
+    else if (id === "view-flow" || id === "view-list") {
+      void haptics.selection();
+      setView(id === "view-flow" ? "flow" : "list");
+    }
+  };
+  const runLabel = starting ? t("mobile.workflow.detail.starting") : t("mobile.workflow.action.run");
   return (
     <>
       {workflow ? (
         isAndroid ? (
-          <AndroidHeaderButton
-            placement="right"
-            glass
-            icon={PinIcon}
-            accessibilityLabel={pinLabel}
-            onPress={() => commands.togglePin(workflowId)}
+          <Stack.Screen
+            options={{
+              headerRight: () => (
+                <View className="flex-row items-center">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={runLabel}
+                    accessibilityState={{ disabled: starting }}
+                    disabled={starting}
+                    android_ripple={{ borderless: true, radius: 20 }}
+                    style={{ opacity: starting ? 0.38 : 1 }}
+                    onPress={() => void runNow()}
+                  >
+                    <AndroidBarIcon>
+                      <Play color={foreground} size={20} strokeWidth={2} />
+                    </AndroidBarIcon>
+                  </Pressable>
+                  <MenuView
+                    colorScheme={theme === "dark" ? "dark" : "light"}
+                    actions={menuActions}
+                    onPressAction={(event) => onMenu(event.nativeEvent.event)}
+                  >
+                    <View accessible accessibilityRole="button" accessibilityLabel={t("mobile.workflow.detail.more")}>
+                      <AndroidBarIcon>
+                        <EllipsisVertical color={foreground} size={22} strokeWidth={2} />
+                      </AndroidBarIcon>
+                    </View>
+                  </MenuView>
+                </View>
+              ),
+            }}
           />
         ) : (
           <Stack.Toolbar placement="right">
             <Stack.Toolbar.Button
-              icon={pinned ? "pin.slash" : "pin"}
-              accessibilityLabel={pinLabel}
-              onPress={() => commands.togglePin(workflowId)}
+              icon="play.fill"
+              accessibilityLabel={runLabel}
+              disabled={starting}
+              onPress={() => void runNow()}
             />
+            <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel={t("mobile.workflow.detail.more")}>
+              {toolbarMenuItems(menuActions, onMenu)}
+            </Stack.Toolbar.Menu>
           </Stack.Toolbar>
         )
       ) : null}
@@ -139,6 +192,8 @@ export function WorkflowScreen() {
         title={title}
         caption={workflow ? t("mobile.workflow.detail.steps", { count: workflow.summary.steps }) : undefined}
         contentContainerClassName="gap-7 px-4 pt-3"
+        // Run and the "…" menu.
+        barButtonsRight={2}
       >
         {!workflow ? (
           <Typography.Paragraph className="px-1 text-text-secondary" style={typeScale.preview}>
@@ -148,23 +203,6 @@ export function WorkflowScreen() {
           </Typography.Paragraph>
         ) : (
           <>
-            <View className="flex-row gap-2">
-              <Button
-                className="flex-1 bg-action"
-                feedbackVariant="scale"
-                isDisabled={starting}
-                onPress={() => void runNow()}
-              >
-                <Button.Label className="text-action-foreground">
-                  {starting ? t("mobile.workflow.detail.starting") : t("mobile.workflow.action.run")}
-                </Button.Label>
-              </Button>
-              {workflow.needsNewerApp ? null : (
-                <Button className="flex-1" variant="tertiary" onPress={() => commands.edit(workflowId)}>
-                  <Button.Label>{t("mobile.workflow.action.edit")}</Button.Label>
-                </Button>
-              )}
-            </View>
             {workflow.needsNewerApp ? (
               <Typography.Paragraph className="px-1 text-text-secondary" style={typeScale.caption}>
                 {t("mobile.workflow.detail.newerApp")}
@@ -179,12 +217,18 @@ export function WorkflowScreen() {
                 </SettingsRow>
               </SettingsSection>
             ) : null}
-            <SettingsSection
-              title={t("mobile.workflow.detail.stepsTitle")}
-              footer={workflowOutline(workflow.graph) ? undefined : t("mobile.workflow.detail.canvasOrder")}
-            >
-              {workflowStepRows(workflow.graph, serverAgents, t, stepMenu)}
-            </SettingsSection>
+            {view === "flow" ? (
+              <View className="gap-2">
+                <Typography type="body-xs" className="px-4 text-grouped-secondary">
+                  {t("mobile.workflow.detail.stepsTitle")}
+                </Typography>
+                <WorkflowFlowView graph={workflow.graph} agents={serverAgents} menu={stepMenu} />
+              </View>
+            ) : (
+              <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
+                {workflowStepRows(workflow.graph, serverAgents, t, stepMenu)}
+              </SettingsSection>
+            )}
             {soloSteps.length > 0 ? (
               <SettingsSection
                 title={t("mobile.workflow.detail.soloSteps")}

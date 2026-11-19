@@ -1,4 +1,4 @@
-import { canAdministerServer } from "@openbot/contracts/ipc";
+import { type BrowserControlState, canAdministerServer, type TeamRole } from "@openbot/contracts/ipc";
 // The embedded browser, driven from a remote client: its tabs, and who is holding the wheel.
 //
 // Every handler forwards straight to `BrowserHost`. The validation here is only about the wire -
@@ -12,6 +12,11 @@ import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageImport,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_SIGN_IN_ROUTES,
@@ -36,16 +41,57 @@ import { nullableString, parseBrowserBounds, pathIdentifier, readJson, stringFie
 export interface BrowserRouteDependencies {
   browser: TeamApiBrowser;
   browserView?: TeamApiBrowserView | undefined;
+  /** The agents at `none` for this member. Their tabs are not this member's to see or use. Read only on a browser route. */
+  blockedAgentIds: () => ReadonlySet<string>;
+}
+
+/**
+ * The test of a tab that this member must not see or use. A private tab holds an administrator's MCP
+ * sign-in (`mcp-sign-in-v1`): a member could watch the password, or finish the sign-in with their own
+ * account. A tab of an agent at `none` for the member holds that agent's sign-ins. The routes and the
+ * events use this one test. The tab owners are read only when an agent is closed to the member.
+ */
+export function hiddenTabTest(
+  browser: Pick<TeamApiBrowser, "isPrivate" | "listTabs">,
+  role: TeamRole | null | undefined,
+  blockedAgentIds: () => ReadonlySet<string>,
+  owners?: ReadonlyMap<string, string | null>,
+): (tabId: string) => boolean {
+  if (canAdministerServer(role)) return () => false;
+  let blocked: ReadonlySet<string> | undefined;
+  let tabOwners = owners;
+  return (tabId) => {
+    if (browser.isPrivate(tabId)) return true;
+    blocked ??= blockedAgentIds();
+    if (blocked.size === 0) return false;
+    tabOwners ??= new Map(browser.listTabs().map((tab) => [tab.id, tab.ownerAgentId]));
+    const owner = tabOwners.get(tabId);
+    return typeof owner === "string" && blocked.has(owner);
+  };
+}
+
+/** The control sessions that a member may see: none of them is in a tab that `hidden` closes. */
+export function visibleControlState(
+  state: BrowserControlState,
+  hidden: (tabId: string) => boolean,
+): BrowserControlState {
+  return state.sessions.some((session) => session.tabId !== null && hidden(session.tabId))
+    ? { sessions: state.sessions.filter((session) => session.tabId === null || !hidden(session.tabId)) }
+    : state;
 }
 
 export async function routeBrowser(
   context: TeamApiRequestContext,
-  { browser, browserView }: BrowserRouteDependencies,
+  { browser, browserView, blockedAgentIds: readBlockedAgentIds }: BrowserRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, member, sessionId, capabilities, json, empty } = context;
-  // A private tab holds an administrator's MCP sign-in (`mcp-sign-in-v1`). A member could watch the
-  // password, or finish the sign-in with their own account, so to a member that tab does not exist.
-  const hidden = (tabId: string) => !canAdministerServer(member.role) && browser.isPrivate(tabId);
+  let blocked: ReadonlySet<string> | undefined;
+  const blockedAgentIds = () => {
+    blocked ??= readBlockedAgentIds();
+    return blocked;
+  };
+  // To a member, a hidden tab does not exist.
+  const hidden = hiddenTabTest(browser, member.role, blockedAgentIds);
   const tabId = (body: DynamicRecord) => {
     const id = stringField(body, "tabId");
     if (hidden(id)) throw new HttpError(404, sourceText("error.backend.browserTabNotFound"));
@@ -67,19 +113,23 @@ export async function routeBrowser(
     return json(200, { tabs, activeTabId });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.browser.control) {
-    return json(200, browser.getControlState());
+    return json(200, visibleControlState(browser.getControlState(), hidden));
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.browser.open) {
     const body = await readJson(request);
     const focus = body.focus ?? false;
     if (!isBoolean(focus)) throw new HttpError(400, "focus must be a boolean.");
+    const ownerAgentId = nullableString(body, "ownerAgentId");
+    // A tab opens in its agent's browser session, with that agent's sign-ins.
+    if (ownerAgentId !== null && blockedAgentIds().has(ownerAgentId))
+      throw new HttpError(404, sourceText("error.team.agentNotFound"));
     return json(
       201,
       await runCauseEffect(
         browser.open(
           stringField(body, "url", false, INPUT_LIMITS.browserUrl),
           nullableString(body, "ownerThreadId"),
-          nullableString(body, "ownerAgentId"),
+          ownerAgentId,
           focus,
         ),
       ),
@@ -186,7 +236,16 @@ export async function routeBrowser(
       throw new HttpError(400, sourceText("error.backend.browserSignInUnsupported"));
     const body = await readJson(request);
     const signIn = decodeBrowserSignInImport({ ...body, tabId: tabId(body) });
-    return json(200, { cookies: await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies)) });
+    const result = await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies));
+    return json(200, { cookies: result.cookies });
+  }
+  // Behind `browser-sign-in-storage-v1`: the same, and also the page storage of the site (#8686).
+  if (method === "POST" && url.pathname === BROWSER_SIGN_IN_STORAGE_ROUTES.import) {
+    if (!capabilities.has(BROWSER_SIGN_IN_STORAGE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserSignInUnsupported"));
+    const body = await readJson(request);
+    const signIn = decodeBrowserSignInStorageImport({ ...body, tabId: tabId(body) });
+    return json(200, await runCauseEffect(browser.importSignIn(signIn.tabId, signIn.cookies, signIn.storage)));
   }
 
   // Behind `browser-view`. The session is only the agreement about which tab and who is watching;

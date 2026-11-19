@@ -75,6 +75,18 @@ export function blockChatMath(source: string): ChatMath | null {
   return null;
 }
 
+/**
+ * Whether a display math block starts on a line after the first line of `source` and before `end`.
+ * Markdown reads the lines above a line of `=` or `-` as a heading. Such a block ends that text, as
+ * a code fence does, so a `=` or `-` line in the formula stays part of the formula.
+ */
+export function chatMathBlockInterrupts(source: string, end: number): boolean {
+  for (let line = source.indexOf("\n") + 1; line > 0 && line < end; line = source.indexOf("\n", line) + 1) {
+    if (blockChatMath(source.slice(line))) return true;
+  }
+  return false;
+}
+
 function delimitedMath(source: string, open: string, close: string, display: boolean): ChatMath | null {
   for (let index = open.length; index < source.length; index += 1) {
     // `\\` is a LaTeX line break, so its second backslash does not start `\)` or `\]`.

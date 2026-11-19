@@ -14,7 +14,6 @@
   height: var(--left-header-height, 38px);
   min-width: 0;
   padding: 0 var(--openbot-space-2);
-  container: side-panel-header / inline-size;
 }
 
 /* A short line at the start of the tab row, above the panel's divider. */
@@ -136,12 +135,6 @@
   cursor: pointer;
 }
 
-/* A file-type badge of three or four letters is wider than a tab icon, so the slot grows to hold it. */
-.side-panel-file-tab .side-panel-tab-close {
-  width: auto;
-  min-width: var(--openbot-icon-md);
-}
-
 .side-panel-tab-icon,
 .side-panel-tab-x {
   grid-area: 1 / 1;
@@ -160,6 +153,20 @@
 
 .side-panel-tab-x {
   opacity: 0;
+}
+
+/* In the side panel, the X sits over the end of the tab, and the icon keeps its place. The X shows on the
+ * selected tab, and on another tab under the pointer or with the focus. */
+.side-panel-header .side-panel-tab-close {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  inset-inline-end: var(--openbot-space-1);
+  translate: 0 -50%;
+}
+
+.side-panel-header :where(.side-panel-tab[data-selected]) .side-panel-tab-x {
+  opacity: 1;
 }
 
 .side-panel-tab:is(:hover, :focus-within) .side-panel-tab-close {
@@ -184,53 +191,121 @@
   outline: none;
 }
 
-/* When the labels of all tabs do not fit, a tab that is not selected shows only its icon. The whole
- * tab then selects its pane. The selected tab keeps its label, and its icon still closes it. With the
- * keyboard, Delete closes the focused tab. */
-@container side-panel-header (max-width: 480px) {
-  .side-panel-tabs:has(> .side-panel-tab:nth-child(4)) {
-    --side-panel-tabs-compact: 1;
+/* The tab row of the side panel. All tabs share one width, which shrinks to a minimum that still shows
+ * a few words of the title; below it, the row scrolls and its edges fade (`SidePanel.tsx`). The row is
+ * the offset parent of the tabs, so a drag and the scroll into view measure the tabs in it. */
+.side-panel-header > .side-panel-tabs {
+  --side-panel-tab-fade: calc(var(--openbot-space-8) * 2);
+  position: relative;
+  overflow-x: auto;
+  padding: var(--openbot-space-0-5);
+  /* A tab that scrolls into view keeps the padding, so the first tab does not start under the fade. */
+  scroll-padding-inline: var(--openbot-space-0-5);
+  scrollbar-width: none;
+}
+
+.side-panel-header > .side-panel-tabs[data-fade-start] {
+  mask-image: linear-gradient(to right, transparent, var(--openbot-text-primary) var(--side-panel-tab-fade));
+}
+
+.side-panel-header > .side-panel-tabs[data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    var(--openbot-text-primary) calc(100% - var(--side-panel-tab-fade)),
+    transparent
+  );
+}
+
+.side-panel-header > .side-panel-tabs[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--openbot-text-primary) var(--side-panel-tab-fade),
+    var(--openbot-text-primary) calc(100% - var(--side-panel-tab-fade)),
+    transparent
+  );
+}
+
+.side-panel-header .side-panel-tab {
+  flex: 0 1 200px;
+  min-width: min(120px, 100%);
+  padding: 0;
+  user-select: none;
+  transition:
+    flex-basis var(--openbot-duration-normal) var(--openbot-ease-out),
+    transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/*
+ * After a close with the pointer, the tabs keep their width until the pointer leaves the row. The width
+ * does not animate on the way in, so the next X is under the pointer at once.
+ */
+.side-panel-header > .side-panel-tabs[data-frozen] > .side-panel-tab {
+  flex: 0 0 var(--side-panel-tab-frozen);
+  transition-property: transform;
+}
+
+/* The whole tab selects it: the icon, the title and the state of a thread. */
+.side-panel-header .side-panel-tab-select {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--openbot-space-1-5);
+  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
+  border-radius: inherit;
+  text-align: start;
+}
+
+.side-panel-tab-glyph {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: var(--openbot-icon-md);
+  opacity: 0.7;
+}
+
+.side-panel-tab-glyph svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.side-panel-header .side-panel-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The X gives the title room only while it shows. */
+.side-panel-header :where(.side-panel-tab:is([data-selected], :hover, :focus-within)) .side-panel-tab-select {
+  padding-inline-end: calc(var(--openbot-icon-md) + var(--openbot-space-1) * 2);
+}
+
+/* A touch does not hover, so only the X that shows takes a tap. */
+@media (pointer: coarse) {
+  .side-panel-header .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
+    pointer-events: none;
   }
 }
 
-@container side-panel-header (max-width: 360px) {
-  .side-panel-tabs:has(> .side-panel-tab:nth-child(3)) {
-    --side-panel-tabs-compact: 1;
-  }
+.side-panel-hidden-tabs {
+  max-width: 320px;
 }
 
-@container style(--side-panel-tabs-compact: 1) {
-  .side-panel-tab:not([data-selected]) {
-    width: auto;
-    min-width: 0;
-    padding: 0 var(--openbot-space-1-5);
-  }
+/* File badges have different widths, so the icons share one column and the names start at one line. */
+.side-panel-hidden-tab-icon {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  inline-size: var(--openbot-space-6);
+}
 
-  .side-panel-tab:not([data-selected]) .side-panel-tab-select {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-  }
-
-  .side-panel-tab:not([data-selected]) .side-panel-tab-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
-    background: transparent;
-  }
-
-  .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-icon {
-    opacity: 0.7;
-  }
-
-  .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-x {
-    opacity: 0;
-  }
+.side-panel-hidden-tabs .side-panel-menu-item > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* In the dock, a pane starts under the tab row. Its inset card starts at the top row's line. */
@@ -296,13 +371,7 @@
   color: var(--openbot-text-muted);
 }
 
-/* A file tab shows the file-type badge of a file link at its size in the chat. A file name is longer
- * than a pane name, so it shrinks and ends in an ellipsis. A file tab slides when it drags, as a thread
- * tab does. */
-.side-panel-file-tab {
-  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
-}
-
+/* A file tab shows the file-type badge of a file link at its size in the chat. */
 .side-panel-file-badge {
   display: inline-flex;
 }
@@ -310,10 +379,6 @@
 .side-panel-file-badge > .attachment-reference-visual > svg {
   width: 12px;
   height: 12px;
-}
-
-.side-panel-file-tab .side-panel-tab-select {
-  flex: 0 1 auto;
 }
 
 /* In the dock, the file tab names the file. The title keeps its place, so the file actions stay at
@@ -331,7 +396,8 @@
 }
 
 /* A thread tab: the state badge of the thread takes the icon slot at its own size, and the X shows
- * over it on hover. A thread that needs the user wears the tint of its badge, as in the chat header. */
+ * over it on hover in the copy that a drag carries. A thread that needs the user wears the tint of its
+ * badge, as in the chat header. */
 .side-panel-tab-close:has(.agent-threads-state) {
   width: auto;
   min-width: var(--openbot-icon-md);
@@ -339,27 +405,14 @@
   min-height: var(--openbot-icon-md);
 }
 
-.side-panel-tab:not(:hover, :focus-within) .side-panel-tab-icon:has(.agent-threads-state) {
+.side-panel-tab:not(:hover, :focus-within) .side-panel-tab-icon:has(.agent-threads-state),
+.side-panel-tab-glyph:has(.agent-threads-state) {
   opacity: 1;
 }
 
-.side-panel-tab-icon .agent-threads-state-icon svg {
+:is(.side-panel-tab-icon, .side-panel-tab-glyph) .agent-threads-state-icon svg {
   width: 12px;
   height: 12px;
-}
-
-/* A thread tab has the widths of a tab in the chat header, so a thread keeps its size when it moves
- * between the two rows. Its title takes the free width of the tab and starts after the icon. */
-.side-panel-thread-tab {
-  flex: 0 1 auto;
-  width: 140px;
-  min-width: 96px;
-  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
-}
-
-.side-panel-thread-tab .side-panel-tab-select {
-  flex: 1;
-  text-align: start;
 }
 
 /* A thread or file tab that the pointer moves follows the pointer and wears the selection fill, so it covers
@@ -438,8 +491,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .side-panel-thread-tab,
-  .side-panel-file-tab {
+  .side-panel-header .side-panel-tab {
     transition: none;
   }
 }

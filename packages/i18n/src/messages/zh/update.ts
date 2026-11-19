@@ -73,4 +73,9 @@ export const messages = {
   "update.whatsNew.changelog": "完整更新日志",
   "update.whatsNew.changelogFailed": "OpenBot 无法打开更新日志。",
   "update.whatsNew.done": "知道了",
+  "update.required.title": "需要更新",
+  "update.required.description": "OpenBot {version} 已不再受支持。请更新到 {minimum} 或更高版本以继续使用。",
+  "update.required.download": "下载 OpenBot",
+  "update.required.continue": "不更新并继续",
+  "update.required.failed": "更新未完成。",
 } as const satisfies PartialTranslation<typeof source>;

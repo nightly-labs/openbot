@@ -7,7 +7,8 @@
 
 import { Check, DropdownMenu, Input, Search } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 
 export interface PickerChip {
@@ -88,6 +89,30 @@ export function PickerRow(props: { option: PickerOption<string>; checked?: boole
 }
 
 /**
+ * The edge fades of a picker list: an edge with more rows behind it fades out. The list measures
+ * again when it scrolls, when it changes size, and when a search changes its rows. One list at a
+ * time: a list that binds replaces the list before it.
+ */
+export function createPickerFades() {
+  const fades = createScrollFades();
+  let rows: MutationObserver | undefined;
+  onCleanup(() => {
+    fades.stop();
+    rows?.disconnect();
+  });
+  return {
+    bind(element: HTMLElement) {
+      fades.bind(element);
+      rows?.disconnect();
+      rows = new MutationObserver(fades.remeasure);
+      rows.observe(element, { childList: true, subtree: true });
+    },
+    classes: fades.classes,
+    measure: fades.measure,
+  };
+}
+
+/**
  * The panel, the search field and the filter. With `search`, the field takes focus when the menu
  * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
  * With `loading`, a line under the rows tells that more rows come.
@@ -104,6 +129,7 @@ function PickerShell<T extends string>(props: {
   let field: HTMLInputElement | undefined;
   let list: HTMLDivElement | undefined;
   let opening = true;
+  const fades = createPickerFades();
   const shown = createMemo(() => {
     const text = query().trim().toLowerCase();
     if (!text) return props.groups;
@@ -158,6 +184,7 @@ function PickerShell<T extends string>(props: {
       <div
         ref={(element: HTMLDivElement) => {
           list = element;
+          fades.bind(element);
           // A letter typed while a row has focus goes back to the field, so typing always searches.
           element.addEventListener(
             "keydown",
@@ -173,7 +200,8 @@ function PickerShell<T extends string>(props: {
             true,
           );
         }}
-        class="wfn-picker-list"
+        class={["wfn-picker-list", fades.classes()]}
+        onScroll={fades.measure}
       >
         <For each={shown()} fallback={<p class="wfn-picker-empty">{t("workflow.picker.noMatches")}</p>}>
           {(group) => props.children(group)}

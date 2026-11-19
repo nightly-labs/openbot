@@ -7,6 +7,8 @@ export type ThreadStatus =
   /** A message waits for a free turn. */
   | { kind: "queued" }
   | { kind: "waiting"; reason: SidebarWaitReason }
+  /** No turn runs, and the thread waits for the answers to its requests to other agents. */
+  | { kind: "awaiting" }
   | { kind: "failed" };
 
 /**

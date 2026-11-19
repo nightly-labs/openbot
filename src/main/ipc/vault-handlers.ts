@@ -1,7 +1,8 @@
 // The Vault of this computer, for Server settings of the local server. Main opens the CSV file dialog
 // and writes the clipboard, so a copied secret does not pass through the renderer. The `host*`
-// endpoints do the same for one server: a joined server answers through `vault-v3`, through `vault-v2`
-// without two-step keys, or through `vault-v1` without API keys when it is older. `hostImportCsv` opens
+// endpoints do the same for one server: a joined server answers through `vault-v4`, through `vault-v3`
+// without the agents of each item, through `vault-v2` without two-step keys, or through `vault-v1`
+// without API keys when it is older. `hostImportCsv` opens
 // the file dialog on this computer and sends the text to a host that serves `vault-import-v1`.
 
 import { readFile, stat } from "node:fs/promises";
@@ -13,6 +14,7 @@ import {
   type VaultImportResult,
   type VaultSaveInput,
   type VaultSecretRequest,
+  type VaultState,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
@@ -23,6 +25,7 @@ import {
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -67,16 +70,23 @@ export function vaultIpcHandlers({
     decode: ResponseDecoder<T>,
     body: VaultSaveInput | VaultSecretRequest | { id: string } | Record<string, never> = {},
   ): Promise<T> {
-    const routes = remoteServers.supportsCapability(serverId, VAULT_V3_CAPABILITY)
-      ? VAULT_V3_ROUTES
-      : remoteServers.supportsCapability(serverId, VAULT_V2_CAPABILITY)
-        ? VAULT_V2_ROUTES
-        : remoteServers.supportsCapability(serverId, VAULT_CAPABILITY)
-          ? VAULT_ROUTES
-          : null;
+    const routes = remoteServers.supportsCapability(serverId, VAULT_V4_CAPABILITY)
+      ? VAULT_V4_ROUTES
+      : remoteServers.supportsCapability(serverId, VAULT_V3_CAPABILITY)
+        ? VAULT_V3_ROUTES
+        : remoteServers.supportsCapability(serverId, VAULT_V2_CAPABILITY)
+          ? VAULT_V2_ROUTES
+          : remoteServers.supportsCapability(serverId, VAULT_CAPABILITY)
+            ? VAULT_ROUTES
+            : null;
     if (!routes) throw new Error(sourceText("error.team.vaultUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, routes[route], decode, { method: "POST", body }));
   }
+  /** Only a `vault-v4` host keeps the agents of each item. */
+  const hostState =
+    (serverId: string): ResponseDecoder<VaultState> =>
+    (value) =>
+      decodeHostVaultState(value, remoteServers.supportsCapability(serverId, VAULT_V4_CAPABILITY));
   // A secret from a joined server is redacted from logs here as well, as on its host. The security
   // code is not: a three-digit pattern would remove numbers from every log line.
   const remoteReveal = async (request: VaultSecretRequest, serverId: string): Promise<string> => {
@@ -131,7 +141,7 @@ export function vaultIpcHandlers({
         body: { csv },
       }),
     );
-    return { imported, skipped, state: await post(serverId, "list", decodeHostVaultState) };
+    return { imported, skipped, state: await post(serverId, "list", hostState(serverId)) };
   };
 
   return {
@@ -158,7 +168,7 @@ export function vaultIpcHandlers({
       codes: handler(() => runCauseEffect(vault.codes())),
       hostList: scopedQueryHandler({
         local: () => vault.state(),
-        remote: (serverId) => post(serverId, "list", decodeHostVaultState),
+        remote: (serverId) => post(serverId, "list", hostState(serverId)),
       }),
       hostSave: scopedHandler(decodeVaultSaveInput, {
         local: (input) => runCauseEffect(vault.save(input)),
@@ -170,12 +180,12 @@ export function vaultIpcHandlers({
           if (input.kind === "apiKey" && input.key !== null) registerSecretValue(input.key, { allowShort: true });
           const twoStepKey = input.kind === "login" && input.twoStepKey ? twoStepKeySecret(input.twoStepKey) : null;
           if (twoStepKey) registerSecretValue(twoStepKey);
-          return post(serverId, "save", decodeHostVaultState, input);
+          return post(serverId, "save", hostState(serverId), input);
         },
       }),
       hostDelete: scopedHandler(stringPayload("id", 64), {
         local: (id) => runCauseEffect(vault.delete(id)),
-        remote: (id, serverId) => post(serverId, "delete", decodeHostVaultState, { id }),
+        remote: (id, serverId) => post(serverId, "delete", hostState(serverId), { id }),
       }),
       hostReveal: scopedHandler(decodeVaultSecretRequest, {
         local: (request) => vault.reveal(request),
@@ -204,7 +214,7 @@ export function vaultIpcHandlers({
       }),
       hostReset: scopedQueryHandler({
         local: () => runCauseEffect(vault.reset()),
-        remote: (serverId) => post(serverId, "reset", decodeHostVaultState),
+        remote: (serverId) => post(serverId, "reset", hostState(serverId)),
       }),
     },
   };

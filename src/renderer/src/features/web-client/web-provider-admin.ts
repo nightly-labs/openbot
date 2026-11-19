@@ -19,9 +19,15 @@ import {
   CUSTOM_PROVIDER_EDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
@@ -55,12 +61,14 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { runTeamEffect } from "@openbot/team-client";
 import {
   type CustomProviderRoutes,
+  cancelProviderAccountCodeLogin,
   cancelProviderAccountSignIn,
   cancelProviderCodeLogin,
   cancelProviderHostSignIn,
   cancelProviderRuntime,
   checkProviderRuntimeUpdates,
   clearProviderApiKey,
+  connectProviderAccountKey,
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
@@ -74,6 +82,7 @@ import {
   listProviderAccountsWithModels,
   type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
+  providerAccountCodeLoginStatus,
   providerAccountSignInStatus,
   providerAccountUsage,
   providerHostSignInStatus,
@@ -88,9 +97,11 @@ import {
   setProviderApiKey,
   setProviderUse,
   signOutProvider,
+  startProviderAccountCodeLogin,
   startProviderAccountSignIn,
   startProviderCodeLogin,
   startProviderHostSignIn,
+  submitProviderAccountCodeLogin,
   submitProviderCodeLogin,
   updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
@@ -115,7 +126,7 @@ import {
   type ProviderDetectionCalls,
 } from "../custom-providers/stores/provider-detection-store";
 import { createProviderConnection } from "../provider-updates/provider-connection";
-import { createProviderRuntimeStore } from "../provider-updates/provider-runtime-store";
+import { createProviderRuntimeStore, hostConnection } from "../provider-updates/provider-runtime-store";
 import { remoteProviderRuntimes } from "../provider-updates/remote-provider-runtimes";
 import { remoteAdminServer, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
@@ -273,6 +284,24 @@ function webProviderAdmin(
       runTeamEffect(
         cancelProviderAccountSignIn(request(serverId), provider).pipe(Effect.mapError((error) => error.cause)),
       ),
+    connectAccountKey: async (input, serverId) =>
+      runTeamEffect(connectProviderAccountKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    startAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        startProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    submitAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        submitProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    accountCodeLoginStatus: async (input, serverId) =>
+      runTeamEffect(
+        providerAccountCodeLoginStatus(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    cancelAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        cancelProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
     renameAccount: async (input, serverId) =>
       runTeamEffect(renameProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     removeAccount: async (input, serverId) =>
@@ -391,11 +420,13 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           ? PROVIDERS_V5_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
     () =>
-      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY)
-        ? CUSTOM_PROVIDER_EDIT_ROUTES
-        : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
-          ? CUSTOM_PROVIDER_HARNESS_ROUTES
-          : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY)
+        ? CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
+        : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY)
+          ? CUSTOM_PROVIDER_EDIT_ROUTES
+          : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+            ? CUSTOM_PROVIDER_HARNESS_ROUTES
+            : PROVIDERS_ADMIN_ROUTES,
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
@@ -413,6 +444,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
       isLocalServer: () => false,
       managesRuntimes: () => serverId() !== undefined,
+      hostConnection: () => hostConnection(options.server()),
     },
   );
   // A boolean, so that a server-list update that keeps the capability does not read the list again.
@@ -427,8 +459,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     editsCustomProviders();
     if (!id) return undefined;
     const store = createCustomProvidersStore(() => hostCustomProvidersApi(() => admin, id));
-    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here.
-    void store.refreshCustomProviders().catch(() => undefined);
+    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here. The read
+    // picks its routes from the server summary; untracked, so a summary update does not read it again.
+    void untrack(() => store.refreshCustomProviders()).catch(() => undefined);
     return store;
   });
   // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.
@@ -506,6 +539,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         },
         ...(accountsServerId() ? { accountSignIn: accountSignIn(accountsServerId() ?? "") } : {}),
         ...(relayed ? { accountRelay: accountRelay(accountsServerId() ?? "", relayed) } : {}),
+        ...(accountCodeServerId() ? { accountCode: accountCode(accountCodeServerId() ?? "") } : {}),
         relay: {
           hostName: options.server()?.name ?? "",
           start: (provider: AgentProviderId) => admin.startRelaySignIn(provider, id ?? ""),
@@ -542,6 +576,34 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
     };
   }
+  /** The joined server whose host signs a provider account in with a code (`provider-account-code-v1`). */
+  const accountCodeServerId = () => {
+    const id = accountsServerId();
+    return id && remoteAdminServer(options.server(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id === id ? id : undefined;
+  };
+  /** As on desktop: the accounts are read again when an account's code sign-in starts and when it ends. */
+  function accountCode(id: string) {
+    const refresh = () => hostAccounts.refresh().catch(() => undefined);
+    return {
+      start: async (provider: AgentProviderId, accountId: string | null) => {
+        const started = await admin.startAccountCodeLogin({ provider, accountId }, id);
+        // The code is shown at once: the code lives for a short time only.
+        void refresh();
+        return started;
+      },
+      submit: (provider: AgentProviderId, accountId: string, code: string) =>
+        admin.submitAccountCodeLogin({ provider, accountId, code }, id),
+      status: async (provider: AgentProviderId, accountId: string) => {
+        const result = await admin.accountCodeLoginStatus({ provider, accountId }, id);
+        if (result.result) await refresh();
+        return result;
+      },
+      cancel: async (provider: AgentProviderId, accountId: string) => {
+        await admin.cancelAccountCodeLogin({ provider, accountId }, id);
+        await refresh();
+      },
+    };
+  }
   /** As on desktop: the other relay requests run an account's relayed sign-in by its provider. */
   function accountRelay(id: string, relayed: ProviderAccountRelay) {
     return {
@@ -573,8 +635,10 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     return {
       connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
       // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-      cancel: async (provider) => {
+      // It does not stop a code sign-in, which the code route stops by its account.
+      cancel: async (provider, accountId) => {
         await accountSignIn(id).cancel(provider);
+        if (accountCodeServerId() === id) await accountCode(id).cancel(provider, accountId);
       },
       rename: (provider, accountId, label) => changed(admin.renameAccount({ provider, accountId, label }, id)),
       remove: (provider, accountId) => changed(admin.removeAccount({ provider, accountId }, id)),
@@ -596,6 +660,20 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         ? {
             setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
               changed(admin.setAccountPool({ provider, enabled, leftOut: [...leftOut] }, id)),
+          }
+        : {}),
+      ...(accountCodeServerId() === id
+        ? {
+            connectWithCode: async (provider: AgentProviderId, accountId: string | null) =>
+              connection.connectAccountWithCode(provider, accountId),
+            // Only a host that can run a pasted code advertises `providers-v3`.
+            pasteCodeSignIn: serverSupportsCapability(options.server(), "providers-v3"),
+          }
+        : {}),
+      ...(remoteAdminServer(options.server(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id === id
+        ? {
+            connectKey: (provider: AgentProviderId, accountId: string | null, key: string) =>
+              changed(admin.connectAccountKey({ provider, accountId, key }, id)),
           }
         : {}),
     };
@@ -767,6 +845,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         editsCustomProviders() &&
         (customProviders()?.customProviders() ?? []).every((provider) => provider.headerNames !== undefined);
       return editable ? updateEndpoint : undefined;
+    },
+    get customProviderHarnessChoice() {
+      return serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY);
     },
     get providerKeys() {
       return providerKeys();

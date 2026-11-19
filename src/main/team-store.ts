@@ -26,6 +26,7 @@ import {
   type TeamSessionSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Layer, Result, Schema } from "effect";
@@ -70,6 +71,10 @@ class TeamStoreFiles extends Context.Service<
 }
 
 const scrypt = promisify(scryptCallback);
+/** The team file in userData: one host per account. */
+export const TEAM_STORE_FILE = "openbot-team-server-v2.json";
+/** The file of the last build without accounts. `initialize` moves it into `TEAM_STORE_FILE`. */
+export const LEGACY_TEAM_STORE_FILE = "openbot-team-server-v1.json";
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
@@ -118,6 +123,11 @@ interface StoredTeam {
         mimeType: AvatarImageInput["mimeType"];
       }
     | undefined;
+  /**
+   * The shape and colour that the server shows with no logo. Absent for the automatic look. Read
+   * with `serverAppearanceOrNull`, so a bad value gives the automatic look and the file still loads.
+   */
+  serverAppearance?: ServerAppearance | undefined;
   members: StoredMember[];
   invites: StoredInvite[];
   sessions: StoredSession[];
@@ -164,6 +174,7 @@ export interface TeamIdentity {
   publicKey: string;
   enabledOnLaunch: boolean;
   logoVersion: string | null;
+  appearance: ServerAppearance | null;
 }
 
 export interface CreatedInvite {
@@ -221,6 +232,8 @@ export class TeamStore {
    * so writing would destroy the user's only copy. Nothing here is backed up.
    */
   #unreadableFile = false;
+  /** Set by `loadReadOnly`: each write fails, so the server safe mode changes no user data. */
+  #readOnly = false;
 
   /**
    * `legacyPath` is the single-host file shipped builds read and write. This store never
@@ -235,6 +248,35 @@ export class TeamStore {
     this.#logoRoot = join(dirname(path), `${basename(path)}.assets`, "logo");
     this.#legacyLogoRoot = legacyPath ? join(dirname(legacyPath), `${basename(legacyPath)}.assets`, "logo") : null;
   }
+
+  /**
+   * Reads the host of the active account and writes nothing, also later: each write of this store
+   * then fails. The server safe mode (`server-safe-mode.ts`) uses it, because it must not change user
+   * data. It does no legacy import, no logo copy and no session prune, and it does not set aside an
+   * empty file. A missing, empty or unreadable file leaves the store unconfigured.
+   */
+  readonly loadReadOnly = Effect.fn("TeamStore.loadReadOnly")(function* (
+    this: TeamStore,
+  ): Effect.fn.Return<void, never, TeamStoreFiles> {
+    this.#readOnly = true;
+    const contents = yield* TeamStoreFiles.use((files) => files.readText(this.#path)).pipe(
+      Effect.orElseSucceed(() => null),
+    );
+    if (contents === null || isEmptyStoredFile(contents)) return;
+    let parsed: StoredTeamFile | null = null;
+    try {
+      parsed = parseStoredJson(this.#path, contents, (value) => (isStoredTeamFile(value) ? value : null));
+    } catch {
+      return;
+    }
+    if (!parsed) return;
+    this.#file = parsed;
+    const activeAccountId = parsed.activeAccountId;
+    this.#state =
+      (activeAccountId === null
+        ? parsed.hosts.find((host) => ownerAccountId(host) === null)
+        : parsed.hosts.find((host) => ownerAccountId(host) === activeAccountId)) ?? null;
+  }, Effect.provide(TeamStoreFiles.layer)).bind(this);
 
   readonly initialize = Effect.fn("TeamStore.initialize")(
     function* (this: TeamStore): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
@@ -651,12 +693,12 @@ export class TeamStore {
   readonly updateIdentity = Effect.fn("TeamStore.updateIdentity")(
     function* (
       this: TeamStore,
-      input: { serverName?: string; logo?: AvatarImageInput | null },
+      input: { serverName?: string; logo?: AvatarImageInput | null; appearance?: ServerAppearance | null },
     ): Effect.fn.Return<TeamIdentity, RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
       const serverName = input.serverName;
       if (serverName !== undefined) yield* remoteDecode(() => validateServerName(serverName));
-      if (input.serverName === undefined && input.logo === undefined) {
+      if (input.serverName === undefined && input.logo === undefined && input.appearance === undefined) {
         const identity = this.getIdentity();
         if (!identity)
           return yield* new RemoteWorkflowError({ cause: new TeamStoreError(sourceText("error.team.notConfigured")) });
@@ -665,6 +707,7 @@ export class TeamStore {
 
       const previousName = state.serverName;
       const previousLogo = state.serverLogo;
+      const previousAppearance = state.serverAppearance;
       const nextLogo =
         input.logo === undefined
           ? previousLogo
@@ -683,6 +726,8 @@ export class TeamStore {
       if (input.serverName !== undefined) state.serverName = input.serverName.trim();
       if (nextLogo === undefined) delete state.serverLogo;
       else state.serverLogo = nextLogo;
+      if (input.appearance === null) delete state.serverAppearance;
+      else if (input.appearance !== undefined) state.serverAppearance = { ...input.appearance };
       const attempt6 = yield* Effect.gen({ self: this }, function* () {
         yield* this.#persistEffect();
       }).pipe(Effect.result);
@@ -691,6 +736,8 @@ export class TeamStore {
         state.serverName = previousName;
         if (previousLogo === undefined) delete state.serverLogo;
         else state.serverLogo = previousLogo;
+        if (previousAppearance === undefined) delete state.serverAppearance;
+        else state.serverAppearance = previousAppearance;
         if (nextLogo && nextLogo.version !== previousLogo?.version) {
           yield* this.#removeLogoEffect(nextLogo).pipe(Effect.catch(() => Effect.void));
         }
@@ -912,6 +959,16 @@ export class TeamStore {
     return this.#state?.members.map(publicMember) ?? [];
   }
 
+  /**
+   * The account of each member who has one: the same person has the same account on every server,
+   * and a member id belongs to one server. A server transfer moves a person's choices by it.
+   */
+  memberAccounts(): { memberId: string; accountId: string; owner: boolean }[] {
+    return this.#requireState().members.flatMap((member) =>
+      member.accountId ? [{ memberId: member.id, accountId: member.accountId, owner: member.role === "owner" }] : [],
+    );
+  }
+
   listMembers(): TeamMemberSummary[] {
     const members = this.#requireState().members.map(publicMember);
     const known = new Set(members.map((member) => member.id));
@@ -1052,6 +1109,19 @@ export class TeamStore {
     for (const [tokenHash, session] of this.#remoteSessions) {
       if (session.sessionId === sessionId) this.#remoteSessions.delete(tokenHash);
     }
+  }
+
+  /**
+   * Whether `sessionId` is a session of the owner that a sign-in to this store made, not one of a
+   * Signal connection (`openRemoteSession`). On a server on this computer, the owner has a password
+   * that only the desktop app here knows, and the owner's other devices connect through Signal.
+   */
+  isStoredOwnerSession(sessionId: string): boolean {
+    const ownerId = this.getOwnerMemberId();
+    return (
+      ownerId !== null &&
+      (this.#state?.sessions.some((session) => session.id === sessionId && session.memberId === ownerId) ?? false)
+    );
   }
 
   getMember(memberId: string): TeamMemberSummary | null {
@@ -1596,7 +1666,7 @@ export class TeamStore {
   readonly #persistFileEffect = Effect.fn("TeamStore.persistFile")(function* (
     this: TeamStore,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
-    if (this.#unreadableFile) {
+    if (this.#unreadableFile || this.#readOnly) {
       return yield* new RemoteWorkflowError({
         cause: new TeamStoreError(sourceText("error.team.serverFileUnreadable")),
       });
@@ -1737,6 +1807,7 @@ function identityOf(host: StoredTeam): TeamIdentity {
     publicKey: host.publicKey,
     enabledOnLaunch: host.enabledOnLaunch,
     logoVersion: host.serverLogo?.version ?? null,
+    appearance: serverAppearanceOrNull(host.serverAppearance),
   };
 }
 
@@ -1782,6 +1853,9 @@ function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTea
   const serverLogo = pickChanged(baseline.serverLogo, mine.serverLogo, theirs.serverLogo);
   if (serverLogo === undefined) delete merged.serverLogo;
   else merged.serverLogo = serverLogo;
+  const serverAppearance = pickChanged(baseline.serverAppearance, mine.serverAppearance, theirs.serverAppearance);
+  if (serverAppearance === undefined) delete merged.serverAppearance;
+  else merged.serverAppearance = serverAppearance;
   return merged;
 }
 

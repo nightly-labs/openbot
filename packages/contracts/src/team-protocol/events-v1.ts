@@ -21,7 +21,7 @@ import {
   string,
   variant,
 } from "./admin-wire";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const EVENTS_CAPABILITY = "events-v1";
 

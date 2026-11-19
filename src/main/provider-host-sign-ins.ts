@@ -41,11 +41,14 @@ export class ProviderHostSignIns {
     );
   }
 
-  /** Starts the sign-in with no tab: the page address waits for a client to open it (`sign-in-relay-v1`). */
-  startRelay(provider: AgentProviderId) {
+  /**
+   * Starts the sign-in with no tab: the page address waits for a client to open it (`sign-in-relay-v1`).
+   * `atHost`: the client is at this computer (`ProviderRuntime.signInProviderOnHost`).
+   */
+  startRelay(provider: AgentProviderId, atHost = false) {
     return this.#pages.start(
       provider,
-      (openPage) => this.#dependencies.service.signInProviderOnHost(provider, openPage),
+      (openPage) => this.#dependencies.service.signInProviderOnHost(provider, openPage, atHost),
       (exit) => resultOf(provider, exit),
       "relay",
     );

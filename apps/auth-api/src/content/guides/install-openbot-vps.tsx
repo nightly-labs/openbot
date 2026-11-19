@@ -403,9 +403,11 @@ export function InstallOpenBotVPS() {
       </p>
 
       <p>
-        <strong>Can I move my existing agents to the VPS?</strong> Yes. Choose the VPS as the destination when using an
-        appropriate import or transfer flow. Reading local Hermes folders belongs to the local desktop flow; a joined
-        VPS uses a ZIP import.
+        <strong>Can I move my existing agents to the VPS?</strong> Yes. If you administer both servers, open{" "}
+        <strong>Transfer</strong> in <strong>Server settings</strong> in the desktop app and choose{" "}
+        <strong>Copy to another server</strong>. Pick the server that has the agents and choose this VPS as the
+        destination. You can copy the agents in one step without handling a file. ZIP import still works. To read a
+        local Hermes folder, use the OpenBot desktop app on the computer where the folder is stored.
       </p>
     </>
   );

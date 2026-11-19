@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -16,8 +16,8 @@ const launchArgs = process.argv.slice(2);
 const useRocketSim = launchArgs.includes("--rocketsim");
 const args = launchArgs.filter((arg) => arg !== "--" && arg !== "--rocketsim");
 
-function run(command: string, args: string[]) {
-  const result = spawnSync(command, args, { cwd: mobileRoot, stdio: "inherit", env: process.env });
+function run(command: string, args: string[], cwd = mobileRoot) {
+  const result = spawnSync(command, args, { cwd, stdio: "inherit", env: process.env });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
@@ -53,12 +53,16 @@ process.env.OPENBOT_XCODE_DERIVED_DATA ??= join(mobileRoot, "ios/DerivedData");
 process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), process.env.PATH].join(delimiter);
 
 // run:ios skips prebuild when ios/ exists. Apply config plugins to existing projects too.
-// run:ios installs pods only when Podfile.lock changes. Install them again when their generated
-// output is missing, because Xcode's fallback codegen does not match the Pods project, and when a
-// native dependency changed after the last install: a removed package otherwise stays a Pods target
-// whose source files no longer exist, and a new local module is not built.
+// run:ios installs pods only when Podfile.lock changes, and prebuild only when the dependencies of
+// package.json changed. Install them here when their generated output is missing, because Xcode's
+// fallback codegen does not match the Pods project, and when a native dependency changed after the
+// last install: a removed package otherwise stays a Pods target whose source files no longer exist,
+// and a new local module, or a new source file of one, is not built.
 const podsOutput = join(mobileRoot, "ios/build/generated/autolinking/autolinking.json");
 const podfileLock = join(mobileRoot, "ios/Podfile.lock");
+// CocoaPods does not write Podfile.lock again when it has no change. This file has the time of the
+// last install from here, so a change that keeps the lock file does not install at each build.
+const podsStamp = join(mobileRoot, "ios/Pods/.openbot-installed");
 const modulesRoot = join(mobileRoot, "modules");
 const nativeInputs = [
   join(mobileRoot, "package.json"),
@@ -66,17 +70,30 @@ const nativeInputs = [
   ...(existsSync(modulesRoot)
     ? readdirSync(modulesRoot).flatMap((name) => {
         const ios = join(modulesRoot, name, "ios");
+        // The Pods project lists the source files of a module. The time of the folder changes when a
+        // file is added or removed.
         return existsSync(ios)
-          ? readdirSync(ios)
-              .filter((file) => file.endsWith(".podspec"))
-              .map((file) => join(ios, file))
+          ? [
+              ios,
+              ...readdirSync(ios)
+                .filter((file) => file.endsWith(".podspec"))
+                .map((file) => join(ios, file)),
+            ]
           : [];
       })
     : []),
 ];
+const podsInstalledAt = Math.max(
+  existsSync(podfileLock) ? statSync(podfileLock).mtimeMs : 0,
+  existsSync(podsStamp) ? statSync(podsStamp).mtimeMs : 0,
+);
 const podsStale =
   !existsSync(podfileLock) ||
-  nativeInputs.some((input) => existsSync(input) && statSync(input).mtimeMs > statSync(podfileLock).mtimeMs);
+  nativeInputs.some((input) => existsSync(input) && statSync(input).mtimeMs > podsInstalledAt);
 const installPods = existsSync(join(mobileRoot, "ios/Pods")) && (!existsSync(podsOutput) || podsStale);
-run("node", [expo, "prebuild", "--platform", "ios", "--no-clean", ...(installPods ? [] : ["--no-install"])]);
+run("node", [expo, "prebuild", "--platform", "ios", "--no-clean", "--no-install"]);
+if (installPods) {
+  run("pod", ["install"], join(mobileRoot, "ios"));
+  writeFileSync(podsStamp, "");
+}
 run("node", [expo, "run:ios", ...args]);

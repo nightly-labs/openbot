@@ -147,12 +147,15 @@
   margin: 20px;
 }
 
-.file-preview-video {
-  display: block;
-  width: 100%;
+/* The player takes the width of the panel and the shape of the video, and never more than the panel's height. */
+.media-generation-stage.file-preview-video {
   max-height: 100%;
+  border-radius: 0;
   background: var(--openbot-bg-canvas);
-  object-fit: contain;
+}
+
+.file-preview-video .media-generation-player:not(:popover-open) video {
+  background: var(--openbot-bg-canvas);
 }
 
 .file-preview-spreadsheet {

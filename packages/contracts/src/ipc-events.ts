@@ -1,14 +1,17 @@
 import {
+  isRoutinePausedByRun,
   isRoutineRunFields,
   isRoutineSchedule,
   ROUTINE_MISSED_POLICIES,
   ROUTINE_RUN_PLACES,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutinePausedByRun,
   type RoutineRunFields,
   type RoutineRunPlace,
   type RoutineSchedule,
 } from "./ipc-routines";
+import { API_KEY_NAME_PATTERN } from "./ipc-vault";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 /** JSON values accepted from a webhook request. */
@@ -72,6 +75,8 @@ export interface EventRoutine {
   missedPolicy?: RoutineMissedPolicy;
   /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
   runIn?: RoutineRunPlace;
+  /** As `RoutineFields.pausedByRun`: a paused agent routine that one of its own scheduled runs paused. */
+  pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,6 +106,14 @@ export interface SaveEventRoutineResult {
 
 export interface WebhookSecret {
   secret: string;
+}
+
+/**
+ * The API key of the agent that has the new signing secret of its webhook routine. The host keeps the
+ * secret; the agent reads it from the file of the key with this name.
+ */
+export interface AgentWebhookSecret {
+  name: string;
 }
 
 /** A signing secret that the sender made, such as a Composio or Svix webhook secret. */
@@ -270,6 +283,7 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );
@@ -281,6 +295,10 @@ function isSaveEventRoutineResult(value: unknown): value is SaveEventRoutineResu
 
 function isWebhookSecret(value: unknown): value is WebhookSecret {
   return isDynamicRecord(value) && isString(value.secret) && value.secret.length > 0;
+}
+
+function isAgentWebhookSecret(value: unknown): value is AgentWebhookSecret {
+  return isDynamicRecord(value) && isString(value.name) && API_KEY_NAME_PATTERN.test(value.name);
 }
 
 function isDeliveryId(value: unknown): value is string {
@@ -334,6 +352,7 @@ export const decodeEventActivity = decodeList(isEventActivity, "Invalid event ac
 export const decodeEventRoutines = decodeList(isEventRoutine, "Invalid event routine response.");
 export const decodeSaveEventRoutineResult = decodeOne(isSaveEventRoutineResult, "Invalid event routine response.");
 export const decodeWebhookSecret = decodeOne(isWebhookSecret, "Invalid webhook secret response.");
+export const decodeAgentWebhookSecret = decodeOne(isAgentWebhookSecret, "Invalid webhook secret response.");
 export const decodeWebhookTestResult = decodeOne(isWebhookTestResult, "Invalid webhook test response.");
 function isEventRoutineRun(value: unknown): value is EventRoutineRun {
   return (

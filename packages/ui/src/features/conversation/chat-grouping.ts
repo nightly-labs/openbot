@@ -1,0 +1,56 @@
+/*
+ * The rule that decides when a run of messages by one sender reads as one block. Both the agent
+ * chat and the channel chat use it, so the rule lives here, away from either timeline, beside the
+ * day separator rule it works with.
+ */
+
+/**
+ * How long a run of messages by one sender stays one block. Beyond it the time returns, because a
+ * reply an hour later is a new turn of the conversation, not a continuation.
+ */
+const CHAT_GROUPING_WINDOW_MS = 5 * 60_000;
+
+/**
+ * With the compact action row, a separator with the time stands above a message that comes this long
+ * after the one before it, in the agent chat and in a thread.
+ */
+export const CHAT_TIME_GAP_MS = 60 * 60 * 1000;
+
+/** A row of a transcript, as the fields the grouping rule reads. */
+export interface SenderRunRow {
+  /** Who wrote the row. The agent chat carries "you" or "agent"; a channel carries an author id. */
+  author: string;
+  createdAt?: string;
+  /** The agent turn that wrote the row. The updates and the answer of one turn are one run. */
+  turnId?: string;
+}
+
+/** Do two messages fall close enough together to stay one block? An unreadable time says no. */
+function withinGroupingWindow(previousIso: string | undefined, currentIso: string | undefined): boolean {
+  if (previousIso === undefined || currentIso === undefined) return false;
+  const previous = new Date(previousIso).getTime();
+  const current = new Date(currentIso).getTime();
+  if (Number.isNaN(previous) || Number.isNaN(current)) return false;
+  return current - previous <= CHAT_GROUPING_WINDOW_MS;
+}
+
+/**
+ * Does this row continue the run above it, and so draw no time of its own? Rows of one agent turn
+ * always do; other rows do when they come within the grouping window.
+ *
+ * `previous` is absent for the first row of the transcript, which always opens a run.
+ * `previousDrawsTime` is false for a row that carries no time the reader can see, such as an
+ * activity marker: the run it interrupts cannot continue under it. `startsDay` is true when a day
+ * separator stands above the row, which opens a run the same way a new sender does.
+ */
+export function continuesSenderRun(
+  previous: SenderRunRow | undefined,
+  current: SenderRunRow,
+  options: { previousDrawsTime: boolean; startsDay: boolean },
+): boolean {
+  if (previous === undefined || !options.previousDrawsTime || options.startsDay) return false;
+  if (previous.author !== current.author) return false;
+  // A long step can keep an agent quiet for many minutes, but its next update is still the same turn.
+  if (previous.turnId !== undefined && previous.turnId === current.turnId) return true;
+  return withinGroupingWindow(previous.createdAt, current.createdAt);
+}

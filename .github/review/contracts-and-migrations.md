@@ -28,8 +28,8 @@ Report a finding when the diff:
   the time and disk cost is unbounded; the migration itself has to be safe.
 - Changes a released Team API protocol under `packages/contracts/src/team-protocol` — a required
   field, a removed field, or a changed meaning. That needs a new version, not an edit.
-- Removes a registered adapter, or serializes current IPC types directly across the Team API
-  boundary.
+- Removes a registered adapter that a release in the support window (root `AGENTS.md`) still speaks,
+  or serializes current IPC types directly across the Team API boundary.
 - Uses the application SemVer as a wire protocol version.
 - Makes a malformed known payload anything other than a fail-closed `protocol_error`, or fails on an
   unknown optional event instead of ignoring it.
@@ -40,8 +40,8 @@ Report a finding when the diff:
 
 Do **not** report:
 
-- The existence of old adapters. Released adapters are permanent by design; age, release count, and
-  SemVer distance are not reasons to remove one.
+- The existence of old adapters while a release in the support window speaks them, or the removal of
+  an adapter that no release in the window speaks.
 - Duplication between a frozen adapter and the current one. Frozen copies are deliberately frozen.
 - A capability used for additive, optional behaviour where a missing capability disables only the
   related feature. That is the intended mechanism.

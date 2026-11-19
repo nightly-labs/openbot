@@ -3,7 +3,8 @@
 // set through `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`, answers `loadCodeAssist` and
 // `retrieveUserQuotaSummary` with the CLI's token in a temporary `GEMINI_HOME`. Checks that a Google
 // sign-in gives the Gemini weekly window and not the Claude and GPT one, that a model with a quota
-// group of its own gets that group's window (#3055), that on a plan with no Gemini group the dock shows
+// group of its own gets that group's window (#3055), also when Google lists no models for the group and leaves the spent
+// fraction out (#9864), that on a plan with no Gemini group the dock shows
 // the group with the least room left and a Gemini model still has no reading, that the reading names every group for the usage
 // popover and the composer notice, that the fake gets the Antigravity desktop app's User-Agent, the bearer token and
 // the account's project, that an API key sign-in, an access token that expires within a minute, a 403
@@ -64,7 +65,11 @@ const GOOGLE_QUOTA = {
     },
   ],
 };
-/** The same answer for a plan that gives Gemini 4 Argon a group of its own, here spent (#3055). */
+/**
+ * The same answer for a plan that gives Gemini 4 Argon a group of its own, here spent (#3055). As
+ * Google sends it, the group's description is a plan note with no model list, and the spent bucket
+ * has no `remainingFraction`: Google's JSON leaves a zero out (#9864).
+ */
 const ARGON_QUOTA = {
   groups: [
     {
@@ -81,14 +86,17 @@ const ARGON_QUOTA = {
     },
     {
       displayName: "Gemini 4 Argon",
-      description: "Models within this group: Gemini 4 Argon",
+      description:
+        "For paid Pro plans, Argon quota is separate. Higher Argon quota (included as part of the larger Gemini quota bucket) is available on Ultra plans.",
       buckets: [
         {
-          displayName: "Weekly Limit Remaining",
+          bucketId: "gemini-argon-wtu-weekly",
+          displayName: "Gemini 4 Argon Weekly Limit",
           window: "weekly",
           resetTime: "2026-11-18T10:00:00Z",
-          remainingFraction: 0,
         },
+        // A bucket that gives an amount and no fraction has no window.
+        { bucketId: "gemini-argon-credits", window: "5h", resetTime: "2026-11-18T10:00:00Z", remainingAmount: "40" },
       ],
     },
     {
@@ -340,8 +348,9 @@ try {
   assert.equal(cli.source, "managed");
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  // The desktop app's version, not the CLI's: Google sends the Gemini group only to it (#7215).
-  report.userAgent = `antigravity/2.31.0 ${os}/${arch}`;
+  // The desktop app's own form and version, not the CLI's: Google sends the Gemini group only to the
+  // desktop version (#7215), and a Pro plan's Gemini 4 Argon group only to the `hub` form (#10934).
+  report.userAgent = `antigravity/hub/2.24.0 (aidev_client; os_type=${os}; arch=${arch}; cl=963137146)`;
 
   // 1. A Google sign-in: the Gemini group's weekly window, from the account's project.
   await writeToken(ACCESS_TOKEN, inOneHour());

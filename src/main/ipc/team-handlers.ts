@@ -225,6 +225,7 @@ export function withLocalHostSummary(servers: ServerSummary[], status: HostStatu
           ...server,
           name: status.serverName ?? "Local",
           logoUrl: status.logoUrl,
+          appearance: status.appearance,
           apiUrl: status.apiUrl,
           remoteDesktopAvailable: status.remoteDesktopReady,
           state: status.phase === "error" ? "error" : "online",

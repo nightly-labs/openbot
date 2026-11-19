@@ -32,6 +32,7 @@ import {
 } from "./database/storage-usage-queries";
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import type { UserFilesBytes } from "./user-files-bytes";
 
 interface StorageRoots {
   /** The SQLite file. Its `-wal` and `-shm` companions are counted with it. */
@@ -64,6 +65,8 @@ export interface StorageUsageSources {
    * Absent on a host without channels.
    */
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
+  /** The bytes of the files of the server's user. Only a hosted server has it. */
+  userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
 }
 
 export interface StorageChannelFile {
@@ -540,7 +543,7 @@ function scopeKey(input: GetStorageUsageInput): string {
  */
 export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
-  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox">;
+  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
   readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
@@ -550,7 +553,7 @@ export class StorageUsageService {
 
   constructor(
     scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
-    sources: Pick<StorageUsageSources, "roots" | "mailbox">,
+    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">,
     now: () => number = Date.now,
   ) {
     this.#scanner = scanner;
@@ -591,21 +594,36 @@ export class StorageUsageService {
   readonly deleteFile = Effect.fn("StorageUsage.deleteFile")(function* (this: StorageUsageService, fileId: string) {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
       return yield* new StoredStateFailure({ cause: new StorageNotFoundError(sourceText("error.backend.fileGone")) });
-    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.invalidate())));
+    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.#afterRemove())));
   }).bind(this);
 
   disk() {
     return diskSpace(this.#sources.roots.data);
   }
 
+  /** The disk with the bytes of the user's files (`storage-user-files-v1`). */
+  readonly diskUse = Effect.fn("StorageUsage.diskUse")(function* (this: StorageUsageService) {
+    const disk = yield* diskSpace(this.#sources.roots.data);
+    const userBytes = this.#sources.userFiles ? yield* this.#sources.userFiles.read() : null;
+    return { ...disk, userBytes };
+  }).bind(this);
+
   clear(category: ClearableStorageCategory) {
     return clearStorageCategory(this.#sources.roots, category).pipe(
-      Effect.ensuring(Effect.sync(() => this.invalidate())),
+      Effect.ensuring(Effect.sync(() => this.#afterRemove())),
     );
   }
 
   dispose() {
-    return Scope.close(this.#scope, Exit.void);
+    return Scope.close(this.#scope, Exit.void).pipe(
+      Effect.andThen(this.#sources.userFiles ? this.#sources.userFiles.dispose() : Effect.void),
+    );
+  }
+
+  /** A delete or a clear also makes the measured user files old, so the free space of the plan shows it. */
+  #afterRemove(): void {
+    this.invalidate();
+    this.#sources.userFiles?.forget();
   }
 
   invalidate(): void {

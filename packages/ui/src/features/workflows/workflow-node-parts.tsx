@@ -40,6 +40,7 @@ import type { JSX } from "@solidjs/web";
 import { children, createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 import { PickerMenu } from "./WorkflowPicker";
 import {
   Hint,
@@ -75,7 +76,7 @@ type BlockKind = "trigger" | "condition" | "output" | "approval" | "note" | "sha
 
 /* --------------------------------------------------------------- Ports */
 
-function PortIcon(props: { type: WfnPortType }) {
+export function PortIcon(props: { type: WfnPortType }) {
   return (
     <Show when={props.type === "text"} fallback={props.type === "image" ? <Image /> : <File />}>
       <Type />
@@ -91,8 +92,8 @@ export function Port(props: {
   node: string;
   type: WfnPortType;
   side: WfnPortSide;
-  branch?: string;
-  label?: string;
+  branch?: string | undefined;
+  label?: string | undefined;
   missing?: boolean;
 }) {
   const board = useBoard();
@@ -123,7 +124,7 @@ export function Port(props: {
         data-wfn-port-type={props.type}
         data-wfn-port-branch={props.branch}
         data-missing={props.missing ? "" : undefined}
-        data-connected={board.connected(props.node, props.side, props.type, props.branch) ? "" : undefined}
+        data-connected={board.drawsLine(props.node, props.side, props.type, props.branch) ? "" : undefined}
         data-armed={armed() ? "" : undefined}
         data-target={target() ? "" : undefined}
         data-refused={refused() ? "" : undefined}
@@ -341,6 +342,15 @@ export function oneOf<T extends WfnFieldValue>(values: readonly T[]): (value: Wf
 export const asProvider = (value: WfnFieldValue): WfProvider | undefined =>
   isAgentProviderRef(value) ? value : undefined;
 
+/** One input port of a step. */
+export interface WfnInputPort {
+  type: WfnPortType;
+  /** The field that holds the source of this port. */
+  branch?: string;
+  /** The name on hover. Without it, the name of the type. */
+  label?: string;
+}
+
 export interface ShellProps {
   id: string;
   label: string;
@@ -360,11 +370,18 @@ export interface ShellProps {
   /** The node has no label above its card, as a shape. The lock badge still shows. */
   bare?: boolean;
   inputs?: readonly WfnPortType[];
+  /**
+   * The input ports, when a type has more than one, as the first and the last frame of a video. A
+   * port with a branch puts its source in the field of that name. Without it, one port for each input.
+   */
+  inputPorts?: readonly WfnInputPort[] | undefined;
   /** The step cannot run until a line comes into one of its inputs. */
   requires?: boolean;
   output?: WfnPortType | undefined;
   toolbar: JSX.Element;
   media?: boolean;
+  /** The media has clear pixels: the card has no fill and no ring, so the canvas shows through. */
+  clear?: boolean;
   /** The image of a result in the results strip. A text step has none. */
   thumb?: (result: WfnResult) => string | undefined;
   style?: JSX.CSSProperties;
@@ -407,7 +424,9 @@ export function NodeShell(props: ShellProps) {
   /** A failed step that can run again shows Retry in place of its run button, and a step that runs alone Stop. */
   const action = children(() => props.action);
   const stop = () => stopOf(board, props.id);
-  const missing = () => props.requires === true && !props.inputs?.some((type) => board.connected(props.id, "in", type));
+  const inputPorts = (): readonly WfnInputPort[] => props.inputPorts ?? (props.inputs ?? []).map((type) => ({ type }));
+  const missing = () =>
+    props.requires === true && !inputPorts().some((port) => board.connected(props.id, "in", port.type, port.branch));
   const style = (): JSX.CSSProperties => {
     const size = board.size(props.id);
     return {
@@ -447,7 +466,11 @@ export function NodeShell(props: ShellProps) {
           <RunTime id={props.id} />
         </span>
         <div class="wfn-card-frame">
-          <div class="wfn-card" data-media={props.media ? "" : undefined}>
+          <div
+            class="wfn-card"
+            data-media={props.media ? "" : undefined}
+            data-clear={props.media && props.clear ? "" : undefined}
+          >
             {props.children}
             <Show when={missing() && (selected() || board.status(props.id) !== undefined)}>
               <p class="wfn-alert" data-tone="warning">
@@ -483,10 +506,19 @@ export function NodeShell(props: ShellProps) {
         <Show when={selected()}>
           <ResultStrip id={props.id} thumb={props.thumb} />
         </Show>
-        <Show when={props.inputs?.length}>
+        <Show when={inputPorts().length}>
           <span class="wfn-ports" data-side="in">
-            <For each={props.inputs}>
-              {(type) => <Port node={props.id} type={type} side="in" missing={missing()} />}
+            <For each={inputPorts()}>
+              {(port) => (
+                <Port
+                  node={props.id}
+                  type={port.type}
+                  side="in"
+                  branch={port.branch}
+                  label={port.label}
+                  missing={missing()}
+                />
+              )}
             </For>
           </span>
         </Show>
@@ -668,7 +700,9 @@ export function resultTime(format: AppFormat, at: string): string {
 /**
  * The results of a step, oldest first, under the selected node, as on the Higgsfield canvas. An
  * image step shows each image; a text step shows the number of each result. The arrows move to the
- * result before or after the one on view. A step with one result shows nothing.
+ * result before or after the one on view. A step with one result shows nothing. When there are more
+ * results than fit, the list scrolls so that the result on view is in the middle, clear of the faded
+ * edges. A wheel or a trackpad over the list scrolls it.
  */
 function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string | undefined) | undefined }) {
   const board = useBoard();
@@ -682,6 +716,41 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
     const next = list()[index() + step];
     if (next) board.pick(props.id, next.id);
   };
+  let items: HTMLSpanElement | undefined;
+  createEffect(
+    () => (list().length > 1 ? board.shown(props.id)?.id : undefined),
+    (id, before) => {
+      const item = id ? items?.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
+      if (!items || !item) return;
+      items.scrollTo({
+        left: item.offsetLeft + item.offsetWidth / 2 - items.clientWidth / 2,
+        behavior: before === undefined || prefersReducedMotion() ? "instant" : "smooth",
+      });
+    },
+  );
+  // A wheel or a trackpad scrolls the row while the row can move that way. At an end of the row, and
+  // for a pinch, the canvas pans or zooms as before.
+  const scrollOnWheel = (event: WheelEvent) => {
+    if (!items || event.ctrlKey || event.metaKey) return;
+    const unit =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? items.clientWidth
+          : 1;
+    const rightToLeft = getComputedStyle(items).direction === "rtl";
+    // A sideways swipe moves the row as the browser does. A vertical wheel moves it toward the end of
+    // the row, which is on the left in a right-to-left language.
+    const sideways = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
+    const step = (sideways ? event.deltaX : rightToLeft ? -event.deltaY : event.deltaY) * unit;
+    // In a right-to-left language, scrollLeft goes from 0 at the start to a negative value at the end.
+    const end = items.scrollWidth - items.clientWidth;
+    const [min, max] = rightToLeft ? [-end, 0] : [0, end];
+    if (step === 0 || (step > 0 ? items.scrollLeft >= max - 1 : items.scrollLeft <= min + 1)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    items.scrollLeft += step;
+  };
   return (
     <Show when={list().length > 1}>
       <fieldset class="wfn-strip" aria-label={t("workflow.node.result.list")}>
@@ -694,7 +763,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
         >
           <ChevronLeft />
         </Button>
-        <span class="wfn-strip-list">
+        <span ref={items} class="wfn-strip-list" onWheel={scrollOnWheel}>
           <For each={list()}>
             {(result, at) => (
               <Hint

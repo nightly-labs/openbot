@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { androidApkRelease, androidApkVersion } from "../lib/android-apk";
 import { OPENBOT_LINKS } from "../lib/landing-links";
 
 export type AvailableDownloadPlatform = "linux" | "macos" | "windows";
@@ -74,6 +75,17 @@ function findInstaller(
     return asset;
   }
   return undefined;
+}
+
+/**
+ * The APK of the newest Android version on Google Play. Its place on GitHub follows from the
+ * version, so this asks GitHub nothing. Not found while no version has an APK: the site shows no
+ * link to it then.
+ */
+export function androidApkResponse(): Response {
+  const version = androidApkVersion();
+  if (version === undefined) return new Response("Not found", { status: 404 });
+  return redirect(androidApkRelease(version).url);
 }
 
 /**

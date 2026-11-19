@@ -14,8 +14,10 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
+import { playbackTime } from "../model/playback-time";
+import { shareTypeOptions } from "../model/share-file-type";
 import type { AttachmentTint } from "./chat-attachment";
-import { playbackTime, runFileAction } from "./chat-video.native";
+import { runFileAction } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
@@ -112,8 +114,11 @@ export function ChatAudioAttachment(props: AudioAttachmentProps) {
   const { attachment, serverId } = props;
   const settled = useListSettled();
   const historyShown = useHistoryShown();
-  const query = useMediaFile(serverId, attachment, settled && historyShown);
-  const uri = query.data ?? null;
+  const ready = settled && historyShown;
+  const query = useMediaFile(serverId, attachment, ready);
+  // A file that an earlier card downloaded is there at once. Its player also waits until the chat
+  // shows and the list is not in a fast fling, as the download does.
+  const uri = ready ? (query.data ?? null) : null;
   // The player is made with the file: each player is a native media player, and a card without its
   // file has nothing to play.
   return uri ? (
@@ -209,7 +214,7 @@ function AudioCard({
     await runFileAction(
       async () => {
         if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { mimeType: attachment.mimeType, dialogTitle: attachment.name });
+        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
       },
       t("mobile.chat.attachment.openFailed"),
       text,

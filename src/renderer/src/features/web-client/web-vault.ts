@@ -8,6 +8,7 @@ import { VAULT_IMPORT_CSV_LIMIT } from "@openbot/contracts/team-protocol/vault-i
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { runTeamEffect } from "@openbot/team-client";
 import { importHostVaultCsv } from "@openbot/team-client/team-admin-requests";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
@@ -18,18 +19,20 @@ import { chooseFiles } from "./web-channels-runtime";
 import type { WebWorkspace } from "./web-client-context";
 
 /**
- * The Vault of the connected host (`vault-v3`, `vault-v2` without two-step keys, or `vault-v1` without
- * API keys), for its owner or admin. The browser has no main process, so a copy shows the secret to this page and puts it on the
+ * The Vault of the connected host (`vault-v4`, `vault-v3` without the agents of each item, `vault-v2`
+ * without two-step keys, or `vault-v1` without API keys), for its owner or admin. The browser has no main process, so a copy shows the secret to this page and puts it on the
  * clipboard here. `importable` is true while the host serves `vault-import-v1`: the browser's file
  * chooser picks the CSV export, and its text goes to the host.
  */
 export function webVaultCalls(
   request: () => TeamApiRequest,
   onHostEvent: WebWorkspace["onHostEvent"],
-  version: 1 | 2 | 3,
+  version: 1 | 2 | 3 | 4,
   importable = false,
 ): VaultCalls {
-  const routes = version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
+  const routes =
+    version === 4 ? VAULT_V4_ROUTES : version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
+  const state = (value: unknown) => decodeHostVaultState(value, version === 4);
   const post = <T>(path: string, decode: (value: unknown) => T, body: Parameters<TeamApiRequest>[3] = {}) =>
     request()("POST", path, decode, body);
   const reveal: VaultCalls["reveal"] = (secret) => post(routes.reveal, decodeHostVaultSecret, { ...secret });
@@ -46,13 +49,13 @@ export function webVaultCalls(
     const { imported, skipped } = await runTeamEffect(
       importHostVaultCsv(send, csv).pipe(Effect.mapError((error) => error.cause)),
     );
-    return { imported, skipped, state: await send("POST", routes.list, decodeHostVaultState, {}) };
+    return { imported, skipped, state: await send("POST", routes.list, state, {}) };
   };
   return remoteVaultCalls(
     {
-      list: () => post(routes.list, decodeHostVaultState),
-      save: (input) => post(routes.save, decodeHostVaultState, saveBody(input)),
-      remove: (id) => post(routes.delete, decodeHostVaultState, { id }),
+      list: () => post(routes.list, state),
+      save: (input) => post(routes.save, state, saveBody(input)),
+      remove: (id) => post(routes.delete, state, { id }),
       reveal,
       // The write starts in the click, with the value still on its way: Safari refuses a clipboard
       // write that starts after the request returns.
@@ -62,8 +65,11 @@ export function webVaultCalls(
             "text/plain": reveal(secret).then((value) => new Blob([value], { type: "text/plain" })),
           }),
         ]),
-      reset: () => post(routes.reset, decodeHostVaultState),
-      codes: async () => (version === 3 ? post(VAULT_V3_ROUTES.codes, decodeHostVaultCodes) : { codes: [] }),
+      reset: () => post(routes.reset, state),
+      codes: async () =>
+        version >= 3
+          ? post(version === 4 ? VAULT_V4_ROUTES.codes : VAULT_V3_ROUTES.codes, decodeHostVaultCodes)
+          : { codes: [] },
       ...(importable ? { importCsv } : {}),
     },
     (read) =>
@@ -83,8 +89,9 @@ function loginBody({ twoStepKey, ...login }: Extract<VaultSaveInput, { kind: "lo
   return twoStepKey === undefined ? login : { ...login, twoStepKey };
 }
 
+/** An item with no `agents` keeps its saved agents; the key stays out of the body, as for `fillSites`. */
 function saveBody(input: VaultSaveInput) {
-  if (input.kind === "card") return cardBody(input);
-  if (input.kind === "login") return loginBody(input);
-  return { ...input };
+  const { agents, ...body } =
+    input.kind === "card" ? cardBody(input) : input.kind === "login" ? loginBody(input) : { ...input };
+  return agents === undefined ? body : { ...body, agents };
 }

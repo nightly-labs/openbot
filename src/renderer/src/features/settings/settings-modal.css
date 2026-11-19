@@ -17,11 +17,10 @@
 
 /* A server logo in the island server list, at the size of the billing server rows. */
 .settings-dynamic-island-server-mark {
-  --server-gradient-logo-size: 32px;
-  --server-gradient-logo-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
-.settings-dynamic-island-server-mark > img {
+.settings-dynamic-island-server-mark > .server-rail-logo {
   width: 32px;
   height: 32px;
   border-radius: var(--openbot-radius-md);

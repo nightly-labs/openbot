@@ -374,7 +374,8 @@ async function* readRange(handle: FileHandle, start: number, length: number): As
   }
 }
 
-const readAtEffect = Effect.fn("Archive.readAt")(function* (
+/** Reads `length` bytes at `position`, and fails with `invalid` when the file is shorter. */
+export const readAtEffect = Effect.fn("Archive.readAt")(function* (
   handle: FileHandle,
   position: number,
   length: number,

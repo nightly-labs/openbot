@@ -28,6 +28,22 @@ const PART_MAXIMUM_SAMPLES = 28 * SAMPLE_RATE;
 /** A part ends at the quietest moment in its last seconds, so a cut seldom splits a word. */
 const PART_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
 const SPLIT_WINDOW_SAMPLES = SAMPLE_RATE / 50;
+/**
+ * Whisper can write a sentence again when room sound comes before or after the speech. Only the
+ * speech goes to Whisper: a 20 ms frame is speech when it is this much louder than the quietest
+ * frames, and not much quieter than the loudest ones.
+ */
+const SPEECH_ABOVE_FLOOR_DB = 10;
+const SPEECH_BELOW_PEAK_DB = 40;
+/** The sound kept before and after the speech, so a soft start or end of a word stays. */
+const SPEECH_MARGIN_SAMPLES = (450 * SAMPLE_RATE) / 1_000;
+/**
+ * Digital silence after the speech in each part, which stays under the 29.5 s that sherpa-onnx
+ * reads. With it, Whisper ends its text instead of writing it again.
+ */
+const SPEECH_END_SILENCE_SAMPLES = SAMPLE_RATE;
+/** A frame this quiet is digital silence; no microphone in a real room is this quiet. */
+const DIGITAL_SILENCE_DB = -90;
 /** The most leading silence a request can ask for. */
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
 /** The most ONNX Runtime threads a request can ask for. */
@@ -168,7 +184,7 @@ function recognizerConfig(
       modelConfig: {
         whisper: {
           encoder: file("turbo-encoder.int8.onnx"),
-          decoder: file("turbo-decoder.int8.onnx"),
+          decoder: file("turbo-decoder.onnx"),
           language,
           task: "transcribe",
           tailPaddings: -1,
@@ -288,10 +304,13 @@ async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
   const loaded = await recognizerFor(request);
   useLanguage(loaded, request.language);
   if (request.pcm.byteLength < 2) return "";
-  const samples = toSamples(request.pcm, request.leadingSilenceSamples);
+  const recording = toSamples(request.pcm, request.leadingSilenceSamples);
+  const speech = loaded.engine === "whisper" ? speechOnly(recording) : undefined;
+  const samples = speech ?? recording;
   const parts = loaded.engine === "nemo-transducer" ? [samples] : splitIntoParts(samples);
   let text = "";
-  for (const part of parts) text = joinText(text, await decode(loaded, part));
+  // Each part gets the silence after its cut, so no part is only silence and none ends on speech.
+  for (const part of parts) text = joinText(text, await decode(loaded, speech ? withEndSilence(part) : part));
   return text;
 }
 
@@ -311,6 +330,46 @@ async function decode(
   }
 }
 
+/** The sum of the squared samples of the 20 ms window that starts at `start`. */
+function windowEnergy(samples: Float32Array, start: number): number {
+  let energy = 0;
+  for (let index = start; index < start + SPLIT_WINDOW_SAMPLES; index += 1) {
+    const sample = samples[index] ?? 0;
+    energy += sample * sample;
+  }
+  return energy;
+}
+
+/**
+ * The speech of a recording with a short margin, or undefined when no frame counts as speech.
+ * Digital silence, from a stream that has not started to flow or from a muted input, is not
+ * room sound, so it does not set the quietest level.
+ */
+function speechOnly(samples: Float32Array): Float32Array | undefined {
+  const frames = Math.floor(samples.length / SPLIT_WINDOW_SAMPLES);
+  const loudness = new Float64Array(frames);
+  for (let frame = 0; frame < frames; frame += 1)
+    loudness[frame] =
+      10 * Math.log10(windowEnergy(samples, frame * SPLIT_WINDOW_SAMPLES) / SPLIT_WINDOW_SAMPLES + 1e-12);
+  const sound = loudness.filter((value) => value > DIGITAL_SILENCE_DB).sort();
+  if (sound.length === 0) return undefined;
+  const floor = sound[Math.floor(sound.length * 0.1)] ?? 0;
+  const peak = sound[Math.floor(sound.length * 0.95)] ?? 0;
+  const threshold = Math.max(floor + SPEECH_ABOVE_FLOOR_DB, peak - SPEECH_BELOW_PEAK_DB);
+  const first = loudness.findIndex((value) => value > threshold);
+  if (first < 0) return undefined;
+  const last = loudness.findLastIndex((value) => value > threshold);
+  const start = Math.max(0, first * SPLIT_WINDOW_SAMPLES - SPEECH_MARGIN_SAMPLES);
+  const end = Math.min(samples.length, (last + 1) * SPLIT_WINDOW_SAMPLES + SPEECH_MARGIN_SAMPLES);
+  return samples.subarray(start, end);
+}
+
+function withEndSilence(part: Float32Array): Float32Array {
+  const padded = new Float32Array(part.length + SPEECH_END_SILENCE_SAMPLES);
+  padded.set(part);
+  return padded;
+}
+
 /** Splits audio into parts that the model reads whole, each cut at the quietest point near its end. */
 function splitIntoParts(samples: Float32Array): Float32Array[] {
   const parts: Float32Array[] = [];
@@ -324,11 +383,7 @@ function splitIntoParts(samples: Float32Array): Float32Array[] {
       windowStart >= limit - PART_SPLIT_SEARCH_SAMPLES;
       windowStart -= SPLIT_WINDOW_SAMPLES
     ) {
-      let energy = 0;
-      for (let index = windowStart; index < windowStart + SPLIT_WINDOW_SAMPLES; index += 1) {
-        const sample = samples[index] ?? 0;
-        energy += sample * sample;
-      }
+      const energy = windowEnergy(samples, windowStart);
       if (energy < quietest) {
         quietest = energy;
         end = windowStart + SPLIT_WINDOW_SAMPLES / 2;

@@ -1,9 +1,10 @@
 import { type BillingServerPlan, serverStorageGb } from "@openbot/contracts/billing";
 import type { HostedServerSummary } from "@openbot/contracts/hosted-servers";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createSignal, createStore, Show } from "solid-js";
 import { useText } from "../../text";
 import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
 import { BillingServerLifecycle, type BillingServerLifecycleAction } from "./BillingServerLifecycle";
+import { BillingStorageDialog } from "./BillingStorageDialog";
 import type { BillingStore } from "./billing-store";
 
 export function BillingManagedServer(props: {
@@ -21,6 +22,7 @@ export function BillingManagedServer(props: {
     pending: boolean;
     error: string | null;
   }>({ action: null, timing: "period-end", name: "", pending: false, error: null });
+  const [addingStorage, setAddingStorage] = createSignal(false);
   createEffect(
     () => props.hosting.state.pendingDelete?.serverId === props.server.serverId,
     (requested) => {
@@ -100,61 +102,71 @@ export function BillingManagedServer(props: {
     });
   };
   return (
-    <BillingServerLifecycle
-      name={props.server.name}
-      planDescription={t("billing.server.summary", {
-        plan: t(planNames[props.plan.plan]),
-        size: format.number(serverStorageGb(props.plan)),
-      })}
-      price={price()}
-      paidThrough={props.server.deletionScheduledAt ?? props.paidThrough}
-      running={props.server.state === "running"}
-      statusLabel={t(stateNames[props.server.state])}
-      cancelAtPeriodEnd={props.plan.cancelAtPeriodEnd}
-      scheduled={props.server.deletionScheduledAt != null}
-      deleted={false}
-      action={dialog.action}
-      deletionTiming={dialog.timing}
-      confirmName={dialog.name}
-      pending={dialog.pending}
-      error={dialog.error}
-      onAction={(action) =>
-        setDialog((draft) => {
-          draft.action = action;
-          draft.name = "";
-          draft.error = null;
-          draft.timing = "period-end";
-        })
-      }
-      onTimingChange={(timing) =>
-        setDialog((draft) => {
-          draft.timing = timing;
-          draft.error = null;
-        })
-      }
-      onNameChange={(name) =>
-        setDialog((draft) => {
-          draft.name = name;
-          draft.error = null;
-        })
-      }
-      onCancel={() => {
-        if (!dialog.pending)
+    <>
+      <BillingServerLifecycle
+        name={props.server.name}
+        planDescription={t("billing.server.summary", {
+          plan: t(planNames[props.plan.plan]),
+          size: format.number(serverStorageGb(props.plan)),
+        })}
+        price={price()}
+        paidThrough={props.server.deletionScheduledAt ?? props.paidThrough}
+        running={props.server.state === "running"}
+        statusLabel={t(stateNames[props.server.state])}
+        cancelAtPeriodEnd={props.plan.cancelAtPeriodEnd}
+        scheduled={props.server.deletionScheduledAt != null}
+        deleted={false}
+        action={dialog.action}
+        deletionTiming={dialog.timing}
+        confirmName={dialog.name}
+        pending={dialog.pending}
+        error={dialog.error}
+        onAction={(action) =>
           setDialog((draft) => {
-            draft.action = null;
-          });
-      }}
-      onConfirm={() => void confirm()}
-      onChangePlan={
-        props.server.deletionScheduledAt == null
-          ? () => void props.billing.openPortal({ flow: "update", subscriptionId: props.plan.subscriptionId })
-          : undefined
-      }
-      onWake={
-        (props.server.state === "stopped" || props.server.state === "error") && props.server.error !== "plan_ended"
-          ? () => void props.hosting.wake(props.server)
-          : undefined
-      }
-    />
+            draft.action = action;
+            draft.name = "";
+            draft.error = null;
+            draft.timing = "period-end";
+          })
+        }
+        onTimingChange={(timing) =>
+          setDialog((draft) => {
+            draft.timing = timing;
+            draft.error = null;
+          })
+        }
+        onNameChange={(name) =>
+          setDialog((draft) => {
+            draft.name = name;
+            draft.error = null;
+          })
+        }
+        onCancel={() => {
+          if (!dialog.pending)
+            setDialog((draft) => {
+              draft.action = null;
+            });
+        }}
+        onConfirm={() => void confirm()}
+        onAddStorage={
+          props.server.deletionScheduledAt == null && (props.plan.storageUpgrades?.length ?? 0) > 0
+            ? () => setAddingStorage(true)
+            : undefined
+        }
+        onWake={
+          (props.server.state === "stopped" || props.server.state === "error") && props.server.error !== "plan_ended"
+            ? () => void props.hosting.wake(props.server)
+            : undefined
+        }
+      />
+      <Show when={addingStorage()}>
+        <BillingStorageDialog
+          plan={props.plan}
+          serverName={props.server.name}
+          store={props.billing}
+          onClose={() => setAddingStorage(false)}
+        />
+      </Show>
+    </>
   );
 }

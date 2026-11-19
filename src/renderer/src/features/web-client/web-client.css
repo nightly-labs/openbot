@@ -7,6 +7,11 @@
   color: var(--openbot-text-primary);
   background: var(--openbot-bg-canvas);
 }
+/* A backdrop paints at -1 under the page, so the page is clear while it shows. The root keeps the
+ * canvas color behind the backdrop. */
+:root[data-openbot-window-glass] .web-app {
+  background: transparent;
+}
 .web-app-frame {
   min-width: 0;
   height: 100%;
@@ -32,6 +37,30 @@
   display: none;
 }
 
+/* The phone app screen: the store links under the sign-in title, and the browser choice as a quiet link. */
+.web-phone-app-stores {
+  width: 100%;
+  display: grid;
+  gap: var(--openbot-space-3);
+  margin-top: 30px;
+}
+
+.web-phone-app-store {
+  width: 100%;
+  height: 44px;
+}
+
+.web-phone-app-store-logo {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.web-phone-app-continue {
+  margin-top: var(--openbot-space-4);
+  color: var(--openbot-text-muted);
+}
+
 /* The analytics box of the sign-in form is a line of the form, not a row of a grouped list. */
 .web-consent-row.first-run-choice-improve {
   align-items: flex-start;
@@ -43,13 +72,9 @@
   margin-top: 1px;
 }
 
-/* Under the box, the lock line and the Terms notice form the footer of the form. */
-.web-consent-row + .account-login-footer {
-  margin-top: var(--openbot-space-3);
-}
-
-.account-login-footer .first-run-consent-notice {
-  width: 100%;
+/* The Terms notice sits under the lock line in the page footer of the sign-in screen. */
+.account-login-legal .first-run-consent-notice {
+  width: auto;
   margin: 0;
 }
 

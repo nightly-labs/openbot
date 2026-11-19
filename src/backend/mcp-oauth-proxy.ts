@@ -5,7 +5,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
@@ -121,6 +121,13 @@ export class McpOAuthProxy {
   #server: HttpServer | null = null;
   #port: number | null = null;
   #secret: string | null = null;
+  /**
+   * The paths whose last `initialize` did not give the provider a good answer, and whether
+   * `reportedFailedStart` already marked that failure.
+   */
+  readonly #failedStarts = new Map<string, boolean>();
+  /** How many times each path was handed out again after a failed `initialize`. */
+  readonly #attempts = new Map<string, number>();
 
   constructor(options: McpOAuthProxyOptions) {
     this.#options = options;
@@ -130,6 +137,12 @@ export class McpOAuthProxy {
    * The address and the bearer of `route` for the agent with `agentKey` (`mcpOAuthProxyAgentKey`),
    * after the listener is up. Every caller shares one start, so two hand-offs at once do not bind
    * two ports.
+   *
+   * **A new address after a failed start.** OpenCode 2.3.0 keeps one connection for each server
+   * name in a folder and connects again only when the server's settings change. One `initialize`
+   * that failed, such as during an expired sign-in, hid the server's tools from each chat of the
+   * agent until OpenCode restarted (#9526). The next hand-off of such a path adds `?attempt=N`, so
+   * the provider connects again. The bearer stays the same, and each earlier address stays valid.
    */
   readonly route = Effect.fn("McpOAuthProxy.route")(function* (
     this: McpOAuthProxy,
@@ -140,8 +153,25 @@ export class McpOAuthProxy {
     const path = agentKey ? `${route}/${agentKey}` : route;
     const bearer = routeBearer(secret, path);
     registerSecretValue(bearer);
-    return { url: `http://127.0.0.1:${port}/mcp/${path}`, bearer };
+    let attempt = this.#attempts.get(path) ?? 0;
+    if (this.#failedStarts.delete(path)) this.#attempts.set(path, ++attempt);
+    return { url: `http://127.0.0.1:${port}/mcp/${path}${attempt > 0 ? `?attempt=${attempt}` : ""}`, bearer };
   });
+
+  /**
+   * Whether a provider's last `initialize` on `route`, for any agent, failed after its last hand-off
+   * and `reportedFailedStart` was not called for it. A path that is not handed out again thus does
+   * not make each later test refresh the agents.
+   */
+  failedStart(route: string): boolean {
+    for (const [path, reported] of this.#failedStarts) if (!reported && onRoute(path, route)) return true;
+    return false;
+  }
+
+  /** Marks the failed starts on `route` as handled, after the agents were refreshed for them. */
+  reportedFailedStart(route: string): void {
+    for (const path of this.#failedStarts.keys()) if (onRoute(path, route)) this.#failedStarts.set(path, true);
+  }
 
   /**
    * A digest of the port and the secret, or `null` before the listener is up. The Codex tool
@@ -158,6 +188,8 @@ export class McpOAuthProxy {
     this.#server = null;
     this.#port = null;
     this.#secret = null;
+    this.#failedStarts.clear();
+    this.#attempts.clear();
     if (!server) return;
     yield* Effect.callback<void>((resume) => {
       server.close(() => resume(Effect.void));
@@ -248,9 +280,12 @@ export class McpOAuthProxy {
     // The provider closed the connection: the upstream request and its event stream end too. This is
     // set before the first wait, so a close during a token refresh is not missed.
     response.once("close", () => controller.abort());
-    const [, route, agentKey] = /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?$/u.exec(request.url ?? "") ?? [];
-    if (!route || !authorized(request, routeBearer(secret, agentKey ? `${route}/${agentKey}` : route)))
-      return refuse(response, 403);
+    // The query is the `attempt` of `route`: each address of a path has the same bearer.
+    const [, route, agentKey] =
+      /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?(?:\?[^#]*)?$/u.exec(request.url ?? "") ?? [];
+    if (!route) return refuse(response, 403);
+    const path = agentKey ? `${route}/${agentKey}` : route;
+    if (!authorized(request, routeBearer(secret, path))) return refuse(response, 403);
     const method = request.method ?? "";
     if (method !== "POST" && method !== "GET" && method !== "DELETE") {
       response.writeHead(405, { allow: "POST, GET, DELETE" });
@@ -259,24 +294,66 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
+    // A start counts when the server answered it with a 2xx. One that ends in any other way, the
+    // provider's own timeout included, is a failed start.
+    const start = { answered: false };
+    const relay = this.#relay(request, response, method, read, route, agentKey ?? null, controller, start);
+    if (!read || initializeRequest(read, request) === null) return yield* relay;
+    yield* relay.pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (start.answered) this.#failedStarts.delete(path);
+          else this.#failedStarts.set(path, false);
+        }),
+      ),
+    );
+  });
+
+  /** Sends one request upstream and its answer back. `start.answered`: the server answered with a 2xx. */
+  readonly #relay = Effect.fn("McpOAuthProxy.relay")(function* (
+    this: McpOAuthProxy,
+    request: IncomingMessage,
+    response: ServerResponse,
+    method: string,
+    read: Buffer | null,
+    route: string,
+    agentKey: string | null,
+    controller: AbortController,
+    start: { answered: boolean },
+  ): Effect.fn.Return<void, McpOperationError> {
     const target = yield* this.#options.target(route);
     if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
-    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey ?? null)) : read;
+    const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
     if (!(upstream instanceof Response)) {
-      // Only a renewed token that the server refused proves a good sign-in. A renewal that could not
-      // reach the authorization server leaves an expired token, and that sign-in has ended for now.
-      const active = upstream.renewed && !this.#options.signInEnded(target.url);
+      // A renewed token that the server refused proves a good sign-in. A renewal that failed for now
+      // keeps the sign-in, and the next request tries again; a sign-in that cannot be renewed ended.
+      const ended = this.#options.signInEnded(target.url);
       logger.warn("The MCP server refused a request with the sign-in of this computer.", {
         challengeError: upstream.challengeError,
         renewed: upstream.renewed,
-        signInActive: active,
+        signInActive: !ended,
       });
-      const message = active
-        ? sourceText("error.backend.mcpOAuthRequestRefused")
-        : sourceText("error.backend.mcpOAuthSignInNeeded");
+      const message = ended
+        ? sourceText("error.backend.mcpOAuthSignInNeeded")
+        : upstream.renewed
+          ? sourceText("error.backend.mcpOAuthRequestRefused")
+          : sourceText("error.backend.mcpOAuthRenewalFailed");
       return refuseRequests(response, method, body, message);
+    }
+    // A notification has no answer, but the MCP Go SDK, which the Antigravity CLI uses, closes the
+    // whole connection when a server refuses one with a 400 that is not a JSON-RPC error. Executor
+    // refused `notifications/roots/list_changed`, and the agent lost all of its tools (#10322). A 400
+    // does not end the server's session (a 404 does), so the proxy accepts the notification, as the
+    // MCP TypeScript SDK server accepts each body of notifications only.
+    const refused = upstream.status === 400 && method === "POST" ? notificationMethods(body) : null;
+    if (refused) {
+      yield* discard(upstream);
+      logger.warn("The MCP server refused a notification. The sign-in proxy accepted it.", { methods: refused });
+      response.writeHead(202);
+      response.end();
+      return;
     }
     const headers: Record<string, string> = {};
     for (const name of FORWARDED_RESPONSE_HEADERS) {
@@ -285,6 +362,7 @@ export class McpOAuthProxy {
     }
     response.writeHead(upstream.status, headers);
     response.flushHeaders();
+    start.answered = upstream.ok;
     if (!upstream.body) {
       response.end();
       return;
@@ -312,6 +390,11 @@ export class McpOAuthProxy {
     yield* discard(second);
     return { challengeError: challengeError(second), renewed: true };
   });
+}
+
+/** Whether `path`, a route with or without an agent key, belongs to `route`. */
+function onRoute(path: string, route: string): boolean {
+  return path === route || path.startsWith(`${route}/`);
 }
 
 /** The bearer of one route: a keyed digest, so no table of bearers is kept or written anywhere. */
@@ -358,6 +441,23 @@ function clientInfo(client: McpOAuthProxyClient, agentKey: string | null): Clien
   };
 }
 
+/** The `initialize` request in a body, or `null` for any other body, a batch included. */
+function initializeRequest(body: Buffer, request: IncomingMessage): DynamicRecord | null {
+  if (
+    body.length > MAX_INITIALIZE_BYTES ||
+    !request.headers["content-type"]?.toLowerCase().includes("json") ||
+    !body.includes('"initialize"')
+  )
+    return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8"));
+  } catch {
+    return null;
+  }
+  return isDynamicRecord(parsed) && parsed.method === "initialize" ? parsed : null;
+}
+
 /**
  * The body with OpenBot as the `clientInfo` when it is an `initialize` request. Any other body is
  * returned as it is. MCP does not let `initialize` be part of a batch, so a batch is not read.
@@ -368,19 +468,8 @@ function withClientInfo(
   client: McpOAuthProxyClient,
   agentKey: string | null,
 ): Buffer {
-  if (
-    body.length > MAX_INITIALIZE_BYTES ||
-    !request.headers["content-type"]?.toLowerCase().includes("json") ||
-    !body.includes('"initialize"')
-  )
-    return body;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body.toString("utf8"));
-  } catch {
-    return body;
-  }
-  if (!isDynamicRecord(parsed) || parsed.method !== "initialize" || !isDynamicRecord(parsed.params)) return body;
+  const parsed = initializeRequest(body, request);
+  if (parsed === null || !isDynamicRecord(parsed.params)) return body;
   const params = { ...parsed.params, clientInfo: clientInfo(client, agentKey) };
   return Buffer.from(JSON.stringify({ ...parsed, params }));
 }
@@ -477,7 +566,11 @@ function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: In
   return headers;
 }
 
-/** A fetch that is abandoned when the headers take longer than `timeoutMs`. The body has no limit. */
+/**
+ * A fetch that is abandoned when the headers take longer than `timeoutMs`. The body has no limit.
+ * A connection that could not be opened is tried once more in the same time limit: a VPN or a
+ * busy network can drop one new connection in many, and nothing reached the server (#8947).
+ */
 function upstreamFetch(
   url: URL,
   init: RequestInit,
@@ -488,10 +581,34 @@ function upstreamFetch(
     const timer = setTimeout(() => controller.abort(new Error("The MCP server did not answer in time.")), timeoutMs);
     try {
       return await fetch(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted || !notConnected(error)) throw error;
+      logger.info("A connection to the MCP server could not be opened. It is tried once more.", {
+        cause: toLogValue(error),
+      });
+      return await fetch(url, { ...init, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
   });
+}
+
+/**
+ * Whether `fetch` failed before a connection was open, so that no part of the request left this
+ * computer. A reset or a closed socket can come after the server read the request, and a tool call
+ * must not run twice, so neither is in this set.
+ */
+function notConnected(error: unknown): boolean {
+  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth += 1) {
+    if (isDynamicRecord(current)) {
+      const { code, syscall } = current;
+      if (code === "UND_ERR_CONNECT_TIMEOUT" || code === "EAI_AGAIN" || syscall === "connect") return true;
+    }
+    // Node tries each address of a host and gives an `AggregateError` when none of them connects.
+    if (current instanceof AggregateError && current.errors.length > 0 && current.errors.every(notConnected))
+      return true;
+  }
+  return false;
 }
 
 function discard(answer: Response): Effect.Effect<void> {
@@ -548,6 +665,27 @@ function refuseRequests(response: ServerResponse, method: string, body: Buffer |
   }
   response.writeHead(200, { "content-type": "application/json" });
   response.end(JSON.stringify(batch ? errors : errors[0]));
+}
+
+/**
+ * The methods of a body that holds only notifications, or `null`. `notifications/initialized`
+ * gives `null`: a server that refuses it did not start the session, and the provider must know.
+ */
+function notificationMethods(body: Buffer | null): string[] | null {
+  let parsed: unknown = null;
+  try {
+    parsed = body && body.length > 0 ? JSON.parse(body.toString("utf8")) : null;
+  } catch {
+    return null;
+  }
+  const messages = Array.isArray(parsed) ? parsed : [parsed];
+  const methods: string[] = [];
+  for (const item of messages) {
+    if (!isDynamicRecord(item) || !isString(item.method) || "id" in item) return null;
+    if (item.method === "notifications/initialized") return null;
+    methods.push(item.method);
+  }
+  return methods.length > 0 ? methods : null;
 }
 
 type JsonRpcId = string | number | null;

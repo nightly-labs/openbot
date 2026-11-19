@@ -12,11 +12,10 @@
 }
 
 .notification-matrix-server-mark {
-  --server-gradient-logo-size: 32px;
-  --server-gradient-logo-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
-.notification-matrix-server-mark > img {
+.notification-matrix-server-mark > .server-rail-logo {
   width: 32px;
   height: 32px;
   border-radius: var(--openbot-radius-md);

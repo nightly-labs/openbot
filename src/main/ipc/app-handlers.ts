@@ -47,14 +47,12 @@ import { readSetupState, writeSetupState } from "../setup-store";
 import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
 import {
-  parseAgentDefaults,
   parseAnalyticsPreference,
   parseAppAppearancePreference,
   parseAppBehaviorPreferenceChange,
   parseAppInterfaceSizePreference,
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
-  parseBusyMessageModePreference,
   parseChatWindowTarget,
   parseExternalDestination,
   parseExternalLinkPreference,
@@ -116,10 +114,12 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "tiktok-post": "https://www.tiktok.com/upload",
   "grok-bot-export": GROK_BOT_EXPORT_URL,
   "hosted-server-contact": HOSTED_SERVER_CONTACT_URL,
+  download: DOWNLOAD_URL,
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { DOWNLOAD_URL } from "../download-url";
 import { openHttpLink } from "../message-link-relay";
 import type { ResourceMonitor } from "../resource-monitor";
 import type { StartupTiming } from "../startup-timing";
@@ -253,17 +253,7 @@ export function appIpcHandlers({
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
-      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
-        runCauseEffect(busyMessageMode.set(parsed)),
-      ),
       getAgentDefaults: handler(() => agentDefaults.get()),
-      // The agents that follow a changed default get it at once: see `AgentService.agentDefaultsChanged`.
-      setAgentDefaults: payloadHandler(parseAgentDefaults, async (parsed) => {
-        const previous = agentDefaults.get();
-        const saved = await runCauseEffect(agentDefaults.set(parsed));
-        service.agentDefaultsChanged(previous);
-        return saved;
-      }),
       getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
       // Off removes the kept sessions at once. The sessions of this run then end when the app quits.

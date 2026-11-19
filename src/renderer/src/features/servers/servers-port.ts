@@ -36,7 +36,7 @@ export interface ServersPort {
   browser: Pick<OpenBotDesktopApi["browser"], "setVisible">;
   hostAdmin: Pick<
     OpenBotDesktopApi["hostAdmin"],
-    "cancelUpdate" | "getUpdateStatus" | "rotateHostKey" | "startUpdate" | "updateIdentity"
+    "cancelUpdate" | "getUpdateStatus" | "restartHost" | "rotateHostKey" | "startUpdate" | "updateIdentity"
   >;
   hostedServers: Pick<OpenBotDesktopApi["hostedServers"], "list" | "restart" | "wake">;
   localServers: OpenBotDesktopApi["localServers"];
@@ -54,7 +54,7 @@ export interface ServersPort {
     | "stopRemoteControl"
     | "updateIdentity"
   >;
-  notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened">;
+  notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened" | "onWorkflowOpened">;
   remoteDesktop: Pick<
     OpenBotDesktopApi["remoteDesktop"],
     "checkSetup" | "connect" | "disconnect" | "list" | "openSetup" | "test"

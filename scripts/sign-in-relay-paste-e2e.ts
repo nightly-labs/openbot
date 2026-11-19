@@ -92,6 +92,7 @@ async function runCase(
     },
     language: { locale: "en", translate: translateFor("en") },
     ownListener: () => null,
+    deepLinkRedirectUrl: () => undefined,
   });
   const run = Effect.runPromise(
     client.run(KEY, remote, chosen ? { page: PAGE, onWaiting: () => waiting.resolve() } : null),

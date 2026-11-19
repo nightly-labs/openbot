@@ -20,6 +20,7 @@ export function SidebarAgentSection(sectionProps: { sectionId: string; depth: nu
     customSectionById,
     dragOffset,
     filteredChatsBySection,
+    listFiltered,
     props,
     sectionChildren,
     sectionDragClasses,
@@ -33,7 +34,12 @@ export function SidebarAgentSection(sectionProps: { sectionId: string; depth: nu
   const children = () => (custom() ? sectionChildren(sectionId()) : []);
   const name = () =>
     sectionId() === SIDEBAR_UNASSIGNED_SECTION_ID ? t("sidebar.section.unassigned") : (custom()?.name ?? "");
-  const headed = () => Boolean(custom()) || props.layout.sections.length > 0;
+  /**
+   * While a filter is set, a folder that shows only for a folder in it has no header: the header of
+   * the inner folder names the chats. It does not collapse then, because nothing could open it.
+   */
+  const headed = () =>
+    (Boolean(custom()) || props.layout.sections.length > 0) && !(listFiltered() && custom() && chats().length === 0);
   const collapsed = () => headed() && sectionIsCollapsed(sectionId());
   return (
     <Show when={name() && (chats().length > 0 || custom())}>

@@ -1,6 +1,17 @@
 import { MASKED_WEBHOOK_SECRET } from "@openbot/contracts/event-filter-value";
-import { Button, ConfirmDialog, CopyButton, Field, IconButton, Input, KeyRound, RefreshCw, Text } from "@openbot/ui";
-import { createSignal, Show } from "solid-js";
+import {
+  Bot,
+  Button,
+  ConfirmDialog,
+  CopyButton,
+  Field,
+  IconButton,
+  Input,
+  KeyRound,
+  RefreshCw,
+  Text,
+} from "@openbot/ui";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
 export interface RoutineWebhookUrlFieldProps {
@@ -45,6 +56,14 @@ export function RoutineWebhookUrlField(props: RoutineWebhookUrlFieldProps) {
   );
 }
 
+/** Gives a new signing secret to the agent of the routine, which saves it as an API key. */
+export interface RoutineWebhookAgentSecret {
+  /** The routine that gets the secret. Another routine starts with no result. */
+  routineId: string;
+  agentName: string;
+  give: () => Promise<void>;
+}
+
 export interface RoutineWebhookSecretFieldProps {
   /** The signing secret that the host returned once. Null when there is nothing to show. */
   secret: string | null;
@@ -56,6 +75,11 @@ export interface RoutineWebhookSecretFieldProps {
    * out when the host cannot do this.
    */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
+  /**
+   * Gives a new secret to the agent of the routine, so that nobody copies it. Leave it out for a
+   * channel routine, which has no single agent, and for a host that cannot do this.
+   */
+  agentSecret?: RoutineWebhookAgentSecret | undefined;
   onCopy?: (() => void) | undefined;
 }
 
@@ -67,6 +91,39 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
   const { t, errorMessage } = useText();
   const [confirm, setConfirm] = createSignal<{ pending: boolean; error: string | null } | null>(null);
   const [sender, setSender] = createSignal<{ value: string; pending: boolean; error: string | null } | null>(null);
+  const [agent, setAgent] = createSignal<{ pending: boolean; error: string | null; given: boolean }>({
+    pending: false,
+    error: null,
+    given: false,
+  });
+  const [agentConfirm, setAgentConfirm] = createSignal(false);
+  // A draft change gives a new action object, and an effect runs again for an equal value. The memo
+  // resets the result only when another routine opens.
+  const agentRoutine = createMemo(() => props.agentSecret?.routineId);
+  createEffect(agentRoutine, () => {
+    setAgent({ pending: false, error: null, given: false });
+    setAgentConfirm(false);
+  });
+
+  async function giveToAgent(): Promise<void> {
+    const action = props.agentSecret;
+    if (!action || agent().pending) return;
+    const sameRoutine = () => props.agentSecret?.routineId === action.routineId;
+    setAgent({ pending: true, error: null, given: false });
+    try {
+      await action.give();
+      if (!sameRoutine()) return;
+      setAgent({ pending: false, error: null, given: true });
+      setAgentConfirm(false);
+    } catch (cause) {
+      if (!sameRoutine()) return;
+      setAgent({
+        pending: false,
+        error: errorMessage(cause, t("routine.webhook.giveSecretFailed", { name: action.agentName })),
+        given: false,
+      });
+    }
+  }
 
   async function saveSenderSecret(): Promise<void> {
     const current = sender();
@@ -141,6 +198,20 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
               />
             )}
           </Show>
+          <Show when={props.agentSecret}>
+            {(action) => (
+              <IconButton
+                variant="ghost"
+                label={t("routine.webhook.giveSecret", { name: action().agentName })}
+                onClick={() => {
+                  setAgent({ pending: false, error: null, given: false });
+                  setAgentConfirm(true);
+                }}
+              >
+                <Bot aria-hidden="true" />
+              </IconButton>
+            )}
+          </Show>
           {/* A sender such as Composio makes its own secret, so this stays beside a new secret too. */}
           <Show when={props.onUseSenderSecret}>
             <IconButton
@@ -163,6 +234,13 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
           </Button>
         </div>
       </Show>
+      <Show when={!props.secret && agent().given ? props.agentSecret : undefined}>
+        {(action) => (
+          <Text variant="caption" tone="success" role="status" class="routine-webhook-note">
+            {t("routine.webhook.secretGiven", { name: action().agentName })}
+          </Text>
+        )}
+      </Show>
 
       <ConfirmDialog
         open={confirm() !== null}
@@ -176,6 +254,20 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
         initialFocus="cancel"
         onCancel={() => setConfirm(null)}
         onConfirm={regenerate}
+      />
+      <ConfirmDialog
+        open={agentConfirm()}
+        tone="default"
+        icon={<Bot />}
+        title={t("routine.webhook.giveSecretTitle", { name: props.agentSecret?.agentName ?? "" })}
+        description={t("routine.webhook.giveSecretDescription", { name: props.agentSecret?.agentName ?? "" })}
+        confirmLabel={t("routine.webhook.giveSecretConfirm")}
+        cancelLabel={t("common.cancel")}
+        pending={agent().pending}
+        error={agent().error ?? undefined}
+        initialFocus="cancel"
+        onCancel={() => setAgentConfirm(false)}
+        onConfirm={giveToAgent}
       />
       <ConfirmDialog
         open={sender() !== null}
@@ -229,6 +321,8 @@ export interface RoutineWebhookEndpointProps {
   onRegenerateSecret: () => Promise<void>;
   /** Replaces the secret with one that the sender made. Leave it out when the host cannot do this. */
   onUseSenderSecret?: ((secret: string) => Promise<void>) | undefined;
+  /** Gives a new secret to the agent of the routine. Leave it out when the host cannot do this. */
+  agentSecret?: RoutineWebhookAgentSecret | undefined;
 }
 
 /** The URL and the signing secret of a saved webhook trigger, each with one action beside it. */
@@ -247,6 +341,7 @@ export function RoutineWebhookEndpoint(props: RoutineWebhookEndpointProps) {
         onSecretDismiss={props.onSecretDismiss}
         onRegenerateSecret={props.onRegenerateSecret}
         onUseSenderSecret={props.onUseSenderSecret}
+        agentSecret={props.agentSecret}
       />
     </>
   );

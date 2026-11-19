@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   applyLibraryFolderAction,
@@ -14,17 +14,21 @@ import {
   type LibraryFoldersSnapshot,
   libraryFolderName,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result, Semaphore } from "effect";
+import { Effect, Semaphore } from "effect";
 import { writeFileAtomically } from "./atomic-json-file";
-import { isMissingFileError } from "./file-errors";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
 /** The name of the file in the user data directory. */
 export const LIBRARY_FOLDERS_FILE = "openbot-library-folders-v1.json";
 
 const STORED_VERSION = 1;
+
+const LIBRARY_FOLDERS_FORMAT: VersionedJsonFormat<LibraryFoldersSnapshot> = {
+  current: STORED_VERSION,
+  releases: { 1: decodeLibraryFoldersSnapshot },
+};
 
 /** The folders that a path named, from the top level down, and whether the store made one of them. */
 export interface PlacedInLibraryPath {
@@ -92,37 +96,40 @@ function apply(
  */
 export class LibraryFoldersStore {
   readonly #path: string;
+  /** The path, or the fallback file while the path holds the file of a newer release. */
+  #writePath: string;
   #snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
+  readonly #listeners = new Set<() => void>();
 
   constructor(path: string) {
     this.#path = path;
+    this.#writePath = path;
   }
 
+  /**
+   * Reads the folders. The file of a newer release stays unchanged: the store starts with no folders
+   * and writes `<path>.v1`. See `readVersionedJsonFile`. The stored files are not in this file, so a
+   * damaged file loses only the folders.
+   */
   initialize() {
     return Effect.gen({ self: this }, function* () {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
-      const loaded = yield* Effect.result(
-        Effect.gen({ self: this }, function* () {
-          const contents = yield* storedIO(() => readFile(this.#path, "utf8"));
-          return yield* storedSync(() => {
-            const parsed = JSON.parse(contents);
-            if (!isDynamicRecord(parsed) || parsed.version !== STORED_VERSION)
-              throw new Error("Invalid library folders state.");
-            return decodeLibraryFoldersSnapshot(parsed);
-          });
-        }),
-      );
-      if (Result.isSuccess(loaded)) {
-        this.#snapshot = loaded.success;
-        return;
-      }
-      if (isMissingFileError(loaded.failure.cause)) return;
-      // The stored files are not in this file: a file that cannot be read loses only the folders.
-      const backupPath = `${this.#path}.corrupt-${Date.now()}`;
-      yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
-      this.#snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
+      const loaded = yield* readVersionedJsonFile(this.#path, LIBRARY_FOLDERS_FORMAT);
+      this.#writePath = loaded.writePath;
+      this.#snapshot = loaded.value ?? structuredClone(EMPTY_LIBRARY_FOLDERS);
     });
+  }
+
+  /**
+   * Calls `listener` after each saved change, from any source: a member, an agent tool, or the removal
+   * of the folders of deleted agents and files. Returns the call that stops it.
+   */
+  onChanged(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
   }
 
   getSnapshot(): LibraryFoldersSnapshot {
@@ -264,10 +271,18 @@ export class LibraryFoldersStore {
   }
 
   #commit = Effect.fn("LibraryFolders.commit")(function* (this: LibraryFoldersStore, next: LibraryFoldersSnapshot) {
-    yield* writeFileAtomically(this.#path, `${JSON.stringify({ version: STORED_VERSION, ...next })}\n`).pipe(
+    yield* writeFileAtomically(this.#writePath, `${JSON.stringify({ version: STORED_VERSION, ...next })}\n`).pipe(
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#snapshot = next;
+    // The change is saved: a listener that fails must not report it as failed.
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch {
+        // The next change or read brings the client up to date.
+      }
+    }
   });
 }
 

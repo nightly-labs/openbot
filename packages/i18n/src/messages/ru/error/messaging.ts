@@ -16,10 +16,14 @@ export const messages = {
   "error.messaging.telegramUnsupported": "Этот компьютер не может подключиться к Telegram.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot не может связаться с Telegram на этом компьютере. Войдите в аккаунт, задайте компьютеру имя и повторите попытку.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot не может подключиться к своему сервису с этого компьютера. Проверьте подключение к интернету, VPN, прокси или брандмауэр и повторите попытку.",
   "error.messaging.telegramServiceUnavailable": "OpenBot сейчас не может подключить Telegram. Повторите попытку позже.",
   "error.messaging.whatsappNotConnected": "Этот номер WhatsApp не подключён.",
   "error.messaging.whatsappUnsupported": "Этот компьютер не может подключиться к WhatsApp.",
   "error.messaging.whatsappTooManySenders": "Номер WhatsApp может разрешить не более 200 контактов и групп.",
+  "error.messaging.whatsappNumberNotFound":
+    "У этого номера нет аккаунта WhatsApp. Введите его с кодом страны, например +44 7700 900123.",
   "error.messaging.whatsappRequestEnded":
     "Срок этого запроса истёк. Попросите человека написать снова, чтобы получить новый код.",
   "error.messaging.memoryLimit":

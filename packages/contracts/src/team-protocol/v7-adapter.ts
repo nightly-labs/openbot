@@ -58,6 +58,7 @@ import {
   encodeTeamProtocolV7BaseCurrentHttpRequest,
   encodeTeamProtocolV7BaseCurrentHttpResponse,
 } from "./v7-base-adapter";
+import { withConversationVideoGeneration } from "./video-generation-v1";
 
 /**
  * `editing` and `expectsReply` ride beside the frozen queue projection: the shipped key lists drop
@@ -212,7 +213,8 @@ export function decodeTeamProtocolV7CurrentHttpRequest(
  * then does a conversation message carry its `uiBlock`. `subagents` is the negotiated subagents-v1
  * capability: only then does a conversation message carry its `subagents`. `promptMultiSelect` is the
  * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
- * Without them the output is the released projection.
+ * `videoGeneration` is the negotiated video-generation-v1 capability: only then does a conversation
+ * message carry its `videoGeneration`. Without them the output is the released projection.
  */
 export function encodeTeamProtocolV7CurrentHttpResponse(
   method: string,
@@ -225,21 +227,24 @@ export function encodeTeamProtocolV7CurrentHttpResponse(
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
+    videoGeneration?: boolean;
   } = {},
 ): string {
-  const { historyExtent, uiBlocks, subagents, promptMultiSelect, ...frozen } = options;
+  const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, ...frozen } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
   const withSubagents = subagents && isConversationRoute(method, path);
   const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
-  if (!withExtent && !withBlocks && !withSubagents && !withMultiSelect) return encoded;
+  const withVideo = videoGeneration && isConversationRoute(method, path);
+  if (!withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo) return encoded;
   let output: TeamProtocolV7BaseJsonValue = JSON.parse(encoded);
   if (withExtent) output = withPageHistoryExtent(output, value);
   if (withBlocks) output = withConversationUiBlocks(output, value);
   if (withSubagents) output = withConversationSubagents(output, value);
   if (withMultiSelect) output = withConversationPromptMultiSelect(output, value);
+  if (withVideo) output = withConversationVideoGeneration(output, value);
   return JSON.stringify(output);
 }
 
@@ -305,8 +310,8 @@ function encodeFrozenResponse(
 
 /**
  * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
- * the subagents only under subagents-v1, and a multi-select flag only under prompt-multi-select-v1,
- * so a present one is always kept.
+ * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, and
+ * a video request only under video-generation-v1, so a present one is always kept.
  */
 export function decodeTeamProtocolV7CurrentHttpResponse(
   method: string,
@@ -319,8 +324,11 @@ export function decodeTeamProtocolV7CurrentHttpResponse(
   // The conversation page route carries all three.
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(decoded, value) : decoded;
   if (!isConversationRoute(method, path)) return withExtent;
-  return withConversationPromptMultiSelect(
-    withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+  return withConversationVideoGeneration(
+    withConversationPromptMultiSelect(
+      withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+      value,
+    ),
     value,
   );
 }

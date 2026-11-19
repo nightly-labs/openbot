@@ -2,8 +2,8 @@
 //
 // What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
 // server can list the programs that the host's agents left running, such as a dev server that an
-// agent started with `nohup ... &`, and stop one of them with its children. These are the programs of
-// Settings > Agents on this computer. Each program carries its id (the pid and the start time), its
+// agent started with `nohup ... &`, and stop one of them with its children. These are the programs that
+// Server Settings > Storage lists for this computer. Each program carries its id (the pid and the start time), its
 // pid, its command line, its start time, the TCP ports that it listens on (at most 64), and the agent whose
 // workspace holds its working folder. The host redacts the secrets of the command line and cuts it to
 // 500 characters, and it never sends the environment of a program. The list has at most 200 programs;

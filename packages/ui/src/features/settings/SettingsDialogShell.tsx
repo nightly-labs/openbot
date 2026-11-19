@@ -139,6 +139,18 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
   );
 }
 
+/**
+ * The label of a group in the section list, before the first section of the group. It only groups the
+ * sections on screen: screen readers read each section by its name, as the tab list has only tabs.
+ */
+export function SettingsNavGroupLabel(props: { label: string }) {
+  return (
+    <div class="settings-modal-nav-heading" aria-hidden="true">
+      {props.label}
+    </div>
+  );
+}
+
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
   const titleId = createUniqueId();
   const descriptionId = createUniqueId();
@@ -240,10 +252,18 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               aria-describedby={descriptionId}
             >
               <div class="settings-modal-main">
-                {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
-                <Portal mount={page().path}>
-                  <PageHeader class="settings-page-path" title={pathTitle()} headingId={titleId} path={pathParents()} />
-                </Portal>
+                {/* A detail page shows its path in the top row, as a Marketplace title does; the parent before it goes
+                    back. The detail page has a header of its own, so it does not also get the large title. */}
+                <Show when={props.crumb}>
+                  <Portal mount={page().path}>
+                    <PageHeader
+                      class="settings-page-path"
+                      title={pathTitle()}
+                      headingId={titleId}
+                      path={pathParents()}
+                    />
+                  </Portal>
+                </Show>
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}
                 </p>
@@ -253,6 +273,12 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   data-scroll-down={canScrollDown() ? "" : undefined}
                 >
                   <div ref={registerScrollElement} class="settings-modal-content" onScroll={updateScrollFades}>
+                    {/* The large title of a section, at the start of the content. */}
+                    <Show when={!props.crumb}>
+                      <h2 id={titleId} class="settings-page-heading">
+                        {props.title}
+                      </h2>
+                    </Show>
                     {props.children}
                   </div>
                 </div>

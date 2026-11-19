@@ -1,6 +1,6 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { CHANNEL_ROUTES, channelResponse } from "./channels-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional channel-picture-v1 contract: the picture of a channel, an icon on a colour or an

@@ -10,9 +10,9 @@
 // ChatGPT plugins load before each thread starts, so each run lists the same skills.
 //
 // The `user-set` setup writes a `config.toml` that sets `features.tool_suggest` and enables
-// `openai-docs`, and checks that OpenBot keeps both. Both setups check, from the rollout file of the
-// reply thread, that `current` drops `request_plugin_install` and the unfit skills, and keeps
-// `web__run` and all other skills.
+// `openai-docs`, and checks that OpenBot keeps `openai-docs` but still turns `tool_suggest` off. Both
+// setups check, from the rollout file of the reply thread, that `current` drops
+// `request_plugin_install` and the unfit skills, and keeps `web__run` and all other skills.
 //
 // Costs a few dozen GPT-6 Luna turns. `bun run bench:codex-prompt-settings`; `--variant=<name>` runs
 // one variant; `--runs=<n>`; `--model=<id>`. Writes .openbot-build/codex-prompt-settings-bench/report.json.
@@ -217,17 +217,17 @@ try {
       for (const skill of listed) assert.ok(!listsSkill(current.context, skill), `current still lists ${skill}.`);
       report.checks.plain = `request_plugin_install and ${listed.join(", ")} dropped; web__run kept`;
     } else {
-      assert.ok(!("features.tool_suggest" in settings), "OpenBot overrides the user's tool_suggest.");
+      assert.equal(settings["features.tool_suggest"], false, "OpenBot keeps the user's tool_suggest.");
       assert.deepEqual(
         settings["skills.config"]?.[0],
         { name: "openai-docs", enabled: true },
         "The user's skill entry is lost.",
       );
-      assert.ok(current.tools.includes("request_plugin_install"), "The user's tool_suggest is not kept.");
+      assert.ok(!current.tools.includes("request_plugin_install"), "current still declares request_plugin_install.");
       assert.ok(listsSkill(current.context, "openai-docs"), "The user's openai-docs entry is not kept.");
       for (const skill of CODEX_UNFIT_SKILLS.filter((name) => name !== "openai-docs" && listsSkill(base.context, name)))
         assert.ok(!listsSkill(current.context, skill), `current still lists ${skill}.`);
-      report.checks["user-set"] = "tool_suggest and openai-docs kept; other unfit skills dropped";
+      report.checks["user-set"] = "openai-docs kept; tool_suggest and other unfit skills dropped";
     }
     // Only the unfit skills leave the listing. A skill line is `- <name>: <description>`; the skill
     // root lines (- `r4` = ...) are numbered again when a root loses all its skills.

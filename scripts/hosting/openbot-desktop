@@ -1,0 +1,50 @@
+#!/bin/bash
+# Runs a window manager on the agent display of a server, with the configuration in desktop/. The
+# server scripts start it in the background with DISPLAY set to that display: openbot-hosted-server
+# on a server without the boat desktop, and openbot-container in the Docker image.
+#
+# Without a window manager, remote desktop shows windows with no title bar, and a click does not move
+# the keyboard focus to another window. Openbox gives each window a title bar, and a right-click on the
+# empty screen opens a menu with a terminal, the files and the open windows. It has no panel and no
+# dock, so the screen that Computer Use sees stays as it was. The boat desktop also used openbox.
+#
+# The configuration binds only Alt+Tab, Alt+Shift+Tab and Alt+F4, so the other keys that an agent or a
+# person types go to the window. A window manager that stops starts again while the display is there.
+set -uo pipefail
+
+desktop=${BASH_SOURCE[0]%/*}/desktop
+# The background: the dark color of the app with the OpenBot logo in the center, at each display size.
+# openbot-logo.png is the lilac logo with a light name from @openbot/brand (openbot-logo-lilac-light
+# on the /brand page), 300 px wide. Without hsetroot, the display keeps its white root: a dark screen
+# with no logo looks like no video came.
+if command -v hsetroot >/dev/null && [ -r "$desktop/openbot-logo.png" ]; then
+  hsetroot -solid '#1a1a1a' -center "$desktop/openbot-logo.png" >/dev/null 2>&1 || true
+fi
+if ! command -v openbox >/dev/null; then
+  echo "openbox is not installed. The agent display has no window manager." >&2
+  exit 0
+fi
+# Openbox finds the menu in the openbox folder of a configuration directory, and the theme in the
+# themes folder of a data directory. The files of the user come first, as for each XDG application.
+export XDG_CONFIG_DIRS="$desktop:${XDG_CONFIG_DIRS:-/etc/xdg}"
+export XDG_DATA_DIRS="$desktop:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
+# The programs of the menu start in the home folder. Openbox does not expand "~" after "=".
+cd "$HOME" || true
+
+# A window manager that stops at once, for example because another one runs on the display, does not
+# start again and again. openbot.service starts this script at the OOM value of main (-500). Openbox and
+# the programs of its menu get the OOM value and the nice value of agent processes (server-memory.ts),
+# so a build in the menu terminal does not take memory or CPU from main. Their output does not go to
+# the service log: GTK programs write many warnings.
+failures=0
+while [ "$failures" -lt 5 ] && xdpyinfo >/dev/null 2>&1; do
+  started=$SECONDS
+  (
+    echo 500 >/proc/self/oom_score_adj 2>/dev/null
+    exec nice -n 10 openbox --config-file "$desktop/openbox/openbot-rc.xml" >/dev/null 2>&1
+  )
+  if [ $((SECONDS - started)) -lt 10 ]; then failures=$((failures + 1)); else failures=0; fi
+  sleep 2
+done
+[ "$failures" -lt 5 ] || echo "openbox stopped 5 times at start. The agent display has no window manager." >&2

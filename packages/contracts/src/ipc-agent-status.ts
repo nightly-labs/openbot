@@ -61,6 +61,16 @@ export interface AgentProviderStatus {
    * apart, and only the provider that resolved a CLI reports one at all.
    */
   cliSource?: "system" | "managed";
+  /**
+   * With `cliSource: "system"`: the user's CLI runs, but a part that some models need is missing,
+   * such as the code-mode host of a bare `codex` (#9139). OpenBot's copy, when downloaded, runs instead.
+   */
+  cliIncomplete?: boolean;
+  /**
+   * The version of the other CLI the user can run instead (`chooseInstalledCli`): the one they
+   * installed while OpenBot's copy runs, or OpenBot's newer copy while theirs runs by their choice.
+   */
+  otherCliVersion?: string;
   /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
   restartPending?: boolean;
   /**
@@ -91,6 +101,74 @@ export interface AgentProviderStatus {
   accounts?: ProviderAccountStatus[];
   /** The pool of `accounts`. Absent while the pool is off. Local only, like `accounts`. */
   accountPool?: ProviderAccountPool;
+  /**
+   * Codex: the user's Codex settings give the models from another source than OpenAI, so the
+   * provider's model list can hold models that are not OpenAI's (#9956). Absent on OpenAI's own list.
+   * Released Team API adapters omit it; a joined server gives it on `provider-model-source-v1`.
+   */
+  modelSource?: ProviderModelSource;
+}
+
+/** The longest model provider name that a status row carries. A longer name is cut. */
+export const PROVIDER_MODEL_SOURCE_NAME_LIMIT = 80;
+
+/**
+ * Where a provider CLI gets its models when its own settings select a source that is not the
+ * provider's own: `provider` is a model provider, such as Ollama, by the name the settings give it;
+ * `catalog` is a model list file that the settings name. The file path stays on the host.
+ */
+export type ProviderModelSource = { kind: "provider"; name: string } | { kind: "catalog" };
+
+export function isProviderModelSource(value: unknown): value is ProviderModelSource {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "catalog") return true;
+  return (
+    value.kind === "provider" &&
+    isBoundedString(value.name, PROVIDER_MODEL_SOURCE_NAME_LIMIT) &&
+    value.name.trim().length > 0
+  );
+}
+
+/** One provider's source, as the `provider-model-source-v1` route lists it. */
+export interface ProviderModelSourceEntry {
+  provider: string;
+  source: ProviderModelSource;
+}
+
+/** The most providers that one `provider-model-source-v1` list holds. */
+const AGENT_PROVIDER_LIMIT = 64;
+
+/** The `provider-model-source-v1` list. A malformed list fails closed, as the other model routes do. */
+export function decodeProviderModelSources(value: unknown): ProviderModelSourceEntry[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.sources) ||
+    value.sources.length > AGENT_PROVIDER_LIMIT ||
+    !value.sources.every(
+      (entry: unknown) =>
+        isDynamicRecord(entry) &&
+        isBoundedString(entry.provider, INPUT_LIMITS.identifier) &&
+        isProviderModelSource(entry.source),
+    )
+  )
+    throw new Error("Invalid model source list.");
+  return value.sources.map((entry: ProviderModelSourceEntry) => ({
+    provider: entry.provider,
+    source: entry.source.kind === "provider" ? { kind: "provider", name: entry.source.name } : { kind: "catalog" },
+  }));
+}
+
+/** The status with the model source of each provider that a joined server lists. */
+export function withModelSources(status: AgentStatus, sources: readonly ProviderModelSourceEntry[]): AgentStatus {
+  if (!status.providers || sources.length === 0) return status;
+  const byProvider = new Map(sources.map((entry) => [entry.provider, entry.source]));
+  return {
+    ...status,
+    providers: status.providers.map((row) => {
+      const source = byProvider.get(row.id);
+      return source ? { ...row, modelSource: source } : row;
+    }),
+  };
 }
 
 /**
@@ -165,6 +243,8 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.cliIncomplete === undefined || typeof value.cliIncomplete === "boolean") &&
+    (value.otherCliVersion === undefined || isBoundedString(value.otherCliVersion, 160)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
     (value.endpointsPending === undefined || typeof value.endpointsPending === "boolean") &&
@@ -175,7 +255,8 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
       (Array.isArray(value.accounts) &&
         value.accounts.length <= MAX_PROVIDER_ACCOUNTS &&
         value.accounts.every(isProviderAccountStatus))) &&
-    (value.accountPool === undefined || isProviderAccountPool(value.accountPool))
+    (value.accountPool === undefined || isProviderAccountPool(value.accountPool)) &&
+    (value.modelSource === undefined || isProviderModelSource(value.modelSource))
   );
 }
 
@@ -218,7 +299,7 @@ export interface AccountUsageWindow {
   resetsAt: number | null;
 }
 
-function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
+export function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
   return (
     isDynamicRecord(value) &&
     isFiniteNumber(value.usedPercent) &&
@@ -234,7 +315,10 @@ function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
 export interface AccountUsageGroup {
   /** The provider's name for the group, such as "Gemini Models". */
   name: string;
-  /** The model names that the provider lists for the group, such as "Gemini Flash". */
+  /**
+   * The model names that the provider lists for the group, such as "Gemini Flash". A group with no list,
+   * such as "Gemini 4 Argon", has its own name when other groups list theirs.
+   */
   models: string[];
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;
@@ -250,7 +334,7 @@ export interface AccountUsageLimit {
    * OpenCode: the weekly or monthly window that `secondary` does not hold. `secondary` is the one that
    * stops work first, so only the usage list shows this one. Cursor: the total of a plan split into
    * Cursor's own models (`primary`) and the others (`secondary`), which the ring shows. No usage limit
-   * check reads this field. The Team API does not send it.
+   * check reads this field. The Team API sends it only to a peer with `usage-tertiary-v1`.
    */
   tertiary?: AccountUsageWindow;
   /**
@@ -263,6 +347,12 @@ export interface AccountUsageLimit {
    * rail then shows the ring of that provider alone. The Team API does not send this field.
    */
   sharedQuotaWith?: AgentProviderId;
+  /**
+   * Codex: whether the account can keep working on credits when a plan window is spent. Absent when
+   * the provider sends no credit state. The released usage routes do not send it: a joined server
+   * reads it with `usage-credits-v1`, and a reading without it keeps the last one (`keepUsageCredits`).
+   */
+  creditsAvailable?: boolean;
 }
 
 export interface AccountUsage {
@@ -285,9 +375,61 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
           (Array.isArray(limit.groups) &&
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
-        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)),
+        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
     )
   );
+}
+
+/** One row of a `usage-credits-v1` list: whether a provider account of the host can work on credits. */
+export interface UsageCredits {
+  provider: AgentProviderId;
+  /** `DEFAULT_PROVIDER_ACCOUNT_ID` for the provider's own sign-in. */
+  accountId: string;
+  available: boolean;
+}
+
+/** The `accounts` of a `usage-credits-v1` list. A provider this client does not know is left out. */
+export function decodeUsageCredits(value: unknown): UsageCredits[] {
+  const invalid = () => new Error("Invalid usage credits.");
+  if (!Array.isArray(value)) throw invalid();
+  return value.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row) || !isProviderAccountId(row.accountId) || typeof row.available !== "boolean")
+      throw invalid();
+    return isAgentProvider(row.provider)
+      ? [{ provider: row.provider, accountId: row.accountId, available: row.available }]
+      : [];
+  });
+}
+
+/** A joined server's reading with the credit state that its host gave on `usage-credits-v1`. */
+export function withUsageCredits(usage: AccountUsage, credits: readonly UsageCredits[]): AccountUsage {
+  const byAccount = new Map(credits.map((row) => [JSON.stringify([row.provider, row.accountId]), row.available]));
+  return {
+    limits: usage.limits.map((limit) => {
+      const available = byAccount.get(JSON.stringify([limit.id, limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID]));
+      return available === undefined ? limit : { ...limit, creditsAvailable: available };
+    }),
+  };
+}
+
+/**
+ * The credit state of the last reading, for a limit of a new one that has none. The released usage
+ * routes and the `usage-changed` event of a joined server do not carry it, and a Codex reading on this
+ * computer always does, so a limit without it keeps the last one.
+ */
+export function keepUsageCredits(previous: AccountUsageLimit | undefined, next: AccountUsageLimit): AccountUsageLimit {
+  return next.creditsAvailable !== undefined || previous?.creditsAvailable === undefined
+    ? next
+    : { ...next, creditsAvailable: previous.creditsAvailable };
+}
+
+/**
+ * A limit that an event updated while a read ran, with the credit state of that read. The event is
+ * newer for the windows, but its credit state is only the one that `keepUsageCredits` kept.
+ */
+export function withReadCredits(read: AccountUsageLimit | undefined, limit: AccountUsageLimit): AccountUsageLimit {
+  return read?.creditsAvailable === undefined ? limit : { ...limit, creditsAvailable: read.creditsAvailable };
 }
 
 /** The most groups in one reading, and the most models in one group. */
@@ -351,6 +493,14 @@ export interface SetProviderApiKeyInput {
 export interface ConnectProviderAccountInput {
   provider: AgentProviderId;
   accountId: string | null;
+}
+
+/**
+ * Gives a provider account its API key: a new account when `accountId` is null, or a new key for one
+ * that exists. For a provider whose accounts are keys (`accountSignIn: "key"`).
+ */
+export interface ConnectProviderAccountKeyInput extends ConnectProviderAccountInput {
+  key: string;
 }
 
 /** A null label returns the account to its email. */
@@ -429,6 +579,11 @@ export interface SubmitProviderCodeLoginInput {
   code: string;
 }
 
+/** As `SubmitProviderCodeLoginInput`, for the `paste` sign-in of one account of a provider. */
+export interface SubmitProviderAccountCodeLoginInput extends SubmitProviderCodeLoginInput {
+  accountId: string;
+}
+
 /**
  * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
  * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
@@ -481,6 +636,20 @@ export type ProviderCodeLoginStart =
       expiresAt: number;
     }
   | { kind: "connected" };
+
+/**
+ * A started code sign-in of one account of a provider. `accountId` is the account that signs in: a
+ * new one when the request named none. Its status and its cancel name it.
+ */
+export interface ProviderAccountCodeLoginStart {
+  accountId: string;
+  start: ProviderCodeLoginStart;
+}
+
+/** The code sign-in of one account of a provider: `result` is `null` while it goes on. */
+export interface ProviderAccountCodeLoginStatus {
+  result: { error: string | null } | null;
+}
 
 /**
  * A sign-in that a joined server's host runs in its own browser (`provider-host-sign-in-v1`). `tabId`

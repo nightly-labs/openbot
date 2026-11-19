@@ -23,6 +23,7 @@ import { listenLoopback } from "./listen-loopback";
 import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
+import { windowsShortPath } from "./windows-short-path";
 
 export class SunshineApiError extends Schema.TaggedError<SunshineApiError>()("SunshineApiError", {
   status: Schema.Int,
@@ -651,6 +652,7 @@ export class SunshineMoonlightRuntime {
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const basePort = this.#sunshineBasePort;
     if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
+    const directory = windowsShortPath(this.#options.stateDirectory);
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
       // The base port: every other Sunshine port (GameStream HTTP/HTTPS, Web UI HTTPS, video,
@@ -662,12 +664,12 @@ export class SunshineMoonlightRuntime {
       "origin_web_ui_allowed = pc",
       "address_family = ipv4",
       "bind_address = 127.0.0.1",
-      `credentials_file = ${join(this.#options.stateDirectory, "sunshine-credentials.json")}`,
-      `file_state = ${join(this.#options.stateDirectory, "sunshine-state.json")}`,
-      `file_apps = ${join(this.#options.stateDirectory, "sunshine-apps.json")}`,
-      `pkey = ${join(this.#options.stateDirectory, "sunshine-key.pem")}`,
-      `cert = ${join(this.#options.stateDirectory, "sunshine-cert.pem")}`,
-      `log_path = ${join(this.#options.stateDirectory, "sunshine.log")}`,
+      `credentials_file = ${join(directory, "sunshine-credentials.json")}`,
+      `file_state = ${join(directory, "sunshine-state.json")}`,
+      `file_apps = ${join(directory, "sunshine-apps.json")}`,
+      `pkey = ${join(directory, "sunshine-key.pem")}`,
+      `cert = ${join(directory, "sunshine-cert.pem")}`,
+      `log_path = ${join(directory, "sunshine.log")}`,
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
       // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
       // probe the others.
@@ -748,9 +750,12 @@ export class SunshineMoonlightRuntime {
       this.#options.stateDirectory,
       this.#options.platform === "win32" ? "openbot-ice-helper.cmd" : "openbot-ice-helper.sh",
     );
+    // Moonlight reads a JSON list of ICE servers from the helper's output. Both helpers copy the
+    // endpoint's body unchanged: Windows PowerShell 5.1 `ConvertTo-Json` writes a list again as an
+    // object, and Moonlight then has no ICE servers.
     const contents =
       this.#options.platform === "win32"
-        ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
+        ? "@powershell.exe -NoProfile -NonInteractive -Command \"(Invoke-WebRequest -UseBasicParsing -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL).Content\"\r\n"
         : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
     yield* desktopCall(() => writeFile(path, contents, { mode: 0o700 }));
     if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o700));
@@ -806,9 +811,10 @@ export class SunshineMoonlightRuntime {
     // A restart is how a newly granted permission takes effect, so the verdict is this process's
     // alone -- carrying the previous one over would keep reporting a grant the user has already made.
     this.#screenCaptureDenied = false;
+    const executable = windowsShortPath(this.#options.paths.sunshine);
     this.#sunshine = yield* desktopSync(() =>
-      this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
-        cwd: dirname(this.#options.paths.sunshine),
+      this.#spawn(executable, [join(windowsShortPath(this.#options.stateDirectory), "sunshine.conf")], {
+        cwd: dirname(executable),
         env: { ...process.env, ...agentDisplayEnvironment(this.#options.platform), OPENBOT_REMOTE_SETUP: "1" },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
@@ -1137,6 +1143,11 @@ export class SunshineMoonlightRuntime {
   // After a start, nothing waits on these processes. One that exits on its own would leave a runtime
   // that still reports itself started, and every new session would wait for a stream that never comes.
   #watchExit(child: ChildProcess, source: "sunshine" | "moonlight"): void {
+    // A file that is not there gives `error` and no `exit`. With no listener, Node throws it as an
+    // uncaught exception. The child then counts as ended, so the readiness wait of the start fails.
+    child.on("error", (error) => {
+      this.#options.onDiagnostic?.(source, `OpenBot: ${source} had a process error (${error.message}).\n`);
+    });
     child.once("exit", (code, signal) => {
       // A stop clears the field before it waits. A start in progress fails its own readiness wait.
       if ((source === "sunshine" ? this.#sunshine : this.#moonlight) !== child || !this.#state) return;

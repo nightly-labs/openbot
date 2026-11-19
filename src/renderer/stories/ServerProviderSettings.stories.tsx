@@ -2,6 +2,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   type AppSetupState,
+  type ClientAgentModelOption,
   type CustomProviderRestart,
   type CustomProviderSummary,
   isManagedRuntimeProvider,
@@ -87,6 +88,39 @@ const openCodeInstalledAgentStatus: AgentStatus = {
     { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
   ],
 };
+/** Devin connected, with the long names of its Fusion models. */
+const devinAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: [
+    ...(providerUpdateAgentStatus.providers ?? []),
+    { id: "devin", state: "available", version: "3000.11.234", message: null },
+  ],
+};
+function devinModel(id: string, name: string): ClientAgentModelOption {
+  return {
+    provider: "devin",
+    id,
+    name,
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  };
+}
+const DEVIN_MODELS: ClientAgentModelOption[] = [
+  devinModel("gpt-6-2-astra-medium", "GPT-6.2 Astra"),
+  devinModel("gpt-6-1-sol-medium", "GPT-6.1 Sol"),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Astra High Thinking + SWE-2 Medium)"),
+  devinModel("fusion-gpt-6-2-sol-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Sol High Thinking + SWE-2 Medium)"),
+  devinModel(
+    "fusion-gpt-6-2-astra-high-thinking-gpt-5-6-luna-high",
+    "Fusion (GPT-6.2 Astra High Thinking + GPT-5.6 Luna High)",
+  ),
+  devinModel(
+    "fusion-gpt-6-2-sol-high-thinking-gpt-6-1-terra-high",
+    "Fusion (GPT-6.2 Sol High Thinking + GPT-6.1 Terra High)",
+  ),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-glm-5-2-high", "Fusion (GPT-6.2 Astra High Thinking + GLM-5.2 High)"),
+];
 /** Codex with two connected accounts. Codex gave the own sign-in two usage resets, and the other none. */
 const usageResetAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -101,6 +135,20 @@ const usageResetAgentStatus: AgentStatus = {
         }
       : provider,
   ),
+};
+/** Claude with one connected account, so its page offers a second account. */
+const accountCodeAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: [
+    ...(providerUpdateAgentStatus.providers ?? []).filter((provider) => provider.id !== "claude"),
+    {
+      id: "claude",
+      state: "available",
+      version: "2.1.0",
+      message: null,
+      accounts: [{ id: "default", label: null, email: "ada@example.com", state: "connected", message: null }],
+    },
+  ],
 };
 /** A reset spends one credit after a short wait, so the dialog shows its pending state. */
 function createUsageResetAccounts(): ProviderAccountActions {
@@ -258,6 +306,8 @@ function ServerProvidersStory(props: {
   usageReset?: boolean;
   /** Codex accounts that the pool can share. */
   accountPool?: boolean;
+  /** A Linux host: an account after the first of ChatGPT, Grok and Claude can sign in with a code. */
+  accountCode?: boolean;
   /**
    * The Hermes row: `null` is a host that sends no installer status, so the row opens the install
    * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
@@ -270,6 +320,8 @@ function ServerProvidersStory(props: {
    * `remove-only` is an older host, which offers Remove only.
    */
   hostCustomProviders?: "edit" | "remove-only";
+  /** Devin with its long Fusion model names: each model row keeps its switch in view. */
+  devinModels?: boolean;
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const poolAccounts = props.accountPool ? createPoolAccounts() : undefined;
@@ -308,6 +360,7 @@ function ServerProvidersStory(props: {
         }
       : {}),
     ...(props.providerUpdateFailure ? { providerRuntimeFailure: true } : {}),
+    ...(props.devinModels ? { models: DEVIN_MODELS } : {}),
   });
   const runtimes = createProviderRuntimeStore(() => (props.providerUpdate ? mock.api.providerRuntimes : undefined));
   window.openbot = mock.api;
@@ -405,6 +458,8 @@ function ServerProvidersStory(props: {
       get agentStatus() {
         if (hermesAgentStatus) return hermesAgentStatus;
         if (poolAccounts) return poolAccounts.agentStatus();
+        if (props.accountCode) return accountCodeAgentStatus;
+        if (props.devinModels) return devinAgentStatus;
         if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
@@ -419,7 +474,7 @@ function ServerProvidersStory(props: {
                   : providerAgentStatus;
       },
       connection:
-        props.codeSignIn || hermes !== undefined
+        props.codeSignIn || props.accountCode || hermes !== undefined
           ? codeConnection
           : props.providerDownloads || props.providerUpdate
             ? browserConnection
@@ -446,7 +501,16 @@ function ServerProvidersStory(props: {
         : props.providerDownloads || hermes !== undefined
           ? fn()
           : undefined,
-      accountActions: poolAccounts?.actions ?? usageResetAccounts,
+      accountActions: props.accountCode
+        ? {
+            connect: fn(async () => undefined),
+            cancel: fn(async () => undefined),
+            rename: fn(async () => undefined),
+            remove: fn(async () => undefined),
+            connectWithCode: async (provider) => codeConnection.alternative(provider),
+            pasteCodeSignIn: true,
+          }
+        : (poolAccounts?.actions ?? usageResetAccounts),
       providerKeys: props.hostCodexKey ? hostCodexKeys(props.hostCodexKey) : undefined,
       onAddCustomProvider: addCustomProvider,
       onDeleteCustomProvider: deleteCustomProvider,
@@ -515,6 +579,7 @@ function ServerProvidersStory(props: {
             hostPromptCacheTtl={{}}
             claudeUserSetup={{}}
             claudeCompactWindow={{}}
+            providerEnvironment={{}}
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}
@@ -707,6 +772,14 @@ export const AccountPool: Story = {
   render: () => <ServerProvidersStory accountPool />,
 };
 
+/**
+ * Open Claude on a Linux host: the ⋯ menu next to "Add account" has "Add account with code". The
+ * dialog opens the Claude page and takes the code that the page shows.
+ */
+export const AccountCodeSignIn: Story = {
+  render: () => <ServerProvidersStory accountCode />,
+};
+
 /** A host that sends no Hermes installer status, such as a Windows host: the row opens the install guide. */
 export const HermesInstallGuide: Story = {
   render: () => <ServerProvidersStory hermes={null} />,
@@ -727,6 +800,11 @@ export const HermesInstalling: Story = {
 /** Hermes is installed: the row offers Connect, which signs in with the Nous Portal code. */
 export const HermesConnect: Story = {
   render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
+};
+
+/** Devin's long model names are cut, and each row keeps the switch that hides the model from the picker. */
+export const DevinModels: Story = {
+  render: () => <ServerProvidersStory devinModels />,
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */

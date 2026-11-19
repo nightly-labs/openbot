@@ -1,11 +1,12 @@
 # A hosted server runs only while it is in use, so the first check comes soon after each start. The
 # delay counts from the start of the timer: boat resumes a server on a machine that booted before.
+# `check` runs each hour: a stopped start loop tries again each hour, and `stage` runs about each 6 hours.
 [Unit]
 Description=Check for an OpenBot update
 
 [Timer]
 OnActiveSec=5min
-OnUnitActiveSec=6h
+OnUnitActiveSec=1h
 RandomizedDelaySec=5min
 
 [Install]

@@ -44,6 +44,7 @@ export function projectAgent(serverId: string, agent: RemoteAgent, avatarColor: 
     description: agent.description,
     preview: agent.preview,
     updatedLabel: formatUpdatedAt(agent.updatedAt),
+    updatedAt: agent.updatedAt,
     provider: agent.provider,
     foreignProvider: agent.foreignProvider,
     model: agent.model,

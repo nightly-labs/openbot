@@ -15,7 +15,6 @@ interface QueuedChat {
 }
 
 interface QueuedMessages {
-  chats: ReadonlyMap<string, QueuedChat>;
   publish: (chatId: string, chat: QueuedChat | null) => void;
   /** The waiting rows that the person closed. They stay closed when the chat opens again. */
   hiddenReplyIds: ReadonlySet<string>;
@@ -23,6 +22,12 @@ interface QueuedMessages {
 }
 
 const QueuedMessagesContext = createContext<QueuedMessages | null>(null);
+/**
+ * The published queues, apart from the actions above. Each chat publishes its queue and reads the
+ * closed rows, and only the queue sheet reads the queues. In one context, each publish rendered
+ * every mounted chat again, which then published again.
+ */
+const QueuedChatsContext = createContext<ReadonlyMap<string, QueuedChat> | null>(null);
 
 // The queue sheet is a native route, so the controller cannot travel in navigation
 // params. Each chat stays mounted behind the sheet and publishes its live controller
@@ -47,11 +52,12 @@ export function QueuedMessagesProvider({ children }: PropsWithChildren) {
   const hideReplies = useCallback((ids: readonly string[]) => {
     setHiddenReplyIds((current) => new Set([...current, ...ids]));
   }, []);
-  const value = useMemo(
-    () => ({ chats, publish, hiddenReplyIds, hideReplies }),
-    [chats, publish, hiddenReplyIds, hideReplies],
+  const value = useMemo(() => ({ publish, hiddenReplyIds, hideReplies }), [publish, hiddenReplyIds, hideReplies]);
+  return (
+    <QueuedMessagesContext value={value}>
+      <QueuedChatsContext value={chats}>{children}</QueuedChatsContext>
+    </QueuedMessagesContext>
   );
-  return <QueuedMessagesContext value={value}>{children}</QueuedMessagesContext>;
 }
 
 function useQueuedMessagesContext(): QueuedMessages {
@@ -84,7 +90,8 @@ export function useQueuedChat(chatId: string | undefined): {
   queue: ChatQueueController | null;
   pending: QueuedUpload | null;
 } {
-  const { chats } = useQueuedMessagesContext();
+  const chats = useContext(QueuedChatsContext);
+  if (!chats) throw new Error("QueuedMessagesProvider is missing.");
   const chat = chatId ? chats.get(chatId) : undefined;
   return { queue: chat?.queue ?? null, pending: chat?.pending ?? null };
 }

@@ -11,8 +11,11 @@ import {
   SUPERTONIC_MODEL_FILES,
 } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
+
+const logger = createOpenBotLogger("voice-model-service");
 
 /** The N-API addon of sherpa-onnx. Its libraries are in the same directory. */
 export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
@@ -107,11 +110,15 @@ const WHISPER_TURBO_MODEL_BASE_URL = `https://huggingface.co/csukuangfj/sherpa-o
 
 /**
  * The directory name of Whisper turbo in `<userData>/runtimes`. It is not `whisper`: startup
- * deletes that directory, which held the Whisper model of earlier versions.
+ * deletes that directory, which held the Whisper model of earlier versions. Only the encoder is
+ * int8 now; the name stays, so that a user who has the model downloads only the new decoder.
  */
 export const WHISPER_TURBO_MODEL_DIRECTORY = "whisper-turbo-int8";
 
-/** OpenAI Whisper large-v3 turbo (MIT), int8 ONNX export for sherpa-onnx. */
+/**
+ * OpenAI Whisper large-v3 turbo (MIT), ONNX export for sherpa-onnx: an int8 encoder and a
+ * full-precision decoder. The int8 decoder writes a word or a phrase again and again in Thai.
+ */
 const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
   {
     name: "turbo-encoder.int8.onnx",
@@ -120,10 +127,10 @@ const WHISPER_TURBO_MODEL_FILES: readonly VoiceModelFile[] = [
     sha256: "b02dcdf54f348741e93fe732b67d933c8dcb6735655f710640143081db38878b",
   },
   {
-    name: "turbo-decoder.int8.onnx",
-    url: `${WHISPER_TURBO_MODEL_BASE_URL}/turbo-decoder.int8.onnx`,
-    bytes: 361_080_764,
-    sha256: "20accd02388482eb3a46bd615631adfdc85e1eb2c7db9ea3f02a40ffe6b81547",
+    name: "turbo-decoder.onnx",
+    url: `${WHISPER_TURBO_MODEL_BASE_URL}/turbo-decoder.onnx`,
+    bytes: 636_209_532,
+    sha256: "b24db5d90fa230c5eaa6b823d74862ced9e0d1dc3e01ec46601968e8db0e09ec",
   },
   {
     name: "turbo-tokens.txt",
@@ -191,6 +198,14 @@ const VOICE_MODEL_FILES: Record<DownloadedModelId, readonly VoiceModelFile[]> = 
   "supertonic-3": SUPERTONIC_MODEL_FILES,
 };
 
+/**
+ * Files of an earlier pin that are still in the directory of a model. They are deleted only after
+ * the current files are verified, so a failed download does not leave fewer files than before.
+ */
+const RETIRED_MODEL_FILES: Partial<Record<DownloadedModelId, readonly string[]>> = {
+  "whisper-turbo": ["turbo-decoder.int8.onnx"],
+};
+
 /** The status of one downloaded model. */
 export type DownloadedModelStatus<Id extends DownloadedModelId> = Omit<VoiceModelStatus, "modelId"> & { modelId: Id };
 
@@ -250,6 +265,20 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     return yield* this.#readStatus();
   }).bind(this);
 
+  /**
+   * Deletes the files of an earlier pin when all current files are verified. While a current file is
+   * missing, nothing is hashed or deleted.
+   */
+  readonly removeRetiredFiles = Effect.fn("VoiceModel.removeRetiredFiles")(function* (this: VoiceModelService<Id>) {
+    const retired = (RETIRED_MODEL_FILES[this.modelId] ?? [])
+      .map((name) => join(this.#directory, name))
+      .filter((path) => existsSync(path));
+    if (retired.length === 0) return;
+    if (this.#files.some((file) => !existsSync(join(this.#directory, file.name)))) return;
+    if (!(yield* this.#isComplete())) return;
+    for (const path of retired) yield* voiceIO(() => rm(path, { force: true }));
+  }).bind(this);
+
   readonly prepare = Effect.fn("VoiceModel.prepare")(function* (this: VoiceModelService<Id>) {
     // A download that starts while the files are deleted would write into the directory being removed.
     if (this.#removal) yield* Fiber.await(this.#removal);
@@ -288,12 +317,14 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
             this.#setStatus({ phase: "ready", progress: 100, message: null });
           }).pipe(Effect.ensuring(Effect.sync(() => controller.abort()))),
         );
+        if (Result.isSuccess(downloaded)) yield* this.#removeRetiredFilesOrWarn();
         if (Result.isFailure(downloaded) && this.#cancelled) {
           // Files that completed stay verified, so the next download starts at the first one missing.
           this.#setStatus({ phase: "missing", progress: null, message: null });
         } else if (Result.isFailure(downloaded)) {
           const cause = downloaded.failure.cause;
           const stopped = cause instanceof Error && cause.name === "AbortError";
+          if (!stopped) logger.warn(`Could not download the ${this.modelId} model.`, downloadFailureReason(cause));
           this.#setStatus({
             phase: "error",
             progress: null,
@@ -439,6 +470,20 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
     );
   }
 
+  /** A file that cannot be deleted only uses disk space, so the model stays ready. */
+  #removeRetiredFilesOrWarn(): Effect.Effect<void> {
+    return this.removeRetiredFiles().pipe(
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          logger.warn(
+            `Could not remove the old files of the ${this.modelId} model.`,
+            downloadFailureReason(error.cause),
+          ),
+        ),
+      ),
+    );
+  }
+
   #readStatus(): Effect.Effect<DownloadedModelStatus<Id>, VoiceOperationError> {
     return Effect.gen({ self: this }, function* () {
       const ready = yield* this.#isComplete();
@@ -487,6 +532,27 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
 }) {}
 
 const { io: voiceIO } = causeHelpers(VoiceOperationError);
+
+/**
+ * A short reason for the log, never a URL or a path: a code of this file (`download-status-404`),
+ * a Chromium network error (`net::ERR_PROXY_CONNECTION_FAILED`) or a Node error code (`ECONNRESET`).
+ */
+function downloadFailureReason(cause: unknown): string {
+  if (!(cause instanceof Error)) return "unknown";
+  if (/^download-[a-z0-9-]+$/.test(cause.message)) return cause.message;
+  const network = /net::ERR_[A-Z_]+/.exec(cause.message);
+  if (network) return network[0];
+  for (const error of [cause, cause.cause]) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      /^[A-Z][A-Z0-9_]+$/.test(error.code)
+    )
+      return error.code;
+  }
+  return "unknown";
+}
 
 /**
  * Deletes the Whisper model cache that earlier versions downloaded (`<userData>/runtimes/whisper`).

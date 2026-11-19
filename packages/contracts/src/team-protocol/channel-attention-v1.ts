@@ -1,7 +1,7 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { CHANNEL_ROUTES } from "./channels-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional channel-attention-v1 contract: what a client needs to show a channel prompt, notify

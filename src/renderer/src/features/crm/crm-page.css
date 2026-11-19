@@ -1,0 +1,45 @@
+/* The CRM page of the desktop window and the web client. */
+.crm-window-page {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.crm-window-page > * {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+}
+
+@media (min-width: 721px) {
+  /* The top row stays empty and lets clicks through to the server menu, as on the Library page. */
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .crm-window-page {
+    grid-template-rows: var(--left-header-height) minmax(0, 1fr);
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .crm-window-page > * {
+    grid-row: 2;
+    pointer-events: auto;
+  }
+
+  /* The top row moves the window, as the header of the usage page does. It starts after the buttons
+   * of the frame, so Back, Forward and the sidebar toggle keep their clicks. */
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .crm-window-page::before {
+    content: "";
+    grid-row: 1;
+    grid-column: 1;
+    margin-inline-start: var(--top-row-tabs-start, var(--left-panel-width));
+    -webkit-app-region: drag;
+  }
+
+  /* The CRM header below the top row also moves the window. Its tabs, search and buttons keep their
+   * clicks. */
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .crm-window-page .crm-top {
+    -webkit-app-region: drag;
+  }
+
+  .app-frame-edge[data-window-page-kind="titled"] > .window-page > .crm-window-page .crm-top > * {
+    -webkit-app-region: no-drag;
+  }
+}
