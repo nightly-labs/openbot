@@ -776,6 +776,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (effort) yield* thread.rpc.request({ type: "set_thinking_level", level: effort === "none" ? "off" : effort });
   });
 
+  readonly #modelReadsImages = Effect.fn("PiAgentClient.modelReadsImages")(function* (thread: PiThread) {
+    const state = yield* thread.rpc.request({ type: "get_state" });
+    const input = getArray(getRecord(state, "model"), "input");
+    return input.length === 0 || input.includes("image");
+  });
+
   readonly #prompt = Effect.fn("PiAgentClient.prompt")(function* (
     this: PiAgentClient,
     thread: PiThread,
@@ -784,6 +790,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     yield* this.#configure(thread, params);
     const prompt = yield* piPrompt(params);
+    if (this.options.profileGeneration && prompt.images && !(yield* this.#modelReadsImages(thread)))
+      return yield* providerFailure(new Error(sourceText("error.workflow.modelImageUnsupported")));
     const context = this.#turnContext.take(thread.id, prompt.message.startsWith("/"));
     const message = context.length > 0 ? [...context, prompt.message].join("\n\n") : prompt.message;
     const turn: PiTurn = {
