@@ -187,6 +187,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   readonly contextCompaction = "request";
   readonly provisionalAnswers = true;
   readonly turnContext = true;
+  readonly imageInput = (): boolean => true;
   readonly #turnContext = new TurnContext();
   readonly provider: "pi" | KeyOnlyProviderId;
   readonly #bridge = new LocalMcpBridge();

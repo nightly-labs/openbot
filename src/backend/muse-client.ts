@@ -113,6 +113,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "muse";
   readonly turnContext = true;
+  readonly imageInput = (): boolean => true;
   readonly #turnContext = new TurnContext();
   readonly #cli: AgentCliInfo;
   readonly #options: MuseProviderOptions;

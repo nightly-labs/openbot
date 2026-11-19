@@ -1,4 +1,5 @@
 import { isAgentProvider } from "@openbot/contracts/agent-providers";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
@@ -171,7 +172,10 @@ interface WorkflowTextRequest {
   model: string | null;
   effort: AgentReasoningEffort | null;
   prompt: string;
+  images: readonly string[];
 }
+
+const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 interface WorkflowMediaRequest {
   kind: WorkflowMediaKind;
@@ -445,17 +449,52 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return false;
         };
 
-        const startGeneration = (step: StoredWorkflowStep, node: WorkflowNode): Effect.Effect<void> => {
+        const modelStepImages = Effect.fn("Workflows.modelStepImages")(function* (
+          step: StoredWorkflowStep,
+          run: StoredWorkflowRun | null,
+        ) {
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const inputs = graph
+            ? mediaInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
+            : [];
+          const attachmentIds = [...new Set(inputs.map((input) => input.attachmentId))];
+          if (attachmentIds.length > INPUT_LIMITS.attachments)
+            return Result.fail(sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }));
+          const paths: string[] = [];
+          for (const attachmentId of attachmentIds) {
+            const path = dependencies.filePath
+              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
+              : null;
+            if (!path) return Result.fail(sourceText("error.workflow.mediaInputMissing"));
+            if (!MODEL_IMAGE_TYPES.has(attachmentMimeTypeForName(path)))
+              return Result.fail(sourceText("error.workflow.modelImageType"));
+            paths.push(path);
+          }
+          return Result.succeed(paths);
+        });
+
+        const startGeneration = (
+          step: StoredWorkflowStep,
+          node: WorkflowNode,
+          run: StoredWorkflowRun | null,
+        ): Effect.Effect<void> => {
           const condition = node.kind === "condition";
-          const request: WorkflowTextRequest = {
-            provider: isAgentProvider(node.fields.provider) ? node.fields.provider : null,
-            model: fieldText(node, "model") || null,
-            effort: isReasoningEffort(node.fields.effort) ? node.fields.effort : null,
-            prompt: condition
-              ? conditionPrompt(fieldText(node, "rule"), step.input)
-              : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
-          };
           const generate = Effect.gen(function* () {
+            const images = condition ? Result.succeed([]) : yield* modelStepImages(step, run);
+            if (Result.isFailure(images)) {
+              settle(step, { status: "failed", error: images.failure });
+              yield* requestSweep();
+              return;
+            }
+            const request: WorkflowTextRequest = {
+              provider: isAgentProvider(node.fields.provider) ? node.fields.provider : null,
+              model: fieldText(node, "model") || null,
+              effort: isReasoningEffort(node.fields.effort) ? node.fields.effort : null,
+              prompt: condition
+                ? conditionPrompt(fieldText(node, "rule"), step.input)
+                : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
+              images: images.success,
+            };
             const result = yield* generationLock.withPermit(dependencies.generateText(request)).pipe(Effect.result);
             if (Result.isFailure(result)) {
               settle(step, { status: "failed", error: result.failure.message });
@@ -763,6 +802,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                   model: null,
                   effort: null,
                   prompt: githubChoicePrompt(step.input, options, plan.choose),
+                  images: [],
                 }),
               );
               const chosen = githubChoices(answer, options, plan.choose);
@@ -928,7 +968,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               return;
             case "llm":
             case "condition":
-              yield* startGeneration(step, node);
+              yield* startGeneration(step, node, run);
               return;
             case "image":
               yield* startMedia(step, node, run);

@@ -25,6 +25,10 @@ export const messages = {
     "モデルが時間内に回答しませんでした。このステップの推論レベルを下げるか、より速いモデルを選んでから、もう一度実行してください。",
   "error.workflow.modelToolUse":
     "モデルがツールを使おうとしましたが、このステップはテキストでしか回答できません。ステップをもう一度実行するか、別のモデルを選んでください。",
+  "error.workflow.modelImageUnsupported":
+    "このステップのモデルは画像を読み取れません。画像を読み取れるモデルを選ぶか、画像の接続を外してください。",
+  "error.workflow.modelImageType":
+    "モデルのステップが読み取れる画像は PNG、JPEG、GIF、WebP だけです。これらの形式の画像を接続してください。",
   "error.workflow.modelUnavailable": "このステップのモデルは利用できません。このステップに別のモデルを選んでください。",
   "error.workflow.providerBusy": "プロバイダーが混み合っています。数分待ってから、ステップをもう一度実行してください。",
   "error.workflow.providerOffline":

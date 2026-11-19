@@ -23,6 +23,10 @@ export const messages = {
     "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelToolUse":
     "Model bir araç kullanmaya çalıştı, ancak bu adım yalnızca metinle yanıt verebilir. Adımı yeniden çalıştırın veya başka bir model seçin.",
+  "error.workflow.modelImageUnsupported":
+    "Bu adımın modeli resimleri okuyamaz. Okuyabilen bir model seçin veya resim bağlantısını kaldırın.",
+  "error.workflow.modelImageType":
+    "Model adımı yalnızca PNG, JPEG, GIF ve WebP resimlerini okuyabilir. Bu türlerden birinde bir resim bağlayın.",
   "error.workflow.modelUnavailable": "Bu adımın modeli kullanılamıyor. Bu adım için başka bir model seçin.",
   "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerOffline":
