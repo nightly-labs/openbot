@@ -2342,14 +2342,17 @@ export class TurnLifecycle {
       const channelTask =
         this.#conversation.channelForThread(snapshot.threadId) !== null ||
         deliveries.some(({ channelId }) => channelId !== undefined);
+      // Whether a backup model takes this turn, in the agent's own chat and for a channel task alike.
+      const backupTakes = () =>
+        ((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
+        (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId));
       const failedOver =
         (mayRunAgain || mayContinue) &&
         failedKey !== null &&
         deliveries.length > 0 &&
         !channelTask &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
-          (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)));
+        backupTakes();
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
       // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
       // thread too (#8503). So does the turn of an
@@ -2484,10 +2487,7 @@ export class TurnLifecycle {
       if (
         failover &&
         failedKey !== null &&
-        ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) ||
-          (channelTask &&
-            (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
-              (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)))))
+        ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
       )
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as
