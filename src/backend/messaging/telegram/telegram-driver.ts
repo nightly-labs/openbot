@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import type { MessagingHistoryStore } from "../messaging-history-store";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import {
   type ConnectionIdentity,
@@ -365,6 +366,7 @@ function unparsable(failure: MessagingAdapterError): boolean {
 
 export interface TelegramDriverOptions {
   ingress?: MessagingIngress;
+  history?: MessagingHistoryStore;
 }
 
 export function telegramDriver(options: TelegramDriverOptions = {}): MessagingDriver {
@@ -379,6 +381,12 @@ export function telegramDriver(options: TelegramDriverOptions = {}): MessagingDr
     createAdapter(credentials, driverOptions) {
       if (!options.ingress) throw new Error(sourceText("error.messaging.telegramUnsupported"));
       const chat = state(credentials);
+      if (options.history)
+        chat.state.attach({
+          connectionId: driverOptions.connectionId,
+          chatId: chat.values.chatId,
+          store: options.history,
+        });
       return new TelegramAdapter(options.ingress, chat.values, chat.state, driverOptions);
     },
     createTransport(credentials, identity) {

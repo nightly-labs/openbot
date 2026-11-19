@@ -468,7 +468,7 @@ try {
             ),
           ),
       },
-    }).createAdapter({ guildId }, { rateLimited: () => {} });
+    }).createAdapter({ guildId }, { connectionId: "discord-e2e", rateLimited: () => {} });
     const listed = await runCauseEffect(adapter.places());
     const threadIds = listed.places.filter((place) => place.kind === "thread").map((place) => place.id);
     assert.equal(listed.places.length, 500);

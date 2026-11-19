@@ -840,7 +840,7 @@ async function createMessagingServices({
     drivers: [
       slackDriver({ ingress: signalIngress }),
       discordDriver({ ingress: signalIngress }),
-      telegramDriver({ ingress: signalIngress }),
+      telegramDriver({ ingress: signalIngress, history: service.messaging.history }),
       whatsAppDriver({ runtime: whatsapp }),
     ],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
