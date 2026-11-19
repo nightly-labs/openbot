@@ -48,6 +48,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "מודלים של Mercury עם מפתח API של Inception",
   "onboarding.provider.deepseekKey": "מודלים של DeepSeek עם מפתח API של DeepSeek",
   "onboarding.provider.openrouterKey": "מודלים רבים עם מפתח API של OpenRouter",
+  "onboarding.provider.veniceKey": "מודלים רבים עם מפתח API של Venice",
   "onboarding.provider.tryFree": "אפשר לנסות בחינם",
   "onboarding.provider.noSignIn": "בלי צורך בהתחברות",
   "onboarding.provider.more": "ספקים נוספים",

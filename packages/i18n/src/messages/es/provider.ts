@@ -207,6 +207,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "Guarda una clave de API de OpenRouter en el host para usar los modelos que ofrece OpenRouter. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.openrouterKey.label": "Clave de API de OpenRouter",
+  "provider.veniceKey.title": "Clave de API de Venice",
+  "provider.veniceKey.description":
+    "Guarda una clave de API de Venice en este equipo para usar los modelos que ofrece Venice. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.veniceKey.descriptionHost":
+    "Guarda una clave de API de Venice en el host para usar los modelos que ofrece Venice. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.veniceKey.label": "Clave de API de Venice",
   "provider.openCodeKey.title": "Iniciar sesión en OpenCode Go",
   "provider.openCodeKey.description":
     "Los modelos gratuitos no requieren una cuenta. Una clave permite usar los modelos Go de pago.",

@@ -51,6 +51,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "Modelos Mercury com uma chave de API da Inception",
   "onboarding.provider.deepseekKey": "Modelos da DeepSeek com uma chave de API da DeepSeek",
   "onboarding.provider.openrouterKey": "Muitos modelos com uma chave de API do OpenRouter",
+  "onboarding.provider.veniceKey": "Muitos modelos com uma chave de API do Venice",
   "onboarding.provider.tryFree": "Experimente grátis",
   "onboarding.provider.noSignIn": "Não precisa entrar em uma conta",
   "onboarding.provider.more": "Mais provedores",

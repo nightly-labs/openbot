@@ -60,6 +60,8 @@
      marks and disabled text, as in the dark palette. */
   --openbot-text-primary: #141414;
   --openbot-text-secondary: #3a3a3c;
+  /* Venice Deep Blue: its brand allows no near-black such as the primary text. */
+  --openbot-provider-venice: #0e2942;
   --openbot-text-muted: #6b6b70;
   --openbot-text-dim: #8e8e93;
   --openbot-text-placeholder: #5c5c61;

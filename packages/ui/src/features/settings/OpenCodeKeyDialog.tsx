@@ -88,6 +88,13 @@ const KEY_TEXT = {
     descriptionHost: "provider.openrouterKey.descriptionHost",
     label: "provider.openrouterKey.label",
   },
+  venice: {
+    name: "Venice",
+    title: "provider.veniceKey.title",
+    description: "provider.veniceKey.description",
+    descriptionHost: "provider.veniceKey.descriptionHost",
+    label: "provider.veniceKey.label",
+  },
 } as const satisfies Record<string, KeyDialogText>;
 
 /** The text of one key: `descriptionHost` is for a key that goes to the host of a joined server. */
