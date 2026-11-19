@@ -83,5 +83,7 @@ export class ScreenCaptureFailed extends Schema.TaggedError<ScreenCaptureFailed>
 
 export interface ScreenCaptureHost {
   listSources(): Effect.Effect<ScreenCaptureSources, ScreenCaptureFailed>;
+  listDisplays(): Effect.Effect<ScreenCaptureSources["displays"]>;
+  promptsForPermission(): Effect.Effect<boolean>;
   capture(request: ScreenCaptureRequest): Effect.Effect<ScreenCaptureImage, ScreenCaptureFailed>;
 }

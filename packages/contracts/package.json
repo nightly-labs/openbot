@@ -203,6 +203,7 @@
     "./team-protocol/routine-run-place-v1": "./src/team-protocol/routine-run-place-v1.ts",
     "./team-protocol/routine-quiet-answers-v1": "./src/team-protocol/routine-quiet-answers-v1.ts",
     "./team-protocol/routine-results-v1": "./src/team-protocol/routine-results-v1.ts",
+    "./team-protocol/queue-hold-v1": "./src/team-protocol/queue-hold-v1.ts",
     "./team-protocol/routine-results-whatsapp-v1": "./src/team-protocol/routine-results-whatsapp-v1.ts",
     "./team-protocol/webhook-tests-v1": "./src/team-protocol/webhook-tests-v1.ts",
     "./team-protocol/webhook-agent-secret-v1": "./src/team-protocol/webhook-agent-secret-v1.ts",

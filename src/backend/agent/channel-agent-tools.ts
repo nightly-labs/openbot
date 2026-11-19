@@ -13,7 +13,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
-import { loadAvatarFile } from "./avatar-file";
+import { type AvatarImageDecoder, loadAvatarFile } from "./avatar-file";
 import { profileToolErrorMessage } from "./profile-tools";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
@@ -210,6 +210,7 @@ function channelResult(channel: Channel, agents: readonly AgentSummary[]) {
 export interface ChannelAgentToolDependencies {
   channels: ChannelService;
   listAgents(): AgentSummary[];
+  decodeAvatar: AvatarImageDecoder | null;
   taskChannelId?: string | null;
 }
 
@@ -218,7 +219,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   senderAgentId: string,
   dependencies: ChannelAgentToolDependencies,
 ) {
-  const { channels, listAgents, taskChannelId } = dependencies;
+  const { channels, listAgents, decodeAvatar, taskChannelId } = dependencies;
   const agents = listAgents();
   const sender = agents.find((agent) => agent.id === senderAgentId);
   if (!sender) throw new Error("The calling agent no longer exists.");
@@ -226,7 +227,7 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   const picture = (path: string | null | undefined) =>
     path === undefined || path === null
       ? Effect.succeed(path)
-      : loadAvatarFile(path, sender.workspacePath).pipe(toToolOperationFailed);
+      : loadAvatarFile(path, sender.workspacePath, decodeAvatar).pipe(toToolOperationFailed);
   const removeImage = (channel: Channel) =>
     channel.imageUrl ? channels.setImage(channel.id, null) : Effect.succeed(channel);
 

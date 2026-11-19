@@ -65,13 +65,7 @@ import {
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import { BillingReferral } from "./billing-referral";
-import {
-  type BillingSales,
-  type BillingSalesSynced,
-  type PaymentReversal,
-  paymentReversal,
-  withoutTax,
-} from "./billing-sales";
+import { type BillingSales, type BillingSalesSynced, paymentReversal, withoutTax } from "./billing-sales";
 import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
 import type { HostedFailure } from "./hosted-server-service";
 import {
@@ -161,6 +155,7 @@ export interface BillingServiceOptions {
   fetch: StripeFetch;
   now?: () => number;
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  onServerRefunded?: (refund: ServerRefund) => Effect.Effect<void, HostedFailure>;
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
   sales?: BillingSales;
@@ -170,6 +165,11 @@ export interface BillingServiceOptions {
   vies?: ViesClient;
   onVatMismatch?: (text: string) => void;
   oss?: BillingOss;
+}
+
+export interface ServerRefund {
+  userId: string;
+  serverId: string;
 }
 
 export interface FirstPlanStart {
@@ -200,6 +200,8 @@ interface SyncedSubscription {
   interval: BillingInterval;
   currency: BillingCurrency;
   latestInvoiceId: string | null;
+  serverId: string | null;
+  ended: boolean;
 }
 
 export interface CheckoutRequest {
@@ -223,6 +225,7 @@ class BillingDependencies extends Context.Service<
     stripe: StripeClient;
     now: () => number;
     onSubscriptionSynced: ((sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>) | null;
+    onServerRefunded: ((refund: ServerRefund) => Effect.Effect<void, HostedFailure>) | null;
     analytics: AccountAnalytics;
   }
 >()("auth-api/BillingService/Dependencies") {}
@@ -263,6 +266,7 @@ export class BillingService {
       stripe,
       now,
       onSubscriptionSynced,
+      onServerRefunded: options.onServerRefunded ?? null,
       analytics: this.#analytics,
     });
     this.#referral = new BillingReferral({
@@ -944,9 +948,21 @@ export class BillingService {
         : null;
       const subscriptionId = eventSubscriptionId(event) ?? payment?.subscriptionId ?? null;
       const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
-      if (reversal && payment && synced && (yield* this.#reversalEndsPlan(reversal, payment, synced))) {
+      if (reversal?.type === "payment_disputed" && payment && synced) {
         yield* this.cancelSubscription(payment.subscriptionId);
         yield* this.#syncSubscription(payment.subscriptionId);
+      }
+      if (synced?.kind === "plan" && synced.ended && synced.serverId && dependencies.onServerRefunded) {
+        const invoiceId = synced.latestInvoiceId;
+        const refunded =
+          reversal?.type === "payment_refunded" ||
+          (event.type === "customer.subscription.deleted" &&
+            invoiceId !== null &&
+            (yield* this.#stripeCall(() => dependencies.stripe.isInvoiceRefunded(invoiceId))));
+        if (refunded)
+          yield* dependencies
+            .onServerRefunded({ userId: synced.userId, serverId: synced.serverId })
+            .pipe(Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))));
       }
       const failedInvoice = synced?.kind === "license" ? failedRenewalInvoice(event, synced.currency) : null;
       if (synced?.kind === "license" && failedInvoice) yield* this.license.paymentFailed(synced, failedInvoice);
@@ -984,20 +1000,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  readonly #reversalEndsPlan = Effect.fn("BillingService.reversalEndsPlan")(function* (
-    this: BillingService,
-    reversal: PaymentReversal,
-    payment: { invoiceId: string; billingReason: string | null },
-    synced: SyncedSubscription | LicenseSync,
-  ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
-    if (reversal.type === "payment_disputed") return true;
-    if (reversal.type !== "payment_refunded") return false;
-    if (payment.invoiceId !== synced.latestInvoiceId) return false;
-    if (payment.billingReason !== "subscription_create" && payment.billingReason !== "subscription_cycle") return false;
-    const dependencies = yield* BillingDependencies;
-    return yield* this.#stripeCall(() => dependencies.stripe.isPaymentRefunded(reversal.paymentIntentId));
-  });
 
   readonly #trackEvent = Effect.fn("BillingService.trackEvent")(function* (
     this: BillingService,
@@ -1118,6 +1120,8 @@ export class BillingService {
       interval: key.interval,
       currency,
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
+      serverId,
+      ended: subscription.status === "canceled",
     };
     const finish = Effect.andThen(
       ordersLicense(subscription) ? this.license.splitOrder(subscription, ownerId) : Effect.void,

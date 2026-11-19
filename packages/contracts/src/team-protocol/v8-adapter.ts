@@ -46,6 +46,7 @@ import { decodeProfileV8Request, decodeProfileV8Response } from "./profile-v8";
 import { withConversationPromptMultiSelect } from "./prompt-multi-select-v1";
 import { OPEN_PROVIDER_ID } from "./provider-aware-codec";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
+import { withQueueHold } from "./queue-hold-v1";
 import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
 import { withConversationRemoteSender } from "./remote-agent-bridge-v1";
 import {
@@ -200,6 +201,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
   } = {},
 ): string {
   const {
@@ -212,10 +214,13 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     usageTertiary,
     agentPendingRuntime,
     memoryChanges,
+    queueHold,
     ...frozen
   } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
+  if (queueHold && (isQueueSnapshotRoute(method, path) || isQueueEditRoute(method, path)))
+    return JSON.stringify(withQueueHold(JSON.parse(encoded), value, true));
   const withUsage = usageTertiary && isUsageRoute(method, path);
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
@@ -354,12 +359,18 @@ function decodeFrozenResponse(
     return toCurrentAgentKeys(structuredClone(decodeBrowserDisplayResponse(value)));
   if (isQueueEditRoute(method, path) && status === 204) return {};
   if (isQueueEditRoute(method, path))
-    return withQueueMarks(
-      decodeTeamProtocolV8BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
+    return withQueueHold(
+      withQueueMarks(
+        decodeTeamProtocolV8BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
+        value,
+      ),
       value,
     );
   if (isQueueSnapshotRoute(method, path) && status < 400)
-    return withQueueMarks(decodeTeamProtocolV8BaseCurrentHttpResponse(method, path, status, value), value);
+    return withQueueHold(
+      withQueueMarks(decodeTeamProtocolV8BaseCurrentHttpResponse(method, path, status, value), value),
+      value,
+    );
   if (isConversationRoute(method, path) && status < 400)
     return withConversationSenders(
       withConversationPlans(

@@ -64,6 +64,7 @@ export interface TeamHttpCodecOptions {
   usageTertiary?: boolean;
   agentPendingRuntime?: boolean;
   memoryChanges?: boolean;
+  queueHold?: boolean;
 }
 
 type DecodedRequest =

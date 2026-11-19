@@ -7,6 +7,7 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import {
   answeredSelect,
   ChatChoicePrompt,
@@ -42,6 +43,7 @@ export function ChatQuestionPrompt({
   onActivate?: () => void;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const canEditPreview = useMobileWorkspaceSelector((workspace) => workspace.canEditUiBlockPreview(serverId));
   const vaultRequest = vaultRequestOf(uiBlock);
@@ -61,7 +63,7 @@ export function ChatQuestionPrompt({
   const choice = choiceBlockOf(prompt, uiBlock);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3">
+      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
@@ -77,10 +79,7 @@ export function ChatQuestionPrompt({
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {
     return (
-      <View
-        className="max-w-[92%] self-start gap-2 rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
+      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">
@@ -137,10 +136,7 @@ export function ChatQuestionPrompt({
 
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
-      <View
-        className="max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
-      >
+      <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         <View className="flex-row items-center gap-2">
           <View className="min-w-0 flex-1">
             <QuestionText question={question.question} variant="title" />

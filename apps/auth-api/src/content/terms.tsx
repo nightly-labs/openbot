@@ -68,7 +68,7 @@ export function Terms() {
       <ul>
         <li>Starter License – intended for one individual user (one Seat).</li>
         <li>
-          Team License – intended for teams of at least five individual users (a minimum of five Seats), with the option
+          Team License – intended for teams of at least two individual users (a minimum of two Seats), with the option
           to purchase additional Seats.
         </li>
       </ul>
@@ -94,6 +94,7 @@ export function Terms() {
         The available Hosted Server plans include Starter, Standard, and Pro, which differ in their intended use,
         available resources, storage capacity, performance, and other technical characteristics.
       </p>
+      <p>A monthly data transfer limit of 10 TB applies per Hosted Server.</p>
       <p>
         Hosted Server Services are purchased separately from Commercial Licenses. Purchasing a Hosted Server does not
         grant a Commercial License, and purchasing a Commercial License does not include a Hosted Server.
@@ -618,13 +619,13 @@ export function Terms() {
         renewal, retain server data, delete a server immediately, or schedule its deletion at the end of the paid
         billing period.
       </p>
+      <p>Upon expiry of the paid subscription, the Hosted Server will be deactivated.</p>
       <p>
-        When a paid subscription expires, the Hosted Server ceases to operate under that subscription. Where the User
-        has not requested deletion, the expiry of the subscription does not itself constitute an instruction to delete
-        the associated workspace data.
+        Where the User has not requested deletion, the expiry of the subscription does not itself constitute an
+        instruction to delete the associated workspace data.
       </p>
       <p>
-        If the subscription is not renewed, the associated Hosted Server data will be retained for 30 days following the
+        If the subscription is not renewed, the associated Hosted Server data will be retained for 14 days following the
         expiry of the paid billing period. If the subscription is not renewed or reactivated within this period, the
         associated Hosted Server data will be deleted.
       </p>
@@ -633,6 +634,12 @@ export function Terms() {
         Where a User chooses to delete a Hosted Server, the associated server environment and its contents, including
         agent workspaces, conversations, files, and related materials, are removed in accordance with the applicable
         functionality.
+      </p>
+      <p>
+        In the case of a refund for a Hosted Server subscription, the associated Hosted Server, including its
+        environment and all stored content, will be deleted immediately upon approval of the refund request by us,
+        without the 14-day data retention period otherwise applicable following subscription expiry. Such deletion is
+        permanent, and the associated data cannot be recovered.
       </p>
       <p>
         Users are responsible for saving or exporting any content they wish to retain before deleting a Hosted Server.
@@ -696,15 +703,14 @@ export function Terms() {
       <ul>
         <li>serious or repeated violations of these Terms;</li>
         <li>unlawful activities or unauthorised use of the Services;</li>
-        <li>threats to the security or integrity of the Platform or connected infrastructure;</li>
+        <li>
+          activities that may harm the Platform, compromise its security or integrity, or disrupt its proper operation.
+        </li>
         <li>
           failure to fulfil payment obligations relating to paid Services, in accordance with the applicable contractual
           conditions; or
         </li>
         <li>compliance with applicable legal obligations or binding decisions of competent authorities.</li>
-        <li>
-          activities that may harm the Platform, compromise its security or integrity, or disrupt its proper operation.
-        </li>
       </ul>
       <p>Any measures taken will be appropriate and proportionate to the circumstances, subject to applicable law.</p>
       <p>

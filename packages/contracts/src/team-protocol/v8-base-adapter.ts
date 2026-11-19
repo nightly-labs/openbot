@@ -19,6 +19,7 @@ import {
 } from "./current-agent-keys";
 import { withConversationMemoryChanges } from "./memory-changes-v1";
 import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
+import { withQueueEventHold } from "./queue-hold-v1";
 import { withConversationRemoteSender } from "./remote-agent-bridge-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
@@ -55,9 +56,12 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
           restoreBrowserTakeoverReason(
             restoreBrowserSecretMetadata(
               toCurrentAgentKeys(
-                withEventAgentPendingRuntimes(
-                  withUsageEventTertiary(
-                    withRuntimeSnapshotBackgroundWork(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                withQueueEventHold(
+                  withEventAgentPendingRuntimes(
+                    withUsageEventTertiary(
+                      withRuntimeSnapshotBackgroundWork(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                      value,
+                    ),
                     value,
                   ),
                   value,
@@ -103,6 +107,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
   } = {},
 ): string | null {
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
@@ -121,6 +126,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const backgroundWork = options.backgroundWork === true && event.type === "runtime-snapshot";
   const usageTertiary = options.usageTertiary === true && event.type === "usage-changed";
   const pendingRuntime = options.agentPendingRuntime === true && event.type === "agents-changed";
+  const queueHold = options.queueHold === true && event.type === "queue-changed";
   if (
     !encoded ||
     (!options.preserveBrowserSecrets &&
@@ -131,7 +137,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
       !contextUsage &&
       !backgroundWork &&
       !usageTertiary &&
-      !pendingRuntime)
+      !pendingRuntime &&
+      !queueHold)
   )
     return encoded;
   const withPlans = withEventConversationPlans(
@@ -149,7 +156,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     : withMultiSelect;
   const withWork = backgroundWork ? withRuntimeSnapshotBackgroundWork(withContext, wireValue, true) : withContext;
   const withUsage = usageTertiary ? withUsageEventTertiary(withWork, wireValue, true) : withWork;
-  const output = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
+  const withPending = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
+  const output = queueHold ? withQueueEventHold(withPending, wireValue, true) : withPending;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;
   return JSON.stringify(options.browserVaultSkip ? restoreBrowserVaultSkip(withReason, wireValue) : withReason);

@@ -17,6 +17,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
+import type { LiveVoiceRelayed } from "./live-voice";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import { pendingSkillSuggestionNote } from "./skill-suggestion";
 
@@ -111,6 +112,7 @@ export interface DeliveryPromptSources {
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
+  liveVoice?: LiveVoiceRelayed | null;
   steerFramedAsUser?: boolean;
 }
 
@@ -351,7 +353,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     ]
       .filter((line) => line !== null)
       .join("\n");
-  } else if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
+  }
+  const voice = sources.liveVoice;
+  if (delivery.sender.kind === "user" && voice && delivery.text === voice.shown) text = liveVoicePrompt(voice);
+  if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
       "You started this task with openbot.start_task from your own chat. It is a separate conversation beside that chat, with this brief as its first message.",
       "Do the work in the brief here, and end with the result for the user: the user reads it in this task. Do not send it with openbot.send_message.",
@@ -498,6 +503,30 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+const LIVE_VOICE_CALL_LIMIT = 4000;
+const LIVE_VOICE_LINE_LIMIT = 1000;
+
+function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
+  const call: string[] = [];
+  let length = 0;
+  for (const line of heard.toReversed()) {
+    const entry = `${line.role === "user" ? "User" : "Voice assistant"}: ${line.text}`;
+    const clipped = entry.length > LIVE_VOICE_LINE_LIMIT ? `${entry.slice(0, LIVE_VOICE_LINE_LIMIT - 1)}…` : entry;
+    length += clipped.length + 1;
+    if (length > LIVE_VOICE_CALL_LIMIT && call.length > 0) break;
+    call.unshift(clipped);
+  }
+  return [
+    "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    call.length
+      ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
+      : "The user's exact words are not available.",
+    ...(call.length ? ["--- voice call since the previous request ---", ...call] : []),
+    "--- request from the voice assistant ---",
+    request,
+  ].join("\n");
 }
 
 function taggedAgentsNote(

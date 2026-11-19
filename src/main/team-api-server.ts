@@ -233,6 +233,7 @@ import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
@@ -1552,6 +1553,7 @@ export class TeamApiServer {
         backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
+        queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -2363,6 +2365,7 @@ export class TeamApiServer {
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
+      queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
     };
     const visibleValue =
       status < 400 && route.hiddenAgentIds
@@ -2938,6 +2941,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  QUEUE_HOLD_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

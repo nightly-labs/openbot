@@ -47,6 +47,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isQueueSnapshot,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
@@ -56,6 +57,7 @@ import {
   type ProviderAccountPool,
   type ProviderDetectionSettings,
   type QueueDelivery,
+  type QueueHold,
   type QueueSnapshot,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type Routine,
@@ -360,6 +362,7 @@ import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/con
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
@@ -404,6 +407,7 @@ import {
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
+import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
@@ -806,8 +810,11 @@ function activeQueue(agentId: string): QueueSnapshot {
   };
 }
 
+let queueSnapshotHold: { agentId: string; hold: QueueHold } | null = null;
+
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
+    ...(queueSnapshotHold?.agentId === agentId ? { hold: queueSnapshotHold.hold } : {}),
     agentId,
     deliveries: [
       {
@@ -6392,6 +6399,61 @@ try {
         ),
       [summary(noSave), summary(saved), summary(discarded)],
     );
+  }
+
+  {
+    const path = TEAM_API_ROUTES.agent.queue("agent-ada");
+    const withHold = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
+    const read = (headers?: Record<string, string>, protocol: number = TEAM_PROTOCOL_V10) =>
+      call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
+    queueSnapshotHold = { agentId: "agent-ada", hold: { reason: "provider-restart", provider: "claude" } };
+    const held = await read(withHold);
+    const plain = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== QUEUE_HOLD_CAPABILITY),
+      ),
+    );
+    const older = await read(undefined, TEAM_PROTOCOL_V9);
+    const decoded = held.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, held.body) : null;
+    check(
+      "a client with queue-hold-v1 reads the provider restart hold of the queue, and its decoder keeps it",
+      held.status === 200 &&
+        isDeepStrictEqual(field(held.body, "hold"), { reason: "provider-restart", provider: "claude" }) &&
+        isQueueSnapshot(decoded) &&
+        isDeepStrictEqual(decoded.hold, { reason: "provider-restart", provider: "claude" }),
+      [summary(held), decoded],
+    );
+    check(
+      "a client without queue-hold-v1, and a protocol 9 client, read the queue without the hold, as before",
+      plain.status === 200 &&
+        field(plain.body, "hold") === undefined &&
+        older.status === 200 &&
+        field(older.body, "hold") === undefined,
+      [summary(plain), summary(older)],
+    );
+    queueSnapshotHold = {
+      agentId: "agent-ada",
+      hold: { reason: "channel-task", channelId: "channel-1", channelName: "Launch room", agentId: "agent-ada" },
+    };
+    const channel = await read(withHold);
+    check(
+      "a channel task hold does not leave the host: it names a channel that the member may not see",
+      channel.status === 200 && field(channel.body, "hold") === undefined,
+      summary(channel),
+    );
+    const unknown = decodeTeamProtocolV8CurrentHttpResponse(
+      "GET",
+      path,
+      200,
+      isDynamicRecord(held.body) ? { ...held.body, hold: { reason: "provider-limit", provider: "claude" } } : held.body,
+    );
+    check(
+      "a client ignores a hold reason from a newer host that it does not know",
+      isQueueSnapshot(unknown) && unknown.hold === undefined,
+      unknown,
+    );
+    queueSnapshotHold = null;
   }
 
   {

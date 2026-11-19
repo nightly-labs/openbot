@@ -1,3 +1,4 @@
+import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
@@ -119,24 +120,30 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
   );
 }
 
-export const QUEUE_HOLD_REASONS = ["channel-task"] as const;
+export const QUEUE_HOLD_REASONS = ["channel-task", "provider-restart"] as const;
 export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
 
-export interface QueueHold {
-  reason: QueueHoldReason;
-  channelId: string;
-  channelName: string;
-  agentId: string;
-}
+export type QueueHold =
+  | {
+      reason: "channel-task";
+      channelId: string;
+      channelName: string;
+      agentId: string;
+    }
+  | { reason: "provider-restart"; provider: AgentProviderRef };
 
 export function isQueueHold(value: unknown): value is QueueHold {
+  if (!isDynamicRecord(value) || !isOneOf(QUEUE_HOLD_REASONS, value.reason)) return false;
+  if (value.reason === "provider-restart") return isAgentProviderRef(value.provider);
   return (
-    isDynamicRecord(value) &&
-    isOneOf(QUEUE_HOLD_REASONS, value.reason) &&
     isIdentifier(value.channelId) &&
     isBoundedString(value.channelName, INPUT_LIMITS.agentTitle) &&
     isIdentifier(value.agentId)
   );
+}
+
+export function queueHoldWorker(hold: QueueHold | null | undefined): string | null {
+  return hold?.reason === "channel-task" ? hold.agentId : null;
 }
 
 export interface QueueSnapshot {
