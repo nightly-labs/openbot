@@ -54,18 +54,23 @@ export class TelegramChatState {
   }
 
   attach(archive: TelegramArchive): void {
-    const restores = this.#archive === null;
     this.#archive = archive;
-    if (!restores) return;
-    const saved = archived(() => archive.store.latest(archive.connectionId, archive.chatId, RECENT_MESSAGES));
-    for (const message of saved ?? []) this.#keep(message);
+    const saved = archived("restore", () =>
+      archive.store.latest(archive.connectionId, archive.chatId, RECENT_MESSAGES),
+    );
+    if (!saved) return;
+    this.#recent.length = 0;
+    for (const message of saved) {
+      this.#keep(message);
+      this.rememberThread(Number(message.id), message.threadKey);
+    }
   }
 
   rememberMessage({ authorId, ...message }: TelegramMessage): void {
     if (!this.#keep(message)) return;
     const archive = this.#archive;
     if (archive)
-      archived(() =>
+      archived("save", () =>
         archive.store.save(
           archive.connectionId,
           archive.chatId,
@@ -117,11 +122,16 @@ export class TelegramChatState {
   }
 }
 
-function archived<T>(operation: () => T): T | null {
+const ARCHIVE_FAILURES = {
+  restore: "The saved Telegram messages could not be read.",
+  save: "A Telegram message could not be saved.",
+} as const;
+
+function archived<T>(action: keyof typeof ARCHIVE_FAILURES, operation: () => T): T | null {
   try {
     return operation();
   } catch (cause) {
-    logger.warn("A Telegram message could not be read or saved.", {
+    logger.warn(ARCHIVE_FAILURES[action], {
       cause: cause instanceof Error ? cause.name : "unknown",
     });
     return null;
