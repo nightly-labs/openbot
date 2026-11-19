@@ -3675,7 +3675,8 @@ export class ProviderRuntime implements ProviderPort {
           : undefined;
       if (mcpServer !== undefined && !mcpServer?.builtIn) {
         const server = mcpServer?.name ?? null;
-        stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+        // The card shows a general sentence, so `providers.log` keeps the redacted cause (#12005).
+        logger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
         if (server && client.provider !== "codex") this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
@@ -3775,7 +3776,7 @@ export class ProviderRuntime implements ProviderPort {
       rows.find((row) => key === providerMcpServerName(row.name));
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
-    stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+    logger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
     if (!server) return;
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
