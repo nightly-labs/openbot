@@ -13,13 +13,18 @@ import type {
   QueueDelivery,
   Routine,
   RoutineConversationEventAction,
+  RoutineMissedRuns,
   RoutineRun,
   RoutineRunConversationEventStatus,
   TestRoutineInput,
   UpdateRoutineInput,
   WorkflowRunSource,
 } from "@openbot/contracts/ipc";
-import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
+import {
+  ROUTINE_MISSED_COUNT_LIMIT,
+  routineConversationEventItemType,
+  routineRunConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -101,7 +106,15 @@ export interface RoutineHooks {
 const logger = createOpenBotLogger("routine-scheduler");
 
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
-const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was not running at the scheduled time.";
+const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
+
+function skippedRuns(scheduledFor: string, missed: RoutineMissedRuns) {
+  return {
+    scheduledFor,
+    ...(missed.until ? { until: missed.until } : {}),
+    ...(missed.count > ROUTINE_MISSED_COUNT_LIMIT ? { moreThan: ROUTINE_MISSED_COUNT_LIMIT } : { count: missed.count }),
+  };
+}
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -1183,9 +1196,7 @@ export class RoutineScheduler implements RoutineDueSource {
     return {
       status: run.status,
       at: run.updatedAt,
-      ...(run.missed
-        ? { skipped: { scheduledFor: run.scheduledFor, until: run.missed.until, count: run.missed.count } }
-        : {}),
+      ...(run.missed ? { skipped: skippedRuns(run.scheduledFor, run.missed) } : {}),
       ...(reason ? { reason } : {}),
     };
   }
