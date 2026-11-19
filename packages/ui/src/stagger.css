@@ -6,10 +6,6 @@
   --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Lines start translated down + blurred + invisible; .is-shown
-   on the parent flips them to their resting state. The second
-   line's transition-delay holds it back by --stagger-stagger
-   so the eye lands on the headline first. */
 .t-stagger-line {
   display: block;
   opacity: 0;

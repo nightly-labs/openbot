@@ -1,18 +1,7 @@
-// The sealed hand-off from the account Worker to one desktop host, for an install that ends in the
-// browser, such as the OpenBot Slack or Discord app's.
-//
-// The host makes a P-256 key pair for one sign-in and sends only the public key. The Worker seals
-// the result to it with ECDH, HKDF and AES-GCM, and only the host that holds the private key can open
-// it. The host's nonce is the additional data, so a grant opens only for the sign-in that asked for
-// it. Each kind of grant has its own HKDF info and version, so one kind never opens as another.
-//
-// WebCrypto only, so the Worker and the Electron main process run the same code.
-
 import { isDynamicRecord, isString } from "./runtime-values";
 
 const RAW_P256_PUBLIC_KEY_BYTES = 65;
 
-/** What separates one kind of grant from another. */
 export interface HostGrantKind {
   version: number;
   info: string;
@@ -33,10 +22,6 @@ export async function createHostGrantKeyPair(): Promise<{ privateKey: CryptoKey;
   return { privateKey: pair.privateKey, publicKey: toBase64Url(raw) };
 }
 
-/**
- * A key pair that the host keeps across restarts. `privateKey` is PKCS #8 in base64url: the host stores
- * it encrypted and opens it with `importHostGrantPrivateKey`.
- */
 export async function createStoredHostGrantKeyPair(): Promise<{ privateKey: string; publicKey: string }> {
   const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
   const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
@@ -87,10 +72,6 @@ export async function sealHostGrant(
   );
 }
 
-/**
- * The grant, checked by `decode`. Throws for a payload that another key sealed, that another sign-in
- * asked for, that is another kind, that was changed, or that `decode` refuses.
- */
 export async function openHostGrant<T>(
   kind: HostGrantKind,
   privateKey: CryptoKey,

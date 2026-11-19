@@ -9,18 +9,12 @@ interface RecoveryCountdown {
 
 export type RecoveryCountdowns = ReturnType<typeof createRecoveryCountdowns>;
 
-// The status that a reveal still shows while it leaves, and the one after it.
 const KEPT_STATUSES = 2;
 
 function recoveryKey(status: RemoteRecoveryStatus): string {
   return `${status.phase}:${status.attempt}`;
 }
 
-/**
- * The latest status of each server's recovery, which repeats each second for its countdown. The
- * server list changes only when the phase, the attempt or the failure changes, so a countdown
- * draws again only the views that show it.
- */
 export function createRecoveryCountdowns() {
   const latest = new Map<string, Map<string, RecoveryCountdown>>();
   const listeners = new Map<string, Set<() => void>>();

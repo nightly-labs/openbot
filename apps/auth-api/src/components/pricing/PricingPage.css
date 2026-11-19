@@ -1,13 +1,8 @@
-/* The /pricing page around the shared order form (`@openbot/ui/features/billing/order-form.css`). Every rule is
-   scoped under `.pricing-page`. */
-
 .pricing-page .pricing-hero {
-  /* The accent colour as channels. The page sets it from the size of the order. */
   --pricing-accent: 236, 72, 153;
   padding-bottom: clamp(72px, 8vw, 120px);
 }
 
-/* The order form takes the colour of the order. */
 .pricing-page .order-form {
   --order-accent: rgb(var(--pricing-accent));
 }
@@ -16,7 +11,6 @@
   max-width: 520px;
 }
 
-/* A soft light of the accent colour behind the form, across the full page width. */
 .pricing-page .pricing-hero::before {
   position: absolute;
   z-index: -1;
@@ -41,7 +35,6 @@
   min-width: 240px;
 }
 
-/* Off until the buyer ticks the consent box. The hover colour of the site's primary button stays off too. */
 .pricing-page .pricing-cta[data-disabled],
 .pricing-page .pricing-cta[data-disabled]:hover {
   background: var(--openbot-surface-light);
@@ -49,9 +42,6 @@
   opacity: 0.45;
 }
 
-/* The consent checkbox above the buy button. The site does not load the app's primitives, so the checkbox rules
-   of `primitives.css` are repeated here. The column is wide enough for the English sentence on one line; a longer
-   language wraps to two lines. */
 .pricing-page .pricing-consent-action {
   display: flex;
   max-width: 420px;
@@ -129,10 +119,6 @@
   stroke-width: 2.5;
 }
 
-/*
- * Enterprise: a band of light crosses the strip every 6 s, as on a rare card. The band lights the edge as it passes,
- * and Contact sales catches a glint when the band reaches it. A sheen hairline of the home page price runs along the top.
- */
 @keyframes pricing-sweep {
   0% {
     background-position: 120% 0;
@@ -144,7 +130,6 @@
   }
 }
 
-/* The band reaches the button at about a third of the cycle on a wide screen. */
 @keyframes pricing-glint {
   0%,
   22% {
@@ -198,13 +183,11 @@
   overflow: hidden;
 }
 
-/* The personal strip is the first block of the hero, so it has the space under it, not above it. */
 .pricing-page .pricing-personal {
   margin-top: 0;
   margin-bottom: clamp(32px, 4vw, 48px);
 }
 
-/* The soft band across the face of the strip. */
 .pricing-page .pricing-enterprise::after {
   position: absolute;
   z-index: -1;
@@ -216,7 +199,6 @@
   animation: pricing-sweep 6s ease-in-out infinite;
 }
 
-/* The same band, cut to the 1px edge at full strength, so the border lights up where the band is. */
 .pricing-page .pricing-enterprise::before {
   position: absolute;
   inset: 0;

@@ -1,9 +1,3 @@
-// One agent's memories: the standing notes it carries into every turn.
-//
-// `memoryId` is decoded by `pathIdentifier` on the first line of the parametric branch, before any
-// method is matched, so a malformed id is a 400 and not a 404. That ordering is the released
-// behaviour and the status-contract test pins it.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentMemory } from "@openbot/contracts/ipc";
 import {
@@ -24,10 +18,6 @@ export interface AgentMemoryRouteDependencies {
   agents: Pick<TeamApiAgents, "listMemories" | "createMemory" | "updateMemory" | "deleteMemory" | "clearMemories">;
 }
 
-/**
- * A memory in the fields that the released routes send. The site of migration 60 stays on this
- * computer: the frozen `agent-memories-v1` page codec has no `site` field.
- */
 function releasedMemory({ site: _site, ...memory }: AgentMemory): Omit<AgentMemory, "site"> {
   return memory;
 }
@@ -85,7 +75,6 @@ export async function routeAgentMemories(
   return "unmatched";
 }
 
-/** A separate optional route keeps the released full-list response unchanged. */
 export async function routeAgentMemoryPage(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listMemories" | "listAgents" | "getMemorySelection" | "setMemoryInclusion">,

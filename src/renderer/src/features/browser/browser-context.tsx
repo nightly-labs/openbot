@@ -11,31 +11,6 @@ import { useWindowPage } from "../window/window-page-context";
 import { browserPort } from "./browser-port";
 import { activeTabAfterLoad, browserTabsAfterClose } from "./browser-tab-reconciliation";
 
-/**
- * The built-in browser's tabs and the control sessions attached to them.
- *
- * Every write to the tab list is racing something: a `browser-changed` event
- * from main, a close the user started, and the load that runs when a server is
- * selected all produce a list, and the newest one wins regardless of which
- * finished last. `browserChangeRevision` is that ordering. It is bumped by the
- * two writes that come from an *observed* change - the event, and a completed
- * close - and read by `beginBrowserLoad`, so a load started before either one
- * lands is discarded instead of repainting a stale list.
- *
- * `browserVisibilitySuspended` is composed here from two owners. The switch half is
- * `server-switch.tsx`'s: it describes the gap between two server scopes, so it has to outlive
- * both this provider and the switch that replaces it. The Usage half is the report covering
- * the conversation. Every consumer reads the pair through this provider, which is why the
- * composition belongs here and not at one of them.
- *
- * `loadDisplayState`/`loadControlState` build the reads rather than performing
- * them so their caller can put them in the same `Promise.all` as the rest of a
- * server load; both answer the empty state for a preview mount or a server
- * without `browser-control`, which is what makes the switch clear the tabs of
- * the server being left.
- *
- * Ungated - see `app-providers.tsx`.
- */
 const BrowserTabs = createSimpleContext({
   name: "Browser tabs",
   init: () => {
@@ -43,9 +18,6 @@ const BrowserTabs = createSimpleContext({
     const { currentServerSelection } = useServers();
     const { browserVisibilitySuspended: switchHidesBrowser } = useServerSwitch();
     const windowPage = useWindowPage();
-    // The browser is a separate Electron view, so hiding renderer content leaves it painted
-    // over whatever replaced the conversation. A rail page, such as Usage or Settings, suspends it for the same reason a server
-    // switch does, and Back restores it because this is derived rather than set.
     const browserVisibilitySuspended = () => switchHidesBrowser() || windowPage.conversationCovered();
     const scopeIsCurrent = createScopeGuard();
 
@@ -61,8 +33,6 @@ const BrowserTabs = createSimpleContext({
 
     function loadDisplayState(server: ServerSummary | undefined): Promise<BrowserDisplayState> {
       if (!supportsBrowser(server)) return Promise.resolve({ tabs: [], activeTabId: null });
-      // Main answers this for a remote server too, and falls back to the tab list for a host
-      // without `browser-navigation`, so the two server kinds read the same state here.
       return browserPort().browser.getDisplayState();
     }
 
@@ -71,11 +41,6 @@ const BrowserTabs = createSimpleContext({
       return browserPort().browser.getControlState();
     }
 
-    /**
-     * Claims the current revision and hands back the applier for it. Calling it
-     * before the read starts is the point: anything that changes the tabs while
-     * the read is in flight makes the applier a no-op.
-     */
     function beginBrowserLoad(): (state: BrowserDisplayState) => void {
       const requestedAtRevision = browserChangeRevision;
       return (state) => {
@@ -85,7 +50,6 @@ const BrowserTabs = createSimpleContext({
       };
     }
 
-    /** A `browser-changed` event: main is authoritative, so it outranks any load in flight. */
     function applyBrowserChange(tabs: BrowserTab[], activeTabId: string | null): void {
       browserChangeRevision += 1;
       setBrowserTabs(tabs);

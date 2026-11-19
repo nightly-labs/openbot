@@ -1,8 +1,3 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Routines: the scheduled standing instructions attached to one agent, and the calendar of every
-// routine of a host.
-
 import {
   CHANNEL_CHATS_CAPABILITY,
   decodeChannelRoutineRuns,
@@ -14,6 +9,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
+import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
@@ -42,7 +42,8 @@ import {
   requireReleasedScheduleOn,
   updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import { Effect } from "effect";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localRoutineCalendarSource } from "../local-routine-calendar";
@@ -55,6 +56,7 @@ import {
 } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   parseAgentId,
   parseCreateRoutine,
@@ -88,18 +90,28 @@ export function routineIpcHandlers({
             serverId,
             Effect.gen(function* () {
               const routines = remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-              if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)) return yield* routines;
-              const [list, places] = yield* Effect.all(
+              const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
+              const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
+              if (!runPlaces && !pauseReasons) return yield* routines;
+              const [list, places, reasons] = yield* Effect.all(
                 [
                   routines,
-                  remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
-                    method: "POST",
-                    body: { agentId },
-                  }),
+                  runPlaces
+                    ? remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
+                  pauseReasons
+                    ? remoteServers.request(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
                 ],
                 { concurrency: "unbounded" },
               );
-              return withRoutineRunPlaces(list, places);
+              return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
             }),
             (send) => listOnceAgentRoutines(send, agentId),
           ),
@@ -126,8 +138,6 @@ export function routineIpcHandlers({
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
         remote: (input, serverId) => {
-          // The routes of `routines-once-v1` change every schedule routine, the place too, so a routine
-          // can go from `once` to a released kind and back.
           if (remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY))
             return updateAgentRoutineOnce(remoteOnceSend(remoteServers, serverId), input);
           requireReleasedScheduleOn(input.schedule, false);
@@ -181,8 +191,6 @@ export function routineIpcHandlers({
       }),
       automationRunCommand: scopedHandler(parseTestRoutine, {
         local: (parsed) => service.automationRunCommand(parsed),
-        // The command runs in a shell on the host. An owner or admin gets it from a host with
-        // `routine-run-command-v1`; the renderer shows Copy run command only then.
         remote: (parsed, serverId) => {
           if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_COMMAND_CAPABILITY))
             throw new Error(sourceText("error.team.routineRunCommandUnsupported"));
@@ -202,12 +210,6 @@ export function routineIpcHandlers({
   };
 }
 
-/**
- * The released routine routes leave out where a routine runs, so a host with `routine-run-place-v1`
- * gets the place on its own route after the save. A host without it keeps the saved place. The new
- * routine exists, so a failed place does not fail the create: the routine runs in the chat, and a
- * second save does not make a second routine.
- */
 function withRemoteRunPlace(
   remoteServers: RemoteServerManager,
   serverId: string,
@@ -234,16 +236,11 @@ function withRemoteRunPlace(
   );
 }
 
-/** One POST of `routines-once-v1` to a joined server, for the shared client calls. */
 export function remoteOnceSend(remoteServers: RemoteServerManager, serverId: string): RoutinesOncePost {
   return (path, decode, body) =>
     runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
 }
 
-/**
- * The released routine list of a joined server, with the `once` routines of a host with
- * `routines-once-v1`. The released routes leave them out.
- */
 export async function withOnceRoutines<R>(
   remoteServers: RemoteServerManager,
   serverId: string,
@@ -261,10 +258,6 @@ function calendar(input: { from: string; to: string }, source: RoutineCalendarSo
   );
 }
 
-/**
- * A remote host answers through the routes its routine settings already use, so no new route is needed.
- * A host with `routines-once-v1` also gives its `once` routines.
- */
 function remoteCalendarSource(
   remoteServers: RemoteServerManager,
   serverId: string,
@@ -284,7 +277,6 @@ function remoteCalendarSource(
   return {
     owners: () =>
       Effect.gen(function* () {
-        // A host from before channels rejects the channel routes; its agents still have routines.
         const [agents, channels] = yield* Effect.all(
           [
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),

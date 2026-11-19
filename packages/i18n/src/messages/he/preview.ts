@@ -20,6 +20,8 @@ export const messages = {
   "preview.unsupported.title": "התצוגה המקדימה אינה זמינה",
   "preview.unsupported.description": "אפשר לפתוח סוג קובץ זה באפליקציית ברירת המחדל שלו.",
   "preview.unsupported.openExternally": "פתיחה באפליקציה חיצונית",
+  "preview.tooLarge.title": "הקובץ גדול מדי לתצוגה מקדימה",
+  "preview.tooLarge.description": "התצוגה המקדימה מוגבלת ל-100MB. אפשר לפתוח את הקובץ באפליקציית ברירת המחדל שלו.",
   "preview.spreadsheet.readFailed": "לא ניתן לקרוא את הגיליון.",
   "preview.spreadsheet.truncated": "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
 } as const satisfies PartialTranslation<typeof source>;

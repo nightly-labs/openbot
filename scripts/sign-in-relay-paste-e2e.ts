@@ -1,9 +1,3 @@
-// Runs the real `SignInRelayClient` against a fake host whose `complete` waits until the check lets it
-// go (#3243). A callback came back, by the listener or by a paste, and the host completes the sign-in:
-// a paste of the same sign-in then must not say that the sign-in ended, must not send a second grant,
-// and the host's result must still arrive. A paste before the callback, and after the end, keep their
-// errors. The page opens with no click, also when no link chose it.
-// `bun run test:sign-in-relay-paste`. Writes .openbot-build/sign-in-relay-paste-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -16,7 +10,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/sign-in-relay-paste-
 
 const KEY = "server-1:codex";
 const STATE = "relay-state";
-/** No loopback `redirect_uri`, so the client binds no port and the callback comes by `deliver` or a paste. */
 const PAGE = `https://auth.example/authorize?state=${STATE}`;
 const CALLBACK = `http://127.0.0.1:1455/auth/callback?code=first&state=${STATE}`;
 const SECOND_CALLBACK = `http://127.0.0.1:1455/auth/callback?code=second&state=${STATE}`;
@@ -40,7 +33,6 @@ interface Report {
   cases: CaseResult[];
 }
 
-/** The message that `action` throws, or `null`. */
 function thrown(action: () => void): string | null {
   try {
     action();
@@ -50,10 +42,6 @@ function thrown(action: () => void): string | null {
   }
 }
 
-/**
- * One sign-in on a fake host. The callback comes back by `accept`. With `chosen`, a link chose the
- * page, as in a conversation; without it, the sign-in started from a dialog.
- */
 async function runCase(
   name: string,
   accept: (client: SignInRelayClient) => void,
@@ -69,7 +57,6 @@ async function runCase(
   const status = (): SignInRelayStatus => ({ authorizeUrl: result ? null : PAGE, callback: null, result });
   const remote: SignInRelayRemote<never> = {
     start: Effect.succeed({ flowId: "flow-1" }),
-    // The first read gives the page. The client reads again only after the sign-in waits for its callback.
     status: () =>
       Effect.sync(() => {
         statusReads += 1;
@@ -92,6 +79,7 @@ async function runCase(
     },
     language: { locale: "en", translate: translateFor("en") },
     ownListener: () => null,
+    deepLinkRedirectUrl: () => undefined,
   });
   const run = Effect.runPromise(
     client.run(KEY, remote, chosen ? { page: PAGE, onWaiting: () => waiting.resolve() } : null),

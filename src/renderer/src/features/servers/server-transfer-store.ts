@@ -10,17 +10,17 @@ import type {
   InstanceExportPhase,
   InstanceImportPhase,
   InstanceTransferScreen,
+  TransferUploadState,
 } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
-/**
- * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
- * host. In the browser client they go to the connected host, and a download has no folder to show.
- */
-export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport"> &
-  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
+export type ServerTransferCalls = Omit<
+  OpenBotDesktopApi["instanceTransfer"],
+  "showExport" | "copy" | "onUploadProgress"
+> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport" | "onUploadProgress">>;
 
 interface ServerTransferState {
   screen: InstanceTransferScreen;
@@ -30,6 +30,7 @@ interface ServerTransferState {
   exportWarnings: string[];
   exportError: string | null;
   importPhase: InstanceImportPhase;
+  importProgress: TransferUploadState | null;
   preview: InstanceTransferPreview | null;
   result: InstanceTransferResult | null;
   importError: string | null;
@@ -43,16 +44,23 @@ const INITIAL: ServerTransferState = {
   exportWarnings: [],
   exportError: null,
   importPhase: "idle",
+  importProgress: null,
   preview: null,
   result: null,
   importError: null,
 };
 
-/** The Transfer section's view of one export and one import of one server. */
 export function createServerTransferStore(serverId: string, calls: ServerTransferCalls) {
   const [state, setState] = createStore<ServerTransferState>({ ...INITIAL });
 
-  // The agents are read again each time the export screen opens.
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
+    if (target !== serverId || state.importPhase !== "reading") return;
+    setState((draft) => {
+      draft.importProgress = { sent, total };
+    });
+  });
+  if (stopProgress) onCleanup(stopProgress);
+
   createEffect(
     () => state.screen === "export" && state.exportPhase === "options",
     (load) => {
@@ -88,7 +96,6 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
     void calls
       .export(options, serverId)
       .then((result) => {
-        // A closed save dialog saves nothing.
         desktopAnalytics.track("server_transfer_action", {
           action: "export",
           result: result.saved ? "succeeded" : "cancelled",
@@ -112,7 +119,6 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       });
   }
 
-  // Absent when the calls have no folder to show.
   const show = calls.showExport;
   const showExport = show
     ? (): void => {
@@ -131,26 +137,28 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
   function choose(): void {
     setState((draft) => {
       draft.importPhase = "reading";
+      draft.importProgress = null;
       draft.importError = null;
     });
     void calls
       .choose(serverId)
       .then((preview) =>
         setState((draft) => {
-          // A closed dialog keeps the file that was open before.
           if (preview) draft.preview = preview;
           draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
         }),
       )
       .catch((error: unknown) =>
         setState((draft) => {
           draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
           draft.importError = message(error, "settings.transfer.import.openFailed");
         }),
       );
   }
 
-  function importFile(keys: string[], includeSettings: boolean): void {
+  function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {
     const token = state.preview?.token;
     if (!token) return;
     setState((draft) => {
@@ -158,7 +166,10 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       draft.importError = null;
     });
     void calls
-      .apply({ token, keys, includeSettings }, serverId)
+      .apply(
+        { token, keys, includeSettings, ...(includeServerPreferences ? { includeServerPreferences } : {}) },
+        serverId,
+      )
       .then((result) => {
         desktopAnalytics.track("server_transfer_action", { action: "import", result: "succeeded" });
         setState((draft) => {
@@ -174,7 +185,6 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
           failure_code: "import_failed",
         });
         setState((draft) => {
-          // The token is spent once main starts, so the file must be chosen again.
           draft.importPhase = "idle";
           draft.preview = null;
           draft.importError = message(error, "settings.transfer.import.failed");

@@ -10,10 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireVisibleBodyAgent } from "./request-helpers";
 
-/**
- * Each member reads and sets, for themselves only, the notification level of this server and of each
- * agent. The levels of an agent that this peer cannot see are not in the list and cannot be set.
- */
 export async function routeAgentNotificationLevels(
   context: TeamApiRequestContext,
   levels: TeamApiAgentNotificationLevels | undefined,

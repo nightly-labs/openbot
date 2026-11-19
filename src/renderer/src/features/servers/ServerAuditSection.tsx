@@ -9,37 +9,30 @@ import { createEffect, createStore, Show, untrack } from "solid-js";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
-/** The audit call of one server's host. The desktop reaches it through main. */
 export type HostServerAuditCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAuditLog">;
 
 export interface ServerAuditOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostServerAuditCalls;
-  /** The agents of this dialog's server, for their faces. */
   listAgents: () => Promise<readonly RoleAgent[]>;
 }
 
 interface AuditState {
-  /** The changes, newest first, or null before they load. */
   entries: ServerAuditEntry[] | null;
   agents: readonly RoleAgent[];
   loadError: string | null;
 }
 
 export interface ServerAuditSection {
-  /** True when this account reads the audit log of this server: the Audit log tab shows then. */
   available: () => boolean;
   Panel: () => JSX.Element;
   resetForServer(): void;
 }
 
-/** Server Settings > Audit log (`server-audit-v1`): the changes to the access of the server. */
 export function createServerAuditSection(host: ServerSettingsSectionHost, visible: () => boolean): ServerAuditSection {
   const { t, errorMessage } = useText();
   const { props, configured, actionsAvailable } = host;
   const calls = (): HostServerAuditCalls => props.serverAudit?.calls ?? window.openbot.hostAdmin;
   const [state, setState] = createStore<AuditState>({ entries: null, agents: [], loadError: null });
-  /** Bumped for each read, so an answer for an earlier server or read is dropped. */
   let generation = 0;
 
   const available = () =>
@@ -52,7 +45,6 @@ export function createServerAuditSection(host: ServerSettingsSectionHost, visibl
     const options = props.serverAudit;
     if (!options) return;
     const current = ++generation;
-    // The agents give only the faces, so the log shows with fallback faces when they do not load.
     const agents = options.listAgents().catch((): readonly RoleAgent[] => []);
     Promise.all([calls().getAuditLog(serverId), agents]).then(
       ([log, agents]) => {
@@ -72,7 +64,6 @@ export function createServerAuditSection(host: ServerSettingsSectionHost, visibl
     );
   }
 
-  // Read again each time the log shows, so the changes made since then appear.
   createEffect(
     () => (props.open && visible() && available() ? props.server.id : null),
     (serverId) => {

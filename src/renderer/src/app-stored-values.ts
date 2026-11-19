@@ -1,13 +1,6 @@
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import { createStore } from "solid-js";
 
-/**
- * Agent profiles and messages are handed to the view as stores, so replacing one
- * field re-renders only what read that field. The setter is kept beside the
- * store in a `WeakMap` rather than travelling with it, so consumers hold a plain
- * readable value and only `updateStored` can write.
- */
-
 type StoredValue = AgentProfile | AgentMessage;
 type StoredSetter = (value: StoredValue) => void;
 
@@ -35,7 +28,6 @@ export function createStoredMessage(value: AgentMessage): AgentMessage {
   return store;
 }
 
-/** Replaces a stored value in place. A value this module did not create is ignored. */
 export function updateStored(store: StoredValue, value: StoredValue): void {
   storeSetters.get(store)?.(value);
 }

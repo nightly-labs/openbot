@@ -2,10 +2,6 @@ import { DEFAULT_REMOTE_SESSION_REUSE_PREFERENCE, type RemoteSessionReusePrefere
 import { isBoolean, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { PreferenceStore } from "./preference-file";
 
-/**
- * Whether the desktop keeps its remote server sessions between runs. Main reads it at start and when
- * the app quits. A file without the switch reads as the default, on.
- */
 export type RemoteSessionReusePreferenceStore = PreferenceStore<RemoteSessionReusePreference>;
 
 export function createRemoteSessionReusePreferenceStore(path: string): RemoteSessionReusePreferenceStore {

@@ -4,14 +4,10 @@ import { DOWNLOAD_PLATFORMS, detectDownloadPlatform } from "../../lib/download-p
 import { Button } from "../ui/button";
 
 export interface PluginOpenButtonsProps {
-  /** An `openbot://` link, built by a shared helper from contracts. */
   href: string;
   label: string;
-  /** The browser client's entry for the same item, built by a shared helper from contracts. */
   browserHref?: string;
-  /** What the download offer says after the app did not open. */
   downloadCopy: string;
-  /** The other labels, in the page's language. The plugin and shared agent pages are English and omit it. */
   text?: PluginOpenButtonsText;
 }
 
@@ -19,7 +15,6 @@ export interface PluginOpenButtonsText {
   browser: string;
   notOpened: string;
   dismiss: string;
-  /** The download button for one platform, such as "Download for macOS". */
   download: (platform: string) => string;
 }
 
@@ -30,26 +25,8 @@ const ENGLISH_TEXT: PluginOpenButtonsText = {
   download: (platform) => `Download for ${platform}`,
 };
 
-/** How long the app is given to take over before the page offers the download instead. */
 const DOWNLOAD_HINT_DELAY_MS = 1200;
 
-/**
- * `Open in OpenBot` (or the label the page gives), and the download offer that appears only after it is pressed.
- *
- * The page cannot ask whether the app is installed, and it must not try: a hidden frame that probes
- * the scheme is a fingerprint. So the offer is a reveal on a timer, cancelled when the tab is hidden
- * - which is what happens when the app really does take over. A visitor who has OpenBot never sees
- * it, and a visitor who does not sees it a moment later. Neither is redirected anywhere.
- *
- * The offer is a modal `<dialog>` rather than a line on the page. A visitor sees it only after the
- * page failed to do the one thing they asked for, so it is the whole subject at that moment, and a
- * note beside the button reads as debris instead. The element is the platform's own: it takes the
- * focus, holds it, closes on Escape and gives the focus back to the button, none of which this file
- * has to write or keep true.
- *
- * The caller builds the address from an id through the shared helper, never from listing data, so
- * a listing cannot put another link behind this button. The plugin and shared agent pages use it.
- */
 export function PluginOpenButtons(props: PluginOpenButtonsProps) {
   const [showDownload, setShowDownload] = createSignal(false);
   const titleId = createUniqueId();
@@ -83,16 +60,6 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
     }, DOWNLOAD_HINT_DELAY_MS);
   };
 
-  /**
-   * Opened as modal rather than with the markup's `open`, which is the non-modal dialog: no
-   * backdrop, no focus, and the page still reachable behind it. It waits a microtask because a
-   * `ref` runs before the element is in the document, and a detached dialog cannot be shown.
-   *
-   * The press-away is bound here rather than as `onClick`, because it is not a control: the
-   * backdrop is the dialog's own box, so a press outside the panel lands on the element itself.
-   * A keyboard closes this dialog with Escape and with `Not now`, both of which the element and
-   * the markup already carry.
-   */
   const openDialog = (element: HTMLDialogElement) => {
     dialog = element;
     element.addEventListener("click", (event) => {
@@ -103,8 +70,6 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
     });
   };
 
-  // The wrapper carries no class of its own: what it holds together is the button and the offer
-  // that follows it, and the spacing is the hero line's own.
   return (
     <div>
       <div class="plugin-actions-row">
@@ -121,8 +86,6 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
       </div>
 
       <Show when={showDownload()}>
-        {/* Out of this page's own boxes, because the header it stands in animates a transform, and
-            a transformed ancestor is what a modal dialog then centres itself in, not the window. */}
         <Portal>
           <dialog
             ref={openDialog}
@@ -138,8 +101,6 @@ export function PluginOpenButtons(props: PluginOpenButtonsProps) {
               <button class="plugin-dialog-dismiss" type="button" onClick={() => dialog?.close()}>
                 {text().dismiss}
               </button>
-              {/* Where the dialog puts the focus, because it is the thing the visitor came for.
-                  Without it the modal would open on `Not now`, which is the way out. */}
               <Button autofocus href={platform().href} variant="primary" size="sm" icon="download">
                 {text().download(platform().label)}
               </Button>

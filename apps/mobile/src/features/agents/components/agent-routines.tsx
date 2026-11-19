@@ -18,10 +18,6 @@ import { isWebhookRoutine, type RoutineRecord, saveRoutineActive } from "./agent
 import { RoutineActiveSwitch } from "./routine-active-switch";
 import { TRIGGER_TEXT } from "./routine-trigger-picker";
 
-/**
- * Agent info > Routines. As on desktop, each routine is a card: the trigger icon, the name and when
- * it runs, and a switch that pauses or resumes it. A press on the card opens the editor.
- */
 export function AgentRoutines({
   agent,
   routines,
@@ -29,13 +25,11 @@ export function AgentRoutines({
 }: {
   agent: MobileAgent;
   routines: RoutineRecord[];
-  /** The query that holds the routines. A saved switch reloads it, so the card shows the host result. */
   queryKey: QueryKey;
 }) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspaceActions();
   const queryClient = useQueryClient();
-  // The new state of each routine whose switch waits for the host.
   const [pending, setPending] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +121,6 @@ function RoutineCard({
   const summary = routineSummary(routine, completed, text);
   return (
     <SettingsSection>
-      {/* The switch is beside the card's button, not in it, so a press on the switch does not open the editor. */}
       <View className="flex-row items-center gap-3 pr-4">
         <Pressable
           accessibilityRole="button"
@@ -147,7 +140,6 @@ function RoutineCard({
             </Typography.Paragraph>
           </View>
         </Pressable>
-        {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}
         <RoutineActiveSwitch
           label={routine.name}
           value={active}
@@ -163,23 +155,17 @@ function routineSchedule(routine: RoutineRecord): RoutineSchedule | null {
   return "schedule" in routine.trigger ? routine.trigger.schedule : null;
 }
 
-/**
- * A one-time routine that the host finished: the host paused it at or after its time. A routine
- * that the person paused before its time stays paused. The desktop list uses the same rule.
- */
 function routineCompleted(routine: RoutineRecord): boolean {
   const schedule = routineSchedule(routine);
   if (routine.active || schedule?.kind !== "once") return false;
   return Date.parse(routine.updatedAt) >= routineOnceInstant(schedule, routine.timezone).getTime();
 }
 
-/** "Daily · 9:00 AM", "Weekly · Monday · 9:00 AM", "Webhook". The switch shows the state, so this does not. */
 function routineSummary(routine: RoutineRecord, completed: boolean, { t, format }: MobileText): string {
   const schedule = routineSchedule(routine);
   if (!schedule) return t(TRIGGER_TEXT.webhook.title);
   const clock = (time: string) => {
     const [hour = 0, minute = 0] = time.split(":").map(Number);
-    // UTC, so that no clock change of the phone's zone moves the wall-clock time.
     return format.date(Date.UTC(2000, 0, 1, hour, minute), { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
   };
   const parts = [t(TRIGGER_TEXT[routineScheduleToDraft(schedule).kind].title)];
@@ -190,7 +176,6 @@ function routineSummary(routine: RoutineRecord, completed: boolean, { t, format 
       clock(schedule.time),
     );
   } else if (schedule.kind === "weekly") {
-    // January 7, 2024 is a Sunday.
     parts.push(format.date(new Date(2024, 0, 7 + schedule.weekday), { weekday: "long" }), clock(schedule.time));
   } else if (schedule.kind === "daily" || schedule.kind === "weekdays" || schedule.kind === "monthly") {
     parts.push(clock(schedule.time));

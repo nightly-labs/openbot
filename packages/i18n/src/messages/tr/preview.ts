@@ -20,6 +20,8 @@ export const messages = {
   "preview.unsupported.title": "Önizleme kullanılamıyor",
   "preview.unsupported.description": "Bu dosya türü varsayılan uygulamasında açılabilir.",
   "preview.unsupported.openExternally": "Harici olarak aç",
+  "preview.tooLarge.title": "Dosya önizleme için çok büyük",
+  "preview.tooLarge.description": "Önizleme 100 MB'a kadar çalışır. Bu dosyayı varsayılan uygulamasında açabilirsiniz.",
   "preview.spreadsheet.readFailed": "Bu elektronik tablo okunamadı.",
   "preview.spreadsheet.truncated": "Önizleme ilk {rows} satır ve {columns} sütunla sınırlandırıldı.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -16,17 +16,11 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** How often the host is asked how an install is, as on desktop. */
 const STATUS_POLL_MS = 1000;
-/** The longest search that the host takes. */
 const QUERY_LIMIT = 256;
 
 type Registry = NonNullable<ProviderAdmin["registry"]>;
 
-/**
- * The agent ID of a new install, as desktop suggests it, with a number added when the host has an
- * agent of that ID. The host does not replace an agent that it did not install from the registry.
- */
 function suggestedAgentId(entry: AcpRegistryEntry, taken: ReadonlySet<string>): string {
   const base = isNewCustomAgentId(entry.id) ? entry.id : `registry-${entry.id}`.slice(0, 40);
   if (!taken.has(base)) return base;
@@ -42,10 +36,6 @@ function candidateId(base: string, number: number): string {
   return `${base.slice(0, 40 - suffix.length)}${suffix}`;
 }
 
-/**
- * Server settings > Providers > ACP registry: the agents of the ACP registry, as the desktop section
- * shows them for a joined server. The host downloads and runs the command of each agent it installs.
- */
 export function ServerAcpRegistryScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -67,11 +57,9 @@ function RegistryPage({ serverId, admin, registry }: { serverId: string; admin: 
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<AcpRegistryEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
-  /** The registry ID of the install, update or removal that runs on the host. */
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searched = useRef("");
-  // An install adds a custom agent, so the Agents section reads the list again after each change.
   const customAgents = useServerCustomAgents(serverId, admin);
   const hasCustomAgents = admin.customAgents !== null;
   const refetchAgents = customAgents.list.refetch;
@@ -102,12 +90,10 @@ function RegistryPage({ serverId, admin, registry }: { serverId: string; admin: 
     [registry, errorMessage, t],
   );
 
-  // The whole registry shows before the first search.
   useEffect(() => {
     void search("");
   }, [search]);
 
-  // An install runs on the host after its request answers, so the page reads its state until it ends.
   useEffect(() => {
     if (!busy) return;
     let current = true;
@@ -280,7 +266,6 @@ function RegistryPage({ serverId, admin, registry }: { serverId: string; admin: 
           {error}
         </Typography.Paragraph>
       ) : null}
-      {/* The agents that the server has, above the others, so an update or a removal is at the top. */}
       {installed.length > 0 ? (
         <SettingsSection title={t("mobile.server.acpRegistry.installedTitle")}>{installed.map(row)}</SettingsSection>
       ) : null}

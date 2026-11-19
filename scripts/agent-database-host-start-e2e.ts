@@ -1,11 +1,3 @@
-// The start of the agent database host does not count against the first statement. Drives the real
-// `AgentDatabaseSupervisor` against the real host, `agent-database-host.ts` run by `node` over stdio:
-// - a host that reports ready after longer than the statement deadline answers the first statement,
-//   and the reported statement time does not include the start;
-// - a host that never reports ready fails the waiting request with the start message and is ended;
-// - a host that exits before ready fails the waiting request and is not started again in a loop;
-// - a prewarmed host answers the first statement with no second start.
-// `bun run test:agent-database-host-start`. Writes .openbot-build/agent-database-host-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -22,15 +14,16 @@ import {
   type AgentDatabaseOutcome,
   AgentDatabaseSupervisor,
 } from "../src/backend/agent-data/agent-database-supervisor";
+import { AgentTables } from "../src/backend/agent-data/agent-tables";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-database-host-start-e2e");
 const HOST = resolve(import.meta.dirname, "../src/backend/agent-data/agent-database-host.ts");
-/** Wide for a loaded CI runner: the first statement creates the file and the metadata tables. */
 const STATEMENT_DEADLINE_MS = 1_000;
-/** Longer than the statement deadline: before the fix, this start ended the first statement. */
 const READY_DELAY_MS = 2_000;
 const START_DEADLINE_MS = 3_000;
 const NOT_STARTED = "The database process did not start. Nothing was run. Try the call again.";
+const UNAVAILABLE =
+  "The database process could not start, so shared tables are not available now. Nothing was run. Do not retry now: keep these records in a file in your workspace, and try shared tables again later.";
 
 interface Case {
   ok: boolean;
@@ -40,12 +33,20 @@ interface Case {
   aliveAfter: number;
 }
 
+interface TriggerStep {
+  agent: string;
+  sql: string;
+  result: string;
+}
+
 interface Report {
   passed: boolean;
   slowStart?: Case;
   neverReady?: Case & { elapsedMs: number };
   exitBeforeReady?: Case;
   prewarm?: Case;
+  repeatedFailure?: { failures: string[]; starts: number; reasons: string[]; recovered: string[] };
+  triggers?: TriggerStep[];
   failure?: string;
 }
 
@@ -53,7 +54,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-agent-database-host-start-e2e
 const report: Report = { passed: false };
 const children: ChildProcess[] = [];
 
-/** The test transport: the host's stdio, with an optional hold on its ready message. */
 function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   const child = spawn(process.platform === "win32" ? "node.exe" : "node", args, {
     stdio: ["pipe", "pipe", "inherit"],
@@ -71,7 +71,7 @@ function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   return {
     send: (request) => child.stdin.write(`${JSON.stringify(request)}\n`),
     onMessage: (listener) => listeners.push(listener),
-    onExit: (listener) => child.once("exit", () => listener()),
+    onExit: (listener) => child.once("exit", (code) => listener(code)),
     kill: () => child.kill("SIGKILL"),
   };
 }
@@ -124,7 +124,6 @@ async function run(
     assert.equal(starts, 1, "the prewarm did not start a host");
   }
   const outcome = await select(supervisor);
-  // The start failures end the host themselves; the others are ended here.
   if (options.dispose !== false) supervisor.dispose();
   await waitForExits();
   return {
@@ -167,6 +166,133 @@ try {
   report.prewarm = prewarm;
   assert.equal(prewarm.failure, null);
   assert.equal(prewarm.starts, 1, "the statement after a prewarm started a second host");
+
+  children.length = 0;
+  let failingStarts = 0;
+  const reasons: string[] = [];
+  const failing = new AgentDatabaseSupervisor({
+    spawnHost: () => {
+      failingStarts += 1;
+      return stdioHost(["-e", "process.exit(3)"]);
+    },
+    hostStartDeadlineMs: START_DEADLINE_MS,
+    hostStartRetryDelayMs: 60_000,
+    onHostStartFailed: (failure) => reasons.push(`${failure.reason}; retry after ${failure.retryAfterMs} ms`),
+  });
+  const failures: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(failing);
+    failures.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  failing.prewarm();
+  const startsInDelay = failingStarts;
+  failing.dispose();
+  await waitForExits();
+
+  children.length = 0;
+  const hosts = [
+    ["-e", "process.exit(3)"],
+    ["-e", "process.exit(3)"],
+  ];
+  const recovering = new AgentDatabaseSupervisor({
+    spawnHost: () => stdioHost(hosts.shift() ?? ["--disable-warning=ExperimentalWarning", HOST]),
+    hostStartRetryDelayMs: 0,
+  });
+  const recovered: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(recovering);
+    recovered.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  recovering.dispose();
+  await waitForExits();
+
+  report.repeatedFailure = { failures, starts: startsInDelay, reasons, recovered };
+  assert.deepEqual(failures, [NOT_STARTED, UNAVAILABLE, UNAVAILABLE]);
+  assert.equal(startsInDelay, 2, "a call or a prewarm inside the retry delay started a host");
+  assert.deepEqual(reasons, [
+    "exited with code 3 before it reported ready; retry after 0 ms",
+    "exited with code 3 before it reported ready; retry after 60000 ms",
+  ]);
+  assert.equal(recovered.at(-1), "ok", "the host did not answer after the failed starts");
+
+  const steps: TriggerStep[] = [];
+  report.triggers = steps;
+  children.length = 0;
+  const tables = new AgentTables({
+    sharedRoot: join(root, "triggers"),
+    supervisor: new AgentDatabaseSupervisor({
+      spawnHost: () => stdioHost(["--disable-warning=ExperimentalWarning", HOST]),
+    }),
+  });
+  const execute = async (agent: string, sql: string): Promise<string> => {
+    const result = await Effect.runPromise(tables.execute(agent, sql, []));
+    const text = result.ok ? "ok" : result.message;
+    steps.push({ agent, sql, result: text });
+    return text;
+  };
+  const OTHER_AGENT = "given a trigger";
+  try {
+    assert.equal(await execute("A", "CREATE TABLE item_revisions (id INTEGER PRIMARY KEY, body TEXT NOT NULL)"), "ok");
+    assert.equal(
+      await execute(
+        "A",
+        "CREATE TRIGGER item_revision_no_update BEFORE UPDATE ON item_revisions BEGIN SELECT RAISE(ABORT, 'Revisions are immutable'); END",
+      ),
+      "ok",
+      "a trigger was refused",
+    );
+    assert.equal(await execute("A", "INSERT INTO item_revisions (body) VALUES ('a')"), "ok");
+    assert.match(await execute("B", "UPDATE item_revisions SET body = 'b'"), /Revisions are immutable/);
+    assert.match(
+      await execute(
+        "A",
+        "CREATE TRIGGER second AFTER INSERT ON item_revisions BEGIN SELECT 1; END; DELETE FROM item_revisions",
+      ),
+      /^Send one SQL statement per call/,
+      "a statement after a trigger was let through",
+    );
+    assert.match(
+      await execute("B", "CREATE TRIGGER b_lock AFTER INSERT ON item_revisions BEGIN SELECT 1; END"),
+      new RegExp(OTHER_AGENT),
+    );
+    assert.match(await execute("B", "DROP TRIGGER item_revision_no_update"), new RegExp(OTHER_AGENT));
+    assert.notEqual(
+      await execute("A", "CREATE TRIGGER owners AFTER INSERT ON openbot_metadata BEGIN SELECT 1; END"),
+      "ok",
+      "a trigger was added to the owner record",
+    );
+    assert.match(
+      await execute("A", "CREATE TEMP TRIGGER temp_lock AFTER INSERT ON main.item_revisions BEGIN SELECT 1; END"),
+      /TEMP triggers/,
+    );
+
+    assert.equal(await execute("B", "CREATE TABLE b_table (id INTEGER PRIMARY KEY)"), "ok");
+    assert.equal(await execute("A", "CREATE TABLE parent (id INTEGER PRIMARY KEY)"), "ok");
+    assert.equal(
+      await execute(
+        "A",
+        "CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id) ON DELETE CASCADE)",
+      ),
+      "ok",
+    );
+    assert.equal(
+      await execute(
+        "A",
+        "CREATE TRIGGER take AFTER DELETE ON child BEGIN UPDATE openbot_metadata SET owner_agent_id = 'A' WHERE table_name = 'b_table'; END",
+      ),
+      "ok",
+    );
+    assert.equal(await execute("A", "INSERT INTO parent (id) VALUES (1)"), "ok");
+    assert.equal(await execute("A", "INSERT INTO child (id, parent_id) VALUES (1, 1)"), "ok");
+    const removed = await Effect.runPromise(tables.remove("A", "parent"));
+    steps.push({ agent: "A", sql: "remove parent", result: removed.ok ? "ok" : removed.message });
+    const listed = await Effect.runPromise(tables.list());
+    assert.ok(listed.ok, "the tables could not be listed");
+    const owner = listed.value.find((table) => table.name === "b_table")?.ownerAgentId;
+    assert.equal(owner, "B", "a trigger in OpenBot's own DROP TABLE reassigned the owner of another agent's table");
+  } finally {
+    tables.dispose();
+  }
 
   report.passed = true;
 } catch (error) {

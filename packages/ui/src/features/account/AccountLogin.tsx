@@ -1,14 +1,16 @@
 import { AppLogo } from "@openbot/brand";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AppVariant, CentralAuthIssue, CentralAuthState } from "@openbot/contracts/ipc";
+import { referralCodeFromInput } from "@openbot/contracts/referral";
 import { normalizeEmailAddress, normalizeOneTimeCode } from "@openbot/contracts/validation";
 import type { TranslatedLocale } from "@openbot/i18n";
 import { appLanguageOption } from "@openbot/i18n/languages";
-import { ArrowLeft, Button, ErrorReference, Globe2, Input, Lock, RefreshCw } from "@openbot/ui";
+import { ArrowLeft, Button, Confetti, ErrorReference, Globe2, Input, Lock, RefreshCw } from "@openbot/ui";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { InviteCorner } from "./InviteCorner";
 import { OtpInput, type OtpInputStatus } from "./OtpInput";
 
 interface AccountLoginProps {
@@ -16,18 +18,16 @@ interface AccountLoginProps {
   state: CentralAuthState;
   onRetry: () => Promise<void>;
   onRequestEmailCode: (email: string) => Promise<void>;
-  onVerifyEmailCode: (challengeId: string, code: string) => Promise<void>;
+  onVerifyEmailCode: (challengeId: string, code: string, referralCode?: string) => Promise<void>;
   onReset: () => Promise<void>;
-  /** Opens the company sign-in page again: in the browser on desktop, in this tab on the web. */
   onOpenCompanySignIn?: () => Promise<void>;
-  /** A choice under the send button, such as the analytics box of the web app. */
   consent?: JSX.Element;
-  /** Fine print under the lock line, such as the Terms of Service notice of the web app. */
   notice?: JSX.Element;
-  /** The language the screen is in. The button that opens the language choice again shows its name. */
   language?: TranslatedLocale;
-  /** Opens the language choice again, so a reader who chose a language they cannot read can leave it. */
   onChangeLanguage?: () => void;
+  inviteField?: boolean;
+  initialInviteCode?: string | undefined;
+  revealed?: boolean;
 }
 
 type PendingAction = "retry" | "send" | "check" | "verify" | "resend" | "reset" | "company";
@@ -55,6 +55,13 @@ export function AccountLogin(props: AccountLoginProps) {
   const { t, sourceText } = useText();
   const [email, setEmail] = createSignal("");
   const [code, setCode] = createSignal("");
+  const [inviteCode, setInviteCode] = createSignal(
+    untrack(() => (props.initialInviteCode ? referralCodeFromInput(props.initialInviteCode) : null)),
+  );
+  let sentInviteCode: string | undefined;
+  const [bursts, setBursts] = createSignal<{ origin: Element | undefined }[]>([]);
+  let burstTimer: number | undefined;
+  let screen: HTMLElement | undefined;
   const [presentedEmailError, setPresentedEmailError] = createSignal<string | null>(null);
   const [emailErrorActive, setEmailErrorActive] = createSignal(false);
   const [emailShaking, setEmailShaking] = createSignal(false);
@@ -71,11 +78,24 @@ export function AccountLogin(props: AccountLoginProps) {
   let emailMessageTimer: number | undefined;
 
   onCleanup(clearEmailErrorTimers);
+  onCleanup(() => window.clearTimeout(burstTimer));
 
-  // `now()` exists for the two countdowns below and nothing else, so the clock
-  // runs only while one of them is on screen. Arming it at creation instead
-  // woke the view once a second for its whole life, including the ordinary case
-  // where there is nothing to count down.
+  let linkCelebrated = !untrack(() => props.inviteField && inviteCode());
+  createEffect(
+    () => props.revealed ?? true,
+    (revealed) => {
+      if (!revealed || linkCelebrated) return;
+      linkCelebrated = true;
+      celebrate(screen?.querySelector(".account-login-logo") ?? undefined);
+    },
+  );
+
+  function celebrate(origin: Element | undefined): void {
+    setBursts([{ origin }]);
+    window.clearTimeout(burstTimer);
+    burstTimer = window.setTimeout(() => setBursts([]), 2_400);
+  }
+
   const countdownUntil = createMemo(() => {
     const resendAt = props.state.status === "code_sent" ? props.state.resendAvailableAt : 0;
     return Math.max(resendAt, issueBlockedUntil());
@@ -88,8 +108,6 @@ export function AccountLogin(props: AccountLoginProps) {
       if (until <= Date.now()) return;
       const clock = window.setInterval(() => {
         setNow(Date.now());
-        // Stop at the deadline rather than wait for the next state change: the
-        // label has reached zero and no later tick can change it.
         if (Date.now() >= until) window.clearInterval(clock);
       }, 1_000);
       return () => window.clearInterval(clock);
@@ -162,7 +180,7 @@ export function AccountLogin(props: AccountLoginProps) {
     const [before = "", after = ""] = t("account.login.codeSent", { email: EMAIL_MARKER }).split(EMAIL_MARKER);
     return [before, after] as const;
   };
-  // Only on a settled email step: a code in flight belongs to the screen that sent it.
+  const emailFormShown = () => !connecting() && !unavailable() && loginStep() === "email";
   const languageButtonShown = () =>
     (props.state.status === "signed_out" || props.state.status === "error") && pendingAction() === null;
   const otpStatus = (): OtpInputStatus => {
@@ -271,10 +289,6 @@ export function AccountLogin(props: AccountLoginProps) {
     }, shakeDuration + motionDuration("--revert-hold", 3_000));
   }
 
-  /**
-   * Show a failed action with the code of its cause. When the action already gave a typed issue,
-   * that issue explains the failure, so a general sentence does not replace it.
-   */
   function showActionError(error: unknown, message: string, keepIssue: boolean): void {
     if (keepIssue && displayedIssue()) return;
     setLocalError({ message, reference: errorReference(error) });
@@ -304,6 +318,7 @@ export function AccountLogin(props: AccountLoginProps) {
     }
     const normalizedEmail = normalizeEmailAddress(email());
     if (!normalizedEmail) return;
+    sentInviteCode = props.inviteField ? (inviteCode() ?? undefined) : undefined;
     const action: PendingAction = emailDeliveryUncertain() ? "check" : "send";
     setEmail(normalizedEmail);
     setIssueVisible(false);
@@ -330,7 +345,7 @@ export function AccountLogin(props: AccountLoginProps) {
     setLocalError(null);
     setPendingAction("verify");
     try {
-      await props.onVerifyEmailCode(props.state.challengeId, formatCode(normalizedCode));
+      await props.onVerifyEmailCode(props.state.challengeId, formatCode(normalizedCode), sentInviteCode);
     } catch (error) {
       showActionError(error, t("account.login.verifyFailed"), true);
     } finally {
@@ -396,7 +411,7 @@ export function AccountLogin(props: AccountLoginProps) {
   }
 
   return (
-    <main class="account-login-screen">
+    <main class="account-login-screen" ref={screen}>
       <div class="account-login-shell">
         <header class="account-login-brand-lockup">
           <AppLogo variant={props.variant} animation="blink" interactive class="account-login-logo" />
@@ -585,7 +600,6 @@ export function AccountLogin(props: AccountLoginProps) {
                       aria-describedby={emailErrorActive() ? "account-email-error" : undefined}
                       autofocus
                       onBlur={() => {
-                        // An empty field is not wrong yet: the user can move to the analytics box first.
                         const value = untrack(email);
                         const validationError = value.trim() ? validateEmail(value) : null;
                         if (validationError) showEmailError(validationError);
@@ -602,7 +616,6 @@ export function AccountLogin(props: AccountLoginProps) {
                       {presentedEmailError()}
                     </p>
                   </div>
-
                   <Show when={formIssue()}>
                     {(issue) => (
                       <p class="account-login-error" role="alert">
@@ -634,14 +647,6 @@ export function AccountLogin(props: AccountLoginProps) {
                     </Show>
                   </Button>
                   {props.consent}
-                  <div class="account-login-footer">
-                    {/* The account is for sign-in only. A new user asks what leaves the computer. */}
-                    <p class="account-login-local-data">
-                      <Lock size={13} aria-hidden="true" />
-                      {t("account.login.localData")}
-                    </p>
-                    {props.notice}
-                  </div>
                 </form>
               }
             >
@@ -745,25 +750,40 @@ export function AccountLogin(props: AccountLoginProps) {
             </Show>
           </Show>
         </section>
-
-        <Show when={languageButtonShown() && props.onChangeLanguage && props.language}>
-          {(language) => (
-            <Button
-              type="button"
-              class="account-login-language"
-              variant="ghost"
-              size="sm"
-              lang={appLanguageOption(language()).lang}
-              title={t("account.language.change")}
-              data-cuelume-tap="navigate"
-              onClick={() => props.onChangeLanguage?.()}
-            >
-              <Globe2 size={14} aria-hidden="true" />
-              {appLanguageOption(language()).label}
-            </Button>
-          )}
-        </Show>
       </div>
+
+      <Show when={languageButtonShown() && props.onChangeLanguage && props.language}>
+        {(language) => (
+          <Button
+            type="button"
+            class="account-login-language"
+            variant="ghost"
+            size="sm"
+            lang={appLanguageOption(language()).lang}
+            title={t("account.language.change")}
+            data-cuelume-tap="navigate"
+            onClick={() => props.onChangeLanguage?.()}
+          >
+            <Globe2 size={14} aria-hidden="true" />
+            {appLanguageOption(language()).label}
+          </Button>
+        )}
+      </Show>
+      <footer class="account-login-page-footer" data-shown={emailFormShown() ? "true" : undefined}>
+        <div class="account-login-page-footer-start">
+          <Show when={props.inviteField}>
+            <InviteCorner code={inviteCode()} onChange={setInviteCode} onAdded={celebrate} />
+          </Show>
+        </div>
+        <div class="account-login-legal">
+          <p class="account-login-local-data">
+            <Lock size={13} aria-hidden="true" />
+            {t("account.login.localData")}
+          </p>
+          {props.notice}
+        </div>
+      </footer>
+      <For each={bursts()}>{(burst) => <Confetti origin={burst.origin} />}</For>
     </main>
   );
 }

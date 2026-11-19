@@ -9,6 +9,7 @@ export const messages = {
   "mobile.share.readFailed": "OpenBot kan niet lezen wat je hebt gedeeld. Deel het opnieuw.",
   "mobile.share.content": "Te delen",
   "mobile.share.footer": "De chat opent met dit in het berichtveld. Er wordt niets verstuurd totdat jij het verstuurt.",
+  "mobile.share.sendFooter": "OpenBot stuurt dit naar de agent en opent daarna de chat.",
   "mobile.share.lastUsed": "Laatst gebruikt",
   "mobile.share.noAgents": "Geen agents",
   "mobile.share.chooseAgent": "Kies een agent",

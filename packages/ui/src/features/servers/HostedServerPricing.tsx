@@ -44,67 +44,88 @@ import { useText } from "../../text";
 export type HostedServerPlanId = BillingPlanId;
 export type HostedServerBilling = "monthly" | "yearly";
 
-export const HOSTED_CURRENCIES = ["EUR", "USD", "PLN"] as const;
+export const HOSTED_CURRENCIES = ["EUR", "USD", "PLN", "BRL"] as const;
 export type HostedCurrency = (typeof HOSTED_CURRENCIES)[number];
+type HostedBaseCurrency = Exclude<HostedCurrency, "BRL">;
+const HOSTED_BASE_CURRENCIES: readonly HostedBaseCurrency[] = ["EUR", "USD", "PLN"];
 
-/** The Stripe currency of each shown currency. */
 export const HOSTED_BILLING_CURRENCY = {
   EUR: "eur",
   USD: "usd",
   PLN: "pln",
+  BRL: "brl",
 } as const satisfies Record<HostedCurrency, BillingCurrency>;
 
-/**
- * A first guess of the currency from the computer's time zone, for when the consumer does not know
- * the user's country. It reads only local settings and sends nothing.
- */
-export function guessHostedCurrency(timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): HostedCurrency {
+const BRAZIL_TIME_ZONES = new Set([
+  "America/Araguaina",
+  "America/Bahia",
+  "America/Belem",
+  "America/Boa_Vista",
+  "America/Campo_Grande",
+  "America/Cuiaba",
+  "America/Eirunepe",
+  "America/Fortaleza",
+  "America/Maceio",
+  "America/Manaus",
+  "America/Noronha",
+  "America/Porto_Velho",
+  "America/Recife",
+  "America/Rio_Branco",
+  "America/Santarem",
+  "America/Sao_Paulo",
+  "Brazil/Acre",
+  "Brazil/DeNoronha",
+  "Brazil/East",
+  "Brazil/West",
+]);
+
+export function guessHostedCurrency(
+  offered: readonly HostedCurrency[] = HOSTED_BASE_CURRENCIES,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): HostedCurrency {
   if (timeZone === "Europe/Warsaw") return "PLN";
   if (timeZone.startsWith("Europe/")) return "EUR";
+  if (BRAZIL_TIME_ZONES.has(timeZone) && offered.includes("BRL")) return "BRL";
   return "USD";
 }
 
+export function hostedCurrencies(plans: readonly HostedServerPlan[]): HostedCurrency[] {
+  const brl = plans.length > 0 && plans.every((plan) => plan.monthlyPrice.BRL !== undefined);
+  return HOSTED_CURRENCIES.filter((currency) => currency !== "BRL" || brl);
+}
+
+function hostedPrice(plan: HostedServerPlan, interval: "month" | "year", currency: HostedCurrency): number {
+  return (interval === "month" ? plan.monthlyPrice[currency] : plan.yearlyPrice[currency]) ?? 0;
+}
+
+type HostedPrices = Record<HostedBaseCurrency, number> & Partial<Record<HostedCurrency, number>>;
+
 export interface HostedServerPlan {
   id: HostedServerPlanId;
-  /**
-   * The price for one month on monthly billing, in each currency. These are set prices, not
-   * conversions, so each one is a round number.
-   */
-  monthlyPrice: Record<HostedCurrency, number>;
-  /** The price for one year on yearly billing, in each currency. */
-  yearlyPrice: Record<HostedCurrency, number>;
+  monthlyPrice: HostedPrices;
+  yearlyPrice: HostedPrices;
   diskGb: number;
-  /** The most active members of the server, the owner included. */
   memberLimit: number;
-  /** The most active hosted sites. The catalog does not send it, so it comes from the plan. */
   siteLimit: number;
-  /** The speed compared with the smallest plan. 1 is the base speed. */
   relativeSpeed: number;
-  /** No new server can take this plan. */
   soldOut: boolean;
 }
 
-/**
- * How much less yearly billing costs than twelve monthly payments, in whole percent, from the prices of
- * the catalog. It is the smallest discount of the plans, so the text is true for each plan. 0 means no discount.
- */
 export function hostedYearlyDiscountPercent(plans: readonly HostedServerPlan[], currency: HostedCurrency): number {
   const discounts = plans.map((plan) => {
-    // In cents, so that the division does not get a floating point error such as 19.999.
-    const twelveMonths = Math.round(plan.monthlyPrice[currency] * 100) * 12;
-    const year = Math.round(plan.yearlyPrice[currency] * 100);
+    const twelveMonths = Math.round(hostedPrice(plan, "month", currency) * 100) * 12;
+    const year = Math.round(hostedPrice(plan, "year", currency) * 100);
     return twelveMonths > 0 ? Math.floor(((twelveMonths - year) * 100) / twelveMonths) : 0;
   });
   return discounts.length === 0 ? 0 : Math.max(0, Math.min(...discounts));
 }
 
-/** The price for one month. On yearly billing this is the yearly price divided by 12. */
 export function hostedPlanMonthlyPrice(
   plan: HostedServerPlan,
   billing: HostedServerBilling,
   currency: HostedCurrency,
 ): number {
-  return billing === "yearly" ? plan.yearlyPrice[currency] / 12 : plan.monthlyPrice[currency];
+  return billing === "yearly" ? hostedPrice(plan, "year", currency) / 12 : hostedPrice(plan, "month", currency);
 }
 
 const BILLING_INTERVAL = { monthly: "month", yearly: "year" } as const satisfies Record<
@@ -112,23 +133,18 @@ const BILLING_INTERVAL = { monthly: "month", yearly: "year" } as const satisfies
   BillingInterval
 >;
 
-/** A price for one month: `regular` has no discount, `monthly` has the yearly and bundle discounts. */
 export interface HostedOrderPrice {
   regular: number;
   monthly: number;
 }
 
-/**
- * The price for one month of a server and, for the people at work, its license at the bundle price. 0
- * people is personal use: the server alone.
- */
 export function hostedOrderMonthlyPrice(
   plan: HostedServerPlan,
   billing: HostedServerBilling,
   currency: HostedCurrency,
   people: number,
 ): HostedOrderPrice {
-  const regular = plan.monthlyPrice[currency];
+  const regular = hostedPrice(plan, "month", currency);
   const monthly = hostedPlanMonthlyPrice(plan, billing, currency);
   if (people === 0) return { regular, monthly };
   const license = licenseOrderFor(people);
@@ -140,20 +156,13 @@ export function hostedOrderMonthlyPrice(
   };
 }
 
-/** The counts of people at work that the dialog sells a license for. */
 const WORK_PEOPLE = Array.from({ length: LICENSE_MAX_USERS }, (_, index) => index + 1);
 
-/**
- * The smallest yearly discount of a server with its license, in whole percent, for each count of people
- * and each plan that fits them. The license has a smaller discount than the server, so the text is true
- * for each order, and it does not change with the count.
- */
 export function hostedWorkYearlyDiscountPercent(plans: readonly HostedServerPlan[], currency: HostedCurrency): number {
   const discounts = WORK_PEOPLE.flatMap((people) =>
     plans
       .filter((plan) => plan.memberLimit >= people)
       .map((plan) => {
-        // In cents, so that the division does not get a floating point error.
         const month = Math.round(hostedOrderMonthlyPrice(plan, "monthly", currency, people).monthly * 100);
         const year = Math.round(hostedOrderMonthlyPrice(plan, "yearly", currency, people).monthly * 100);
         return month > 0 ? Math.floor(((month - year) * 100) / month) : 0;
@@ -162,10 +171,6 @@ export function hostedWorkYearlyDiscountPercent(plans: readonly HostedServerPlan
   return discounts.length === 0 ? 0 : Math.max(0, Math.min(...discounts));
 }
 
-/**
- * The longest old and new price texts of all orders that the plans can show: each billing, personal use,
- * and each count of people at work on each plan that fits them.
- */
 export function hostedLongestOrderPrice(
   plans: readonly HostedServerPlan[],
   currency: HostedCurrency,
@@ -185,16 +190,19 @@ export function hostedLongestOrderPrice(
   return longest;
 }
 
-/** The plans of the Stripe catalog. The catalog has amounts in cents; the plans show whole units. */
 export function hostedServerPlansFromCatalog(catalog: HostedServerCatalog): HostedServerPlan[] {
   const amounts = (
     prices: HostedServerCatalog["plans"][number]["prices"],
     interval: "month" | "year",
-  ): Record<HostedCurrency, number> => ({
-    EUR: prices.eur[interval] / 100,
-    USD: prices.usd[interval] / 100,
-    PLN: prices.pln[interval] / 100,
-  });
+  ): HostedPrices => {
+    const result: HostedPrices = {
+      EUR: prices.eur[interval] / 100,
+      USD: prices.usd[interval] / 100,
+      PLN: prices.pln[interval] / 100,
+    };
+    if (prices.brl) result.BRL = prices.brl[interval] / 100;
+    return result;
+  };
   return catalog.plans.map((plan) => ({
     id: plan.id,
     monthlyPrice: amounts(plan.prices, "month"),
@@ -220,13 +228,11 @@ const BILLING_OPTIONS: readonly HostedServerBilling[] = ["monthly", "yearly"];
 
 interface HostedBillingSwitchProps {
   billing: HostedServerBilling;
-  /** The yearly discount in whole percent. The switch does not show a discount of 0. */
   discountPercent: number;
   onChange: (billing: HostedServerBilling) => void;
   disabled?: boolean | undefined;
 }
 
-/** Monthly or yearly billing. The yearly option shows the discount. */
 export function HostedBillingSwitch(props: HostedBillingSwitchProps) {
   const { t } = useText();
   return (
@@ -260,27 +266,22 @@ export function HostedBillingSwitch(props: HostedBillingSwitchProps) {
   );
 }
 
-/** Kobalte takes a mutable array. */
-const CURRENCY_OPTIONS: HostedCurrency[] = [...HOSTED_CURRENCIES];
-
 interface HostedCurrencySelectProps {
+  options: HostedCurrency[];
   currency: HostedCurrency;
   onChange: (currency: HostedCurrency) => void;
   disabled?: boolean | undefined;
-  /** The account pays its plans in this currency, so it shows as text, not as a choice. */
   locked?: boolean | undefined;
-  /** The dialog element the popover portals into, so that it stays inside the dialog's focus trap. */
   mount?: HTMLElement | undefined;
 }
 
-/** The currency of the prices. The ISO code is the same in each language. */
 export function HostedCurrencySelect(props: HostedCurrencySelectProps) {
   const { t } = useText();
   return (
     <Show when={!props.locked} fallback={<span class="hosted-currency hosted-currency-locked">{props.currency}</span>}>
       <Select<HostedCurrency>
         class="hosted-currency"
-        options={CURRENCY_OPTIONS}
+        options={props.options}
         value={props.currency}
         disabled={props.disabled ?? false}
         onChange={(currency) => currency && props.onChange(currency)}
@@ -302,30 +303,15 @@ interface HostedServerPlansProps {
   billing: HostedServerBilling;
   currency: HostedCurrency;
   onChoose: (plan: HostedServerPlanId) => void;
-  /** The plan that shows the "Best value" badge and the primary button. */
   recommended?: HostedServerPlanId | undefined;
-  /** The plan whose button shows the loading state. All buttons are disabled while it is set. */
   pendingPlan?: HostedServerPlanId | null | undefined;
-  /** Disables all buttons, such as when the account has the maximum number of servers. */
   disabled?: boolean | undefined;
-  /**
-   * The people at work, when the plans also sell a license. 0 is personal use: the server alone. Each
-   * plan that fits the people shows the server and its license together; the other plans are disabled.
-   */
   people?: number | undefined;
-  /**
-   * The longest old and new price that the plans can show, from `hostedLongestOrderPrice`. When it does
-   * not fit on one line, each plan puts the old price on its own line, so the plans keep their shape
-   * when the people or the billing change.
-   */
   longestPrice?: { was: string; now: string } | undefined;
-  /** The license that the plans sell is free until this time, in milliseconds since the epoch. */
   licenseTrialEnd?: number | undefined;
 }
 
-/** A plan price: "zł 90" in place of "PLN 90", so that the old and the new price fit in a column. */
 export function formatHostedPrice(format: AppFormat, value: number, currency: HostedCurrency): string {
-  // "€103.50", not "€103.5": a price with cents shows two digits.
   const whole = Math.round(value * 100) % 100 === 0;
   return format.number(value, {
     style: "currency",
@@ -336,34 +322,34 @@ export function formatHostedPrice(format: AppFormat, value: number, currency: Ho
   });
 }
 
-/**
- * The most characters that the old and the new yearly price of one plan have together, for example
- * 12 for "zł 440" and "zł 352". The dialog uses it to make the columns wide enough, so that the
- * price line does not break. It uses the yearly prices on both billings, so the width does not
- * change when the billing changes.
- */
+const NARROW_PRICE_CHARACTERS = /[\s.,'ł]/gu;
+
+function priceTextWidth(text: string): number {
+  return text.length - (text.match(NARROW_PRICE_CHARACTERS)?.length ?? 0) / 2;
+}
+
 export function hostedPriceLength(
   plans: readonly HostedServerPlan[],
   currency: HostedCurrency,
   format: AppFormat,
 ): number {
-  return Math.max(
-    0,
-    ...plans.map(
-      (plan) =>
-        formatHostedPrice(format, plan.monthlyPrice[currency], currency).length +
-        formatHostedPrice(format, hostedPlanMonthlyPrice(plan, "yearly", currency), currency).length,
+  return Math.ceil(
+    Math.max(
+      0,
+      ...plans.map(
+        (plan) =>
+          priceTextWidth(formatHostedPrice(format, hostedPrice(plan, "month", currency), currency)) +
+          priceTextWidth(formatHostedPrice(format, hostedPlanMonthlyPrice(plan, "yearly", currency), currency)),
+      ),
     ),
   );
 }
 
-/** One column for each plan, in one panel. Each column has its own button, so one click creates the server. */
 export function HostedServerPlans(props: HostedServerPlansProps) {
   const { t, format } = useText();
   const price = (value: number) => formatHostedPrice(format, value, props.currency);
   const people = () => props.people ?? 0;
   const [stacked, setStacked] = createSignal(false);
-  /** The license of the order, as the summary of a plan says it. */
   const licenseLine = () => {
     const license = licenseOrderFor(people());
     return license.tier === "team"
@@ -430,7 +416,6 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                 <Show when={index() === 0 ? props.longestPrice : undefined}>
                   {(longest) => <LongestPrice was={longest().was} now={longest().now} onStackedChange={setStacked} />}
                 </Show>
-                {/* Always in the layout, so that it can grow in when a discount shows. */}
                 <span
                   class="hosted-plan-was"
                   data-shown={discounted() ? "" : undefined}
@@ -441,13 +426,11 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                     <s aria-hidden="true">{price(regular())}</s>
                   </span>
                 </span>
-                {/* The new price and "/ month" stay on one line. */}
                 <span class="hosted-plan-now">
                   <RollingPrice value={monthly()} format={price} />
                   <span class="hosted-plan-period">{t("settings.hostedServers.plan.perMonth")}</span>
                 </span>
               </p>
-              {/* A new line for each billing period, so that it fades in again. */}
               <Show when={props.billing} keyed>
                 {(billing) => (
                   <p class="hosted-plan-billed">
@@ -462,7 +445,6 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                   </p>
                 )}
               </Show>
-              {/* For work, the summary says that the price includes the license. */}
               <p class="hosted-plan-summary" data-license={work() ? "" : undefined}>
                 <Show when={work()} fallback={t(PLAN_TEXT[plan.id].summary)}>
                   <ShieldCheck aria-hidden="true" />
@@ -501,11 +483,9 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
                   <Globe2 aria-hidden="true" />
                   {t("settings.hostedServers.plan.sites", { count: plan.siteLimit })}
                 </li>
-                {/* For work, the summary already names the license of the order. An account with a license buys no license. */}
                 <Show when={props.people !== undefined && !work()}>
                   <li>
                     <ShieldCheck aria-hidden="true" />
-                    {/* A server too small for the Team license sells the Starter license, at the bundle price of the period. */}
                     <Show
                       when={plan.memberLimit < LICENSE_INCLUDED_USERS}
                       fallback={t("settings.hostedServers.plan.license.team")}
@@ -537,10 +517,6 @@ export function HostedServerPlans(props: HostedServerPlansProps) {
   );
 }
 
-/**
- * A hidden copy of the longest price, as wide as the price line of the first plan. When it does not fit on
- * one line, all plans put the old price on its own line.
- */
 function LongestPrice(props: { was: string; now: string; onStackedChange: (stacked: boolean) => void }) {
   const { t } = useText();
   let line: HTMLSpanElement | undefined;
@@ -565,7 +541,6 @@ function LongestPrice(props: { was: string; now: string; onStackedChange: (stack
   );
 }
 
-/** Personal use buys the server alone. Work adds a license to the server. */
 export function HostedUseSwitch(props: {
   work: boolean;
   onChange: (work: boolean) => void;
@@ -599,15 +574,9 @@ export function HostedUseSwitch(props: {
 
 const LICENSE_MINIMUM_TOAST = "hosted-license-minimum";
 
-/**
- * The people at work, under the plans. It stays in place for personal use, disabled, so that the dialog
- * does not change size.
- */
 export function HostedLicensePeople(props: {
   value: number;
-  /** The fewest people to choose. */
   min: number;
-  /** The people who use the account's servers now. They set the minimum; "Fewer" there tells why. */
   used: number;
   disabled: boolean;
   onChange: (value: number) => void;

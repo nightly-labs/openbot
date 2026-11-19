@@ -15,10 +15,6 @@ import {
   AccountServicePlatform,
 } from "./account-service-platform";
 
-/**
- * The commercial license of the account. The renderer never sends a URL: this service gets the Stripe
- * Checkout URL from the account server and opens it only when it is an https Stripe page.
- */
 export class LicenseDesktopService {
   readonly #platform: Layer.Layer<AccountServicePlatform>;
 

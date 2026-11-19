@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { chmod, lstat, mkdir, readdir, readlink, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { isNewerRelease as isNewerSharedRelease } from "@openbot/contracts/release-version";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { HostManagerOperations } from "../src/main/host-manager";
@@ -29,7 +30,6 @@ export async function hostCommand(file: string, args: string[], timeout = 60_000
 }
 const command = hostCommand;
 
-/** The system Applications directory normally permits administrators (group 80) to install apps. */
 export async function verifySharedAppParent(): Promise<void> {
   await verifyHostPath("/");
   const info = await lstat("/Applications");
@@ -86,7 +86,6 @@ export async function ensureHostDirectory(path: string, mode: number): Promise<v
   await chmod(path, mode);
 }
 
-/** Only visits the application bundle. Internal framework symlinks are valid; external links are not. */
 export async function verifyBundleTree(root: string, requireRootOwner: boolean): Promise<void> {
   const walk = async (path: string): Promise<void> => {
     const info = await lstat(path);
@@ -103,7 +102,6 @@ export async function verifyBundleTree(root: string, requireRootOwner: boolean):
   };
   if (!(await lstat(root)).isDirectory()) throw new Error("Application must be a real directory.");
   await walk(root);
-  // A single recursive listing checks bundle ACLs without launching a process for every file.
   const acl = await command("/bin/ls", ["-leR", root]);
   if (acl.split("\n").some((line) => /^\s*\d+:.*\ballow\b/.test(line)))
     throw new Error("Bundle has access-granting ACLs.");
@@ -123,7 +121,6 @@ export async function bundleVersion(app = SHARED_APP): Promise<string> {
 }
 
 export async function bundleProcesses(): Promise<Array<{ uid: number; pid: number; main: boolean }>> {
-  // comm reports executable paths, without workspace paths or prompts in command arguments.
   const output = await command("/bin/ps", ["-axo", "pid=,uid=,comm="]);
   if (!output) throw new Error("Process scan returned no processes.");
   const processes: Array<{ uid: number; pid: number; main: boolean }> = [];
@@ -170,7 +167,6 @@ export function macHostOperations(): HostManagerOperations {
       await ensureHostDirectory(STAGING, 0o700);
       const dmg = join(PRIVATE, "release.dmg");
       await rm(dmg, { force: true });
-      // Asset names and repository are fixed. No tenant supplies a network destination.
       const url = `https://github.com/nightly-labs/openbot/releases/download/${release.tag_name}/OpenBot-${version}-arm64.dmg`;
       await command(
         "/usr/bin/curl",
@@ -222,7 +218,6 @@ export function macHostOperations(): HostManagerOperations {
       if ((await bundleVersion(staged)) !== version) throw new Error("Staged version mismatch.");
       if ((await bundleProcesses()).length !== 0) throw new Error("OpenBot restarted during maintenance.");
       const retired = join(STAGING, "retired.app");
-      // Only application code moves here, never tenant content. No automatic downgrade.
       await rm(retired, { recursive: true, force: true });
       await rename(SHARED_APP, retired);
       await rename(staged, SHARED_APP);
@@ -236,14 +231,7 @@ export function macHostOperations(): HostManagerOperations {
 
 export function isNewerRelease(candidate: string, current: string): boolean {
   if (!/^\d+\.\d+\.\d+$/.test(current)) throw new Error("Installed version is not a stable release.");
-  const next = candidate.split(".").map(Number);
-  const previous = current.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    const nextPart = next[index] ?? 0;
-    const previousPart = previous[index] ?? 0;
-    if (nextPart !== previousPart) return nextPart > previousPart;
-  }
-  return false;
+  return isNewerSharedRelease(candidate, current);
 }
 
 export async function openSharedApplication(): Promise<void> {

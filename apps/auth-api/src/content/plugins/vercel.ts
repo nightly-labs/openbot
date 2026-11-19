@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Vercel here is taken from vercel.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const VERCEL_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

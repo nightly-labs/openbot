@@ -1,14 +1,3 @@
-// Checks channel work when the user hides an agent or changes its provider, in this worktree's
-// running dev app with real provider turns. Start the app with `bun run dev` (never `--shared`), then
-// run `bun scripts/channel-hide-handoff-e2e.ts --allow-mutations [--provider=<provider id>]`. It needs
-// three visible agents whose provider is signed in, and a second signed-in provider for the switch
-// (default: the first other provider that lists a model).
-//
-// It checks that a hidden lead routes a task, that a hidden owner does its task, each while the
-// agent stays hidden, and that after a provider switch the owner answers in the channel on the new
-// provider, with the channel context. It makes its own
-// channels and deletes them, restores each agent it hides, and gives the agent its provider back.
-// Writes .openbot-build/channel-hide-handoff-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor, isAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, ChannelPage, ChannelTask } from "@openbot/contracts/ipc";
@@ -41,7 +30,6 @@ try {
       (agent) => agent.agentId === agentId,
     );
 
-  // 1. A hidden lead routes the task of a request that names no owner.
   const routed = await client.create("E2E hidden lead", [lead.id, b.id, c.id], lead.id);
   await client.setHidden(lead.id, true);
   hidden.add(lead.id);
@@ -60,7 +48,6 @@ try {
   await client.setHidden(lead.id, false);
   hidden.delete(lead.id);
 
-  // 2. A hidden owner does its task.
   const kept = await client.create("E2E hidden owner", [b.id, c.id], b.id);
   await client.setHidden(b.id, true);
   hidden.add(b.id);
@@ -82,7 +69,6 @@ try {
   await client.setHidden(b.id, false);
   hidden.delete(b.id);
 
-  // 3. After a provider switch the owner answers in the channel on the new provider.
   const providerId = argument("provider");
   const models = await page.evaluate(() => window.openbot.agent.listModels());
   const target = models

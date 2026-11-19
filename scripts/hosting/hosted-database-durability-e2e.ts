@@ -1,21 +1,3 @@
-/**
- * Checks that a SQLite database in the home folder of a boat sandbox survives stop and resume:
- *
- *   BOAT_API_KEY=... bun scripts/hosting/hosted-database-durability-e2e.ts --sandbox=bx_... \
- *     --cycles=10 --mode=live|pre-stop
- *
- * boat saves /home file by file while the sandbox runs, and it resumes before the disk is restored.
- * The run starts with a new test database. Each cycle resumes the sandbox, checks the test database
- * that the last cycle left, starts a writer in WAL mode as OpenBot uses it, and stops the sandbox while
- * the writer runs. `live` stops during writes, with no hook for the writer. `pre-stop` runs the writer as a
- * systemd unit and installs openbot-boat-pre-stop for that unit, as a hosted server does for
- * openbot.service. The writer then closes the database before boat saves the disk, and each check
- * must find every row that the writer committed. The first damaged or incomplete check ends the run.
- * The test database is in /home/user/openbot-durability; OpenBot's own data is not touched. The test
- * hook also runs the OpenBot hook of the sandbox, and the run puts that hook back at the end. The
- * report is in .openbot-build/hosted-database-durability/.
- */
-
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -47,19 +29,11 @@ interface CycleReport {
   check: DynamicRecord | null;
   writer?: DynamicRecord | null;
   pathView?: DynamicRecord | null;
-  /**
-   * False when the sandbox did not start again after the last stop: the check proves nothing. No
-   * value in the first cycle, which has no last stop.
-   */
   restored: boolean | undefined;
   writeSeconds?: number;
   stoppedBy: "script" | "other";
 }
 
-/**
- * Writes rows with automatic checkpoints until SIGTERM. Then it writes its last committed row to the
- * status file and closes the database, as OpenBot does at its teardown.
- */
 const WRITER = `
 import json, os, signal, sqlite3, sys, time
 db_path, status_path = sys.argv[1], sys.argv[2]
@@ -91,11 +65,6 @@ status()
 c.close()
 `;
 
-/**
- * Checks a copy, so that the check itself does not checkpoint the restored WAL. `bootId` and `uptime`
- * show if the sandbox started again. `wal` counts the WAL frames that SQLite can read: the frames up to
- * the first frame with a wrong salt or checksum. `writer` is the restored status of the last writer.
- */
 const CHECK = `
 import json, os, shutil, sqlite3, struct, subprocess, sys
 source, target, flag = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -220,7 +189,6 @@ async function main(): Promise<void> {
   if (damaged > 0) process.exitCode = 1;
 }
 
-/** With the hook, the database must also hold the last row that the writer committed before its stop. */
 function isGood(check: DynamicRecord, mode: Mode): boolean {
   const quickCheck = check.quickCheck;
   const healthy = Array.isArray(quickCheck) && quickCheck.length === 1 && quickCheck[0] === "ok";
@@ -231,7 +199,6 @@ function isGood(check: DynamicRecord, mode: Mode): boolean {
 
 async function ensureRunning(boat: BoatRequester, sandboxId: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    // A stop that is still saving the disk must end before the resume.
     const state = await sandboxState(boat, sandboxId);
     if (state === "archived" || state === "stopped") {
       await boat("POST", `/sandboxes/${encodeURIComponent(sandboxId)}/resume`, "Resume", {
@@ -281,10 +248,6 @@ async function checkDatabase(boat: BoatRequester, sandboxId: string): Promise<Dy
   return parseJson(output);
 }
 
-/**
- * Keeps the OpenBot hook of the sandbox, which the test hook runs and the run puts back. Only a file
- * with the OpenBot first line: a test hook that an earlier run left is not kept.
- */
 async function saveOpenBotHook(boat: BoatRequester, sandboxId: string): Promise<void> {
   await command(
     boat,
@@ -301,10 +264,6 @@ async function restoreOpenBotHook(boat: BoatRequester, sandboxId: string): Promi
   );
 }
 
-/**
- * The test hook runs the real hook for the writer unit (not in `live` mode), and then the OpenBot
- * hook. It has no OpenBot first line, so a start of OpenBot does not replace it during the run.
- */
 async function installHook(boat: BoatRequester, sandboxId: string, mode: Mode): Promise<void> {
   const writerHook = (await readFile(join(import.meta.dirname, "openbot-boat-pre-stop"), "utf8"))
     .replaceAll("openbot.service", WRITER_UNIT)
@@ -347,7 +306,6 @@ async function startWriter(boat: BoatRequester, sandboxId: string, mode: Mode): 
 }
 
 async function readWriterStatus(boat: BoatRequester, sandboxId: string): Promise<DynamicRecord | null> {
-  // The writer ends when it reads a damaged page, before it writes its status.
   return parseJson(await command(boat, sandboxId, `cat ${REMOTE_DIRECTORY}/writer.json 2>/dev/null || echo null`));
 }
 
