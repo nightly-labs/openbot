@@ -141,6 +141,7 @@ export const messages = {
   "provider.picker.effort": "מאמץ",
   "provider.picker.effortLabel": "מאמץ החשיבה של הסוכן",
   "provider.picker.effortFixed": "{effort}, נקבע על ידי {provider}",
+  "provider.picker.effortLimited": "ההגדרות של Claude או הארגון שלך מגבילים את המאמץ ל־{effort}.",
   "provider.picker.fast": "מהיר",
   "provider.picker.fastText": "תשובות מהירות יותר, שימוש מוגבר",
   "provider.picker.speed": "מהירות",

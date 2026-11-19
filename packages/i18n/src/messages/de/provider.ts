@@ -146,6 +146,8 @@ export const messages = {
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
   "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
+  "provider.picker.effortLimited":
+    "Deine Claude-Einstellungen oder deine Organisation begrenzen den Aufwand auf {effort}.",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastText": "Schnellere Antworten, höhere Nutzung",
   "provider.picker.speed": "Geschwindigkeit",

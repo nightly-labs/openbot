@@ -145,6 +145,7 @@ export const messages = {
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
   "provider.picker.effortFixed": "{effort}（{provider} が固定）",
+  "provider.picker.effortLimited": "Claude の設定または組織により、推論の強さは {effort} までに制限されています。",
   "provider.picker.fast": "高速",
   "provider.picker.fastText": "応答が速く、使用量が増えます",
   "provider.picker.speed": "速度",

@@ -1084,6 +1084,19 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                       previous.every((option, i) => option.id === next[i]?.id && option.name === next[i]?.name),
                   },
                 );
+                /**
+                 * The highest effort that Claude Code allows for the model, when a limit is set. Claude
+                 * Code lists Low to High for each model that takes an effort, and since 2.1.328 drops each
+                 * level above the `maxEffortLevel` of the user's Claude settings or their organization. A
+                 * list with Low and without High stops at that limit (#12631).
+                 */
+                const effortLimit = () => {
+                  const option = effortOption();
+                  if (option?.provider !== "claude" || effortOptions().length === 0 || effortModel()?.variants.length)
+                    return;
+                  const efforts = option.supportedReasoningEfforts;
+                  return efforts.includes("low") && !efforts.includes("high") ? efforts.at(-1) : undefined;
+                };
                 const effortValue = () => {
                   const model = effortModel();
                   const queued = queuedEffort();
@@ -1383,6 +1396,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           </SelectTrigger>
                           <SelectContent class="provider-model-effort-content" />
                         </Select>
+                        <Show when={effortLimit()}>
+                          {(effort) => (
+                            <Text variant="caption" tone="muted" class="provider-model-effort-note">
+                              {t("provider.picker.effortLimited", { effort: reasoningLabel(effort(), t) })}
+                            </Text>
+                          )}
+                        </Show>
                       </div>
                     </Show>
                     <Show when={ownsSelection() && effortOptions().length === 0 && selectedFixed()?.effort}>

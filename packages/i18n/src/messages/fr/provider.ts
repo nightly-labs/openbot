@@ -151,6 +151,7 @@ export const messages = {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
   "provider.picker.effortFixed": "{effort}, fixé par {provider}",
+  "provider.picker.effortLimited": "Vos paramètres Claude ou votre organisation limitent l’effort à {effort}.",
   "provider.picker.fast": "Rapide",
   "provider.picker.fastText": "Réponses plus rapides, utilisation accrue",
   "provider.picker.speed": "Vitesse",
