@@ -168,12 +168,13 @@ const searchSchema = z
   );
 // The read answer gives nextCursor and history_search takes it as `cursor`, so models send `cursor`
 // here too. The error names the argument that takes it (#12517).
-const READ_CURSOR_HINT = "Send nextCursor as before for older messages.";
+// A history_search with only a taskId gives this answer too, so the hint names the tool.
+const READ_CURSOR_HINT = "Send nextCursor to history_read as before for older messages.";
 const readSchema = z
   .strictObject(readShape, {
     error: (issue) =>
       issue.code === "unrecognized_keys" && issue.keys.includes("cursor")
-        ? `history_read has no cursor. ${READ_CURSOR_HINT}`
+        ? `There is no cursor argument. ${READ_CURSOR_HINT}`
         : undefined,
   })
   .refine(
