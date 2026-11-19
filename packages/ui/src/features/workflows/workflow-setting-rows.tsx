@@ -1,20 +1,13 @@
-/**
- * The settings of a trigger or an output card, one full-width row each: a name, a value and an arrow.
- * The whole row opens its menu, so the target is the width of the card. The type or target is the first
- * row, and the settings of that type follow it, so a card keeps its layout when the type changes.
- */
-
 import type { MessagingPlatform } from "@openbot/contracts/ipc";
 import { Bot, ChevronDown, DropdownMenu, Hash, Input } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { DiscordMark, SlackMark, TelegramMark, WhatsAppMark } from "../settings/brand-marks";
-import { type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
+import { createPickerFades, type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
 import { useBoard, type WfnFieldValue } from "./workflow-board";
 import { asString, type Choice, placeKey, useField, usePlace } from "./workflow-node-parts";
 
-/** The settings of a card, on the field colour. */
 export function SettingRows(props: { head: JSX.Element; children?: JSX.Element }) {
   return (
     <div class="wfn-settings">
@@ -24,16 +17,13 @@ export function SettingRows(props: { head: JSX.Element; children?: JSX.Element }
   );
 }
 
-/** A setting with one value. With groups, the menu shows a heading for each. */
 export function SettingRow<T extends string>(props: {
   name: string;
   value: T;
   choices: readonly Choice<T>[];
   groups?: readonly { label: string; choices: readonly Choice<T>[] }[] | undefined;
   placeholder?: string | undefined;
-  /** The placeholder of a search field, for a long list. */
   search?: string | undefined;
-  /** More choices come, such as the people of a repository that the host still reads. */
   loading?: boolean | undefined;
   disabled?: boolean | undefined;
   onChange: (value: T) => void;
@@ -74,28 +64,21 @@ export function SettingRow<T extends string>(props: {
   );
 }
 
-/**
- * A setting with many values, such as labels. The menu stays open, and each row in it turns one value
- * on or off. With `agent`, the agent can choose the values; the list is then what it chooses from.
- */
 export function SettingListRow(props: {
   name: string;
-  /** The value text when the list is empty. */
   empty: string;
   options: readonly string[];
   values: readonly string[];
-  /** The name of an option in the menu, and its text as a tag. Both are the option itself when absent. */
   optionLabel?: ((value: string) => string) | undefined;
   tagLabel?: ((value: string) => string) | undefined;
-  /** The colour of an option, such as the colour of a GitHub label. */
   tone?: ((value: string) => string | undefined) | undefined;
-  /** More options come, such as the labels of a repository that the host still reads. */
   loading?: boolean | undefined;
   disabled?: boolean | undefined;
   onChange: (values: readonly string[]) => void;
   agent?: { on: boolean; onChange: (on: boolean) => void } | undefined;
 }) {
   const { t } = useText();
+  const fades = createPickerFades();
   const byAgent = () => props.agent?.on === true;
   const agentText = () =>
     props.values.length > 0
@@ -160,7 +143,7 @@ export function SettingListRow(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content class="wfn-menu wfn-picker" data-wfn-portal="" aria-label={props.name}>
-          <div class="wfn-picker-list">
+          <div ref={fades.bind} class={["wfn-picker-list", fades.classes()]} onScroll={fades.measure}>
             <Show when={props.agent}>
               {(agent) => (
                 <fieldset class="wfn-picker-group" aria-label={t("workflow.row.whoChooses")}>
@@ -210,7 +193,6 @@ export function SettingListRow(props: {
   );
 }
 
-/** A setting that the user types, such as a path. */
 export function InputRow(props: {
   name: string;
   value: string;
@@ -233,7 +215,6 @@ export function InputRow(props: {
   );
 }
 
-/** A row that only shows a value. */
 export function StaticRow(props: { name: string; empty?: boolean; children: JSX.Element }) {
   return (
     <div class="wfn-row" data-static="">
@@ -245,12 +226,10 @@ export function StaticRow(props: { name: string; empty?: boolean; children: JSX.
   );
 }
 
-/** The end of the settings, under a hairline, such as the next run of a schedule. */
 export function SettingsFoot(props: { children: JSX.Element }) {
   return <div class="wfn-settings-foot">{props.children}</div>;
 }
 
-/** The channel of a message trigger or of an output, with the places of the catalog. */
 export function PlaceRow(props: {
   id: string;
   connectionId?: string | undefined;
@@ -294,16 +273,10 @@ const PLATFORM_MARKS: Record<MessagingPlatform, (props: { class?: string }) => J
   whatsapp: WhatsAppMark,
 };
 
-/** The key of an OpenBot channel in the channel list. A place key has two parts, so the two never match. */
 const channelKey = (channelId: string) => JSON.stringify([channelId]);
 
-/**
- * The channel of an output: the OpenBot channels first, then the places of each messaging connection under
- * its name. An OpenBot channel stores the `chat-channel` target, a place the `channel` target.
- */
 export function OutputChannelRow(props: {
   id: string;
-  /** The output posts into an OpenBot channel. */
   openbot: boolean;
   connectionId?: string | undefined;
   placeId?: string | undefined;
@@ -365,7 +338,6 @@ export function OutputChannelRow(props: {
 
 const asList = (value: WfnFieldValue) => (typeof value === "string" ? value : undefined);
 
-/** A list of strings on the board, one per line, so undo and copy keep it. */
 export function useListField(
   id: () => string,
   key: string,

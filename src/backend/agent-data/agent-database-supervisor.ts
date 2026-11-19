@@ -10,22 +10,22 @@ import {
 } from "./agent-database-protocol";
 
 export interface AgentDatabaseSupervisorOptions {
-  /** Injected: how a host is started differs between the packaged app and a test. */
   spawnHost: () => AgentDatabaseHostProcess;
-  /** Input, not a wait: a test sets it low to reach the kill path without sleeping. */
   statementDeadlineMs?: number;
-  /** Input, not a wait: a test sets it low to reach a host that never reports ready. */
   hostStartDeadlineMs?: number;
   queueWaitMs?: number;
-  /**
-   * Reports how long the host took to answer one statement, or to be ended for it. The time starts
-   * when the statement is sent, which is never before the host reported ready.
-   */
+  hostStartRetryDelayMs?: number;
+  onHostStartFailed?: (failure: AgentDatabaseHostStartFailure) => void;
   onStatementSettled?: (durationMs: number) => void;
 }
 
-/** The answer to one statement. A failure is a value, never a rejection: every one of these is a
- * sentence the calling agent is meant to read and act on, not an exception for the app. */
+export interface AgentDatabaseHostStartFailure {
+  reason: string;
+  output: string;
+  consecutiveFailures: number;
+  retryAfterMs: number;
+}
+
 export type AgentDatabaseOutcome =
   | { ok: true; result: AgentDatabaseRows }
   | { ok: false; failure: AgentDatabaseFailure };
@@ -39,57 +39,36 @@ interface PendingRequest {
 const STOPPED_MESSAGE =
   "That statement ran longer than allowed and was stopped. Nothing it was writing was saved. Narrow the query, add an index, or work in smaller batches.";
 
-/**
- * A write can commit in the host before its reply reaches this process, so a write that passes the
- * deadline may be saved. Saying it was not saved made agents write the same rows again (#6311).
- */
 const WRITE_STOPPED_MESSAGE =
   "That statement ran longer than allowed and was stopped. It may have been saved before it stopped: read the rows it writes before you run it again. Narrow the query, add an index, or work in smaller batches.";
 
 const EXITED_MESSAGE = "The database process stopped unexpectedly. Try the call again.";
 
-/** No statement was sent, so the statement itself is not the cause and the caller must not change it. */
 const NOT_STARTED_MESSAGE = "The database process did not start. Nothing was run. Try the call again.";
 
-/**
- * Owns the one database host and the statement deadline.
- *
- * Knows nothing about agents, names, or tools: it takes an already-resolved request and answers with
- * rows or a failure. One statement is outstanding at a time and the rest wait in a queue here. That
- * single decision is what makes the deadline a true statement deadline rather than queue wait plus
- * execution, makes "which request was running when we ended the host" unambiguous, and makes two
- * agents writing the same database two entries in one queue rather than a locking design.
- *
- * The deadline exists because a runaway statement cannot be interrupted from inside: `sqlite3_step`
- * never returns to JavaScript, so a worker thread's `terminate()` never resolves. Ending the process
- * is the only mechanism that works, which is why the host is a process at all.
- *
- * A new host gets its own start deadline instead, and no statement is sent until the host reports
- * ready. Process start and module load take seconds on a slow computer; counted against the first
- * statement, they ended that statement as a runaway one and reported the start as database time.
- * A host that does not report ready in time, or exits first, fails the requests that waited for it
- * and is discarded. The next request starts a new host, so a host that cannot start is not
- * restarted in a loop.
- */
+const UNAVAILABLE_MESSAGE =
+  "The database process could not start, so shared tables are not available now. Nothing was run. Do not retry now: keep these records in a file in your workspace, and try shared tables again later.";
+
 export class AgentDatabaseSupervisor {
   readonly #spawnHost: () => AgentDatabaseHostProcess;
   readonly #statementDeadlineMs: number;
   readonly #hostStartDeadlineMs: number;
   readonly #queueWaitMs: number;
   readonly #onStatementSettled: ((durationMs: number) => void) | undefined;
+  readonly #hostStartRetryDelayMs: number;
+  readonly #onHostStartFailed: ((failure: AgentDatabaseHostStartFailure) => void) | undefined;
   readonly #queue: PendingRequest[] = [];
 
   #host: AgentDatabaseHostProcess | null = null;
-  /** False from the start of a host until its ready message. Nothing is sent to it before. */
   #hostReady = false;
   #inFlight: PendingRequest | null = null;
   #sentAt = 0;
-  /** The start deadline while the host starts, then the statement deadline while one runs. */
   #deadline: NodeJS.Timeout | null = null;
-  /** Bumped whenever a host is discarded, so a late message from it is dropped rather than matched. */
   #generation = 0;
   #nextId = 1;
   #disposed = false;
+  #startFailures = 0;
+  #retryNotBefore = 0;
 
   constructor(options: AgentDatabaseSupervisorOptions) {
     this.#spawnHost = options.spawnHost;
@@ -97,6 +76,8 @@ export class AgentDatabaseSupervisor {
     this.#hostStartDeadlineMs = options.hostStartDeadlineMs ?? AGENT_DATABASE_LIMITS.hostStartDeadlineMs;
     this.#queueWaitMs = options.queueWaitMs ?? AGENT_DATABASE_LIMITS.queueWaitMs;
     this.#onStatementSettled = options.onStatementSettled;
+    this.#hostStartRetryDelayMs = options.hostStartRetryDelayMs ?? AGENT_DATABASE_LIMITS.hostStartRetryDelayMs;
+    this.#onHostStartFailed = options.onHostStartFailed;
   }
 
   send(request: AgentDatabaseRequestInput): Effect.Effect<AgentDatabaseOutcome> {
@@ -114,8 +95,6 @@ export class AgentDatabaseSupervisor {
       };
       this.#queue.push(entry);
       this.#pump();
-      // Cancellation removes queued work only. An executing write keeps its original deadline;
-      // dropping its reply must not replay it or terminate another caller's statement.
       return Effect.sync(() => {
         const index = this.#queue.indexOf(entry);
         if (index !== -1) this.#queue.splice(index, 1);
@@ -123,12 +102,8 @@ export class AgentDatabaseSupervisor {
     });
   }
 
-  /**
-   * Starts the host before the first statement needs it, so that statement does not wait for the
-   * start. Does nothing when a host exists. A start that fails here fails no request.
-   */
   prewarm(): void {
-    if (this.#disposed) return;
+    if (this.#disposed || this.#waitingToRetry()) return;
     this.#ensureHost();
   }
 
@@ -147,8 +122,11 @@ export class AgentDatabaseSupervisor {
 
   #pump(): void {
     if (this.#inFlight || this.#disposed || this.#queue.length === 0) return;
+    if (this.#waitingToRetry()) {
+      for (const entry of this.#queue.splice(0)) entry.settle(failed("internal", UNAVAILABLE_MESSAGE));
+      return;
+    }
     const host = this.#ensureHost();
-    // `#hostReady` pumps again when the ready message comes.
     if (!this.#hostReady) return;
     const next = this.#queue.shift();
     if (!next) return;
@@ -173,10 +151,13 @@ export class AgentDatabaseSupervisor {
     const host = this.#spawnHost();
     const generation = this.#generation;
     host.onMessage((message) => this.#message(message, generation));
-    host.onExit(() => this.#exited(generation));
+    host.onExit((code) => this.#exited(generation, code));
     this.#host = host;
     this.#hostReady = false;
-    this.#deadline = setTimeout(() => this.#abandonStart(generation), this.#hostStartDeadlineMs);
+    this.#deadline = setTimeout(
+      () => this.#abandonStart(generation, `did not report ready in ${this.#hostStartDeadlineMs} ms`),
+      this.#hostStartDeadlineMs,
+    );
     this.#deadline.unref();
     return host;
   }
@@ -190,12 +171,14 @@ export class AgentDatabaseSupervisor {
     if (generation !== this.#generation || this.#hostReady) return;
     this.#clearDeadline();
     this.#hostReady = true;
+    this.#startFailures = 0;
+    this.#retryNotBefore = 0;
     this.#pump();
   }
 
-  #exited(generation: number): void {
+  #exited(generation: number, code: number | null): void {
     if (this.#hostReady) this.#discardHost(generation, EXITED_MESSAGE);
-    else this.#abandonStart(generation);
+    else this.#abandonStart(generation, `exited with code ${code ?? "unknown"} before it reported ready`);
   }
 
   #receive(response: { id: number } & AgentDatabaseOutcome, generation: number): void {
@@ -209,10 +192,6 @@ export class AgentDatabaseSupervisor {
     this.#pump();
   }
 
-  /**
-   * The statement that was running is failed and its host is ended. Everything still queued was
-   * never handed to that host, so it is dispatched to a fresh one rather than made collateral.
-   */
   #discardHost(generation: number, message: string): void {
     if (generation !== this.#generation || this.#disposed) return;
     this.#endHost();
@@ -226,17 +205,27 @@ export class AgentDatabaseSupervisor {
     this.#pump();
   }
 
-  /**
-   * The host did not report ready in time, or exited first. No statement was sent to it, so every
-   * waiting request fails with that reason and none starts another host here: a host that cannot
-   * start would otherwise be started again at once, without end.
-   */
-  #abandonStart(generation: number): void {
+  #abandonStart(generation: number, reason: string): void {
     if (generation !== this.#generation || this.#disposed) return;
+    const output = this.#host?.recentOutput?.() ?? "";
     this.#endHost();
-    // Emptied before the callers hear, so a caller that sends again starts one new host for it.
+    this.#startFailures += 1;
+    const retryAfterMs =
+      this.#startFailures < 2
+        ? 0
+        : Math.min(
+            this.#hostStartRetryDelayMs * 2 ** (this.#startFailures - 2),
+            AGENT_DATABASE_LIMITS.maxHostStartRetryDelayMs,
+          );
+    this.#retryNotBefore = Date.now() + retryAfterMs;
+    this.#onHostStartFailed?.({ reason, output, consecutiveFailures: this.#startFailures, retryAfterMs });
+    const message = retryAfterMs === 0 ? NOT_STARTED_MESSAGE : UNAVAILABLE_MESSAGE;
     const waiting = this.#queue.splice(0);
-    for (const entry of waiting) entry.settle(failed("internal", NOT_STARTED_MESSAGE));
+    for (const entry of waiting) entry.settle(failed("internal", message));
+  }
+
+  #waitingToRetry(): boolean {
+    return this.#host === null && Date.now() < this.#retryNotBefore;
   }
 
   #endHost(): void {

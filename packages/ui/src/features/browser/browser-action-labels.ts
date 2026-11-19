@@ -29,7 +29,6 @@ export const BROWSER_ACTION_LABELS = {
   "close-tab": "browser.action.closeTab",
 } as const satisfies Record<BrowserControlAction | BrowserControlDetailAction, AppTextKey>;
 
-/** The text key of the step that a browser control session does now. */
 export function browserActionLabel(session: Pick<BrowserControlSession, "action" | "detailAction">): AppTextKey {
   return BROWSER_ACTION_LABELS[session.detailAction ?? session.action];
 }

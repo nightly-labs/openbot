@@ -10,6 +10,7 @@ export const messages = {
   "mobile.share.content": "À partager",
   "mobile.share.footer":
     "La discussion s’ouvre avec ce contenu dans le champ de message. Rien n’est envoyé tant que vous ne l’envoyez pas.",
+  "mobile.share.sendFooter": "OpenBot envoie ceci à l’agent, puis ouvre la discussion.",
   "mobile.share.lastUsed": "Utilisé en dernier",
   "mobile.share.noAgents": "Aucun agent",
   "mobile.share.chooseAgent": "Choisissez un agent",

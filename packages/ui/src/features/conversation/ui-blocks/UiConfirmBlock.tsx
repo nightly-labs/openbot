@@ -1,5 +1,13 @@
-import type { UiAction, UiActionStyle, UiConfirmBlock as UiConfirmSpec } from "@openbot/contracts/ui-blocks";
-import { Button, NativeSelect } from "@openbot/ui";
+import {
+  UI_BLOCK_LIMITS,
+  UI_CONFIRM_EDIT_ACTION_ID,
+  type UiAction,
+  type UiActionStyle,
+  type UiBlockResponse,
+  type UiConfirmBlock as UiConfirmSpec,
+  uiConfirmPreviewEditable,
+} from "@openbot/contracts/ui-blocks";
+import { Button, NativeSelect, Textarea } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, flush, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
@@ -8,7 +16,6 @@ import { UiBlockCard } from "./UiBlockCard";
 import { UiHoldButton } from "./UiHoldButton";
 import { sendUiBlockResponse, type UiBlockProps, uiBlockState } from "./ui-block-support";
 
-/** How long a held button is held when the block is dangerous and gives no time. */
 const DEFAULT_HOLD_MS = 800;
 
 const BUTTON_VARIANT = {
@@ -18,21 +25,16 @@ const BUTTON_VARIANT = {
   danger: "destructive",
 } as const satisfies Record<UiActionStyle, "default" | "secondary" | "ghost" | "destructive">;
 
-export interface UiConfirmBlockProps extends UiBlockProps<UiConfirmSpec> {
-  /** Draws `spec.preview` as safe Markdown. Without it the preview is plain text. */
+export interface UiConfirmBlockProps extends Omit<UiBlockProps<UiConfirmSpec>, "onRespond"> {
+  onRespond: (response: UiBlockResponse, preview?: string) => void;
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
+  canEditPreview?: boolean | undefined;
 }
 
 function actionStyle(action: UiAction): UiActionStyle {
   return action.style ?? "secondary";
 }
 
-/**
- * A long draft stops at a fixed height and fades out. It does not scroll, so the chat is the only
- * part that scrolls. A button under it opens the rest in the card. The button and the fade are there
- * only when the text is cut off. Whether it is is a measurement, made again when the text or the
- * width changes. A draft that is not cut off keeps its sideways scroll and its keyboard focus.
- */
 function UiConfirmPreview(props: { children: JSX.Element }) {
   const { t } = useText();
   const previewId = createUniqueId();
@@ -40,21 +42,17 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
   const [clamped, setClamped] = createSignal(false);
   let preview: HTMLElement | undefined;
 
-  // An open preview shows everything, so it cannot say whether the closed one cuts anything off.
   function measure(): void {
     if (!preview || expanded()) return;
     setClamped(preview.scrollHeight > preview.clientHeight);
   }
 
-  // A text that fits after the card got wider while open keeps the box height on close, so no
-  // resize says that nothing is cut off any more.
   function toggle(): void {
     setExpanded((open) => !open);
     flush();
     measure();
   }
 
-  // A link that the box hides can get keyboard focus. The box then opens, so the focus stays in sight.
   function revealFocus(event: FocusEvent): void {
     if (!preview || expanded() || !clamped() || !(event.target instanceof Element)) return;
     if (event.target.getBoundingClientRect().bottom > preview.getBoundingClientRect().bottom) toggle();
@@ -64,7 +62,6 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
     if (!preview || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(preview);
-    // The box stops growing at its limit, so a change in the text shows only on the content.
     for (const child of preview.children) observer.observe(child);
     return () => observer.disconnect();
   });
@@ -100,7 +97,6 @@ function UiConfirmPreview(props: { children: JSX.Element }) {
   );
 }
 
-/** A countdown of a minute or more, as m:ss or h:mm:ss. */
 function countdownClock(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -119,7 +115,6 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const isHeld = (action: UiAction) =>
     actionStyle(action) === "danger" || (holdsPrimary() && actionStyle(action) === "primary");
   const anyHeld = () => props.spec.actions.some(isHeld);
-  // The host answers the block itself at `autoAnswer.at`. Its button counts down to that time.
   const autoAnswer = () => state().autoAnswer;
   const [now, setNow] = createSignal(Date.now());
   createEffect(
@@ -138,7 +133,6 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const actionLabel = (action: UiAction) => {
     const left = secondsLeft();
     if (autoAnswer()?.actionId !== action.id || left <= 0) return action.label;
-    // The wait can be minutes or hours long.
     return left < 60
       ? t("uiBlock.confirm.autoActionLabel", { action: action.label, seconds: left })
       : t("uiBlock.confirm.autoActionClock", { action: action.label, time: countdownClock(left) });
@@ -149,8 +143,13 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       : state().outcome;
 
   const [selected, setSelected] = createSignal<Record<string, string>>({});
-  // A `confirm: true` action, or a held action that was clicked instead of held. The card asks for it
-  // again before it acts.
+  const [draft, setDraft] = createSignal<string>();
+  const [sentDraft, setSentDraft] = createSignal<string>();
+  const editing = () => !frozen() && draft() !== undefined;
+  const blankDraft = () => editing() && !draft()?.trim();
+  let editor: HTMLTextAreaElement | undefined;
+  const opensEditor = (action: UiAction) =>
+    action.id === UI_CONFIRM_EDIT_ACTION_ID && props.canEditPreview === true && uiConfirmPreviewEditable(props.spec);
   const [confirming, setConfirming] = createSignal<UiAction>();
   const actionButtons = new Map<string, HTMLButtonElement>();
   let confirmButton: HTMLButtonElement | undefined;
@@ -173,36 +172,45 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       ? String(state().response?.values?.[select])
       : (selected()[select] ?? options[0] ?? "");
 
+  function startEditing(): void {
+    setDraft(props.spec.preview);
+    flush();
+    editor?.focus();
+  }
+
   function respond(action: UiAction): void {
-    if (locked()) return;
+    if (locked() || blankDraft()) return;
     setConfirming(undefined);
+    if (opensEditor(action)) {
+      startEditing();
+      return;
+    }
     const values: Record<string, string> = {};
     for (const field of props.spec.fields ?? []) {
       if ("select" in field) values[field.select] = selected()[field.select] ?? field.options[0] ?? "";
     }
+    const edited = draft();
     sendUiBlockResponse(
       props.spec,
       { actionId: action.id, ...(Object.keys(values).length > 0 ? { values } : {}) },
-      props.onRespond,
+      (response) => {
+        setSentDraft(edited);
+        props.onRespond(response, edited);
+      },
     );
   }
 
-  /**
-   * The footer buttons. An agent lists the main action first; the footer shows it last, at the end of
-   * the row, as the main button of a question. The step that asks again shows its own buttons, so the
-   * footer has none then.
-   */
   function actionButtonsOrNone(): JSX.Element | undefined {
     if (confirming()) return undefined;
     return (
-      <For each={props.spec.actions.toReversed()}>
+      <For each={props.spec.actions.filter((action) => !(editing() && opensEditor(action))).toReversed()}>
         {(action) => (
           <Switch>
             <Match when={isHeld(action)}>
               <UiHoldButton
                 holdMs={holdMs()}
                 variant={BUTTON_VARIANT[actionStyle(action)]}
-                disabled={locked()}
+                disabled={locked() || blankDraft()}
                 describedBy={hintId}
                 ref={(element) => actionButtons.set(action.id, element)}
                 onComplete={() => respond(action)}
@@ -216,7 +224,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
                 type="button"
                 size="sm"
                 variant={BUTTON_VARIANT[actionStyle(action)]}
-                disabled={locked()}
+                disabled={locked() || blankDraft()}
                 ref={(element: HTMLButtonElement) => {
                   actionButtons.set(action.id, element);
                 }}
@@ -241,7 +249,6 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       busy={props.busy}
       waiting={props.disabled !== true}
       error={props.error}
-      // The step that asks again has its own Cancel, so it has no Skip.
       onSkip={props.disabled || autoAnswer() || confirming() ? undefined : props.onSkip}
       actions={actionButtonsOrNone()}
       elementRef={props.elementRef}
@@ -274,14 +281,31 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
           </For>
         </dl>
       </Show>
-      <Show when={props.spec.preview}>
-        {(preview) => (
-          <UiConfirmPreview>
-            <Show when={props.renderPreview} fallback={<p class="ui-block-preview-text">{preview()}</p>}>
-              {(render) => render()(preview())}
-            </Show>
-          </UiConfirmPreview>
-        )}
+      <Show
+        when={editing()}
+        fallback={
+          <Show when={(state().status === "answered" ? sentDraft() : undefined) ?? props.spec.preview}>
+            {(preview) => (
+              <UiConfirmPreview>
+                <Show when={props.renderPreview} fallback={<p class="ui-block-preview-text">{preview()}</p>}>
+                  {(render) => render()(preview())}
+                </Show>
+              </UiConfirmPreview>
+            )}
+          </Show>
+        }
+      >
+        <Textarea
+          ref={(element: HTMLTextAreaElement) => {
+            editor = element;
+          }}
+          rows={8}
+          value={draft() ?? ""}
+          maxlength={UI_BLOCK_LIMITS.preview}
+          aria-label={t("uiBlock.confirm.previewLabel")}
+          disabled={locked()}
+          onValueChange={(value) => setDraft(value)}
+        />
       </Show>
       <Show when={!frozen() && confirming()}>
         {(action) => (

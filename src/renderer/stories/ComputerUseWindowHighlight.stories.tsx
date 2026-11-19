@@ -4,11 +4,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { ComputerUseAgentCursor } from "../src/features/computer-use/ComputerUseAgentCursor";
 import { ComputerUseWindowHighlight } from "../src/features/computer-use/ComputerUseWindowHighlight";
 
-/**
- * A stand-in for the application window under the tint. The real one is another program's window
- * on the desktop, which a story cannot hold, so this draws the parts the tint has to stay readable
- * over: a title bar, text, and a field.
- */
 function MockWindow(props: { children?: JSX.Element; dark?: boolean; title?: string }) {
   return (
     <div class="highlight-story-desktop">
@@ -42,7 +37,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The window the agent holds: one even rim the whole way round, and nothing that moves. */
 export const Highlighted: Story = {
   render: () => (
     <main class="foundation-story">
@@ -53,7 +47,6 @@ export const Highlighted: Story = {
   ),
 };
 
-/** The window under it is what sets the radius, which a square-cornered window proves. */
 export const SquareWindow: Story = {
   render: () => (
     <main class="foundation-story">
@@ -66,7 +59,6 @@ export const SquareWindow: Story = {
   ),
 };
 
-/** Most windows an agent drives are dark, where the same rim has to read without glaring. */
 export const DarkWindow: Story = {
   render: () => (
     <main class="foundation-story">
@@ -77,10 +69,6 @@ export const DarkWindow: Story = {
   ),
 };
 
-/**
- * The cursor OpenBot draws itself, which it does on every desktop of more than one display. The
- * story places it over the field, where an agent that types there would have clicked first.
- */
 export const WithAgentCursor: Story = {
   render: () => (
     <main class="foundation-story">
@@ -92,7 +80,6 @@ export const WithAgentCursor: Story = {
   ),
 };
 
-/** Points an agent might click in the mock window: the title, the field, and the text. */
 const CURSOR_STOPS = [
   { x: 64, y: 150 },
   { x: 300, y: 14 },
@@ -100,7 +87,6 @@ const CURSOR_STOPS = [
   { x: 360, y: 160 },
 ];
 
-/** Moves the cursor to the next stop every 1.5 seconds, so the motion can be judged. */
 function TravellingCursor() {
   const [stop, setStop] = createSignal(0);
   onSettled(() => {
@@ -111,11 +97,6 @@ function TravellingCursor() {
   return <ComputerUseAgentCursor x={point().x} y={point().y} />;
 }
 
-/**
- * The cursor travelling between clicks with the driver's `adaptive` motion: a Fitts min-jerk glide
- * at this distance. A move longer than 900 pixels swoops instead, which a story this size cannot
- * show. With reduced motion on, the cursor jumps.
- */
 export const AgentCursorMoving: Story = {
   render: () => (
     <main class="foundation-story">
@@ -127,7 +108,6 @@ export const AgentCursorMoving: Story = {
   ),
 };
 
-/** The same cursor on a dark window, where the white outline is what keeps the dart readable. */
 export const AgentCursorOnDark: Story = {
   render: () => (
     <main class="foundation-story">
@@ -139,12 +119,6 @@ export const AgentCursorOnDark: Story = {
   ),
 };
 
-/**
- * A window in front of the one the agent works in, which the rim gives way to.
- *
- * The overlay floats over the whole desktop, so without this the rim would be drawn over the window
- * in front and read as a rim around that one. The story covers the lower right corner.
- */
 export const CoveredByAnotherWindow: Story = {
   render: () => (
     <main class="foundation-story">
@@ -161,7 +135,6 @@ export const CoveredByAnotherWindow: Story = {
   ),
 };
 
-/** Side by side, which is the only way to judge whether the rim is light enough. */
 export const WithAndWithout: Story = {
   render: () => (
     <main class="foundation-story foundation-story-row">

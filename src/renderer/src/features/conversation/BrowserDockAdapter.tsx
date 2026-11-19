@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import {
   BROWSER_DOCK_LIMITS,
   type BrowserDockAction,
@@ -9,6 +9,7 @@ import {
   type BrowserDockSkill,
   type BrowserTab,
   isBrowserDockIsland,
+  routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "@openbot/ui/data";
@@ -23,15 +24,6 @@ import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
-/**
- * The dock over the page of `tab`: the island, the queue and the composer of the agent that owns the tab.
- * It uses the draft, the queue and the turn of the conversation, so a message typed here is the same message
- * as in the chat.
- *
- * With `overlay`, the page is a native view above this window, so the dock here is under it. The adapter
- * then publishes the dock to the overlay view above the page and does the actions that it sends back.
- * This dock shows again when main hides the overlay.
- */
 export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; overlay: boolean }) {
   const {
     props,
@@ -60,10 +52,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   const working = () => Boolean(props.activeTurnId) || control()?.phase === "acting";
   const [handoffPending, setHandoffPending] = createSignal(false);
   const [dismissedReplies, setDismissedReplies] = createSignal<ReadonlySet<string>>(new Set());
-  /**
-   * Only an answer that arrives while the page is open shows on it. For each agent, this is the last message
-   * when its chat had loaded in this view; the reply of an agent whose chat is still loading does not show.
-   */
   const [openedAfter, setOpenedAfter] = createSignal<ReadonlyMap<string, string | null>>(new Map());
   createEffect(
     () => ({ agentId: props.agent?.id, loaded: props.loaded }),
@@ -78,16 +66,8 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     const request = props.browserTakeover;
     return request && request.tabId === adapterProps.tab?.id ? request : undefined;
   };
-  /**
-   * The cards that the user answered. A card goes from the dock at once, and the dock shows the agent's work.
-   * When the answer fails, the card shows again as a new `attempt`.
-   */
   const [answered, setAnswered] = createSignal<ReadonlySet<string>>(new Set());
   const [attempt, setAttempt] = createSignal(0);
-  /**
-   * One open question with no choices is answered from the field. Other questions show as a card over the
-   * page. A secret answer, a card of the agent's own design, and a card that main would refuse need the chat.
-   */
   const question = createMemo(() => {
     const prompt = props.prompt;
     if (!prompt || prompt.agentId !== props.agent?.id || prompt.questions.length === 0) return undefined;
@@ -157,7 +137,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     return answer ? { kind: "reply", id: answer.id, body: answer.body } : null;
   });
 
-  /** The user takes the page from the agent, or gives it back. A request of the agent ends when the user is done. */
   const handoffAction = (): (() => Promise<void>) | undefined => {
     const tab = adapterProps.tab;
     const content = island();
@@ -169,6 +148,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   };
 
   const deliveries = presentedQueueDeliveries;
+  const canSteer = () => Boolean(props.activeTurnId) && !routineRunsTurn(props.queue?.deliveries, props.activeTurnId);
   const hold = () => {
     const current = props.queue?.hold;
     return current && current.agentId !== props.agent?.id ? current : null;
@@ -195,7 +175,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     if (asked?.first && !editingDeliveryId()) {
       const answer = text.trim();
       if (!answer) return;
-      // The user can select the tab of another agent before the answer arrives: clear the draft of this one.
       const target = currentTarget();
       const draft = currentDraft();
       const prompt = asked.prompt;
@@ -209,7 +188,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     void submitComposer();
   }
 
-  /** Answers the card on the page. An answer for a card that has gone does nothing. */
   async function answerPrompt(requestId: string | number, answers: Record<string, string[]>): Promise<boolean> {
     const asked = question();
     if (asked?.card?.kind !== "prompt" || String(asked.prompt.requestId) !== String(requestId)) return false;
@@ -224,15 +202,10 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     if (current?.kind !== "approval" || String(current.approval.requestId) !== String(requestId)) return false;
     const key = approvalCardKey(current.approval);
     const done = await sendAnswer(key, () => props.onRespondToApproval(decision));
-    // The approval has gone from the turns, and the agent can use its request id again.
     if (done) forgetAnswered(key);
     return done;
   }
 
-  /**
-   * The chat shows the answer of its own card, then marks the prompt as done. The dock card has gone, so it
-   * marks it at once: the chat must not show the card again.
-   */
   function presentResolution(prompt: NonNullable<typeof props.prompt>) {
     props.onPromptResolutionPresented?.(prompt.agentId, prompt.turnId, prompt.requestId);
   }
@@ -245,7 +218,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     });
   }
 
-  /** Removes the card while its answer goes to the agent, and shows it again when the answer fails. */
   async function sendAnswer(key: string, respond: () => Promise<boolean>): Promise<boolean> {
     setAnswered((keys) => new Set(keys).add(key));
     let done = false;
@@ -260,7 +232,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     }
   }
 
-  /** The overlay's field: a revision changes only for a draft that did not come from the overlay. */
   let overlayText: string | undefined;
   let draftText = untrack(() => currentDraft().text);
   let draftRevision = 0;
@@ -273,11 +244,13 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
       if (text !== overlayText) draftRevision += 1;
       overlayText = undefined;
     }
-    // The stores hold proxies, which IPC cannot copy.
     return snapshot({
       agent: dockAgent(agent),
       agents: props.agents.map(dockAgent),
-      skills: installedSkills().slice(0, BROWSER_DOCK_LIMITS.skills).map(dockSkill),
+      skills: installedSkills()
+        .filter((skill) => skill.problem === undefined)
+        .slice(0, BROWSER_DOCK_LIMITS.skills)
+        .map(dockSkill),
       mcpServers: mcpServers().map(dockMcpServer),
       draft: { text, revision: draftRevision },
       focusRequest: composerFocusRequest(),
@@ -286,18 +259,16 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
       deliveries: deliveries().slice(0, BROWSER_DOCK_LIMITS.deliveries),
       hold: hold(),
       editingDeliveryId: editingDeliveryId() ?? null,
-      canSteer: Boolean(props.activeTurnId),
-      steerSupported: providerSteersTurns(agent.provider),
+      canSteer: canSteer(),
+      steerSupported: agentSteersTurns(agent, props.modelOptions),
       canRunAsTask: Boolean(props.threads?.onRunQueuedMessage),
       island: dockIsland(island()),
       handoffPending: handoffPending(),
       canHandoff: Boolean(onHandoff()),
     });
   });
-  /** Main shows the overlay above the page. */
   const [overlayShown, setOverlayShown] = createSignal(false);
 
-  // A failed publish keeps the overlay as it was; main hides it when the page goes.
   const publish = (value: BrowserDockPresentation | null) =>
     void conversationPort()
       .browserDock.publishPresentation(value)
@@ -365,7 +336,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     }
   }
 
-  // Only the desktop app has the overlay; the web client has no `window.openbot`.
   createEffect(
     () => adapterProps.overlay,
     (overlay) => {
@@ -384,8 +354,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   return (
     <Show when={!overlayShown() && props.agent}>
       {(agent) => {
-        // Main hides the overlay while a menu covers the page, and this dock shows in its place. A
-        // focus request from before it showed is not for it: it would take the focus from the menu.
         const shownAt = untrack(composerFocusRequest);
         return (
           <BrowserDock
@@ -400,13 +368,13 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
             deliveries={deliveries()}
             hold={hold()}
             editingDeliveryId={editingDeliveryId()}
-            canSteer={Boolean(props.activeTurnId)}
+            canSteer={canSteer()}
             island={island()}
             handoffPending={handoffPending()}
             onValueChange={(text) => updateCurrentDraft({ text })}
             onSend={send}
             onStop={props.onStop}
-            onSteer={providerSteersTurns(agent().provider) ? props.onSteerQueuedMessage : undefined}
+            onSteer={agentSteersTurns(agent(), props.modelOptions) ? props.onSteerQueuedMessage : undefined}
             onRunAsTask={props.threads?.onRunQueuedMessage}
             onCancel={props.onCancelQueuedMessage}
             onEdit={(delivery) => void editQueuedMessage(delivery)}
@@ -428,7 +396,6 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   );
 }
 
-/** The request ids count per agent process, so the key also has the agent and the turn. */
 function promptCardKey(prompt: { agentId: string; turnId: string; requestId: string | number }): string {
   return JSON.stringify(["prompt", prompt.agentId, prompt.turnId, String(prompt.requestId)]);
 }
@@ -437,7 +404,6 @@ function approvalCardKey(approval: { agentId: string; requestId: string | number
   return JSON.stringify(["approval", approval.agentId, String(approval.requestId)]);
 }
 
-/** Main refuses a whole presentation with a field over its limit, so a long step or reply is cut here. */
 function dockIsland(island: BrowserDockIsland | null): BrowserDockIsland | null {
   if (island?.kind === "activity" && island.control === "agent")
     return { ...island, label: island.label.slice(0, BROWSER_DOCK_LIMITS.label) };
@@ -469,7 +435,6 @@ function dockSkill(skill: ComposerSkill): BrowserDockSkill {
   };
 }
 
-/** Never the environment or the headers: they can hold secrets. */
 function dockMcpServer(server: ComposerMcpServer): BrowserDockMcpServer {
   return {
     id: server.id,

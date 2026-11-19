@@ -10,10 +10,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * The person who uses this computer. The owner's desktop app has no member ID before the host first
- * runs, so the owner's pins have this key, and the owner's phones read the same pins.
- */
 export const OWNER_PIN_KEY = "owner";
 
 interface MemberPins {
@@ -21,13 +17,6 @@ interface MemberPins {
   updatedAt: string;
 }
 
-/**
- * The chats that each person pinned on this server, in their order (`sidebar-pins-v1`): the owner of
- * this computer, and each member by member ID. Each device of that person shows this list.
- *
- * A file that is missing or unreadable as JSON reads as no pins, and an entry that is not a pin is left
- * out. Writes are chained for the reason `update-preference-store.ts` chains its own.
- */
 export class SidebarPinStore {
   readonly #path: string;
   #members: Readonly<Record<string, MemberPins>> = {};
@@ -48,13 +37,11 @@ export class SidebarPinStore {
     });
   }
 
-  /** Calls `listener` with the key of a person after each saved change of their pins. */
   subscribe(listener: (key: string) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
 
-  /** The pins of one person, without the agents in `hidden`, which that person cannot see. */
   snapshot(key: string, hidden: ReadonlySet<string> = new Set()): SidebarPinsSnapshot {
     const member = this.#members[key];
     return {
@@ -65,7 +52,6 @@ export class SidebarPinStore {
     };
   }
 
-  /** Replaces the pins of one person. The agents in `hidden` keep the pins that the person cannot see. */
   readonly set = Effect.fn("SidebarPins.set")(function* (
     this: SidebarPinStore,
     key: string,
@@ -76,7 +62,6 @@ export class SidebarPinStore {
     return this.snapshot(key, hidden);
   });
 
-  /** Saves the pins of one person only when that person has no saved list yet. */
   readonly seed = Effect.fn("SidebarPins.seed")(function* (
     this: SidebarPinStore,
     key: string,
@@ -87,7 +72,6 @@ export class SidebarPinStore {
     return this.snapshot(key, hidden);
   });
 
-  /** A removed member keeps no pins on this computer. */
   readonly removeMember = Effect.fn("SidebarPins.removeMember")(function* (this: SidebarPinStore, key: string) {
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
@@ -100,11 +84,6 @@ export class SidebarPinStore {
     );
   });
 
-  /**
-   * Saves the list that `change` gives for one person, or nothing when it gives `null` or the same
-   * list. The change reads the pins inside the write permit, so a change that starts while another
-   * one is saved builds on its result.
-   */
   #update(
     key: string,
     change: (current: MemberPins | undefined) => readonly SidebarPin[] | null,
@@ -142,7 +121,6 @@ export class SidebarPinStore {
   }
 }
 
-/** `items` in their order, then the saved pins of the agents in `hidden`, each pin once. */
 function merged(
   current: MemberPins | undefined,
   items: readonly SidebarPin[],

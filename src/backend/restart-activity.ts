@@ -1,7 +1,5 @@
 import type { AgentEvent } from "@openbot/contracts/ipc";
 
-// One generation per application process. No content or identifiers are stored or exported.
-// Event sources advance it even when their work completes between host-status polls.
 let generation = 0;
 
 export function recordRestartActivity(): void {

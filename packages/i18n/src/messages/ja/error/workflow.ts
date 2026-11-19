@@ -17,9 +17,26 @@ export const messages = {
   "error.workflow.agentMissing": "このステップのエージェントを選択してください。",
   "error.workflow.handoffFailed": "OpenBot はこのステップをエージェントに送信できませんでした。",
   "error.workflow.agentStepEnded": "エージェントが回答する前に、このステップのメッセージが削除されました。",
+  "error.workflow.agentStepStopped":
+    "エージェントはこのステップに回答する前に停止しました。ステップをもう一度実行してください。",
   "error.workflow.conditionUnclear": "モデルが「はい」か「いいえ」で回答しませんでした。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
+  "error.workflow.modelTimedOut":
+    "モデルが時間内に回答しませんでした。このステップの推論レベルを下げるか、より速いモデルを選んでから、もう一度実行してください。",
+  "error.workflow.modelToolUse":
+    "モデルがツールを使おうとしましたが、このステップはテキストでしか回答できません。ステップをもう一度実行するか、別のモデルを選んでください。",
+  "error.workflow.modelUnavailable": "このステップのモデルは利用できません。このステップに別のモデルを選んでください。",
+  "error.workflow.providerBusy": "プロバイダーが混み合っています。数分待ってから、ステップをもう一度実行してください。",
+  "error.workflow.providerOffline":
+    "OpenBot がプロバイダーに接続できませんでした。インターネット接続を確認してから、ステップをもう一度実行してください。",
   "error.workflow.modelBusy": "別のモデルリクエストが実行中です。しばらくしてからステップを再実行してください。",
+  "error.workflow.mediaFailed": "モデルが画像または動画を作成できませんでした。ステップをもう一度実行してください。",
+  "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
+  "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
+  "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",
+  "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
+  "error.workflow.mediaInputNotImage":
+    "このステップは画像のみを受け取り、動画は受け取れません。動画からの接続を削除してください。",
   "error.workflow.stepMissing": "このステップはもう存在しません。",
   "error.workflow.nodeMissing": "この手順はワークフローにありません。",
   "error.workflow.runMissing": "この実行はもう存在しません。",
@@ -70,4 +87,24 @@ export const messages = {
   "error.workflow.githubUncertain":
     "変更が途中で止まりました。GitHub にすでに反映されている可能性があります。ステップを再実行する前に GitHub を確認してください。",
   "error.workflow.githubNoEvent": "このトリガーが開始する Issue またはプルリクエストが GitHub にありません。",
+  "error.workflow.sunraSignIn": "Sunra のモデルを使うには、アプリで Sunra にサインインしてください。",
+  "error.workflow.sunraNoCredits":
+    "Sunra アカウントのクレジットが足りません。sunra.ai/pricing でクレジットを追加してから、ステップをもう一度実行してください。",
+  "error.workflow.sunraNeedsPlan":
+    "この Sunra モデルには Sunra のプランが必要です。sunra.ai/pricing でプランを選ぶか、別のモデルを選んでください。",
+  "error.workflow.sunraTeamInputs":
+    "Sunra は個人アカウントでのみ入力画像を使います。Sunra で個人アカウントを選ぶか、画像の接続を外してください。",
+  "error.workflow.sunraFailed": "Sunra がファイルを作成できませんでした: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra が時間内にファイルを完成できませんでした。ステップをもう一度実行する前に、sunra.ai の OpenBot プロジェクトを確認してください。",
+  "error.workflow.higgsfieldSignIn": "Higgsfield のモデルを使うには、アプリで Higgsfield にサインインしてください。",
+  "error.workflow.higgsfieldNoCredits":
+    "Higgsfield アカウントのクレジットが足りません。higgsfield.ai/pricing でクレジットを追加してから、ステップをもう一度実行してください。",
+  "error.workflow.higgsfieldNeedsPlan":
+    "この Higgsfield モデルには Higgsfield のプランが必要です。higgsfield.ai/pricing でプランを選ぶか、別のモデルを選んでください。",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield のコンテンツチェックで止められたため、ファイルは作成されませんでした。プロンプトか入力画像を変更してから、ステップをもう一度実行してください。",
+  "error.workflow.higgsfieldFailed": "Higgsfield がファイルを作成できませんでした: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield が時間内にファイルを完成できませんでした。ステップをもう一度実行する前に、higgsfield.ai の履歴を確認してください。",
 } as const satisfies PartialTranslation<typeof source>;

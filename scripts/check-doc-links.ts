@@ -1,9 +1,3 @@
-// Fails when a Markdown link names a Markdown file in this repository that does not exist, or a
-// `#anchor` that the file does not have. It reads every tracked `*.md` file, and checks relative
-// links and same-file `#anchor` links. It does not check web links or links to other file types.
-//
-//   bun scripts/check-doc-links.ts
-
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, relative, resolve } from "node:path";
@@ -17,7 +11,6 @@ const INLINE_CODE = /(`+)[^`]*?\1/g;
 
 const logger = createOpenBotLogger("check-doc-links");
 
-/** The anchor GitHub gives a heading: lower case, no punctuation, a hyphen for each space. */
 function headingAnchor(heading: string): string {
   return heading
     .replace(/`([^`]*)`/g, "$1")
@@ -29,7 +22,6 @@ function headingAnchor(heading: string): string {
     .replaceAll(" ", "-");
 }
 
-/** The lines of `text`, with each line of a fenced code block left empty. */
 function linesOutsideFences(text: string): string[] {
   let fence: string | undefined;
   const lines: string[] = [];
@@ -52,7 +44,6 @@ function anchors(path: string): Set<string> {
   const found = new Set<string>();
   const seen = new Map<string, number>();
   const text = readFileSync(path, "utf8");
-  // A heading keeps its inline code: `headingAnchor` removes only the backticks, as GitHub does.
   for (const line of linesOutsideFences(text)) {
     const heading = HEADING.exec(line)?.[1];
     if (heading !== undefined) {
@@ -67,8 +58,6 @@ function anchors(path: string): Set<string> {
   return found;
 }
 
-// A vendored marketplace bundle is upstream text, kept unchanged, and links to upstream files that
-// the catalog does not copy; the catalog build checks the links of what it publishes.
 const VENDORED = "marketplace/production-catalog/bundles/";
 const files = execFileSync("git", ["ls-files", "*.md"], { cwd: ROOT, encoding: "utf8" })
   .split("\n")

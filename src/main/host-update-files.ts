@@ -62,7 +62,6 @@ export const verifyHostDirectory: (path: string, hostUid?: number) => Effect.Eff
     const parent = dirname(absolute);
     if (parent !== absolute) yield* verifyHostDirectory(parent, hostUid);
     const info = yield* fileCall(() => lstat(absolute));
-    // Tests use a private directory below the OS temporary directory. Production always uses UID 0.
     if (!info.isDirectory() || (info.uid !== 0 && info.uid !== hostUid) || (info.mode & 0o022) !== 0) {
       return yield* new HostProtocolFileError({
         cause: new Error("Host directory must have a trusted owner and no group or public write permission."),
@@ -84,7 +83,6 @@ export const readOwnedJson = Effect.fn("HostFiles.readOwnedJson")(function* <T>(
             cause: new Error("Invalid host protocol file ownership, type, permissions or size."),
           });
         }
-        // Bound the read even if the tenant grows its file after fstat.
         const buffer = Buffer.alloc(8193);
         const { bytesRead } = yield* fileCall(() => handle.read(buffer, 0, buffer.length, 0));
         if (bytesRead > 8192)
@@ -122,7 +120,6 @@ export const writeProtocolJson = Effect.fn("HostFiles.writeProtocolJson")(functi
           (parent) => fileCall(() => parent.close()),
         );
       }),
-    // A successful rename already removes this path. Other cleanup failures remain visible.
     (temporary) =>
       fileCall(() => unlink(temporary)).pipe(
         Effect.catch((failure) => (isMissingFileError(failure.cause) ? Effect.void : Effect.fail(failure))),
@@ -134,8 +131,6 @@ export const readHostConfig = Effect.fn("HostFiles.readConfig")(function* (
   hostUid = 0,
 ): Effect.fn.Return<HostManagerConfig | null, HostProtocolFileError> {
   return yield* Effect.gen(function* () {
-    // No host directory means no host manager, whatever its parents allow (#3802). The parent
-    // checks apply only to a host directory that exists.
     yield* fileCall(() => lstat(directory));
     yield* verifyHostDirectory(directory, hostUid);
     return yield* readOwnedJson(join(directory, "config.json"), hostUid, hostConfigSchema);
@@ -149,7 +144,6 @@ export const verifyTenantDirectory = Effect.fn("HostFiles.verifyTenantDirectory"
   yield* verifyHostDirectory(join(directory, "tenants"), hostUid);
   const path = join(directory, "tenants", String(uid));
   const info = yield* fileCall(() => lstat(path));
-  // The parent is root-owned, so a tenant cannot replace this directory with a symlink.
   if (!info.isDirectory() || info.uid !== uid || (info.mode & 0o077) !== 0) {
     return yield* new HostProtocolFileError({ cause: new Error("Invalid tenant status directory.") });
   }

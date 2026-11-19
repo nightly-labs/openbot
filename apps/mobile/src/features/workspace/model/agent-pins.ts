@@ -3,16 +3,22 @@ import type { createWorkspacePreferences, RemoteWorkspacePreferences } from "@op
 
 const MAX_PINNED_AGENTS = 16;
 
-export function canToggleAgentPin(pinned: readonly string[], agentId: string): boolean {
-  return pinned.includes(agentId) || pinned.length < MAX_PINNED_AGENTS;
+export function canToggleChatPin(
+  pinnedAgentIds: readonly string[],
+  pinnedChannelIds: readonly string[],
+  chatId: string,
+): boolean {
+  return (
+    pinnedAgentIds.includes(chatId) ||
+    pinnedChannelIds.includes(chatId) ||
+    pinnedAgentIds.length + pinnedChannelIds.length < MAX_PINNED_AGENTS
+  );
 }
 
-/** True when a server with `count` pinned chats takes one more pin. */
 export function canAddChatPin(count: number): boolean {
   return count < MAX_PINNED_AGENTS;
 }
 
-/** Call only with a complete server list, never a filtered or loading list. */
 export function reconcileAgentPins(
   store: ReturnType<typeof createWorkspacePreferences>,
   serverId: string,
@@ -55,11 +61,6 @@ export function setChannelHidden(
   };
 }
 
-/**
- * The pins of this phone as one list for the host (`sidebar-pins-v1`): the pins that are still in
- * `current`, in the order of the last list that the host gave, then the new agent and channel pins.
- * The desktop app mixes agents and channels in one order, and this keeps that order.
- */
 export function phoneSidebarPins(current: RemoteWorkspacePreferences): SidebarPin[] {
   const wanted = [
     ...current.pinned.map((id) => ({ kind: "agent" as const, id })),
@@ -81,11 +82,6 @@ function samePinList(left: readonly SidebarPin[], right: readonly SidebarPin[]):
   );
 }
 
-/**
- * True when the pins of this phone must go to the host: they differ from the last list that the host
- * gave, or they changed while a send waits. A change back to that list during a send must go too, or
- * the answer of the host puts the earlier change back.
- */
 export function sidebarPinsChanged(
   current: RemoteWorkspacePreferences,
   previous?: RemoteWorkspacePreferences,
@@ -98,7 +94,6 @@ export function sidebarPinsChanged(
   );
 }
 
-/** The preferences with the list that the host keeps for all devices of the user. */
 export function withHostSidebarPins(
   current: RemoteWorkspacePreferences,
   items: readonly SidebarPin[],
@@ -112,10 +107,6 @@ export function withHostSidebarPins(
   };
 }
 
-/**
- * The preferences with the pins of this phone in a new order, such as after a drag. With a host that
- * keeps the pins, `pinOrder` takes the new order too, so the next send carries it.
- */
 export function withPhoneSidebarPins(
   current: RemoteWorkspacePreferences,
   items: readonly SidebarPin[],

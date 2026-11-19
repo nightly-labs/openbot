@@ -4,6 +4,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentSummary,
   type AskSideQuestionInput,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
@@ -11,18 +12,15 @@ import {
 } from "@openbot/contracts/ipc";
 import { tagSafe } from "./developer-instructions";
 
-/** The chat messages a side question reads, newest last. */
 export const SIDE_QUESTION_CHAT_MESSAGES = 60;
 const MESSAGE_CHARACTERS = INPUT_LIMITS.sideQuestionEarlierText;
 const CHAT_CHARACTERS = 60_000;
 const EARLIER_CHARACTERS = 60_000;
 
-/** Compact JSON for a prompt block, with `<` escaped as `tagSafe` does. Indents only add tokens. */
 export function promptJson(value: unknown): string {
   return tagSafe(JSON.stringify(value));
 }
 
-/** A message that a person or the agent wrote in the chat, not a tool step or a status line. */
 function chatMessage(message: ConversationMessage): boolean {
   return (
     (message.author === "user" || message.author === "assistant" || message.author === "agent") &&
@@ -30,8 +28,8 @@ function chatMessage(message: ConversationMessage): boolean {
     message.itemType !== "commentary" &&
     message.itemType !== "question_prompt" &&
     message.itemType !== "agent_attachment" &&
-    // The user did not write a new agent's setup message, and does not see it.
     message.itemType !== AGENT_WELCOME_ITEM_TYPE &&
+    message.itemType !== CHANNEL_RESUME_ITEM_TYPE &&
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
@@ -39,7 +37,6 @@ function chatMessage(message: ConversationMessage): boolean {
   );
 }
 
-/** The chat messages that fit the budget, newest last, each with the name of its writer. */
 export function chatTranscript(
   agent: Pick<AgentSummary, "name">,
   messages: readonly ConversationMessage[],
@@ -62,7 +59,6 @@ export function chatTranscript(
   return entries.reverse();
 }
 
-/** The newest earlier side questions that fit the budget, oldest first. */
 function earlierTurns(input: AskSideQuestionInput) {
   const turns: AskSideQuestionInput["earlier"] = [];
   let characters = 0;
@@ -76,10 +72,6 @@ function earlierTurns(input: AskSideQuestionInput) {
   return turns.reverse();
 }
 
-/**
- * The prompt of a side question: the agent's profile, the end of its chat, the earlier side turns, and
- * the question. The generation has no tools, so the answer can only come from this text.
- */
 export function sideQuestionPrompt(
   agent: AgentSummary,
   messages: readonly ConversationMessage[],

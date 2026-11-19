@@ -74,6 +74,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type VaultAgentChoice, type VaultAgentScope, VaultAgentsButton } from "./VaultAgents";
 import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
 import {
   createDraftTwoStepCode,
@@ -87,31 +88,21 @@ import {
 
 export interface VaultPanelProps {
   state: VaultState;
-  /** False for a server that cannot keep API keys: the kind is not offered. */
   apiKeys: boolean;
-  /** Adds an item when `id` is null. A null secret keeps the saved value. */
   onSave: (input: VaultSaveInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  /** The saved password, card number, security code or API key, for the edit dialog. */
   onReveal: (request: VaultSecretRequest) => Promise<string>;
-  /** Puts the saved value on the clipboard. On desktop the value does not come to this window. */
   onCopy: (request: VaultSecretRequest) => Promise<void>;
-  /** Puts a username, an address or a two-step code on the clipboard. */
   onCopyText: (value: string) => Promise<void>;
-  /**
-   * The current two-step code of each login with a key. Absent for a server that cannot keep two-step
-   * keys: the dialog does not offer them.
-   */
   onCodes?: (() => Promise<VaultTwoStepCodes>) | undefined;
-  /** Opens the file dialog. Null when the user closes it. Absent for a host without CSV import. */
   onImportCsv?: (() => Promise<VaultImportResult>) | undefined;
-  /** Deletes the Vault file that cannot be read, and starts again with no items. */
   onReset: () => Promise<void>;
-  /** Where the menus open, so they stay inside the settings page. */
   menuMount?: HTMLElement | undefined;
-  /** The Link account of this computer, above the cards. Absent for a joined server. */
   link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
+  agents?: readonly VaultAgentChoice[] | undefined;
 }
+
+export type { VaultAgentChoice };
 
 type Filter = VaultItemKind | "all";
 
@@ -139,7 +130,6 @@ const NEW_TITLE = {
   apiKey: "vault.newApiKey",
 } as const satisfies Record<VaultItemKind, AppTextKey>;
 
-/** Brand names are not translated. */
 const BRAND_NAME: Record<VaultCardBrand, string> = {
   visa: "Visa",
   mastercard: "Mastercard",
@@ -147,7 +137,6 @@ const BRAND_NAME: Record<VaultCardBrand, string> = {
   discover: "Discover",
 };
 
-/** The words in the Visa and Amex marks. They are artwork, so they are not translated. */
 const BRAND_MARK = { visa: "VISA", amex: "AMEX" } as const;
 
 const SECRET_TEXT = {
@@ -159,7 +148,6 @@ const SECRET_TEXT = {
 
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
 
-/** `MM/YY` or `MM/YYYY`, or null when the text is not a date. */
 function parseExpiry(text: string): { month: number; year: number } | null {
   const match = /^\s*(\d{1,2})\s*\/\s*(\d{2}|\d{4})\s*$/u.exec(text);
   if (!match?.[1] || !match[2]) return null;
@@ -174,9 +162,7 @@ type LoginDraft = {
   username: string;
   notes: string;
   password: string;
-  /** A new two-step key that the user typed. The saved key never comes to this window. */
   twoStepKey: string;
-  /** The user removed the saved two-step key. */
   twoStepRemoved: boolean;
 };
 type CardDraft = {
@@ -187,7 +173,6 @@ type CardDraft = {
   expiry: string;
   securityCode: string;
   billingContactId: string;
-  /** The sites where agents can fill the card with no approval. The user can only remove one. */
   fillSites: string[];
 };
 type ContactDraft = { kind: "contact" } & VaultContactFields;
@@ -207,7 +192,6 @@ const EMPTY_CONTACT: VaultContactFields = {
   email: "",
 };
 
-/** The secret fields of a saved item start empty: the user reveals or replaces them. */
 function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   if (kind === "login")
     return item?.kind === "login"
@@ -254,7 +238,6 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
   return { kind, ...EMPTY_CONTACT };
 }
 
-/** The values that a chat request filled in, over a new item's draft. A secret field is never one of them. */
 function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draft {
   const value = (key: string, current: string) => values[key] ?? current;
   switch (draft.kind) {
@@ -282,11 +265,10 @@ function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draf
         email: value("email", draft.email),
       };
     case "apiKey":
-      return draft;
+      return { ...draft, name: value("name", draft.name) };
   }
 }
 
-/** Whether a draft has the fields that the item needs. A saved secret counts as present. */
 function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
   if (draft.kind === "login")
     return Boolean(draft.website.trim() && (draft.password || (saved?.kind === "login" && saved.hasPassword)));
@@ -301,19 +283,21 @@ function draftReady(draft: Draft, saved: VaultItemSummary | null): boolean {
       API_KEY_NAME_PATTERN.test(draft.name.trim()) &&
       (draft.key.trim() !== "" || (saved?.kind === "apiKey" && saved.hasKey))
     );
-  // The same rule as main: a label alone is not contact info.
   return [draft.fullName, draft.address, draft.phone, draft.email].some((field) => field.trim() !== "");
 }
 
-/** A new key, an empty text that removes the saved key, or nothing, which keeps it. */
 function twoStepKeyInput(draft: LoginDraft): { twoStepKey?: string } {
   const typed = normalizeTwoStepKey(draft.twoStepKey);
   if (typed !== null) return { twoStepKey: typed };
   return draft.twoStepRemoved ? { twoStepKey: "" } : {};
 }
 
-/** An empty secret field keeps the saved value. */
-function saveInput(draft: Draft, id: string | null): VaultSaveInput {
+function saveInput(draft: Draft, id: string | null, agents: VaultAgentScope | undefined): VaultSaveInput {
+  const item = itemInput(draft, id);
+  return agents === undefined ? item : { ...item, agents: agents === null ? null : [...agents] };
+}
+
+function itemInput(draft: Draft, id: string | null): VaultSaveInput {
   if (draft.kind === "login")
     return {
       kind: "login",
@@ -367,7 +351,6 @@ function itemMatches(item: VaultItemSummary, query: string): boolean {
   return text.some((value) => value.toLowerCase().includes(needle));
 }
 
-/** The countries that a contact can have, by name in the reader's language. */
 function useCountries() {
   const { locale } = useText();
   const regionNames = createMemo(() => new Intl.DisplayNames([locale()], { type: "region" }));
@@ -378,11 +361,6 @@ function useCountries() {
   return { countryName, countries };
 }
 
-/**
- * The Vault of the computer that runs the agents, in its server settings: filter tabs with counts,
- * one list, and a dialog to add or edit an item. A list item never carries a password, a card number,
- * a security code or an API key; the edit dialog asks for one only when the user shows it.
- */
 export function VaultPanel(props: VaultPanelProps) {
   const { t, errorDetails } = useText();
   const [filter, setFilter] = createSignal<Filter>("all");
@@ -415,11 +393,9 @@ export function VaultPanel(props: VaultPanelProps) {
     if (item.kind === "apiKey") return item.notes || t("vault.kind.apiKey");
     return contactLine(item) || item.email || item.phone;
   };
-  // An item that an agent added names the agent, so the user can find what agents saved.
   const itemSummary = (item: VaultItemSummary) =>
     [itemDetail(item), item.addedBy ? t("vault.addedBy", { agent: item.addedBy }) : ""].filter(Boolean).join(" · ");
 
-  // A new list after each saved change, so a replaced key loads its code again.
   const keyedLogins = createMemo(() =>
     props.state.items.filter((item) => item.kind === "login" && item.hasTwoStep).map((item) => item.id),
   );
@@ -436,8 +412,10 @@ export function VaultPanel(props: VaultPanelProps) {
   const visible = (kind: Filter) =>
     props.state.items.filter((item) => (kind === "all" || item.kind === kind) && itemMatches(item, query()));
   const empty = () => props.state.items.length === 0;
+  const agentChoices = () => (props.state.agentScope && props.agents?.length ? props.agents : undefined);
+  const saveAgents = (item: VaultItemSummary, agents: VaultAgentScope) =>
+    run(() => props.onSave(saveInput(draftOf(item.kind, item), item.id, agents)));
 
-  /** Runs one change of a confirm dialog. A failure stays in the dialog. */
   async function run(action: () => Promise<void>, fallback: AppTextKey = "vault.failed"): Promise<boolean> {
     setUi((draft) => {
       draft.failure = null;
@@ -532,7 +510,7 @@ export function VaultPanel(props: VaultPanelProps) {
         <SlidingTabs.Root value={filter()} onChange={(value) => isFilter(value) && setFilter(value)}>
           <SettingsSection
             title={t("vault.items.title")}
-            description={t("vault.items.description")}
+            description={t(props.state.agentScope ? "vault.items.scopedDescription" : "vault.items.description")}
             actions={
               <NewItemMenu
                 kinds={filters().flatMap((item) => (item.value === "all" ? [] : [item.value]))}
@@ -640,6 +618,18 @@ export function VaultPanel(props: VaultPanelProps) {
                                 <ItemDescription class="vault-truncate">{itemSummary(item)}</ItemDescription>
                               </ItemContent>
                               <ItemActions class="integrations-hub-actions">
+                                <Show when={agentChoices()}>
+                                  {(agents) => (
+                                    <VaultAgentsButton
+                                      name={itemTitle(item)}
+                                      agents={agents()}
+                                      scope={item.agents ?? null}
+                                      onChange={async (scope) => {
+                                        await saveAgents(item, scope);
+                                      }}
+                                    />
+                                  )}
+                                </Show>
                                 <Show when={twoStepCodes.code(item.id)}>
                                   {(code) => (
                                     <TwoStepRowCode
@@ -691,6 +681,7 @@ export function VaultPanel(props: VaultPanelProps) {
             contactLine={contactLine}
             title={editingTitle(editing())}
             twoStep={props.onCodes !== undefined}
+            agents={agentChoices()}
             savedCode={editingCode()}
             onCopyCode={copyCode}
             onSave={(input) => props.onSave(input)}
@@ -775,7 +766,6 @@ function ApiKeyLogo() {
   );
 }
 
-/** The first letter of a site. No icon is fetched: the page would learn which sites are saved. */
 const siteLetter = (website: string) =>
   website
     .trim()
@@ -794,10 +784,6 @@ function SiteLogo(props: { website: string }) {
   );
 }
 
-/**
- * The card brand on a small card. Lucide has no payment brands, so the marks are drawn here in the
- * brands' fixed colours. An unknown brand shows the generic card icon.
- */
 function CardLogo(props: { brand: VaultCardBrand | null }) {
   return (
     <span class="vault-logo vault-card-logo" aria-hidden="true">
@@ -846,7 +832,6 @@ function CardLogo(props: { brand: VaultCardBrand | null }) {
   );
 }
 
-/** The initials of the person, in the same style as an account avatar. */
 function ContactLogo(props: { name: string }) {
   const initials = () => (props.name.trim() ? userInitials({ name: props.name.trim(), email: "" }) : "");
   return (
@@ -898,7 +883,6 @@ function DraftLogo(props: { draft: Draft; saved: VaultItemSummary | null }) {
   );
 }
 
-/** The ⋯ menu of a row: edit, copy, delete. A secret goes to the clipboard from main. */
 function ItemMenu(props: {
   item: VaultItemSummary;
   title: string;
@@ -975,7 +959,6 @@ function ItemMenu(props: {
   );
 }
 
-/** "New item" with each kind that the server keeps, and the import when the server has one. */
 function NewItemMenu(props: {
   kinds: readonly VaultItemKind[];
   mount: HTMLElement | undefined;
@@ -1016,17 +999,13 @@ function NewItemMenu(props: {
   );
 }
 
-/**
- * A secret field: hidden until the user shows it. For a saved item it starts empty, and the eye
- * button asks for the saved value; an empty field keeps it.
- */
 function SecretInput(props: {
   field: VaultSecretField;
   value: string;
   saved: boolean;
   maxlength: number;
   inputMode?: "numeric";
-  placeholder?: string;
+  placeholder?: string | undefined;
   onChange: (value: string) => void;
   onReveal: () => Promise<string>;
   onRevealFailed: (error: unknown) => void;
@@ -1075,7 +1054,6 @@ function SecretInput(props: {
   );
 }
 
-/** Add or edit one item in a dialog. */
 function ItemDialog(props: {
   kind: VaultItemKind;
   item: VaultItemSummary | null;
@@ -1083,16 +1061,15 @@ function ItemDialog(props: {
   contacts: readonly VaultContactSummary[];
   countries: readonly { code: string; name: string }[];
   contactLine: (contact: VaultContactFields) => string;
-  /** The values of a chat request for a new item. */
   prefill?: Readonly<Record<string, string>> | undefined;
-  /** A request from the chat: no billing address and no notes, which it does not carry. */
   fromChat?: boolean | undefined;
-  /** The server keeps two-step keys, so a login offers one. */
   twoStep?: boolean | undefined;
-  /** The current code of the saved key, from main. */
+  agents?: readonly VaultAgentChoice[] | undefined;
   savedCode?: LiveTwoStepCode | undefined;
   onCopyCode?: ((code: string) => void) | undefined;
-  onSave: (input: VaultSaveInput) => Promise<void>;
+  scope?: VaultRequestScope | undefined;
+  keyPlaceholder?: string | undefined;
+  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
@@ -1102,12 +1079,13 @@ function ItemDialog(props: {
   );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
+  const [scope, setScope] = createSignal<VaultAgentScope>(untrack(() => props.item?.agents ?? null));
+  const [requestScope, setRequestScope] = createSignal(untrack(() => props.scope?.value ?? ""));
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
   const loginDraft = () => {
     const current = draft();
     return current.kind === "login" ? current : undefined;
   };
-  /** The setup of a two-step key replaces the fields: the key, then a check of its code on the site. */
   const [step, setStep] = createSignal<"form" | "key" | "check">("form");
   const typedKey = createDraftTwoStepCode(() => loginDraft()?.twoStepKey ?? "");
   const savedTwoStep = () => props.item?.kind === "login" && props.item.hasTwoStep;
@@ -1124,7 +1102,6 @@ function ItemDialog(props: {
     if (login) set(login, { twoStepKey: "" });
     setStep("key");
   };
-  /** Back from the key step drops the typed key, so the login keeps what it had. */
   const cancelSetup = () => {
     const login = loginDraft();
     if (login) set(login, { twoStepKey: "" });
@@ -1181,7 +1158,10 @@ function ItemDialog(props: {
     setSaving(true);
     setFailure(null);
     try {
-      await props.onSave(saveInput(draft(), props.item?.id ?? null));
+      await props.onSave(
+        saveInput(draft(), props.item?.id ?? null, props.agents ? scope() : undefined),
+        props.scope ? requestScope() : undefined,
+      );
       props.onClose();
     } catch (error) {
       setFailure(errorDetails(error, t("vault.failed")));
@@ -1189,6 +1169,30 @@ function ItemDialog(props: {
       setSaving(false);
     }
   }
+
+  const keyLabel = (apiKey: ApiKeyDraft) => (props.fromChat ? apiKey.name : t("vault.field.apiKey"));
+
+  const requestScopeField = () => (
+    <Show when={props.scope}>
+      {(choice) => (
+        <Field label={choice().label} class="vault-wide">
+          <NativeSelect value={requestScope()} onChange={(event) => setRequestScope(event.currentTarget.value)}>
+            <For each={choice().options}>{(option) => <option value={option}>{option}</option>}</For>
+          </NativeSelect>
+        </Field>
+      )}
+    </Show>
+  );
+
+  const agentsField = () => (
+    <Show when={props.agents}>
+      {(agents) => (
+        <Field label={t("vault.agents.label")} class="vault-wide">
+          <VaultAgentsButton name={props.title} agents={agents()} scope={scope()} onChange={setScope} />
+        </Field>
+      )}
+    </Show>
+  );
 
   const fields = (): JSX.Element => (
     <Switch>
@@ -1240,6 +1244,7 @@ function ItemDialog(props: {
                 />
               </Field>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1328,6 +1333,7 @@ function ItemDialog(props: {
                 </ul>
               </fieldset>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1390,7 +1396,6 @@ function ItemDialog(props: {
                 onChange={(event) => set(contact(), { country: event.currentTarget.value })}
               >
                 <option value="">{t("vault.chooseCountry")}</option>
-                {/* A country outside the list, such as one that an agent saved, stays a choice under its code. */}
                 <Show
                   when={contact().country && !props.countries.some((country) => country.code === contact().country)}
                 >
@@ -1415,45 +1420,52 @@ function ItemDialog(props: {
                 onValueChange={(email) => set(contact(), { email })}
               />
             </Field>
+            {agentsField()}
           </div>
         )}
       </Match>
       <Match when={apiKeyDraft()}>
         {(apiKey) => (
           <div class="vault-fields">
-            <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
-              <Input
-                placeholder={t("vault.placeholder.variableName")}
-                autocomplete="off"
-                spellcheck={false}
-                maxlength={64}
-                value={apiKey().name}
-                onInput={(event) => {
-                  // The field shows the capitals that it keeps, so the binding has no other text to restore.
-                  const input = event.currentTarget;
-                  const { selectionStart, selectionEnd } = input;
-                  input.value = input.value.toUpperCase();
-                  input.setSelectionRange(selectionStart, selectionEnd);
-                  set(apiKey(), { name: input.value });
-                }}
-              />
-            </Field>
-            <Field label={t("vault.field.apiKey")} class="vault-wide">
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
+                <Input
+                  placeholder={t("vault.placeholder.variableName")}
+                  autocomplete="off"
+                  spellcheck={false}
+                  maxlength={64}
+                  value={apiKey().name}
+                  onInput={(event) => {
+                    const input = event.currentTarget;
+                    const { selectionStart, selectionEnd } = input;
+                    input.value = input.value.toUpperCase();
+                    input.setSelectionRange(selectionStart, selectionEnd);
+                    set(apiKey(), { name: input.value });
+                  }}
+                />
+              </Field>
+            </Show>
+            <Field label={keyLabel(apiKey())} class="vault-wide">
               <SecretInput
                 {...secretProps("key")}
+                placeholder={props.keyPlaceholder}
                 maxlength={VAULT_API_KEY_LIMIT}
                 value={apiKey().key}
                 onChange={(key) => set(apiKey(), { key })}
               />
             </Field>
-            <Field label={t("vault.field.notes")} class="vault-wide">
-              <Textarea
-                rows={2}
-                maxlength={VAULT_NOTES_LIMIT}
-                value={apiKey().notes}
-                onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
-              />
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.notes")} class="vault-wide">
+                <Textarea
+                  rows={2}
+                  maxlength={VAULT_NOTES_LIMIT}
+                  value={apiKey().notes}
+                  onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
+                />
+              </Field>
+            </Show>
+            {requestScopeField()}
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1549,16 +1561,19 @@ function ItemDialog(props: {
   );
 }
 
-/**
- * The Vault dialog for a request from the chat: a new login, card or contact, with the values that the
- * agent filled in. It has no billing address and no notes, which a request does not carry.
- */
+export interface VaultRequestScope {
+  label: string;
+  options: readonly string[];
+  value: string;
+}
+
 export function VaultRequestDialog(props: {
-  kind: Exclude<VaultItemKind, "apiKey">;
+  kind: VaultItemKind;
   title: string;
   prefill: Readonly<Record<string, string>>;
-  /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
-  onSave: (input: VaultSaveInput) => Promise<void>;
+  scope?: VaultRequestScope | undefined;
+  keyPlaceholder?: string | undefined;
+  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onClose: () => void;
 }) {
   const { countries } = useCountries();
@@ -1572,6 +1587,8 @@ export function VaultRequestDialog(props: {
       contactLine={() => ""}
       prefill={props.prefill}
       fromChat
+      scope={props.scope}
+      keyPlaceholder={props.keyPlaceholder}
       onSave={props.onSave}
       onReveal={() => Promise.resolve("")}
       onClose={props.onClose}

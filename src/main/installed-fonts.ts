@@ -12,11 +12,6 @@ class InstalledFontsFailure extends Schema.TaggedError<InstalledFontsFailure>()(
   cause: Schema.Defect(),
 }) {}
 
-/**
- * The command that writes one family name on each line. Each one is part of the system: AppKit
- * through JavaScript for Automation on macOS, Fontconfig on Linux, and .NET through PowerShell on
- * Windows. The renderer could ask Chromium (`queryLocalFonts`), but that needs a new permission.
- */
 function fontListCommand(platform: NodeJS.Platform): { command: string; args: string[] } {
   switch (platform) {
     case "darwin":
@@ -60,10 +55,6 @@ const runFontListCommand = (platform: NodeJS.Platform) =>
     });
   });
 
-/**
- * The family names, one time each, in alphabetical order. A name that starts with a dot is a font
- * that macOS keeps for itself. A name that cannot go into a CSS font list is left out.
- */
 function parseFontFamilies(output: string): string[] {
   const families = new Set<string>();
   for (const line of output.split(/\r?\n/u)) {
@@ -74,11 +65,6 @@ function parseFontFamilies(output: string): string[] {
   return [...families].sort((left, right) => left.localeCompare(right));
 }
 
-/**
- * The fonts that are installed on this computer, for the font choices in Settings. When the list
- * does not load, such as on a Linux computer without Fontconfig, it is empty: Settings then shows
- * only the default font and the saved one.
- */
 export const listInstalledFonts = Effect.fn("InstalledFonts.list")(function* (
   platform: NodeJS.Platform = process.platform,
 ) {

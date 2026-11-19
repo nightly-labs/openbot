@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_LANGUAGE_COUNT, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about dots here is taken from openai.com, chatgpt.com and the OpenAI
-// help center, and each page used is in `sources`. Where they state nothing, the text
-// says so. Check them again, and move `checkedAt`, whenever this file changes. OpenAI
-// writes the name in lower case, "dots"; this page calls the product ChatGPT dots,
-// because a dot lives in ChatGPT. Dots started on 29 September 2026, at DevDay.
-
 const OPENAI_HELP = "https://help.openai.com/en/articles";
 
 export const CHATGPT_DOTS_COMPARISON: Comparison = {

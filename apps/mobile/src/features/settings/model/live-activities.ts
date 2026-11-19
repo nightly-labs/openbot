@@ -12,7 +12,6 @@ export async function loadLiveActivitiesPreference(): Promise<void> {
   if (useLiveActivitiesPreference.getState().ready) return;
   try {
     const stored = await SecureStore.getItemAsync(key);
-    // A second startup read must not overwrite a change made in Settings.
     if (!useLiveActivitiesPreference.getState().ready) {
       useLiveActivitiesPreference.setState({ enabled: stored !== "false" });
     }
@@ -23,7 +22,6 @@ export async function loadLiveActivitiesPreference(): Promise<void> {
 
 export async function saveLiveActivitiesPreference(enabled: boolean): Promise<void> {
   if (!useLiveActivitiesPreference.getState().ready || useLiveActivitiesPreference.getState().saving) return;
-  // Apply immediately, including when storage fails. Settings offers a retry.
   useLiveActivitiesPreference.setState({ enabled, saving: true });
   try {
     await SecureStore.setItemAsync(key, String(enabled));

@@ -7,23 +7,18 @@ import {
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/** The newest entries that a host keeps for each server, and the most that one read returns. */
 export const SERVER_AUDIT_ENTRY_LIMIT = 500;
-// The same bounds as server-audit-v1.
 const NAME_LIMIT = 200;
 const TIME_LIMIT = 40;
 
 export const SERVER_AUDIT_MEMBER_ROLES = ["admin", "member"] as const;
-/** The server role of a member. The owner does not change. */
 export type ServerAuditMemberRole = (typeof SERVER_AUDIT_MEMBER_ROLES)[number];
 
-/** A member, a role or an agent, with its name at the time of the change. A removed one keeps it. */
 export interface ServerAuditName {
   id: string;
   name: string;
 }
 
-/** One change to the access of a server. */
 export type ServerAuditChange =
   | { kind: "member-joined"; member: ServerAuditName; role: ServerAuditMemberRole }
   | { kind: "member-removed"; member: ServerAuditName }
@@ -32,7 +27,6 @@ export type ServerAuditChange =
   | { kind: "role-renamed"; roleId: string; from: string; to: string }
   | { kind: "role-deleted"; role: ServerAuditName }
   | { kind: "role-member"; role: ServerAuditName; member: ServerAuditName; added: boolean }
-  /** `role` null is the levels that apply to every member. */
   | {
       kind: "agent-level";
       role: ServerAuditName | null;
@@ -43,7 +37,6 @@ export type ServerAuditChange =
 
 export type ServerAuditChangeKind = ServerAuditChange["kind"];
 
-/** One change, who made it, and when. `actor` is null when the host does not know who made it. */
 export interface ServerAuditEntry {
   id: string;
   at: string;
@@ -51,15 +44,10 @@ export interface ServerAuditEntry {
   change: ServerAuditChange;
 }
 
-/** The changes of one server, newest first (`server-audit-v1`). */
 export interface ServerAuditLog {
   entries: ServerAuditEntry[];
 }
 
-/**
- * A name cut to the length that the log keeps. An email or an agent name can be longer, and a longer
- * name would fail the codec of the file and of the wire. The cut does not split a character.
- */
 function serverAuditText(name: string): string {
   if (name.length <= NAME_LIMIT) return name;
   let cut = "";
@@ -70,7 +58,6 @@ function serverAuditText(name: string): string {
   return cut;
 }
 
-/** A member, role or agent with its name of now, cut as `serverAuditText` says. */
 export function serverAuditName(id: string, name: string): ServerAuditName {
   return { id, name: serverAuditText(name) };
 }
@@ -86,7 +73,6 @@ function copyName(name: ServerAuditName): ServerAuditName {
 const isMemberRole = (value: unknown): value is ServerAuditMemberRole => isOneOf(SERVER_AUDIT_MEMBER_ROLES, value);
 const isLevel = (value: unknown): value is AgentAccessLevel => isOneOf(AGENT_ACCESS_LEVELS, value);
 
-/** The change, or null for a kind that this build does not know: a newer host can record more kinds. */
 function decodeChange(value: unknown): ServerAuditChange | null {
   if (!isDynamicRecord(value)) throw new Error("Invalid server audit change.");
   switch (value.kind) {
@@ -138,10 +124,6 @@ function decodeChange(value: unknown): ServerAuditChange | null {
   throw new Error("Invalid server audit change.");
 }
 
-/**
- * On the wire the route codec has already checked the fields; this fails closed on anything else.
- * An entry of an unknown kind is left out.
- */
 export function decodeServerAuditLog(value: unknown): ServerAuditLog {
   if (!isDynamicRecord(value) || !Array.isArray(value.entries) || value.entries.length > SERVER_AUDIT_ENTRY_LIMIT)
     throw new Error("Invalid server audit log.");
@@ -162,23 +144,16 @@ export function decodeServerAuditLog(value: unknown): ServerAuditLog {
   return { entries };
 }
 
-/** The names that a change keeps. Each returns the id when the name is not known. */
 export interface ServerAuditNames {
   member(id: string): string;
   agent(id: string): string;
 }
 
-/** The levels for every member and the roles, as the roles file keeps them. */
 export interface AgentAccessRoles {
   everyone: AgentAccessLevels;
   roles: readonly AgentAccessRole[];
 }
 
-/**
- * The changes from one set of roles to the next, in the order that they apply: new and renamed roles,
- * then their members, then the levels, then deleted roles. An agent that "everyone" does not list is
- * `manage`, and an agent that a role does not list is `none`, as `agent-access-v1` says.
- */
 export function agentAccessAuditChanges(
   before: AgentAccessRoles,
   after: AgentAccessRoles,

@@ -1,15 +1,3 @@
-// Frozen optional custom-agents-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list, add, replace and remove the host's custom ACP agents, as the local Settings do.
-// The host starts the command of each agent on its own computer, as it does for a stdio MCP server
-// that an admin adds with `mcp-v1` and for an agent from `acp-registry-v1`. A member cannot use any
-// route; `requireAdmin` on the host is the only gate. The trial start (`check`) and the usage answers
-// stay on the host's own computer.
-//
-// Environment values are write-only: a value travels only in a save body, towards the host, and a
-// response names the variables only. A save with `value: null` keeps the value that the host holds
-// for that name. Widening any of it needs a second capability string.
 import { adminRoute, fields, identifier, list, nullable, type OptionalRouteCodec, oneOf, string } from "./admin-wire";
 
 export const CUSTOM_AGENTS_CAPABILITY = "custom-agents-v1";

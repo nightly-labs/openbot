@@ -1,10 +1,3 @@
-// Run: bun scripts/skill-install-local-changes-e2e.ts
-// Report: .openbot-build/skill-install-local-changes-e2e.json; exit 0 = all pass.
-// Drives the real local skill library and skill service in a temporary workspace (#7072).
-// A copy with no unsaved edits installs the next revision: a Finder `.DS_Store`, the text before a
-// save put quotes in the frontmatter, or the files of a newer saved revision than the lock.
-// A copy with an edit that no revision has still refuses, and the user's replace still installs.
-
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -33,7 +26,6 @@ function skillMarkdown(description: string, body: string): string {
   return `---\nname: Demo Skill\ndescription: ${description}\n---\n\n${body}\n`;
 }
 
-/** The message of a failed Effect, or null when it succeeded. */
 async function failure<A, E extends { cause: unknown }>(effect: Effect.Effect<A, E>): Promise<string | null> {
   const result = await Effect.runPromise(Effect.result(effect));
   if (Result.isSuccess(result)) return null;
@@ -82,7 +74,6 @@ async function scenario(name: string, run: (context: Context) => Promise<Record<
     };
     const agents = () => [agent];
     const library = new LocalSkillLibrary(join(root, "library"), agents);
-    // A local skill never reaches the account service, so this one has no session.
     const auth = new CentralAuthManager({
       apiUrl: "https://example.invalid",
       storagePath: join(root, "auth.json"),

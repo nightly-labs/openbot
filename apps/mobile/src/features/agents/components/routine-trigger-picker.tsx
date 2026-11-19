@@ -13,7 +13,6 @@ import { SettingsRow } from "@/features/settings/components/settings-content";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** What starts a routine: a schedule frequency, or a request to its webhook. */
 export type RoutineTriggerChoice = RoutineDraftKind | "webhook";
 
 export const TRIGGER_TEXT = {
@@ -46,11 +45,6 @@ function GroupLabel({ children }: { children: string }) {
   );
 }
 
-/**
- * The first row of the trigger card: what starts the routine, with one line that tells when it runs.
- * A press shows the choices below it, as on desktop: the schedule frequencies first, then the webhook
- * in its own group. The selected choice has a check.
- */
 export function RoutineTriggerPicker({
   value,
   webhook,
@@ -58,7 +52,6 @@ export function RoutineTriggerPicker({
   onSelect,
 }: {
   value: RoutineTriggerChoice;
-  /** False hides the webhook choice, for a host that cannot receive webhooks. */
   webhook: boolean;
   disabled: boolean;
   onSelect: (choice: RoutineTriggerChoice) => void;

@@ -1,7 +1,3 @@
-// Frozen provider-aware schema for protocol 6: the protocol 5 schema, with Cursor (`cursor`) and Cline
-// (`cline`) added to the providers and auth kinds, and `=` and `,` added to the agent model charset for
-// Cursor model ids. Versions 1-5 retain their own codec.
-// The schema is in `provider-aware-codec.ts`; this file holds only what protocol 6 accepts.
 import { createProviderAwareCodec } from "./provider-aware-codec";
 
 export type {
@@ -34,8 +30,6 @@ export const TEAM_PROTOCOL_V6Base_WEBSOCKET = "openbot-team-v6";
 const codec = createProviderAwareCodec({
   providers: ["codex", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline"],
   authKinds: ["chatgpt", "claude", "grok", "opencode", "antigravity", "acp", "cursor", "cline"],
-  // The charset of `isAgentModel`: the Claude CLI names a 1M-context model `claude-opus-5-5[1m]`, and
-  // the Cursor CLI lists ids such as `gpt-5.6-sol[context=272k,reasoning=medium,fast=false]`.
   agentModel: /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u,
 });
 

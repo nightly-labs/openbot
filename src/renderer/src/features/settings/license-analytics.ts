@@ -1,7 +1,6 @@
 import type { LicenseStoreEvent } from "@openbot/ui/features/billing/license-store";
 import { desktopAnalytics } from "../../analytics";
 
-/** Sends a license store step. Desktop and web use the same event. */
 export function trackLicenseEvent(event: LicenseStoreEvent): void {
   desktopAnalytics.track("license_action", {
     ...event,
@@ -11,7 +10,6 @@ export function trackLicenseEvent(event: LicenseStoreEvent): void {
   });
 }
 
-/** Opens the sales contact from the license section. */
 export function licenseContactUs(open: (() => void) | undefined): (() => void) | undefined {
   return (
     open &&

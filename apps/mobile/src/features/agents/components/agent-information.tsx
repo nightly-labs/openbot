@@ -101,7 +101,6 @@ export function AgentInformation({
     if (section === "usage") mobileAnalytics.track("usage_viewed", { scope: "agent" });
   }, [section]);
   const { t, format } = useText();
-  // The server Usage screen passes its range, so the agent's report opens on the same days.
   const { recordId, startDate, endDate, timeZone } = useLocalSearchParams<{
     recordId?: string;
     startDate?: string;
@@ -143,12 +142,10 @@ export function AgentInformation({
     queryKeys.agentEventRoutines(queryScope, agent.serverId, agent.id),
   );
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
-  // An owner or admin reads the admin list, which has the enabled state, and can change it.
   const manageSkills = useMobileWorkspaceSelector((current) => current.canManageAgentSkills(agent.serverId));
   const skillsQuery = agentSkillsQuery(queryScope, agent.serverId, agent.id, manageSkills, workspace.loadAgentSkills);
   const skillsKey = skillsQuery.queryKey;
   const skills = useQuery({ ...options, ...skillsQuery, enabled: available && section === "skills" });
-  // The host caches a scan. A retry or a deletion measures again, as on desktop.
   const forceStorageScan = useRef(false);
   const storage = useQuery({
     ...options,
@@ -168,10 +165,7 @@ export function AgentInformation({
     ...options,
     enabled: available && section === "usage",
     queryKey: queryKeys.agentUsage(queryScope, agent.serverId, agent.id, available, range),
-    // The last report stays on screen while the next range loads, so its values change in place.
     placeholderData: keepPreviousData,
-    // As on desktop, the agent page reads the host report with an agent filter: it splits the days by
-    // provider. A host without `host-analytics` still answers the agent report, which draws one area.
     queryFn: async () =>
       (await workspace.loadHostAnalytics(range, agent.serverId)) ?? workspace.loadAgentAnalytics(range, agent.serverId),
   });
@@ -380,7 +374,6 @@ export function AgentInformation({
                 key={recordId}
                 agent={agent}
                 available={available && !routines.isError && !(eventsEnabled && eventRoutines.isError)}
-                // The event record carries what the routine does with missed runs; the released one does not.
                 routine={
                   eventRoutines.data?.find((item) => item.id === recordId) ??
                   allRoutines.find((item) => item.id === recordId)

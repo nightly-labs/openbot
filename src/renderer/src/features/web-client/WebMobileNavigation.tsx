@@ -8,7 +8,6 @@ export type WebMobilePane = "conversation" | "workspace";
 
 interface WebMobileNavigationProps {
   activePane: WebMobilePane;
-  /** The Routines view is on: the conversation pane shows the routine canvas. */
   routines?: boolean;
   onChange: (pane: WebMobilePane) => void;
 }
@@ -24,7 +23,6 @@ const PANES: ReadonlyArray<PaneButton> = [
   { id: "workspace", label: "webClient.pane.workspace", Icon: Globe2 },
 ];
 
-/** The small-screen switch for the existing workspace and conversation surfaces. */
 export function WebMobileNavigation(props: WebMobileNavigationProps) {
   const { t } = useText();
   const shown = (pane: PaneButton): PaneButton =>

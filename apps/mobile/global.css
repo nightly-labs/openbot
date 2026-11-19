@@ -46,19 +46,29 @@
   --tracking-openbot-wide: var(--openbot-tracking-wide);
 }
 
+@theme static {
+  --color-accent-hover: color-mix(in oklab, var(--openbot-action) 90%, var(--openbot-action-foreground) 10%);
+}
+
+@layer components {
+  .button__root--variant-primary {
+    background-color: var(--color-action);
+  }
+
+  .button__label--variant-primary {
+    color: var(--color-action-foreground);
+  }
+}
+
 @layer theme {
   :root {
     color-scheme: light dark;
 
-    /* uniwind reads theme values only from @variant blocks, so a plain :root alias
-     * loses to HeroUI's own near-black dark --background. */
     @variant dark {
       --background: var(--openbot-bg-native-canvas);
-      /* Only the Android menu draws on --overlay. HeroUI's light value is already #ffffff. */
       --overlay: var(--openbot-bg-surface-raised);
     }
 
-    /* HeroUI consumes these aliases; OpenBot tokens remain the source of truth. */
     --foreground: var(--openbot-text-primary);
     --surface: var(--openbot-bg-surface);
     --surface-foreground: var(--openbot-text-primary);
@@ -88,7 +98,6 @@
     --field-placeholder: var(--openbot-text-muted);
     --field-border: var(--openbot-border-strong);
 
-    /* A 4 pt base produces the 8 / 12 / 16 px radius family used on desktop. */
     --radius: 0.25rem;
     --field-radius: 0.75rem;
     --surface-shadow: var(--openbot-shadow-card);
@@ -97,9 +106,6 @@
   }
 }
 
-/* Inter is the desktop and web font. The expo-font plugin in app.json embeds it as one family, so
- * `fontWeight` picks the face. A build without the files falls back to the system font. HeroUI
- * reads --font-normal to --font-bold. */
 @media ios {
   :root {
     --font-sans: Inter;

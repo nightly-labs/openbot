@@ -24,10 +24,6 @@ const STATUS_KEYS = {
   connected: "mobile.server.connectors.statusConnected",
 } as const;
 
-/**
- * Marketplace › Apps › 1Password of a joined server. The host connects with a service
- * account token that the user pastes here. The token goes to the host once; this phone keeps no copy.
- */
 export function OnePasswordConnectorPage({
   server,
   query,

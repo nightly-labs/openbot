@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/onboarding";
 
 export const messages = {
-  // The saved setup could not be read. Retry, or set up again with no saved state.
   "onboarding.readFailed.title": "OpenBot 无法读取你的设置。",
   "onboarding.readFailed.description": "你的本地数据没有变化。请重试；如果问题仍然存在，请重新设置 OpenBot。",
   "onboarding.readFailed.setUpAgain": "重新设置",
@@ -99,7 +98,7 @@ export const messages = {
   "onboarding.action.connect": "连接",
   "onboarding.action.open": "打开 OpenBot",
   "onboarding.action.next": "下一步",
-  "onboarding.server.title": "设置 {server}",
+  "onboarding.server.title": "欢迎使用 {server}",
   "onboarding.server.description": "OpenBot 不包含 AI 订阅。在创建助手之前，请先为该服务器连接你自己的服务商。",
   "onboarding.server.label": "选择该服务器的 AI 服务商",
   "onboarding.server.hint": "登录状态保存在服务器上。之后可以为每个助手单独更改服务商。",

@@ -53,6 +53,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Esta habilidade local não tem a revisão {revision}. A revisão mais recente é {latest}.",
   "error.skill.localNameTaken": "Já existe uma habilidade local com este nome. Revise a habilidade existente.",
+  "error.skill.localNameClash":
+    'Este nome e a habilidade local "{name}" viram "{slug}". Para alterar essa habilidade, revise-a. Para adicionar uma nova habilidade, mude as letras latinas ou os números deste nome.',
   "error.skill.localKeepName": "Mantenha o nome da habilidade ao revisá-la.",
   "error.skill.localRelativeFolder":
     "Use uma pasta de habilidade com caminho relativo dentro do espaço de trabalho do agente atual.",
@@ -61,4 +63,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "A pasta da habilidade precisa de SKILL.md na raiz.",
   "error.skill.pathSymlink": "Os caminhos de habilidades não podem conter links simbólicos.",
   "error.skill.folderNotRead": "{provider} não lê {folder}. Copie esta pasta para {target}.",
+  "error.skill.githubLinkInvalid": "Cole um link para um repositório ou pasta do GitHub.",
+  "error.skill.githubNotFound": "O OpenBot não consegue abrir {repository}. O repositório é privado ou não existe.",
+  "error.skill.githubNoSkills": "Não há SKILL.md em {folder}.",
+  "error.skill.githubUnavailable": "O OpenBot não consegue ler o GitHub agora. Tente novamente mais tarde.",
+  "error.skill.githubRateLimited":
+    "O GitHub limita a frequência com que o OpenBot pode lê-lo sem uma conta. Tente novamente em uma hora.",
+  "error.skill.githubTooLarge":
+    "O OpenBot não consegue ler todos os arquivos de {repository}. O repositório é grande demais.",
+  "error.skill.githubHostTooOld": "Atualize este servidor para adicionar habilidades do GitHub.",
+  "error.skill.publishGithub": "{name} vem do GitHub. Você só pode publicar as habilidades que criou.",
 } as const satisfies PartialTranslation<typeof source>;

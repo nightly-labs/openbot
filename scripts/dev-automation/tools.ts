@@ -7,9 +7,6 @@ import { describeTarget } from "./page-url";
 
 const MAX_SNAPSHOT_LENGTH = 20_000;
 
-// The runtime list is the only copy; the type comes from Playwright, so a
-// misspelled or removed role fails to compile instead of failing deep
-// inside a locator call.
 export type AutomationRole = Parameters<Page["getByRole"]>[0];
 
 const AUTOMATION_ROLES: readonly AutomationRole[] = [
@@ -109,8 +106,6 @@ export interface WaitTarget {
   name: string;
 }
 
-// `--wait-for=<role>,<name>`. Only the first comma is structural, because an
-// accessible name legitimately contains one ("Send to Alice, Bob").
 export function parseWaitTarget(value: string): WaitTarget {
   const separator = value.indexOf(",");
   if (separator < 1) {
@@ -121,11 +116,6 @@ export function parseWaitTarget(value: string): WaitTarget {
   return { role: parseAutomationRole(value.slice(0, separator).trim()), name };
 }
 
-// Without this every command was a race: a click returns as soon as the event
-// is dispatched, so the snapshot that follows shows the state before the
-// update landed, and the only workaround was re-running snapshot in a loop.
-// Waiting on an accessible role and name is the same contract the assertions
-// in this repository use - never on the clock.
 export async function waitForRole(
   page: Page,
   target: WaitTarget,
@@ -146,30 +136,13 @@ export interface AutomationSnapshot {
   accessibility: string;
 }
 
-// A control's accessible name is the only thing in an accessibility tree that
-// says what its value means, and `redactText` cannot help here: a login code
-// is a handful of characters that match no secret shape and carry no label. So
-// a node named for a one-time code, a password or a token loses what was
-// entered - inline, and anywhere in its subtree, because a value does not
-// always arrive as the value of the control. `OtpInput` is the case that
-// matters: it shows the code as visible characters, which reach the tree as
-// loose text under the group that holds them, and its native input can hold
-// the same code under a name that is only a digit count.
 const SENSITIVE_CONTROL_NAME = /one[\s-]?time|passcode|password|\botp\b|secret|token|credential|api[\s_-]?key/iu;
 
-// One node of Playwright's aria YAML: indentation, role, quoted accessible
-// name, states such as ` [disabled]`, and either an inline value after the
-// colon or an indented subtree. A disabled OTP group is still sensitive.
 const NAMED_NODE = /^(\s*)- ([a-z]+) "((?:[^"\\]|\\.)*)"((?: \[[^\]]*\])*)(?::(.*))?$/u;
 
 export function redactSensitiveSnapshotValues(yaml: string): string {
   const lines: string[] = [];
-  // Indentation of each sensitive node still open, innermost last. A stack
-  // rather than one value: the OTP group holds the input, which is sensitive
-  // too, and leaving the inner one has to stay inside the outer.
   const sensitiveIndents: number[] = [];
-  // Whether the one replacement line has been written for the current run of
-  // dropped nodes.
   let replaced = false;
   for (const line of yaml.split("\n")) {
     if (line.trim() === "") {
@@ -186,22 +159,15 @@ export function redactSensitiveSnapshotValues(yaml: string): string {
     if (match && name !== undefined && SENSITIVE_CONTROL_NAME.test(name)) {
       const inline = match[5]?.trim() ?? "";
       sensitiveIndents.push(indent);
-      // The role and the name stay: an agent still has to see that the control
-      // exists to aim `type` at it. Only what was entered goes.
       replaced = inline !== "";
       lines.push(inline === "" ? line : `${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
       continue;
     }
     if (match && sensitiveIndents.length > 0 && (match[5]?.trim() ?? "") !== "") {
-      // A named control inside a sensitive subtree keeps its name, which an
-      // agent navigates by, but not its value: a caller can name the `OtpInput`
-      // native input for the digit count, and that input holds the code.
       lines.push(`${match[1]}- ${match[2]} "${name}"${match[4]}: [redacted]`);
       continue;
     }
     if (sensitiveIndents.length === 0 || match) {
-      // Outside a sensitive subtree, or a named node inside one with no inline
-      // value - structure the developer navigates by.
       lines.push(line);
       continue;
     }
@@ -214,16 +180,8 @@ export function redactSensitiveSnapshotValues(yaml: string): string {
 }
 
 export async function snapshotPage(page: Page, logger: Logger = dummyLogger): Promise<AutomationSnapshot> {
-  // Redacted before truncation, so a secret cannot survive in the part that is
-  // kept. The document leaves this process on stdout and lands in an agent
-  // transcript, which is the same kind of path as a log line: a page showing
-  // an API token exports it otherwise. `screenshot` is where you look when the
-  // literal value is the thing under test.
   const yaml = redactText(redactSensitiveSnapshotValues(await page.ariaSnapshot({ depth: 30 })));
   const snapshot: AutomationSnapshot = {
-    // The sanitized location, not `page.url()`: the snapshot is a document an
-    // agent prints and pastes, and a query string on the app route can carry
-    // an OAuth code the redactor would not recognize.
     url: describeTarget(page.url()),
     title: redactText(await page.title()),
     accessibility: yaml.length > MAX_SNAPSHOT_LENGTH ? `${yaml.slice(0, MAX_SNAPSHOT_LENGTH)}…` : yaml,
@@ -261,13 +219,6 @@ export async function typeByRole(
   if (submit) await control.press("Enter", { timeout: timeoutMs });
 }
 
-// Every read-only command that writes a file owes the same two promises: the
-// destination stays inside the build directory, so `--out=src/main/index.ts`
-// cannot overwrite tracked code without `--allow-mutations`, and no symbolic
-// link on the way redirects the write out of it. The writers create missing
-// parents, so the check has to happen before the write, not after.
-// `subject` names the artefact in the message; `extension` is what `--out`
-// must end with.
 export function resolveWritablePath(root: string, requested: string, extension: string, subject: string): string {
   const base = resolve(root);
   if (requested === "") throw new Error("--out=<path> cannot be empty.");
@@ -285,11 +236,6 @@ export function resolveScreenshotPath(root: string, requested: string | null, no
   return resolveWritablePath(root, requested, ".png", "Screenshots");
 }
 
-// The containment check above is lexical, and both writers follow links: a
-// symlink at the destination, or on any directory below the build root, would
-// let a read-only command overwrite a file outside it without
-// `--allow-mutations`. Components that do not exist yet are the normal case
-// and are fine - `mkdir` will create real directories for them.
 function assertNoSymlinkOnPath(base: string, target: string, subject: string): void {
   const steps = relative(base, target).split(sep);
   let current = base;
@@ -299,7 +245,6 @@ function assertNoSymlinkOnPath(base: string, target: string, subject: string): v
     try {
       link = lstatSync(current).isSymbolicLink();
     } catch {
-      // Nothing there yet, so nothing can redirect the write.
       return;
     }
     if (link) {
@@ -311,11 +256,6 @@ function assertNoSymlinkOnPath(base: string, target: string, subject: string): v
   }
 }
 
-// The absolute path carries the home directory, which is a checkout location
-// the developer chose - the same reason `instances` redacts `projectRoot`. A
-// path relative to the worktree drops that prefix and is still what an agent
-// needs to open the file. If what is left would be redacted, the caller could
-// not reopen it, so say so instead of handing back an unusable path.
 export function reportableScreenshotPath(out: string, workspace: string): string {
   const reportable = relative(workspace, out);
   const redacted = redactText(reportable);

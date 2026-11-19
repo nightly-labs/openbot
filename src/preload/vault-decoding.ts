@@ -1,8 +1,3 @@
-// What main answers for the Vault in Server settings. A list item never carries a password, a card
-// number, a security code, an API key or a two-step key: a summary that has one of those keys is refused, so a
-// main-process bug cannot put a secret in renderer state. Only `reveal` answers with a secret, and `codes`
-// with the current two-step codes, never with their keys.
-
 import type {
   VaultCardBrand,
   VaultImportResult,
@@ -27,6 +22,7 @@ const STATUSES: readonly VaultStatus[] = ["ready", "unavailable", "unreadable"];
 const BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
 const SECRET_KEYS = ["password", "number", "securityCode", "key", "twoStepKey"] as const;
 const decodeFillSites = guardedListDecoder(isString, "fillSites");
+const decodeAgents = guardedListDecoder(isString, "agents");
 
 function contactFields(item: DynamicRecord) {
   return {
@@ -49,7 +45,16 @@ function addedBy(item: DynamicRecord): { addedBy?: string } {
   return { addedBy: item.addedBy };
 }
 
+function agents(item: DynamicRecord): { agents?: string[] } {
+  if (item.agents === undefined) return {};
+  return { agents: decodeAgents(item.agents) };
+}
+
 function vaultItem(item: DynamicRecord): VaultItemSummary {
+  return { ...vaultItemFields(item), ...agents(item) };
+}
+
+function vaultItemFields(item: DynamicRecord): VaultItemSummary {
   if (SECRET_KEYS.some((key) => key in item)) throw new Error("Invalid Vault item.");
   const id = requiredString(item, "id");
   switch (item.kind) {
@@ -102,7 +107,13 @@ function vaultItem(item: DynamicRecord): VaultItemSummary {
 export function decodeVaultState(value: unknown): VaultState {
   const state = decodeRecord(value, "Vault state");
   if (!isOneOf(STATUSES, state.status)) throw new Error("Invalid Vault status.");
-  return { status: state.status, items: decodeList(state.items, "Vault item", vaultItem) };
+  if (state.agentScope !== undefined && typeof state.agentScope !== "boolean")
+    throw new Error("Invalid Vault agent scope.");
+  return {
+    status: state.status,
+    items: decodeList(state.items, "Vault item", vaultItem),
+    ...(state.agentScope === undefined ? {} : { agentScope: state.agentScope }),
+  };
 }
 
 export function decodeVaultImportResult(value: unknown): VaultImportResult {

@@ -232,7 +232,7 @@ export const messages = {
   "import.hermes.reason.invalidSkill": "لا يحتوي ملف SKILL.md الخاص بها على اسم ووصف صالحين.",
   "import.hermes.reason.duplicateSkill": "توجد مهارة أخرى في ملف التعريف هذا بالاسم نفسه.",
   "import.hermes.reason.builtIn": "تأتي مع Hermes. لدى OpenBot مهاراته الخاصة.",
-  "import.hermes.reason.mcpOff": "يُضاف متوقفًا. تحقّق منه، ثم شغّله في إعدادات MCP.",
+  "import.hermes.reason.mcpOff": "يُضاف متوقفًا. تحقّق منه، ثم شغّله في المتجر، التطبيقات.",
   "import.hermes.reason.mcpNameTaken": "يوجد خادم بهذا الاسم هنا بالفعل.",
   "import.hermes.reason.routineSchedule": "لا يستطيع OpenBot تشغيل جدولها، أو انقضى وقتها.",
   "import.hermes.reason.routineScript": "تشغّل نصًا برمجيًا، لا الوكيل.",

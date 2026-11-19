@@ -49,11 +49,6 @@ import { useMarketplaceInstalled } from "../model/use-marketplace";
 import { usePluginConnect } from "../model/use-plugin-connect";
 import { useTryInChat } from "../model/use-try-in-chat";
 
-/**
- * The page of one listing, as a sheet over the Marketplace. It shows what the listing is, as the
- * desktop page does; the `+` in the header installs it. A skill and an app that asks for a key or a
- * sign-in open the next page of the same sheet for that step.
- */
 export function MarketplaceListingScreen() {
   const { t, errorMessage } = useText();
   const { serverId, kind, id, name } = useLocalSearchParams<{
@@ -78,7 +73,6 @@ export function MarketplaceListingScreen() {
   });
   const app = apiUrl && kind === "app" ? appListings(apiUrl).find((item) => item.id === id) : undefined;
   const [busy, setBusy] = useState(false);
-  // The host may already install it. The sheet stays until the request settles.
   usePreventRemove(busy, () => undefined);
   const close = () => {
     if (router.canGoBack()) router.back();
@@ -119,7 +113,6 @@ export function MarketplaceListingScreen() {
       contentContainerClassName="gap-6 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
     >
-      {/* The name from the row, from the first frame; the loaded listing sets the same title. */}
       <Stack.Screen options={{ title: name ?? "" }} />
       {isAndroid ? (
         <AndroidHeaderButton
@@ -154,7 +147,6 @@ function ErrorText({ error }: { error: string | null }) {
   ) : null;
 }
 
-/** Why the user cannot install here: a member, or a server that is offline or too old for the route. */
 function useInstallBlock(serverId: string, allowed: boolean): string | null {
   const { t } = useText();
   const role = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId)?.role);
@@ -164,7 +156,6 @@ function useInstallBlock(serverId: string, allowed: boolean): string | null {
     : t("mobile.marketplace.permission.admin");
 }
 
-/** The properties of a catalog listing, as the desktop page lists them beside its content. */
 function useCatalogFacts(listing: MarketplaceListing, version: number, updatedAt: string, installs: number) {
   const { t, format } = useText();
   return [
@@ -195,8 +186,6 @@ function AgentPage({
   const installed = useMarketplaceInstalled(serverId);
   const canUpdate = useMobileWorkspaceSelector((workspace) => workspace.canUpdateMarketplaceAgents(serverId));
   const added = installed.agentFor(detail.id);
-  // The agent that this page added or updated, before the refreshed agent list shows it. Without it,
-  // the `+` comes back in that time, and a second tap adds a second agent.
   const [finished, setFinished] = useState<string | null>(null);
   const addedId = added?.id ?? finished;
   const updatable =
@@ -227,7 +216,6 @@ function AgentPage({
               listingId: detail.id,
               ...(added ? { agentId: added.id } : {}),
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              // Counts one install, however often a retry sends it.
               receiptId: Crypto.randomUUID(),
             },
             serverId,
@@ -235,7 +223,6 @@ function AgentPage({
       );
       setFinished(result.id);
       void haptics.notification("success");
-      // The chat list shows the new agent; a failed refresh does not make the install fail.
       void refreshServer(serverId).catch(() => undefined);
     } catch (cause) {
       void haptics.notification("error");
@@ -271,7 +258,6 @@ function AgentPage({
         </SettingsNote>
       ) : null}
       {addedId ? (
-        // The app's own black or white action, not the accent; the scale feedback has no tinted flash.
         <Button
           className="bg-action"
           feedbackVariant="scale"
@@ -325,7 +311,6 @@ function AgentPage({
   );
 }
 
-/** The SKILL.md body without its first heading, when that heading only repeats the name, as on the desktop. */
 function skillInstructions(skill: Pick<MarketplaceSkillDetail, "name" | "description" | "instructions">): string {
   const instructions = skill.instructions || skill.description;
   const [first, ...rest] = instructions.split(/\r?\n/u);
@@ -355,7 +340,6 @@ function SkillPage({
   const tryInChat = useTryInChat(serverId);
   const usable = installed.usableSkillAgentIds(detail.id, detail.version);
   const example = detail.examplePrompt?.trim() || t("mobile.marketplace.skill.examplePrompt");
-  // As on the desktop: the skill's marker, then the example, so the agent knows which skill to use.
   const request = `${serializeChatTagReference("skill", detail.name, detail.id)} ${example}`;
   const targets = {
     agents: installed.agents.filter((agent) => usable.includes(agent.id)),
@@ -424,12 +408,15 @@ function AppPage({
   const { t } = useText();
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
-  const block = useInstallBlock(serverId, canManage);
+  const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   const installed = useMarketplaceInstalled(serverId);
   const app = plugin.apps[0] ?? null;
+  const needsMac = macUnavailable && plugin.apps.some((entry) => entry.needsMac);
+  const block = useInstallBlock(serverId, canManage) ?? (needsMac ? t("mobile.marketplace.app.needsMac") : null);
   const method = app ? pluginConnectMethod(app, canRelay) : null;
   const connect = usePluginConnect(serverId, app, method);
   const connected = connect.state.phase === "done" || installed.installed(listing);
+  const connectedServerId = connected ? pluginServerId(plugin, installed.mcpServers ?? []) : null;
   const working = connect.state.phase === "working";
   useEffect(() => onBusy(working), [onBusy, working]);
   const installable =
@@ -437,8 +424,6 @@ function AppPage({
   const [first, ...more] = plugin.prompts;
   const [muted] = useThemeColor(["muted"]);
   const tryInChat = useTryInChat(serverId);
-  // An app's tools reach every agent of the server, so any agent can try it once it is connected.
-  // The request is the question alone, as on the desktop: there is no marker to point at.
   const targetsFor = (text: string) => ({
     agents: connected ? installed.agents : [],
     onTry: (agentId: string) => tryInChat(agentId, text),
@@ -449,8 +434,9 @@ function AppPage({
     plugin.privacyPolicyUrl ? { label: t("mobile.marketplace.app.privacy"), url: plugin.privacyPolicyUrl } : null,
     plugin.termsUrl ? { label: t("mobile.marketplace.app.terms"), url: plugin.termsUrl } : null,
   ].filter((link) => link !== null);
-  const access =
-    method?.kind === "key"
+  const access = needsMac
+    ? t("mobile.marketplace.facts.accessMac")
+    : method?.kind === "key"
       ? t("mobile.marketplace.facts.accessKey")
       : method?.kind === "link" || method?.kind === "relayUnsupported"
         ? t("mobile.marketplace.facts.accessSignIn")
@@ -467,7 +453,6 @@ function AppPage({
   ];
 
   function add() {
-    // An app that asks for nothing connects from here; a key or a sign-in has its own page.
     if (method?.kind === "none") void connect.connect();
     else router.push({ pathname: "/marketplace-listing/connect", params: { serverId, slug: plugin.slug } });
   }
@@ -499,13 +484,15 @@ function AppPage({
       {connected ? (
         <SettingsSection footer={t("mobile.marketplace.app.connectedHint")}>
           <SettingsRow
-            onPress={() => {
-              // The app's own MCP page; the list when the row is not known yet, such as right after a connect.
-              const mcpServerId = pluginServerId(plugin, installed.mcpServers ?? []);
-              if (mcpServerId)
-                router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId } });
-              else router.push({ pathname: "/server-settings/mcp", params: { serverId } });
-            }}
+            onPress={
+              connectedServerId
+                ? () =>
+                    router.push({
+                      pathname: "/server-settings/mcp-server",
+                      params: { serverId, mcpServerId: connectedServerId },
+                    })
+                : undefined
+            }
           >
             <Typography.Paragraph>{t("mobile.marketplace.app.connected")}</Typography.Paragraph>
           </SettingsRow>

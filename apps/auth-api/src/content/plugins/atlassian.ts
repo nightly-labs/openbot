@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Atlassian here is taken from support.atlassian.com and
-// developer.atlassian.com. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const ATLASSIAN_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

@@ -1,11 +1,9 @@
-// The always-on-top island window: its preference, its presentation, and the actions and
-// haptics it sends back.
-
 import { Effect } from "effect";
 import type { IpcMainInvokeEvent } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type DynamicIslandWindowController, requireDynamicIslandSender } from "../dynamic-island-window";
 import {
+  parseBrowserTakeoverPage,
   parseDynamicIslandAction,
   parseDynamicIslandInputRegion,
   parseDynamicIslandInteractive,
@@ -30,14 +28,14 @@ export interface DynamicIslandIpcDependencies {
     | "setInteractive"
     | "setInputRegion"
   >;
-  /** On Wayland, starts OpenBot again on XWayland at each start, or stops that. */
+  chatRendererIds: () => ReadonlySet<number>;
   setXWayland: (enabled: boolean) => Effect.Effect<void, { readonly cause: unknown }>;
-  /** Already on XWayland in a Wayland session: keeps that for the next start. Does not restart. */
   keepXWayland: () => Effect.Effect<void, { readonly cause: unknown }>;
 }
 
 export function dynamicIslandIpcHandlers({
   dynamicIsland,
+  chatRendererIds,
   setXWayland,
   keepXWayland,
 }: DynamicIslandIpcDependencies): Pick<IpcGroupHandlers, "dynamicIsland"> {
@@ -45,6 +43,8 @@ export function dynamicIslandIpcHandlers({
     requireDynamicIslandSender(event.sender.id, dynamicIsland.mainRendererIds, "main renderer");
   const fromOverlayRenderer = (event: IpcMainInvokeEvent) =>
     requireDynamicIslandSender(event.sender.id, dynamicIsland.overlayRendererIds, "Dynamic Island renderer");
+  const fromChatWindow = (event: IpcMainInvokeEvent) =>
+    requireDynamicIslandSender(event.sender.id, chatRendererIds(), "chat windows");
 
   return {
     dynamicIsland: {
@@ -59,18 +59,17 @@ export function dynamicIslandIpcHandlers({
       setPreference: authorizedHandler(fromMainRenderer, parseDynamicIslandPreference, (_event, preference) => {
         const wasEnabled = dynamicIsland.preference.enabled;
         return runCauseEffect(
-          dynamicIsland.setPreference(preference).pipe(
-            // Linux: an island that is off does not need XWayland, so the next start on a Wayland
-            // session uses Wayland again. An island that the user turns on again on XWayland keeps it;
-            // another change does not, so a start on XWayland for another reason stays a single start.
-            Effect.tap((saved) =>
-              saved.enabled
-                ? wasEnabled
-                  ? Effect.void
-                  : keepXWayland().pipe(Effect.ignore)
-                : setXWayland(false).pipe(Effect.ignore),
+          dynamicIsland
+            .setPreference(preference)
+            .pipe(
+              Effect.tap((saved) =>
+                saved.enabled
+                  ? wasEnabled
+                    ? Effect.void
+                    : keepXWayland().pipe(Effect.ignore)
+                  : setXWayland(false).pipe(Effect.ignore),
+              ),
             ),
-          ),
         );
       }),
       publishPresentation: authorizedHandler(fromMainRenderer, parseDynamicIslandPresentation, (_event, presentation) =>
@@ -86,6 +85,9 @@ export function dynamicIslandIpcHandlers({
       }),
       performAction: authorizedHandler(fromOverlayRenderer, parseDynamicIslandAction, (_event, action) =>
         runCauseEffect(dynamicIsland.performAction(action)),
+      ),
+      openBrowserTakeover: authorizedHandler(fromChatWindow, parseBrowserTakeoverPage, (_event, page) =>
+        runCauseEffect(dynamicIsland.performAction({ type: "open-browser-takeover", ...page })),
       ),
       performHaptic: eventHandler((event) => {
         fromOverlayRenderer(event);

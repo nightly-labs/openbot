@@ -1,17 +1,3 @@
-// Appends the `AGENTS.md` files and the domain review fragments for the directories the PR diff
-// touches, so one reviewer call carries the base instructions plus only the repository and
-// domain knowledge this diff needs.
-//
-// Fragments are read from the base commit, never from the working tree, for the same reason the
-// workflow reads the base prompt that way: a pull request must not be able to rewrite the
-// instructions used to review it.
-//
-// Nothing here may import a workspace package. The workflow copies this file to `$RUNNER_TEMP` and
-// runs it with `--no-install`, so an import outside `node:` cannot resolve and the composer dies
-// before it produces a prompt - which fails the review of every open pull request, not just the one
-// that added the import. Resolving it by running the copy inside the checkout instead would hand a
-// pull request the ability to edit the package the composer imports, and so to run its own code
-// inside the trusted step. The stdlib is the price of that guarantee.
 import { execFileSync } from "node:child_process";
 
 const FRAGMENT_DIRECTORY = ".github/review";
@@ -26,7 +12,6 @@ function git(args: string[]): string {
   return execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
 
-/** Parses the `include:` list out of a fragment's front matter and returns the body after it. */
 export function parseFragment(path: string, source: string): ReviewFragment {
   const lines = source.split("\n");
   if (lines[0]?.trim() !== "---") throw new Error(`${path}: missing front matter`);
@@ -60,7 +45,6 @@ export function parseFragment(path: string, source: string): ReviewFragment {
   };
 }
 
-/** Matches the `*` / `**` subset of glob syntax the fragments use. */
 export function matchesGlob(glob: string, filePath: string): boolean {
   const pattern = glob
     .split(/(\*\*\/|\*\*|\*)/)
@@ -95,7 +79,6 @@ export function readFragmentsAtCommit(commit: string): ReviewFragment[] {
     .map((path) => parseFragment(path, git(["show", `${commit}:${path}`])));
 }
 
-/** The root `AGENTS.md` and each nested one whose directory holds a changed file. */
 export function selectAgentFiles(agentFiles: string[], changedFiles: string[]): string[] {
   return agentFiles.filter((path) => {
     if (path === "AGENTS.md") return true;
@@ -104,9 +87,6 @@ export function selectAgentFiles(agentFiles: string[], changedFiles: string[]): 
   });
 }
 
-// The reviewer used to read these from the checkout, which is the pull request's own copy: a
-// pull request could rewrite the rules its review applied. Read from the base commit and handed
-// over whole, they are also read once, instead of again after every context compaction.
 export function composeAgentInstructions(baseSha: string, changedFiles: string[]): string {
   const agentFiles = git(["ls-tree", "-r", "--name-only", baseSha])
     .split("\n")

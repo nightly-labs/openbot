@@ -13,23 +13,15 @@ interface MoreProvidersEntry {
 export interface MoreProvidersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The providers that the list does not show, in the order to list them. */
   providers: readonly MoreProvidersEntry[];
-  /** Adds the custom provider entry below a divider. */
   custom?: boolean;
   onChoose: (provider: AgentProviderId) => void;
   onChooseCustom?: (() => void) | undefined;
-  /** Kobalte calls it when the dialog closes, before it moves the focus back to the trigger. */
   onCloseAutoFocus?: ((event: Event) => void) | undefined;
 }
 
-/** The search field shows only when the list is long enough to need it. */
 const SEARCH_FROM = 8;
 
-/**
- * The providers that are not in the list: a title and one plain list. Each row is the full target,
- * so there are no group labels, cards or "Add" buttons. The custom provider is last, below a line.
- */
 export function MoreProvidersDialog(props: MoreProvidersDialogProps) {
   const { t } = useText();
   const [query, setQuery] = createSignal("");
