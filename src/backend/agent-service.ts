@@ -6330,13 +6330,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "load message agent", cause: failure.cause }),
         ),
       );
-    yield* this.#providers
-      .ensureProvider(providerForAgent(agent))
-      .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
-        ),
-      );
+    const provider = providerForAgent(agent);
+    const providerState = () => this.#providers.status().providers?.find((status) => status.id === provider)?.state;
+    const signedInBeforeSend = providerState() === "available";
+    yield* this.#providers.ensureProvider(provider).pipe(
+      Effect.catchIf(
+        () =>
+          providerState() === "sign-in-required" &&
+          (signedInBeforeSend || this.#mailbox.nextQueued(agent.id, input.taskId ?? null) !== null),
+        () => Effect.void,
+      ),
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
+      ),
+    );
     yield* lifecycleStep("validate message recipient", validateRecipient);
     const taskId = input.taskId;
     const task = taskId

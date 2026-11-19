@@ -3460,6 +3460,8 @@ export class ProviderRuntime implements ProviderPort {
                 email: null,
               }),
             });
+            if (this.#released.has(provider) || this.#restartAttempts.has(provider))
+              this.#scheduleStartRetry(provider, !disposed());
             return message;
           }
           const authenticated = account.account;
