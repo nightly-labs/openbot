@@ -15,8 +15,13 @@ export const FINISH_CHECK_DEADLINE_MS = 30_000;
 /** The text in the provider input that marks a finish check, for logs and test fakes. */
 export const FINISH_CHECK_MARKER = "OpenBot finish check";
 
+/** How often a running check looks for a Stop or a new message, which end it at once. */
+export const FINISH_CHECK_ABORT_POLL = "250 millis";
+
+/** The most chat messages from before the request that the check reads. */
+export const FINISH_CHECK_CONTEXT_MESSAGES = 6;
+
 const REQUEST_CHARACTERS = 2_000;
-const CONTEXT_MESSAGES = 6;
 const CONTEXT_CHARACTERS = 600;
 const ANSWER_CHARACTERS = 4_000;
 const STEP_LINES = 40;
@@ -79,7 +84,7 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
           "The chat before the request, only to understand it:",
           "<context>",
           ...input.context
-            .slice(-CONTEXT_MESSAGES)
+            .slice(-FINISH_CHECK_CONTEXT_MESSAGES)
             .map((message) => `${message.author}: ${clip(oneLine(message.text), CONTEXT_CHARACTERS)}`),
           "</context>",
         ]

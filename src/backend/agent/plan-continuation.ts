@@ -396,7 +396,8 @@ export class PlanContinuation {
   ): ({ kind: ContinuationKind } & ContinuationCount) | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
-    if (chain?.kind !== "finishCheck" || chain.gap !== null || chain.count >= this.#limit) {
+    // `consider` gives no check at the limit, so a chain that waits for a check is below it.
+    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
       this.#chains.delete(key);
       return null;
     }

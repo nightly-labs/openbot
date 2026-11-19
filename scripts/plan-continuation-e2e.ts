@@ -33,7 +33,8 @@
 //      most 3 times for one request. "done", "user", an answer that does not decode, and a turn with no
 //      tool end the request. An offer question ("Do you want me to fix b.ts too?") continues only on
 //      a "continue" verdict. The message names the verdicts in `<<VERDICT[...]VERDICT>>`: each check of
-//      that request takes the next one, and a string element is the raw answer.
+//      that request takes the next one, and a string element is the raw answer. A Stop or a new
+//      message during a slow check ends the check at once, and the request does not continue.
 // Not checked: a message sent in the short gap before a continuation starts. The drain starts the
 // continuation at once, and a hidden agent refuses new messages. Check 7 covers the same rule.
 // No provider, account or network is used. `bun run test:plan-continuation`.
@@ -91,8 +92,11 @@ interface FakeTurn {
 const plan = (...turns: FakeTurn[]) =>
   `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
 
-/** One verdict of the finish check, or a raw answer that is not a verdict. */
-type Verdict = { verdict: "done" | "continue" | "user" | "blocked"; missing?: string } | string;
+/**
+ * One verdict of the finish check, or a raw answer that is not a verdict. `delayMs`: the check
+ * answers only after this time, as a slow model does.
+ */
+type Verdict = { verdict: "done" | "continue" | "user" | "blocked"; missing?: string; delayMs?: number } | string;
 
 /** The answers of the finish checks of one request, in order. */
 const verdicts = (...answers: Verdict[]) => `<<VERDICT${JSON.stringify(answers)}VERDICT>>`;
@@ -175,8 +179,10 @@ const answer = (message) => {
         const answers = named ? JSON.parse(named[1]) : [];
         const chosen = answers[earlier] ?? { verdict: "done" };
         log({ method: "check", key, text });
-        const answer = typeof chosen === "string" ? chosen : JSON.stringify(chosen);
-        return finish({ threadId: params.threadId, turnId, script: { steps: [], answer } });
+        const { delayMs, ...verdict } = typeof chosen === "string" ? {} : chosen;
+        const answer = typeof chosen === "string" ? chosen : JSON.stringify(verdict);
+        const checked = { threadId: params.threadId, turnId, script: { steps: [], answer } };
+        return delayMs ? timers.set(turnId, setTimeout(() => finish(checked), delayMs)) : finish(checked);
       }
       const note = text.includes(NOTE);
       if (!note) {
@@ -1140,6 +1146,47 @@ try {
     assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
     assert.equal(continuationLines(agent.id).length, 3);
     return { turns: turns.length };
+  });
+
+  await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
+    // The check answers "continue" after 20 s. Each request must end well before that.
+    const slow: Verdict = { verdict: "continue", missing: "Fix the rest.", delayMs: 20_000 };
+    const quick = 8_000;
+    const stopped = await createAgent("Halted");
+    let mark = loggedTurns().length;
+    let checks = loggedChecks().length;
+    const first = await send(
+      stopped.id,
+      `Fix the stopped files. ${verdicts(slow)} ${plan({ steps: [], commands: ["fix a.ts"], answer: "I fixed a.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const turnId = turnsSince(mark)[0]?.turnId;
+    assert.ok(turnId, "The request ran a turn.");
+    await runCauseEffect(current.service.interrupt(stopped.id, turnId));
+    assert.ok(ended(await settled(first, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(stopped.id).length, 0);
+
+    const queued = await createAgent("Overtaken");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const second = await send(
+      queued.id,
+      `Fix the queued files. ${verdicts(slow)} ${plan({ steps: [], commands: ["fix b.ts"], answer: "I fixed b.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const next = await send(queued.id, "Use tabs.");
+    assert.equal(await settled(second, quick), "completed", "The new message ends the check before it answers.");
+    assert.equal(await settled(next, quick), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, false],
+      "No continuation turn runs, and the new message runs next.",
+    );
+    assert.ok(turns[1]?.text.includes("Use tabs."));
+    assert.equal(continuationLines(queued.id).length, 0);
+    return { checks: loggedChecks().length - checks };
   });
 
   await check("a done or user verdict, a bad answer, or a turn with no tool ends the request", async () => {

@@ -30,7 +30,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { userErrorMessage } from "@openbot/user-errors";
-import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
+import { Cause, Deferred, Effect, Exit, Schedule, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { BrowserOperationError } from "../browser-effects";
@@ -66,6 +66,8 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import type { DeltaBuffer } from "./delta-buffer";
 import type { FailureContext, FailureSignal } from "./failure-signal";
 import {
+  FINISH_CHECK_ABORT_POLL,
+  FINISH_CHECK_CONTEXT_MESSAGES,
   FINISH_CHECK_DEADLINE_MS,
   type FinishCheckInput,
   type FinishCheckResult,
@@ -867,24 +869,38 @@ export class TurnLifecycle {
       )
     )
       return "no";
-    const free =
-      !this.#hooks.turnStopped(agentId, taskId, turnId) &&
-      !this.#hooks.hasOpenWait(
-        agentId,
-        deliveries.map(({ delivery }) => delivery.id),
-      ) &&
-      !this.#attention.hasAttentionFor(agentId) &&
-      this.#mailbox.laneQueuedIds(agentId, taskId).length === 0;
-    if (!free) return "no";
+    if (!this.#mayContinue(agentId, taskId, turnId, deliveries)) return "no";
     // A question in the last line can be an offer to do work that the request already asked for. Only
     // the finish check, which reads the request, may continue it.
     return waitsForUser(answer) ? "only" : "allowed";
   }
 
   /**
+   * Whether nothing stops the request of this turn from continuing: the user did not stop the turn,
+   * the agent waits for nothing and needs no attention, and no message waits in its lane.
+   */
+  #mayContinue(
+    agentId: string,
+    taskId: string | null,
+    turnId: string,
+    deliveries: readonly DeliveryContext[],
+  ): boolean {
+    return (
+      !this.#hooks.turnStopped(agentId, taskId, turnId) &&
+      !this.#hooks.hasOpenWait(
+        agentId,
+        deliveries.map(({ delivery }) => delivery.id),
+      ) &&
+      !this.#attention.hasAttentionFor(agentId) &&
+      this.#mailbox.laneQueuedIds(agentId, taskId).length === 0
+    );
+  }
+
+  /**
    * Runs the finish check of a turn that no other rule continued, and answers the work it found not
-   * done, or null. A check that fails, runs out of time, or ends after the user stopped the turn or
-   * sent a new message, does not continue the request.
+   * done, or null. A check that fails or runs out of time does not continue the request. When the
+   * user stops the turn or sends a new message during the check, the check ends at once
+   * (`FINISH_CHECK_ABORT_POLL`), so the lane does not wait for it.
    */
   #checkFinish(
     agentId: string,
@@ -900,23 +916,21 @@ export class TurnLifecycle {
     const check = this.#hooks.checkFinish;
     if (!check) return Effect.succeed(null);
     const redact = (text: string) => redactText(this.#hooks.redactMcp(text));
+    // The deliveries hold the request text. A long chain can push the request message out of the
+    // loaded page of the chat, and then the chat before it is not loaded either.
+    const request = deliveries.map(({ delivery }) => redact(delivery.text)).filter((text) => text.trim().length > 0);
+    if (request.length === 0) return Effect.succeed(null);
     const deliveryIds = new Set(deliveries.map(({ delivery }) => delivery.id));
     const requestIndex = snapshot.messages.findIndex(
       (message) => message.delivery !== undefined && deliveryIds.has(message.delivery.id),
     );
-    const request = snapshot.messages
-      .filter((message) => message.delivery !== undefined && deliveryIds.has(message.delivery.id))
-      .map((message) => redact(message.text))
-      .filter((text) => text.trim().length > 0);
-    if (requestIndex < 0 || request.length === 0) return Effect.succeed(null);
-    const context = snapshot.messages
-      .slice(0, requestIndex)
+    const context = (requestIndex < 0 ? [] : snapshot.messages.slice(0, requestIndex))
       .filter(
         (message) =>
           message.text.trim().length > 0 &&
           (message.author === "user" || (message.author === "assistant" && message.itemType !== "commentary")),
       )
-      .slice(-6)
+      .slice(-FINISH_CHECK_CONTEXT_MESSAGES)
       .map((message) => ({ author: message.author, text: redact(message.text) }));
     const input: FinishCheckInput = {
       request,
@@ -931,19 +945,22 @@ export class TurnLifecycle {
       answer: redact(answer),
       continuations,
     };
-    return Effect.suspend(() => check(agentId, input)).pipe(
-      Effect.timeoutOption(FINISH_CHECK_DEADLINE_MS),
-      Effect.map((result) => {
-        if (result._tag === "None" || result.value === null) return null;
-        // The check took a few seconds: the user can have stopped the turn or written since.
-        if (
-          this.#hooks.turnStopped(agentId, taskId, turnId) ||
-          this.#mailbox.laneQueuedIds(agentId, taskId).length > 0 ||
-          this.#attention.hasAttentionFor(agentId)
-        )
-          return null;
-        return finishCheckGap(result.value);
-      }),
+    // The check takes a few seconds, and the turn's deliveries hold the lane until it ends.
+    const aborted = Effect.sync(() => !this.#mayContinue(agentId, taskId, turnId, deliveries)).pipe(
+      Effect.repeat({ until: (stop) => stop, schedule: Schedule.spaced(FINISH_CHECK_ABORT_POLL) }),
+      Effect.as(null),
+    );
+    return Effect.raceFirst(
+      Effect.suspend(() => check(agentId, input)).pipe(
+        Effect.timeoutOption(FINISH_CHECK_DEADLINE_MS),
+        Effect.map((result) => (result._tag === "None" ? null : result.value)),
+      ),
+      aborted,
+    ).pipe(
+      Effect.map((result) =>
+        // The user can have stopped the turn or written between the last poll and the answer.
+        result === null || !this.#mayContinue(agentId, taskId, turnId, deliveries) ? null : finishCheckGap(result),
+      ),
       Effect.catchCause((cause) =>
         Effect.sync(() => {
           logger.warn("The finish check of a turn failed.", { error: Cause.squash(cause) });
