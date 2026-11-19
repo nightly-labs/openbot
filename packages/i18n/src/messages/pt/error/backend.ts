@@ -280,6 +280,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Este servidor pede login. Entre nele pelo OpenBot no computador anfitrião.",
   "error.backend.mcpSignInNeedsHttps":
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Este servidor só faz login em {url}. Altere a URL para este endereço e depois entre de novo.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
   "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",

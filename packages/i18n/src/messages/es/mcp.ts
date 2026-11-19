@@ -102,6 +102,7 @@ export const messages = {
   "mcp.panel.signIn": "Iniciar sesión",
   "mcp.panel.signOut": "Cerrar sesión",
   "mcp.panel.cancelSignIn": "Cancelar",
+  "mcp.panel.useAddress": "Usar esta dirección",
   "mcp.panel.signInTo": "Iniciar sesión en {name}",
   "mcp.panel.signInWaiting": {
     one: "Completa el inicio de sesión en tu navegador. OpenBot deja de esperar después de {count} minuto.",

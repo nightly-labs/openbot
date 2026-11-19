@@ -265,6 +265,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Bu sunucu oturum açılmasını istiyor. Ana makinedeki OpenBot'ta oturum açın.",
   "error.backend.mcpSignInNeedsHttps":
     "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
+  "error.backend.mcpSignInOtherAddress":
+    "Bu sunucu yalnızca {url} adresinde oturum açar. URL'yi bu adresle değiştirin, sonra yeniden oturum açın.",
   "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
   "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
   "error.backend.mcpSignInRefused": "Oturum açma sayfası erişimi reddetti. Yeniden oturum açın.",

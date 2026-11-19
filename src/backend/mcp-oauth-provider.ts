@@ -49,11 +49,13 @@ import {
   type OAuthTokens,
   OAuthTokensSchema,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import { checkResourceAllowed, resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
 import { mcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
+import { getDomain } from "tldts";
 import { z } from "zod";
 import { runCauseEffect } from "./effect-boundary";
 import { readLimitedBody } from "./limited-body";
@@ -325,6 +327,8 @@ export interface McpSignIn {
    * token, such as Coolify, has no sign-in to find there (#9176).
    */
   signInServerMissing: () => boolean;
+  /** The address the server signs in at instead of the one the user typed, or `null`. See `otherAddress`. */
+  otherAddress: () => string | null;
   /**
    * The HTTP status of this attempt's last registration answer, or `null`. The SDK keeps the status
    * only when the body is not an OAuth error, and turns a code it does not know into a
@@ -710,6 +714,7 @@ export class McpOAuth implements McpOAuthAuthority {
       registrationFailed: () => provider.registrationPending,
       registrationUnsupported: () => provider.registrationUnsupported,
       signInServerMissing: () => provider.signInServerMissing,
+      otherAddress: () => provider.otherAddress,
       registrationStatus: () => provider.registrationStatus,
       registrationRedirectRefused: () => provider.redirectRefused,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
@@ -1338,6 +1343,26 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       !discovery.authorizationServerMetadata &&
       !discovery.resourceMetadata
     );
+  }
+
+  /**
+   * The https address that the protected-resource metadata names, when it is not the address the
+   * user typed. The SDK refuses such a resource before any page opens. COROS answers at
+   * `mcp.coros.com` with the metadata of `mcpeu.coros.com` (#12431). The SDK saves the discovery
+   * before it checks, so this reads what it refused. Only an address on the same site is offered.
+   */
+  get otherAddress(): string | null {
+    const resource = this.#discoveryState?.resourceMetadata?.resource;
+    if (!resource || !URL.canParse(resource)) return null;
+    const requested = resourceUrlFromServerUrl(this.#options.resource);
+    if (checkResourceAllowed({ requestedResource: requested, configuredResource: resource })) return null;
+    const address = new URL(resource);
+    const site = getDomain(address.hostname, { allowPrivateDomains: true });
+    if (address.protocol !== "https:" || !site || site !== getDomain(requested.hostname, { allowPrivateDomains: true }))
+      return null;
+    address.search = "";
+    address.hash = "";
+    return address.href;
   }
 
   get registrationStatus(): number | null {

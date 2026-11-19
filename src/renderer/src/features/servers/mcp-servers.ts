@@ -13,7 +13,7 @@ import {
   normalizeMcpConfig,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
-import { type AppTextKey, type AppTranslate, matchingSourceKeys } from "@openbot/i18n";
+import { type AppTextKey, type AppTranslate, matchingSourceKeys, sourceTextValues } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 
 export type {
@@ -49,6 +49,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpRegistrationRefused": "refused",
   "error.backend.mcpSignInAppRefused": "refused",
   "error.backend.mcpSignInNeedsHttps": "url",
+  "error.backend.mcpSignInOtherAddress": "url",
   "error.backend.mcpServerHttpUrl": "url",
   "error.backend.mcpServerNoAnswer": "timeout",
   "error.backend.mcpSignInResponseTimedOut": "timeout",
@@ -79,6 +80,11 @@ export function isMcpSignInOnHost(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInOnHost";
 }
 
+/** The address a sign-in answered that the server signs in at, instead of the URL that was tried. */
+export function mcpSignInAddress(sourceText: string): string | undefined {
+  return sourceTextValues(sourceText, "error.backend.mcpSignInOtherAddress")?.url;
+}
+
 /** Whether a test answered that the user cancelled a sign-in, which is not a failure to show. */
 export function isMcpSignInCancelled(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInCancelled";
@@ -95,7 +101,8 @@ export type McpTestState =
   /** A sign-in the user started, waiting for the browser to come back. */
   | { status: "signing-in" }
   | { status: "passed"; toolCount: number }
-  | { status: "failed"; error: string; kind: McpFailureKind };
+  /** `address`: where the server signs in, which "Use this address" puts in the URL. */
+  | { status: "failed"; error: string; kind: McpFailureKind; address?: string };
 
 /** The sign-in states main answers with, as the lookup by row id the panel reads. */
 export function mcpSignInRecord(states: readonly McpSignInState[]): Record<string, McpSignInState> {

@@ -291,6 +291,8 @@ export const messages = {
     "Dieser Server verlangt eine Anmeldung. Melde dich in OpenBot auf dem Host-Computer bei ihm an.",
   "error.backend.mcpSignInNeedsHttps":
     "Dieser Server verlangt eine Anmeldung, und OpenBot meldet sich nur über https an. Ändere die URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Dieser Server meldet sich nur unter {url} an. Ändere die URL in diese Adresse und melde dich dann erneut an.",
   "error.backend.mcpSignInCancelled": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInTimedOut": "Die Anmeldung wurde im Browser nicht abgeschlossen.",
   "error.backend.mcpSignInRefused": "Die Anmeldeseite hat den Zugriff abgelehnt. Melde dich erneut an.",

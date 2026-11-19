@@ -98,6 +98,7 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.signIn": "Sign in",
   "mcp.panel.signOut": "Sign out",
   "mcp.panel.cancelSignIn": "Cancel sign-in",
+  "mcp.panel.useAddress": "Use this address",
   "mcp.panel.signInTo": "Sign in to {name}",
   "mcp.panel.signInWaiting": {
     one: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minute.",

@@ -242,6 +242,7 @@ export const messages = {
   "error.backend.mcpSignInRequired": "该服务器要求登录。请选择“登录”，在浏览器中继续。",
   "error.backend.mcpSignInOnHost": "该服务器要求登录。请在主机电脑上的 OpenBot 中登录它。",
   "error.backend.mcpSignInNeedsHttps": "该服务器要求登录，而 OpenBot 仅通过 https 登录。请把地址改为 {url}。",
+  "error.backend.mcpSignInOtherAddress": "此服务器只能在 {url} 登录。请将 URL 改为此地址，然后重新登录。",
   "error.backend.mcpSignInCancelled": "登录已取消。",
   "error.backend.mcpSignInTimedOut": "未在浏览器中完成登录。",
   "error.backend.mcpSignInRefused": "登录页面拒绝了访问。请重新登录。",

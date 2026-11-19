@@ -25,7 +25,13 @@ export {
   type Translate,
 } from "./message";
 export type { AppMessages } from "./messages/en/index";
-export { localizeSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "./source-text";
+export {
+  localizeSourceText,
+  matchingSourceKeys,
+  type SourceMessages,
+  sourceText,
+  sourceTextValues,
+} from "./source-text";
 export { en };
 
 /** The desktop translator: every key of the desktop catalog, including shared and source keys. */

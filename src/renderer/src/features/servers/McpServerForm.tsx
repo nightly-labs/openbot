@@ -134,6 +134,16 @@ export function McpServerForm(props: McpServerFormProps) {
   const testDraft = () => measure("testing", runs.runTest);
   const signInDraft = () => measure("signing-in", runs.runSignIn);
 
+  const failedAddress = (shown: McpTestState) => (shown.status === "failed" ? shown.address : undefined);
+
+  /** Puts the address the server signs in at in the URL, and signs in there. Save keeps it. */
+  function switchAddress(url: string): void {
+    setState((current) => {
+      current.draft.url = url;
+    });
+    void signInDraft();
+  }
+
   /** Not behind the save: nothing may leave the user unable to stop a browser wait. */
   function cancelSignIn(url: string): void {
     props.tools
@@ -642,6 +652,21 @@ export function McpServerForm(props: McpServerFormProps) {
               <Text class="server-mcp-test-result" variant="caption" tone={mcpTestTone(shown())} role="status">
                 {runs.testMessage(shown())}
               </Text>
+              <Show when={signingIn() ? undefined : failedAddress(shown())}>
+                {(address) => (
+                  <div class="server-mcp-row-next">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={disabled() || waiting()}
+                      onClick={() => switchAddress(address())}
+                    >
+                      {t("mcp.panel.useAddress")}
+                    </Button>
+                  </div>
+                )}
+              </Show>
               <Show when={signingIn()}>
                 {(pending) => (
                   <div class="server-mcp-row-next">

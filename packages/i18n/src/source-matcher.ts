@@ -12,6 +12,8 @@ export interface SourceLocalizer {
   localize: (text: string, locale: TranslatedLocale) => string;
   /** Every key whose English can render `text`. A template that is not unique is a catalog bug. */
   matchingKeys: (text: string) => readonly string[];
+  /** The placeholder values that `text` gives to the English of `key`, or `null` when it is not that text. */
+  values: (text: string, key: string) => Readonly<Record<string, string>> | null;
 }
 
 interface Template {
@@ -161,5 +163,12 @@ export function createSourceLocalizer(input: {
       candidates(text)
         .filter((template) => template.pattern.test(text))
         .map((template) => template.key),
+    values: (text, key) => {
+      for (const template of candidates(text)) {
+        const match = template.key === key ? template.pattern.exec(text) : null;
+        if (match) return Object.fromEntries(template.names.map((name, position) => [name, match[position + 1] ?? ""]));
+      }
+      return null;
+    },
   };
 }

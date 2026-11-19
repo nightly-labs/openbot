@@ -353,6 +353,8 @@ function describeProbeFailure(
   accountRefused: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
+  const otherAddress = signIn?.otherAddress();
+  if (otherAddress) return sourceText("error.backend.mcpSignInOtherAddress", { url: otherAddress });
   // With no metadata, the SDK registers at a guessed address, and a token server answers that with
   // a status such as Laravel's 419, or 401. The sign-in never existed; the key is what it wants.
   if (signIn?.signInServerMissing()) return BEARER_KEY;

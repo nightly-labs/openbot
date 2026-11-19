@@ -95,6 +95,7 @@ export const messages = {
   "mcp.panel.signIn": "התחברות",
   "mcp.panel.signOut": "התנתקות",
   "mcp.panel.cancelSignIn": "ביטול התחברות",
+  "mcp.panel.useAddress": "השתמש בכתובת הזו",
   "mcp.panel.signInTo": "התחברות ל-{name}",
   "mcp.panel.signInWaiting": {
     one: "יש לסיים את ההתחברות בדפדפן. OpenBot מפסיק להמתין אחרי דקה.",

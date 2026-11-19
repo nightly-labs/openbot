@@ -36,6 +36,11 @@ export function localizeSourceText(text: string, locale: TranslatedLocale): stri
   return localizer.localize(text, locale);
 }
 
+/** The placeholder values that `text` gives to the English of `key`, or `null` when it is not that text. */
+export function sourceTextValues(text: string, key: keyof SourceMessages): Readonly<Record<string, string>> | null {
+  return localizer.values(text, key);
+}
+
 /** Every source key whose English can render `text`. `bun run i18n:check` expects one per template. */
 export function matchingSourceKeys(text: string): readonly string[] {
   return localizer.matchingKeys(text);

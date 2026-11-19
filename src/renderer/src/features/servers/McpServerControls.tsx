@@ -63,6 +63,11 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     return undefined;
   });
   const waiting = () => (test()?.status === "signing-in" ? state.test?.config : undefined);
+  /** The address the server answered that it signs in at. */
+  const otherAddress = () => {
+    const current = test();
+    return current?.status === "failed" ? current.address : undefined;
+  };
 
   async function latch(key: string, action: () => Promise<void>): Promise<void> {
     if (state.busy !== null) return;
@@ -114,6 +119,16 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
           current.error = errorMessage(error, t("mcp.panel.saveFailed"));
         });
       });
+  }
+
+  /** Stores the address the server signs in at, and signs in there. */
+  async function switchAddress(url: string): Promise<void> {
+    const current = config();
+    if (!current) return;
+    await latch("address", async () => {
+      await props.tools.save({ ...current, url });
+    });
+    if (config()?.url === url) void signIn();
   }
 
   function signOut(): void {
@@ -176,6 +191,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   }
                 >
                   {(note) => <ItemDescription class="server-mcp-row-text">{note()}</ItemDescription>}
+                </Show>
+                <Show when={otherAddress()}>
+                  {(address) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={state.busy !== null}
+                        loading={state.busy === "address"}
+                        onClick={() => void switchAddress(address())}
+                      >
+                        {t("mcp.panel.useAddress")}
+                      </Button>
+                    </div>
+                  )}
                 </Show>
                 <Show when={waiting()}>
                   {(pending) => (
