@@ -237,7 +237,7 @@ export const messages = {
   "error.provider.customEndpointKeyMissing":
     '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
   "error.provider.customEndpointEffortRefused":
-    '"{provider}" uç noktası bu modelin akıl yürütme eforunu reddetti. Sunucu ayarları → Sağlayıcılar bölümünde "{provider}" öğesini düzenleyin. Efor altında yalnızca bu modelin kabul ettiği düzeyleri bırakın veya Akıl yürütme yok için tümünün işaretini kaldırın. Ardından tekrar deneyin.',
+    '"{provider}" uç noktası bu modelin akıl yürütme eforunu reddetti. Sunucu ayarları → Sağlayıcılar bölümünde "{provider}" öğesini düzenleyin. Efor altında yalnızca bu modelin kabul ettiği düzeyleri bırakın veya Akıl yürütme yok seçeneğini seçin. Ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":

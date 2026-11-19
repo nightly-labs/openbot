@@ -218,7 +218,7 @@ export const messages = {
   "error.provider.customEndpointKeyMissing":
     "נקודת הקצה ״{provider}״ דורשת מפתח API. יש להוסיף את המפתח בהגדרות שרת ← ספקים, ואז לנסות שוב.",
   "error.provider.customEndpointEffortRefused":
-    "נקודת הקצה ״{provider}״ דחתה את רמת המאמץ של המודל הזה. בהגדרות שרת ← ספקים, יש לערוך את ״{provider}״. תחת רמות מאמץ, יש להשאיר רק את הרמות שהמודל מקבל, או לבטל את כולן לבחירת ללא הנמקה. ואז לנסות שוב.",
+    "נקודת הקצה ״{provider}״ דחתה את רמת המאמץ של המודל הזה. בהגדרות שרת ← ספקים, יש לערוך את ״{provider}״. תחת רמות מאמץ, יש להשאיר רק את הרמות שהמודל מקבל, או לבחור ללא הנמקה. ואז לנסות שוב.",
   "error.provider.opencodeKeyExpired":
     "תוקף מפתח ה-API של OpenCode פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
   "error.provider.opencodeKeyRefused":
