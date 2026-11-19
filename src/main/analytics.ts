@@ -39,8 +39,8 @@ import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider
 import type { WebhookDeliveryReport } from "./host-events-service";
 import { isProfileFrame, isProfileStack } from "./main-loop-profile";
 import {
+  isSignalHomeName,
   REMOTE_CONNECT_PHASES,
-  REMOTE_SIGNAL_HOMES,
   type RemoteConnectPhase,
   type RemoteConnectSummary,
 } from "./remote-connect-trace";
@@ -88,7 +88,6 @@ const REMOTE_CONNECT_ENUMS = {
   session_kind: ["new", "stored", "reused"],
   last_phase: ["start", ...REMOTE_CONNECT_PHASES],
   first_request: ["ok", "error"],
-  signal_home: REMOTE_SIGNAL_HOMES,
 } as const;
 const STARTUP_PROPERTY_NAMES = [
   "start_kind",
@@ -687,7 +686,7 @@ export class HostAnalytics {
       wait_ms: summary.waitMs,
       ...(summary.hostedStartWaitMs === undefined ? {} : { hosted_start_wait_ms: summary.hostedStartWaitMs }),
       failed_attempts: summary.failedAttempts,
-      ...(summary.signalHome ? { signal_home: summary.signalHome } : {}),
+      ...(summary.signalHome === undefined ? {} : { signal_home: summary.signalHome }),
     };
     for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) {
       const ms = summary.phases[phase];
@@ -1284,12 +1283,12 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       key === "connection" ||
       key === "session_kind" ||
       key === "last_phase" ||
-      key === "first_request" ||
-      key === "signal_home"
+      key === "first_request"
     ) {
       const allowed: readonly string[] = REMOTE_CONNECT_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
     }
+    if (key === "signal_home") return isSignalHomeName(value) ? value : undefined;
     if (key === "failed_attempts") return boundedCount(value, 100_000);
     if (key === "wait_ms" || key === "hosted_start_wait_ms") return boundedCount(value, MAX_REMOTE_CONNECT_WAIT_MS);
     return boundedCount(value, MAX_REMOTE_CONNECT_PHASE_MS);

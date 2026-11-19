@@ -316,9 +316,6 @@ Setup of each machine (Ubuntu 26.04):
    `openbot_remote_signal_entry` 0.
 7. Worker variables: add the home to `REMOTE_SIGNAL_HOMES` after `a` and `b`, its webhook URL to
    `REMOTE_AUTH_WEBHOOK_URLS`, and its place to `REMOTE_SIGNAL_HOME_LOCATIONS`, in one deploy.
-8. Desktop: add the home and its host name to `REMOTE_SIGNAL_HOMES` and `SIGNAL_HOME_HOSTNAMES` in
-   `src/main/remote-connect-trace.ts`, so `signal_home` on `system_remote_connect` names it. Until
-   that release, connections to the new home report `other`.
 
 Placement: `REMOTE_SIGNAL_HOME_LOCATIONS` gives each home a place as `id=latitude:longitude`. The
 ticket route reads the host place from the Cloudflare request (`request.cf`). The Worker keeps the

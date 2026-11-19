@@ -949,8 +949,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (startedNewSession) this.#lastEventSequence.delete(hostId);
     const connectedSessionId = active.sessionId;
     this.#signalUrl = bootstrap.signalUrl;
-    connectTrace?.signalHome(hostId, bootstrap.signalUrl);
-    if (this.#options.sessionCache && this.#active.get(hostId) === active && !active.cancelled)
+    const stillCurrent = this.#active.get(hostId) === active && !active.cancelled;
+    if (stillCurrent) connectTrace?.signalHome(hostId, bootstrap.ticket);
+    if (this.#options.sessionCache && stillCurrent)
       yield* this.#options.sessionCache.set(
         active.principalId,
         hostId,

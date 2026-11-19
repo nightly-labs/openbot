@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { REMOTE_TICKET_AUDIENCE, type RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 import { createOpenBotLogger } from "@openbot/logging";
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import { HostAnalytics, type HostOpenPanelClient } from "../src/main/analytics";
@@ -21,6 +22,13 @@ const PHASE_PROPERTIES = [
   "compatibility_ms",
   "first_request_ms",
 ];
+
+function ticket(claims: Pick<RemoteTicketClaims, "signal">): string {
+  const payload = Buffer.from(JSON.stringify({ aud: REMOTE_TICKET_AUDIENCE, ...claims })).toString("base64url");
+  return `${Buffer.from('{"alg":"EdDSA"}').toString("base64url")}.${payload}.signature`;
+}
+const US_TICKET = ticket({ signal: "us" });
+const ENTRY_TICKET = ticket({});
 
 type Sent = { name: string; properties: NonNullable<Parameters<HostOpenPanelClient["track"]>[1]> };
 const sent: Sent[] = [];
@@ -70,14 +78,14 @@ async function run() {
     firstRequest: "ok" | "error",
     hostedWaitMs?: number,
     afterBegin = () => {},
-    signalUrl = "wss://signal-us.openbot.run/v1/signal",
+    signalTicket = US_TICKET,
   ) => {
     trace.begin(hostId);
     afterBegin();
     for (const phase of REMOTE_CONNECT_PHASES) {
-      if (phase === "bridge") trace.signalHome(hostId, signalUrl);
       if (phase === "compatibility" && hostedWaitMs !== undefined) trace.hostedStart(hostId, hostedWaitMs);
       trace.mark(hostId, phase, phase === "session" ? session : phase === "first-request" ? firstRequest : "ok");
+      if (phase === "ticket") trace.signalHome(hostId, signalTicket);
     }
   };
   const remoteEvents = () => sent.filter((event) => event.name === "system_remote_connect");
@@ -123,7 +131,7 @@ async function run() {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     trace.fail(HOST, trace.begin(HOST), "error");
   }
-  connect(HOST, "reused", "error", undefined, undefined, "wss://signal.openbot.run/v1/signal");
+  connect(HOST, "reused", "error", undefined, undefined, ENTRY_TICKET);
   await sentCount(3);
   const retried = remoteEvents()[2]?.properties ?? {};
   check(
@@ -142,7 +150,7 @@ async function run() {
   const afterTicket = trace.begin(OTHER_HOST);
   trace.mark(OTHER_HOST, "session");
   trace.mark(OTHER_HOST, "ticket");
-  trace.signalHome(OTHER_HOST, "wss://signal2.openbot.run/v1/signal");
+  trace.signalHome(OTHER_HOST, ticket({ signal: "b" }));
   trace.fail(OTHER_HOST, afterTicket, "error");
   await sentCount(4);
   const afterCancel = remoteEvents()[3]?.properties ?? {};
@@ -162,12 +170,12 @@ async function run() {
     "ok",
     undefined,
     () => trace.fail(LAST_HOST, old, "cancelled"),
-    "wss://signal.self-hosted.example/v1/signal",
+    ticket({ signal: "Not A Home!" }),
   );
   await sentCount(5);
   const last = remoteEvents()[4]?.properties ?? {};
   check(
-    "an old attempt that ends late does not stop the newer one, and an unknown Signal is other",
+    "an old attempt that ends late does not stop the newer one, and a home claim that is not a name is other",
     last.outcome === "connected" &&
       last.connection === "first" &&
       last.last_phase === "first-request" &&
@@ -181,8 +189,8 @@ async function run() {
   );
   const body = JSON.stringify({ globals, sent });
   check(
-    "no event names a host or a Signal address",
-    ![HOST, OTHER_HOST, LAST_HOST, "openbot.run", "self-hosted"].some((text) => body.includes(text)),
+    "no event names a host or has a ticket",
+    ![HOST, OTHER_HOST, LAST_HOST, US_TICKET, ENTRY_TICKET, "Not A Home"].some((text) => body.includes(text)),
   );
   check(
     "the events go on the host surface with its current generation",
