@@ -418,12 +418,14 @@ export class UsageLimitGate {
     if (this.#returnHolds.get(key) !== hold) return;
     const resetsAt = usage ? spentWindowReset(usage) : null;
     if (resetsAt !== null) {
+      const waited = !hold.spent;
       hold.spent = true;
       const untilReset = resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
       hold.timer = setTimeout(
         () => this.#readReturn(key, limit, hold),
         Math.max(0, Math.min(untilReset, USAGE_LIMIT_RECHECK_MS)),
       );
+      if (waited) this.#wakeReturning(key);
       return;
     }
     this.#forgetReturnHold(key);
