@@ -4,6 +4,7 @@
 // keeps the loop; each approval of the second step starts the next pass with its answer as one more
 // input, and the output runs once for each pass; a rejection ends the loop and stops the run. A run
 // from a node inside the loop starts at that node and takes the earlier answer of the node before it.
+// A loop that one more connection also enters goes back to its leftmost entry, in any edge order.
 //
 // Run: bun scripts/workflow-loop-e2e.ts
 // Writes .openbot-build/workflow-loop-e2e/report.json and exits non-zero on a failure.
@@ -111,6 +112,30 @@ try {
   check(
     "the graph has one loop: the connection back",
     [...workflowLoopEdges(GRAPH.nodes, GRAPH.edges)].join() === "check>review",
+  );
+  // The task also goes to the reviewer: the loop still goes back from the condition to the fork.
+  const at = (x: number) => ({ x, y: 0 });
+  const entered = [
+    { id: "fork", at: at(0) },
+    { id: "search", at: at(300) },
+    { id: "reviewer", at: at(600) },
+    { id: "enough", at: at(900) },
+    { id: "task", at: at(-300) },
+  ];
+  const chain = [
+    { id: "task>fork", from: "task", to: "fork" },
+    { id: "fork>search", from: "fork", to: "search" },
+    { id: "search>reviewer", from: "search", to: "reviewer" },
+    { id: "reviewer>enough", from: "reviewer", to: "enough" },
+    { id: "enough>fork", from: "enough", to: "fork" },
+  ];
+  const extra = { id: "task>reviewer", from: "task", to: "reviewer" };
+  check(
+    "a loop with two entries goes back to its leftmost entry, in any edge order",
+    [
+      [...chain, extra],
+      [extra, ...chain],
+    ].every((edges) => [...workflowLoopEdges(entered, edges)].join() === "enough>fork"),
   );
 
   const created = await runCauseEffect(workflows.create({ title: "Review loop" }));
