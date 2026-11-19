@@ -3551,6 +3551,7 @@ try {
     for (const [key, status] of [
       ["error.agent.stopBeforeDelete", 409],
       ["error.agent.deletionBusy", 409],
+      ["error.agent.deleteWhenFolderFree", 409],
       ["error.agent.deleteIncomplete", 500],
     ] as const) {
       deleteFailure = sourceText(key);

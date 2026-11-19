@@ -978,6 +978,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isProviderBusyApartFrom: (provider, agentId) => this.#isProviderBusyApartFrom(provider, agentId),
         isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
+        afterIdleCheck: () => this.#deleteReleasedFolders(),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         endpointsPending: (harness) => this.#endpoints.pending(harness),
         onProviderActivated: (provider, configRevision) =>
@@ -1875,6 +1876,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 kept = true;
             return kept;
           }),
+        folderHeld: (agentId) => this.#folderHeld(agentId),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
         settleModelMoves: () => this.#endpoints.runExclusive(() => Effect.void),
@@ -1979,23 +1981,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
         ensureAgentDeletable: (agentId) => this.ensureAgentDeletable(agentId).pipe(toToolOperationFailed),
-        deleteAgent: (agentId) =>
-          this.deleteAgent(agentId).pipe(
-            toToolOperationFailed,
-            Effect.andThen(() =>
-              Effect.all([
-                this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void,
-                this.#libraryFolders?.removeAgent(agentId) ?? Effect.void,
-              ]).pipe(
-                Effect.catch((failure) =>
-                  Effect.sync(() =>
-                    logger.warn("Could not remove the places of a deleted agent.", { agentId, error: failure.cause }),
-                  ),
-                ),
-              ),
-            ),
-            Effect.asVoid,
-          ),
+        deleteAgent: (agentId) => this.#deleteAgentAndPlaces(agentId).pipe(toToolOperationFailed),
         enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
@@ -4696,6 +4682,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  #deleteAgentAndPlaces(agentId: string): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.deleteAgent(agentId).pipe(
+      Effect.andThen(() =>
+        Effect.all([
+          this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void,
+          this.#libraryFolders?.removeAgent(agentId) ?? Effect.void,
+        ]).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not remove the places of a deleted agent.", { agentId, error: failure.cause }),
+            ),
+          ),
+        ),
+      ),
+      Effect.asVoid,
+    );
+  }
+
+  #deleteReleasedFolders(): Effect.Effect<void> {
+    return Effect.suspend(() =>
+      this.#stopping
+        ? Effect.void
+        : Effect.forEach(
+            this.#removal.heldFoldersReleased(),
+            (agentId) => this.#deleteAgentAndPlaces(agentId).pipe(Effect.ignore),
+            { discard: true },
+          ),
+    );
+  }
+
   deleteChannel(channelId: string): Effect.Effect<void, AgentLifecycleFailed> {
     return this.channels
       .deleteChannel(channelId)
@@ -5321,15 +5337,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #sharedProcessesToRelease(agentId: string): AgentProvider[] {
-    const agents = this.#store.list();
-    const agent = agents.find((candidate) => candidate.id === agentId);
+    const reading = this.#providersReadingSessionSettings();
+    return this.#folderProviders(agentId).filter((provider) => !reading.has(provider));
+  }
+
+  #folderHeld(agentId: string): boolean {
+    if (!this.#providers.isReady()) return true;
+    const reading = this.#providersReadingSessionSettings();
+    return this.#folderProviders(agentId).some(
+      (provider) => provider !== "codex" && (reading.has(provider) || this.#providers.keepsSharedProcess(provider)),
+    );
+  }
+
+  #folderProviders(agentId: string): AgentProvider[] {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return [];
     const providers = new Set<AgentProvider>([providerForAgent(agent)]);
     if (agent.threadId)
       for (const session of this.#store.database.listProviderSessions(agent.threadId)) providers.add(session.provider);
-    for (const candidate of agents)
-      if (this.#drain.holdsSessionSettings(candidate.id)) providers.delete(providerForAgent(candidate));
     return [...providers];
+  }
+
+  #providersReadingSessionSettings(): Set<AgentProvider> {
+    return new Set(
+      this.#store
+        .list()
+        .filter((agent) => this.#drain.holdsSessionSettings(agent.id))
+        .map((agent) => providerForAgent(agent)),
+    );
   }
 
   #providerAvailable(provider: AgentProvider): boolean {

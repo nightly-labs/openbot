@@ -275,6 +275,7 @@ export interface ProviderHooks {
   isProviderBusyApartFrom?(provider: AgentProvider, agentId: string): boolean;
   isAgentBusy(agentId: string): boolean;
   isProviderAssigned(provider: AgentProvider): boolean;
+  afterIdleCheck?(): Effect.Effect<void>;
   onAgentClientLost(agentId: string, client: AgentClient): Effect.Effect<void>;
   sharedRoot(): string;
   onProviderResumed(provider: AgentProvider): void;
@@ -841,7 +842,7 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const client = this.#clients.get(provider);
     if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return false;
-    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) {
+    if (this.keepsSharedProcess(provider)) {
       logger.info("Kept a provider CLI that holds a deleted agent's folder, because work uses it.", { provider });
       return true;
     }
@@ -849,6 +850,11 @@ export class ProviderRuntime implements ProviderPort {
     yield* this.#releaseClient(provider, client);
     return false;
   }, Effect.uninterruptible).bind(this);
+
+  keepsSharedProcess(provider: AgentProvider): boolean {
+    const client = this.#clients.get(provider);
+    return client !== undefined && (client.canReleaseProcess?.() === false || this.#providerInUse(provider));
+  }
 
   readonly releaseIdleThreads = Effect.fn("ProviderRuntime.releaseIdleThreads")(function* (this: ProviderRuntime) {
     for (const client of this.#clients.values()) if (client.releaseIdleThreads) yield* client.releaseIdleThreads();
@@ -1267,6 +1273,7 @@ export class ProviderRuntime implements ProviderPort {
       () =>
         Effect.runFork(
           Effect.exit(this.#releaseIdleProviders()).pipe(
+            Effect.andThen(Effect.exit(this.#hooks.afterIdleCheck?.() ?? Effect.void)),
             Effect.andThen(this.#rereadModels()),
             Effect.forkIn(this.#scope),
           ),
