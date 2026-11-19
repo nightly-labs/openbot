@@ -61,6 +61,13 @@ type PendingMemoryMutation =
       expectedSelectionRevision: number;
     };
 
+interface StagedMemoryFields {
+  memoryId?: string | null;
+  inclusion?: "essential" | "searchable";
+  site?: string;
+  note?: string;
+}
+
 export interface MemoryReviewBase {
   epoch: number;
   limit: number;
@@ -238,9 +245,10 @@ export class AgentMemories {
     params: DynamicToolCallParams,
     senderAgentId: string,
     redact: (value: string) => string = redactSecrets,
+    turnRunning = true,
   ): OpenBotToolResponse | null {
     try {
-      return this.#handleTool(params, senderAgentId, redact);
+      return this.#handleTool(params, senderAgentId, redact, turnRunning);
     } catch (error) {
       const message =
         error instanceof AgentMemorySelectionError ? error.message : sourceText("error.backend.memoryOperationFailed");
@@ -252,6 +260,7 @@ export class AgentMemories {
     params: DynamicToolCallParams,
     senderAgentId: string,
     redact: (value: string) => string,
+    turnRunning: boolean,
   ): OpenBotToolResponse | null {
     if (params.tool === "search_memories") {
       const parsed = searchMemoriesArguments.safeParse(params.arguments);
@@ -301,7 +310,7 @@ export class AgentMemories {
         epoch: this.#epoch(senderAgentId),
         changes: parsed.data.changes,
       });
-      return openBotToolResult({ status: "staged" });
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "saved", {});
     }
     if (params.tool === "remember") {
       const args = params.arguments;
@@ -396,8 +405,7 @@ export class AgentMemories {
         inclusion,
         ...(site ? { site } : {}),
       });
-      return openBotToolResult({
-        status: "staged",
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "saved", {
         memoryId: memoryId ?? null,
         inclusion,
         ...(site ? { site } : {}),
@@ -434,10 +442,23 @@ export class AgentMemories {
         expectedUpdatedAt: current.updatedAt,
         expectedSelectionRevision: selection?.revision ?? -1,
       });
-      return openBotToolResult({ status: "staged", memoryId: current.id });
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "forgotten", { memoryId: current.id });
     }
 
     return null;
+  }
+
+  #stagedResult(
+    turnId: string,
+    agentId: string,
+    turnRunning: boolean,
+    applied: "saved" | "forgotten",
+    fields: StagedMemoryFields,
+  ): OpenBotToolResponse {
+    if (turnRunning) return openBotToolResult({ status: "staged", ...fields });
+    const before = this.#storedState(agentId);
+    this.finishTurn(turnId, "completed");
+    return openBotToolResult({ status: this.#storedState(agentId) === before ? "unchanged" : applied, ...fields });
   }
 
   finishTurn(turnId: string, status: string): Map<string, ConversationMemoryChange[]> {
