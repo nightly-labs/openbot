@@ -47,6 +47,7 @@ import {
   type BillingReturnTarget,
   type BillingService,
   type CheckoutOrder,
+  type ServerRefund,
   type SubscriptionSync,
 } from "./billing-service";
 import {
@@ -98,7 +99,7 @@ const SCHEDULE_WAKE_BEFORE_MS = 10 * 60_000;
 const RETENTION_WAKE_AFTER_MS = 10 * 24 * 60 * 60_000;
 const RETENTION_DISK_KEPT_MS = 14 * 24 * 60 * 60_000;
 const RETENTION_WAKE_EVERY_MINUTES = 10;
-export const OPERATOR_HOST_DATA_KEPT_MS = 30 * 24 * 60 * 60_000;
+export const OPERATOR_HOST_DATA_KEPT_MS = 14 * 24 * 60 * 60_000;
 const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 const CLAIM_OPEN_SQL = `(hosted_servers.auth_session_id IS NULL OR NOT EXISTS(
   SELECT 1 FROM auth_sessions WHERE auth_sessions.id = hosted_servers.auth_session_id AND auth_sessions.revoked_at IS NULL))`;
@@ -736,6 +737,54 @@ export class HostedServerService {
       yield* this.#finishDelete(yield* this.#requireRow(row.server_id));
     }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
   });
+
+  readonly deleteForRefund = Effect.fn("HostedServerService.deleteForRefund")(
+    function* (
+      this: HostedServerService,
+      refund: ServerRefund,
+    ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+      const dependencies = yield* HostedServerDependencies;
+      const row = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(`SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND owner_user_id = ?`)
+          .bind(refund.serverId, refund.userId)
+          .first<HostedServerRow>(),
+      );
+      if (!row || row.desired_state === "deleted") return;
+      const token = crypto.randomUUID();
+      if (!(yield* this.#claimLifecycle(row.server_id, token))) return yield* lifecycleFailure();
+      yield* Effect.gen({ self: this }, function* () {
+        const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
+        const closed = checkout ? yield* this.#closeCheckout(checkout) : "closed";
+        if (closed === "paid") return;
+        if (closed !== "closed") return yield* lifecycleFailure();
+        const claimed = yield* hostedCall(() =>
+          dependencies.database
+            .prepare(
+              `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
+         WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?
+         AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND s.status IN ${OPEN_STATUSES_SQL})`,
+            )
+            .bind(dependencies.now(), row.server_id, token, dependencies.now())
+            .run(),
+        );
+        if (claimed.meta.changes !== 1) return;
+        this.#track(row, { name: "hosted_server_action", action: "deleted", plan: row.plan, size: row.size });
+        yield* this.#finishDelete(yield* this.#requireRow(row.server_id)).pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              console.warn("Hosted server delete after a refund failed; the cron tries again.", {
+                serverId: row.server_id,
+                error: safeErrorCode(error),
+              });
+            }),
+          ),
+        );
+      }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
 
   readonly delete = Effect.fn("HostedServerService.delete")(
     function* (

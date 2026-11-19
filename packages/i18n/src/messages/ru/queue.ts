@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "Вложение",
   "queue.hold.named": "Ожидание — {name} работает в канале {channel}",
   "queue.hold.unnamed": "Ожидание — этот агент работает в канале {channel}",
+  "queue.hold.providerRestart": "Ожидание — {provider} перезапустится после завершения текущих задач",
   "queue.item.label": "Сообщение в очереди {position}: {preview}",
   "queue.item.labelEditing": "Сообщение в очереди {position}, редактируется: {preview}",
   "queue.item.editing": "Редактируется",

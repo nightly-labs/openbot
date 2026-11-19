@@ -18,7 +18,7 @@ import {
   isCustomProviderId,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
-  isCustomProviderReasoningEfforts,
+  isCustomProviderModelEfforts,
   isNewCustomProviderId,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
@@ -89,7 +89,7 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
       model.maxOutput = entry.maxOutput;
     }
     if (entry.reasoningEfforts !== undefined) {
-      if (!isCustomProviderReasoningEfforts(entry.reasoningEfforts))
+      if (!isCustomProviderModelEfforts(entry.reasoningEfforts))
         throw new Error(sourceText("error.provider.reasoningEffortsInvalid"));
       model.reasoningEfforts = [...entry.reasoningEfforts];
     }

@@ -25,6 +25,8 @@ export const messages = {
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
   "error.remote.windowsSessionDisconnected":
     "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
+  "error.remote.macScreenLocked":
+    "Mac がロックされているため、画面を共有できません。Mac の画面でロックを解除してから、再試行してください。",
   "error.remote.streamTooSlowLowerQuality":
     "ホストへの接続が遅すぎて画面を表示できません。再試行してください。次の接続では画質を下げます。",
   "error.remote.streamTooSlow":
@@ -192,6 +194,8 @@ export const messages = {
   "error.remote.iceFailed":
     "ホストに直接接続できませんでした。ファイアウォール、VPN、プロキシが接続をブロックしている可能性があります。",
   "error.remote.iceDisconnected": "ホストへの直接接続が切れました。",
+  "error.remote.webrtcBlocked":
+    "このデバイスは OpenBot に必要な接続をブロックしています。ロックダウンモードがオンの場合は、設定 > プライバシーとセキュリティ > ロックダウンモードで OpenBot に対してオフにしてください。",
   "error.remote.directoryUnreachable": "OpenBot は OpenBot サービスに接続できませんでした。接続を確認してください。",
   "error.remote.directoryTimeout": "OpenBot サービスが時間内に応答しませんでした。もう一度お試しください。",
   "error.remote.inviteAlreadyUsed": "この招待はすでに使用されています。新しい招待を依頼してください。",

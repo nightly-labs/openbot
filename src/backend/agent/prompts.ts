@@ -43,16 +43,29 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
+function elicitationOptionLabel(text: string): string {
+  return text.slice(0, INPUT_LIMITS.promptOptionLabel);
+}
+
+function isElicitationOptionAnswer(text: string, answer: string | undefined): boolean {
+  return text === answer || elicitationOptionLabel(text) === answer;
+}
+
 function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
       if (!value) return [];
-      return [{ label: getString(option, "title") ?? value, description: getString(option, "description") ?? "" }];
+      return [
+        {
+          label: elicitationOptionLabel(getString(option, "title") ?? value),
+          description: (getString(option, "description") ?? "").slice(0, INPUT_LIMITS.promptOptionDescription),
+        },
+      ];
     });
   }
   if (Array.isArray(property.enum)) {
-    return property.enum.filter(isString).map((value) => ({ label: value, description: "" }));
+    return property.enum.filter(isString).map((value) => ({ label: elicitationOptionLabel(value), description: "" }));
   }
   if (property.type === "boolean") {
     return [
@@ -70,8 +83,14 @@ export function elicitationValue(property: DynamicRecord | undefined, answers: s
   if (Array.isArray(property.oneOf)) {
     const selected = property.oneOf
       .filter(isRecord)
-      .find((option) => (getString(option, "title") ?? getString(option, "const")) === answers[0]);
+      .find((option) =>
+        isElicitationOptionAnswer(getString(option, "title") ?? getString(option, "const") ?? "", answers[0]),
+      );
     if (selected) return getString(selected, "const") ?? answers[0] ?? "";
+  }
+  if (Array.isArray(property.enum)) {
+    const selected = property.enum.filter(isString).find((value) => isElicitationOptionAnswer(value, answers[0]));
+    if (selected !== undefined) return selected;
   }
   if (property.type === "number" || property.type === "integer") {
     const parsed = Number(answers[0]);
@@ -139,7 +158,14 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
     if (!isRecord(property)) return [];
     const description = getString(property, "description");
     const question = description ?? message ?? `${subject} needs more information.`;
-    const detail = index === 0 && description && message && message !== description ? message : undefined;
+    const options = elicitationOptions(property);
+    const hidden = options?.slice(INPUT_LIMITS.promptOptions).map((option) => option.label) ?? [];
+    const detail = [
+      index === 0 && description && message && message !== description ? message : undefined,
+      hidden.length > 0 ? sourceText("status.agent.elicitationMoreOptions", { options: hidden.join(", ") }) : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
     return [
       {
         id,
@@ -147,7 +173,7 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
         ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
-        options: elicitationOptions(property),
+        options: options?.slice(0, INPUT_LIMITS.promptOptions) ?? null,
       },
     ];
   });

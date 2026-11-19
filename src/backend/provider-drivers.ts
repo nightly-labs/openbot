@@ -104,6 +104,7 @@ import {
   customAgentStatePaths,
   devinDataDirectory,
   devinStatePaths,
+  grokHomeDirectory,
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
@@ -747,6 +748,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       codeSignIn: { flow: "device", command: GROK_CODE_SIGN_IN },
     },
+    signInFiles: () => [join(grokHomeDirectory(), "auth.json")],
     signOut: { argv: ["--no-auto-update", "logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs, context, confinement) =>

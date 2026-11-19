@@ -238,6 +238,8 @@ export const messages = {
     'O endpoint "{provider}" recusou a solicitação. A chave de API ou os cabeçalhos podem estar incorretos, ou a conta não pode usar este modelo. Verifique-os em Configurações do servidor → Provedores ou escolha outro modelo. Depois tente novamente.',
   "error.provider.customEndpointKeyMissing":
     'O endpoint "{provider}" precisa de uma chave de API. Adicione a chave em Configurações do servidor → Provedores e tente novamente.',
+  "error.provider.customEndpointEffortRefused":
+    'O endpoint "{provider}" recusou o esforço de raciocínio deste modelo. Em Configurações do servidor → Provedores, edite "{provider}". Em Esforço, mantenha só os níveis que este modelo aceita, ou selecione Sem raciocínio. Depois tente novamente.',
   "error.provider.opencodeKeyExpired":
     "Sua chave de API do OpenCode expirou. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
   "error.provider.opencodeKeyRefused":
@@ -266,6 +268,10 @@ export const messages = {
     "Este modelo não está disponível para você. Escolha outro modelo para este agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "A resposta do modelo passou do limite de saída três vezes, então o turno parou. Escolha um esforço menor ou outro modelo e envie sua mensagem de novo.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "A resposta do modelo passou do limite de saída três vezes, então o turno parou. Em Configurações, abra Provedor personalizado, clique em Editar neste endpoint e defina uma Saída máxima maior para este modelo. Ou escolha um esforço menor ou outro modelo.",
   "error.provider.opencodeReasoningOverlap":
     "O OpenCode não conseguiu ler o raciocínio deste modelo com este esforço. Selecione um esforço menor ou outro modelo e envie sua mensagem de novo.",
   "error.provider.opencodeModelNotServed":
@@ -291,6 +297,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} executou alguns passos e terminou o turno sem resposta. Pergunte ao agente o que ele fez antes de enviar o mesmo pedido de novo.",
   "error.provider.acpRefusedNoReason": "{provider} parou sem resposta. Envie a mensagem novamente.",
+  "error.provider.channelNoAnswer":
+    "{provider} encerrou o turno sem resposta. No canal, clique em Continuar para executar a tarefa novamente, ou em Reatribuir para passá-la a outro membro.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",

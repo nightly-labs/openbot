@@ -1785,27 +1785,63 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const row = account.row(server.serverId);
     record(
       "refund",
-      "a partial refund keeps the plan and the server",
+      "a refund alone keeps the plan and the server",
       plan?.status === "active" && row?.desired_state === "running" && row.observed_error !== "plan_ended",
       { refund: partial.status, plan, row },
     );
-    const rest = await stripe("POST", "/v1/refunds", refundSchema, { payment_intent: paid.intent });
-    await applied("refund.created", rest.id);
-    const ended = await rowWhere(account, server.serverId, "plan ended", (row) => row.desired_state === "stopped");
-    const stripeSub = await subscription(sub);
+    await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
+    const removed = await rowWhere(
+      account,
+      server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted",
+    );
     record(
       "refund",
-      "a full refund of the current invoice cancels the plan now; the server stops with plan_ended and is kept",
-      stripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
-      { refund: rest.status, stripeStatus: stripeSub.status, row: ended },
+      "a cancel after a refund of the last invoice deletes the server",
+      removed.desired_state === "deleted",
+      removed,
+    );
+    const later = await account.createServer("Refund after cancel");
+    const laterSub = await account.pay(later.server.serverId);
+    await provisioned(account, later.server.serverId);
+    const laterPaid = await paymentIntent(laterSub);
+    await stripe("DELETE", `/v1/subscriptions/${laterSub}`, idSchema);
+    const stopped = await rowWhere(
+      account,
+      later.server.serverId,
+      "plan ended",
+      (row) => row.desired_state === "stopped",
+    );
+    record(
+      "refund",
+      "a cancel with no refund stops the server and keeps it",
+      stopped.observed_error === "plan_ended",
+      stopped,
+    );
+    const laterRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+      payment_intent: laterPaid.intent,
+      amount: "100",
+    });
+    await applied("refund.created", laterRefund.id);
+    const laterRemoved = await rowWhere(
+      account,
+      later.server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted",
+    );
+    record(
+      "refund",
+      "a refund of a cancelled plan deletes the server",
+      laterRemoved.desired_state === "deleted",
+      laterRemoved,
     );
     if (sales) {
       const recorded = facts(paid.invoice);
       record(
         "refund",
-        "each refund is a payment_refunded sales fact",
-        recorded.some((fact) => fact.source_key === `refund:${partial.id}:succeeded`) &&
-          recorded.some((fact) => fact.source_key === `refund:${rest.id}:succeeded`),
+        "a refund is a payment_refunded sales fact",
+        recorded.some((fact) => fact.source_key === `refund:${partial.id}:succeeded`),
         recorded,
       );
     } else {

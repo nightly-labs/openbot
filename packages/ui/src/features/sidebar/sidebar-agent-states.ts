@@ -1,4 +1,4 @@
-import type { ChannelSummary, QueueSnapshot } from "@openbot/contracts/ipc";
+import { type ChannelSummary, type QueueSnapshot, queueHoldWorker } from "@openbot/contracts/ipc";
 import type { SidebarAgentState, SidebarChannelWait, SidebarRoutinePhase } from "./sidebar-types";
 
 export type SidebarAttention =
@@ -32,7 +32,7 @@ export function isAgentWorking(
   const queue = queues[agentId];
   return (
     Boolean(activeTurns[agentId]) ||
-    queue?.hold?.agentId === agentId ||
+    queueHoldWorker(queue?.hold) === agentId ||
     Boolean(queue?.deliveries.some((delivery) => delivery.status === "starting" || delivery.status === "running"))
   );
 }

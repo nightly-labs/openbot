@@ -304,6 +304,13 @@ export function memorySitesForHost(hostname: string): string[] {
   return labels.slice(0, -1).map((_, index) => labels.slice(index).join("."));
 }
 
+export function memoryPromptLine(text: string, block: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(new RegExp(`<\\s*/\\s*${block}`, "gi"), `< /${block}`)
+    .trim();
+}
+
 export function normalizeMemoryText(value: string): string {
   return value;
 }
