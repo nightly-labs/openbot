@@ -104,8 +104,13 @@ export function settleQuietRoutineTurn(
   return !reported;
 }
 
-export function quietRunStepsMessage(turnId: string, trace: ConversationTurnTrace): ConversationMessage | null {
-  if (!trace.steps.some((step) => step.kind === "tool" && step.text?.trim())) return null;
+export function quietRunStepsMessage(
+  turnId: string,
+  trace: ConversationTurnTrace,
+  noUpdateSteps: ReadonlySet<string> = new Set(),
+): ConversationMessage | null {
+  if (!trace.steps.some((step) => step.kind === "tool" && step.text?.trim() && !noUpdateSteps.has(step.id)))
+    return null;
   return {
     id: routineQuietStepsItemId(turnId),
     turnId,
