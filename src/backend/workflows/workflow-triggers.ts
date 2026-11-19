@@ -8,6 +8,7 @@ import {
   validateRoutineSchedule,
 } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
+import { routineLocalTime } from "../agent/delivery-content";
 import type { ReceivedWebhookEvent } from "../routine-store";
 import type { RoutineDueSource } from "../routine-timer";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
@@ -117,6 +118,10 @@ export function prepareWorkflowSchedules(graph: WorkflowGraph, timezone: string,
       return { ...node, schedule };
     }),
   };
+}
+
+export function workflowScheduleOutput(runAt: string, timeZone: string): string {
+  return [`Run time: ${runAt}`, ...routineLocalTime(runAt, timeZone)].join("\n");
 }
 
 export function workflowWebhookPayload(nodeId: string, event: ReceivedWebhookEvent): string {
