@@ -22,7 +22,9 @@ const isOwnerReference = (reference: string) => {
   return rest.length === 0 && EMAIL_PATTERN.test((email ?? "").toLowerCase()) && /^[0-9a-f]{8}$/u.test(server ?? "");
 };
 const IMAGE = "UBUNTU_26_04_64BIT";
-const OPERATOR_KEYS_HOST_PATTERN = /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$/u;
+const OPERATOR_KEYS_HOST_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$/u;
+const OPERATOR_KEY_PATTERN =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+=*( .*)?$/u;
 const keyLines = (text: string) =>
   text
     .split("\n")
@@ -815,8 +817,11 @@ class Pool {
     const coreLines = keyLines(fromCore);
     if (coreLines.length === 0) throw new Error("The core server of the operators has no public key.");
     const fileLines = this.#operatorKeysFile ? keyLines(readFileSync(this.#operatorKeysFile, "utf8")) : [];
-    const lines = [...coreLines];
-    for (const line of fileLines) {
+    const lines: string[] = [];
+    for (const line of [...coreLines, ...fileLines]) {
+      if (!OPERATOR_KEY_PATTERN.test(line)) {
+        throw new Error(`Operator key ${lines.length + 1} is not a public key with no options.`);
+      }
       if (!lines.some((listed) => keyBlob(listed) === keyBlob(line))) lines.push(line);
     }
     let own = "";

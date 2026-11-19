@@ -18,8 +18,7 @@ they do. This skill adds the rules for an agent.
 - Take only a VPS with no reference. Never take a VPS with a reference, also `pool`. The
   command refuses both.
 - The repository is public. Do not write a customer name, an email, an address or a VPS ID in a
-  commit, a PR, an issue or a document. Keys files and logs go in `.openbot-build/custom/`, which git
-  ignores.
+  commit, a PR, an issue or a document. Logs go in `.openbot-build/custom/`, which git ignores.
 - Never print a token or a password. Load the environment as the docs say, with the root `.env.keys`
   of the main checkout: a worktree has none.
 - `--apply` changes production. Show the plan of the dry run and get the developer's approval first.
