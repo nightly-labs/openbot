@@ -231,6 +231,18 @@ export class WorkflowRunStore {
     return row ? toRun(row) : null;
   }
 
+  /**
+   * How the work of an agent step's handoff began. The handoff names the step's run, or the step itself
+   * when it runs alone, which only the user starts. Null when no workflow run or step has this ID.
+   */
+  handoffSource(runId: string): WorkflowRunSource | null {
+    const connection = this.#database.connection;
+    const run = databaseRow(connection.prepare("SELECT source FROM workflow_runs WHERE run_id = ?").get(runId));
+    if (run) return checkedColumn(run, "source", WORKFLOW_RUN_SOURCES);
+    const alone = connection.prepare("SELECT 1 FROM workflow_steps WHERE step_id = ? AND run_id IS NULL").get(runId);
+    return alone === undefined ? null : "manual";
+  }
+
   /** Runs that can still move: running, waiting for an approval, or stopping. */
   openRuns(): StoredWorkflowRun[] {
     return databaseRows(
