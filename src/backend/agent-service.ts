@@ -5753,10 +5753,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emitProviderQueues(provider: AgentProvider): void {
     for (const agent of this.#store.list())
-      if (
-        providerForAgent(agent) === provider &&
-        this.#mailbox.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "queued")
-      )
+      if (providerForAgent(agent) === provider && this.#mailbox.queuedDeliveryIds(agent.id).length)
         this.#mailboxSync.emitQueue(agent.id);
   }
 
