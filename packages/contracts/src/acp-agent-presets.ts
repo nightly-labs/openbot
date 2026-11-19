@@ -8,6 +8,5 @@ export interface AcpAgentPreset {
 export const ACP_AGENT_PRESETS: readonly AcpAgentPreset[] = [
   { id: "goose", name: "Goose", command: "goose", args: ["acp"] },
   { id: "qwen", name: "Qwen Code", command: "qwen", args: ["--acp"] },
-  { id: "copilot", name: "GitHub Copilot", command: "copilot", args: ["--acp"] },
   { id: "omp", name: "Oh My Pi", command: "omp", args: ["acp"] },
 ];
