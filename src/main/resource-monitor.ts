@@ -137,7 +137,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #lastSample: ResourceSample | null = null;
   #lastSampleAt: number | null = null;
   #previousCpuSeconds: Map<number, number> | null = null;
-  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null }[] = [];
+  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null; appWindow: boolean }[] = [];
   #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
     longTasks: 0,
     inputs: 0,
@@ -311,25 +311,26 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#turnInLoopWindow = this.#activeTurns.size > 0;
   }
 
-  readonly #rendererGone = (_event: Event, _contents: WebContents, details: RenderProcessGoneDetails) =>
-    this.#recordGone("renderer", details.reason, null);
+  readonly #rendererGone = (_event: Event, contents: WebContents, details: RenderProcessGoneDetails) =>
+    this.#recordGone("renderer", details.reason, null, this.#options.appWindowContents?.().includes(contents) ?? false);
   readonly #childGone = (_event: Event, details: Details) => {
     if (details.type === "Utility" && details.reason === "killed") return;
     this.#recordGone("child", details.reason, childType(details));
   };
 
-  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null): void {
+  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null, appWindow = false): void {
     const known = goneReason(reason);
     if (!known) return;
     const name = type ? `child_gone:${type}` : `${kind}_gone`;
     this.#options.trace.record({ kind: "crash", name, durationMs: 0, outcome: known });
     Effect.runFork(this.#options.trace.flush());
-    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type });
+    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type, appWindow });
   }
 
   #countGone(day: ResourceDay): void {
-    for (const { kind, reason, type } of this.#gone) {
+    for (const { kind, reason, type, appWindow } of this.#gone) {
       addCount(day, kind === "renderer" ? COUNTER.rendererGone : COUNTER.childGone);
+      if (appWindow) addCount(day, COUNTER.windowGone);
       if (type) addCount(day, COUNTER.childType(type));
       addCount(day, COUNTER.goneReason(reason));
     }

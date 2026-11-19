@@ -68,6 +68,7 @@ const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
 
 const RENDERER_RELOAD_MAX = 3;
 const RENDERER_RELOAD_WINDOW_MS = 60_000;
+const RESTARTED_RENDERER_QUERY = "restarted";
 const RELOADABLE_RENDERER_EXITS: ReadonlySet<RenderProcessGoneDetails["reason"]> = new Set([
   "crashed",
   "oom",
@@ -188,8 +189,51 @@ export function createMainWindowController({
       reportError,
     });
   let rendererReloadTimes: number[] = [];
+  let rendererStoppedDialogOpen = false;
   let closeConfirmationOpen = false;
   let closeConfirmed = false;
+
+  function reloadStoppedRenderer(window: BrowserWindow): void {
+    setImmediate(() => {
+      if (window.isDestroyed()) return;
+      loadRenderer(window, { restarted: true }).catch((error: unknown) =>
+        reportError("Could not reload the main window after its renderer stopped", error),
+      );
+    });
+  }
+
+  function askAfterRendererStopped(window: BrowserWindow): void {
+    if (rendererStoppedDialogOpen || window.isDestroyed()) return;
+    if (!window.isVisible()) {
+      window.once("show", () => askAfterRendererStopped(window));
+      return;
+    }
+    const translate = getTranslate();
+    rendererStoppedDialogOpen = true;
+    void dialog
+      .showMessageBox(window, {
+        type: "warning",
+        message: translate("window.rendererStoppedTitle"),
+        detail: translate("window.rendererStoppedBody"),
+        buttons: [translate("window.rendererStoppedReload"), translate("menu.quitConfirm")],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+      .then(({ response }) => {
+        if (window.isDestroyed() || isQuitting()) return;
+        if (response === 1) {
+          app.quit();
+          return;
+        }
+        rendererReloadTimes = [];
+        reloadStoppedRenderer(window);
+      })
+      .catch((error: unknown) => reportError("Unable to ask after the main window stopped:", error))
+      .finally(() => {
+        rendererStoppedDialogOpen = false;
+      });
+  }
 
   function confirmCloseWhileWorking(window: BrowserWindow): void {
     const translate = getTranslate();
@@ -308,21 +352,13 @@ export function createMainWindowController({
     window.webContents.on("render-process-gone", (_event, details) => {
       const now = Date.now();
       rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
-      if (
-        isQuitting() ||
-        window.isDestroyed() ||
-        !RELOADABLE_RENDERER_EXITS.has(details.reason) ||
-        rendererReloadTimes.length >= RENDERER_RELOAD_MAX
-      ) {
+      if (isQuitting() || window.isDestroyed() || !RELOADABLE_RENDERER_EXITS.has(details.reason)) return;
+      if (rendererReloadTimes.length >= RENDERER_RELOAD_MAX) {
+        askAfterRendererStopped(window);
         return;
       }
       rendererReloadTimes.push(now);
-      setImmediate(() => {
-        if (window.isDestroyed()) return;
-        loadRenderer(window).catch((error: unknown) =>
-          reportError("Could not reload the main window after its renderer stopped", error),
-        );
-      });
+      reloadStoppedRenderer(window);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: true, quitShortcut });
     allowPinchZoom(window.webContents);
@@ -431,9 +467,11 @@ export function createMainWindowController({
     return window;
   }
 
-  function loadRenderer(window: BrowserWindow): Promise<void> {
+  function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
     onRendererLoadStarted();
-    return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString()).catch((error: unknown) => {
+    const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
+    if (options.restarted) url.searchParams.set(RESTARTED_RENDERER_QUERY, "1");
+    return window.loadURL(url.toString()).catch((error: unknown) => {
       if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
       return replacementLoad(window.webContents, error);
     });
