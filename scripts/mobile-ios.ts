@@ -48,8 +48,9 @@ process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), p
 
 process.env.OPENBOT_KEEP_METRO_CACHE = "1";
 
-const { mobileBuildCacheRoot }: { mobileBuildCacheRoot: (projectRoot: string) => string | undefined } =
-  require("./metro-cache.js");
+const { mobileBuildCacheRoot }: { mobileBuildCacheRoot: (projectRoot: string) => string | undefined } = require(
+  join(mobileRoot, "metro-cache.js"),
+);
 const buildCacheRoot = mobileBuildCacheRoot(mobileRoot);
 if (buildCacheRoot) {
   const checkout = dirname(dirname(mobileRoot));
