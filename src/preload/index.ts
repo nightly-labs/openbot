@@ -1546,7 +1546,7 @@ const openbotApi: OpenBotDesktopApi = {
     getStatus: decodeUpdateStatus,
     check: decodeUpdateStatus,
     download: decodeUpdateStatus,
-    install: decodeVoid,
+    install: decodeUpdateStatus,
     getPreference: decodeUpdatePreference,
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,

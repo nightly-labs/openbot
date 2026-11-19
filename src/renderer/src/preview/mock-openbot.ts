@@ -3523,6 +3523,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       install: async () => {
         updateStatus = { ...updateStatus, phase: "installing" };
         emit(updateListeners, updateStatus);
+        return clone(updateStatus);
       },
       getPreference: async () => clone(updatePreference),
       setPreference: async (input) => {

@@ -32,8 +32,9 @@ export function updateIpcHandlers({
       check: handler(() => runCauseEffect(updater.checkForUpdates())),
       download: handler(() => runCauseEffect(updater.downloadUpdate())),
       install: handler(async () => {
-        if (!restartWouldStopWork(describeReadiness())) return runCauseEffect(updater.installUpdate());
-        idleRestart.request("update");
+        if (restartWouldStopWork(describeReadiness())) return idleRestart.request("update");
+        await runCauseEffect(updater.installUpdate());
+        return updater.getStatus();
       }),
       getPreference: handler(() => runCauseEffect(readUpdatePreference(updatePreferenceFile))),
       setPreference: payloadHandler(parseUpdatePreference, (parsed) =>

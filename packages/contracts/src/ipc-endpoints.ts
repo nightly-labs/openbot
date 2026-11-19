@@ -1433,7 +1433,7 @@ export const IPC_ENDPOINTS = {
     getStatus: request<undefined, UpdateStatus>()("update:get-status"),
     check: request<undefined, UpdateStatus>()("update:check"),
     download: request<undefined, UpdateStatus>()("update:download"),
-    install: request<undefined, void>()("update:install"),
+    install: request<undefined, UpdateStatus>()("update:install"),
     getPreference: request<undefined, UpdatePreference>()("update:get-preference"),
     setPreference: request<UpdatePreferenceChange, UpdatePreference>()("update:set-preference"),
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
