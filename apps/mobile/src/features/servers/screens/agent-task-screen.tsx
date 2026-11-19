@@ -693,28 +693,30 @@ function AgentTaskChat({
     ) : null;
   }, [isDraft, task, listLimit, t, errorMessage, target.name]);
 
+  const { menu: threadMenuActions, run: runThreadAction } = threadActions;
+  const actionsMenu = useMemo(() => {
+    if (!task) return null;
+    const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
+    return {
+      label: t("mobile.server.threads.actions"),
+      actions: pinsEnabled && !isDraft ? [...threadMenuActions(task), pinsAction] : threadMenuActions(task),
+      onPressAction: (id: string) => {
+        if (id !== PINS_ACTION) {
+          runThreadAction(task, id);
+          return;
+        }
+        void haptics.impact("soft");
+        router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
+      },
+    };
+  }, [task, t, pinsEnabled, isDraft, threadMenuActions, runThreadAction, agentId, serverId, taskId]);
+
   if (!task && !isDraft) {
     if (list.isError)
       return <TaskNote note={t("mobile.server.threads.loadFailed")} retry={() => void list.refetch()} />;
     if (!enabled || list.data)
       return <TaskNote note={t(enabled ? "mobile.server.threads.notFound" : "mobile.server.threads.offline")} />;
   }
-
-  const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
-  const actionsMenu = task
-    ? {
-        label: t("mobile.server.threads.actions"),
-        actions: pinsEnabled && !isDraft ? [...threadActions.menu(task), pinsAction] : threadActions.menu(task),
-        onPressAction: (id: string) => {
-          if (id !== PINS_ACTION) {
-            threadActions.run(task, id);
-            return;
-          }
-          void haptics.impact("soft");
-          router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
-        },
-      }
-    : null;
 
   return (
     <View className="flex-1" style={{ backgroundColor: background }}>
