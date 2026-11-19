@@ -106,7 +106,7 @@ export const messages = {
   "settings.quitGuard.never": "أبدًا",
   "settings.externalLinks.title": "فتح الروابط الخارجية في",
   "settings.externalLinks.description":
-    "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة. مع OpenBot، تُفتح في OpenBot روابط الدردشات في النافذة الرئيسية فقط. وتُفتح الروابط الأخرى في المتصفح الافتراضي.",
+    "تُفتح هنا الروابط في الدردشات وصفحات تسجيل الدخول وصفحات الفوترة. مع OpenBot، تُفتح في OpenBot فقط روابط دردشات النافذة الرئيسية مع الوكلاء على هذا الكمبيوتر. وتُفتح الروابط الأخرى في المتصفح الافتراضي.",
   "settings.externalLinks.defaultBrowser": "المتصفح الافتراضي",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "المتصفح الافتراضي ({name})",

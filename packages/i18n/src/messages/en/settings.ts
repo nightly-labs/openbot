@@ -109,7 +109,7 @@ export const messages = defineMessages("settings", {
   "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
   "settings.externalLinks.description":
-    "Links in chats, sign-in pages and billing pages open here. With OpenBot, only links in the chats of the main window open in OpenBot. Other links open in the default browser.",
+    "Links in chats, sign-in pages and billing pages open here. With OpenBot, only links in the main window's chats with agents on this computer open in OpenBot. Other links open in the default browser.",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",

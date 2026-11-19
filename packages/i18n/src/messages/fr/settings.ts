@@ -116,7 +116,7 @@ export const messages = {
   "settings.quitGuard.never": "Jamais",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
-    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici. Avec OpenBot, seuls les liens des discussions de la fenêtre principale s’ouvrent dans OpenBot. Les autres liens s’ouvrent dans le navigateur par défaut.",
+    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici. Avec OpenBot, seuls les liens des discussions de la fenêtre principale avec des agents de cet ordinateur s’ouvrent dans OpenBot. Les autres liens s’ouvrent dans le navigateur par défaut.",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
