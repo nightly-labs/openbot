@@ -56,7 +56,9 @@ async function until(test: () => Promise<boolean>, what: string) {
   while (Date.now() < deadline) {
     const change = nextChange();
     if (await test()) return;
-    await Promise.race([change, new Promise((resolve) => setTimeout(resolve, deadline - Date.now()))]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([change, new Promise((resolve) => (timer = setTimeout(resolve, deadline - Date.now())))]);
+    clearTimeout(timer);
   }
   assert.fail(`timed out: ${what}`);
 }
