@@ -577,6 +577,8 @@ export const messages = {
   "workflow.canvas.version.run": "Przed uruchomieniem",
   "workflow.canvas.deleteUndo.title": "Usunięto: {name}",
   "workflow.canvas.deleteUndo.action": "Cofnij",
+  "workflow.canvas.deleted.none": "Brak przepływów",
+  "workflow.canvas.deleted.open": "Otwórz przepływ",
   "workflow.page.failed": "OpenBot nie mógł tego zrobić. Spróbuj ponownie.",
   "workflow.page.needsNewerApp": "Ten przepływ ma kroki z nowszej wersji OpenBot. Zaktualizuj OpenBot, aby go zmienić.",
   "workflow.page.manageOnly": "Aby zmienić ten przepływ, potrzebujesz dostępu do zarządzania każdym z jego agentów.",

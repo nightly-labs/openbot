@@ -533,6 +533,8 @@ export const messages = {
   "workflow.canvas.version.run": "运行之前",
   "workflow.canvas.deleteUndo.title": "{name} 已删除",
   "workflow.canvas.deleteUndo.action": "撤销",
+  "workflow.canvas.deleted.none": "没有工作流",
+  "workflow.canvas.deleted.open": "打开工作流",
   "workflow.page.failed": "OpenBot 无法完成该操作，请重试。",
   "workflow.page.needsNewerApp": "该工作流包含来自更新版 OpenBot 的步骤。更新 OpenBot 后才能更改它。",
   "workflow.page.manageOnly": "要更改该工作流，你需要对其中每个助手拥有“可管理”权限。",

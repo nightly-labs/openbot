@@ -535,6 +535,8 @@ export const messages = {
   "workflow.canvas.version.run": "Çalıştırmadan önce",
   "workflow.canvas.deleteUndo.title": "{name} silindi",
   "workflow.canvas.deleteUndo.action": "Geri al",
+  "workflow.canvas.deleted.none": "İş akışı yok",
+  "workflow.canvas.deleted.open": "Bir iş akışı açın",
   "workflow.page.failed": "OpenBot bunu yapamadı. Tekrar deneyin.",
   "workflow.page.needsNewerApp":
     "Bu iş akışında daha yeni bir OpenBot sürümünden adımlar var. Değiştirmek için OpenBot'u güncelleyin.",

@@ -1277,8 +1277,35 @@
   }
 }
 
-.wfn-stage[data-deleted] {
+.wfn-stage[data-deleted] > :not(.wfn-deleted) {
   visibility: hidden;
+}
+
+.wfn-deleted-list {
+  display: grid;
+  width: min(320px, calc(100vw - var(--openbot-space-8)));
+  max-height: min(320px, 40vh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.wfn-deleted .wfn-deleted-item {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.wfn-deleted-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-deleted-steps {
+  flex: none;
+  color: var(--openbot-text-secondary);
 }
 
 .wfn-undo-toast-tile {

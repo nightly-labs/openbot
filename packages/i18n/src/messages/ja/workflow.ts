@@ -532,6 +532,8 @@ export const messages = {
   "workflow.canvas.version.run": "実行前",
   "workflow.canvas.deleteUndo.title": "{name} を削除しました",
   "workflow.canvas.deleteUndo.action": "元に戻す",
+  "workflow.canvas.deleted.none": "ワークフローがありません",
+  "workflow.canvas.deleted.open": "ワークフローを開く",
   "workflow.page.failed": "OpenBot で実行できませんでした。もう一度お試しください。",
   "workflow.page.needsNewerApp":
     "このワークフローには新しいバージョンの OpenBot のステップがあります。変更するには OpenBot を更新してください。",

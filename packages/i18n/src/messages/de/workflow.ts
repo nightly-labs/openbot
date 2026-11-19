@@ -535,6 +535,8 @@ export const messages = {
   "workflow.canvas.version.run": "Vor einem Lauf",
   "workflow.canvas.deleteUndo.title": "{name} gelöscht",
   "workflow.canvas.deleteUndo.action": "Rückgängig",
+  "workflow.canvas.deleted.none": "Keine Workflows",
+  "workflow.canvas.deleted.open": "Workflow öffnen",
   "workflow.page.failed": "OpenBot konnte das nicht ausführen. Versuche es erneut.",
   "workflow.page.needsNewerApp":
     "Dieser Workflow hat Schritte aus einer neueren OpenBot-Version. Aktualisiere OpenBot, um ihn zu ändern.",

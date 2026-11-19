@@ -524,6 +524,8 @@ export const messages = {
   "workflow.canvas.version.run": "לפני הרצה",
   "workflow.canvas.deleteUndo.title": "{name} נמחק",
   "workflow.canvas.deleteUndo.action": "ביטול",
+  "workflow.canvas.deleted.none": "אין תהליכי עבודה",
+  "workflow.canvas.deleted.open": "פתיחת תהליך עבודה",
   "workflow.page.failed": "OpenBot לא הצליח לבצע את הפעולה. יש לנסות שוב.",
   "workflow.page.needsNewerApp": "בתהליך העבודה הזה יש שלבים מ-OpenBot חדש יותר. יש לעדכן את OpenBot כדי לשנות אותו.",
   "workflow.page.manageOnly": "כדי לשנות את תהליך העבודה הזה, נדרשת ההרשאה ״Can manage״ בכל אחד מהסוכנים שלו.",

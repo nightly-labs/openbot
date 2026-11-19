@@ -85,6 +85,7 @@ import {
   WorkflowCanvasHeader,
 } from "./WorkflowCanvasHud";
 import { ConditionNode } from "./WorkflowConditionNode";
+import { WorkflowDeletedState } from "./WorkflowDeletedState";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
 import { ImageNode } from "./WorkflowImageNode";
 import { LlmNode } from "./WorkflowLlmNode";
@@ -1073,6 +1074,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         : { id: workflow.id, title: workflow.title, steps: workflow.steps },
     );
   };
+  const remaining = () => listed().filter((workflow) => workflow.id !== openId());
   const onSwitcher = (action: SwitcherAction) => {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
@@ -2936,7 +2938,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       <main
         ref={root}
         class="wfn-stage wfn-canvas"
-        inert={deleted()}
         data-deleted={deleted() ? "" : undefined}
         data-preview={previewing() ? "" : undefined}
         data-tool={ui.tool}
@@ -2945,6 +2946,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-frame={props.frame}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
+          if (deleted()) return;
           if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
@@ -2959,7 +2961,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           if (!panning && ui.tool === "select") canvas.selectFrom(event.target, event.shiftKey);
         }}
         onFocusIn={(event) => {
-          if (!pressing) canvas.selectFrom(event.target);
+          if (!pressing && !deleted()) canvas.selectFrom(event.target);
         }}
       >
         <ContextMenu.Root modal={false}>
@@ -3400,6 +3402,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               {t("workflow.canvas.empty.add")}
             </Button>
           </div>
+        </Show>
+        <Show when={deleted()}>
+          <WorkflowDeletedState
+            workflows={remaining()}
+            onOpen={(workflowId) => onSwitcher(`open:${workflowId}`)}
+            onCreate={() => onSwitcher("new")}
+          />
         </Show>
 
         <WorkflowCanvasHeader

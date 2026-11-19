@@ -577,6 +577,8 @@ export const messages = {
   "workflow.canvas.version.run": "Перед запуском",
   "workflow.canvas.deleteUndo.title": "Удалено: {name}",
   "workflow.canvas.deleteUndo.action": "Отменить",
+  "workflow.canvas.deleted.none": "Нет рабочих процессов",
+  "workflow.canvas.deleted.open": "Откройте рабочий процесс",
   "workflow.page.failed": "OpenBot не смог это сделать. Повторите попытку.",
   "workflow.page.needsNewerApp":
     "В этом рабочем процессе есть шаги из более новой версии OpenBot. Обновите OpenBot, чтобы изменить его.",

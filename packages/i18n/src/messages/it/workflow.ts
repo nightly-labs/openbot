@@ -534,6 +534,8 @@ export const messages = {
   "workflow.canvas.version.run": "Prima di un'esecuzione",
   "workflow.canvas.deleteUndo.title": "Eliminato: {name}",
   "workflow.canvas.deleteUndo.action": "Annulla",
+  "workflow.canvas.deleted.none": "Nessun flusso di lavoro",
+  "workflow.canvas.deleted.open": "Apri un flusso di lavoro",
   "workflow.page.failed": "OpenBot non è riuscito a completare l'operazione. Riprova.",
   "workflow.page.needsNewerApp":
     "Questo flusso di lavoro ha passaggi di una versione più recente di OpenBot. Aggiorna OpenBot per modificarlo.",
