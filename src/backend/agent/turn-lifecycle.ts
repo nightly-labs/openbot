@@ -360,6 +360,7 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
   readonly #noUpdateTurns = new Set<string>();
+  readonly #taskStartTurns = new Set<string>();
   readonly #noUpdateSteps = new Map<string, Set<string>>();
   readonly #quietTurns = new Set<string>();
   readonly #followUpTurns = new Set<string>();
@@ -461,6 +462,10 @@ export class TurnLifecycle {
     return this.#runningTurns.get(turnId)?.startedAt ?? null;
   }
 
+  startedTask(turnId: string): void {
+    if (this.#runningTurns.has(turnId)) this.#taskStartTurns.add(turnId);
+  }
+
   earliestRunningTurnStartedAt(): number | null {
     let earliest: number | null = null;
     for (const turn of this.#runningTurns.values()) earliest = Math.min(earliest ?? turn.startedAt, turn.startedAt);
@@ -512,6 +517,7 @@ export class TurnLifecycle {
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
     this.#noUpdateTurns.clear();
+    this.#taskStartTurns.clear();
     this.#quietChannelTurns.clear();
     this.#quietEmptyAnswers.clear();
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
@@ -1772,6 +1778,7 @@ export class TurnLifecycle {
       const noUpdateSteps = this.#noUpdateSteps.get(turnId);
       this.#noUpdateSteps.delete(turnId);
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
+      const taskStarted = this.#taskStartTurns.delete(turnId);
       const quietChannelRun = this.#quietChannelTurns.has(turnId);
       this.#quietEmptyAnswers.delete(turnId);
       this.#clearQuietEnd(turnId);
@@ -2110,9 +2117,10 @@ export class TurnLifecycle {
           : "no";
       const continueMode: FinishCheckMode =
         planMode !== "no" &&
-        (yield* (running?.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
-          Effect.orElseSucceed(() => false),
-        ))
+        (taskStarted ||
+          (yield* (running?.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+            Effect.orElseSucceed(() => false),
+          )))
           ? "no"
           : planMode;
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
