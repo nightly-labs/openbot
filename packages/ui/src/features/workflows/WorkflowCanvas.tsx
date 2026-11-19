@@ -244,14 +244,16 @@ function MenuItem(props: {
   keys?: readonly string[];
   danger?: boolean;
   onAim?: (aimed: boolean) => void;
-  onSelect: () => void;
+  onSelect?: () => void;
+  onSelectAfterClose?: () => void;
 }) {
   return (
     <ContextMenu.Item
       class={props.danger ? "ui-action-menu-danger" : ""}
       onFocus={() => props.onAim?.(true)}
       onBlur={() => props.onAim?.(false)}
-      onSelect={props.onSelect}
+      onSelect={() => props.onSelect?.()}
+      onSelectAfterClose={props.onSelectAfterClose}
     >
       <span class="wfn-menu-glyph" aria-hidden="true">
         {props.icon}
@@ -1407,9 +1409,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setNodes((list) => [...list, ...copies]);
     canvas.addEdges(
       clip.edges.flatMap((edge) => {
-        const from = ids.get(edge.from);
+        const from = ids.get(edge.from) ?? edge.from;
         const to = ids.get(edge.to);
-        if (!from || !to) return [];
+        if (!to) return [];
         const copy: WfnEdge = {
           id: `${from}${edge.branch ? `.${edge.branch}` : ""}>${to}:${edge.type}`,
           from,
@@ -1423,8 +1425,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(copies.map((node) => node.id));
   };
 
-  const duplicateNodes = (ids: readonly string[]) =>
-    place(collect(ids), { x: DUPLICATE_OFFSET, y: DUPLICATE_OFFSET }, "copy");
+  const referencesInto = (clip: Clip): WfnEdge[] => {
+    const inside = new Set(clip.nodes.map((node) => node.id));
+    const pictures = new Set(clip.nodes.flatMap((node) => (node.kind === "image" ? [node.id] : [])));
+    return canvas
+      .edges()
+      .filter(
+        (edge) =>
+          edge.type === "image" && pictures.has(edge.to) && !inside.has(edge.from) && !board.isRemoved(edge.from),
+      );
+  };
+
+  const duplicateNodes = (ids: readonly string[]) => {
+    const clip = collect(ids);
+    place(
+      { ...clip, edges: [...clip.edges, ...referencesInto(clip)] },
+      { x: DUPLICATE_OFFSET, y: DUPLICATE_OFFSET },
+      "copy",
+    );
+  };
 
   const resetSize = (id: string) => {
     if (!sizes[id]) return;
@@ -3253,14 +3272,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         icon={<ClipboardPaste />}
                         label={t("workflow.canvas.action.paste")}
                         keys={[MOD_KEY, "V"]}
-                        onSelect={() => pasteNodes()}
+                        onSelectAfterClose={() => pasteNodes()}
                       />
                     </Show>
                     <MenuItem
                       icon={<CopyPlus />}
                       label={t("workflow.node.toolbar.duplicate")}
                       keys={[MOD_KEY, "D"]}
-                      onSelect={() => duplicateNodes(targets(id()))}
+                      onSelectAfterClose={() => duplicateNodes(targets(id()))}
                     />
                     <ContextMenu.Separator />
                     <MenuItem
