@@ -204,7 +204,8 @@ function quitOnGpuRestartLoop(): void {
   });
   app.on("child-process-gone", (_event, details) => {
     if (quitting || details.type !== "GPU" || details.reason === "clean-exit") return;
-    const now = Date.now();
+    // Monotonic: a clock that goes back must not keep old exits in the window.
+    const now = performance.now();
     while (exits.length > 0 && now - (exits[0] ?? now) >= GPU_RESTART_LOOP_WINDOW_MS) exits.shift();
     exits.push(now);
     if (exits.length < GPU_RESTART_LOOP_LIMIT) {
