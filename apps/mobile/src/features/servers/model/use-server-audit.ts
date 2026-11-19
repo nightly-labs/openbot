@@ -2,7 +2,7 @@ import type { AgentAccessLevel, ServerAuditChange, ServerAuditEntry, ServerAudit
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
+import { AGENT_ACCESS_LEVEL_KEYS, SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -19,13 +19,6 @@ export const AUDIT_FILTER_KEYS = {
   roles: "mobile.server.audit.filterRoles",
   agents: "mobile.server.audit.filterAgents",
 } as const satisfies Record<AuditFilter, MobileTextKey>;
-
-const LEVEL_KEYS = {
-  none: "mobile.server.roles.level.none",
-  view: "mobile.server.roles.level.view",
-  chat: "mobile.server.roles.level.chat",
-  manage: "mobile.server.roles.level.manage",
-} as const satisfies Record<AgentAccessLevel, MobileTextKey>;
 
 export function auditCategory(change: ServerAuditChange): Exclude<AuditFilter, "all"> {
   switch (change.kind) {
@@ -59,7 +52,7 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
   const name = (value: ServerAuditName) => key(value.name);
   const step = (from: Key, to: Key) => show(from, { kind: "to", text: t("mobile.server.audit.to") }, to);
   const memberRole = (role: "admin" | "member") => key(t(SERVER_ROLE_LABEL_KEYS[role]));
-  const level = (value: AgentAccessLevel) => key(t(LEVEL_KEYS[value]), value);
+  const level = (value: AgentAccessLevel) => key(t(AGENT_ACCESS_LEVEL_KEYS[value]), value);
   const change = entry.change;
   const line = (() => {
     switch (change.kind) {

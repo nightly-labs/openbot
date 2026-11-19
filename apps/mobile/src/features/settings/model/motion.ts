@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { storedFields } from "./stored-fields";
 
 export interface MotionPreferences {
   allAnimations: boolean;
@@ -31,13 +32,7 @@ export const useMotionPreferences = create<MotionPreferences & { ready: boolean 
 }));
 
 export function decodeMotionPreferences(stored: string | null): MotionPreferences {
-  let value: unknown = null;
-  try {
-    value = stored === null ? null : JSON.parse(stored);
-  } catch {
-    value = null;
-  }
-  const fields = new Map<string, unknown>(typeof value === "object" && value !== null ? Object.entries(value) : []);
+  const fields = storedFields(stored) ?? new Map<string, unknown>();
   const preferences = { ...DEFAULTS };
   for (const name of MOTION_PREFERENCE_NAMES) {
     const field = fields.get(name);

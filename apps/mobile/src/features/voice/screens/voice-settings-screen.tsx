@@ -91,9 +91,32 @@ function useSupertonicStatus(): string {
   );
 }
 
-function useCheckMark() {
+export function ChoiceRow({
+  checked,
+  disabled,
+  supportingText,
+  label,
+  onPress,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  supportingText?: string;
+  label: string;
+  onPress: () => void;
+}) {
   const accent = String(useCSSVariable("--openbot-accent"));
-  return (checked: boolean) => (checked ? <Check size={18} color={accent} strokeWidth={2} /> : null);
+  return (
+    <SettingsRow
+      checked={checked}
+      disclosure={false}
+      disabled={disabled}
+      supportingText={supportingText}
+      trailing={checked ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+      onPress={onPress}
+    >
+      <Typography.Paragraph>{label}</Typography.Paragraph>
+    </SettingsRow>
+  );
 }
 
 const LOCAL_RECOGNITION_TEXT = {
@@ -133,7 +156,6 @@ function useLocalModelStatus(engine: LocalRecognition): string {
 function RecognitionSection({ onError }: { onError: (message: string) => void }) {
   const { t } = useText();
   const settings = useVoiceSettings();
-  const mark = useCheckMark();
   const statuses = {
     parakeet: useLocalModelStatus("parakeet"),
     "parakeet-unified": useLocalModelStatus("parakeet-unified"),
@@ -161,46 +183,36 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
       title={t("mobile.settings.voice.recognition.title")}
       footer={t("mobile.settings.voice.recognition.footer")}
     >
-      <SettingsRow
+      <ChoiceRow
         checked={settings.recognition === "system"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={t("mobile.settings.voice.recognition.systemHint")}
-        trailing={mark(settings.recognition === "system")}
+        label={t("mobile.settings.voice.recognition.system")}
         onPress={() => choose("system")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.system")}</Typography.Paragraph>
-      </SettingsRow>
+      />
       {localEngines.map((engine) => (
-        <SettingsRow
+        <ChoiceRow
           key={engine}
           checked={settings.recognition === engine}
-          disclosure={false}
           disabled={!settings.ready || (!localRecognitionSupported(engine) && !layoutPreview)}
           supportingText={statuses[engine]}
-          trailing={mark(settings.recognition === engine)}
+          label={t(LOCAL_RECOGNITION_TEXT[engine].name)}
           onPress={() => choose(engine)}
-        >
-          <Typography.Paragraph>{t(LOCAL_RECOGNITION_TEXT[engine].name)}</Typography.Paragraph>
-        </SettingsRow>
+        />
       ))}
-      <SettingsRow
+      <ChoiceRow
         checked={settings.recognition === "elevenlabs"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={t(
           settings.hasElevenLabsKey
             ? "mobile.settings.voice.recognition.elevenLabsHint"
             : "mobile.settings.voice.engine.elevenLabsNoKey",
         )}
-        trailing={mark(settings.recognition === "elevenlabs")}
+        label={t("mobile.settings.voice.recognition.elevenLabs")}
         onPress={() => choose("elevenlabs")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.recognition.elevenLabs")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
+      />
+      <ChoiceRow
         checked={settings.recognition === "voice-server"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={
           server?.routes.dictation
@@ -209,11 +221,9 @@ function RecognitionSection({ onError }: { onError: (message: string) => void })
               })
             : t("mobile.settings.voice.server.dictationOff")
         }
-        trailing={mark(settings.recognition === "voice-server")}
+        label={t("mobile.settings.voice.server.choice")}
         onPress={() => choose("voice-server")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.server.choice")}</Typography.Paragraph>
-      </SettingsRow>
+      />
     </SettingsSection>
   );
 }
@@ -396,8 +406,6 @@ function EngineSection({ onError }: { onError: (message: string) => void }) {
   const settings = useVoiceSettings();
   const supertonicStatus = useSupertonicStatus();
   const server = useVoiceServer((state) => state.server);
-  const checkMark = useCheckMark();
-  const mark = (engine: VoiceEngine) => checkMark(settings.engine === engine);
   const elevenLabsStatus = !settings.hasElevenLabsKey
     ? t("mobile.settings.voice.engine.elevenLabsNoKey")
     : settings.elevenLabsVoice
@@ -418,29 +426,22 @@ function EngineSection({ onError }: { onError: (message: string) => void }) {
   };
   return (
     <SettingsSection title={t("mobile.settings.voice.engine.title")} footer={t("mobile.settings.voice.engine.footer")}>
-      <SettingsRow
+      <ChoiceRow
         checked={settings.engine === "supertonic"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={supertonicStatus}
-        trailing={mark("supertonic")}
+        label={t("mobile.settings.voice.engine.supertonic")}
         onPress={() => choose("supertonic")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.engine.supertonic")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
+      />
+      <ChoiceRow
         checked={settings.engine === "elevenlabs"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={elevenLabsStatus}
-        trailing={mark("elevenlabs")}
+        label={t("mobile.settings.voice.engine.elevenLabs")}
         onPress={() => choose("elevenlabs")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.engine.elevenLabs")}</Typography.Paragraph>
-      </SettingsRow>
-      <SettingsRow
+      />
+      <ChoiceRow
         checked={settings.engine === "voice-server"}
-        disclosure={false}
         disabled={!settings.ready}
         supportingText={
           server?.routes.speech
@@ -450,11 +451,9 @@ function EngineSection({ onError }: { onError: (message: string) => void }) {
               })
             : t("mobile.settings.voice.server.speechOff")
         }
-        trailing={mark("voice-server")}
+        label={t("mobile.settings.voice.server.choice")}
         onPress={() => choose("voice-server")}
-      >
-        <Typography.Paragraph>{t("mobile.settings.voice.server.choice")}</Typography.Paragraph>
-      </SettingsRow>
+      />
     </SettingsSection>
   );
 }
@@ -585,7 +584,6 @@ function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; o
   const { t } = useText();
   const ready = useVoiceSettings((state) => state.ready);
   const chosen = useVoiceSettings((state) => state.elevenLabsModel);
-  const mark = useCheckMark();
   const choose = (elevenLabsModel: ElevenLabsSpeechModelId) => {
     if (elevenLabsModel === chosen) return;
     void haptics.selection();
@@ -598,17 +596,14 @@ function ElevenLabsModelSection({ onChange, onError }: { onChange: () => void; o
       footer={t("mobile.settings.voice.elevenLabs.model.footer")}
     >
       {ELEVENLABS_SPEECH_MODEL_IDS.map((id) => (
-        <SettingsRow
+        <ChoiceRow
           key={id}
           checked={chosen === id}
-          disclosure={false}
           disabled={!ready}
           supportingText={t(ELEVENLABS_MODEL_HINT[id])}
-          trailing={mark(chosen === id)}
+          label={cloudSpeechModel(id)?.name ?? id}
           onPress={() => choose(id)}
-        >
-          <Typography.Paragraph>{cloudSpeechModel(id)?.name ?? id}</Typography.Paragraph>
-        </SettingsRow>
+        />
       ))}
     </SettingsSection>
   );

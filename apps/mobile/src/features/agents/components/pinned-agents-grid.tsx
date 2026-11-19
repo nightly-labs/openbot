@@ -16,7 +16,7 @@ import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/compon
 import { type AgentListRevealState, AgentListRowReveal } from "@/features/agents/components/agent-list-reveal";
 import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
-import { AGENT_WAIT_STATE, AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
+import { AgentWaitBadge, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import {
   AgentDragPreview,
@@ -154,19 +154,7 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   const trigger = (
     <ChatLinkPressable
       chatId={agent.id}
-      accessibilityLabel={
-        waitReason
-          ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : unreadCount > 0 || unreadThreads
-            ? t("mobile.agent.list.withState", {
-                label: openLabel,
-                state:
-                  unreadCount > 0
-                    ? t("mobile.agent.list.unread", { count: unreadCount })
-                    : t("mobile.agent.list.unreadThreads"),
-              })
-            : openLabel
-      }
+      accessibilityLabel={agentListStateLabel(t, openLabel, waitReason, unreadCount, unreadThreads)}
       accessibilityRole="button"
       className="w-full items-center gap-2 px-1"
       onPressIn={agentChatPreview.onPressIn}

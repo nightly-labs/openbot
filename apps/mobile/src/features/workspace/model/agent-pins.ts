@@ -72,7 +72,7 @@ export function phoneSidebarPins(current: RemoteWorkspacePreferences): SidebarPi
   return [...ordered.map(({ kind, id }) => ({ kind, id })), ...wanted.filter((pin) => !placed.has(sidebarPinKey(pin)))];
 }
 
-function samePinList(left: readonly SidebarPin[], right: readonly SidebarPin[]): boolean {
+export function samePinList(left: readonly SidebarPin[], right: readonly SidebarPin[]): boolean {
   return (
     left.length === right.length &&
     left.every((pin, index) => {

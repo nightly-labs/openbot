@@ -3,9 +3,10 @@ import { Typography } from "heroui-native";
 import { useState } from "react";
 import { useUniwind } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { localDay } from "@/shared/lib/local-day";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
-import { localDate, localDay } from "./usage-date";
+import { localDate } from "./usage-date";
 
 export function UsageDateRow({
   label,

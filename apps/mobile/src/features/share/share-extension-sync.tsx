@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { useAppLock } from "@/features/app-lock/model/app-lock";
+import { appLockEnabled } from "@/features/app-lock/model/app-lock-storage";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
-import { loadLastShareTarget, type ShareTarget } from "./model/last-share-target";
+import { useLastShareTarget } from "./model/last-share-target";
 import {
   forgetShareTargets,
   lockShareExtension,
@@ -35,26 +36,14 @@ export function ShareExtensionSync({
 }: ShareExtensionSyncProps): null {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
-  const lockReady = useAppLock((state) => state.status === "ready");
-  const lockOn = useAppLock((state) => state.config.pin || state.config.deviceUnlock);
-  const locked = !lockReady || lockOn;
+  const locked = useAppLock((state) => state.status !== "ready" || appLockEnabled(state.config));
   const [saved] = useState(() => readShareExtensionAgents(apiUrl, userId) ?? []);
   const offered = useRef(new Set(saved.map((agent) => shareConversationId(agent.serverId, agent.id))));
-  const [lastTarget, setLastTarget] = useState<ShareTarget | null>(null);
+  const lastTarget = useLastShareTarget(apiUrl, userId);
 
   useEffect(() => {
     setShareExtensionSession({ apiUrl, userId, sessionToken });
   }, [apiUrl, userId, sessionToken]);
-
-  useEffect(() => {
-    let mounted = true;
-    void loadLastShareTarget(apiUrl, userId).then((target) => {
-      if (mounted) setLastTarget(target);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [apiUrl, userId]);
 
   const text = useMemo(
     () => ({

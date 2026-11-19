@@ -1,5 +1,7 @@
 import type { AppFormat } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
+import { useEffect, useRef } from "react";
+import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
@@ -75,6 +77,44 @@ export function exportDate(value: string, format: AppFormat): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return format.date(date, { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function useReleaseOnClose(
+  token: string | null,
+  discard: (token: string, serverId: string) => Promise<void>,
+  serverId: string,
+) {
+  const open = useRef(token);
+  open.current = token;
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      if (open.current) void discard(open.current, serverId).catch(() => undefined);
+    };
+  }, [discard, serverId]);
+  return closed;
+}
+
+export function confirmDuplicateNames(
+  t: MobileText["t"],
+  agents: readonly { name: string; nameExists: boolean }[],
+  start: () => void,
+): void {
+  const duplicates = agents.filter((agent) => agent.nameExists);
+  if (duplicates.length === 0) {
+    start();
+    return;
+  }
+  Alert.alert(
+    t("mobile.server.import.duplicatesTitle"),
+    t("mobile.server.import.duplicatesBody", { names: duplicates.map((agent) => agent.name).join(", ") }),
+    [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("mobile.server.import.duplicatesConfirm"), onPress: start },
+    ],
+  );
 }
 
 export function toggledKeys(set: ReadonlySet<string>, key: string, include: boolean): ReadonlySet<string> {

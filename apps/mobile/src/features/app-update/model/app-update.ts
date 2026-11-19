@@ -13,7 +13,7 @@ import { create } from "zustand";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { supportLog } from "@/features/support/model/support-log";
 import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
-import { currentAppVersion, refreshMobileFeatures, useLatestAppVersion } from "@/shared/lib/mobile-features";
+import { currentAppVersion, useLatestAppVersion, useMobileFeaturesRefresh } from "@/shared/lib/mobile-features";
 import { isIOS } from "@/shared/lib/platform";
 
 export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: string; version: string };
@@ -110,14 +110,7 @@ export function useAppUpdate(): AppUpdate | null {
   useEffect(() => {
     if (rollbackWaits) void fetchRollback();
   }, [rollbackWaits]);
-  useEffect(() => {
-    if (!apiUrl) return;
-    void refreshMobileFeatures(apiUrl);
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void refreshMobileFeatures(apiUrl);
-    });
-    return () => subscription.remove();
-  }, [apiUrl]);
+  useMobileFeaturesRefresh(apiUrl, { onAppActive: true });
 
   if (dismissed === undefined) return null;
   const current = currentAppVersion();

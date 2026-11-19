@@ -14,6 +14,7 @@ import {
 } from "@shopify/react-native-skia";
 import { File, Paths } from "expo-file-system";
 import { APP_FONT } from "@/shared/lib/app-font";
+import { nameInitials } from "@/shared/lib/name-initials";
 import { currentText } from "@/shared/lib/text";
 
 const WIDTH = 1200;
@@ -61,17 +62,6 @@ function ellipsize(text: string, typeface: SkFont, width: number): string {
   let end = text.length;
   while (end > 0 && textWidth(`${text.slice(0, end)}…`, typeface) > width) end -= 1;
   return `${text.slice(0, end).trimEnd()}…`;
-}
-
-function initials(name: string): string {
-  return (
-    name
-      .trim()
-      .split(/\s+/u)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "O"
-  );
 }
 
 async function loadPhoto(url: string) {
@@ -144,7 +134,7 @@ async function drawHeader(
   } else {
     canvas.drawRect(Skia.XYWHRect(PAD, PAD, AVATAR, AVATAR), fill(colors.accent, ACCENT_SOFT_ALPHA));
     const initialsFont = font(32, "600");
-    const text = initials(account.name);
+    const text = nameInitials(account.name);
     canvas.drawText(text, cx - textWidth(text, initialsFont) / 2, cy + 11, fill(colors.accent), initialsFont);
   }
   canvas.restore();

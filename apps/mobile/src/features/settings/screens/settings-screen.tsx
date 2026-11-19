@@ -15,7 +15,6 @@ import Shield from "lucide-react-native/icons/shield";
 import SquareMenu from "lucide-react-native/icons/square-menu";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import WandSparkles from "lucide-react-native/icons/wand-sparkles";
-import { useEffect } from "react";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -25,7 +24,7 @@ import { useBillingState } from "@/features/settings/model/billing";
 import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
-import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
+import { useRefreshedMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
@@ -34,10 +33,7 @@ export function SettingsScreen() {
   const managesAgents = useMobileWorkspaceSelector((workspace) => agentDefaultsServers(workspace).length > 0);
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
   const apiUrl = session?.apiUrl ?? "";
-  const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
-  useEffect(() => {
-    if (apiUrl) void refreshMobileFeatures(apiUrl);
-  }, [apiUrl]);
+  const cloudServersOn = useRefreshedMobileFeature(apiUrl, "cloudServers");
   const billing = useBillingState(cloudServersOn);
   const showsBilling = cloudServersOn && billing.data?.available !== false;
   const planCount = billing.data?.servers.length;

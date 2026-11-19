@@ -45,7 +45,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
@@ -68,7 +67,7 @@ import { largePastedText } from "../model/composer-paste";
 import { createComposerSendGate } from "../model/composer-send";
 import { composerAction } from "../model/voice-dictation";
 import type { VoicePalette } from "../model/voice-palette";
-import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
+import { attachmentTypeLabel, shareLocalAttachment, showFileFailure } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
 import type { ComposerContextMeter } from "./composer-context-ring";
@@ -956,15 +955,9 @@ export const ChatComposer = memo(function ChatComposer({
                               latestTextRef.current = pasted.draft;
                               onChangeDraft(pasted.draft);
                             })
-                            .catch((error) => {
-                              void haptics.notification("error");
-                              showFailureAlert(
-                                error,
-                                "turn",
-                                t("mobile.chat.composer.pasteFailed"),
-                                error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-                              );
-                            });
+                            .catch((error) =>
+                              showFileFailure(error, t("mobile.chat.composer.pasteFailed"), { t, sourceText }),
+                            );
                           return;
                         }
                         const source = latestTextRef.current;

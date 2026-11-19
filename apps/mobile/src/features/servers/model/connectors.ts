@@ -45,6 +45,13 @@ export const CONNECTOR_STATUS_KEYS = {
 
 export type ConnectionKind = "live" | "setup" | "paused" | "attention";
 
+export const CONNECTION_KIND_KEYS = {
+  live: "mobile.server.connectors.statusConnected",
+  paused: "mobile.server.connectors.statusPaused",
+  setup: "mobile.server.connectors.statusConnecting",
+  attention: "mobile.server.connectors.statusAttention",
+} as const satisfies Record<ConnectionKind, MobileTextKey>;
+
 export function connectionKind(connection: MessagingConnection): ConnectionKind {
   switch (connection.state) {
     case "connected":

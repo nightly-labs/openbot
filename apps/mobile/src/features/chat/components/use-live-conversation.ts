@@ -33,8 +33,8 @@ import { useVoiceDictation, type VoiceDictation } from "./use-voice-dictation";
 
 const REPLY_GRACE_MS = 5_000;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-const OPEN_MS = 460;
-const CLOSE_MS = 400;
+export const PRESENCE_OPEN = { duration: 460, easing: EASE_OUT, reduceMotion: ReduceMotion.System };
+export const PRESENCE_CLOSE = { duration: 400, easing: EASE_OUT, reduceMotion: ReduceMotion.System };
 const SPEAKING_PULSE_MS = 420;
 
 interface PendingReply {
@@ -137,25 +137,7 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     if (state.open && (!input.focused || (!input.foreground && !asking))) controller.end();
   }, [controller, state.open, input.focused, input.foreground, asking]);
 
-  const keepAwakeTag = useId();
-  useEffect(() => {
-    if (!state.open) return;
-    activateKeepAwakeAsync(keepAwakeTag).catch(() => {});
-    return () => {
-      deactivateKeepAwake(keepAwakeTag).catch(() => {});
-    };
-  }, [state.open, keepAwakeTag]);
-
-  useEffect(() => {
-    if (!state.open || !input.focused) return;
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      controller.end();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [controller, state.open, input.focused]);
-
-  useEffect(() => () => controller.dispose(), [controller]);
+  useLiveCallSession(controller, state.open, input.focused);
 
   return {
     ...state,
@@ -168,6 +150,32 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     interrupt: controller.interrupt,
     end: controller.end,
   };
+}
+
+export function useLiveCallSession(
+  controller: { end: () => void; dispose: () => void },
+  open: boolean,
+  focused: boolean,
+) {
+  const keepAwakeTag = useId();
+  useEffect(() => {
+    if (!open) return;
+    activateKeepAwakeAsync(keepAwakeTag).catch(() => {});
+    return () => {
+      deactivateKeepAwake(keepAwakeTag).catch(() => {});
+    };
+  }, [open, keepAwakeTag]);
+
+  useEffect(() => {
+    if (!open || !focused) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      controller.end();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [controller, open, focused]);
+
+  useEffect(() => () => controller.dispose(), [controller]);
 }
 
 function createController({
@@ -512,7 +520,7 @@ function createController({
         server_kind: "remote",
         result: "succeeded",
       });
-      presence.set(withTiming(1, { duration: OPEN_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }));
+      presence.set(withTiming(1, PRESENCE_OPEN));
       if (online) listen();
       else {
         phase = "listening";
@@ -555,7 +563,7 @@ function createController({
         turn_count: turns,
       });
       presence.set(
-        withTiming(0, { duration: CLOSE_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }, (finished) => {
+        withTiming(0, PRESENCE_CLOSE, (finished) => {
           if (finished) scheduleOnRN(closed);
         }),
       );

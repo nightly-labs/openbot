@@ -6,7 +6,7 @@ import { StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { clamp, focalTranslation, rubberBandClamp } from "@/features/chat/model/image-viewer-geometry";
+import { focalTranslation, rubberBandClamp } from "@/features/chat/model/image-viewer-geometry";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import {
   type AvatarCrop,
@@ -16,6 +16,7 @@ import {
 } from "@/shared/lib/avatar-crop-request";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { clamp } from "@/shared/lib/worklet-math";
 
 const MARGIN = 16;
 const MAX_SCALE = 5;

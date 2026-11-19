@@ -4,7 +4,7 @@ import { memo, type ReactNode, useMemo } from "react";
 import { FlatList, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
-import { AgentWaitBadge } from "@/features/agents/components/agent-wait-badge";
+import { AgentWaitBadge, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
@@ -69,17 +69,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
       <ChatLinkPressable
         chatId={agent.id}
         accessibilityRole="button"
-        accessibilityLabel={
-          unreadCount > 0 || unreadThreads
-            ? t("mobile.agent.list.withState", {
-                label: openLabel,
-                state:
-                  unreadCount > 0
-                    ? t("mobile.agent.list.unread", { count: unreadCount })
-                    : t("mobile.agent.list.unreadThreads"),
-              })
-            : openLabel
-        }
+        accessibilityLabel={agentListStateLabel(t, openLabel, undefined, unreadCount, unreadThreads)}
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >

@@ -1,4 +1,5 @@
 import type { ConversationReaction } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
@@ -26,6 +27,17 @@ export interface MessageActionsInput {
   pinned?: boolean;
   onTogglePin?: () => Promise<void>;
   files?: MessageFiles;
+}
+
+export function reportTeamResult(work: Promise<void>, failedTitle: MobileTextKey): Promise<void> {
+  return work.then(
+    () => void haptics.notification("success"),
+    (error: unknown) => {
+      void haptics.notification("error");
+      const title = currentText().t(failedTitle);
+      showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
+    },
+  );
 }
 
 export function useMessageActions(input: MessageActionsInput | null) {
@@ -63,31 +75,13 @@ export function useMessageActions(input: MessageActionsInput | null) {
           {
             text: text.t("common.delete"),
             style: "destructive",
-            onPress: () =>
-              onDelete().then(
-                () => void haptics.notification("success"),
-                (error: unknown) => {
-                  void haptics.notification("error");
-                  const title = currentText().t("mobile.chat.message.deleteFailed");
-                  showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
-                },
-              ),
+            onPress: () => reportTeamResult(onDelete(), "mobile.chat.message.deleteFailed"),
           },
         ]);
       }
     : undefined;
   const onTogglePin = input?.onTogglePin;
-  const togglePin = onTogglePin
-    ? () =>
-        onTogglePin().then(
-          () => void haptics.notification("success"),
-          (error: unknown) => {
-            void haptics.notification("error");
-            const title = currentText().t("mobile.chat.pins.failed");
-            showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
-          },
-        )
-    : undefined;
+  const togglePin = onTogglePin ? () => reportTeamResult(onTogglePin(), "mobile.chat.pins.failed") : undefined;
   const open = input
     ? () =>
         openMessageActions({

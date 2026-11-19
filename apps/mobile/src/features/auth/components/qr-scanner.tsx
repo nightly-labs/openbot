@@ -10,7 +10,6 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import Animated, {
-  Easing,
   FadeIn,
   FadeOut,
   ReduceMotion,
@@ -26,6 +25,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ScanAgainButton } from "./scan-again-button";
+import { SIGN_IN_EASE_OUT } from "./sign-in-motion";
 
 type ScanState =
   | { status: "idle" }
@@ -71,15 +71,13 @@ function ScannerStatus({
   return (
     <Card variant="default" className="rounded-3xl p-4">
       <Card.Body className="flex-row items-center gap-3">
-        {scanState.status === "connecting" ? (
-          <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+        <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+          {scanState.status === "connecting" ? (
             <Spinner size="sm" color={accent} />
-          </Surface>
-        ) : (
-          <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+          ) : (
             <ScanLine size={22} color={foreground} strokeWidth={1.75} />
-          </Surface>
-        )}
+          )}
+        </Surface>
         <View className="min-w-0 flex-1 gap-0.5">
           <Card.Title className="font-sans text-body font-semibold">
             {scanState.status === "connecting"
@@ -117,7 +115,7 @@ function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanSt
     <View className="items-center gap-3">
       <Animated.View
         key={`${scanState.status}-${text}`}
-        entering={FadeIn.duration(220).easing(Easing.bezier(0.23, 1, 0.32, 1))}
+        entering={FadeIn.duration(220).easing(SIGN_IN_EASE_OUT)}
         exiting={FadeOut.duration(120)}
         accessibilityLiveRegion="polite"
         className="max-w-full flex-row items-center gap-2.5 rounded-full px-4 py-3"
@@ -215,7 +213,7 @@ export function QrScanner({
     connecting.set(
       withTiming(isConnecting ? 1 : 0, {
         duration: 220,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
+        easing: SIGN_IN_EASE_OUT,
         reduceMotion: ReduceMotion.Never,
       }),
     );
@@ -347,24 +345,17 @@ export function QrScanner({
                     canRequestPermission
                       ? async () => {
                           const scope = mobileAnalytics.scope();
-                          try {
-                            const response = await requestPermission();
-                            if (pairing)
-                              scope.track("mobile_pairing_action", {
-                                action: "camera_permission",
-                                entry_point: "qr",
-                                result: response.granted ? "succeeded" : "failed",
-                                ...(response.granted ? {} : { failure_code: "permission_denied" }),
-                              });
-                          } catch {
-                            if (pairing)
-                              scope.track("mobile_pairing_action", {
-                                action: "camera_permission",
-                                entry_point: "qr",
-                                result: "failed",
-                                failure_code: "permission_denied",
-                              });
-                          }
+                          const granted = await requestPermission().then(
+                            (response) => response.granted,
+                            () => false,
+                          );
+                          if (pairing)
+                            scope.track("mobile_pairing_action", {
+                              action: "camera_permission",
+                              entry_point: "qr",
+                              result: granted ? "succeeded" : "failed",
+                              ...(granted ? {} : { failure_code: "permission_denied" }),
+                            });
                         }
                       : () => void Linking.openSettings()
                   }

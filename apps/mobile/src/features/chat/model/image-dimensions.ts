@@ -1,3 +1,5 @@
+import { base64ToBytes } from "@openbot/team-client/base64";
+
 export interface ImageDimensions {
   width: number;
   height: number;
@@ -15,10 +17,7 @@ export function imageDimensions(base64: string): ImageDimensions | null {
 function decodePrefix(base64: string): Uint8Array | null {
   const prefix = base64.slice(0, HEADER_BASE64_LENGTH);
   try {
-    const binary = atob(prefix.slice(0, prefix.length - (prefix.length % 4)));
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
+    return base64ToBytes(prefix.slice(0, prefix.length - (prefix.length % 4)));
   } catch {
     return null;
   }

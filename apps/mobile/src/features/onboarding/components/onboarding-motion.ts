@@ -25,12 +25,12 @@ export function glassAfter(entranceDelay: number): number {
   return Math.max(STEP_ENTER_MS + 20, entranceDelay);
 }
 
-export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
+function slideInEntering(motion: OnboardingMotion, offset: number, duration: number, delay: number) {
   if (motion === "none") return undefined;
-  const shift = motion === "full" ? STEP_SHIFT * direction : 0;
+  const shift = motion === "full" ? offset : 0;
   return () => {
     "worklet";
-    const timing = { duration: STEP_ENTER_MS, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
+    const timing = { duration, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
     return {
       initialValues: { opacity: 0, transform: [{ translateX: shift }] },
       animations: {
@@ -39,6 +39,10 @@ export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay 
       },
     };
   };
+}
+
+export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
+  return slideInEntering(motion, STEP_SHIFT * direction, STEP_ENTER_MS, delay);
 }
 
 export function stepExiting(motion: OnboardingMotion, direction: 1 | -1) {
@@ -157,19 +161,7 @@ export function handOffEntering(motion: OnboardingMotion, landsAt: number) {
 }
 
 export function slideSwapEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
-  if (motion === "none") return undefined;
-  const shift = motion === "full" ? 24 * direction : 0;
-  return () => {
-    "worklet";
-    const timing = { duration: 280, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
-    return {
-      initialValues: { opacity: 0, transform: [{ translateX: shift }] },
-      animations: {
-        opacity: withDelay(delay, withTiming(1, timing), ReduceMotion.Never),
-        transform: [{ translateX: withDelay(delay, withTiming(0, timing), ReduceMotion.Never) }],
-      },
-    };
-  };
+  return slideInEntering(motion, 24 * direction, 280, delay);
 }
 
 export function slideSwapExiting(motion: OnboardingMotion) {

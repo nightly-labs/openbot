@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.chatSwipe.v1";
 
@@ -22,13 +23,11 @@ export async function loadChatSwipePreference(): Promise<void> {
   }
 }
 
-let writes: Promise<void> = Promise.resolve();
+const write = writesInOrder(key);
 
 export function saveChatSwipePreference(action: ChatSwipeAction): Promise<void> {
   useChatSwipePreference.setState({ action, ready: true });
-  const write = writes.then(() => SecureStore.setItemAsync(key, action));
-  writes = write.catch(() => undefined);
-  return write;
+  return write(() => action);
 }
 
 const pullKey = "openbot.mobile.chatPullInfo.v1";
@@ -49,11 +48,9 @@ export async function loadChatPullPreference(): Promise<void> {
   }
 }
 
-let pullWrites: Promise<void> = Promise.resolve();
+const writePull = writesInOrder(pullKey);
 
 export function saveChatPullPreference(enabled: boolean): Promise<void> {
   useChatPullPreference.setState({ enabled, ready: true });
-  const write = pullWrites.then(() => SecureStore.setItemAsync(pullKey, enabled ? "on" : "off"));
-  pullWrites = write.catch(() => undefined);
-  return write;
+  return writePull(() => (enabled ? "on" : "off"));
 }

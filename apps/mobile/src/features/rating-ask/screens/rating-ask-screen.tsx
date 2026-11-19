@@ -3,7 +3,7 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import Star from "lucide-react-native/icons/star";
 import { useCallback, useEffect, useState } from "react";
-import { AppState, BackHandler, Pressable, ScrollView, View } from "react-native";
+import { BackHandler, Pressable, ScrollView, View } from "react-native";
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -29,6 +29,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
+import { useAppActive } from "@/shared/lib/use-app-active";
 
 type Rating = 1 | 2 | 3 | 4 | 5;
 const STARS: readonly Rating[] = [1, 2, 3, 4, 5];
@@ -157,11 +158,7 @@ export function RatingAskScreen() {
     return () => subscription.remove();
   }, [close]);
 
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
-    return () => subscription.remove();
-  }, []);
+  const appActive = useAppActive();
   useEffect(() => {
     if (!thanks || !appActive) return;
     const timer = setTimeout(close, rating === 5 ? JOY_THANKS_MS : THANKS_MS);

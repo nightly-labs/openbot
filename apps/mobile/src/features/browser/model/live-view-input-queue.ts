@@ -1,6 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { BrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { clamp } from "./live-view-geometry";
+import { clamp } from "@/shared/lib/worklet-math";
 
 export function createLiveViewInputQueue(
   send: (inputs: BrowserViewInput[]) => void,

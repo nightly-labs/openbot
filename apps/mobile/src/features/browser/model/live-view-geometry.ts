@@ -1,3 +1,5 @@
+import { clamp } from "@/shared/lib/worklet-math";
+
 export interface Size {
   width: number;
   height: number;
@@ -18,11 +20,6 @@ export interface Zoom {
 
 export const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 export const MAX_ZOOM = 5;
-
-export function clamp(value: number, minimum: number, maximum: number): number {
-  "worklet";
-  return Math.min(maximum, Math.max(minimum, value));
-}
 
 export function fittedRect(stage: Size, frame: Size): Rect {
   "worklet";

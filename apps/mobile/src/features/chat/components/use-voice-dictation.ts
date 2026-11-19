@@ -1,9 +1,7 @@
 import { referenceFrom } from "@openbot/user-errors";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking } from "react-native";
+import { AppState } from "react-native";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
 import {
   isLocalRecognition,
@@ -19,11 +17,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
 import { isIOS } from "@/shared/lib/platform";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
-import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import {
   applyDictationResult,
-  type DictationNotice,
   type DictationPhase,
   type DictationTranscript,
   dictationDraft,
@@ -37,7 +33,13 @@ import {
   retriesWithSystemService,
   spokenText,
 } from "../model/voice-dictation";
-import { type ModelRecognition, modelCaptureAvailable, useModelDictation } from "./use-model-dictation";
+import {
+  type ModelRecognition,
+  modelCaptureAvailable,
+  showNotice,
+  trackTurn,
+  useModelDictation,
+} from "./use-model-dictation";
 
 type Recognizer = NonNullable<typeof speechRecognition>;
 type StartOptions = Parameters<Recognizer["start"]>[0];
@@ -55,23 +57,8 @@ interface DictationSession {
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
 }
 
-function trackTurn(current: DictationSession): void {
-  const now = performance.now();
-  const failed = current.ending === "permission_denied" || current.ending === "operation_failed";
-  const options = current.options;
-  mobileAnalytics.track("voice_turn", {
-    server_kind: "remote",
-    transcription: !options ? undefined : !options.requiresOnDeviceRecognition ? "cloud" : isIOS ? undefined : "local",
-    result: failed ? "failed" : current.ending === "cancelled" || !current.heard ? "cancelled" : "succeeded",
-    failure_code: !failed
-      ? undefined
-      : current.ending === "permission_denied"
-        ? "permission_denied"
-        : "operation_failed",
-    audio_duration_seconds:
-      current.listeningAt === null ? 0 : ((current.stoppingAt ?? now) - current.listeningAt) / 1_000,
-    duration_ms: current.stoppingAt === null ? undefined : now - current.stoppingAt,
-  });
+function transcriptionOf(options: StartOptions | null): "cloud" | "local" | undefined {
+  return !options ? undefined : !options.requiresOnDeviceRecognition ? "cloud" : isIOS ? undefined : "local";
 }
 
 let owner: symbol | null = null;
@@ -122,23 +109,6 @@ async function recognitionOptions(module: Recognizer, supported: Promise<Support
   return { lang, requiresOnDeviceRecognition };
 }
 
-function showNotice(notice: DictationNotice, error?: unknown): void {
-  void haptics.notification("error");
-  const { t } = currentText();
-  showFailureAlert(
-    error,
-    "voice",
-    t(notice.title),
-    t(notice.message),
-    notice.openSettings
-      ? [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("mobile.chat.dictation.openSettings"), onPress: () => void Linking.openSettings() },
-        ]
-      : undefined,
-  );
-}
-
 export interface VoiceDictation {
   available: boolean;
   phase: DictationPhase;
@@ -183,7 +153,7 @@ function useSystemDictation({
   }, []);
 
   const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current);
+    if (session.current) trackTurn(session.current, transcriptionOf(session.current.options));
     if (owner === id) owner = null;
     session.current = null;
     if (stopTimer.current) clearTimeout(stopTimer.current);

@@ -1,14 +1,13 @@
 import type { McpServerConfig, McpSignInState } from "@openbot/contracts/ipc";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { useLockedMutation } from "@/features/servers/model/use-locked-action";
 import {
   useMobileWorkspace,
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { haptics } from "@/shared/lib/haptics";
 
 export function useMcpServerList(serverId: string) {
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
@@ -30,7 +29,6 @@ export function useServerMcp(serverId: string) {
   const queryClient = useQueryClient();
   const server = servers.find((candidate) => candidate.id === serverId);
   const { canManage, list } = useMcpServerList(serverId);
-  const locked = useRef(false);
   const listKey = queryKeys.mcpServers(queryScope, serverId);
   const signInsKey = queryKeys.mcpSignIns(queryScope, serverId);
   const signIns = useQuery({
@@ -39,18 +37,7 @@ export function useServerMcp(serverId: string) {
     retry: false,
     queryFn: () => listMcpSignIns(serverId).catch((): McpSignInState[] => []),
   });
-  const action = useMutation({
-    mutationFn: (operation: () => Promise<void>) => operation(),
-    onSuccess: () => {
-      void haptics.notification("success");
-    },
-    onError: () => {
-      void haptics.notification("error");
-    },
-    onSettled: () => {
-      locked.current = false;
-    },
-  });
+  const { action, perform } = useLockedMutation();
   return {
     server,
     canManage,
@@ -64,13 +51,6 @@ export function useServerMcp(serverId: string) {
     setSignIns(states: McpSignInState[]): void {
       queryClient.setQueryData(signInsKey, states);
     },
-    perform(operation: () => Promise<void>): Promise<boolean> {
-      if (locked.current) return Promise.resolve(false);
-      locked.current = true;
-      return action.mutateAsync(operation).then(
-        () => true,
-        () => false,
-      );
-    },
+    perform,
   };
 }

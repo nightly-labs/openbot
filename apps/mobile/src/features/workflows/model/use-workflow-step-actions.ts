@@ -1,4 +1,5 @@
 import type { WorkflowStep } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Alert } from "react-native";
@@ -14,7 +15,7 @@ type WorkflowStepFailure =
   | "mobile.workflow.run.stopFailed"
   | "mobile.workflow.run.stopStepFailed";
 
-function showStepFailure(error: unknown, title: WorkflowStepFailure) {
+export function showWorkflowFailure(error: unknown, title: MobileTextKey) {
   void haptics.notification("error");
   const text = currentText();
   Alert.alert(text.t(title), text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")));
@@ -31,7 +32,7 @@ export function useWorkflowStepActions(serverId: string, workflowId: string) {
       await operation();
       void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(queryScope, serverId, workflowId) });
     } catch (cause) {
-      showStepFailure(cause, failure);
+      showWorkflowFailure(cause, failure);
     } finally {
       setBusy(false);
     }

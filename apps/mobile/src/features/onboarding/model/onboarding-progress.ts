@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.onboarding.v1";
 const MAX_ACCOUNTS = 20;
@@ -30,6 +31,7 @@ export async function loadOnboardingProgress(): Promise<void> {
   }
 }
 
+const write = writesInOrder(key);
 let writes: Promise<void> = Promise.resolve();
 
 export function finishOnboarding(userId: string): Promise<void> {
@@ -37,7 +39,6 @@ export function finishOnboarding(userId: string): Promise<void> {
   if (current.includes(userId)) return writes;
   const finished = [...current, userId].slice(-MAX_ACCOUNTS);
   useOnboardingProgress.setState({ finished });
-  const write = writes.then(() => SecureStore.setItemAsync(key, JSON.stringify(finished)));
-  writes = write.catch(() => undefined);
+  writes = write(() => JSON.stringify(finished)).catch(() => undefined);
   return writes;
 }

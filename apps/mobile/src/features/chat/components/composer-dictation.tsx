@@ -17,6 +17,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { formatTimer } from "@/shared/lib/countdown";
 import { useReducedMotion } from "@/shared/lib/motion";
 
 export const LONG_PRESS_MS = 400;
@@ -215,7 +216,7 @@ function DictationTimer({ color }: { color: string }) {
       type="body-sm"
       style={{ color, fontVariant: ["tabular-nums"], minWidth: 34 }}
     >
-      {`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+      {formatTimer(seconds)}
     </Typography.Paragraph>
   );
 }

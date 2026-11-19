@@ -8,11 +8,10 @@ import { useRef } from "react";
 import { Pressable, View } from "react-native";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useCSSVariable } from "uniwind";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
+import { reportTeamResult } from "../components/chat-message-actions";
 import { type PinnedMessageRow, useMessagePins, usePinnedMessageRows } from "../components/use-message-pins";
 
 const TASK_ROUTE = "task/[taskId]";
@@ -134,14 +133,7 @@ export function PinnedMessagesScreen() {
     }
   };
   const unpin = ({ pin }: PinnedMessageRow) => {
-    pins.setPinned(pin.taskId, pin.messageId, false).then(
-      () => void haptics.notification("success"),
-      (error: unknown) => {
-        void haptics.notification("error");
-        const title = currentText().t("mobile.chat.pins.failed");
-        showFailureAlert(error, "team", title, currentText().errorMessage(error, title));
-      },
-    );
+    void reportTeamResult(pins.setPinned(pin.taskId, pin.messageId, false), "mobile.chat.pins.failed");
   };
 
   return (

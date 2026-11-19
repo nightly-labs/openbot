@@ -2,12 +2,10 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { plainTaskTitle } from "@openbot/team-client/agent-tasks";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -17,13 +15,14 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { addStartedTask } from "@/features/workspace/model/task-cache";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SaveError } from "@/shared/components/save-error";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const AVATAR_SIZE = 26;
 
@@ -46,21 +45,7 @@ export function NewTaskScreen() {
   const dirty = title !== "";
   const canSave = online && supported && Boolean(chosen) && dirty && !finished;
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
-    if (pending.current) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(!finished && (dirty || saving), { busy: () => pending.current });
   useEffect(() => {
     if (finished) router.back();
   }, [finished]);
@@ -98,21 +83,7 @@ export function NewTaskScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title: t("mobile.server.threads.new") }} />
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button icon="xmark" accessibilityLabel={t("common.close")} disabled={saving} onPress={close}>
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction disabled={saving} onPress={close} />
       <SheetSaveAction
         dirty={dirty}
         canSave={canSave}
@@ -162,11 +133,7 @@ export function NewTaskScreen() {
           {t(online ? "mobile.server.threads.unsupported" : "mobile.server.threads.offline")}
         </Typography.Paragraph>
       ) : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </SheetScrollView>
   );
 }

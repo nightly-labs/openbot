@@ -15,7 +15,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { currentText, type MobileText, useText } from "@/shared/lib/text";
 import { createImageDimensionCache } from "../model/image-dimension-cache";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 import {
@@ -246,7 +246,7 @@ function imageExtension(attachment: AttachmentSummary, mimeType: string) {
 export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
   const text = useText();
-  const { t, sourceText } = text;
+  const { t } = text;
   const { download } = useAttachmentDownload(serverId, attachment);
   const [sharing, setSharing] = useState(false);
   const pending = attachment.id.startsWith("mobile-draft-attachment-");
@@ -291,13 +291,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
         dialogTitle: attachment.name,
       });
     } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.openFailed"),
-        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-      );
+      showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {
       if (file?.exists) file.delete();
       setSharing(false);
@@ -321,13 +315,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.saveImageFailed"),
-        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-      );
+      showFileFailure(error, t("mobile.chat.attachment.saveImageFailed"), text);
       return false;
     } finally {
       if (file?.exists) file.delete();
@@ -344,13 +332,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       await copyImageData(result.data);
       return true;
     } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.copyImageFailed"),
-        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-      );
+      showFileFailure(error, t("mobile.chat.attachment.copyImageFailed"), text);
       return false;
     } finally {
       setSharing(false);
@@ -374,7 +356,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   const { downloadAttachment } = useMobileWorkspaceActions();
   const queryClient = useQueryClient();
   const text = useText();
-  const { t, sourceText } = text;
+  const { t } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
     queryClient.fetchQuery(
@@ -385,15 +367,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
       ),
     );
-  const fail = (error: unknown, title: string) => {
-    void haptics.notification("error");
-    showFailureAlert(
-      error,
-      "turn",
-      title,
-      error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-    );
-  };
+  const fail = (error: unknown, title: string) => showFileFailure(error, title, text);
 
   async function saveAllToPhotos(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
     setBusy(true);
@@ -519,27 +493,32 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   };
 }
 
+export function showFileFailure(error: unknown, title: string, text: Pick<MobileText, "t" | "sourceText">) {
+  void haptics.notification("error");
+  showFailureAlert(
+    error,
+    "turn",
+    title,
+    error instanceof Error ? text.sourceText(error.message) : text.t("mobile.chat.tryAgain"),
+  );
+}
+
 export async function shareLocalAttachment(file: { name: string; mimeType: string; base64?: string; uri?: string }) {
-  const { t, sourceText } = currentText();
+  const text = currentText();
+  const { t } = text;
   let temporary: File | null = null;
   try {
     if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
     let uri = file.uri;
     if (!uri) {
       if (!file.base64) throw new Error(t("mobile.chat.attachment.unavailable"));
-      temporary = new File(Paths.cache, `${Date.now()}-${file.name.replace(/[/\\\p{Cc}]/gu, "_")}`);
+      temporary = new File(Paths.cache, `${Date.now()}-${safeFileName(file.name)}`);
       temporary.writeSync(file.base64, { encoding: "base64" });
       uri = temporary.uri;
     }
     await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, file.mimeType), dialogTitle: file.name });
   } catch (error) {
-    void haptics.notification("error");
-    showFailureAlert(
-      error,
-      "turn",
-      t("mobile.chat.attachment.openFailed"),
-      error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-    );
+    showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
   } finally {
     if (temporary?.exists) temporary.delete();
   }

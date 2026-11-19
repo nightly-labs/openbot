@@ -40,6 +40,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
+import { rubberBand } from "@/shared/lib/worklet-math";
 
 const ITEM_WIDTH = 140;
 const AVATAR_SIZE = 128;
@@ -59,13 +60,6 @@ const ARRIVE_STAGGER_MS = 70;
 const STEP_ASIDE = 240;
 const TEXT_DELAY_MS = 260;
 const REDUCED_SNAP = { duration: 200, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
-
-function rubberBand(value: number, max: number): number {
-  "worklet";
-  if (value < 0) return value / 3;
-  if (value > max) return max + (value - max) / 3;
-  return value;
-}
 
 function StageItem({
   animated,
@@ -197,7 +191,7 @@ export function AgentStep({
           start.set(progress.get());
         })
         .onUpdate((event) => {
-          progress.set(rubberBand(start.get() - (event.translationX * END_X) / ITEM_WIDTH, last));
+          progress.set(rubberBand(start.get() - (event.translationX * END_X) / ITEM_WIDTH, last, 1 / 3));
         })
         .onEnd((event) => {
           const velocity = (-event.velocityX * END_X) / ITEM_WIDTH;
@@ -372,45 +366,48 @@ export function AgentStep({
           </View>
           <Animated.View
             entering={popEntering(motion, TEXT_DELAY_MS)}
-            className="items-center gap-2 px-8"
-            style={{
-              opacity: leaving ? 0 : 1,
-              transitionProperty: "opacity",
-              transitionDuration: motion === "none" ? 0 : 200,
-              transitionTimingFunction: EASE_OUT_CSS,
-            }}
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden
           >
-            <View className="min-h-10 w-full">
-              <Animated.View
-                key={choice}
-                entering={slideSwapEntering(motion, swipeDirection.current)}
-                exiting={slideSwapExiting(motion)}
-                className="absolute inset-x-0 top-0"
-              >
-                <Typography.Heading type="h2" align="center" numberOfLines={1} className="tracking-openbot-tight">
-                  {title}
-                </Typography.Heading>
-              </Animated.View>
-            </View>
-            <View className="min-h-16 w-full">
-              <Animated.View
-                key={choice}
-                entering={slideSwapEntering(motion, swipeDirection.current, TEXT_FOLLOW_MS)}
-                exiting={slideSwapExiting(motion)}
-                className="absolute inset-x-0 top-0"
-              >
-                <Typography.Paragraph align="center" color="muted">
-                  {description}
-                </Typography.Paragraph>
-              </Animated.View>
-            </View>
-            <View className="flex-row justify-center gap-2 pt-2" pointerEvents="none">
-              {CHOICE_SWATCHES.map((color, index) => (
-                <Dot key={color} index={index} progress={progress} />
-              ))}
-            </View>
+            <Animated.View
+              className="items-center gap-2 px-8"
+              style={{
+                opacity: leaving ? 0 : 1,
+                transitionProperty: "opacity",
+                transitionDuration: motion === "none" ? 0 : 200,
+                transitionTimingFunction: EASE_OUT_CSS,
+              }}
+            >
+              <View className="min-h-10 w-full">
+                <Animated.View
+                  key={choice}
+                  entering={slideSwapEntering(motion, swipeDirection.current)}
+                  exiting={slideSwapExiting(motion)}
+                  className="absolute inset-x-0 top-0"
+                >
+                  <Typography.Heading type="h2" align="center" numberOfLines={1} className="tracking-openbot-tight">
+                    {title}
+                  </Typography.Heading>
+                </Animated.View>
+              </View>
+              <View className="min-h-16 w-full">
+                <Animated.View
+                  key={choice}
+                  entering={slideSwapEntering(motion, swipeDirection.current, TEXT_FOLLOW_MS)}
+                  exiting={slideSwapExiting(motion)}
+                  className="absolute inset-x-0 top-0"
+                >
+                  <Typography.Paragraph align="center" color="muted">
+                    {description}
+                  </Typography.Paragraph>
+                </Animated.View>
+              </View>
+              <View className="flex-row justify-center gap-2 pt-2" pointerEvents="none">
+                {CHOICE_SWATCHES.map((color, index) => (
+                  <Dot key={color} index={index} progress={progress} />
+                ))}
+              </View>
+            </Animated.View>
           </Animated.View>
         </Animated.View>
       </View>

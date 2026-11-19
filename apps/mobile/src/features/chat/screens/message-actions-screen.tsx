@@ -32,7 +32,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { MessageFileActions } from "../components/message-file-actions";
-import { useCopyMessage } from "../components/use-copy-message";
+import { copyToClipboard } from "../components/use-copy-message";
 import { MOBILE_LARGE_FILE_BYTES } from "../model/large-files";
 import { releaseMessageActions, useMessageActionsRequest } from "../model/message-actions-sheet";
 
@@ -59,7 +59,6 @@ export function MessageActionsScreen() {
   const reading = useReadingAloud(request?.readAloudId ?? "");
   const speed = useVoiceSettings((state) => state.speed);
   const speedReady = useVoiceSettings((state) => state.ready);
-  const { copy } = useCopyMessage(request?.copyText ?? "");
   const attachments = (request?.files?.attachments ?? NO_FILES).filter(
     (attachment) => attachment.size <= MOBILE_LARGE_FILE_BYTES,
   );
@@ -220,7 +219,7 @@ export function MessageActionsScreen() {
             <SettingsRow
               leading={<Copy size={ICON_SIZE} color={icon} />}
               disclosure={false}
-              onPress={() => run(() => void copy())}
+              onPress={() => run(() => void copyToClipboard(request.copyText, "mobile.chat.message.copyFailed", t))}
             >
               <Typography>{t("mobile.chat.message.copy")}</Typography>
             </SettingsRow>

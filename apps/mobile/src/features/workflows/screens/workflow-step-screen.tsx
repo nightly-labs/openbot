@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
-import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -22,6 +21,7 @@ import {
 } from "@/features/workflows/components/workflow-chat-fields";
 import { DiscordOutputFields } from "@/features/workflows/components/workflow-discord-fields";
 import { GitHubOutputFields } from "@/features/workflows/components/workflow-github-fields";
+import { confirmRemove } from "@/features/workflows/model/use-workflow-step-menu";
 import { useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
 import {
   SLACK_OUTPUT_DEFAULTS,
@@ -31,6 +31,7 @@ import {
 } from "@/features/workflows/model/workflow-chats";
 import { useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import { GITHUB_OUTPUT_DEFAULTS } from "@/features/workflows/model/workflow-github";
+import { fieldText } from "@/features/workflows/model/workflow-node-fields";
 import { canMove, outlineListOf } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
 import { kindLabel } from "@/features/workflows/model/workflow-steps";
@@ -42,7 +43,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const EFFORT_LABEL = {
@@ -57,11 +58,6 @@ const EFFORT_LABEL = {
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
 const FIELD_LIMIT = 20_000;
-
-const text = (node: WorkflowNode, name: string) => {
-  const value = node.fields[name];
-  return typeof value === "string" ? value : "";
-};
 
 function TextField({
   node,
@@ -82,7 +78,7 @@ function TextField({
       maxLength={FIELD_LIMIT}
       autoCapitalize="sentences"
       placeholder={placeholder}
-      value={text(node, name)}
+      value={fieldText(node, name)}
       onChangeText={(value) => setFields(node.id, { [name]: value })}
     />
   );
@@ -92,7 +88,7 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const setFields = useWorkflowDraft((state) => state.setFields);
-  const selected = text(node, "agentId");
+  const selected = fieldText(node, "agentId");
   return (
     <SettingsSection
       title={t("mobile.workflow.step.agent")}
@@ -138,13 +134,13 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
     queryFn: () => loadAgentModels(serverId),
     retry: false,
   });
-  const provider = text(node, "provider");
-  const model = text(node, "model");
+  const provider = fieldText(node, "provider");
+  const model = fieldText(node, "model");
   const value = provider && model ? `${provider}:${model}` : "";
   const options = models.data ?? [];
   const current = options.find((option) => option.provider === provider && option.id === model);
   const efforts = current && current.reasoningEffortConfigurable !== false ? current.supportedReasoningEfforts : [];
-  const effort = text(node, "effort") || current?.defaultReasoningEffort || "";
+  const effort = fieldText(node, "effort") || current?.defaultReasoningEffort || "";
   return (
     <SettingsSection
       title={t("mobile.workflow.step.model")}
@@ -219,7 +215,7 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   );
   const githubSupported = useWorkflowGitHubSupported(draft.serverId);
   const chats = useChatAccess(draft);
-  const target = text(node, "target");
+  const target = fieldText(node, "target");
   const shown =
     target === "channel" || target === "chat-channel" || target === "file" || target === "discord" ? target : null;
   const notify = shown === null && target !== "github" && target !== "telegram" && target !== "slack";
@@ -307,29 +303,11 @@ export function WorkflowStepScreen() {
   const problem = draftProblems(draft, serverAgents, t).steps.get(node.id);
   const loose = list === "loose";
 
-  const removeStep = () => {
-    const text = currentText();
-    const deleteNow = () => {
-      remove(node.id);
+  const removeStep = () =>
+    confirmRemove(node, draft, (id) => {
+      remove(id);
       router.back();
-    };
-    if (node.kind !== "condition") {
-      void haptics.selection();
-      deleteNow();
-      return;
-    }
-    const count = outline ? outline.yes.length + outline.no.length : 0;
-    Alert.alert(
-      text.t("mobile.workflow.editor.deleteConditionTitle"),
-      count > 0
-        ? text.t("mobile.workflow.editor.deleteConditionPaths", { count })
-        : text.t("mobile.workflow.editor.deleteConditionBody"),
-      [
-        { text: text.t("common.cancel"), style: "cancel" },
-        { text: text.t("mobile.workflow.editor.delete"), style: "destructive", onPress: deleteNow },
-      ],
-    );
-  };
+    });
 
   return (
     <SettingsContent>
@@ -401,10 +379,10 @@ export function WorkflowStepScreen() {
       {node.kind === "output" ? (
         <>
           <OutputChoice node={node} draft={draft} />
-          {text(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
-          {text(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
-          {text(node, "target") === "telegram" ? <TelegramOutputFields node={node} draft={draft} /> : null}
-          {text(node, "target") === "slack" ? <SlackOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
+          {fieldText(node, "target") === "telegram" ? <TelegramOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "slack" ? <SlackOutputFields node={node} draft={draft} /> : null}
         </>
       ) : null}
       {outline && (list || node.kind === "condition") ? (

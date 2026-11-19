@@ -1,5 +1,6 @@
 "use dom";
 
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { useEffect, useRef } from "react";
 import type { WaveformJob, WaveformResult } from "../model/audio-waveforms";
 
@@ -48,9 +49,7 @@ export default function AudioWaveformReader({
 async function read(base64: string, count: number): Promise<number[] | null> {
   if (!base64) return null;
   try {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const bytes = base64ToBytes(base64);
     const context = new OfflineAudioContext(1, 1, DECODE_SAMPLE_RATE);
     const buffer = await context.decodeAudioData(bytes.buffer);
     return peaks(buffer, count);

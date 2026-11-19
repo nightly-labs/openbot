@@ -18,12 +18,12 @@ import { AgentCard, AppTile, FeaturedAgent, ListingRow } from "../components/mar
 import { MarketplaceSearchBar } from "../components/marketplace-search-bar";
 import {
   byPopularity,
-  CATEGORY_LABELS,
+  installsOf,
   isMarketplaceFiltered,
-  KIND_LABELS,
   type MarketplaceFilter,
   type MarketplaceKind,
   type MarketplaceListing,
+  marketplaceFilterTokens,
   matchesFilter,
   NO_MARKETPLACE_FILTER,
 } from "../model/marketplace-listings";
@@ -180,10 +180,6 @@ function SectionHeader({ title, onShowAll }: { title: string; onShowAll?: () => 
   );
 }
 
-function installsOf(listing: MarketplaceListing): number {
-  return listing.kind === "app" ? 0 : listing.installs;
-}
-
 function Overview({
   listings,
   pending,
@@ -283,11 +279,7 @@ function FilteredList({
   onClear: () => void;
 }) {
   const { t } = useText();
-  const parts = [
-    filter.kind ? t(KIND_LABELS[filter.kind]) : null,
-    filter.category ? t(CATEGORY_LABELS[filter.category]) : null,
-    filter.installed ? t("mobile.marketplace.installed") : null,
-  ].filter(Boolean);
+  const parts = marketplaceFilterTokens(filter, t).map((token) => token.label);
   return (
     <View className="gap-3 px-4">
       {parts.length > 0 ? (

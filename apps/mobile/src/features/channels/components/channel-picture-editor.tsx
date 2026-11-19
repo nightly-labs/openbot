@@ -14,9 +14,10 @@ import ImagePlus from "lucide-react-native/icons/image-plus";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Trash2 from "lucide-react-native/icons/trash";
 import { type ReactNode, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
-import { HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
+import { View } from "react-native";
+import { ChoiceCell, HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { SaveError } from "@/shared/components/save-error";
 import { haptics } from "@/shared/lib/haptics";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
@@ -180,11 +181,7 @@ export function ChannelPictureEditor({
           ))}
         </View>
       </PictureSection>
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </View>
   );
 }
@@ -231,46 +228,5 @@ function IconAction({
     >
       <Icon color={String(color)} size={small ? 18 : 20} />
     </Button>
-  );
-}
-
-function ChoiceCell({
-  columns,
-  label,
-  checked,
-  disabled,
-  onPress,
-  children,
-}: {
-  columns: number;
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onPress: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      style={{ width: `${100 / columns}%` as const }}
-      className="aspect-square p-0.5"
-      accessibilityRole="radio"
-      accessibilityLabel={label}
-      accessibilityState={{ checked, disabled }}
-      disabled={disabled}
-      onPress={() => {
-        if (checked) return;
-        void haptics.selection();
-        onPress();
-      }}
-    >
-      {({ pressed }) => (
-        <View
-          className={`flex-1 items-center justify-center rounded-xl ${checked ? "bg-foreground/10" : ""}`}
-          style={{ opacity: pressed && !checked ? 0.6 : disabled ? 0.5 : 1 }}
-        >
-          {children}
-        </View>
-      )}
-    </Pressable>
   );
 }

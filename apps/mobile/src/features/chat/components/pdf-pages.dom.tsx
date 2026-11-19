@@ -2,8 +2,8 @@
 
 import { getDocument, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist/legacy/build/pdf.mjs";
 import "pdfjs-dist/legacy/build/pdf.worker.mjs";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { useEffect, useRef, useState } from "react";
-import { base64Bytes } from "../model/base64-bytes";
 
 interface PdfPagesProps {
   base64: string;
@@ -38,7 +38,7 @@ export default function PdfPages({
     const view = scroller.current;
     if (!base64 || !root || !view) return;
     setFailed(false);
-    const task = getDocument({ data: base64Bytes(base64), useSystemFonts: true });
+    const task = getDocument({ data: base64ToBytes(base64), useSystemFonts: true });
     let observer: IntersectionObserver | null = null;
     let cancelled = false;
     void (async () => {

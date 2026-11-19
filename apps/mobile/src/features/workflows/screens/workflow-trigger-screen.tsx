@@ -29,6 +29,7 @@ import {
 } from "@/features/workflows/components/workflow-chat-fields";
 import { DiscordTriggerFields } from "@/features/workflows/components/workflow-discord-fields";
 import { GitHubTriggerFields } from "@/features/workflows/components/workflow-github-fields";
+import { showWorkflowFailure } from "@/features/workflows/model/use-workflow-step-actions";
 import { useWorkflowDetail, useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
 import {
   SLACK_TRIGGER_DEFAULTS,
@@ -159,11 +160,7 @@ export function WorkflowTriggerScreen() {
         { text: text.t("common.done"), style: "cancel" },
       ]);
     } catch (error) {
-      void haptics.notification("error");
-      Alert.alert(
-        text.t("mobile.workflow.webhook.secretFailed"),
-        text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")),
-      );
+      showWorkflowFailure(error, "mobile.workflow.webhook.secretFailed");
     }
   };
 

@@ -1,5 +1,4 @@
 import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
-import * as Clipboard from "expo-clipboard";
 import { Link, router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -19,6 +18,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
@@ -62,11 +62,7 @@ function useAgentMenuActions(agent: MobileAgent) {
 
   const handlePin = () => toggleAgentPinAnimated(agent.id);
 
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(agent.id).then(() => {
-      void haptics.notification();
-    });
-  };
+  const handleCopyId = () => copyWithHaptic(agent.id);
 
   const handleDelete = () => {
     Alert.alert(t("mobile.agent.menu.deleteTitle", { name: agent.name }), t("mobile.agent.menu.deleteBody"), [
@@ -202,6 +198,10 @@ export function AgentContextMenuLink({
 }
 
 export function AgentAndroidMenu({ agent, onClose }: { agent: MobileAgent; onClose: () => void }) {
+  return <AndroidRowMenu>{(size) => <OpenAgentMenu agent={agent} size={size} onClose={onClose} />}</AndroidRowMenu>;
+}
+
+export function AndroidRowMenu({ children }: { children: (size: { width: number; height: number }) => ReactNode }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
     <View
@@ -209,8 +209,38 @@ export function AgentAndroidMenu({ agent, onClose }: { agent: MobileAgent; onClo
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
     >
-      {size ? <OpenAgentMenu agent={agent} size={size} onClose={onClose} /> : null}
+      {size ? children(size) : null}
     </View>
+  );
+}
+
+export function OpenRowMenu({
+  actions,
+  size,
+  onClose,
+  onAction,
+}: {
+  actions: MenuAction[];
+  size: { width: number; height: number };
+  onClose: () => void;
+  onAction: (id: string) => void;
+}) {
+  const { theme } = useUniwind();
+  const menu = useRef<MenuComponentRef>(null);
+  useEffect(() => {
+    menu.current?.show();
+  }, []);
+  return (
+    <MenuView
+      ref={menu}
+      colorScheme={theme === "dark" ? "dark" : "light"}
+      shouldOpenOnLongPress
+      actions={actions}
+      onCloseMenu={onClose}
+      onPressAction={({ nativeEvent }) => onAction(nativeEvent.event)}
+    >
+      <View style={size} />
+    </MenuView>
   );
 }
 
@@ -224,11 +254,6 @@ function OpenAgentMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
   const {
     isPinned,
     isUnread,
@@ -288,18 +313,14 @@ function OpenAgentMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      <View style={size} />
-    </MenuView>
+    />
   );
 }

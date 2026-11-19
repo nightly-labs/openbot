@@ -1,4 +1,5 @@
-import { clamp, lerp } from "./image-viewer-geometry";
+import { clamp } from "@/shared/lib/worklet-math";
+import { lerp } from "./image-viewer-geometry";
 
 export interface StackPose {
   x: number;

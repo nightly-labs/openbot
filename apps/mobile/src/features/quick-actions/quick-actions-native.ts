@@ -1,5 +1,6 @@
 import { type NativeModule, requireOptionalNativeModule } from "expo";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
+import { pendingNavigation } from "@/shared/lib/pending-navigation";
 import { type QuickActionItem, type QuickActionTarget, readQuickActionId } from "./model/quick-action-items";
 
 declare class QuickActionsModule extends NativeModule<{ onQuickAction: (event: { id: string }) => void }> {
@@ -9,31 +10,17 @@ declare class QuickActionsModule extends NativeModule<{ onQuickAction: (event: {
 const native = requireOptionalNativeModule<QuickActionsModule>("OpenBotQuickActions");
 
 let listening = false;
-let navigate: ((target: QuickActionTarget) => void) | null = null;
-let pending: QuickActionTarget | null = null;
-let signedOut = false;
+const opener = pendingNavigation<QuickActionTarget>();
 let published: string | null = null;
 
 export function installQuickActions(): void {
   if (listening || !native) return;
   listening = true;
-  native.addListener("onQuickAction", ({ id }) => {
-    const target = readQuickActionId(id);
-    if (!target || signedOut) return;
-    if (navigate) navigate(target);
-    else pending = target;
-  });
+  native.addListener("onQuickAction", ({ id }) => opener.receive(readQuickActionId(id)));
 }
 
 export function setQuickActionNavigator(open: (target: QuickActionTarget) => void): () => void {
-  signedOut = false;
-  navigate = open;
-  const waiting = pending;
-  pending = null;
-  if (waiting) open(waiting);
-  return () => {
-    if (navigate === open) navigate = null;
-  };
+  return opener.setNavigator(open);
 }
 
 export async function publishQuickActions(items: readonly QuickActionItem[]): Promise<void> {
@@ -50,7 +37,6 @@ export async function publishQuickActions(items: readonly QuickActionItem[]): Pr
 }
 
 export function resetQuickActions(): void {
-  signedOut = true;
-  pending = null;
+  opener.reset();
   void publishQuickActions([]);
 }

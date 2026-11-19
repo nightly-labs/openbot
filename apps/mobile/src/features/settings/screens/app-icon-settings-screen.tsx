@@ -46,6 +46,7 @@ import {
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { clamp, rubberBand } from "@/shared/lib/worklet-math";
 
 const COUNT = APP_ICONS.length;
 const LAST = COUNT - 1;
@@ -58,18 +59,6 @@ const EYES_ASPECT = 1584 / 3480;
 const DIGIT_HEIGHT = 34;
 const SLOPE = 0.42;
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-function clamp(value: number, min: number, max: number): number {
-  "worklet";
-  return Math.min(max, Math.max(min, value));
-}
-
-function rubberBand(value: number): number {
-  "worklet";
-  if (value < 0) return value * RUBBER;
-  if (value > LAST) return LAST + (value - LAST) * RUBBER;
-  return value;
-}
 
 function closeness(progress: number, index: number): number {
   "worklet";
@@ -152,7 +141,7 @@ export function AppIconSettingsScreen() {
       dragStart.set(progress.get());
     })
     .onUpdate((event) => {
-      progress.set(rubberBand(dragStart.get() - (event.translationX * direction) / spacing));
+      progress.set(rubberBand(dragStart.get() - (event.translationX * direction) / spacing, LAST, RUBBER));
     })
     .onEnd((event) => {
       const velocity = (-event.velocityX * direction) / spacing;

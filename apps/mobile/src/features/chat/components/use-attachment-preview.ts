@@ -2,8 +2,6 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
 import { useState } from "react";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import {
   type AttachmentPreviewKind,
@@ -12,6 +10,7 @@ import {
 } from "../model/attachment-file-preview";
 import { type CodePreviewEntry, storeCodePreview } from "../model/code-preview-store";
 import { useAttachmentDownload } from "../model/large-files";
+import { showFileFailure } from "./attachment-preview";
 import { useMediaFile } from "./use-media-file";
 
 export async function openFilePreview(
@@ -31,7 +30,8 @@ export async function openFilePreview(
 }
 
 export function useAttachmentPreview(serverId: string, attachment: AttachmentSummary) {
-  const { t, sourceText } = useText();
+  const text = useText();
+  const { t } = text;
   const kind =
     useAttachmentDownload(serverId, attachment).download === "desktop" ? null : attachmentPreviewKind(attachment);
   const file = useMediaFile(serverId, attachment, false);
@@ -46,13 +46,7 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       await openFilePreview(kind, { uri: result.data, name: attachment.name, mimeType: attachment.mimeType });
     } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.openFailed"),
-        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-      );
+      showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {
       setOpening(false);
     }

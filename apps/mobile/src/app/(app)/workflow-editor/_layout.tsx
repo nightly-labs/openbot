@@ -2,9 +2,7 @@ import { Stack } from "expo-router/stack";
 import { useEffect } from "react";
 import { useCSSVariable } from "uniwind";
 import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
-import { androidBackOptions } from "@/shared/components/android-header-button";
-import { headerFontOptions } from "@/shared/lib/app-font";
-import { isIOS } from "@/shared/lib/platform";
+import { sheetStackOptions } from "@/shared/components/sheet-page-stack";
 import { sheetBackHaptics } from "@/shared/lib/sheet-back-haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -15,21 +13,7 @@ export default function WorkflowEditorLayout() {
   const background = String(useCSSVariable("--openbot-bg-sheet"));
   useEffect(() => () => useWorkflowDraft.getState().clear(), []);
   return (
-    <Stack
-      screenListeners={sheetBackHaptics}
-      screenOptions={(props) => ({
-        ...androidBackOptions(props),
-        presentation: "card",
-        headerBackButtonDisplayMode: "minimal",
-        ...headerFontOptions,
-        headerShadowVisible: false,
-        headerTransparent: isIOS,
-        headerStyle: { backgroundColor: isIOS ? "transparent" : background },
-        headerBlurEffect: "none",
-        scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-        contentStyle: { backgroundColor: background },
-      })}
-    >
+    <Stack screenListeners={sheetBackHaptics} screenOptions={sheetStackOptions(background, { insets: false })}>
       <Stack.Screen name="index" options={{ title: t("mobile.workflow.editor.title") }} />
       <Stack.Screen name="step" options={{ title: t("mobile.workflow.editor.step") }} />
       <Stack.Screen

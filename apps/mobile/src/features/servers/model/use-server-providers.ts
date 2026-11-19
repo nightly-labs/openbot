@@ -5,7 +5,7 @@ import type {
   CustomProviderSummary,
   ProviderRuntimeSnapshot,
 } from "@openbot/contracts/ipc";
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryKey, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { type ProviderAdmin, providerRows } from "@/features/servers/model/provider-admin";
@@ -135,10 +135,21 @@ export function useRefreshProviderAccounts(serverId: string) {
 }
 
 export function useHostProviderDefault(serverId: string, setting: ProviderAdmin["defaultProvider"]) {
-  const { t, errorMessage } = useText();
   const queryScope = useQueryScope();
+  const { current, saving, error, save } = useProviderSetting(queryKeys.providerDefault(queryScope, serverId), setting);
+  const choose = (provider: AgentProviderId) => {
+    if (!setting || saving || provider === current.data?.provider) return;
+    save(provider);
+  };
+  return { current, saving, error, choose };
+}
+
+export function useProviderSetting<T, V>(
+  queryKey: QueryKey,
+  setting: { read: () => Promise<T>; set: (value: V) => Promise<T> } | null,
+) {
+  const { t, errorMessage } = useText();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.providerDefault(queryScope, serverId);
   const current = useQuery({
     queryKey,
     retry: false,
@@ -147,12 +158,12 @@ export function useHostProviderDefault(serverId: string, setting: ProviderAdmin[
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const choose = (provider: AgentProviderId) => {
-    if (!setting || saving || provider === current.data?.provider) return;
+  const save = (value: V) => {
+    if (!setting) return;
     setSaving(true);
     setError(null);
     setting
-      .set(provider)
+      .set(value)
       .then(async (saved) => {
         await queryClient.cancelQueries({ queryKey, exact: true });
         queryClient.setQueryData(queryKey, saved);
@@ -164,7 +175,7 @@ export function useHostProviderDefault(serverId: string, setting: ProviderAdmin[
       })
       .finally(() => setSaving(false));
   };
-  return { current, saving, error, choose };
+  return { current, saving, error, save };
 }
 
 export function useProviderKeyState(serverId: string, admin: ProviderAdmin | null, provider: AgentProviderId | null) {

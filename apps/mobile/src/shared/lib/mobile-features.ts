@@ -7,6 +7,8 @@ import {
   parseMobileLatestVersion,
 } from "@openbot/contracts/mobile-features";
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import { useEffect } from "react";
+import { AppState } from "react-native";
 import { create } from "zustand";
 import { devFeatureOverride, devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
 import { nativeApplicationVersion } from "@/shared/lib/native-application";
@@ -80,6 +82,24 @@ export function currentAppVersion(): string | null {
 export function useMobileFeature(apiUrl: string, feature: keyof MobileFeatureFlags): boolean {
   const on = useMobileFeatures((state) => state.apiUrl === apiUrl && state.flags[feature]);
   return devFeatureOverride(feature) ?? on;
+}
+
+export function useMobileFeaturesRefresh(apiUrl: string | null, options: { onAppActive?: boolean } = {}): void {
+  const onAppActive = options.onAppActive ?? false;
+  useEffect(() => {
+    if (!apiUrl) return;
+    void refreshMobileFeatures(apiUrl);
+    if (!onAppActive) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshMobileFeatures(apiUrl);
+    });
+    return () => subscription.remove();
+  }, [apiUrl, onAppActive]);
+}
+
+export function useRefreshedMobileFeature(apiUrl: string, feature: keyof MobileFeatureFlags): boolean {
+  useMobileFeaturesRefresh(apiUrl);
+  return useMobileFeature(apiUrl, feature);
 }
 
 export function useLatestAppVersion(apiUrl: string): string | null {

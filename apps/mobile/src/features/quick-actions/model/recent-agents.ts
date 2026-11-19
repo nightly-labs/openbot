@@ -1,10 +1,10 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { remoteHostFingerprint } from "@openbot/team-client";
 import { create } from "zustand";
+import { accountScope } from "@/shared/lib/account-scope";
 import type { RecentAgent } from "./quick-action-items";
 
 export function recentAgentsKey(apiUrl: string, userId: string): string {
-  return `openbot.recent-agents.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.recent-agents.v1.${accountScope(apiUrl, userId)}`;
 }
 
 export function decodeRecentAgents(stored: string | null): RecentAgent[] {

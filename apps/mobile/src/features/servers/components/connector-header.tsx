@@ -1,7 +1,9 @@
+import type { UseQueryResult } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { View } from "react-native";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, type MobileConnectorId } from "@/features/servers/model/connectors";
+import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
 export function ConnectorHeader({
@@ -44,4 +46,17 @@ export function ConnectorError({ message }: { message: string | null }) {
       {message}
     </Typography.Paragraph>
   ) : null;
+}
+
+export function ConnectorLoading({ query }: { query: Pick<UseQueryResult, "isError" | "error"> }) {
+  const { t, errorMessage } = useText();
+  return (
+    <SettingsContent>
+      <SettingsNote>
+        {query.isError
+          ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
+          : t("mobile.server.connectors.loading")}
+      </SettingsNote>
+    </SettingsContent>
+  );
 }

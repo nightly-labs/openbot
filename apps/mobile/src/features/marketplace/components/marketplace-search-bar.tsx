@@ -29,6 +29,7 @@ import {
   MARKETPLACE_CATEGORIES,
   MARKETPLACE_KINDS,
   type MarketplaceFilter,
+  marketplaceFilterTokens,
 } from "../model/marketplace-listings";
 
 const KEYBOARD_GAP = 8;
@@ -125,11 +126,7 @@ export function MarketplaceSearchBar({
     },
   ];
 
-  const tokens = [
-    filter.kind ? { id: "kind", label: t(KIND_LABELS[filter.kind]) } : null,
-    filter.category ? { id: "category", label: t(CATEGORY_LABELS[filter.category]) } : null,
-    filter.installed ? { id: "installed", label: t("mobile.marketplace.installed") } : null,
-  ].filter((token) => token !== null);
+  const tokens = marketplaceFilterTokens(filter, t);
 
   function removeToken(id: string) {
     void haptics.impact("soft");

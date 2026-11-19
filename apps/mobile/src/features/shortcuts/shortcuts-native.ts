@@ -1,5 +1,6 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type NativeModule, requireOptionalNativeModule } from "expo";
+import { pendingNavigation } from "@/shared/lib/pending-navigation";
 import type { ShortcutOpenTarget } from "./model/shortcut-target";
 
 declare class ShortcutsModule extends NativeModule<{ onShortcutOpen: (event: { payload: string }) => void }> {
@@ -29,33 +30,18 @@ function decodeOpenTarget(payload: string): ShortcutOpenTarget | null {
 }
 
 let listening = false;
-let navigate: ((target: ShortcutOpenTarget) => void) | null = null;
-let pending: ShortcutOpenTarget | null = null;
-let signedOut = false;
+const opener = pendingNavigation<ShortcutOpenTarget>();
 
 export function installShortcuts(): void {
   if (listening || !native) return;
   listening = true;
-  native.addListener("onShortcutOpen", ({ payload }) => {
-    const target = decodeOpenTarget(payload);
-    if (!target || signedOut) return;
-    if (navigate) navigate(target);
-    else pending = target;
-  });
+  native.addListener("onShortcutOpen", ({ payload }) => opener.receive(decodeOpenTarget(payload)));
 }
 
 export function setShortcutNavigator(open: (target: ShortcutOpenTarget) => void): () => void {
-  signedOut = false;
-  navigate = open;
-  const waiting = pending;
-  pending = null;
-  if (waiting) open(waiting);
-  return () => {
-    if (navigate === open) navigate = null;
-  };
+  return opener.setNavigator(open);
 }
 
 export function resetShortcuts(): void {
-  signedOut = true;
-  pending = null;
+  opener.reset();
 }

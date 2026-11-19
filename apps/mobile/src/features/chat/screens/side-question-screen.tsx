@@ -5,7 +5,7 @@ import { useIsFocused, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, Keyboard, useColorScheme, View } from "react-native";
+import { Alert, Keyboard, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,6 +39,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useAppActive } from "@/shared/lib/use-app-active";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
 const NO_MESSAGES: never[] = [];
@@ -128,11 +129,7 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     "accent-foreground",
     "background",
   ]);
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
-    return () => subscription.remove();
-  }, []);
+  const appActive = useAppActive();
   const rowsShown = useRowsAfterOpenTransition();
   const lastUserId = messages.findLast((row) => row.kind === "message" && row.author === "user")?.id ?? null;
   const motion = useChatMotion(

@@ -145,6 +145,16 @@ async function exchange<T extends string | Uint8Array>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
+  const unreachable = () =>
+    new VoiceServerError(
+      "address",
+      sourceText(
+        controller.signal.aborted ? "error.provider.discoveryTimeout" : "error.provider.discoveryUnreachable",
+        {
+          host,
+        },
+      ),
+    );
   signal?.addEventListener("abort", abort);
   try {
     const headers: Record<string, string> = { Accept: "*/*" };
@@ -161,15 +171,7 @@ async function exchange<T extends string | Uint8Array>(
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      throw new VoiceServerError(
-        "address",
-        sourceText(
-          controller.signal.aborted ? "error.provider.discoveryTimeout" : "error.provider.discoveryUnreachable",
-          {
-            host,
-          },
-        ),
-      );
+      throw unreachable();
     }
     if (response.status >= 300 && response.status < 400)
       throw new VoiceServerError("address", sourceText("error.provider.discoveryRedirect", { host }));
@@ -188,15 +190,7 @@ async function exchange<T extends string | Uint8Array>(
       body = await read(response);
     } catch (error) {
       if (signal?.aborted) throw error;
-      throw new VoiceServerError(
-        "address",
-        sourceText(
-          controller.signal.aborted ? "error.provider.discoveryTimeout" : "error.provider.discoveryUnreachable",
-          {
-            host,
-          },
-        ),
-      );
+      throw unreachable();
     }
     if (body.length > limit) throw new VoiceServerError("address", sourceText("error.voice.server.tooLarge", { host }));
     return body;

@@ -1,12 +1,13 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { type NativeModule, requireOptionalNativeModule } from "expo";
-import { Directory, File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import {
   type AvatarFileAgent as AvatarAgent,
   agentAvatarFile,
   syncAvatarFolder,
 } from "@/features/workspace/model/agent-avatar-file";
+import { appGroupDirectory, appGroupFile, lockAppGroupFile } from "@/shared/lib/app-group";
 
 export interface ShareExtensionDirectory {
   version: 1;
@@ -42,23 +43,12 @@ declare class ShareExtensionModule extends NativeModule {
 
 const native = requireOptionalNativeModule<ShareExtensionModule>("OpenBotShareExtension");
 
-const APP_GROUP = "group.run.openbot.mobile";
 const DIRECTORY_FILE = "share-extension.json";
 const AVATAR_FOLDER = "share-extension-avatars";
 const AVATAR_PIXELS = 108;
 
 export function shareConversationId(serverId: string, agentId: string): string {
   return `${serverId}/${agentId}`;
-}
-
-function directoryFile(): File | null {
-  const container = Paths.appleSharedContainers[APP_GROUP];
-  return container ? new File(container, DIRECTORY_FILE) : null;
-}
-
-function avatarFolder(): Directory | null {
-  const container = Paths.appleSharedContainers[APP_GROUP];
-  return container ? new Directory(container, AVATAR_FOLDER) : null;
 }
 
 export function shareAvatarName(agent: AvatarAgent): string {
@@ -74,7 +64,7 @@ function decodeAgent(value: unknown): ShareExtensionAgent | null {
 
 export function readShareExtensionAgents(apiUrl: string, userId: string): ShareExtensionAgent[] | null {
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (!file?.exists) return null;
     const value = JSON.parse(file.textSync());
     if (!isDynamicRecord(value) || value.apiUrl !== apiUrl || value.userId !== userId) return null;
@@ -89,7 +79,7 @@ let writtenDirectory: string | null = null;
 let avatarUris = new Map<string, string>();
 
 function writeAvatars(directory: ShareExtensionDirectory, avatars: readonly AvatarAgent[]): void {
-  const folder = avatarFolder();
+  const folder = appGroupDirectory(AVATAR_FOLDER);
   if (!folder) return;
   const named = new Set(directory.agents.flatMap((agent) => agent.avatar ?? []));
   syncAvatarFolder(folder, named, avatars, AVATAR_PIXELS, "Share extension avatar");
@@ -107,7 +97,7 @@ export function writeShareExtensionDirectory(
   const text = JSON.stringify(directory);
   if (text === writtenDirectory) return;
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (!file) return;
     writeAvatars(directory, avatars);
     file.writeSync(text);
@@ -148,9 +138,9 @@ export function resetShareExtension(): void {
   writtenDirectory = null;
   avatarUris = new Map();
   try {
-    const file = directoryFile();
+    const file = appGroupFile(DIRECTORY_FILE);
     if (file?.exists) file.delete();
-    const folder = avatarFolder();
+    const folder = appGroupDirectory(AVATAR_FOLDER);
     if (folder?.exists) folder.delete();
   } catch (error) {
     supportLog.add("warn", "app", `Share extension data not removed: ${supportLogValue(error)}`);
@@ -164,12 +154,7 @@ export function resetShareExtension(): void {
 
 export function lockShareExtension(): void {
   try {
-    const file = directoryFile();
-    if (!file?.exists) return;
-    const value = JSON.parse(file.textSync());
-    if (!isDynamicRecord(value) || value.locked === true) return;
-    file.writeSync(JSON.stringify({ ...value, locked: true }));
-    writtenDirectory = null;
+    if (lockAppGroupFile(DIRECTORY_FILE)) writtenDirectory = null;
   } catch (error) {
     supportLog.add("warn", "app", `Share extension data not locked: ${supportLogValue(error)}`);
   }

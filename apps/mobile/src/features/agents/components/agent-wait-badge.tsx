@@ -1,4 +1,4 @@
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import type { LucideIcon } from "lucide-react-native";
@@ -28,6 +28,23 @@ export const AGENT_WAIT_STATE = {
   approval: "mobile.agent.list.waiting.state.approval",
   takeover: "mobile.agent.list.waiting.state.takeover",
 } as const satisfies Record<MobileAgentWaitReason, MobileTextKey>;
+
+export function agentListStateLabel(
+  t: MobileTranslate,
+  label: string,
+  waitReason: MobileAgentWaitReason | undefined,
+  unreadCount: number,
+  unreadThreads: boolean,
+): string {
+  if (waitReason) return t("mobile.agent.list.withState", { label, state: t(AGENT_WAIT_STATE[waitReason]) });
+  if (unreadCount > 0 || unreadThreads)
+    return t("mobile.agent.list.withState", {
+      label,
+      state:
+        unreadCount > 0 ? t("mobile.agent.list.unread", { count: unreadCount }) : t("mobile.agent.list.unreadThreads"),
+    });
+  return label;
+}
 
 export function AgentWaitBadge({ reason, size = 20 }: { reason: MobileAgentWaitReason; size?: number }) {
   const [background] = useThemeColor(["background"]);

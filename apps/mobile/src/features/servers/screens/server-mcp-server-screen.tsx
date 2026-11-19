@@ -2,7 +2,6 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig, McpTestResult, McpTransport } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import LogOut from "lucide-react-native/icons/log-out";
 import PlugZap from "lucide-react-native/icons/plug-zap";
@@ -33,6 +32,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const SIGN_IN_ERRORS = new Set([
   "error.backend.mcpSignInRequired",
@@ -108,22 +108,7 @@ function McpServerForm({
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
   const busy = action.isPending || test?.status === "testing";
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || action.isPending) && !leaving, ({ repeat }) => {
-    if (action.isPending) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
 
   function edit(change: Partial<McpServerDraft>) {
     setDraft((current) => ({ ...current, ...change }));

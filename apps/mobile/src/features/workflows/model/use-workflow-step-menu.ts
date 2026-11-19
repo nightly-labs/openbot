@@ -21,7 +21,7 @@ export function openAddStepAt(place: GraphPlace) {
   router.push({ pathname: "/workflow-editor/add", params: placeParams(place) });
 }
 
-function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
+export function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
   const text = currentText();
   if (node.kind !== "condition" || !draft.outline) {
     void haptics.selection();

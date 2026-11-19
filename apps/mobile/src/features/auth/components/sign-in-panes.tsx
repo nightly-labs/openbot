@@ -26,8 +26,9 @@ import {
   SIGN_IN_TEXT_EASE,
   signInMotion,
 } from "@/features/auth/components/sign-in-motion";
-import { type EmailSignIn, formatTimer } from "@/features/auth/model/use-email-sign-in";
+import type { EmailSignIn } from "@/features/auth/model/use-email-sign-in";
 import { BLOUB_MOVE_MS } from "@/shared/components/bloub-stage/bloub-look";
+import { formatTimer } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_IN_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";

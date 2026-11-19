@@ -2,6 +2,7 @@ import type { RemoteWorkspacePreferences } from "@openbot/team-client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { useAppLock } from "@/features/app-lock/model/app-lock";
+import { appLockEnabled } from "@/features/app-lock/model/app-lock-storage";
 import { shareAvatarName } from "@/features/share/model/share-extension";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
@@ -38,9 +39,7 @@ function ShortcutsDirectorySync({
 }: ShortcutsSyncProps): null {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
-  const lockReady = useAppLock((state) => state.status === "ready");
-  const lockOn = useAppLock((state) => state.config.pin || state.config.deviceUnlock);
-  const locked = !lockReady || lockOn;
+  const locked = useAppLock((state) => state.status !== "ready" || appLockEnabled(state.config));
   const [saved] = useState(() => readShortcutDirectory(apiUrl, userId));
   const target = useShortcutAgent((state) => state.target);
   const targetReady = useShortcutAgent((state) => state.account !== null);

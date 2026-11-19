@@ -1,6 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { remoteHostFingerprint } from "@openbot/team-client";
 import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
+import { accountScope } from "@/shared/lib/account-scope";
 
 export interface ShareTarget {
   serverId: string;
@@ -8,10 +9,10 @@ export interface ShareTarget {
 }
 
 function lastShareTargetKey(apiUrl: string, userId: string): string {
-  return `openbot.share-target.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.share-target.v1.${accountScope(apiUrl, userId)}`;
 }
 
-export async function loadLastShareTarget(apiUrl: string, userId: string): Promise<ShareTarget | null> {
+async function loadLastShareTarget(apiUrl: string, userId: string): Promise<ShareTarget | null> {
   try {
     const value = JSON.parse((await SecureStore.getItemAsync(lastShareTargetKey(apiUrl, userId))) ?? "null");
     if (!isDynamicRecord(value)) return null;
@@ -26,4 +27,19 @@ export async function saveLastShareTarget(apiUrl: string, userId: string, target
   try {
     await SecureStore.setItemAsync(lastShareTargetKey(apiUrl, userId), JSON.stringify(target));
   } catch {}
+}
+
+export function useLastShareTarget(apiUrl: string | undefined, userId: string | undefined): ShareTarget | null {
+  const [target, setTarget] = useState<ShareTarget | null>(null);
+  useEffect(() => {
+    if (!apiUrl || !userId) return;
+    let mounted = true;
+    void loadLastShareTarget(apiUrl, userId).then((loaded) => {
+      if (mounted) setTarget(loaded);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [apiUrl, userId]);
+  return target;
 }

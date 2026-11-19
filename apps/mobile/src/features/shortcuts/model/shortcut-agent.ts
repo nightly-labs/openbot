@@ -1,7 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { remoteHostFingerprint } from "@openbot/team-client";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { accountScope } from "@/shared/lib/account-scope";
 import type { ShortcutTarget } from "./shortcut-target";
 
 export const useShortcutAgent = create<{
@@ -11,7 +11,7 @@ export const useShortcutAgent = create<{
 }>(() => ({ account: null, target: null, saving: false }));
 
 function accountKey(apiUrl: string, userId: string): string {
-  return `openbot.shortcut-agent.v1.${remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]))}`;
+  return `openbot.shortcut-agent.v1.${accountScope(apiUrl, userId)}`;
 }
 
 export async function loadShortcutAgent(apiUrl: string, userId: string): Promise<void> {

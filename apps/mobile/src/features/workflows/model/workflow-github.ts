@@ -20,6 +20,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { fieldOneOf, fieldText } from "./workflow-node-fields";
 
 export const GITHUB_TRIGGER_DEFAULTS = { event: "issue.opened", filters: "notBot" } as const;
 export const GITHUB_OUTPUT_DEFAULTS = { action: "comment" } as const;
@@ -78,11 +79,6 @@ export const AGENT_CHOOSES = "agent";
 export type GitHubOutputItem = "event" | "input";
 type GitHubLabelsFrom = "agent" | "list";
 
-const text = (node: WorkflowNode | undefined, name: string): string => {
-  const value = node?.fields[name];
-  return typeof value === "string" ? value : "";
-};
-
 export interface GitHubTriggerSettings {
   repository: string;
   repositories: string[];
@@ -95,8 +91,7 @@ export interface GitHubTriggerSettings {
 }
 
 export function githubTrigger(node: WorkflowNode | undefined): GitHubTriggerSettings {
-  const stored = text(node, "event");
-  const event = isOneOf(WORKFLOW_GITHUB_EVENTS, stored) ? stored : GITHUB_TRIGGER_DEFAULTS.event;
+  const event = fieldOneOf(node, "event", WORKFLOW_GITHUB_EVENTS, GITHUB_TRIGGER_DEFAULTS.event);
   const filterOptions = WORKFLOW_GITHUB_FILTERS.filter(
     (filter) => filter !== "branch" || workflowGitHubEventItemKind(event) === "pullRequest",
   );
@@ -105,14 +100,14 @@ export function githubTrigger(node: WorkflowNode | undefined): GitHubTriggerSett
   );
   const repositories = workflowGitHubTriggerRepositories(node?.fields ?? {});
   return {
-    repository: repositories[0] ?? text(node, "repository"),
+    repository: repositories[0] ?? fieldText(node, "repository"),
     repositories,
     event,
     labels: workflowListField(node?.fields.labels),
     filterOptions,
     filters,
-    titleText: text(node, "titleText"),
-    branch: text(node, "branch"),
+    titleText: fieldText(node, "titleText"),
+    branch: fieldText(node, "branch"),
   };
 }
 
@@ -164,13 +159,11 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
   const trigger = githubTriggersBefore(graph, node.id)[0];
   const triggerSettings = githubTrigger(trigger);
   const fromEvent = trigger !== undefined;
-  const repository = text(node, "repository") || SAME_REPOSITORY;
-  const storedItem = text(node, "item");
+  const repository = fieldText(node, "repository") || SAME_REPOSITORY;
+  const storedItem = fieldText(node, "item");
   const item: GitHubOutputItem = storedItem === "input" ? "input" : "event";
-  const storedAction = text(node, "action");
-  const action = isOneOf(WORKFLOW_GITHUB_ACTIONS, storedAction) ? storedAction : GITHUB_OUTPUT_DEFAULTS.action;
-  const storedReason = text(node, "reason");
-  const reason = isOneOf(WORKFLOW_GITHUB_CLOSE_REASONS, storedReason) ? storedReason : "completed";
+  const action = fieldOneOf(node, "action", WORKFLOW_GITHUB_ACTIONS, GITHUB_OUTPUT_DEFAULTS.action);
+  const reason = fieldOneOf(node, "reason", WORKFLOW_GITHUB_CLOSE_REASONS, "completed");
   const creates = action === "issue.create";
   const issuesOnly =
     fromEvent && !creates && item === "event" && workflowGitHubEventItemKind(triggerSettings.event) === "issue";
@@ -180,10 +173,10 @@ export function githubOutput(node: WorkflowNode, graph: WorkflowGraph): GitHubOu
     item,
     action,
     labels: workflowListField(node.fields.labels),
-    labelsFrom: text(node, "labelsFrom") === "agent" ? "agent" : "list",
-    person: text(node, "person"),
+    labelsFrom: fieldText(node, "labelsFrom") === "agent" ? "agent" : "list",
+    person: fieldText(node, "person"),
     reason,
-    title: text(node, "title"),
+    title: fieldText(node, "title"),
     fromEvent,
     triggerEvent: triggerSettings.event,
     creates,

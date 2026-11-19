@@ -26,7 +26,6 @@ import {
 } from "@openbot/team-client/routine-schedule-draft";
 import { type QueryKey, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
 import { useEffect, useRef, useState } from "react";
@@ -41,11 +40,13 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { AppSwitch } from "@/shared/components/app-switch";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 import { type RoutineResultChoice, RoutineResultDestinationSection } from "./routine-result-destination";
 import { RoutineScheduleFields } from "./routine-schedule-fields";
 import { type RoutineTriggerChoice, RoutineTriggerPicker } from "./routine-trigger-picker";
@@ -93,22 +94,7 @@ export async function saveRoutineActive(
 }
 
 function useRecordDraftGuard(dirty: boolean, pending: boolean) {
-  const { t } = useText();
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || pending), ({ repeat }) => {
-    if (pending) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty || pending, { busy: () => pending });
 }
 
 function useRecordAction(
@@ -278,11 +264,7 @@ export function MemoryEditor({
           ))}
         </SettingsSection>
       ) : null}
-      {inclusion.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {inclusion.error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={inclusion.error} />
       {memory ? (
         <SettingsSection>
           <SettingsRow
@@ -312,11 +294,7 @@ export function MemoryEditor({
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {action.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {action.error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={action.error} />
     </View>
   );
 }
@@ -770,36 +748,16 @@ export function RoutineEditor({
           {t("mobile.agent.record.testStarted")}
         </Typography.Paragraph>
       ) : null}
-      {testRun.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {testRun.error}
-        </Typography.Paragraph>
-      ) : null}
-      {rotate.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {rotate.error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={testRun.error} />
+      <SaveError error={rotate.error} />
       {givenTo && !give.error ? (
         <Typography.Paragraph accessibilityLiveRegion="polite" className="text-success-text">
           {t("mobile.agent.webhook.given", { name: givenTo })}
         </Typography.Paragraph>
       ) : null}
-      {give.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {give.error}
-        </Typography.Paragraph>
-      ) : null}
-      {toggle.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {toggle.error}
-        </Typography.Paragraph>
-      ) : null}
-      {action.error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {action.error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={give.error} />
+      <SaveError error={toggle.error} />
+      <SaveError error={action.error} />
       {eventsSupported && routine ? (
         <RoutineWebhookActivity key={routine.id} serverId={agent.serverId} owner={eventOwner} routineId={routine.id} />
       ) : null}

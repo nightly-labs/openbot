@@ -1,10 +1,9 @@
 import type { SharedTable } from "@openbot/contracts/ipc";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import Trash2 from "lucide-react-native/icons/trash";
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, View } from "react-native";
+import { RowDeleteButton } from "@/features/agents/components/agent-files";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -67,7 +66,6 @@ function SharedTableRow({
 }) {
   const { t } = useText();
   const { agents, deleteSharedTable } = useMobileWorkspace();
-  const danger = useThemeColor("danger");
   const [deleting, setDeleting] = useState(false);
   const owner = table.ownerAgentId
     ? agents.find((candidate) => candidate.id === table.ownerAgentId && candidate.serverId === agent.serverId)
@@ -119,16 +117,11 @@ function SharedTableRow({
       disabled={deleting}
       supportingText={`${records} · ${ownerLine}`}
       trailing={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.agent.tables.deleteNamed", { name: table.name })}
-          accessibilityState={{ disabled: deleting }}
-          disabled={deleting}
-          hitSlop={8}
+        <RowDeleteButton
+          label={t("mobile.agent.tables.deleteNamed", { name: table.name })}
+          deleting={deleting}
           onPress={confirmDelete}
-        >
-          <Trash2 size={18} color={String(danger)} />
-        </Pressable>
+        />
       }
     >
       <Typography numberOfLines={1}>{table.name}</Typography>

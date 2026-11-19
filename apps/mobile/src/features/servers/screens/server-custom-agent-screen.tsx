@@ -1,7 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { ACP_AGENT_PRESETS, CUSTOM_AGENT_LIMITS, type CustomAgentSummary } from "@openbot/contracts/ipc";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +32,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const AGENT_ID_PLACEHOLDER = "my-agent";
 const COMMAND_PLACEHOLDER = "my-agent";
@@ -111,22 +111,7 @@ function CustomAgentForm({
   const dirty = customAgentDraftChanged(draft, saved);
   const busy = pending !== null;
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || busy) && !leaving, ({ repeat }) => {
-    if (busy) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || busy) && !leaving, { busy: () => busy, warn: true });
 
   async function run(kind: "save" | "remove", operation: () => Promise<CustomAgentSummary[]>) {
     if (locked.current) return;

@@ -1,10 +1,9 @@
 import { NOTIFICATION_SOUND_FILES } from "@openbot/contracts/notification-relay";
-import { File, Paths } from "expo-file-system";
 import * as Notifications from "expo-notifications";
 import type { NotificationPermission } from "@/features/settings/model/push-notifications";
+import { appGroupFile } from "@/shared/lib/app-group";
 import { type PushNotificationsNative, SOUND_PREVIEW_KEY } from "./push-notifications-native.types";
 
-const APP_GROUP = "group.run.openbot.mobile";
 const KEYS_FILE = "push-notifications.json";
 
 export const pushNotificationsNative: PushNotificationsNative | null = {
@@ -25,18 +24,15 @@ export const pushNotificationsNative: PushNotificationsNative | null = {
     return () => subscription.remove();
   },
   writeKeys(servers) {
-    const directory = Paths.appleSharedContainers[APP_GROUP];
-    if (!directory) return;
+    const file = appGroupFile(KEYS_FILE);
+    if (!file) return;
     const text = JSON.stringify({ version: 1, servers });
-    const file = new File(directory, KEYS_FILE);
     if (file.exists && file.textSync() === text) return;
     file.writeSync(text);
   },
   removeKeys() {
-    const directory = Paths.appleSharedContainers[APP_GROUP];
-    if (!directory) return;
-    const file = new File(directory, KEYS_FILE);
-    if (file.exists) file.delete();
+    const file = appGroupFile(KEYS_FILE);
+    if (file?.exists) file.delete();
   },
   async previewSound(sound) {
     await Notifications.scheduleNotificationAsync({

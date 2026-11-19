@@ -1,7 +1,6 @@
 import { WORKFLOW_PORTS, type WorkflowDetail, type WorkflowNode } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Plus from "lucide-react-native/icons/plus";
@@ -55,6 +54,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const TITLE_LIMIT = 160;
 
@@ -228,21 +228,7 @@ export function WorkflowEditorScreen() {
   const changed = draft ? draftChanged(draft) : false;
   const problems = draft ? draftProblems(draft, serverAgents, t) : null;
   const firstProblem = problems?.first ?? null;
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && !savedId && changed, ({ repeat }) => {
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(!savedId && changed, { warn: true });
 
   const finish = (id: string) => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(queryScope, serverId) });

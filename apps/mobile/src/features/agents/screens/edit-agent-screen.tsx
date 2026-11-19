@@ -9,7 +9,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import BookBookmark from "lucide-react-native/icons/book-bookmark";
@@ -25,7 +24,7 @@ import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import Table2 from "lucide-react-native/icons/table-2";
 import Upload from "lucide-react-native/icons/upload";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   AgentAccessFields,
   PERMISSION_LABEL,
@@ -71,11 +70,13 @@ import {
   useMobileWorkspace,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 type AgentEdits = Pick<
   UpdateAgentInput,
@@ -226,21 +227,7 @@ function AgentForm({
       title.length <= INPUT_LIMITS.agentTitle &&
       !instructionsTooLong(description));
 
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || saving || pickingPhoto), ({ repeat }) => {
-    if (pending.current || pickingPhoto) return;
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard(dirty || saving || pickingPhoto, { busy: () => pending.current || pickingPhoto });
 
   function change(value: AgentEdits) {
     setEdits((current) => ({ ...current, ...value }));
@@ -509,11 +496,7 @@ function AgentForm({
         <AgentInformation agent={agent} available={available} section={page} />
       ) : null}
       {!available ? <Typography.Paragraph>{t("mobile.agent.edit.unavailable")}</Typography.Paragraph> : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
       {page === "info" || page === "appearance" || page === "runtime" ? (
         <SheetSaveAction
           dirty={dirty}

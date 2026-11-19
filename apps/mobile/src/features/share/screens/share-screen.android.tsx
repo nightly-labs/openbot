@@ -1,18 +1,13 @@
-import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { router, useNavigation } from "expo-router";
+import { useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
-import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { AttachmentThumbnail } from "@/features/chat/components/attachment-preview";
 import { LARGE_TEXT_LENGTH, useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useOutbox } from "@/features/chat/context/outbox-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -22,26 +17,27 @@ import {
   useMobileWorkspace,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
+import { backOrConnected } from "@/shared/lib/back-or-connected";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { AgentChoice, ShareContentSection } from "../components/share-sheet-parts";
 import { discardIncomingShare, type IncomingShare, takeIncomingShare } from "../model/incoming-share";
-import { loadLastShareTarget, type ShareTarget, saveLastShareTarget } from "../model/last-share-target";
+import { type ShareTarget, saveLastShareTarget, useLastShareTarget } from "../model/last-share-target";
 import { endShareSheetRequest, openShareSheet, setOpenShareSheet } from "../model/share-sheet-opener";
 
 const CHAT_ROUTE = "chat/[agentId]";
 
 export function ShareScreen() {
-  const { t, format } = useText();
+  const { t } = useText();
   const { session } = useMobileSession();
   const { agents, servers, attachmentSupport } = useMobileWorkspace();
   const { store: outbox } = useOutbox();
   const sheetStack = useNavigation().getParent();
   const [share, setShare] = useState<IncomingShare | null | undefined>(undefined);
-  const [lastTarget, setLastTarget] = useState<ShareTarget | null>(null);
   const [chosen, setChosen] = useState<ShareTarget | null>(null);
   const [message, setMessage] = useState("");
   const [folds, setFolds] = useState<Readonly<Record<string, boolean>>>({});
@@ -94,16 +90,7 @@ export function ShareScreen() {
 
   const apiUrl = session?.apiUrl;
   const userId = session?.user.id;
-  useEffect(() => {
-    if (!apiUrl || !userId) return;
-    let current = true;
-    void loadLastShareTarget(apiUrl, userId).then((target) => {
-      if (current) setLastTarget(target);
-    });
-    return () => {
-      current = false;
-    };
-  }, [apiUrl, userId]);
+  const lastTarget = useLastShareTarget(apiUrl, userId);
 
   const agentFor = (target: ShareTarget | null) =>
     target ? (agents.find((agent) => agent.serverId === target.serverId && agent.id === target.agentId) ?? null) : null;
@@ -111,11 +98,6 @@ export function ShareScreen() {
   const selected = chosen ? agentFor(chosen) : lastAgent;
   const selectedKey = chosen ?? lastTarget;
   const inlineTextLength = share?.text && share.text.length <= LARGE_TEXT_LENGTH ? share.text.length + 2 : 0;
-
-  function close(): void {
-    if (router.canGoBack()) router.back();
-    else router.replace("/connected");
-  }
 
   async function send(): Promise<void> {
     if (!sheetStack || !share || !selected || sendingRef.current) return;
@@ -175,13 +157,7 @@ export function ShareScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      <AndroidHeaderButton
-        placement="left"
-        icon={X}
-        accessibilityLabel={t("common.close")}
-        disabled={sending}
-        onPress={close}
-      />
+      <SheetCloseAction disabled={sending} onPress={backOrConnected} />
       <SheetSaveAction
         dirty={Boolean(share)}
         canSave={selected !== null}
@@ -200,28 +176,7 @@ export function ShareScreen() {
         </Typography.Paragraph>
       ) : (
         <>
-          <SettingsSection title={t("mobile.share.content")}>
-            {share.text ? (
-              <SettingsRow disclosure={false}>
-                <Typography.Paragraph numberOfLines={4}>{share.text}</Typography.Paragraph>
-              </SettingsRow>
-            ) : null}
-            {share.files.map((file) => (
-              <SettingsRow
-                key={file.uri}
-                disclosure={false}
-                leading={
-                  <AttachmentThumbnail
-                    name={file.name}
-                    uri={attachmentMimeTypeForName(file.name).startsWith("image/") ? file.uri : null}
-                  />
-                }
-                supportingText={file.size === null ? undefined : format.fileSize(file.size)}
-              >
-                <Typography.Paragraph numberOfLines={1}>{file.name}</Typography.Paragraph>
-              </SettingsRow>
-            ))}
-          </SettingsSection>
+          <ShareContentSection share={share} />
           <SheetFormField
             label={t("mobile.share.extension.message")}
             hideLabel
@@ -312,43 +267,6 @@ function ServerHeader({
       <Typography.Paragraph numberOfLines={1} className="font-semibold">
         {server.name}
       </Typography.Paragraph>
-    </SettingsRow>
-  );
-}
-
-function AgentChoice({
-  agent,
-  checked,
-  disabled,
-  onSelect,
-}: {
-  agent: MobileAgent;
-  checked: boolean;
-  disabled: boolean;
-  onSelect: (agent: MobileAgent) => void;
-}) {
-  const accent = String(useCSSVariable("--openbot-accent"));
-  return (
-    <SettingsRow
-      checked={checked}
-      disabled={disabled}
-      disclosure={false}
-      accessibilityLabel={agent.name}
-      leading={
-        <BloubAvatar
-          agentId={agent.id}
-          serverId={agent.serverId}
-          hue={agent.avatarHue}
-          color={agent.avatarColor}
-          seed={agent.avatarSeed}
-          size={36}
-          animateIdle={false}
-        />
-      }
-      trailing={checked ? <Check size={18} color={accent} strokeWidth={2} /> : null}
-      onPress={() => onSelect(agent)}
-    >
-      <Typography.Paragraph numberOfLines={1}>{agent.name}</Typography.Paragraph>
     </SettingsRow>
   );
 }

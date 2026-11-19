@@ -175,10 +175,7 @@ export function LookStep({
                     checked={isAvatarColorChoice(choice, hue, color)}
                     ring={String(foreground)}
                     motion={motion}
-                    onPress={() => {
-                      void haptics.selection();
-                      onColorChange({ hue: choice.hue, color: choice.color });
-                    }}
+                    onPress={() => onColorChange({ hue: choice.hue, color: choice.color })}
                   >
                     <View className="size-full rounded-full" style={{ backgroundColor: choice.swatch }} />
                   </Swatch>
@@ -189,10 +186,7 @@ export function LookStep({
                     checked={hue === null && color === null}
                     ring={String(foreground)}
                     motion={motion}
-                    onPress={() => {
-                      void haptics.selection();
-                      onColorChange({ hue: null, color: null });
-                    }}
+                    onPress={() => onColorChange({ hue: null, color: null })}
                   >
                     <View className="size-full items-center justify-center rounded-full bg-grouped">
                       <Typography type="body-xs" className="font-semibold">
@@ -231,7 +225,10 @@ function Swatch({
       accessibilityLabel={label}
       accessibilityState={{ checked }}
       hitSlop={6}
-      onPress={onPress}
+      onPress={() => {
+        void haptics.selection();
+        onPress();
+      }}
     >
       <Animated.View
         className="items-center justify-center rounded-full"

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState } from "react-native";
 import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/features/agents/model/plush/plush-frames";
 import { useAppDrawerShownOnUI } from "@/features/servers/components/app-drawer-activity";
 import { isAndroid } from "@/shared/lib/platform";
+import { useAppActive } from "@/shared/lib/use-app-active";
 
 interface Playback {
   frames: PlushFrame[];
@@ -78,15 +78,11 @@ export function usePlushFrame(geometry: PlushGeometry, animate: boolean) {
     if (current.loopStart === null && index >= last) scheduleOnRN(ended, shownCount.get());
   }, false);
 
+  const appActive = useAppActive();
   useEffect(() => {
-    const update = () => clock.setActive(playing && animate && AppState.currentState === "active");
-    update();
-    const subscription = AppState.addEventListener("change", update);
-    return () => {
-      subscription.remove();
-      clock.setActive(false);
-    };
-  }, [animate, clock, playing]);
+    clock.setActive(playing && animate && appActive);
+    return () => clock.setActive(false);
+  }, [animate, appActive, clock, playing]);
 
   useEffect(() => {
     onEnd.current = null;

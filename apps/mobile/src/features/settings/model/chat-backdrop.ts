@@ -4,6 +4,7 @@ import { isAvatarColor } from "@openbot/contracts/ipc";
 import { Directory, File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
+import { storedFields } from "./stored-fields";
 
 export type ChatBackdropChoice = "none" | ChatBackdropScene | "agent" | "photo";
 
@@ -102,14 +103,8 @@ function parseAgentPage(value: unknown): AgentBackdropPage | null {
 }
 
 function parseStored(stored: string | null): ChatBackdropValue | null {
-  let value: unknown = null;
-  try {
-    value = stored === null ? null : JSON.parse(stored);
-  } catch {
-    return null;
-  }
-  if (typeof value !== "object" || value === null) return null;
-  const fields = new Map<string, unknown>(Object.entries(value));
+  const fields = storedFields(stored);
+  if (!fields) return null;
   const choice = fields.get("choice");
   const strength = fields.get("strength");
   const mark = fields.get("mark");

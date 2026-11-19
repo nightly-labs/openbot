@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import {
   cancelAnimation,
-  Easing,
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
@@ -11,6 +10,7 @@ import {
 } from "react-native-reanimated";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { SPLASH_EASE_IN_OUT as EASE_IN_OUT, SPLASH_EASE_OUT as EASE_OUT } from "@/shared/lib/splash-motion";
 
 export type AppLogoAnimation = "none" | "blink";
 
@@ -18,8 +18,6 @@ const VIEWBOX_SIZE = 240;
 const BLINK_INTERVAL_MS = 4_800;
 const BLINK_START_DELAY_MS = 2_112;
 const BLINK_HALF_DURATION_MS = 96;
-const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const WINK_DURATION_MS = 360;
 const WINK_CLOSE_DURATION_MS = 137;
 const WINK_HOLD_DURATION_MS = 72;

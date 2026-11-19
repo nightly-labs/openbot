@@ -8,6 +8,7 @@ import {
   SUPPORTED_AVATAR_SILHOUETTES,
   type SupportedAvatarSilhouetteId,
 } from "@openbot/brand/bloub-avatar";
+import * as Crypto from "expo-crypto";
 
 interface AvatarCandidates {
   namespace: string;
@@ -41,4 +42,8 @@ export function randomAvatarFace(current: AvatarFace): AvatarFace {
 function randomOther<T>(items: readonly T[], current: T): T {
   const others = items.filter((item) => item !== current);
   return others[Math.floor(Math.random() * others.length)] ?? current;
+}
+
+export function newAvatarSeed(): string {
+  return `mobile:${Crypto.randomUUID().replaceAll("-", "")}`;
 }

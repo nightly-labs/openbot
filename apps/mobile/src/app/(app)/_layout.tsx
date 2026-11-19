@@ -88,6 +88,30 @@ function AuthenticatedStack() {
     scrollEdgeEffects: { top: "hidden", bottom: "soft" },
     title: "",
   } as const;
+  const chatPage = {
+    animation: chatAnimation,
+    contentStyle: { backgroundColor: background },
+    fullScreenGestureEnabled: true,
+    gestureEnabled: true,
+    ...nativeBarOptions,
+  } as const;
+  const routinePage = {
+    animation: pushAnimation,
+    contentStyle: { backgroundColor: sheetBackground },
+    headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
+    headerBlurEffect: "none",
+    scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+    title: t("mobile.app.route.routine"),
+  } as const;
+  const formSheet = (sheetAllowedDetents: number[]) =>
+    ({
+      contentStyle: { backgroundColor: sheetBackground },
+      headerShown: false,
+      scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+      presentation: "formSheet",
+      sheetAllowedDetents,
+      sheetGrabberVisible: true,
+    }) as const;
   const { closeDrawer } = useAppDrawer();
   const { agentId: openAgentId, taskId: openTaskId } = useGlobalSearchParams<{ agentId?: string; taskId?: string }>();
   const shown = useRef<{ agentId: string; taskId: string | null } | null>(null);
@@ -276,36 +300,9 @@ function AuthenticatedStack() {
           contentStyle: { backgroundColor: "transparent" },
         }}
       />
-      <Stack.Screen
-        name="chat/[agentId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="side-question/[agentId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="task/[taskId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
+      <Stack.Screen name="chat/[agentId]" options={chatPage} />
+      <Stack.Screen name="side-question/[agentId]" options={chatPage} />
+      <Stack.Screen name="task/[taskId]" options={chatPage} />
       <Stack.Screen
         name="code-preview/[previewId]"
         options={{
@@ -336,17 +333,7 @@ function AuthenticatedStack() {
           ...nativeBarOptions,
         }}
       />
-      <Stack.Screen
-        name="browser-tabs/[agentId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="browser-tabs/[agentId]" options={formSheet([0.6])} />
       <Stack.Screen
         name="remote-desktop/[serverId]"
         options={{
@@ -357,264 +344,42 @@ function AuthenticatedStack() {
           ...nativeBarOptions,
         }}
       />
-      <Stack.Screen
-        name="remote-desktop-stats"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="remote-desktop-help"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="browser-help"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="channel/[channelId]"
-        options={{
-          animation: chatAnimation,
-          contentStyle: { backgroundColor: background },
-          fullScreenGestureEnabled: true,
-          gestureEnabled: true,
-          ...nativeBarOptions,
-        }}
-      />
-      <Stack.Screen
-        name="channel-info/[channelId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="context-usage/[agentId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="channel-actions/[channelId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-channel"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-agent"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="agent-info/[agentId]"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="remote-desktop-stats" options={formSheet([0.6])} />
+      <Stack.Screen name="remote-desktop-help" options={formSheet([0.85])} />
+      <Stack.Screen name="browser-help" options={formSheet([0.85])} />
+      <Stack.Screen name="channel/[channelId]" options={chatPage} />
+      <Stack.Screen name="channel-info/[channelId]" options={formSheet([0.85])} />
+      <Stack.Screen name="context-usage/[agentId]" options={formSheet([0.6, 0.85])} />
+      <Stack.Screen name="channel-actions/[channelId]" options={formSheet([0.6])} />
+      <Stack.Screen name="add-channel" options={formSheet([0.85])} />
+      <Stack.Screen name="add-agent" options={formSheet([0.85])} />
+      <Stack.Screen name="agent-info/[agentId]" options={formSheet([0.85])} />
       <Stack.Screen
         name="install-agent"
         options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: isAndroid ? [0.85] : [1],
+          ...formSheet(isAndroid ? [0.85] : [1]),
           sheetInitialDetentIndex: "last",
-          sheetGrabberVisible: true,
         }}
       />
       <Stack.Screen
         name="marketplace-listing"
         options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: isAndroid ? [0.85] : [1],
+          ...formSheet(isAndroid ? [0.85] : [1]),
           sheetInitialDetentIndex: "last",
-          sheetGrabberVisible: true,
         }}
       />
-      <Stack.Screen
-        name="section-form"
-        listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="library-folders"
-        listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="thread-rename"
-        listeners={refocusNameField}
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="new-task"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="add-server"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="hosted-server"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="hidden-chats"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="deleted-chats"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="server-settings"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="section-form" listeners={refocusNameField} options={formSheet([0.85])} />
+      <Stack.Screen name="library-folders" listeners={refocusNameField} options={formSheet([0.85])} />
+      <Stack.Screen name="thread-rename" listeners={refocusNameField} options={formSheet([0.85])} />
+      <Stack.Screen name="new-task" options={formSheet([0.85])} />
+      <Stack.Screen name="add-server" options={formSheet([0.85])} />
+      <Stack.Screen name="hosted-server" options={formSheet([0.85])} />
+      <Stack.Screen name="hidden-chats" options={formSheet([0.85])} />
+      <Stack.Screen name="deleted-chats" options={formSheet([0.85])} />
+      <Stack.Screen name="server-settings" options={formSheet([0.85])} />
       <Stack.Screen name="server-routines/index" options={largeTitlePage} />
-      <Stack.Screen
-        name="server-routines/agent-routine"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: sheetBackground },
-          headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-          headerBlurEffect: "none",
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          title: t("mobile.app.route.routine"),
-        }}
-      />
-      <Stack.Screen
-        name="server-routines/channel-routine"
-        options={{
-          animation: pushAnimation,
-          contentStyle: { backgroundColor: sheetBackground },
-          headerStyle: { backgroundColor: isIOS ? "transparent" : sheetBackground },
-          headerBlurEffect: "none",
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          title: t("mobile.app.route.routine"),
-        }}
-      />
+      <Stack.Screen name="server-routines/agent-routine" options={routinePage} />
+      <Stack.Screen name="server-routines/channel-routine" options={routinePage} />
       <Stack.Screen name="server-tasks" options={largeTitlePage} />
       <Stack.Screen name="server-workflows/index" options={largeTitlePage} />
       <Stack.Screen name="server-workflows/workflow" options={largeTitlePage} />
@@ -635,116 +400,16 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-usage/index" options={largeTitlePage} />
       <Stack.Screen name="server-library" options={largeTitlePage} />
       <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
-      <Stack.Screen
-        name="share"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="plan-limits"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="message-actions"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="pinned-messages"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="queued-messages"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="vault-request"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="turn-thinking"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="subagent"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="memory-changes"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{
-          contentStyle: { backgroundColor: sheetBackground },
-          headerShown: false,
-          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
-        }}
-      />
+      <Stack.Screen name="share" options={formSheet([0.85])} />
+      <Stack.Screen name="plan-limits" options={formSheet([0.85])} />
+      <Stack.Screen name="message-actions" options={formSheet([0.6])} />
+      <Stack.Screen name="pinned-messages" options={formSheet([0.6, 0.85])} />
+      <Stack.Screen name="queued-messages" options={formSheet([0.85])} />
+      <Stack.Screen name="vault-request" options={formSheet([0.85])} />
+      <Stack.Screen name="turn-thinking" options={formSheet([0.85])} />
+      <Stack.Screen name="subagent" options={formSheet([0.85])} />
+      <Stack.Screen name="memory-changes" options={formSheet([0.85])} />
+      <Stack.Screen name="settings" options={formSheet([0.85])} />
     </Stack>
   );
 }
