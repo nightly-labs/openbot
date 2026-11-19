@@ -229,7 +229,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step found in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page. Select any login-method option first. The user authorizes one fill-and-submit action to the shown origin. On an http:// page only a saved login fills; else use takeover. Never pass a secret as an argument. Use takeover if the method or (without loginId) code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or bank app approval. Fill saved cards with fill_card.",
+      "Request the secret card for the active authentication step found in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page. Select any login-method option first. The user authorizes one fill-and-submit action to the shown origin. Never pass a secret as an argument. Use takeover if the method or (without loginId) code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or bank app approval. Fill saved cards with fill_card.",
     shape: {
       tabId,
       method: z
@@ -301,7 +301,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
       id: identifier.optional().describe("The item to change. Omit it to add a contact or a login."),
       label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
       ...vaultContactShape,
-      website: vaultText.describe("New login: the website. Keep http:// for an HTTP site."),
+      website: vaultText.describe("New login: the website URL."),
       username: vaultText.describe("Login: the username or email."),
       password: z.string().max(VAULT_PASSWORD_LIMIT).optional().describe("Login: the password."),
       twoStepKey: z
@@ -331,7 +331,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
       ),
       label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
       ...vaultContactShape,
-      website: vaultText.describe("Login: the website, such as example.com. Keep http:// for an HTTP site."),
+      website: vaultText.describe("Login: the website URL."),
       username: vaultText.describe("Login: the username or email."),
       nameOnCard: vaultText.describe("Card: the name on the card."),
       expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
