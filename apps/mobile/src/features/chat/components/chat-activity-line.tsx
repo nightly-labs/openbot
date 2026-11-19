@@ -1,4 +1,5 @@
 import { Typography } from "heroui-native";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { type ReactNode, useState } from "react";
 import { type AccessibilityState, Pressable, View } from "react-native";
@@ -9,7 +10,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export const ACTIVITY_ICON_SIZE = 14;
-const CHEVRON_SIZE = 12;
+export const CHEVRON_SIZE = 12;
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 
 export type ActivityColors = {
@@ -41,6 +42,7 @@ export function ChatActivityLine({
   icon,
   label,
   name,
+  nameIcon,
   meta,
   accessibilityLabel,
   accessibilityHint,
@@ -51,6 +53,7 @@ export function ChatActivityLine({
   icon: ReactNode;
   label?: string;
   name?: string;
+  nameIcon?: ReactNode;
   meta?: string;
   accessibilityLabel: string;
   accessibilityHint?: string;
@@ -74,6 +77,7 @@ export function ChatActivityLine({
           {label}
         </Typography.Paragraph>
       ) : null}
+      {nameIcon}
       {name ? (
         <Typography.Paragraph
           type="body-xs"
@@ -134,5 +138,22 @@ export function ChatActivityLine({
         {content}
       </Animated.View>
     </Pressable>
+  );
+}
+
+export function ExpandChevron({ open }: { open: boolean }) {
+  const colors = useActivityColors();
+  const reducedMotion = useReducedMotion();
+  return (
+    <Animated.View
+      style={{
+        transform: [{ rotate: open ? "180deg" : "0deg" }],
+        transitionProperty: "transform",
+        transitionDuration: reducedMotion ? 0 : 160,
+        transitionTimingFunction: PRESS_EASING,
+      }}
+    >
+      <ChevronDown size={CHEVRON_SIZE} color={colors.dim} strokeWidth={2} />
+    </Animated.View>
   );
 }
