@@ -7,23 +7,10 @@ import { createCodeSignInFallback } from "../../components/createCodeSignInFallb
 import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 
-/**
- * The shared slab every composer notice uses: a warning-toned card in the queue's shape, above the
- * input and under the queue, because the user reads that column top to bottom before they send.
- *
- * `tone` is `danger` for errors and spent plan windows, and `warning` for account setup notices.
- *
- * `onDismiss` decides the rest. A notice the user can clear gets the close button, Escape, and
- * `role="alert"`, because a state the user did not ask for has to announce itself. The states they
- * walked into, such as a signed-out provider, stay until they are resolved, so they
- * only report. `title` is optional: a failure the provider already stated in a sentence gains
- * nothing from a label that repeats the word "error" above it.
- */
 export function ComposerNotice(props: {
   tone?: "warning" | "danger";
   title?: string | undefined;
   body: string;
-  /** The code of the failure the body states. */
   reference?: string | null | undefined;
   action?: JSX.Element;
   conversationKey?: string | null | undefined;
@@ -74,7 +61,6 @@ export function ComposerNotice(props: {
   );
 }
 
-/** The icon, copy and optional action the card carries, whichever role announces it. */
 function NoticeContent(props: {
   title?: string | undefined;
   body: string;
@@ -94,20 +80,9 @@ function NoticeContent(props: {
   );
 }
 
-/**
- * The signed-out provider, stated before the user sends rather than after the send fails.
- *
- * The wording matches the provider picker's `sign-in-required` label on purpose - a user who has
- * seen "Sign in required" in the model picker should not have to work out that this is the same
- * state.
- *
- * There is no retry action here. The composer keeps the draft across a sign-in, so sending again is
- * the retry, and a button that re-sent silently would be a second send the user did not ask for.
- */
 export function ComposerSignInNotice(props: {
   provider: AgentProviderId;
   onSignIn: (provider: AgentProviderId) => void | Promise<void>;
-  /** The code sign-in, offered when the browser sign-in that `onSignIn` starts is slow or fails. */
   onSignInWithCode?: ((provider: AgentProviderId) => void) | undefined;
   signingIn?: boolean;
   onShown?: () => void;
@@ -118,13 +93,7 @@ export function ComposerSignInNotice(props: {
     () => props.onShown?.(),
   );
   const providerName = () => agentProviderName(props.provider);
-  /**
-   * Opening the sign-in guide is a round trip to the main process, and the provider only reports
-   * `connecting` once it answers. Without a local pending flag the button looks unpressed for that
-   * whole gap, so the user presses it again and opens a second guide.
-   */
   const [starting, setStarting] = createSignal(false);
-  /** Why the last sign-in could not start. It replaces the body until the next attempt. */
   const [failure, setFailure] = createSignal<string | null>(null);
   const busy = () => starting() || Boolean(props.signingIn);
   const codeFallback = createCodeSignInFallback(() => Boolean(props.signingIn));
@@ -138,7 +107,6 @@ export function ComposerSignInNotice(props: {
     } catch (error) {
       setFailure(errorMessage(error, t("app.provider.connectFailedRetry", { name: providerName() })));
     } finally {
-      // A failed sign-in leaves the notice in place, so the button has to become pressable again.
       setStarting(false);
     }
   };
@@ -224,7 +192,6 @@ export function ComposerUpdateNotice(props: {
   );
 }
 
-/** The reset moment, in the reader's own locale. A window with no reported reset gets no sentence. */
 export function formatUsageReset(resetsAt: number | null | undefined, format: AppFormat): string | null {
   if (resetsAt === null || resetsAt === undefined) return null;
   const date = new Date(resetsAt * 1_000);
@@ -237,13 +204,10 @@ export function formatUsageReset(resetsAt: number | null | undefined, format: Ap
   });
 }
 
-/**
- * A spent plan window can coexist with paid credits. Dismissing the notice only hides the reading;
- * the provider still decides whether to accept the next turn.
- */
 export function ComposerUsageLimitNotice(props: {
   provider: AgentProviderId;
   resetsAt?: number | null;
+  onCredits?: boolean;
   onShown?: () => void;
   onDismiss: () => void;
 }) {
@@ -256,11 +220,20 @@ export function ComposerUsageLimitNotice(props: {
   const body = () => {
     const provider = agentProviderName(props.provider);
     const reset = resetAt();
+    if (props.onCredits)
+      return reset
+        ? t("composer.usageLimit.creditsResets", { provider, reset })
+        : t("composer.usageLimit.credits", { provider });
     return reset
       ? t("composer.usageLimit.resets", { provider, reset })
       : t("composer.usageLimit.selectModel", { provider });
   };
   return (
-    <ComposerNotice tone="danger" title={t("composer.usageLimit.title")} body={body()} onDismiss={props.onDismiss} />
+    <ComposerNotice
+      tone={props.onCredits ? "warning" : "danger"}
+      title={props.onCredits ? t("composer.usageLimit.creditsTitle") : t("composer.usageLimit.title")}
+      body={body()}
+      onDismiss={props.onDismiss}
+    />
   );
 }

@@ -37,11 +37,6 @@ interface SettingsMobileConnectTabProps {
 const IOS_PLATFORM_LABEL = "iOS";
 const ANDROID_PLATFORM_LABEL = "Android";
 
-/**
- * The phones that use this account, as cards. "Add phone" opens a dialog that shows one code at a
- * time, so a phone camera cannot catch the wrong code. The permanent link is one more card, and how
- * devices connect is a chip in the header.
- */
 export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
   const { t } = useText();
   const [adding, setAdding] = createSignal(false);
@@ -130,7 +125,6 @@ export function SettingsMobileConnectTab(props: SettingsMobileConnectTabProps) {
           onCancel={() => props.store.setLinkConfirm(null)}
           onConfirm={async () => {
             await props.store.createLink();
-            // The new link is shown, so its code opens at once.
             if (props.store.state.link.revealed) setLinkOpen(true);
           }}
           tone="default"
@@ -205,7 +199,6 @@ function PhoneCard(props: { store: SettingsMobileConnectStore; device: MobileCon
   );
 }
 
-/** The permanent link among the phones: a dashed card that makes one, or the link with its menu. */
 function LinkCard(props: { store: SettingsMobileConnectStore; onOpen: () => void }) {
   const { t, format } = useText();
   const link = () => props.store.state.link;
@@ -297,7 +290,6 @@ function LinkCard(props: { store: SettingsMobileConnectStore; onOpen: () => void
   );
 }
 
-/** How devices connect: the current route as a chip, and both routes in a popover. */
 function RouteChip(props: { store: SettingsMobileConnectStore; disabled: boolean }) {
   const { t } = useText();
   return (

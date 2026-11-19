@@ -1,11 +1,3 @@
-// Head tags for a collection index and its articles. Separate from
-// site-metadata.ts to keep the import direction one-way: site-metadata knows
-// nothing about articles, content-collection.ts reads the site URL from it, and
-// this file is the only thing that reads both.
-//
-// Each function takes `siteUrl`, the site that served the page. It is required, so
-// that no route can forget it and send a preview's social card to production.
-
 import {
   articleArtPath,
   articleMarkdownUrl,
@@ -27,17 +19,11 @@ import {
   pageSocialImageMeta,
 } from "./site-metadata";
 
-/** The generated social cards. Matches what `content-images.ts` writes. */
 const OG_IMAGE_WIDTH = 1200;
 const OG_IMAGE_HEIGHT = 630;
 
-/** Search results cut a description after about this many characters. */
 const SEARCH_DESCRIPTION_LENGTH = 155;
 
-/**
- * The longest run of whole sentences that a search result shows in full. A first
- * sentence that is already too long is cut at a word and ends with an ellipsis.
- */
 function searchDescription(text: string): string {
   if (text.length <= SEARCH_DESCRIPTION_LENGTH) return text;
   let kept = "";
@@ -48,7 +34,6 @@ function searchDescription(text: string): string {
   }
   if (kept.length > 0) return kept.trimEnd();
   const cut = text.slice(0, SEARCH_DESCRIPTION_LENGTH - 1);
-  // No dangling "and" or comma before the ellipsis.
   return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/(?:[\s,;:]+|\s+(?:and|or|to|of|the|a|an|in))+$/, "")}…`;
 }
 
@@ -89,19 +74,12 @@ export function collectionIndexHead(collection: ContentCollection, siteUrl: stri
   };
 }
 
-/**
- * The artwork of the first article, which fills most of the first screen. It is a
- * background of an element, and no preload scanner reads a background, so without
- * this the browser only learns about the image after the stylesheet has arrived
- * and the first paint is the duller CSS approximation under it.
- */
 function featuredArtworkPreload(collection: ContentCollection) {
   const featured = collection.articles[0];
   if (!featured) return [];
   return [{ rel: "preload", as: "image" as const, href: articleArtPath(collection, featured.slug, "featured") }];
 }
 
-/** `artShape` is the frame under the title: a comparison draws its hero in the featured frame. */
 export function articleHead(
   collection: ContentCollection,
   article: CollectionArticle,
@@ -151,16 +129,11 @@ export function articleHead(
         href: collectionFeedUrl(collection, siteUrl),
       },
       { rel: "alternate", type: "text/markdown", href: articleMarkdownUrl(collection, article.slug, siteUrl) },
-      // The same reason as on the index: this article's artwork is the first
-      // thing under the title and it is a background, not an <img>.
       { rel: "preload", as: "image" as const, href: articleArtPath(collection, article.slug, artShape) },
     ],
   };
 }
 
-// schema.org wants an absolute URL for every entity it can resolve, and a
-// `mainEntityOfPage` that matches the canonical. Google drops the date from a
-// result when those disagree with each other.
 function articleStructuredData(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
   const url = articleUrl(collection, article.slug, siteUrl);
   return {
@@ -184,7 +157,6 @@ function articleStructuredData(collection: ContentCollection, article: Collectio
   };
 }
 
-/** Home › collection › article, which search results show in place of the bare URL. */
 function articleBreadcrumbData(collection: ContentCollection, article: CollectionArticle, siteUrl: string) {
   const trail = [
     { name: "OpenBot", url: siteUrl },
@@ -204,7 +176,6 @@ function articleBreadcrumbData(collection: ContentCollection, article: Collectio
 }
 
 function collectionStructuredData(collection: ContentCollection, siteUrl: string) {
-  // A comparison or a provider page is a reference page, not a dated post, so the index is a list of them.
   if (collection.id === "compare" || collection.id === "providers") {
     return {
       "@context": "https://schema.org",
@@ -237,11 +208,6 @@ function collectionStructuredData(collection: ContentCollection, siteUrl: string
   };
 }
 
-/**
- * The plugin pages. They carry the site's own social card rather than a generated one: the artwork
- * pipeline in `content-images.ts` draws articles, and a listing is not an article. The structured
- * data is `SoftwareApplication`, which is what a plugin is.
- */
 export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   const url = pluginUrl(plugin.slug, siteUrl);
   const title = `${plugin.name} MCP Plugin for AI Agents — OpenBot`;
@@ -270,11 +236,6 @@ export function pluginHead(plugin: SitePlugin, siteUrl: string) {
   };
 }
 
-/**
- * The listing as schema.org sees it. `softwareVersion` is the developer's own string, and the
- * offer says free because installing a plugin costs nothing; what the developer's own service
- * charges is between the reader and the developer, so nothing here claims otherwise.
- */
 function pluginStructuredData(plugin: SitePlugin, siteUrl: string) {
   return {
     "@context": "https://schema.org",

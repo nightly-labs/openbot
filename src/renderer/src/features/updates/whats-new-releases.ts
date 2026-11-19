@@ -18,11 +18,6 @@ import zhUrl from "./whats-new/zh.json?url&no-inline";
 import { releaseVersion } from "./whats-new-history";
 import notesUrl from "./whats-new-releases.json?url&no-inline";
 
-/**
- * The translated notes of each language. A file holds only the releases that were translated, in
- * the shape of the English file. The record names every translated locale, so a new language does
- * not build until it has a file.
- */
 const TRANSLATED_NOTES_URLS: Record<Exclude<TranslatedLocale, "en">, string> = {
   ar: arUrl,
   de: deUrl,
@@ -47,7 +42,6 @@ const releaseSchema = z.object({
   groups: z.array(z.object({ type: z.enum(["added", "changed", "fixed"]), items: z.array(z.string()) })),
 });
 
-/** Decode the bundled editorial data at its read boundary. Never load commits or remote fallback text. */
 const whatsNewReleasesSchema = z.array(releaseSchema);
 
 async function loadNotes(url: string, signal: AbortSignal): Promise<WhatsNewRelease[]> {
@@ -56,11 +50,6 @@ async function loadNotes(url: string, signal: AbortSignal): Promise<WhatsNewRele
   return whatsNewReleasesSchema.parse(await response.json());
 }
 
-/**
- * The release notes in `locale`. A release with no translation keeps its English text, so an old
- * release or a missing file never removes notes. Each retry reads the assets again. The URLs point
- * into the installed app, not a remote service.
- */
 export async function loadWhatsNewReleases(signal: AbortSignal, locale: TranslatedLocale): Promise<WhatsNewRelease[]> {
   if (locale === "en") return loadNotes(notesUrl, signal);
   const [english, translated] = await Promise.all([

@@ -18,7 +18,6 @@ async function showStatus(operations: HostAdminOperations, json: boolean): Promi
 async function watchStatus(operations: HostAdminOperations, intervalMs: number): Promise<void> {
   const repaint = process.stdout.isTTY;
   for (;;) {
-    // A reading can fail while the host is unhealthy. Report that and keep watching, without error text.
     const view = await collectHostStatus(operations).then(
       (report) => formatHostStatus(report),
       () => "Host status is unavailable. Check the host directory, the daemon and the process list.\n",
@@ -72,7 +71,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(() => {
-  // Native/child-process failures may carry passwords. Do not serialize or log the raw error.
   process.stderr.write(
     "Host command failed. Check installation, account names and permissions. Setup does not overwrite registration. After partial account creation, preserve the root-only credential recovery file under /private/var/root.\n",
   );

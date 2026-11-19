@@ -1,19 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that records each call and the real billing service with a Stripe that must get no call. An operator
-// moved three servers from boat to machines that the operator runs (`operator_host`), so the row has no
-// sandbox. For such a server the Worker must send no boat call and must never make a sandbox: a new one
-// would be an empty second server with the same identity. The Worker writes only what the server must
-// do (`desired_state`): the plan end, the renewal and the plan change. The operator starts and stops the
-// machine. A delete removes the boat sandbox from before the move, the Remote host and the session, and
-// keeps the name of the machine until the operator erases it. The server list tells a client that the
-// account service cannot restart a moved server, so the client hides the action. A moved server has the
-// larger storage of its plan in the server list, the hosting list and the billing state, also after a
-// plan change. Servers that boat runs show that the same service still sets up, starts, stops and
-// resizes them, and that they keep the storage of the plan table. A move that the operator writes while
-// the Worker reads the sandbox at boat wins over the state that boat then gives.
-//
-// Run: bun run test:hosted-operator-host
-// It writes .openbot-build/hosted-operator-host-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -107,17 +91,14 @@ async function run() {
     );
     subscribe.run(`sub_${id}`, OWNER.id, id, t0 + 30 * DAY, t0);
   };
-  // Servers that boat runs: a failed setup with no sandbox, and a stopped server that must run.
   server("control-setup", { observed: "error" });
   server("control-stopped", { sandboxId: "bx_control_stopped", template: "tpl_1", observed: "stopped" });
-  // Servers that an operator moved. The row of a moved server keeps its template.
   server("moved", { template: "tpl_1", machine: MACHINE, retired: "bx_old", observed: "running" });
   server("gone", { template: "tpl_1", machine: "leaseweb:12728111", retired: "bx_gone", observed: "running" });
   server("bare", { machine: "leaseweb:12728112", observed: "running" });
 
   const calls: string[] = [];
   const running = new Set<string>();
-  /** Runs one time while boat answers a read of this sandbox: the operator moves the server at that moment. */
   const duringRead = new Map<string, () => void>();
   const boatFetch = async (input: string, init: RequestInit) => {
     const path = new URL(input).pathname.replace("/api/v1", "");
@@ -152,7 +133,6 @@ async function run() {
     }
     return Response.json({ ok: true });
   };
-  // Each call for a server that boat runs names `control`. All other calls are for a moved server.
   const foreign = () => calls.filter((call) => !call.includes("control"));
   const stripeCalls: string[] = [];
   const billing = new BillingService({
@@ -201,7 +181,6 @@ async function run() {
          FROM hosted_servers WHERE server_id = ?`,
       )
       .get(serverId);
-  /** A write that only the operator makes: what the machine does now. */
   const operatorSets = (serverId: string, observed: string, error: string | null, at: number) =>
     database
       .prepare("UPDATE hosted_servers SET observed_state = ?, observed_error = ?, updated_at = ? WHERE server_id = ?")
@@ -219,7 +198,6 @@ async function run() {
       : { status: null, code: String(error) };
   };
 
-  // The server list that each client reads. Before the first tick, so each server has its first state.
   const hostRow = database.prepare(
     "INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at) VALUES (?, ?, ?, 1, 1)",
   );
@@ -248,7 +226,6 @@ async function run() {
     hosted: host.hosted,
     restartAvailable: "restartAvailable" in host ? host.restartAvailable : undefined,
   }));
-  /** The storage of a server in each answer that a client or the host reads. */
   const storage = async (serverId: string) => {
     const host = (await Effect.runPromise(plane.listHosts(OWNER.id))).find((entry) => entry.hostId === serverId);
     const hosting = (await Effect.runPromise(service.list(OWNER))).servers.find((entry) => entry.serverId === serverId);
@@ -321,7 +298,6 @@ async function run() {
     { summary: woken, calls: foreign() },
   );
 
-  // OpenBot on the machine reports its use with the session from before the move.
   database
     .prepare("UPDATE auth_sessions SET token_hash = ? WHERE id = 'session-moved'")
     .run(await Effect.runPromise(sha256("token-moved")));
@@ -342,7 +318,6 @@ async function run() {
     { calls: foreign(), row: reported },
   );
 
-  // The recovery of a machine that lost its session: the operator writes the hash of a new claim.
   database
     .prepare("UPDATE hosted_servers SET claim_token_hash = ?, claim_expires_at = ? WHERE server_id = 'bare'")
     .run(await Effect.runPromise(sha256("operator-claim-for-bare")), at + 60 * MINUTE);
@@ -358,7 +333,6 @@ async function run() {
     { hostId: claimed.hostId, oldSession, calls: foreign(), row: row("bare") },
   );
 
-  // The sandbox from before the move still sends events while the operator stops and deletes it.
   const body = JSON.stringify({
     type: "sandbox.archived",
     createdAt: new Date(at).toISOString(),
@@ -371,8 +345,6 @@ async function run() {
     row("moved"),
   );
 
-  // The operator moves a server while the Worker reads its sandbox at boat. The Worker read the row before
-  // the move, and boat then says that the sandbox is stopped.
   server("control-race", { sandboxId: "bx_control_race", template: "tpl_1", observed: "stopping" });
   duringRead.set("bx_control_race", () => {
     database
@@ -402,11 +374,9 @@ async function run() {
       calls.slice(raceFrom).join() === "GET /sandboxes/bx_control_race",
     { row: raced, calls: calls.slice(raceFrom) },
   );
-  // The other checks do not use this server.
   database.prepare("DELETE FROM billing_subscriptions WHERE server_id = 'control-race'").run();
   database.prepare("DELETE FROM hosted_servers WHERE server_id = 'control-race'").run();
 
-  // The states in which the Worker makes or starts a sandbox for a server that boat runs.
   operatorSets("moved", "error", "provider_error", at - 20 * MINUTE);
   await Effect.runPromise(service.wake(OWNER, "moved"));
   await tick(at);
@@ -435,7 +405,6 @@ async function run() {
     restart,
   );
 
-  // A plan change: boat changes the machine on a resume. The operator machine has one size.
   at += 10 * MINUTE;
   clock.now = at;
   for (const serverId of ["moved", "control-stopped"]) {
@@ -449,6 +418,7 @@ async function run() {
         plan: "pro",
         interval: "month",
         currency: "eur",
+        storageTier: 0,
       }),
     );
   }
@@ -472,7 +442,6 @@ async function run() {
     proStorage,
   );
 
-  // The plan ends: the Worker records that the server must stop. The operator stops the machine.
   plan("moved", "canceled", at, "pro");
   at += 3 * MINUTE;
   const ending = await tick(at);
@@ -502,7 +471,6 @@ async function run() {
   );
   operatorSets("moved", "stopped", "plan_ended", at);
 
-  // The owner pays again: the Worker records that the server must run. The operator starts the machine.
   plan("moved", "active", at, "pro");
   at += 3 * MINUTE;
   await tick(at);
@@ -525,7 +493,6 @@ async function run() {
   );
   operatorSets("moved", "running", null, at);
 
-  // A delete. The plan is closed first, so the real billing service has no Stripe call to make.
   for (const serverId of ["moved", "gone", "bare"]) plan(serverId, "canceled", at, "pro");
   clock.now = at;
   await Effect.runPromise(service.delete(OWNER, "moved", "Server moved"));
@@ -566,7 +533,11 @@ async function run() {
     foreign().length === 2 && last.deleted === 0 && last.failed === 0,
     { calls: foreign(), result: last },
   );
-  check("Stripe got no call", stripeCalls.length === 0, stripeCalls);
+  check(
+    "Stripe got no call other than the Price list",
+    stripeCalls.every((call) => call === "GET /v1/prices"),
+    stripeCalls,
+  );
   database.close();
 }
 

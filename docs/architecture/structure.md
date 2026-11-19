@@ -119,7 +119,11 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   `access`: the Team API does not carry it.
 - `browser-tabs.json` is the embedded browser's own durable state, outside `openbot.db` and outside the
   migration runner. It is versioned in the file (`v1` predates the per-tab `BrowserEnvironment`, `v2`
-  carries it) and always rewritten as the current version, so a downgrade reads a file it does not know.
+  carries it) and always rewritten as the current version. A downgrade that finds a newer version keeps
+  that file unchanged and saves its tabs in `<file>.v2` (`openbot-browser-state-v1.json.v2`)
+  (`src/backend/versioned-json-store.ts`). The sidebar layout, the library folders, the browsing steps
+  and the memory review cursors use the same rule. A file that no released version can read goes to
+  `.corrupt-<time>`.
   Nothing copies it first, so `src/backend/browser-state.ts` re-validates every bound it reads rather
   than trusting it: a tab whose environment fails validation is still returned, without that
   environment, because losing the user's open tab is worse than losing an emulated viewport.
@@ -131,6 +135,9 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   rule does not depend on reading the model's SQL. The agents own these schemas, so nothing copies
   or migrates them before a release, and a table stays when the agent that made it is deleted. The
   user deletes one from agent settings, which is the only way to remove a table whose owner is gone.
+  OpenBot's own schema of the file (the `openbot_metadata` table) has a version in `PRAGMA
+  user_version`. A file without one is version 1. The host refuses a file with a newer version, and
+  changes nothing in it.
   The guidance the agents read ships as the managed skill `resources/managed-skills/openbot-data`,
   beside site hosting and the skill creator, so the always-on prompt only names the tools.
 - Renderer signals and stores are projections for the current screen only. They are not durable

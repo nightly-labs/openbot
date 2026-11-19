@@ -36,7 +36,6 @@ describe("license migration", () => {
     database.exec(migration("0038_licenses.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker's billing and member queries still run and see the same rows.
     expect(
       database
         .prepare(
@@ -78,7 +77,6 @@ describe("license migration", () => {
         ) VALUES ('sub_bad', 'owner', 'cus_1', 5, 'eur', 'active', 2, 5);
       `),
     ).toThrow();
-    // An account that the old Worker deletes takes its license rows with it.
     database.exec("DELETE FROM users WHERE id = 'owner'");
     expect(database.prepare("SELECT COUNT(*) AS count FROM licenses").get()).toEqual({ count: 0 });
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);

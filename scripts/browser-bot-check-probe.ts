@@ -6,11 +6,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
-// Measures how live sites' bot checks treat the agent browser. It is not a CI check: it loads the
-// sites of a list that the caller supplies (`--sites=<json>`: `[{ id, website, category }]`) once
-// each, and writes `.openbot-build/browser-bot-check-probe/<name>/report.json` with page images.
-//   bun scripts/browser-bot-check-probe.ts --sites=<file> [--name=desktop] [--server-gpu]
-
 const option = (name: string) => process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
 const sites = option("sites");
 if (!sites) throw new Error("Missing --sites=<json file>.");

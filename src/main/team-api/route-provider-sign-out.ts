@@ -10,10 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * Signs this host's own sign-in of a provider out, from a joined server. Frozen by
- * `provider-sign-out-v1`. `requireAdmin` runs on the route.
- */
 export async function routeProviderSignOut(
   context: TeamApiRequestContext,
   signOut: TeamApiProviderSignOut | undefined,
@@ -23,7 +19,6 @@ export async function routeProviderSignOut(
   if (!signOut || !capabilities.has(PROVIDER_SIGN_OUT_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `provider-sign-out-v1` codec.
   const body = await readJson(request);
   await runCauseEffect(signOut.signOutProvider(parseProviderId(body.provider)));
   return json(200, {});

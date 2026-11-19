@@ -11,8 +11,6 @@ import {
   requestUser,
 } from "../../../../../../server/request-auth";
 
-// Starts a test sign-in with the values of the setup dialog. The connection is saved only when the
-// owner signs in at the provider and the callback checks the answer.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/company-sign-in/test")({
   server: {
     handlers: {

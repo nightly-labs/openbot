@@ -10,6 +10,7 @@ import {
   requestCompanySignIn,
   requestHostedServerService,
   requestHostedSiteService,
+  requestReferrals,
   requestRemoteControlPlane,
   requestTeamInviteEmailDelivery,
 } from "../../../server/request-auth";
@@ -25,6 +26,7 @@ function handle({ request }: { request: Request }) {
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
     attribution: requestAccountAttribution,
     billing: requestBillingService,
+    referrals: requestReferrals,
     avatarBucket: requestAvatarBucket,
     hostedSites: requestHostedSiteService,
     sourceIp: requestSourceIp,

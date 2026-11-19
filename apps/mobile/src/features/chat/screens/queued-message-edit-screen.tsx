@@ -28,6 +28,7 @@ import {
 import { useChatAttachments } from "../components/use-chat-attachments";
 import type { ChatQueueController } from "../components/use-chat-queue";
 import { useQueuedChat } from "../context/queued-messages-context";
+import { useComposerDraft } from "../model/composer-drafts";
 
 export function QueuedMessageEditScreen() {
   const { t } = useText();
@@ -37,21 +38,20 @@ export function QueuedMessageEditScreen() {
   const delivery = held?.id === deliveryId ? held : queue?.queued.find((item) => item.id === deliveryId);
   const edit = queue?.edit ?? null;
 
-  // The field is controlled from this screen. The controller lives on the chat screen
-  // behind the sheet, so its text only returns one commit later, which loses characters
-  // while typing. `changeText` still runs for the durable draft.
   const [typed, setTyped] = useState<{ editId: string; text: string } | null>(null);
   const text = edit && typed?.editId === edit.editId ? typed.text : (edit?.text ?? "");
   const added = queue?.attachments.length ?? 0;
   const dirty = edit
     ? text !== edit.delivery.text || edit.keepAttachmentIds.length !== edit.delivery.attachments.length || added > 0
     : false;
+  const [, setChatDraft] = useComposerDraft({
+    kind: "agent",
+    serverId: queue?.serverId ?? "",
+    id: queue?.agentId ?? "",
+  });
+  const keptText = edit && text !== edit.delivery.text && text.trim() ? text : null;
 
-  // The host hold is taken once per visit. `busy` only turns on once the controller
-  // starts the request, so track it here as well and keep the failure copy until then.
   const [holding, setHolding] = useState(false);
-  // Attachment reads run in the attachments section below. Save must wait for them,
-  // or it sends the file list from before the new selection.
   const [attachmentsPreparing, setAttachmentsPreparing] = useState(false);
   const requested = useRef(false);
   const hold = useCallback(() => {
@@ -65,8 +65,6 @@ export function QueuedMessageEditScreen() {
     hold();
   }, [queue, delivery, hold]);
 
-  // Leaving releases the hold, so the message cannot stay stuck on Editing. The
-  // navigation runs a render later, once the guard below reads `leaving`.
   const [leaving, setLeaving] = useState(false);
   const exit = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -83,8 +81,6 @@ export function QueuedMessageEditScreen() {
     if (work) void work.finally(finish);
     else finish();
   }, []);
-  // The editor closes only after the host lets the message go. A failed release keeps the
-  // message held, so the agent would wait for a phone that no longer shows the editor.
   const releaseThenExit = useCallback(
     (go: () => void, onFailure?: () => void) => {
       const work = queue?.cancelEdit();
@@ -134,13 +130,16 @@ export function QueuedMessageEditScreen() {
     return (
       <SettingsContent>
         <Typography.Paragraph align="center" className="text-text-secondary">
-          {t("mobile.chat.queue.alreadyReceived")}
+          {t(keptText ? "mobile.chat.queue.alreadyReceivedKept" : "mobile.chat.queue.alreadyReceived")}
         </Typography.Paragraph>
         <SettingsSection>
           <SettingsRow
             disclosure={false}
             disabled={queue.busy}
-            onPress={() => exitAfter(queue.discardFinishedEdit(), () => router.back())}
+            onPress={() => {
+              if (keptText) setChatDraft((current) => (current.trim() ? `${current}\n\n${keptText}` : keptText));
+              exitAfter(queue.discardFinishedEdit(), () => router.back());
+            }}
           >
             <Typography>{t("common.close")}</Typography>
           </SettingsRow>
@@ -199,8 +198,6 @@ export function QueuedMessageEditScreen() {
         pending={queue.busy}
         label={t("mobile.chat.queue.save")}
         onSave={() => {
-          // The controller holds the files this edit added, so a save after a restart still
-          // uploads the copies this phone kept for it.
           void queue.save(text, queue.attachments).then((saved) => {
             void haptics.notification(saved ? "success" : "error");
             if (saved) exitAfter(null, () => router.back());
@@ -259,11 +256,6 @@ function AttachmentRemoveButton({
   );
 }
 
-/**
- * The files of this edit: the ones the queued message already has, and the ones this phone adds.
- * The controller keeps added files on the device, so the list survives navigation and a restart
- * until the edit is saved or cancelled.
- */
 function QueuedEditAttachments({
   queue,
   kept,
@@ -327,12 +319,10 @@ function QueuedEditAttachments({
   );
 }
 
-/** Keeps the add actions on the same left edge as the file thumbnails above them. */
 function AddIcon({ children }: PropsWithChildren) {
   return <View className="size-10 items-center justify-center">{children}</View>;
 }
 
-/** A file the queued message already has. Its thumbnail comes from the host, like in the chat. */
 function KeptAttachmentRow({
   attachment,
   serverId,

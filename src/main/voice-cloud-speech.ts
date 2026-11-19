@@ -12,30 +12,21 @@ import { Effect, Option, Schema } from "effect";
 import { readLimitedBody } from "../backend/limited-body";
 import { VoiceOperationError } from "./voice-model-service";
 
-/** One request is at most `SPEECH_LIMITS.maximumTextLength` characters: about a minute of speech. */
 const SPEECH_TIMEOUT_MS = 60_000;
-/** A minute of 24 kHz 16-bit PCM is about 2.9 MB. The base64 JSON answer of xAI is a third larger. */
 const SPEECH_BODY_LIMIT = 16 * 1024 * 1024;
-/** An error answer is a short JSON object. */
 const ERROR_BODY_LIMIT = 16 * 1024;
 const SAMPLE_RATE = 24_000;
 
 const ELEVENLABS_MODELS: Partial<Record<CloudSpeechModelId, { modelId: string; languageCode: boolean }>> = {
   "elevenlabs-flash-v2.5": { modelId: "eleven_flash_v2_5", languageCode: true },
-  // ElevenLabs does not accept `language_code` for Multilingual v2: it finds the language itself.
   "elevenlabs-multilingual-v2": { modelId: "eleven_multilingual_v2", languageCode: false },
   "elevenlabs-v3": { modelId: "eleven_v3", languageCode: true },
   "elevenlabs-v4-turbo": { modelId: "eleven_v4_turbo", languageCode: true },
   "elevenlabs-v4": { modelId: "eleven_v4", languageCode: true },
 };
 
-/**
- * ElevenLabs refuses a `language_code` that the model does not support. Flash v2.5 does not list
- * Estonian, Latvian, Lithuanian or Slovenian, so the model finds these languages itself.
- */
 const ELEVENLABS_UNLISTED_LANGUAGES: ReadonlySet<SpeechLanguage> = new Set(["et", "lt", "lv", "sl"]);
 
-/** The voice IDs of the ElevenLabs default voices. */
 const ELEVENLABS_VOICE_IDS: Record<ElevenLabsSpeechVoice, string> = {
   alice: "Xb7hH8MSUJpSbSDYk0k2",
   chris: "iP95p4xoKVk53GoZ742B",
@@ -45,7 +36,6 @@ const ELEVENLABS_VOICE_IDS: Record<ElevenLabsSpeechVoice, string> = {
   sarah: "EXAVITQu4vr4xnSDxMaL",
 };
 
-/** The languages that xAI names with a region. xAI finds every other language that it does not list. */
 const XAI_LANGUAGES: Partial<Record<SpeechLanguage, string>> = {
   ar: "ar-SA",
   de: "de",
@@ -63,7 +53,6 @@ const XAI_LANGUAGES: Partial<Record<SpeechLanguage, string>> = {
   vi: "vi",
 };
 
-/** The request body of xAI text to speech. */
 interface XaiSpeechBody {
   text: string;
   voice_id: XaiSpeechVoice;
@@ -71,21 +60,17 @@ interface XaiSpeechBody {
   output_format: { codec: "pcm"; sample_rate: number };
 }
 
-/** The request body of ElevenLabs text to speech. */
 interface ElevenLabsSpeechBody {
   text: string;
   model_id: string;
   language_code?: SpeechLanguage;
 }
 
-/** ElevenLabs names a used-up quota in `detail.status`. */
 const decodeErrorStatus = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ detail: Schema.Struct({ status: Schema.String }) })),
 );
-/** xAI can answer with JSON `{ "audio": "<base64>" }`. */
 const decodeJsonAudio = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ audio: Schema.String })));
 
-/** The `fetch` of the main process, or a test's. */
 export type SpeechFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface CloudSpeechRequest {
@@ -97,10 +82,6 @@ export interface CloudSpeechRequest {
   xaiVoice: XaiSpeechVoice;
 }
 
-/**
- * Reads one part of a reply at the model's provider, with the user's own key, as 24 kHz 16-bit mono
- * PCM. The key goes only in the request header. An error names the provider, never the key.
- */
 export function speakInCloud(
   fetcher: SpeechFetch,
   request: CloudSpeechRequest,
@@ -165,7 +146,6 @@ function exchange(
         );
         const pcm = (response.headers.get("content-type") ?? "").includes("json") ? jsonAudio(body) : body;
         if (!pcm || pcm.byteLength < 2) return yield* fail("error.voice.speech.providerFailed");
-        // A 16-bit sample has two bytes. An odd last byte is not a sample.
         return { pcm: new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength & ~1), sampleRate: SAMPLE_RATE };
       }).pipe(
         Effect.timeoutOrElse({
@@ -190,7 +170,6 @@ type CloudSpeechErrorKey =
   | "error.voice.speech.providerFailed"
   | "error.voice.speech.providerUnreachable";
 
-/** Maps an error answer. ElevenLabs names a used-up quota in `detail.status`. */
 function errorAnswer(
   response: Response,
   fail: (key: CloudSpeechErrorKey) => VoiceOperationError,
@@ -213,7 +192,6 @@ function errorStatus(body: Buffer): string | null {
   });
 }
 
-/** The PCM of a JSON answer `{ "audio": "<base64>" }`, or null. */
 function jsonAudio(body: Buffer): Buffer | null {
   return Option.match(decodeJsonAudio(body.toString("utf8")), {
     onNone: () => null,

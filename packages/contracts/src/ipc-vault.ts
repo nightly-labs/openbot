@@ -1,9 +1,3 @@
-// The Vault of a server: logins, payment cards and contact info that every agent can fill into a
-// page, and API keys that every agent reads from a file. A list answer never carries a password, a card
-// number, a security code or an API key: the renderer gets one of them only from `vault:reveal`, when
-// the user asks for it. A joined server answers through `vault-v2`, or `vault-v1` without API keys, to
-// an owner or admin only.
-
 import {
   decodeList,
   decodeRecord,
@@ -16,20 +10,32 @@ import { type DynamicRecord, isOneOf, isString } from "./runtime-values";
 
 export type VaultItemKind = "login" | "card" | "contact" | "apiKey";
 
-/** The name of the agent that added an item, as it was then. Absent when the user added it. */
 export interface VaultItemOrigin {
   addedBy?: string;
+}
+
+export interface VaultItemScope {
+  agents?: string[];
+}
+
+export interface VaultSaveScope {
+  agents?: string[] | null | undefined;
+}
+
+export const VAULT_AGENT_SCOPE_LIMIT = 1_000;
+export const VAULT_AGENT_ID_LIMIT = 128;
+
+export function vaultItemAllows(item: { readonly agents?: readonly string[] | undefined }, agentId: string): boolean {
+  return item.agents === undefined || item.agents.includes(agentId);
 }
 
 export type VaultCardBrand = "visa" | "mastercard" | "amex" | "discover";
 export const VAULT_CARD_BRANDS: readonly VaultCardBrand[] = ["visa", "mastercard", "amex", "discover"];
 
-/** A card's expiry as MM/YY. */
 export function vaultExpiryText(month: number, year: number): string {
   return `${String(month).padStart(2, "0")}/${String(year % 100).padStart(2, "0")}`;
 }
 
-/** The brand of a card number, from its first digits. */
 export function cardBrand(number: string): VaultCardBrand | null {
   if (/^4/u.test(number)) return "visa";
   if (/^(5[1-5]|2(2[2-9]|[3-6]\d|7[01]|720))/u.test(number)) return "mastercard";
@@ -38,34 +44,28 @@ export function cardBrand(number: string): VaultCardBrand | null {
   return null;
 }
 
-/** A value that the list never returns. */
 export type VaultSecretField = "password" | "number" | "securityCode" | "key";
 
-export interface VaultLoginSummary extends VaultItemOrigin {
+export interface VaultLoginSummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "login";
-  /** An `https:` address or a host name, as the user typed it. */
   website: string;
   username: string;
   notes: string;
   hasPassword: boolean;
-  /** The login has a two-step (TOTP) key, so agents make the sign-in code themselves. */
   hasTwoStep: boolean;
 }
 
-export interface VaultCardSummary extends VaultItemOrigin {
+export interface VaultCardSummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "card";
   label: string;
   nameOnCard: string;
   brand: VaultCardBrand | null;
   last4: string;
-  /** 1–12. */
   expMonth: number;
-  /** Four digits. */
   expYear: number;
   billingContactId: string | null;
-  /** The HTTPS page origins where the owner let agents fill this card with no approval. */
   fillSites: string[];
 }
 
@@ -77,21 +77,19 @@ export interface VaultContactFields {
   city: string;
   region: string;
   postalCode: string;
-  /** An ISO 3166-1 alpha-2 code, or "" when not set. */
   country: string;
   phone: string;
   email: string;
 }
 
-export interface VaultContactSummary extends VaultContactFields, VaultItemOrigin {
+export interface VaultContactSummary extends VaultContactFields, VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "contact";
 }
 
-export interface VaultApiKeySummary extends VaultItemOrigin {
+export interface VaultApiKeySummary extends VaultItemOrigin, VaultItemScope {
   id: string;
   kind: "apiKey";
-  /** The environment variable that a program reads, such as `OPENAI_API_KEY`. Unique in the Vault. */
   name: string;
   notes: string;
   hasKey: boolean;
@@ -99,20 +97,15 @@ export interface VaultApiKeySummary extends VaultItemOrigin {
 
 export type VaultItemSummary = VaultLoginSummary | VaultCardSummary | VaultContactSummary | VaultApiKeySummary;
 
-/**
- * - `ready`: the items can be read and changed.
- * - `unavailable`: this computer has no secret storage (Linux without a keyring), so nothing can be saved.
- * - `unreadable`: the file is there but cannot be decrypted. It is kept until the user resets the Vault.
- */
 export type VaultStatus = "ready" | "unavailable" | "unreadable";
 
 export interface VaultState {
   status: VaultStatus;
   items: VaultItemSummary[];
+  agentScope?: boolean;
 }
 
-/** A new item when `id` is null. A null secret keeps the saved value. */
-export type VaultSaveInput =
+export type VaultSaveInput = (
   | {
       kind: "login";
       id: string | null;
@@ -120,7 +113,6 @@ export type VaultSaveInput =
       username: string;
       notes: string;
       password: string | null;
-      /** A setup key or an `otpauth://totp/` link. Omitted keeps the saved key; "" removes it. */
       twoStepKey?: string | undefined;
     }
   | {
@@ -133,18 +125,18 @@ export type VaultSaveInput =
       billingContactId: string | null;
       number: string | null;
       securityCode: string | null;
-      /** The approved sites to keep. A site can only be removed here; omitted keeps them all. */
       fillSites?: string[] | undefined;
     }
   | ({ kind: "contact"; id: string | null } & VaultContactFields)
-  | { kind: "apiKey"; id: string | null; name: string; notes: string; key: string | null };
+  | { kind: "apiKey"; id: string | null; name: string; notes: string; key: string | null }
+) &
+  VaultSaveScope;
 
 export interface VaultSecretRequest {
   id: string;
   field: VaultSecretField;
 }
 
-/** The current two-step code of each login that has a key. Main makes them; the key stays there. */
 export interface VaultTwoStepCodes {
   codes: VaultTwoStepCode[];
 }
@@ -152,27 +144,21 @@ export interface VaultTwoStepCodes {
 export interface VaultTwoStepCode {
   id: string;
   code: string;
-  /** Seconds that one code is valid. */
   period: number;
-  /** Milliseconds until the next code, when the answer was made. */
   remainingMs: number;
 }
 
-/** Null when the user closed the file dialog. */
 export type VaultImportResult = { imported: number; skipped: number; state: VaultState } | null;
 
 export const EMPTY_VAULT: VaultState = { status: "ready", items: [] };
 
 export const VAULT_TEXT_LIMIT = 512;
-/** The approved sites that one card keeps. The oldest goes when a new one is approved. */
 export const VAULT_FILL_SITE_LIMIT = 100;
 export const VAULT_NOTES_LIMIT = 4096;
 export const VAULT_PASSWORD_LIMIT = 1024;
 export const VAULT_API_KEY_LIMIT = 8192;
-/** An environment variable name, which is also the file name of an API key. */
 export const API_KEY_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 
-/** The countries that the Vault's contact form offers: the ISO 3166-1 alpha-2 codes. */
 export const VAULT_COUNTRY_CODES = [
   "AD",
   "AE",
@@ -427,7 +413,6 @@ export const VAULT_COUNTRY_CODES = [
 
 export type VaultCountryCode = (typeof VAULT_COUNTRY_CODES)[number];
 
-/** The counts of a CSV import on a joined server (`vault-import-v1`), which opens no file dialog. */
 export interface VaultHostImportResult {
   imported: number;
   skipped: number;
@@ -442,7 +427,19 @@ function hostAddedBy(item: DynamicRecord): VaultItemOrigin {
   return { addedBy: item.addedBy };
 }
 
+function hostScope(item: DynamicRecord): VaultItemScope {
+  if (item.agents === undefined) return {};
+  const { agents } = item;
+  if (!Array.isArray(agents) || agents.length > VAULT_AGENT_SCOPE_LIMIT || !agents.every(isString))
+    throw new Error("Invalid Vault response.");
+  return { agents: [...agents] };
+}
+
 function hostVaultItem(item: DynamicRecord): VaultItemSummary {
+  return { ...hostVaultItemFields(item), ...hostScope(item) };
+}
+
+function hostVaultItemFields(item: DynamicRecord): VaultItemSummary {
   if (VAULT_SECRET_KEYS.some((key) => key in item)) throw new Error("Invalid Vault response.");
   const id = requiredString(item, "id");
   switch (item.kind) {
@@ -455,7 +452,6 @@ function hostVaultItem(item: DynamicRecord): VaultItemSummary {
         username: requiredString(item, "username"),
         notes: requiredString(item, "notes"),
         hasPassword: requiredBoolean(item, "hasPassword"),
-        // Only `vault-v3` sends it. An older host keeps no key.
         hasTwoStep: item.hasTwoStep === undefined ? false : requiredBoolean(item, "hasTwoStep"),
       };
     case "card": {
@@ -508,14 +504,16 @@ function hostVaultItem(item: DynamicRecord): VaultItemSummary {
   }
 }
 
-/** The Vault of a joined server (`vault-v3`, `vault-v2` or `vault-v1`). Throws for an item that carries a secret. */
-export function decodeHostVaultState(value: unknown): VaultState {
+export function decodeHostVaultState(value: unknown, agentScope = false): VaultState {
   const state = decodeRecord(value, "Vault response");
   if (!isOneOf(VAULT_STATUSES, state.status)) throw new Error("Invalid Vault response.");
-  return { status: state.status, items: decodeList(state.items, "Vault item", hostVaultItem) };
+  return {
+    status: state.status,
+    items: decodeList(state.items, "Vault item", hostVaultItem),
+    ...(agentScope ? { agentScope: true } : {}),
+  };
 }
 
-/** The counts that a joined server answers to a CSV import (`vault-import-v1`). */
 export function decodeHostVaultImport(value: unknown): VaultHostImportResult {
   const answer = decodeRecord(value, "Vault import response");
   return { imported: requiredNumber(answer, "imported"), skipped: requiredNumber(answer, "skipped") };
@@ -532,13 +530,11 @@ function hostTwoStepCode(item: DynamicRecord): VaultTwoStepCode {
   };
 }
 
-/** The two-step codes that a joined server answers (`vault-v3`). */
 export function decodeHostVaultCodes(value: unknown): VaultTwoStepCodes {
   const answer = decodeRecord(value, "Vault response");
   return { codes: decodeList(answer.codes, "Vault code", hostTwoStepCode) };
 }
 
-/** The secret that a joined server answers to `reveal` (`vault-v3`, `vault-v2` or `vault-v1`). */
 export function decodeHostVaultSecret(value: unknown): string {
   const answer = decodeRecord(value, "Vault response");
   return requiredString(answer, "value");

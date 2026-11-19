@@ -1,16 +1,3 @@
-// Builds the page that the iOS share extension runs (`bun scripts/mobile-share-sender.ts`), opens it
-// from a file in Chrome as the extension opens it in its web view, and drives it through the bridge
-// contract of `apps/mobile/plugins/share-extension/ShareSender.swift`:
-// 1. The page runs under its Content Security Policy and offers `openbotShareSend`.
-// 2. Every account service request goes through the bridge, with the session as a bearer token. The
-//    page makes no request of its own.
-// 3. A ticket that the account service refuses fails the share at `connect`, before any file is read,
-//    and the page ends the session it made.
-// 4. With a ticket, the page opens the Signal socket that the ticket names and sends the ticket there.
-//
-// No host takes part, so the WebRTC path after Signal and the message request are not covered here.
-// Run: bun run test:mobile-share-sender
-// It writes .openbot-build/mobile-share-sender-e2e/report.json and exits non-zero on a failure.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -25,7 +12,6 @@ const PAGE = join(OUT, "share-sender.html");
 const API_URL = "https://api.openbot.test/";
 const SESSION_TOKEN = "share-e2e-session-token";
 const SESSION_ID = "share-e2e-session";
-/** The page goes into the extension bundle. The source translations once made it 2.4 MB. */
 const PAGE_SIZE_LIMIT = 1_500_000;
 const SIGNAL_WAIT_MS = 20_000;
 
@@ -57,7 +43,6 @@ function shareRequest(hostId: string) {
   };
 }
 
-/** The call that `ShareSender.swift` makes, as a page script. */
 function sendScript(hostId: string): string {
   return `window.openbotShareSend(${JSON.stringify(shareRequest(hostId))})`;
 }
@@ -70,7 +55,6 @@ async function main(): Promise<void> {
   const size = statSync(PAGE).size;
   check("the page stays small", size < PAGE_SIZE_LIMIT, { size });
 
-  // A Signal that keeps the first frame of each socket.
   const frames: string[] = [];
   const signal = Bun.serve({
     hostname: "127.0.0.1",
@@ -97,7 +81,6 @@ async function main(): Promise<void> {
     page.on("request", (request) => {
       if (!request.url().startsWith("file:")) directRequests.push(request.url());
     });
-    // The account service as the extension answers it, after its own origin check.
     await page.exposeFunction("openbotBridge", (message: unknown) => {
       if (!isDynamicRecord(message)) return null;
       if (message.type === "file") {
@@ -128,7 +111,6 @@ async function main(): Promise<void> {
       if (path === `/v2/remote/sessions/${SESSION_ID}/end`) return json(200, {});
       return json(404, { error: "not_found" });
     });
-    // WebKit gives the page `window.webkit.messageHandlers.openbot`, whose `postMessage` returns the reply.
     await page.addInitScript(
       "window.webkit = { messageHandlers: { openbot: { postMessage: (message) => window.openbotBridge(message) } } };",
     );
@@ -136,7 +118,6 @@ async function main(): Promise<void> {
     const offered = await page.evaluate("typeof window.openbotShareSend");
     check("the page offers openbotShareSend under its CSP", offered === "function", { offered, pageErrors });
 
-    // 2 and 3: a refused ticket.
     const refused = await page.evaluate(sendScript("host-refused"));
     check(
       "a refused ticket fails at connect, and may be given to the app",
@@ -158,7 +139,6 @@ async function main(): Promise<void> {
       fetches.map((item) => `${item.method} ${new URL(item.url).pathname}`),
     );
 
-    // 4: a ticket that names a Signal.
     ticketAnswer = "signal";
     const pending = page.evaluate(sendScript("host-signal"));
     pending.catch(() => undefined);

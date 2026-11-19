@@ -4,13 +4,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * What the background memory reviews do when a chat teaches an agent a skill. A review reads it when
- * it runs, so it is held in memory after `load` rather than read from disk each time.
- *
- * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default. Writes are chained for the reason `update-preference-store.ts` chains its own.
- */
 export class SkillLearningPreferenceStore {
   readonly #path: string;
   #preference: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -41,7 +34,6 @@ export class SkillLearningPreferenceStore {
     return { ...this.#preference };
   }
 
-  /** Calls `listener` after each saved change. Returns the function that removes it. */
   onChange(listener: (preference: SkillLearningPreference) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);

@@ -13,18 +13,13 @@ import { ContentCallToAction } from "./ContentCallToAction";
 interface DataIndexPageProps {
   collection: ContentCollection;
   title: string;
-  /** The accessible name of the card grid. */
   label: string;
-  /** The words at the foot of each card. */
   action: string;
-  /** The marks on a card's plate. */
   marks: (article: CollectionArticle) => JSX.Element;
 }
 
-/** The index of a collection drawn from data, a comparison or a provider page: a hero and a grid of cards. */
 export function DataIndexPage(props: DataIndexPageProps) {
   let grid: HTMLElement | undefined;
-  // No inset margin: the cards sit right under a short hero and are on screen as the page loads.
   const revealed = createLandingReveal(() => grid, { rootMargin: "0px" });
 
   onSettled(() => landingAnalytics.start(document, window.location.hostname, props.collection.indexRoute));
@@ -87,7 +82,6 @@ function DataIndexCard(props: {
       params={{ slug: props.article.slug }}
       style={{ "--compare-index": props.index }}
     >
-      {/* The featured frame, which is the one the index head preloads. */}
       <div class="compare-index-art" aria-hidden="true">
         <ArticleGradient
           title={props.article.title}

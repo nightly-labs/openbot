@@ -26,10 +26,6 @@ function httpsLink(href: string): string | null {
   }
 }
 
-/**
- * Server sheet > Sites: the openbot.site sites that agents on the server published. Every member
- * opens a site; an owner or admin also deletes it, as on desktop.
- */
 export function ServerSitesScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -60,7 +56,6 @@ export function ServerSitesScreen() {
       void haptics.notification("error");
       setError(currentText().t("mobile.server.sites.openFailed"));
     };
-    // The host sends the URL. Open only a web page, never another scheme or an app link.
     const url = httpsLink(site.url);
     if (!url) return failed();
     void Linking.openURL(url).catch(failed);

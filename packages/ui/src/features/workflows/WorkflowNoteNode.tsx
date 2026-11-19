@@ -1,5 +1,3 @@
-/** A sticky note on the canvas. It has no ports, and a run skips it. */
-
 import type { AppTextKey } from "@openbot/i18n";
 import { Bold, Button, LabelTooltipTrigger, StickyNote, Textarea, UserRoundPen } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
@@ -33,7 +31,6 @@ import {
   useTextField,
 } from "./workflow-node-parts";
 
-/** The text colour of a note: the paper text, or a note colour darkened so that it reads on paper. */
 const noteInk = (color: CanvasColor) =>
   color === "ink"
     ? "var(--openbot-paper-text)"
@@ -41,7 +38,6 @@ const noteInk = (color: CanvasColor) =>
 
 type NoteSize = "lg" | "2xl" | "3xl" | "display";
 
-/** The sizes of the note text, from the text sizes of the palette, in pixels. */
 const NOTE_SIZES: readonly { value: NoteSize; label: AppTextKey; pixels: number }[] = [
   { value: "lg", label: "workflow.note.size.small", pixels: 14 },
   { value: "2xl", label: "workflow.note.size.medium", pixels: 18 },
@@ -49,15 +45,9 @@ const NOTE_SIZES: readonly { value: NoteSize; label: AppTextKey; pixels: number 
   { value: "display", label: "workflow.note.size.extraLarge", pixels: 32 },
 ];
 
-/**
- * A sticky note, as on Higgsfield: coloured paper with its words and the name of its author. The
- * toolbar sets the paper and text colour, the font, the size, the alignment and the weight, and
- * shows or hides the author. It has no ports, and a run skips it.
- */
 export function NoteNode(props: { id: string; text?: string; tone?: NoteTone }) {
   const { t } = useText();
   const id = () => props.id;
-  /** The user who wrote the note. The canvas saves the name when it adds the note, so each reader sees the same name. */
   const [writer] = useField(id, "authorName", "", asString);
   const [text, setText] = useTextField(
     id,

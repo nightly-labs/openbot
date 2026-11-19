@@ -44,7 +44,7 @@ const BILLING_ACTIONS = [
 ] as const;
 const BILLING_PLANS = ["starter", "standard", "pro"] as const;
 const BILLING_INTERVALS = ["month", "year"] as const;
-const BILLING_CURRENCIES = ["eur", "usd", "pln"] as const;
+const BILLING_CURRENCIES = ["eur", "usd", "pln", "brl"] as const;
 const BILLING_PAYMENT_KINDS = ["first_purchase", "renewal", "adjustment"] as const;
 const BILLING_RECOVERY_KINDS = ["invoice", "checkout", "invoice_recovery", "checkout_recovery", "none"] as const;
 const BILLING_FLOWS = ["manage", "update", "cancel"] as const;
@@ -62,7 +62,6 @@ const BILLING_SUBSCRIPTION_STATUSES = [
 const SALES_ANALYTICS_EVENT_NAMES = ["billing_action", "revenue", "billing_snapshot"] as const;
 type SalesAnalyticsEventName = (typeof SALES_ANALYTICS_EVENT_NAMES)[number];
 
-/** The only event properties that the account Worker may send to OpenPanel. */
 const SALES_ANALYTICS_EVENT_PROPERTIES = {
   billing_action: [
     "action",
@@ -167,12 +166,6 @@ interface DeliveryOutcome {
   error: string | null;
 }
 
-/**
- * Durable, server-side delivery for account sales events.
- *
- * The ledger is deliberately separate from the existing account analytics sender. It keeps the
- * source key forever and never retries an outcome for which the HTTP result is unknown.
- */
 export class SalesAnalyticsDelivery {
   readonly #database: D1Database;
   readonly #clientId: string | undefined;
@@ -249,10 +242,6 @@ export class SalesAnalyticsDelivery {
     });
   }
 
-  /**
-   * Sets the account email on the OpenPanel profile, as the apps do at sign-in. It is not part of the
-   * ledger: a failure logs one line with no address, and the event is still sent.
-   */
   async #identify(profileId: string): Promise<void> {
     const clientId = this.#clientId;
     const clientSecret = this.#clientSecret;
@@ -530,11 +519,6 @@ function isEventProperties(value: unknown): value is SalesAnalyticsProperties {
   return true;
 }
 
-/**
- * A payment: `revenue`, or the `payment_succeeded` action that comes with it. It also sets the account
- * email on the OpenPanel profile, so that a paying account is not anonymous when its apps have product
- * analytics off.
- */
 function isPaidEvent(row: LedgerEvent): boolean {
   if (row.event_name === "revenue") return true;
   if (row.event_name !== "billing_action") return false;

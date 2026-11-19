@@ -1,10 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Antigravity and Gemini here is taken from antigravity.google,
-// gemini.google and Google's gemini-cli repository. Each page used is in `sources`.
-// Google moved Google AI Pro and Ultra accounts from Gemini CLI to Antigravity on
-// 18 June 2026. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const GEMINI_PROVIDER: ProviderPage = {
   provider: "antigravity",
   name: "Gemini",

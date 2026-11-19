@@ -9,10 +9,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The roles of this server. Each member reads the levels that apply to them; an owner or admin also
- * reads and replaces the roles. Frozen by `agent-access-v1`.
- */
 export async function routeAgentAccess(
   context: TeamApiRequestContext,
   access: TeamApiAgentAccess | undefined,
@@ -25,7 +21,6 @@ export async function routeAgentAccess(
     return "unmatched";
   if (!access || !serverId || !capabilities.has(AGENT_ACCESS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.agentAccessUnsupported"));
-  // `hiddenAgentIds` holds the agents that the roles close to a member, so `mine` leaves them out.
   const existing = agents.listAgents().map((agent) => agent.id);
   const shown = existing.filter((agentId) => !hiddenAgentIds.has(agentId));
   const body = await readJson(request);

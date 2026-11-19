@@ -92,6 +92,48 @@ export const NarrowAudioTakes: Story = {
   ),
 };
 
+const videoClip = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+export const VideoFile: Story = {
+  name: "Inline video",
+  args: {
+    attachments: [
+      {
+        id: "video-episode-report",
+        name: "episode-report-720p.webm",
+        size: 9.8 * 1024 * 1024,
+        kind: "file",
+        mimeType: "video/webm",
+        previewKind: "video",
+        previewUrl: videoClip,
+      },
+    ],
+  },
+};
+
+export const VideoFromHost: Story = {
+  name: "Inline video that loads from a host",
+  args: {
+    attachments: [
+      {
+        id: "video-host-report",
+        name: "episode-report-720p.mp4",
+        size: 9.8 * 1024 * 1024,
+        kind: "file",
+        mimeType: "video/mp4",
+        previewKind: "video",
+        previewUrl: null,
+      },
+    ],
+    mediaSource: {
+      url: () => undefined,
+      load: () => new Promise<boolean>(() => undefined),
+      thumbnailLimit: 2 * 1024 * 1024,
+      mediaLimit: 25 * 1024 * 1024,
+    },
+  },
+};
+
 const remoteArchive = {
   ...compactFile,
   id: "attachment-release-archive",
@@ -105,7 +147,6 @@ function downloadsOf(state: AttachmentDownloadState) {
   return { state: () => state, stop: fn(), retry: fn() };
 }
 
-/** A file from a joined server downloads; a click on the ring stops it. */
 export const Downloading: Story = {
   name: "Download from a joined server",
   args: {

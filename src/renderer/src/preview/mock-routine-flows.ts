@@ -1,7 +1,5 @@
-// The routine flow group of the preview: links and positions in memory, over the mock's routines.
-// It runs no flow, so a step only exists when a story seeds one.
-
 import type { OpenBotDesktopApi, Routine, RoutineFlowLink, RoutineFlowStep, RoutineRun } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 
 interface MockRoutineFlowsSource {
   routines: Map<string, Routine[]>;
@@ -10,7 +8,6 @@ interface MockRoutineFlowsSource {
   steps?: RoutineFlowStep[] | undefined;
 }
 
-/** `emit` sends the agent event `routine-flows-changed` for one agent whose canvas changed. */
 export function mockRoutineFlows(
   source: MockRoutineFlowsSource,
   emit: (agentId: string) => void,
@@ -102,6 +99,20 @@ export function mockRoutineFlows(
       if (index < 0) throw new Error("This connection no longer exists.");
       const [removed] = links.splice(index, 1);
       if (removed) changed([owner(removed.routineId) ?? removed.fromAgentId, removed.fromAgentId, removed.toAgentId]);
+    },
+    stopRun: async (input) => {
+      const run = source.routineRuns.get(input.routineId)?.find((candidate) => candidate.id === input.runId);
+      if (!run) throw new Error(sourceText("error.backend.routineRunGone"));
+      const now = new Date().toISOString();
+      if (run.status === "queued" || run.status === "running" || run.status === "needs-attention")
+        Object.assign(run, { status: "cancelled", updatedAt: now });
+      for (const step of steps)
+        if (step.runId === run.id && step.status === "running")
+          Object.assign(step, { status: "cancelled", updatedAt: now });
+      changed([
+        run.agentId,
+        ...links.filter((link) => link.routineId === input.routineId).map((link) => link.toAgentId),
+      ]);
     },
   };
 }

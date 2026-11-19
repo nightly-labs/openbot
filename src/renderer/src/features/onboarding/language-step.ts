@@ -4,7 +4,6 @@ const LANGUAGE_STEP_STORAGE_KEY = "openbot:language-step-done";
 
 type StepStorage = Pick<Storage, "getItem" | "setItem">;
 
-/** Reading `window.localStorage` throws when the browser blocks storage, so it is read inside the guard. */
 function read(storage: StepStorage | undefined): boolean {
   try {
     return (storage ?? window.localStorage).getItem(LANGUAGE_STEP_STORAGE_KEY) === "true";
@@ -13,17 +12,11 @@ function read(storage: StepStorage | undefined): boolean {
   }
 }
 
-/**
- * Whether this computer has passed the language wheel before sign-in, or has been signed in. It
- * shows once: a later sign-out goes straight to the sign-in screen, and Settings keeps the language.
- * The language button of the sign-in screen opens it again, so a wrong choice is not final.
- */
 export function createLanguageStep(storage?: StepStorage) {
   const [done, setDone] = createSignal(read(storage));
   const [reopened, setReopened] = createSignal(false);
   return {
     done,
-    /** True after `reopen` until Continue: the wheel then shows over any sign-in state. */
     reopened,
     reopen(): void {
       setReopened(true);
@@ -34,9 +27,7 @@ export function createLanguageStep(storage?: StepStorage) {
       setDone(true);
       try {
         (storage ?? window.localStorage).setItem(LANGUAGE_STEP_STORAGE_KEY, "true");
-      } catch {
-        // Blocked storage passes the step for this window only.
-      }
+      } catch {}
     },
   };
 }

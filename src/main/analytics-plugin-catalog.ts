@@ -1,13 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { analyticsIO, analyticsSync } from "./analytics-effects";
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
-/** The server one catalog plugin installs, as the bundled plugin catalog states it. */
 export interface CatalogPluginServer {
   slug: string;
   name: string;
@@ -15,14 +14,9 @@ export interface CatalogPluginServer {
   url: string;
   command: string;
   args: string[];
-  /** The listing's steps to start a server that runs on this computer, such as Figma's. */
   setupSteps: string[];
 }
 
-/**
- * Reads the plugin catalog that ships in the app resources. A missing or damaged catalog gives no
- * servers, so every configured server reports as `custom`: analytics must never stop startup.
- */
 export const loadCatalogPluginServers = Effect.fn("Analytics.loadPluginCatalog")(
   function* (root: string) {
     const contents = yield* analyticsIO(() => readFile(join(root, "catalog.json"), "utf8"));
@@ -69,24 +63,15 @@ function localSetupSteps(flow: unknown): string[] {
   return flow.steps.filter(isString);
 }
 
-/**
- * Whether a provider can report the server named `configured` as `reported`. Claude changes each
- * character outside `[A-Za-z0-9_-]` to `_`, so this compares that form too, without case.
- */
 export function isReportedMcpServerName(configured: string, reported: string): boolean {
+  const form = (name: string) => name.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase();
   return (
     configured === reported ||
-    configured.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase() ===
-      reported.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase()
+    form(configured) === form(reported) ||
+    (!isReservedMcpServerName(reported) && `openbot_${form(configured)}` === form(reported))
   );
 }
 
-/**
- * The catalog slug of a configured server, or `null` for the user's own server. Like the listing's
- * own matcher, the name alone is not enough: a server the user named `github` that points elsewhere
- * is theirs. An http address matches exactly, or by an https host that is the listing's host or
- * below it, because some listings ask for the user's own link on that host.
- */
 export function catalogPluginSlug(
   config: McpServerConfig,
   servers: readonly CatalogPluginServer[],

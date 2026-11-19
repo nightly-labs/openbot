@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Você está editando uma mensagem na fila. Salve ou cancele a edição para permitir a execução.",
   "composer.queueEdit.cancel": "Cancelar edição",
+  "composer.feedbackFix.body":
+    "Corrigindo o relato #{number}. Envie a solicitação ou cancele para manter o relato como está.",
+  "composer.feedbackFix.cancel": "Cancelar",
   "composer.providerWait.offlineTitle": "Sem conexão com a internet",
   "composer.providerWait.offline": "{provider} não pode responder até que este computador volte a ficar online.",
   "composer.providerWait.silent": "{provider} não envia nada há {duration}.",
@@ -20,6 +23,15 @@ export const messages = {
   "composer.update.manual": "Atualize {provider} no computador em que ele é executado para continuar.",
   "composer.update.pending": "Atualizando…",
   "composer.update.action": "Atualizar",
+  "composer.imageInput.body":
+    "{model} recebe apenas texto, então não vê as imagens que você anexa. Se este modelo lê imagens, ative as imagens para ele.",
+  "composer.imageInput.label": "Ativar imagens para {model}",
+  "composer.imageInput.pending": "Ativando…",
+  "composer.imageInput.action": "Ativar imagens",
+  "composer.usageLimit.credits": "Você usou todo o limite do plano {provider}. Seus agentes agora usam seus créditos.",
+  "composer.usageLimit.creditsResets":
+    "Você usou todo o limite do plano {provider}. Seus agentes usam seus créditos até a renovação em {reset}.",
+  "composer.usageLimit.creditsTitle": "Usando créditos",
   "composer.usageLimit.resets": "Você usou todo o seu limite de {provider}. Ele será renovado em {reset}.",
   "composer.usageLimit.selectModel":
     "Você usou todo o seu limite de {provider}. Selecione outro modelo para continuar.",
@@ -42,6 +54,7 @@ export const messages = {
   "composer.picker.noSkills": "Este agente não tem habilidades.",
   "composer.picker.noSkillMatch": "Nenhuma habilidade corresponde a “{query}”.",
   "composer.picker.skillsLoadFailed": "Não foi possível carregar as habilidades.",
+  "composer.picker.skillProblem": "{name} não está disponível. {problem} Peça ao agente para corrigir.",
   "composer.token.attachment": "Abrir arquivo anexado {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Habilidade {name}",
@@ -60,6 +73,8 @@ export const messages = {
     "O acesso ao microfone está bloqueado. Permita que o OpenBot use o microfone nas configurações do sistema.",
   "composer.voice.noMicrophone": "Nenhum microfone disponível.",
   "composer.voice.startFailed": "O OpenBot não conseguiu iniciar a gravação de voz.",
+  "composer.voice.microphoneUnavailable":
+    "O OpenBot não conseguiu abrir o microfone. Feche outros apps que o usam, confira se ele está conectado e permitido nas configurações do sistema e tente de novo.",
   "composer.voice.transcribeFailed": "O OpenBot não conseguiu transcrever esta gravação.",
   "composer.reply.toYou": "Respondendo à sua mensagem",
   "composer.reply.toAgent": "Respondendo ao agente",
@@ -109,10 +124,19 @@ export const messages = {
   "composer.error.holdQueued": "Não foi possível reservar a mensagem na fila para edição.",
   "composer.error.cancelEdit": "Não foi possível cancelar a edição da fila. Tente novamente.",
   "composer.error.updateQueued": "Não foi possível atualizar a mensagem na fila. Tente novamente.",
+  "composer.queueEdit.received": "O agente já recebeu esta mensagem, então sua edição terminou.",
+  "composer.queueEdit.receivedKept":
+    "O agente já recebeu esta mensagem, então sua edição terminou. Suas alterações ainda estão na caixa de mensagem.",
+  "composer.queueEdit.deletedKept":
+    "Esta mensagem foi excluída, então sua edição terminou. Suas alterações ainda estão na caixa de mensagem.",
+  "composer.queueEdit.endedKept":
+    "Esta edição terminou antes de ser salva. Suas alterações ainda estão na caixa de mensagem.",
   "composer.voice.prepareFailed": "Não foi possível preparar o modelo de voz. Tente novamente.",
   "composer.voice.noSpeechRecorded": "Nenhuma fala foi gravada.",
   "composer.voice.noSpeechDetected": "Nenhuma fala foi detectada.",
   "composer.voice.readFailed": "Não foi possível ler a resposta em voz alta.",
+  "composer.voice.languageUnsupported":
+    "Não foi possível ler a resposta em voz alta. Este idioma ainda não está disponível.",
   "composer.error.saveEditTryAgain": "Não foi possível salvar esta edição neste computador. Tente novamente.",
   "composer.error.saveUnconfirmed": "O salvamento não foi confirmado. Tente Salvar de novo para verificar o resultado.",
   "composer.error.changeModel": "Não foi possível mudar de modelo. Tente novamente.",
@@ -153,6 +177,7 @@ export const messages = {
   "composer.picker.section.files": "Arquivos",
   "composer.picker.section.tabs": "Abas do navegador",
   "composer.picker.section.threads": "Tópicos",
+  "composer.picker.section.messages": "Nas mensagens",
   "composer.token.tab": "Aba do navegador {name}",
   "composer.token.thread": "Tópico {name}",
   "composer.token.unavailableTab": "Aba do navegador fechada {name}",

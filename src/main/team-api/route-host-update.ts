@@ -23,10 +23,6 @@ const MEMBER_ROUTES = new Set<string>(Object.values(HOST_MEMBER_UPDATE_ROUTES));
 const ROUTES = new Set<string>(Object.values(HOST_UPDATE_ROUTES));
 const WAIT_REASONS = new Set<string>(HOST_UPDATE_WAIT_REASONS);
 
-/**
- * The app update of this computer, asked for from a joined server. The update is the one the local
- * user runs; the restart waits for idle unless the admin asks for `now`. Frozen by `host-update-v1`.
- */
 export async function routeHostUpdate(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -85,14 +81,12 @@ export async function routeHostUpdate(
   }
 }
 
-/** `readJson` has checked the body against the codec; this only narrows the type. */
 function restartMode(value: unknown): UpdateRestartMode {
   const mode = HOST_UPDATE_RESTART_MODES.find((candidate) => candidate === value);
   if (!mode) throw new HttpError(400, "A valid JSON object is required.");
   return mode;
 }
 
-/** `readJson` has checked the body against the codec; this keeps only the two switches. */
 function settingsChange(autoDownload: unknown, autoInstall: unknown): HostUpdateSettingsChange {
   return {
     ...(typeof autoDownload === "boolean" ? { autoDownload } : {}),
@@ -100,7 +94,6 @@ function settingsChange(autoDownload: unknown, autoInstall: unknown): HostUpdate
   };
 }
 
-/** A reason this contract does not list travels as `"other"`, so a new blocker never breaks a client. */
 function wireSnapshot(status: HostUpdateStatus): HostUpdateStatus {
   if (!status.restart) return status;
   const waitingFor = [

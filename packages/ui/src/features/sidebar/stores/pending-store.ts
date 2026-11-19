@@ -1,38 +1,19 @@
-/**
- * The two changes the sidebar can have half-made: a delete confirmation waiting on the user, and an
- * open section-name editor. Both live in one store because only one of each can exist, and because
- * closing either is then what discards what the failed attempt was saying.
- */
-
 import type { ChannelSummary, SidebarSection } from "@openbot/contracts/ipc";
 import { createMemo, createStore } from "solid-js";
 import { currentText } from "../../../text";
 import type { SidebarProps } from "../sidebar-types";
 
-/**
- * The one delete confirmation the sidebar can have open: an agent, channel or custom section, never both.
- * The attempt's progress and the reason it failed live inside the record rather than beside it, so
- * closing the dialog cannot leave a "Deleting…" button or the previous attempt's message behind.
- */
 interface SidebarPendingDelete {
   deleting: boolean;
   error: string | null;
-  /** The agent, channel or section, whichever `kind` names. */
   id: string;
-  /** Which confirmation is on screen. Each dialog renders from one arm. */
   kind: "agent" | "channel" | "section";
 }
 
-/** What the section editor is editing: a section about to exist, or the one being renamed. */
 type SidebarSectionEditorTarget =
   | { kind: "create"; agentId?: string; parentId?: string }
   | { kind: "rename"; sectionId: string };
 
-/**
- * The open section-name editor. The name as typed, its validation message and the save in flight
- * hang off the editor because none of them means anything without one - a name left behind by a
- * closed editor is what every `startCreateSection` had to remember to clear.
- */
 interface SidebarSectionEditor {
   error: string | null;
   name: string;
@@ -40,7 +21,6 @@ interface SidebarSectionEditor {
   target: SidebarSectionEditorTarget;
 }
 
-/** The two changes the sidebar can have half-made, each waiting on the user rather than on data. */
 interface SidebarPending {
   deletion: SidebarPendingDelete | null;
   sectionEditor: SidebarSectionEditor | null;
@@ -53,8 +33,6 @@ export function createSidebarPendingStore(deps: {
   const { customSectionById, props } = deps;
 
   const [pending, setPending] = createStore<SidebarPending>({ deletion: null, sectionEditor: null });
-  // Each dialog reads these: only one confirmation exists, and each dialog only renders while it is
-  // the one. That is also why a section delete no longer needs its own pair of flags.
   const deleting = () => pending.deletion?.deleting === true;
   const deleteError = () => pending.deletion?.error ?? null;
   let sectionNameInput: HTMLInputElement | undefined;
@@ -80,14 +58,12 @@ export function createSidebarPendingStore(deps: {
     });
   }
 
-  /** Closing the confirmation is what discards a failed attempt's message; nothing else has to. */
   function closeDelete(): void {
     setPending((state) => {
       state.deletion = null;
     });
   }
 
-  /** Marks the confirmation as running and drops what the previous attempt said. */
   function beginDelete(): void {
     setPending((state) => {
       if (!state.deletion) return;
@@ -96,7 +72,6 @@ export function createSidebarPendingStore(deps: {
     });
   }
 
-  /** A failed delete leaves the confirmation open, no longer running, saying why. */
   function failDelete(cause: unknown): void {
     setPending((state) => {
       if (!state.deletion) return;
@@ -124,12 +99,6 @@ export function createSidebarPendingStore(deps: {
     sectionNameInput = element;
   };
 
-  /**
-   * The editor mounts and unmounts as `pending.sectionEditor` moves between create and rename, and
-   * the new element can claim the slot before the old one is torn down - so only the element that
-   * still holds it may clear it. Clearing unconditionally would leave `focusSectionName` focusing a
-   * detached input, which is the silent half of "bad name, no second chance to fix it".
-   */
   const releaseSectionNameInput = (element: HTMLInputElement | undefined) => {
     if (sectionNameInput === element) sectionNameInput = undefined;
   };
@@ -149,7 +118,6 @@ export function createSidebarPendingStore(deps: {
     });
   }
 
-  /** Opens the name editor for a new folder, at the top or in `parentId`, with `agentId` in it. */
   function startCreateSection(agentId?: string, parentId?: string): void {
     props.onExpand();
     setPending((state) => {
@@ -180,7 +148,6 @@ export function createSidebarPendingStore(deps: {
     });
   }
 
-  /** The editor owns its validation message, so it cannot be read once the editor has closed. */
   function setSectionNameError(message: string): void {
     setPending((state) => {
       if (state.sectionEditor) state.sectionEditor.error = message;
@@ -223,7 +190,6 @@ export function createSidebarPendingStore(deps: {
             }
           : { type: "rename", sectionId: target.sectionId, name },
       );
-      // The editor closes on success, which is also what releases the save it was holding.
       setPending((state) => {
         state.sectionEditor = null;
       });

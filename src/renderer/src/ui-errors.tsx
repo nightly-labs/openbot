@@ -1,23 +1,15 @@
 import type { AgentMessage } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
+import { errorReference } from "@openbot/user-errors";
 import { createSignal } from "solid-js";
 import { formatMessageTime } from "./app-message-projection";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { createSimpleContext } from "./simple-context";
 
-/**
- * The inline error feed of an agent's message list.
- *
- * It sits above the per-server scope, and that placement is the whole point: an
- * error is reported by whichever command failed, and a command can outlive the
- * workspace it was issued from. A voice message whose transcription resolves
- * after the user has moved to another server still sends to the server it was
- * dictated on, so its rejection has to be waiting when they come back.
- *
- * Keys are `agentConversationKey(serverId, agentId)`, so entries for a server you
- * are not looking at are unreachable rather than merely unrendered - which is
- * why nothing prunes this on a switch, and why a shared owner is safe.
- */
+export function isConnectionDrop(error: unknown): boolean {
+  return errorReference(error) === "http/503/remote_disconnected";
+}
+
 const UiErrors = createSimpleContext({
   name: "UI errors",
   init: () => {
@@ -27,7 +19,6 @@ const UiErrors = createSimpleContext({
       const { t, errorMessage } = currentText();
       const body = errorMessage(error, t("app.error.actionFailed"));
       const errorKey = agentConversationKey(serverId, agentId);
-      // The same failure again replaces the earlier one, so a server that is down shows it once.
       setUiErrors((current) => ({
         ...current,
         [errorKey]: [
@@ -44,7 +35,19 @@ const UiErrors = createSimpleContext({
       }));
     }
 
-    return { uiErrors, setUiErrors, appendUiError };
+    function clearUiErrors(status: string, errorKey?: string): void {
+      setUiErrors((current) => {
+        let next = current;
+        for (const [key, errors] of Object.entries(current)) {
+          if ((errorKey !== undefined && key !== errorKey) || !errors.some((entry) => entry.status === status))
+            continue;
+          next = { ...next, [key]: errors.filter((entry) => entry.status !== status) };
+        }
+        return next;
+      });
+    }
+
+    return { uiErrors, setUiErrors, appendUiError, clearUiErrors };
   },
 });
 

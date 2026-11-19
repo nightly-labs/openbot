@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/vault";
 
 export const messages = {
-  // The Vault of this computer: its encrypted file and the items that the user saves in it.
   "error.vault.unavailable": "这台电脑没有密钥存储，因此保险库无法保存项目。",
   "error.vault.unreadable": "保险库文件无法读取。请重置保险库后再使用。",
   "error.vault.tooLarge": "保险库已满。请删除一些项目，然后重试。",

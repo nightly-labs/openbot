@@ -21,7 +21,6 @@ class AccountPageFailure extends Schema.TaggedError<AccountPageFailure>()("Accou
 }) {}
 export type AccountServiceFailure = AccountRequestFailure | AccountPageFailure;
 
-/** Desktop account services share these injected I/O boundaries, including test implementations. */
 export class AccountServicePlatform extends Context.Service<
   AccountServicePlatform,
   {
