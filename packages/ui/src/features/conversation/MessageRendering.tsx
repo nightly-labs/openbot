@@ -631,11 +631,15 @@ export function MessageBody(props: {
     if (file) props.onDownloadImageFile?.(file);
     else props.onDownload?.(image);
   };
-  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
+  const [lightbox, setLightbox] = createSignal<
+    (ImageLightboxOpening & { markdown?: boolean; copies?: boolean }) | null
+  >(null);
   const lightboxImages = createMemo(() => shownAttachments().filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
-  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
+  /* The viewer starts from the small copy only when the tile showed one: a gallery tile, or any image
+     of a client that loads copies. A lone desktop image shows its whole file, and so does its viewer. */
+  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement, fromGallery = false) => {
     if (isLightboxImage(attachment)) {
       const named = fileImages().some((image) => image.id === attachment.id);
       const siblings = named ? fileImages() : lightboxImages();
@@ -645,6 +649,7 @@ export function MessageBody(props: {
         index: images.findIndex((image) => image.id === attachment.id),
         origin,
         markdown: named,
+        copies: !named && (fromGallery || props.imageCopies?.mediaSource !== undefined),
       });
     } else if (canPreviewAttachment(attachment)) {
       props.onPreview(attachment);
@@ -707,7 +712,7 @@ export function MessageBody(props: {
       <Match when={standaloneImageAttachments().length > 1}>
         <ImageGallery
           images={standaloneImageAttachments()}
-          onOpen={openAttachment}
+          onOpen={(attachment, origin) => openAttachment(attachment, origin, true)}
           onDownload={props.onDownload}
           copies={props.imageCopies}
         />
@@ -746,7 +751,7 @@ export function MessageBody(props: {
               : !opening().markdown && Boolean(props.onDownload)
           }
           macWindowControls={props.macWindowControls}
-          copies={opening().markdown ? undefined : props.imageCopies}
+          copies={opening().copies ? props.imageCopies : undefined}
           onClose={() => setLightbox(null)}
         />
       )}
