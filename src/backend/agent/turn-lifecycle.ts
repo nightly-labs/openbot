@@ -511,6 +511,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnCauses.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
@@ -811,6 +812,7 @@ export class TurnLifecycle {
       ...(loop ? { loop: true as const } : {}),
     });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
   }
 
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
@@ -886,6 +888,7 @@ export class TurnLifecycle {
     };
     logger.info("A turn ended with no answer.", { agentId, turnId, provider: source.provider });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
   }
@@ -2208,7 +2211,8 @@ export class TurnLifecycle {
         if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
-          const temporary = !refused && failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause);
+          const temporary =
+            !refused && !limited && failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause);
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
         }
         for (const { delivery } of deliveries) {
