@@ -1,4 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, toast, X } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import {
@@ -391,6 +392,9 @@ export function ImageLightbox(props: {
     copyOf(entry) !== undefined && !(fullReady[entry.id] === true && copies()?.fullUrl(entry));
   // A copy that does not load waits for its full image; the image fails only when both fail.
   const [copyFailed, setCopyFailed] = createStore<Record<string, boolean>>({});
+  // A copy at the host's edge is smaller than its image, so it fills the box of the full image. A
+  // smaller copy has the pixel size of its image and shows at that size, as the full image does.
+  const [copyScaled, setCopyScaled] = createStore<Record<string, boolean>>({});
   const failImage = (entry: AttachmentSummary) => {
     if (entry.id === current()?.id) opened = true;
     setFailed((state) => {
@@ -949,7 +953,7 @@ export function ImageLightbox(props: {
                               "image-lightbox-image",
                               {
                                 "image-lightbox-image-pending": !loaded[entry.id],
-                                "image-lightbox-image-copy": showsCopy(entry),
+                                "image-lightbox-image-copy": showsCopy(entry) && copyScaled[entry.id] === true,
                               },
                             ]}
                             src={sourceOf(entry) ?? ""}
@@ -958,12 +962,19 @@ export function ImageLightbox(props: {
                             draggable={false}
                             onLoad={(event) => {
                               const element = event.currentTarget;
-                              if (showsCopy(entry)) {
+                              const { naturalHeight, naturalWidth } = element;
+                              if (
+                                showsCopy(entry) &&
+                                Math.max(naturalWidth, naturalHeight) >= ATTACHMENT_PREVIEW_EDGE
+                              ) {
                                 // The copy fills the box of the full image, in the shape of the image.
                                 element.style.setProperty(
                                   "--image-lightbox-ratio",
-                                  `${element.naturalWidth} / ${element.naturalHeight}`,
+                                  `${naturalWidth} / ${naturalHeight}`,
                                 );
+                                setCopyScaled((state) => {
+                                  state[entry.id] = true;
+                                });
                               } else {
                                 fitScreenPixels(element, entry.mimeType);
                               }
