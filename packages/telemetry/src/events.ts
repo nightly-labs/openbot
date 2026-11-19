@@ -87,7 +87,7 @@ export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 20,
+  desktop_host: 21,
   desktop: 13,
   web: 2,
   mobile: 4,

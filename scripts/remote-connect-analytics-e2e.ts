@@ -70,10 +70,12 @@ async function run() {
     firstRequest: "ok" | "error",
     hostedWaitMs?: number,
     afterBegin = () => {},
+    signalUrl = "wss://signal-us.openbot.run/v1/signal",
   ) => {
     trace.begin(hostId);
     afterBegin();
     for (const phase of REMOTE_CONNECT_PHASES) {
+      if (phase === "bridge") trace.signalHome(hostId, signalUrl);
       if (phase === "compatibility" && hostedWaitMs !== undefined) trace.hostedStart(hostId, hostedWaitMs);
       trace.mark(hostId, phase, phase === "session" ? session : phase === "first-request" ? firstRequest : "ok");
     }
@@ -84,13 +86,14 @@ async function run() {
   await sentCount(1);
   const first = remoteEvents()[0]?.properties ?? {};
   check(
-    "a first connection sends its outcome, session and every phase time",
+    "a first connection sends its outcome, session, Signal home and every phase time",
     first.outcome === "connected" &&
       first.connection === "first" &&
       first.session_kind === "new" &&
       first.last_phase === "first-request" &&
       first.first_request === "ok" &&
       first.failed_attempts === 0 &&
+      first.signal_home === "us" &&
       PHASE_PROPERTIES.every((key) => Number.isInteger(first[key])) &&
       Number.isInteger(first.total_ms) &&
       first.wait_ms === first.total_ms,
@@ -112,6 +115,7 @@ async function run() {
       Number.isInteger(failed.session_ms) &&
       !("ticket_ms" in failed) &&
       !("first_request" in failed) &&
+      !("signal_home" in failed) &&
       !("hosted_start_wait_ms" in failed),
     failed,
   );
@@ -119,37 +123,55 @@ async function run() {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     trace.fail(HOST, trace.begin(HOST), "error");
   }
-  connect(HOST, "reused", "error");
+  connect(HOST, "reused", "error", undefined, undefined, "wss://signal.openbot.run/v1/signal");
   await sentCount(3);
   const retried = remoteEvents()[2]?.properties ?? {};
   check(
-    "later failures send nothing, and the next connection counts them",
+    "later failures send nothing, and the next connection counts them and names the entry",
     retried.outcome === "connected" &&
       retried.connection === "reconnect" &&
       retried.session_kind === "reused" &&
       retried.first_request === "error" &&
       retried.failed_attempts === 3 &&
+      retried.signal_home === "entry" &&
       Number(retried.wait_ms) >= Number(retried.total_ms),
     retried,
   );
 
   trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "cancelled");
-  trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "error");
+  const afterTicket = trace.begin(OTHER_HOST);
+  trace.mark(OTHER_HOST, "session");
+  trace.mark(OTHER_HOST, "ticket");
+  trace.signalHome(OTHER_HOST, "wss://signal2.openbot.run/v1/signal");
+  trace.fail(OTHER_HOST, afterTicket, "error");
   await sentCount(4);
   const afterCancel = remoteEvents()[3]?.properties ?? {};
   check(
-    "a cancel sends nothing, and the next failure is sent",
-    afterCancel.outcome === "failed" && afterCancel.connection === "first" && afterCancel.last_phase === "start",
+    "a cancel sends nothing, and the next failure after the ticket names its Signal home",
+    afterCancel.outcome === "failed" &&
+      afterCancel.connection === "first" &&
+      afterCancel.last_phase === "ticket" &&
+      afterCancel.signal_home === "b",
     afterCancel,
   );
 
   const old = trace.begin(LAST_HOST);
-  connect(LAST_HOST, "ok", "ok", undefined, () => trace.fail(LAST_HOST, old, "cancelled"));
+  connect(
+    LAST_HOST,
+    "ok",
+    "ok",
+    undefined,
+    () => trace.fail(LAST_HOST, old, "cancelled"),
+    "wss://signal.self-hosted.example/v1/signal",
+  );
   await sentCount(5);
   const last = remoteEvents()[4]?.properties ?? {};
   check(
-    "an old attempt that ends late does not stop the newer one",
-    last.outcome === "connected" && last.connection === "first" && last.last_phase === "first-request",
+    "an old attempt that ends late does not stop the newer one, and an unknown Signal is other",
+    last.outcome === "connected" &&
+      last.connection === "first" &&
+      last.last_phase === "first-request" &&
+      last.signal_home === "other",
     last,
   );
   check(
@@ -158,7 +180,10 @@ async function run() {
     sent.map((event) => event.name),
   );
   const body = JSON.stringify({ globals, sent });
-  check("no event names a host", ![HOST, OTHER_HOST, LAST_HOST].some((host) => body.includes(host)));
+  check(
+    "no event names a host or a Signal address",
+    ![HOST, OTHER_HOST, LAST_HOST, "openbot.run", "self-hosted"].some((text) => body.includes(text)),
+  );
   check(
     "the events go on the host surface with its current generation",
     globals.surface === "desktop_host" && globals.event_schema_version === ANALYTICS_GENERATIONS.desktop_host,

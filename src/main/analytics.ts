@@ -38,7 +38,12 @@ import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./an
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
 import type { WebhookDeliveryReport } from "./host-events-service";
 import { isProfileFrame, isProfileStack } from "./main-loop-profile";
-import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
+import {
+  REMOTE_CONNECT_PHASES,
+  REMOTE_SIGNAL_HOMES,
+  type RemoteConnectPhase,
+  type RemoteConnectSummary,
+} from "./remote-connect-trace";
 import type { MainLoopStallProfile } from "./resource-monitor";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
@@ -83,6 +88,7 @@ const REMOTE_CONNECT_ENUMS = {
   session_kind: ["new", "stored", "reused"],
   last_phase: ["start", ...REMOTE_CONNECT_PHASES],
   first_request: ["ok", "error"],
+  signal_home: REMOTE_SIGNAL_HOMES,
 } as const;
 const STARTUP_PROPERTY_NAMES = [
   "start_kind",
@@ -402,6 +408,7 @@ const HOST_ALLOWLIST = {
     "wait_ms",
     "hosted_start_wait_ms",
     "failed_attempts",
+    "signal_home",
   ],
   hosted_site_action: ["action", "entry_point", "result", "failure_code"],
 } as const satisfies Record<HostEventName, readonly string[]>;
@@ -680,6 +687,7 @@ export class HostAnalytics {
       wait_ms: summary.waitMs,
       ...(summary.hostedStartWaitMs === undefined ? {} : { hosted_start_wait_ms: summary.hostedStartWaitMs }),
       failed_attempts: summary.failedAttempts,
+      ...(summary.signalHome ? { signal_home: summary.signalHome } : {}),
     };
     for (const [phase, property] of REMOTE_CONNECT_PHASE_PROPERTIES) {
       const ms = summary.phases[phase];
@@ -1276,7 +1284,8 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       key === "connection" ||
       key === "session_kind" ||
       key === "last_phase" ||
-      key === "first_request"
+      key === "first_request" ||
+      key === "signal_home"
     ) {
       const allowed: readonly string[] = REMOTE_CONNECT_ENUMS[key];
       return isString(value) && allowed.includes(value) ? value : undefined;
