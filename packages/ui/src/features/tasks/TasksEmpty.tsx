@@ -11,7 +11,6 @@ import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { createMemo, createSignal, For, onSettled } from "solid-js";
 
-/** One sample task: its title, and what its agent does while it runs. */
 interface SampleTask {
   id: string;
   title: AppTextKey;
@@ -51,12 +50,9 @@ const SAMPLE_TASKS: SampleTask[] = [
   },
 ];
 
-/** A task moves one section on each step. The CSS transitions are shorter than a step. */
 const STEP_MS = 2400;
-/** Waiting, Working, Answered: the steps a task is on screen before it fades. */
 const LIFE = 3;
 
-/** How far a task is in its life: 0 waits, 1 works, 2 is answered, 3 fades out. */
 type Age = 0 | 1 | 2 | 3;
 const AGES: readonly Age[] = [0, 1, 2, 3];
 const MOOD: Record<Age, AvatarMood> = { 0: "waiting", 1: "working", 2: "responded", 3: "responded" };
@@ -67,7 +63,6 @@ const SECTIONS = [
   "conversation.tasks.section.waiting",
 ] as const satisfies readonly AppTextKey[];
 
-/** The title of the empty page. The second line ends on one handwritten word, written once. */
 export function TasksEmptyPitch() {
   const { t } = useText();
   const title = () => {
@@ -93,12 +88,6 @@ export function TasksEmptyPitch() {
   );
 }
 
-/**
- * A faint copy of the task list under the composer of the empty page. A sample task arrives in
- * Waiting, rises to Working, then to Needs you as Answered, and fades. Each step adds the next task.
- * It is decoration: nothing in it can be opened, and a reader does not hear it. Less motion keeps one
- * frame with one task in each section.
- */
 export function TasksEmptyBoard(props: { agents: readonly AgentProfile[] }) {
   const { t } = useText();
   const [step, setStep] = createSignal(LIFE - 1);
@@ -108,7 +97,6 @@ export function TasksEmptyBoard(props: { agents: readonly AgentProfile[] }) {
     return () => window.clearInterval(timer);
   });
 
-  /** The tasks on screen: the newest one waits, the oldest fades out. */
   const shown = createMemo(() => {
     const current = step();
     const items: { key: string; index: number; sample: SampleTask; age: Age }[] = [];
@@ -147,10 +135,6 @@ export function TasksEmptyBoard(props: { agents: readonly AgentProfile[] }) {
   );
 }
 
-/**
- * One row with the real row styles: a span with the button classes, not a button. Its section is a
- * position, so a change of state moves it up.
- */
 function SampleRow(props: { sample: SampleTask; age: Age; agent: AgentProfile | undefined }) {
   const { t } = useText();
   const task = createMemo((): AgentTask => {

@@ -12,10 +12,6 @@ import {
   useCustomBackdrops,
 } from "../../custom-backdrops";
 
-/**
- * The backdrop control in Settings on the desktop and in the web client. It keeps an uploaded picture
- * in this browser's store (`custom-backdrops.ts`) and removes a backdrop that the user added.
- */
 export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) {
   const { t } = useText();
   const choice = useChatBackdrop();

@@ -1,5 +1,3 @@
-/* Setting card: an agent shows where a setting is, and Open goes to its row. */
-
 .setting-link-card .setting-link-icon {
   display: inline-grid;
   flex: none;

@@ -6,18 +6,11 @@ import { type CrmSourceAdapter, type SourceAccount, SourceFailure, type SourceSe
 import type { SourceBatch, SourceCustomer, SourcePayment, SourcePlan } from "./crm-source-store";
 import { localCrmDate } from "./crm-store";
 
-/**
- * The Stripe source: GET requests only, with a restricted read-only key. The API version is fixed, so
- * the shapes below do not change with the account's default version.
- */
-
 const STRIPE_VERSION = "2025-03-31.basil";
 const TIMEOUT_MS = 30_000;
 const PAGE = 100;
-/** A list item, so the next page can start after it. */
 const HasId = Schema.Struct({ id: Schema.String });
 const RESOURCES = ["customers", "invoices", "subscriptions", "products"] as const;
-/** Stripe counts these in hundredths, but ISO 4217 has no minor unit for them. */
 const HUNDREDTHS_ONLY = new Set(["ISK", "UGX"]);
 
 const text = Schema.optional(Schema.NullOr(Schema.String));
@@ -96,7 +89,6 @@ type Params = readonly (readonly [string, string])[];
 
 export interface StripeSourceOptions {
   fetch: (input: URL, init: RequestInit) => Promise<Response>;
-  /** Tests point this at a local server. */
   apiBase?: string;
   now?: () => Date;
 }
@@ -122,7 +114,6 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
   const apiBase = options.apiBase ?? "https://api.stripe.com";
   const now = options.now ?? (() => new Date());
 
-  /** One GET. A 404 is null: the object is gone. */
   const get = <S extends Schema.Top>(key: string, path: string, schema: S, params: Params = []) =>
     Effect.tryPromise({
       try: async (signal) => {
@@ -149,7 +140,6 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
       }),
     );
 
-  /** Every page of a list, oldest call first. */
   const pages = <S extends Schema.Top>(
     key: string,
     path: string,
@@ -172,7 +162,6 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
 
   const account = (key: string) =>
     get(key, "/v1/account", Account).pipe(
-      // A restricted key may have no access to the account; the label stays empty.
       Effect.catchIf(
         (failure) => failure.code === "permission",
         () => Effect.succeed(null),
@@ -256,7 +245,6 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
           const currency = invoice.currency.toUpperCase();
           const removed = invoice.status === "void";
           const found = yield* customerOf(invoice.customer);
-          // A voided invoice of a deleted customer still removes its open payment: the ref is enough.
           const ref = typeof invoice.customer === "string" ? invoice.customer : (invoice.customer?.id ?? null);
           const customer = found ?? (removed && ref !== null ? { id: ref } : null);
           if (customer === null) return null;

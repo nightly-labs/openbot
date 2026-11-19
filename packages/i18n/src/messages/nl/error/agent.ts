@@ -144,6 +144,8 @@ export const messages = {
     "De gegevens van de agent konden niet volledig worden verwijderd. Probeer de agent opnieuw te verwijderen.",
   "error.agent.deleteFolderInUse":
     "Werk van een andere agent gebruikt de map van deze agent nog. Verwijder deze agent opnieuw als dat werk klaar is, of nadat je OpenBot opnieuw start.",
+  "error.agent.deleteWhenFolderFree":
+    "Werk van een andere agent gebruikt de map van deze agent nog. OpenBot verwijdert deze agent als dat werk klaar is.",
   "error.agent.duplicationBusy": "Deze agent wordt al gedupliceerd.",
   "error.agent.waitBeforeDuplicate": "Wacht tot de agent klaar is en de wachtrij leeg is voordat je hem dupliceert.",
   "error.agent.saveOtherAgent": "Deze opslag hoort bij een andere agent.",

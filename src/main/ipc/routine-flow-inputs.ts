@@ -1,5 +1,3 @@
-// The payloads of the routine flow endpoints. Only a malformed payload fails here, so the text stays English.
-
 import {
   type ConnectRoutineFlowInput,
   type DisconnectRoutineFlowInput,

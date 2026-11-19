@@ -1,9 +1,3 @@
-import { Effect } from "effect";
-
-// Local model servers, the model list of one endpoint, and where the scan looks. The computer that
-// runs the agents of the server looks: this one, or a joined server's host for an owner or admin,
-// through `provider-detection-v1`. The host makes each request from the host.
-
 import {
   decodeDetectedAgents,
   decodeDetectedModelServers,
@@ -13,6 +7,7 @@ import {
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ProviderDetection } from "../provider-detection";
 import type { ProviderDetectionSettingsStore } from "../provider-detection-settings-store";
@@ -33,7 +28,6 @@ export function providerDetectionIpcHandlers({
   settings,
   remoteServers,
 }: ProviderDetectionIpcDependencies): Pick<IpcGroupHandlers, "providerDetection"> {
-  /** The renderer offers the host's scan only while the host serves `provider-detection-v1`. */
   async function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDER_DETECTION_CAPABILITY))
       throw new Error(sourceText("error.team.providerDetectionUnsupported"));

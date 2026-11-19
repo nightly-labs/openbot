@@ -53,7 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/** Brazilian Portuguese: shared keys, source text, and desktop areas. */
 export const pt = {
   ...shared,
   ...source,

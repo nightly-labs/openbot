@@ -1,13 +1,3 @@
-// Checks that the iOS Live Activity follows the notification settings of each server (#2344): a
-// server that the user muted, or set to notify about "Nothing", does not start or update the
-// activity, and its host does not get the push token that updates it. A change ends or starts the
-// activity at once, also while it runs, and a timed mute that ends shows the server again.
-//
-// It renders the real mobile hook (`useLiveActivity`) with React, with the real settings stores, the
-// Dynamic Island coordinator, the Live Activity view, and `LiveActivitySync`. Only the boundaries
-// that need a phone are replaced: the ActivityKit module that `agentLiveActivity()` returns, the
-// keychain, and the host requests. It sends nothing. Run it with
-// `bun scripts/live-activity-server-mute-e2e.ts`. Writes .openbot-build/live-activity-server-mute-e2e/report.json.
 import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -22,15 +12,12 @@ import { plugin } from "bun";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/live-activity-server-mute-e2e");
 const MOBILE_SRC = resolve(import.meta.dirname, "../apps/mobile/src");
 const WAIT_TIMEOUT_MS = 10_000;
-/** Long enough for the hook to apply the mute before it ends. */
 const TIMED_MUTE_MS = 1_500;
 const PUSH_TOKEN = "e2e-activity-push-token";
 const SERVER_A = "server-a";
 const SERVER_B = "server-b";
 const logger = createOpenBotLogger("live-activity-server-mute-e2e");
 const require = createRequire(import.meta.url);
-
-// --- The ActivityKit module of the iOS build, as the hook uses it. ---
 
 interface ActivityRecord {
   id: number;
@@ -69,7 +56,6 @@ function createActivity(props: unknown) {
 const native = {
   starter: {
     start: createActivity,
-    // Each case starts with no activity from an earlier launch.
     getInstances: () => [],
   },
   setSealKeys: () => undefined,
@@ -79,7 +65,6 @@ const native = {
   removeAvatars: () => undefined,
 };
 
-/** The content that the running activity shows, or `null` when none runs. */
 function shownContent(): string | null {
   const running = activities.filter((activity) => !activity.ended);
   assert.ok(running.length <= 1, "More than one Live Activity runs.");
@@ -87,8 +72,6 @@ function shownContent(): string | null {
   if (!activity) return null;
   return activity.updates.at(-1) ?? activity.starts[0] ?? null;
 }
-
-// --- The phone modules that have no Bun build. The hook reaches them only through these names. ---
 
 const keychain = new Map<string, string>();
 plugin({
@@ -117,13 +100,11 @@ plugin({
       loader: "object",
       exports: { getRandomBytes: (count: number) => webcrypto.getRandomValues(new Uint8Array(count)) },
     }));
-    // The app aliases `@/` to `apps/mobile/src`.
     build.onResolve({ filter: /^@\// }, ({ path }) => ({ path: require.resolve(join(MOBILE_SRC, path.slice(2))) }));
     build.onLoad({ filter: /live-activity[/\\]agent-live-activity\.tsx$/ }, () => ({
       loader: "object",
       exports: { agentLiveActivity: () => native },
     }));
-    // The language comes from the phone. The test uses English.
     build.onLoad({ filter: /shared[/\\]lib[/\\]text\.ts$/ }, async () => {
       const { textFor }: { textFor: (locale: "en") => unknown } = await import(mobileUrl("shared/lib/text-value.ts"));
       return { loader: "object", exports: { currentText: () => textFor("en"), currentLocale: () => "en" } };
@@ -143,12 +124,10 @@ plugin({
   },
 });
 
-/** The mobile modules load at run time, so the Node typecheck does not read the app sources. */
 function mobileUrl(path: string): string {
   return pathToFileURL(join(MOBILE_SRC, path)).href;
 }
 
-// React is a dependency of the mobile app, so it loads from there, as the hook does.
 interface Root {
   render: (element: unknown) => void;
   unmount: () => void;
@@ -157,12 +136,9 @@ const mobileRequire = createRequire(join(MOBILE_SRC, "../package.json"));
 const { createElement }: { createElement: (component: () => null) => unknown } = mobileRequire("react");
 const { createRoot }: { createRoot: (container: Element) => Root } = mobileRequire("react-dom/client");
 
-// React DOM reads the global window. The hook renders nothing.
 const { JSDOM }: { JSDOM: new (html: string) => { window: Window & typeof globalThis } } = require("jsdom");
 const dom = new JSDOM("<!doctype html><div></div>");
 Object.assign(globalThis, { window: dom.window, document: dom.window.document });
-
-// --- The real mobile modules. ---
 
 type ServerState = "online" | "offline";
 interface Server {
@@ -219,8 +195,6 @@ const notifications: {
 const liveActivities: { useLiveActivitiesPreference: PreferenceStore<{ enabled: boolean; ready: boolean }> } =
   await import(mobileUrl("features/settings/model/live-activities.ts"));
 
-// --- The harness. ---
-
 const requests: { serverId: string; path: string; token?: string }[] = [];
 const post: Post = async (serverId, path, body) => {
   const token = typeof body === "object" && body !== null && "token" in body ? String(body.token) : undefined;
@@ -267,7 +241,6 @@ function summary(fixture: Agent): AgentSummary {
   };
 }
 
-/** Waits for a state of the activity or the host requests that the hook reaches on its own. */
 async function waitFor(label: string, probe: () => boolean): Promise<void> {
   const deadline = Date.now() + WAIT_TIMEOUT_MS;
   while (!probe()) {
@@ -309,7 +282,6 @@ async function startSession(serverIds: readonly string[], settings: Record<strin
   await waitFor("the hook renders", () => session.apply !== undefined);
   const apply = session.apply;
   assert.ok(apply);
-  // Each server reports a working agent, so each one has something for the activity to show.
   for (const fixture of agents) {
     apply(fixture.serverId, { type: "agents-changed", agents: [summary(fixture)] });
     apply(fixture.serverId, {
@@ -350,7 +322,6 @@ interface CaseResult {
   error?: string;
 }
 
-/** Every content that the activity started or updated with, in this case. */
 function everShown(serverId: string): boolean {
   return activities.some((activity) =>
     [...activity.starts, ...activity.updates].some((content) => content.includes(`Agent on ${serverId}`)),
@@ -363,10 +334,6 @@ function everRegisteredWith(serverId: string): boolean {
   );
 }
 
-/**
- * Server A is active and has `setting`. Server B has notifications on. The activity shows the active
- * server first, so when it shows server B, the hook has published with server A hidden.
- */
 async function hiddenAtStart(name: string, setting: ServerNotificationSetting): Promise<CaseResult> {
   const { root } = await startSession([SERVER_A, SERVER_B], { [SERVER_A]: setting });
   await waitFor("the activity shows server B", () => shows(SERVER_B));
@@ -375,7 +342,6 @@ async function hiddenAtStart(name: string, setting: ServerNotificationSetting): 
     hostNeverGotToken: !everRegisteredWith(SERVER_A),
     otherServerShown: true,
   };
-  // With the other server off too, nothing is left to show.
   await notifications.saveServerNotificationSetting(SERVER_B, { level: "nothing" });
   await waitFor("the activity ends", () => shownContent() === null);
   root.unmount();
@@ -425,16 +391,12 @@ const cases: [string, () => Promise<CaseResult>][] = [
     "settings are per server",
     async () => {
       const { root } = await startSession([SERVER_A, SERVER_B], {});
-      // Both servers have a working agent. The activity shows the active server first.
       await waitFor("the activity shows server A", () => shows(SERVER_A));
       await waitFor("server A has the push token", () => registeredWith(SERVER_A));
       await notifications.saveServerNotificationSetting(SERVER_A, { level: "nothing" });
-      // Server B is still on, so the activity shows it instead. Only the active host updates the
-      // activity, and it is off, so no host has the token.
       await waitFor("the activity shows server B", () => shows(SERVER_B));
       await waitFor("server A loses the push token", () => removedFrom(SERVER_A));
       const checks: Record<string, boolean> = { activeOffShowsOther: true, activeOffRemovesToken: true };
-      // Muting server B ends the activity. Server A then comes back on its own, with B still muted.
       await notifications.saveServerNotificationSetting(SERVER_B, { mute: { until: null } });
       await waitFor("the activity ends", () => shownContent() === null);
       await notifications.saveServerNotificationSetting(SERVER_A, { level: "all" });
@@ -454,7 +416,6 @@ const cases: [string, () => Promise<CaseResult>][] = [
       });
       await waitFor("the activity shows server B while server A is muted", () => shows(SERVER_B));
       const checks: Record<string, boolean> = { hiddenWhileMuted: !everShown(SERVER_A) };
-      // No setting changes: the hook shows server A when its mute ends.
       await waitFor("the activity shows server A after the mute", () => shows(SERVER_A));
       await waitFor("server A has the push token after the mute", () => registeredWith(SERVER_A));
       checks.shownAfterMute = true;

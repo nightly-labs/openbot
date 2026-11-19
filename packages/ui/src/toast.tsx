@@ -16,17 +16,11 @@ import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner> & {
   onToastShown?: (metadata: FailureProperties) => void;
-  /** Hides the toasts but keeps them, for example while a native view covers their place. */
   hidden?: boolean;
 };
 export type ExternalToast = SonnerExternalToast & {
   report?: NotificationMetadata;
-  /**
-   * The failure the toast reports. The toast shows its code under the description, so a user can
-   * copy it. Without a `description`, the toast shows `errorMessage(error, fallback)`.
-   */
   error?: unknown;
-  /** The translated sentence for an `error` with no readable message of its own. */
   fallback?: string;
 };
 const reports = new Map<string | number, NotificationMetadata>();
@@ -91,16 +85,13 @@ export const toast = Object.assign((...args: Parameters<typeof sonnerToast>) => 
   promise: promiseToast,
 });
 
-/** Toast lifetime; exported so manual timers settle on the same count. */
 export const TOAST_DURATION = 6_000;
 
 export function Toaster(props: ToasterProps): JSX.Element {
-  // The desktop app mounts the Toaster outside its text provider, so it follows the active locale.
   const { t } = currentText();
   const notifications = useSonner();
   const sonnerProps = omit(props, "onToastShown", "hidden");
   createEffect(
-    // Tracks `hidden`, so a toast is reported when it shows, not while it is hidden.
     () => ({ toasts: notifications.toasts(), hidden: props.hidden }),
     ({ toasts, hidden }) => {
       if (!props.onToastShown || hidden) return;
@@ -131,7 +122,6 @@ export function Toaster(props: ToasterProps): JSX.Element {
   onSettled(() => {
     if (!layer) return;
     const markCloseButtons = () => {
-      // solid-sonner renders the close button, so mark it here for the close cue.
       for (const button of layer?.querySelectorAll("[data-close-button]:not([data-cuelume-close])") ?? []) {
         button.setAttribute("data-cuelume-close", "");
         button.setAttribute("data-cuelume-emphasis", "subtle");
@@ -151,8 +141,6 @@ export function Toaster(props: ToasterProps): JSX.Element {
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
         theme={props.theme ?? documentColorScheme()}
         position={props.position ?? "top-right"}
-        // A toast past the visible count stays hidden even when hover expands the stack, so an update
-        // offer would wait behind another. Six providers can offer an update at once.
         visibleToasts={props.visibleToasts ?? 6}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}

@@ -8,7 +8,6 @@ import { sha256, sha256File } from "./remote-desktop-runtime-release";
 
 export type OpencodeRuntimeTarget = "darwin-arm64" | "darwin-x64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
-/** The npm platform package and the executable inside it, per target OpenBot supports. */
 const TARGETS = {
   "darwin-arm64": { package: "@opencode/cli-darwin-arm64", executable: "opencode", platformDirectory: "mac" },
   "darwin-x64": { package: "@opencode/cli-darwin-x64", executable: "opencode", platformDirectory: "mac" },
@@ -17,7 +16,6 @@ const TARGETS = {
   "win32-x64": { package: "@opencode/cli-windows-x64", executable: "opencode.exe", platformDirectory: "win" },
 } as const satisfies Record<OpencodeRuntimeTarget, { package: string; executable: string; platformDirectory: string }>;
 
-/** The same keys as `TARGETS`, in the order the lock file lists them. */
 const TARGET_IDS: readonly OpencodeRuntimeTarget[] = [
   "darwin-arm64",
   "darwin-x64",
@@ -27,12 +25,9 @@ const TARGET_IDS: readonly OpencodeRuntimeTarget[] = [
 ];
 
 const REGISTRY = "https://registry.npmjs.org";
-/** The package that lists the OpenCode 2 platform packages. It carries no LICENSE. */
 const CLI_PACKAGE = "@opencode/cli";
-/** The OpenCode 1 package, from the same repository, whose tarball carries the MIT LICENSE. */
 const LICENSE_PACKAGE = "opencode-ai";
 const REPOSITORY = "https://github.com/anomalyco/opencode";
-/** `installedBytes` only funds the manager's free-space precheck, so it is rounded generously. */
 const DISK_HEADROOM = 1.05;
 const DISK_GRANULARITY = 10_000_000;
 
@@ -71,21 +66,11 @@ interface OpencodeArtifactPin {
   platformDirectory: string;
 }
 
-/**
- * Recomputes the `opencode` block of `native-runtime.lock.json` from the npm registry.
- *
- * `verifyInstalledRuntime` compares the version in `opencode --version` against `lock.opencode.version`
- * for exact equality, so a pin is only trustworthy if the staged binary really prints it. On darwin
- * this script runs the extracted binary and asserts it; on other hosts the darwin binary cannot be
- * executed, so the caller has to repeat the pin on a matching machine before a release.
- */
 export async function pinOpencodeRuntime(
   input: {
     version?: string | undefined;
-    /** The `opencode-ai` release whose LICENSE is installed. Its latest release when unset. */
     licenseVersion?: string | undefined;
     fetchImpl?: typeof fetch;
-    /** Set to false to skip the `--version` assertion on the target that matches this host. */
     runBinary?: boolean;
   } = {},
 ): Promise<OpencodeRuntimePin> {
@@ -99,8 +84,6 @@ export async function pinOpencodeRuntime(
 
   const pinTarget = (target: OpencodeRuntimeTarget) =>
     pinArtifact(fetchImpl, target, version, umbrella.optionalDependencies, input.runBinary);
-  // One target at a time, in the lock file's order: several 50 MB downloads at once only make the
-  // registry slower, and a literal is what proves every key is present without an assertion.
   const artifacts: Record<OpencodeRuntimeTarget, OpencodeArtifactPin> = {
     "darwin-arm64": await pinTarget("darwin-arm64"),
     "darwin-x64": await pinTarget("darwin-x64"),
@@ -139,7 +122,6 @@ async function pinArtifact(
   if (platform.name !== descriptor.package || platform.version !== version) {
     throw new Error(`The registry served the wrong package for ${target}.`);
   }
-  // npm names a scoped tarball after the unscoped part: `@opencode/cli-x` serves `cli-x-<version>.tgz`.
   const asset = `${descriptor.package.slice(descriptor.package.indexOf("/") + 1)}-${version}.tgz`;
   if (platform.dist.tarball !== `${REGISTRY}/${descriptor.package}/-/${asset}`) {
     throw new Error(`Unexpected tarball URL for ${target}: ${platform.dist.tarball}`);
@@ -162,7 +144,6 @@ async function pinArtifact(
     const binary = join(packageRoot, "bin", descriptor.executable);
     if (runBinary && target === `${process.platform}-${process.arch}`) {
       await chmod(binary, 0o755);
-      // OpenCode 2 prints `opencode v2.1.1`; `parseOpencodeVersion` accepts the same forms.
       const printed = execFileSync(binary, ["--version"], { encoding: "utf8", windowsHide: true }).trim();
       if (printed.replace(/^(?:opencode\s+)?v?/iu, "") !== version) {
         throw new Error(`The ${target} binary prints "${printed}" and not "${version}".`);
@@ -183,7 +164,6 @@ async function pinArtifact(
   }
 }
 
-/** The LICENSE inside the `opencode-ai` tarball: the copy the app installs, so its hash is the one it checks. */
 async function packageLicense(fetchImpl: typeof fetch, version: string): Promise<Buffer> {
   const asset = `${LICENSE_PACKAGE}-${version}.tgz`;
   const archiveBytes = await fetchBytes(fetchImpl, `${REGISTRY}/${LICENSE_PACKAGE}/-/${asset}`);
@@ -208,7 +188,6 @@ async function packageLicense(fetchImpl: typeof fetch, version: string): Promise
   }
 }
 
-/** The OpenCode platform tarball is two files, and anything else is not the package we pinned. */
 export function validateOpencodeArchive(archive: string, executable: string): string[] {
   const names = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).split(/\r?\n/u).filter(Boolean);
   const details = execFileSync("tar", ["-tvzf", archive], { encoding: "utf8" }).split(/\r?\n/u).filter(Boolean);
@@ -228,7 +207,6 @@ export function validateOpencodeArchive(archive: string, executable: string): st
   return names;
 }
 
-/** Fetches one registry document and parses it, so no caller ever holds the raw JSON. */
 async function fetchParsed<Schema extends z.ZodType>(
   fetchImpl: typeof fetch,
   url: string,
@@ -246,7 +224,6 @@ async function fetchBytes(fetchImpl: typeof fetch, url: string): Promise<Buffer>
   return Buffer.from(await response.arrayBuffer());
 }
 
-/** True when the pin matches what `native-runtime.lock.json` already holds. */
 export function isPinnedAlready(pin: OpencodeRuntimePin, lock: AgentRuntimeLock): boolean {
   return JSON.stringify(pin) === JSON.stringify(lock.opencode);
 }

@@ -1,4 +1,3 @@
-/* A play icon before each sound name. The menu portals out of the row, so the rules use the item classes. */
 .ui-select-item-label:has(.sound-choice-item) {
   flex: 1;
 }

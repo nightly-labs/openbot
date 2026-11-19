@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/error/attachment";
 export const messages = {
   "error.attachment.notFound": "De bijlage is niet gevonden.",
   "error.attachment.fileTooLarge": "Een bestand is groter dan de limiet van 100 MB.",
+  "error.attachment.namedFileTooLarge": "{name} is groter dan de limiet van 100 MB.",
   "error.attachment.totalTooLarge": "De bijlagen zijn samen groter dan de limiet van 250 MB.",
   "error.attachment.unavailable": "Dit bestand is niet meer beschikbaar.",
   "error.attachment.tooMany": "Kies maximaal {limit} bestanden.",

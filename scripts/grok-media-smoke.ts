@@ -1,10 +1,3 @@
-// Runs one real Grok agent turn through `GrokAgentClient` and asks for one image and one short
-// video. It checks that the driver turns the Grok media tools (`grok-media.ts`) into an
-// `imageGeneration` and a `videoGeneration` item, each with the file that Grok wrote. It uses a copy
-// of the user's Grok login (see `grok-live-harness.ts`) and a temporary workspace. Costs one Grok
-// session with one image and one video of about two seconds. `bun scripts/grok-media-smoke.ts`;
-// `--model=<id>` replaces Grok Build Fast. Writes .openbot-build/grok-media-smoke/report.json and a
-// copy of each file.
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath, rm } from "node:fs/promises";
@@ -55,7 +48,6 @@ const saved = { ...process.env };
 const clients: AgentClient[] = [];
 const root = await realpath(await mkdtemp(join(tmpdir(), "openbot-grok-media-smoke-")));
 
-/** A short name of the file kind from its first bytes. */
 function signature(bytes: Buffer): "png" | "jpeg" | "webp" | "mp4" | "unknown" {
   if (bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return "jpeg";

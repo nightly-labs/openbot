@@ -223,7 +223,7 @@ export const messages = {
   "crm.customer.paidOn": "Ödendi: {date}",
   "crm.customer.billing": "Faturalama",
   "crm.customer.details": "Ayrıntılar",
-  "crm.customer.since": "Müşteri başlangıcı",
+  "crm.customer.added": "Eklenme tarihi",
   "crm.customer.activity": "Etkinlik",
   "crm.customer.loading": "Yükleniyor…",
 

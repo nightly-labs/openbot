@@ -1,8 +1,3 @@
-// The public marketplace catalog and shared agent templates, read from the account service with plain GETs.
-//
-// The desktop app reads the same routes from its main process. The web client serves `/app` from the
-// account service, so it reads them on its own origin. None of these routes needs an account.
-
 import {
   type AgentTemplateDetail,
   decodeAgentTemplateDetail,
@@ -29,16 +24,13 @@ export interface MarketplaceCatalog {
   skills: {
     list: (query?: MarketplaceSkillQuery) => Effect.Effect<MarketplaceSkillPage, MarketplaceCatalogError>;
     get: (skillId: string) => Effect.Effect<MarketplaceSkillDetail, MarketplaceCatalogError>;
-    /** The skill a shared link names, by its slug. */
     getBySlug: (slug: string) => Effect.Effect<MarketplaceSkillDetail, MarketplaceCatalogError>;
   };
   agents: {
     list: (query?: MarketplaceAgentQuery) => Effect.Effect<MarketplaceAgentPage, MarketplaceCatalogError>;
     get: (listingId: string) => Effect.Effect<MarketplaceAgentDetail, MarketplaceCatalogError>;
-    /** The agent a shared link names: approved, or waiting for its first review with `pending`. */
     getListing: (agentId: string) => Effect.Effect<MarketplaceAgentDetail, MarketplaceCatalogError>;
   };
-  /** A shared agent template, by the id its link names. */
   templates: { get: (templateId: string) => Effect.Effect<AgentTemplateDetail, MarketplaceCatalogError> };
 }
 

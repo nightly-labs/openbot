@@ -45,7 +45,6 @@
 }
 
 .remote-desktop-workspace-darwin .remote-desktop-header {
-  /* The macOS traffic lights are at the inline start in every language. */
   padding-inline-start: 84px;
 }
 

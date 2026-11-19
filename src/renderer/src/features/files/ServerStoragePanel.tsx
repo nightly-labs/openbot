@@ -15,32 +15,18 @@ import { createServerBackgroundProcesses } from "./server-background-processes";
 import { createServerAgents, createStorageUsage } from "./storage-usage";
 
 export interface ServerStorageOptions {
-  /** The computer the numbers belong to, such as "This Mac" or the server name. */
   hostName: string;
-  /** Owners and admins clear caches and delete files. A member only reads. */
   canManage: boolean;
   onOpenAgent: (agentId: string) => void;
   onShowMessage: (agentId: string, messageId: string) => void;
-  /** The members of the server. An owner or admin among them gets the machine alerts. */
   members?: readonly TeamMemberSummary[];
-  /** The storage calls of a client with no `window.openbot`, such as the web client. */
   calls?: FilesPort;
-  /**
-   * This computer, or a joined server that serves `background-processes-v1`. With `canManage`, Storage
-   * lists the programs that its agents left running.
-   */
   backgroundProcesses?: boolean;
 }
 
-/**
- * Server Settings > Storage: every location on the host, its agents, its largest chats and every
- * stored file. The agents are read for this server, because the dialog can be open for a server
- * that is not the selected one and the selected server's agents would name the wrong rows.
- */
 export function ServerStoragePanel(
   props: ServerStorageOptions & {
     serverId: string;
-    /** The plan storage in GB of a hosted server. The free space is then what the plan has left. */
     storageGb?: number | null;
   },
 ) {
@@ -56,7 +42,6 @@ export function ServerStoragePanel(
     calls,
   );
 
-  // Only this computer: a server removes its own old versions, and its store is not reachable here.
   const runtimes = () => {
     const { getRemovableRuntimes, removeRemovableRuntimes } = calls().storage;
     return props.serverId === LOCAL_SERVER_ID && getRemovableRuntimes && removeRemovableRuntimes
@@ -65,7 +50,6 @@ export function ServerStoragePanel(
   };
   const noRuntimes: RemovableRuntimes = { bytes: 0, providers: [] };
   const [removableRuntimes, setRemovableRuntimes] = createSignal<RemovableRuntimes>(noRuntimes);
-  // Read again after each scan, so "Measure again" and a removal both show the new size.
   createEffect(
     () => [storage.state.usage, runtimes()] as const,
     ([scan, port]) => {
@@ -76,7 +60,6 @@ export function ServerStoragePanel(
         .then((removable) => {
           if (current) setRemovableRuntimes(removable);
         })
-        // Hide the row rather than show an old size; the storage read reports its own failures.
         .catch(() => {
           if (current) setRemovableRuntimes(noRuntimes);
         });
@@ -96,8 +79,6 @@ export function ServerStoragePanel(
     }
   }
 
-  // A hosted server shows the free space of its plan, as the sidebar storage card does. The disk is read
-  // again after each scan; until it comes, the free space of the disk shows.
   const [disk, setDisk] = createSignal<{ scan: unknown; disk: StorageDisk } | null>(null);
   createEffect(
     () => [storage.state.usage, props.storageGb, calls().storage.getDisk] as const,
@@ -150,7 +131,6 @@ export function ServerStoragePanel(
       runtimeBytes={runtimes() ? removableRuntimes().bytes : 0}
       runtimeProviders={removableRuntimes().providers}
       onRemoveRuntimes={removeRuntimes}
-      // Settings has no preview pane, so a preview opens the file in its app.
       onPreviewFile={(file) => void storage.fileAction(file, "open", { onShowInChat: () => undefined })}
       machine={
         <>

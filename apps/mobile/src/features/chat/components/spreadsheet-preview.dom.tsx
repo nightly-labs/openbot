@@ -1,16 +1,13 @@
 "use dom";
 
 import { parseSpreadsheet, type SpreadsheetData } from "@openbot/contracts/spreadsheet-workbook";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { useMemo, useState } from "react";
-import { base64Bytes } from "../model/base64-bytes";
 
 interface SpreadsheetPreviewProps {
-  /** The `.xlsx` file as Base64. */
   base64: string;
   title: string;
-  /** The language that formats the cell numbers, as desktop formats them. */
   locale: string;
-  /** The space that the floating header and the home indicator cover. */
   insets: { top: number; bottom: number };
   colors: { background: string; foreground: string; muted: string; border: string; field: string };
   failedText: string;
@@ -34,7 +31,6 @@ interface ShownSheet {
   rows: { id: string; cells: Cell[] }[];
 }
 
-/** The sheets with an id for each sheet, row and cell: the place of each in the workbook. */
 function shownSheets(workbook: SpreadsheetData): ShownSheet[] {
   const cells = (row: string[]) => row.map((value, column) => ({ id: String(column), value }));
   return workbook.sheets.map((sheet, index) => ({
@@ -45,12 +41,6 @@ function shownSheets(workbook: SpreadsheetData): ShownSheet[] {
   }));
 }
 
-/**
- * The sheets of an `.xlsx` file as tables, with the parser of the desktop preview. The parser
- * reads the workbook XML with `DOMParser`, which this web view has and the app does not.
- * The first row is the header, and the tabs choose a sheet when the workbook has several.
- * The props have defaults: Expo Go on Android can render once before they come; see expo-go-dom.ts.
- */
 export default function SpreadsheetPreview({
   base64 = "",
   title = "",
@@ -63,7 +53,7 @@ export default function SpreadsheetPreview({
   const workbook = useMemo<SpreadsheetData | null>(() => {
     if (!base64) return null;
     try {
-      return parseSpreadsheet(base64Bytes(base64), {
+      return parseSpreadsheet(base64ToBytes(base64), {
         number: (value, options) => new Intl.NumberFormat(locale, options).format(value),
       });
     } catch {

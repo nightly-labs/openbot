@@ -470,7 +470,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Görüntü kopyalanamadı.",
   "settings.profile.share.createFailed": "Görüntü oluşturulamadı.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot ile son altı ayım",
   "settings.profile.activity.title": "Bu bilgisayardaki etkinlik",
   "settings.profile.activity.activeDays": {
@@ -480,7 +479,6 @@ export const messages = {
   "settings.profile.activity.empty": "Henüz etkinlik yok",
   "settings.profile.activity.loading": "Etkinlik yükleniyor…",
   "settings.profile.activity.loadFailed": "Etkinliğiniz yüklenemedi.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Son bir yılda {count} etkin günde {tokens} token",
     other: "Son bir yılda {count} etkin günde {tokens} token",
@@ -562,7 +560,6 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot yeniden başlar ve indirilen güncellemeyi yükler. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
-  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
   "settings.updates.idleRestart.title": "OpenBot'u yeniden başlat",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
@@ -659,7 +656,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.parakeetUnified.description":
@@ -837,6 +833,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.duplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {
     one: "{count} ajan {server} sunucusuna kopyalandı.",

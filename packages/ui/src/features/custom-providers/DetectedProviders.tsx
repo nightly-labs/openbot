@@ -30,19 +30,15 @@ import {
 interface DetectedProvidersProps {
   detection: ProviderDetection;
   api: DetectedProviderApi;
-  /** Saved IDs, so a duplicate is a field error in the form before a round trip. */
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
   disabled?: boolean | undefined;
-  /** The rows are of the joined server's host, not of this computer. */
   onServer?: boolean | undefined;
-  /** After an Add or an Edit, so the host can say when the new models appear. */
   onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
 }
 
 export function DetectedProviders(props: DetectedProvidersProps) {
   const { t } = useText();
-  /** The row whose form is open. Add and Edit open the same filled form. */
   const [setupFor, setSetupFor] = createSignal<DetectedProvider | null>(null);
   const hidden = () => props.detection.hidden ?? 0;
   const heading = () => t(props.onServer ? "customProvider.detected.titleServer" : "customProvider.detected.title");
@@ -101,7 +97,6 @@ export function DetectedProviders(props: DetectedProvidersProps) {
         }
       >
         <ItemGroup surface="subtle">
-          {/* Keyed by the detection key, so a store update keeps the row and the focus of its Edit button. */}
           <For each={props.detection.found} keyed={(row) => row.key}>
             {(provider) => (
               <Item size="compact">

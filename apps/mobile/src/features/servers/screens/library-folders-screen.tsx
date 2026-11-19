@@ -17,7 +17,6 @@ import Files from "lucide-react-native/icons/files";
 import FolderIcon from "lucide-react-native/icons/folder";
 import FolderPlus from "lucide-react-native/icons/folder-plus";
 import UserX from "lucide-react-native/icons/user-x";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -40,8 +39,9 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { SaveError } from "@/shared/components/save-error";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -50,13 +50,11 @@ import { isAndroid } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-/** Each level of the tree moves its rows in by this much. */
 const INDENT = 18;
 const ICON_BOX = 28;
 
 type ChangeFolders = (action: LibraryFolderAction) => Promise<void>;
 
-/** A refused or failed change. The folders already show what the host has now. */
 function alertChangeFailed(cause: unknown): void {
   void haptics.notification("error");
   const text = currentText();
@@ -64,7 +62,6 @@ function alertChangeFailed(cause: unknown): void {
   Alert.alert(title, text.errorMessage(cause, title));
 }
 
-/** The page that names a new folder, or a folder that gets a new name, in the folder sheet. */
 function openNamePage(params: {
   serverId: string;
   agentId?: string;
@@ -76,7 +73,6 @@ function openNamePage(params: {
   router.push({ pathname: "/library-folders/name", params });
 }
 
-/** Asks first: a delete takes the folders in the folder too. The files stay with the agent. */
 function confirmDelete(folder: LibraryFolder, change: ChangeFolders): void {
   const text = currentText();
   void haptics.notification("warning");
@@ -94,7 +90,6 @@ function confirmDelete(folder: LibraryFolder, change: ChangeFolders): void {
   );
 }
 
-/** The "…" of a folder or an agent row: the native menu of its folder actions. */
 function FolderActionsMenu({
   serverId,
   agentId,
@@ -106,7 +101,6 @@ function FolderActionsMenu({
   serverId: string;
   agentId: string;
   agentName: string;
-  /** Absent: the menu of the agent row, which only makes a folder at the top level. */
   folder?: LibraryFolder;
   folders: readonly LibraryFolder[];
   change: ChangeFolders;
@@ -160,7 +154,6 @@ function FolderActionsMenu({
   );
 }
 
-/** The chevron that shows or hides the folders of a row. It turns down while they show. */
 function ExpandButton({ name, expanded, onPress }: { name: string; expanded: boolean; onPress: () => void }) {
   const { t } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
@@ -199,10 +192,6 @@ function Glyph({ children, depth = 0 }: { children: ReactNode; depth?: number })
   );
 }
 
-/**
- * A tree row and its controls. The chevron and the "…" are beside the row, not in it: a control
- * inside the pressable row gives its tap to the row, and the native menu does not open.
- */
 function TreeRow({ row, controls }: { row: ReactNode; controls: ReactNode }) {
   return (
     <View className="flex-row items-center">
@@ -221,7 +210,6 @@ function RowTrailing({ count, children }: { count: string; children?: ReactNode 
   );
 }
 
-/** The note of a sheet whose folders did not load, or of a server without folders. */
 function FoldersNote({ library }: { library: ReturnType<typeof useLibrary> }) {
   const { t, errorMessage } = useText();
   const { folders, storage } = library;
@@ -239,10 +227,6 @@ function FoldersNote({ library }: { library: ReturnType<typeof useLibrary> }) {
   );
 }
 
-/**
- * Library > folder capsule: the place sheet. With `fileId` it is the move sheet of that file instead.
- * The rows follow the host: a change on another device or by an agent shows here at once.
- */
 export function LibraryFoldersScreen() {
   const { fileId } = useLocalSearchParams<{ serverId: string; fileId?: string }>();
   return fileId ? <MoveFileSheet fileId={fileId} /> : <PlaceSheet />;
@@ -269,7 +253,6 @@ function PlaceSheet() {
     () => resolveLibraryPlace(storedPlace, snapshot, folders.livingAgentIds, removedFilesExist),
     [storedPlace, snapshot, folders.livingAgentIds, removedFilesExist],
   );
-  // The agent and the folders of the place show open, so the place is in view.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => {
     const open = new Set<string>();
     if (chosen.kind === "agent" || chosen.kind === "folder") open.add(`agent:${chosen.agentId}`);
@@ -277,8 +260,6 @@ function PlaceSheet() {
       for (const folder of libraryFolderPath(snapshot.folders, chosen.folderId)) open.add(folder.id);
     return open;
   });
-  // A folder that is new since the list opened, from this phone or from another device, shows: its
-  // agent and the folders above it open.
   const seenFolderIds = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
     if (!snapshot) return;
@@ -315,7 +296,6 @@ function PlaceSheet() {
   const check = (place: LibraryPlace) => (isChosen(place) ? <Check size={18} color={accent} strokeWidth={2} /> : null);
   const countText = (count: number) => format.number(count);
 
-  /** The folder rows under one parent, and the rows of each open folder under it. */
   const folderRows = (agentId: string, agentName: string, parentId: string | undefined, depth: number): ReactNode[] =>
     childFolders(snapshot.folders, agentId, parentId).flatMap((folder) => {
       const place: LibraryPlace = { kind: "folder", agentId, folderId: folder.id };
@@ -445,7 +425,6 @@ function PlaceSheet() {
   );
 }
 
-/** Library > a file's "Move to folder": the folders of the file's agent. A file never leaves its agent. */
 function MoveFileSheet({ fileId }: { fileId: string }) {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -544,10 +523,6 @@ function MoveFileSheet({ fileId }: { fileId: string }) {
   );
 }
 
-/**
- * The folder sheet's name page: a new folder of an agent (in `parentId`, and with `fileId` in it), or a
- * new name for `folderId`. It closes the whole sheet when the host has the change.
- */
 export function LibraryFolderNameScreen() {
   const { t } = useText();
   const params = useLocalSearchParams<{
@@ -559,10 +534,7 @@ export function LibraryFolderNameScreen() {
   }>();
   const { serverId } = params;
   const navigation = useNavigation();
-  // The stack that presents the sheet: going back in it closes the sheet with all its pages.
   const sheetStack = navigation.getParent();
-  // Opened from the folder list or the move list of the sheet: the page goes back to that list, which
-  // shows the change. Opened alone, from the "+" of the Library, it closes the sheet.
   const hasListBelow = (navigation.getState()?.index ?? 0) > 0;
   const { folders, canOrganize } = useLibrary(serverId);
   const snapshot: LibraryFoldersSnapshot | null = folders.snapshot;
@@ -570,7 +542,6 @@ export function LibraryFolderNameScreen() {
   const parent = params.parentId ? snapshot?.folders.find((folder) => folder.id === params.parentId) : undefined;
   const agentId = renaming?.agentId ?? params.agentId ?? null;
   const [name, setName] = useState(renaming?.name ?? "");
-  // The folders can load after the page opens. The field then starts with the folder's name.
   const touched = useRef(false);
   const loadedName = renaming?.name;
   useEffect(() => {
@@ -629,22 +600,7 @@ export function LibraryFolderNameScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title }} />
-      {/* Over a list, the native back button goes to it. Alone, the page closes the sheet. */}
-      {hasListBelow ? null : isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button icon="xmark" accessibilityLabel={t("common.close")} disabled={saving} onPress={close}>
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      {hasListBelow ? null : <SheetCloseAction disabled={saving} onPress={close} />}
       <SheetSaveAction
         dirty={dirty}
         canSave={available && valid}
@@ -674,11 +630,7 @@ export function LibraryFolderNameScreen() {
       {snapshot && !available ? (
         <Typography.Paragraph className="text-muted">{t("mobile.server.library.folders.gone")}</Typography.Paragraph>
       ) : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </SheetScrollView>
   );
 }

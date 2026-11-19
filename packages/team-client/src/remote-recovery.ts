@@ -21,15 +21,9 @@ const recoveryCall = <A>(operation: () => Promise<A>) =>
       }),
   });
 
-/** The wait after the first failed attempt. Each next failed attempt doubles it: 2, 4, 8 and 16 seconds. */
 export const REMOTE_RETRY_INTERVAL_MS = 2_000;
 export const REMOTE_RETRY_LIMIT = 5;
-/**
- * The wait after `REMOTE_RETRY_LIMIT` failed attempts. Then the attempts start again from the first wait.
- * A server that comes back is found within this time, without a manual reconnect (issue #4087).
- */
 export const REMOTE_RETRY_COOLDOWN_MS = 30_000;
-/** Up to this fraction of a wait is added at random, so phones that lost the same service do not retry together. */
 const REMOTE_RETRY_JITTER = 0.2;
 
 function remoteRetryDelay(attempt: number): number {
@@ -41,7 +35,6 @@ function remoteRetryDelay(attempt: number): number {
 export interface RemoteRecoveryStatus {
   phase: "connecting" | "waiting" | "cooldown" | "online" | "suspended";
   attempt: number;
-  /** The wait before the next attempt. While connecting, the wait that follows if this attempt fails. */
   remainingSeconds: number;
 }
 
@@ -55,8 +48,6 @@ const CONNECTION_STAGES = {
   reads: "status.remote.stageReads",
 } as const satisfies Record<RemoteConnectionStage, keyof SourceMessages>;
 
-// Only fixed protocol messages may appear in diagnostics. Arbitrary server or
-// decoder errors can contain request bodies, credentials, or conversation text.
 const SAFE_CONNECTION_ERRORS = new Set(
   (
     [
@@ -108,12 +99,13 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.accountSessionInactive",
       "error.remote.hostOtherAccount",
       "error.remote.remoteNotConfigured",
+      "error.remote.hostKeyMissing",
+      "error.remote.connectionNotStarted",
     ] as const satisfies readonly (keyof SourceMessages)[]
   ).map((key) => sourceText(key)),
 );
 
 const NUMBER_MARK = "\u0000";
-/** A fixed message with a number in it. Only digits can fill the number, so no server text can pass. */
 function numberTemplate(text: string): RegExp {
   const [before = "", after = ""] = text.split(NUMBER_MARK);
   const literal = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -126,12 +118,10 @@ const SAFE_NUMBER_CONNECTION_ERRORS = [
   numberTemplate(sourceText("error.remote.requestFailedStatus", { status: NUMBER_MARK })),
 ];
 
-/** Whether a connection message is one of our fixed sentences, and not text from a peer or the browser. */
 export function isSafeConnectionError(message: string): boolean {
   return SAFE_CONNECTION_ERRORS.has(message) || SAFE_NUMBER_CONNECTION_ERRORS.some((pattern) => pattern.test(message));
 }
 
-/** What a failed connection step shows: a fixed sentence, and the code that says where it failed. */
 export interface RemoteConnectionFailure {
   message: string;
   reference: string | null;
@@ -142,14 +132,12 @@ export function remoteConnectionFailureDetails(stage: RemoteConnectionStage, err
     error instanceof Error && isSafeConnectionError(error.message)
       ? error.message
       : sourceText("error.remote.connectionStepFailed");
-  // The reference is built only from fixed identifiers, so it is safe when the text is not.
   return { message: sourceText(CONNECTION_STAGES[stage], { reason }), reference: errorReference(error) };
 }
 
 export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: string | null): string | null {
   if (status.phase === "online") return null;
   const detail = failure || null;
-  // No countdown, because nothing is scheduled. Retrying is what this phase exists to stop.
   if (status.phase === "suspended") {
     return detail
       ? sourceText("status.remote.suspendedDetail", { detail })
@@ -174,23 +162,15 @@ export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: st
       ? sourceText("status.remote.attemptFailedDetail", { count, detail })
       : sourceText("status.remote.attemptFailed", { count });
   }
-  // The limit is the {count} value: only a number placeholder at the end keeps this text apart from its detail form.
   return detail
     ? sourceText("status.remote.reconnectingDetail", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT, detail })
     : sourceText("status.remote.reconnecting", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT });
 }
 
-/**
- * One recovery attempt at a time. Background time never starts network work. `connect` gets `check`
- * on the first attempt after a return to the app while the connection was online: the consumer can
- * check the connection that it kept instead of loading everything again. A refresh, a lost
- * connection and a failed check load everything.
- */
 export function createRemoteConnectionRecovery(
   connect: (check: boolean) => Promise<void>,
   onError: (error: unknown) => void,
   onStatus: (status: RemoteRecoveryStatus) => void = () => {},
-  /** The wait while the host starts, such as a hosted server after a wake. It replaces the backoff. */
   startingRetryDelay: () => number | null = () => null,
 ) {
   let active = false;
@@ -201,13 +181,10 @@ export function createRemoteConnectionRecovery(
   let retryRequested = false;
   let refreshRequested = false;
   let interrupted = false;
-  /** The running attempt checks a connection that was online, such as on a return to the app. */
   let checking = false;
-  /** The next attempt is the first after a return to the app with an online connection. */
   let checkOnReturn = false;
   let attempt = 0;
   let retryAt: number | null = null;
-  /** Chosen when an attempt starts, so its status can show the wait that follows a failure. */
   let retryDelay: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -220,12 +197,10 @@ export function createRemoteConnectionRecovery(
     void runTeamEffect(run());
   }
 
-  /** `start` begins the attempt that is due now: a new run, or the next pass of the run that is ending. */
   function scheduleRetry(start: () => void = startRun) {
     if (disposed || suspended) return;
     const startingDelay = startingRetryDelay();
     retryAt ??= Date.now() + (startingDelay ?? retryDelay ?? remoteRetryDelay(attempt));
-    // A host that began to start during a longer wait does not wait for the rest of it.
     if (startingDelay !== null) retryAt = Math.min(retryAt, Date.now() + startingDelay);
     retryDelay = null;
     if (!active) return;
@@ -241,10 +216,7 @@ export function createRemoteConnectionRecovery(
       attempt,
       remainingSeconds: Math.ceil(remaining / 1000),
     });
-    // Offline can arrive before the bridge finishes its command. Show the failure
-    // immediately, but let run's finally start an overdue retry after cleanup.
     if (timer !== null || remaining === 0) return;
-    // The one-second tick only updates the UI; network work starts at the deadline.
     timer = setTimeout(
       () => {
         timer = null;
@@ -254,7 +226,6 @@ export function createRemoteConnectionRecovery(
     );
   }
 
-  // An attempt that ends with a refresh or a due retry starts the next pass in the same run.
   const run = Effect.fn("RemoteRecovery.run")(function* () {
     while (yield* attemptOnce()) {}
   });
@@ -273,8 +244,6 @@ export function createRemoteConnectionRecovery(
     interrupted = false;
     attempt += 1;
     retryDelay = remoteRetryDelay(attempt);
-    // A foreground read is not a lost connection. Keep the workspace usable
-    // until the transport reports a failure or the read fails.
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: Math.ceil(retryDelay / 1000) });
     yield* Effect.gen(function* () {
       const result = yield* recoveryCall(() => connect(check)).pipe(Effect.result);
@@ -291,8 +260,6 @@ export function createRemoteConnectionRecovery(
           if (!disposed) onError(error);
         }
         retryRequested = true;
-        // A read on a previously usable peer detected a dead connection. Its first
-        // replacement starts now; only a failed replacement earns a retry delay.
         if (checkingConnection) {
           attempt = 0;
           retryAt = Date.now();
@@ -331,19 +298,13 @@ export function createRemoteConnectionRecovery(
       active = value;
       cancelTimer();
       if (!active && running) {
-        // Background entry invalidates the consumer's pending workspace reads.
         interrupted = true;
       }
       if (active) {
-        // Coming back to the app is this phone's version of the explicit refresh the desktop asks
-        // for after a protocol error, and it is the exit a user reaches without knowing there is
-        // one: the desktop they left to update is the reason the frame was unreadable. One attempt
-        // per return, not a loop.
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
         else {
-          // A refresh asked for while inactive, such as after lost events, still loads everything.
           checkOnReturn = online && !refreshRequested;
           startRun();
         }
@@ -355,20 +316,12 @@ export function createRemoteConnectionRecovery(
       checkOnReturn = false;
       if (error !== undefined) onError(error);
       retryRequested = true;
-      // Losing a connection is not a failed reconnection attempt. Neither is losing the connection that
-      // a running attempt checks: as when the check fails, its replacement starts at once, so the status
-      // shows no countdown of a failed attempt.
       if (retryAt === null && (!running || checking)) {
         if (running) attempt = 0;
         retryAt = Date.now();
       }
       scheduleRetry();
     },
-    /**
-     * The platform saw the network come back. A wait that the lost network caused is over, so the
-     * next attempt starts now and counts from one. A connection that is online or connecting is
-     * left alone: the peer renews its own path.
-     */
     networkRestored() {
       if (disposed || suspended || online || running || retryAt === null) return;
       retryAt = null;
@@ -376,12 +329,6 @@ export function createRemoteConnectionRecovery(
       cancelTimer();
       if (active) startRun();
     },
-    /**
-     * A failure no retry can fix: the two ends disagree about the wire, so the next attempt is told
-     * the same thing. Stops the loop rather than joining it -- `offline` would schedule five
-     * attempts, a wait of 30 seconds and five attempts again, for as long as the app is open.
-     * Reversible: `refresh`, returning to the foreground, and switching servers each clear it.
-     */
     suspend(error?: unknown) {
       if (disposed) return;
       online = false;
@@ -409,7 +356,6 @@ export function createRemoteConnectionRecovery(
   };
 }
 
-/** Order initial and event reads together, without invalidating another server's responses. */
 export function createRemoteReadRefresh() {
   const requests = new Map<string, number>();
   const cursors = new Map<string, number>();
@@ -436,11 +382,6 @@ export function createRemoteReadRefresh() {
   };
 }
 
-/**
- * Merge one server/page's read state without clearing unrelated cached unread IDs. An unchanged
- * result returns `current`, so a state setter does not notify consumers for a read refresh that
- * changed nothing.
- */
 export function mergeRemoteUnreadIds(current: string[], reads: Record<string, { unreadCount: number }>): string[] {
   const next = [
     ...current.filter((id) => !(id in reads)),
@@ -451,7 +392,6 @@ export function mergeRemoteUnreadIds(current: string[], reads: Record<string, { 
   return next.length === current.length && next.every((id, index) => id === current[index]) ? current : next;
 }
 
-/** Only conversations cached for agents in this server need recovery. */
 export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConversations")(function* <E>(input: {
   agentIds: string[];
   cached: Record<string, ConversationSnapshot>;
@@ -468,17 +408,8 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
   }
 });
 
-/** A request with a short limit waits at most this long, also while answers to earlier requests arrive. */
 export const REMOTE_REQUEST_MAX_WAIT_MILLISECONDS = 60_000;
 
-/**
- * Starts the deadline of one request and gives its first timer. Answers come back in order on one
- * channel, so on a slow path a request waits behind earlier answers while the host works. Thus
- * `timeoutMs` counts from the send or the last answer on the channel, whichever is later. A host
- * that stops sends no answers and fails the request after `timeoutMs`, as before. `rearm` keeps
- * each later timer, so that the caller can clear it. Times are `performance.now()`, which a clock
- * change does not move.
- */
 export function startRemoteRequestDeadline(
   timeoutMs: number,
   lastAnswerAt: () => number,
@@ -496,10 +427,8 @@ export function startRemoteRequestDeadline(
   return setTimeout(check, timeoutMs);
 }
 
-/** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
 export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {
   const route = path.split("?")[0];
-  // `sidebar-folders-v1` reads the layout with a POST.
   if (method === "POST" && route === SIDEBAR_FOLDERS_ROUTES.read) return 15_000;
   if (method !== "GET") return undefined;
   return route === TEAM_API_ROUTES.compatibility ||

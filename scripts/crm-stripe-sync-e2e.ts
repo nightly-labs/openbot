@@ -1,18 +1,3 @@
-// Checks the Stripe sync of the CRM. A loopback stand-in for `api.stripe.com` serves customers,
-// subscriptions, invoices, products and the account, and records each request. A real
-// `TeamApiServer` runs on loopback with the real CRM service and the real Stripe adapter on a temporary
-// `openbot.db`; each request and answer goes through the frozen crm-v1 codec.
-//
-// The owner connects with a secret key, an unknown key and a key without a permission (each refused),
-// then with a restricted test key. The first sync links a customer by Stripe ID and one by email,
-// imports new customers (one with no currency), imports subscriptions as plans and invoices as
-// payments, converts ISK, and counts a currency and a weekly interval as not imported. The next full
-// sync marks a payment paid with no extra plan payment and removes a voided one. People and agents cannot
-// change the rows that Stripe owns, and a pending proposal that targets one is closed. A deleted linked
-// customer is not imported again. A 429 sets the error state. Disconnect makes the rows editable, and a
-// reconnect links them again with no duplicates. The key is in no response and in no log line.
-// Run: `bun scripts/crm-stripe-sync-e2e.ts`. Writes .openbot-build/crm-stripe-sync-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -63,7 +48,6 @@ const UNKNOWN_KEY = "rk_test_E2eUnknownKey00000";
 const SECRET_KEY = "sk_test_E2eFullAccessKey000";
 const KEYS = [GOOD_KEY, NO_PERMISSION_KEY, UNKNOWN_KEY, SECRET_KEY];
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "crm-stripe-sync-electron-boundary",
   setup(build) {
@@ -97,9 +81,6 @@ const { TeamApiServer } = await import("../src/main/team-api-server");
 const { AGENT_ACCESS_FILE, AgentAccessStore } = await import("../src/main/agent-access-store");
 const { TeamStore } = await import("../src/main/team-store");
 
-// --- Log capture: the key must be in no line that the host writes. ---------------------------------
-
-// Every line of the host's Team API logger, at all levels. The CRM code has no logger of its own.
 const logged: string[] = [];
 teeLogLines(["team-api-server"], (line) => logged.push(line));
 
@@ -122,12 +103,10 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. Each detail holds counts and states, never a key. */
 async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its sync, and a missing sync must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -143,8 +122,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
     clearTimeout(deadline);
   }
 }
-
-// --- The Stripe stand-in ----------------------------------------------------------------------------
 
 const NOW = Math.floor(Date.now() / 1000);
 const DAY = 24 * 60 * 60;
@@ -162,7 +139,6 @@ const customers = new Map<string, StripeObject>(
   [
     { id: "cus_A", name: "Acme in Stripe", email: "ap@acme.example", phone: null, currency: "eur" },
     { id: "cus_B", name: "Beta in Stripe", email: "Billing@Beta.example", phone: null, currency: "eur" },
-    // Outer spaces: the CRM trims them, or the page decoders refuse the whole page.
     { id: "cus_C", name: " Cobalt  ", email: "c@cobalt.example", phone: "+1 555 0100", currency: null },
     { id: "cus_D", name: "Delta", email: "d@delta.example", phone: null, currency: null },
     { id: "cus_E", name: "Iceland ehf", email: "e@iceland.example", phone: null, currency: "isk" },
@@ -290,7 +266,6 @@ interface StripeRequest {
 
 const stripe: { rateLimited: boolean; requests: StripeRequest[] } = { rateLimited: false, requests: [] };
 
-/** Changes one Stripe object, as a dashboard edit would, and returns its new state. */
 function change(map: Map<string, StripeObject>, id: string, patch: Partial<StripeObject>): StripeObject {
   const object = map.get(id);
   assert.ok(object, `The stand-in has no ${id}.`);
@@ -308,7 +283,6 @@ function embedCustomer(object: StripeObject): StripeObject {
   return typeof ref === "string" && customers.has(ref) ? { ...object, customer: customers.get(ref) } : object;
 }
 
-/** One list page after the `starting_after` anchor. */
 function page<T extends { id: string }>(
   items: T[],
   query: URLSearchParams,
@@ -392,8 +366,6 @@ const stripeAddress = stripeServer.address();
 assert.ok(stripeAddress !== null && typeof stripeAddress === "object", "The Stripe stand-in has no port.");
 const stripeBase = `http://127.0.0.1:${stripeAddress.port}`;
 
-// --- The host ---------------------------------------------------------------------------------------
-
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
@@ -427,6 +399,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -443,10 +416,8 @@ const root = await mkdtemp(join(tmpdir(), "openbot-crm-stripe-sync-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
 
-/** The saved keys, as main keeps them; in memory here. */
 const savedKeys = new Map<CrmSourceKind, string>();
 
-/** Each `changed()` of the CRM wakes the waiters, so a step waits for the sync and not for time. */
 let changeWaiters: (() => void)[] = [];
 function nextChange(): Promise<void> {
   return new Promise((resolveChange) => changeWaiters.push(resolveChange));
@@ -479,7 +450,6 @@ async function startHost(): Promise<Host> {
   const crm = await Effect.runPromise(
     createCrm({
       database,
-      // Server Settings > Experimental has the CRM on, so the agents read it and the sync runs.
       settings: { get: () => ({ enabled: true }), set: (settings) => Effect.succeed(settings) },
       changed: () => {
         agents.notifyCrmChanged();
@@ -530,9 +500,6 @@ function current(): Host {
   return host;
 }
 
-// --- Team API client ---------------------------------------------------------------------------------
-
-/** Every response body, to check that no key comes back. */
 const responses: string[] = [];
 
 async function call(
@@ -558,7 +525,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A CRM request through the frozen codec, in both directions. */
 async function wire(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = CRM_CODECS.get(path);
   assert.ok(codec, `No crm-v1 codec for ${path}.`);
@@ -573,7 +539,6 @@ async function ok<T>(path: string, token: string, body: unknown, decode: (value:
   return decode(response.body);
 }
 
-/** A refused request: its status and the catalog text that it must carry. */
 async function refused(path: string, token: string, body: unknown, status: number, text: string) {
   const response = await wire(path, token, body);
   assert.equal(response.status, status, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
@@ -624,7 +589,6 @@ async function activity(token: string, customerId: string) {
   return (await ok(CRM_ROUTES.activity, token, { customerId }, decodeRemoteCrmActivityPage)).activity;
 }
 
-/** Starts a sync with `trigger` and waits for its end: a state that is not `syncing`. */
 async function settled(token: string, trigger: () => Promise<void>): Promise<CrmSource> {
   let next = nextChange();
   await trigger();
@@ -660,7 +624,6 @@ try {
       }),
     );
     await applied(token, { kind: "agent-access", agentIds: [agent.id] });
-    // Approved after the sync links Beta: it would change the Stripe ID that Stripe then sets.
     const { proposalId } = await Effect.runPromise(
       current().crm.agentPropose(agent.id, {
         change: { kind: "customer-update", customerId: beta, patch: { stripeCustomerId: "cus_other" } },
@@ -728,7 +691,6 @@ try {
       "A customer is not linked.",
     );
 
-    // Linked by the Stripe ID: the CRM name stays.
     const acme = await byName(token, "Acme");
     assert.equal(acme.id, before.acme);
     assert.equal(acme.statusId, "customer");
@@ -751,7 +713,6 @@ try {
       "An invoice is not on its plan.",
     );
 
-    // Linked by email (the case differs): the Stripe ID is set, the weekly subscription is not imported.
     const beta = await byName(token, "Beta");
     assert.equal(beta.id, before.beta);
     assert.equal(beta.stripeCustomerId, "cus_B");
@@ -764,7 +725,6 @@ try {
       (await activity(token, beta.id)).some((item) => item.kind === "customer-linked" && item.actor.kind === "source"),
     );
 
-    // New: no Stripe currency, so the invoice's currency; no invoice, so the account default.
     const cobalt = await byName(token, "Cobalt");
     assert.equal(cobalt.currency, "USD");
     assert.equal(cobalt.statusId, "lead");
@@ -773,7 +733,6 @@ try {
     const delta = await byName(token, "Delta");
     assert.equal(delta.currency, "EUR");
 
-    // ISK: Stripe counts hundredths, the CRM counts whole krónur. The plan takes the product name.
     const iceland = await byName(token, "Iceland ehf");
     assert.equal(iceland.currency, "ISK");
     assert.deepEqual(
@@ -822,7 +781,6 @@ try {
     const after = await payments(token, acme.id);
     const a2 = after.find((payment) => payment.label === "A-0002");
     assert.equal(a2?.paidAt, new Date(paidAt * 1000).toISOString());
-    // The plan is Stripe's: a paid payment makes no next one; the next invoice does.
     assert.equal(after.filter((payment) => payment.paidAt === null).length, 0, JSON.stringify(after));
     assert.ok(
       (await activity(token, acme.id)).some(
@@ -887,7 +845,6 @@ try {
     assert.ok(agentRefusal instanceof CrmError);
     assert.equal(agentRefusal.message, sourceText("error.crm.sourceOwned"));
 
-    // The proposal from before the link can never apply: approving it closes it.
     const approve = await refused(
       CRM_ROUTES.apply,
       token,
@@ -968,7 +925,6 @@ try {
     const [relinked] = await payments(token, beta.id);
     assert.equal(relinked?.id, b1.id);
     assert.equal(relinked?.source, "stripe");
-    // Stripe owns the row again, so its label comes back.
     assert.equal(relinked?.label, "B-0001");
     return { again, connected, reconnected };
   });

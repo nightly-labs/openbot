@@ -1,17 +1,3 @@
-// Frozen optional providers-v4 wire contract.
-//
-// It adds Cursor (`cursor`) and Cline (`cline`) to the managed CLI runtimes of `providers-v2` and to
-// the sign-in on another device of `providers-v3`, for a host whose browser nobody can see. An owner
-// or admin of a server can read the host's runtimes, download or cancel one, and start, answer or
-// cancel a sign-in. A member cannot use any route; `requireAdmin` on the host is the only gate.
-//
-// The sign-in kinds are those of `providers-v3`, plus `link`: a page that signs the provider's CLI in
-// by itself, with no code to confirm or copy (Cursor). Cline signs in with a device `code`. A host
-// advertises this whenever it has provider admin, so a client offers the Claude `paste` sign-in only
-// when the host also advertises `providers-v3`, which a host does only where it can run that flow.
-// How a sign-in ends arrives as the host's agent status, as for `providers-v1`. A runtime message
-// longer than 1024 characters is cut by the host before it is sent. `providers-v1` to `providers-v3`
-// stay as they were.
 import {
   adminRoute,
   count,
@@ -36,9 +22,7 @@ export const PROVIDERS_V4_ROUTES = {
   runtimesCheck: "/v1/admin/providers/v4/runtimes/check-updates",
 } as const;
 
-/** The providers these routes sign in. */
 export const PROVIDERS_V4_SIGN_IN_PROVIDERS = ["codex", "claude", "grok", "cursor", "cline"] as const;
-/** The managed runtimes these routes read, download and cancel. */
 export const PROVIDERS_V4_RUNTIME_PROVIDERS = [
   "codex",
   "claude",

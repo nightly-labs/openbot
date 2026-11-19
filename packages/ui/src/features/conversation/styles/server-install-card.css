@@ -1,5 +1,3 @@
-/* Server install card: the loader waits in the icon tile, then the new server's logo pops in. */
-
 .server-install-card-status[data-step="expired"] {
   color: var(--openbot-warning);
 }
@@ -55,12 +53,10 @@
   border-radius: inherit;
 }
 
-/* The plush keeps its own squircle: the tile clip cuts its fur. */
 .server-install-card-tile[data-step] .server-install-card-logo:has(> .ui-server-plush-logo) {
   overflow: visible;
 }
 
-/* When the server signs in, the plush squints with its happy face, hops, and shrinks away. */
 .server-install-card-tile:is([data-step="starting"], [data-step="connected"], [data-step="offline"]) .ui-plush-eye {
   animation: ui-plush-squint 220ms var(--openbot-ease-out) forwards;
 }
@@ -70,7 +66,6 @@
   animation: server-install-pop-out 420ms var(--openbot-ease-out) 200ms forwards;
 }
 
-/* The first animation in each list stays the same, so that the pop does not play again. */
 .server-install-card-tile[data-step="starting"] .server-install-card-logo {
   animation:
     server-install-pop-in 520ms var(--server-install-spring) 380ms backwards,
@@ -83,7 +78,6 @@
     server-install-settle 420ms var(--server-install-spring);
 }
 
-/* The badge: a spinner while the server starts, then a check that draws itself. */
 .server-install-card-badge {
   position: absolute;
   right: -5px;
@@ -93,7 +87,6 @@
   height: 18px;
   box-sizing: border-box;
   place-items: center;
-  /* The ring has the fill of the card, so the badge cuts into the logo. */
   border: 2px solid var(--openbot-bg-surface);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
@@ -124,7 +117,6 @@
   animation: server-install-text-in var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* The card showed first with the server signed in: the logo is already in place. */
 .server-install-card-tile[data-revealed][data-step] .server-install-card-face,
 .server-install-card-tile[data-revealed] .server-install-card-badge,
 .server-install-card-tile[data-revealed] .server-install-card-check * {

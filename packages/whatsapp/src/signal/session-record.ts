@@ -1,36 +1,25 @@
-// Pairwise session states and the record that holds them for one remote address, with OpenBot's own
-// versioned binary format. A record has one current state and archived states (newest first).
-
 import { ProtoFields, ProtoWriter } from "./protobuf";
 
-/** OpenBot session record format 1. */
 const RECORD_FORMAT = 1;
-/** Current state plus archived states. */
 const MAX_SESSION_STATES = 40;
 export const MAX_RECEIVING_CHAINS = 5;
 export const MAX_SKIPPED_MESSAGE_KEYS = 2000;
-/** Largest accepted step from the last derived index of a chain to a message counter. */
 export const MAX_FORWARD_JUMP = 2000;
 
 interface RatchetKeyPair {
-  /** 33 bytes with the type byte 0x05. */
   publicKey: Uint8Array;
   privateKey: Uint8Array;
 }
 
 interface SendingChain {
   chainKey: Uint8Array;
-  /** Counter of the next message. */
   nextIndex: number;
 }
 
 export interface ReceivingChain {
   ratchetKey: Uint8Array;
-  /** Undefined when the chain is closed: no more keys can be derived. */
   chainKey: Uint8Array | undefined;
-  /** Index of the next message key to derive. */
   nextIndex: number;
-  /** Message key seeds of skipped messages by counter, oldest first. */
   skipped: Map<number, Uint8Array>;
 }
 
@@ -43,32 +32,25 @@ interface PendingPreKey {
 export interface SessionState {
   remoteIdentityKey: Uint8Array;
   remoteRegistrationId: number;
-  /** The initiator's base key. It identifies the state between two devices. */
   baseKey: Uint8Array;
   rootKey: Uint8Array;
   localRatchet: RatchetKeyPair;
-  /** Undefined only for a responder state before its first message. */
   remoteRatchetKey: Uint8Array | undefined;
   previousCounter: number;
   sending: SendingChain | undefined;
-  /** Oldest first. */
   receiving: ReceivingChain[];
-  /** Set while the initiator has not decrypted a message on this state. */
   pendingPreKey: PendingPreKey | undefined;
 }
 
 export interface SessionRecord {
-  /** `states[0]` is the current state; the others are archived, newest first. */
   states: SessionState[];
 }
 
-/** Makes `state` current and archives the old current state. */
 export function addCurrentState(record: SessionRecord, state: SessionState): void {
   record.states.unshift(state);
   if (record.states.length > MAX_SESSION_STATES) record.states.length = MAX_SESSION_STATES;
 }
 
-/** Replaces the state at `index` with `state` and makes it current. */
 export function promoteState(record: SessionRecord, index: number, state: SessionState): void {
   record.states.splice(index, 1);
   record.states.unshift(state);

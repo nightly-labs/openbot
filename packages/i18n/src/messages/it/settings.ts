@@ -476,7 +476,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossibile copiare l'immagine.",
   "settings.profile.share.createFailed": "Impossibile creare l'immagine.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "I miei ultimi sei mesi con OpenBot",
   "settings.profile.activity.title": "Attività su questo computer",
   "settings.profile.activity.activeDays": {
@@ -486,7 +485,6 @@ export const messages = {
   "settings.profile.activity.empty": "Ancora nessuna attività",
   "settings.profile.activity.loading": "Caricamento attività…",
   "settings.profile.activity.loadFailed": "Impossibile caricare la tua attività.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} token in {count} giorno attivo nell'ultimo anno",
     other: "{tokens} token in {count} giorni attivi nell'ultimo anno",
@@ -829,6 +827,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "settings.transfer.copy.submit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "settings.transfer.copy.duplicatesTitle": "Copiare gli agenti duplicati?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ha già agenti con questi nomi: {names}. La copia aggiunge un secondo agente per ciascuno. Ogni copia è un agente separato, con le sue chat, i suoi file e le sue memorie.",
+  "settings.transfer.copy.duplicatesConfirm": "Copia i duplicati",
   "settings.transfer.copy.copying": "Copia in corso…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiato su {server}.",

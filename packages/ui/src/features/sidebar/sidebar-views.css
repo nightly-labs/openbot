@@ -1,5 +1,3 @@
-/* The switch over the sidebar list, and the rows of the diagrams view. */
-
 .sidebar-view-switch {
   padding: 2px 12px 6px;
 }
@@ -28,7 +26,6 @@
   flex: none;
 }
 
-/* Back and forward follow the reading direction. */
 .sidebar-history-button > svg:dir(rtl) {
   transform: scaleX(-1);
 }

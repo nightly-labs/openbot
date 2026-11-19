@@ -6,7 +6,6 @@ import { useText } from "../../text";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { routineScheduleSummary } from "../conversation/routine-schedule-ui";
 
-/** The agent's standing remit: its title and description. The description is Markdown. */
 export function TemplateInstructions(props: { title: string; description: string; onOpenLink: (url: string) => void }) {
   const { t } = useText();
   return (
@@ -31,10 +30,6 @@ export function TemplateInstructions(props: { title: string; description: string
   );
 }
 
-/**
- * The skills a template carries. With `expandable`, a local skill can open to show the `SKILL.md`
- * text it installs, so a user reads what an agent from another person will follow.
- */
 export function TemplateSkills(props: { skills: readonly AgentTemplateSkill[]; expandable?: boolean }) {
   const { t } = useText();
   return (
@@ -105,7 +100,6 @@ function EmbeddedSkill(props: { name: string; markdown: string }) {
   );
 }
 
-/** Each routine with its schedule and instruction. `labelled` adds the heading a mixed page needs. */
 export function TemplateRoutines(props: { routines: readonly MarketplaceAgentRoutine[]; labelled?: boolean }) {
   const text = useText();
   const { t } = text;

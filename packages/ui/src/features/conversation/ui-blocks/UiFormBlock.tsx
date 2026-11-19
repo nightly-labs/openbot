@@ -19,11 +19,9 @@ function fieldLabel(field: UiFormField): string {
 
 interface AnswerRow {
   field: UiFormField;
-  /** Absent for a secret field: the host never keeps its value. */
   value?: string;
 }
 
-/** A secret in an answered form. Always eight dots, so the card does not tell the length of the secret. */
 function HiddenValue() {
   const { t } = useText();
   return (
@@ -35,10 +33,6 @@ function HiddenValue() {
   );
 }
 
-/**
- * The answer of a form that asked for a secret: one row for each field with a value, and one for
- * each secret field, which shows as hidden.
- */
 function FormAnswerRows(props: { rows: AnswerRow[] }) {
   return (
     <dl class="ui-block-answer-rows">
@@ -58,7 +52,6 @@ function FormAnswerRows(props: { rows: AnswerRow[] }) {
   );
 }
 
-/** The key before the title of a form that asks for a secret, as the Vault request card has its kind. */
 function SecretFormIcon(props: { shown: boolean }) {
   return (
     <Show when={props.shown}>
@@ -80,18 +73,13 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
     Object.fromEntries(props.spec.fields.map((field) => [field.id, field.value ?? ""])),
   );
   const [failed, setFailed] = createSignal<ReadonlySet<string>>(new Set());
-  // The answer did not pass the block's checks, such as a date that is not a real date.
   const [rejected, setRejected] = createSignal(false);
 
-  // A frozen block shows the stored answer; an open one shows what the person has typed.
   const currentValue = (field: UiFormField): string => {
     const stored = frozen() ? state().response?.values?.[field.id] : undefined;
     return typeof stored === "string" ? stored : (draft()[field.id] ?? "");
   };
-  // An answered form that asked for a secret shows its answer as rows, not as disabled inputs.
   const summarized = () => state().status === "answered" && props.spec.fields.some(isSecretFormField);
-  // One that closed or expired without an answer leaves out its secret fields: an empty, disabled key
-  // field looks like a field that does not work (#7678). The other fields still show what was asked.
   const shownFields = () =>
     frozen() && state().status !== "answered"
       ? props.spec.fields.filter((field) => !isSecretFormField(field))
@@ -102,7 +90,6 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       const value = state().response?.values?.[field.id];
       return typeof value === "string" && value.trim() !== "" ? [{ field, value }] : [];
     });
-  // The rows already show each answer, so the line under them would repeat it.
   const outcome = () => (summarized() ? undefined : state().outcome);
   const errorOf = (field: UiFormField) => (failed().has(field.id) ? t("uiBlock.form.required") : undefined);
   const cardError = (): string | undefined => (rejected() ? t("uiBlock.form.invalid") : props.error);
@@ -140,7 +127,6 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       error={cardError()}
       onSkip={props.disabled ? undefined : props.onSkip}
       actions={
-        // The button is outside the form, in the footer of the card, so it names the form it sends.
         <Button type="submit" size="sm" form={formId} disabled={locked()}>
           {props.spec.submit ?? t("uiBlock.form.submit")}
         </Button>

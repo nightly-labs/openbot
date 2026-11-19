@@ -8,7 +8,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
-/** The icon size of each activity line, so routines, subagents, memory and thinking match. */
 export const ACTIVITY_ICON_SIZE = 14;
 const CHEVRON_SIZE = 12;
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -38,11 +37,6 @@ export function useActivityColors(): ActivityColors {
   };
 }
 
-/**
- * One line of the work of a turn: a routine, subagents, memory changes or the thinking steps. All
- * kinds share this line, so they start at the same edge, with the same icon size and type size. The
- * icon shows the kind; a caller shows a state icon only while the work runs or after it fails.
- */
 export function ChatActivityLine({
   icon,
   label,
@@ -55,18 +49,13 @@ export function ChatActivityLine({
   onPress,
 }: {
   icon: ReactNode;
-  /** Absent when the name alone says what the line is, such as a group of runs of one routine. */
   label?: string;
-  /** A name after the label, such as the routine name, in a stronger color. It can wrap to a second line. */
   name?: string;
-  /** Counts or a duration after the label, in a weaker color. */
   meta?: string;
   accessibilityLabel: string;
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
-  /** Replaces the chevron, such as the count and the arrow of a routine group. */
   trailing?: ReactNode;
-  /** Absent where nothing can open. The line then has no chevron and no press feedback. */
   onPress?: () => void;
 }) {
   const colors = useActivityColors();

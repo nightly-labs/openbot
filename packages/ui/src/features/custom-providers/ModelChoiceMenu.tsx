@@ -12,25 +12,17 @@ function MenuMark(props: { on: boolean }) {
   );
 }
 
-/**
- * One cell of the model table that holds a set of choices, such as the efforts of a model. The field
- * shows the chosen names in one line, and its menu stays open while the user checks items.
- */
 export function ModelChoiceMenu<T extends string>(props: {
-  /** The accessible name of the field, as `Model 1 efforts`. */
   label: string;
-  /** What the field shows when nothing is chosen. */
   empty: string;
   choices: readonly T[];
   name: (choice: T) => string;
   chosen: readonly T[];
   busy: boolean;
-  /** The dialog element that the menu portals into. */
   mount: HTMLElement | undefined;
   onToggle: (choice: T, on: boolean) => void;
 }) {
   const { t } = useText();
-  // The label names the field, so the chosen names are its description for a screen reader.
   const valueId = createUniqueId();
   const names = () => props.choices.filter((choice) => props.chosen.includes(choice)).map(props.name);
 

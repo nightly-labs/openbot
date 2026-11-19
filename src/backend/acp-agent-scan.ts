@@ -1,9 +1,3 @@
-// Which known ACP agents are installed on this computer.
-//
-// The scan looks for the preset command names, and for nothing else: a file in a folder the user
-// listed is found only when its name is a preset's. Nothing is started, not even with `--version`,
-// so the scan cannot run an unknown file.
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -19,9 +13,7 @@ const AGENT_SCAN_TIMEOUT_MS = 10_000;
 const AGENT_SCAN_CONCURRENCY = 4;
 
 export interface ScanAcpAgentsOptions {
-  /** Extra folders from the detection settings: absolute, or `~/…`. They are searched first. */
   folders: readonly string[];
-  /** Custom agent ids in use, so a suggested id is free. */
   takenIds: ReadonlySet<string>;
   presets?: readonly AcpAgentPreset[];
   platform?: NodeJS.Platform;
@@ -30,7 +22,6 @@ export interface ScanAcpAgentsOptions {
   resolve?: typeof resolveAgentCommand;
 }
 
-/** One row for each preset that is installed, in preset order. A scan past its time finds nothing. */
 export const scanAcpAgents = Effect.fn("AcpAgents.scan")(function* (options: ScanAcpAgentsOptions) {
   const presets = options.presets ?? ACP_AGENT_PRESETS;
   const platform = options.platform ?? process.platform;
@@ -41,8 +32,6 @@ export const scanAcpAgents = Effect.fn("AcpAgents.scan")(function* (options: Sca
     if (folder.startsWith("~/")) return [join(home, folder.slice(2))];
     return [folder];
   });
-  // On Windows an npm folder holds an extensionless shell script next to the `.cmd` shim, and only
-  // the shim or an `.exe` can be started.
   const names = (command: string) => (platform === "win32" ? [`${command}.exe`, `${command}.cmd`] : [command]);
   const lookup = Effect.fn("AcpAgents.lookup")((name: string, searchPath?: readonly string[]) =>
     resolve(name, { platform, home, ...(searchPath ? { searchPath } : {}) }).pipe(

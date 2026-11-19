@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "リモートデスクトップの設定を使うには、クライアントを更新してください。",
   "error.remote.desktopSetupUnavailable": "リモートデスクトップの設定を利用できません。",
   "error.remote.desktopTestUnavailable": "リモートデスクトップのテストを利用できません。",
@@ -26,6 +25,10 @@ export const messages = {
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
   "error.remote.windowsSessionDisconnected":
     "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
+  "error.remote.streamTooSlowLowerQuality":
+    "ホストへの接続が遅すぎて画面を表示できません。再試行してください。次の接続では画質を下げます。",
+  "error.remote.streamTooSlow":
+    "ホストへの接続が遅すぎて画面を表示できません。より速いネットワークを使ってから、再試行してください。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",
@@ -85,7 +88,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "このサーバーを削除できるのはオーナーだけです。",
   "error.remote.requestTimeout": "リモートリクエストがタイムアウトしました。",
   "error.remote.requestFailed": "リモートリクエストに失敗しました。",
-  "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",
+  "error.remote.hostKeyMissing":
+    "セキュリティキーがないか変更されたため、OpenBot はこのサーバーを確認できません。サーバーの所有者にサーバーの確認を依頼してください。",
+  "error.remote.connectionNotStarted":
+    "OpenBot はこのサーバーへの接続を開始できませんでした。問題が続く場合は、OpenBot を終了してもう一度開いてください。",
   "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
   "error.remote.hostDisconnected":
@@ -210,6 +216,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",
   "error.remote.taskHistoryRefreshFailed": "タスクは変更されましたが、チャット履歴を更新できませんでした。",
+  "error.remote.serverNotLoaded": "OpenBot はサーバーを読み込めませんでした。もう一度お試しください。",
+  "error.remote.localServerNotStarted":
+    "このコンピューターのサーバーが起動しませんでした。もう一度お試しください。起動しない場合は、このコンピューターで OpenBot を再起動してください。",
   "error.remote.localServerAccountRemovalFailed":
     "サーバーはそのコンピュータで削除されましたが、アカウントにはまだ表示されています。アカウントから外すには、もう一度削除してください。",
 } as const satisfies PartialTranslation<typeof source>;

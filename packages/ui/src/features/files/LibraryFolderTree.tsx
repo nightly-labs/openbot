@@ -43,83 +43,59 @@ import {
   UNSORTED_FILES,
 } from "./library-folders-view";
 
-/** The number of files that each row of the side panel shows. */
 export interface LibraryCounts {
   all: number;
   recent: number;
   unsorted: number;
   removed: number;
-  /** The files of an agent. */
   agent: ReadonlyMap<string, number>;
-  /** The files in a folder and in the folders in it. */
   folder: ReadonlyMap<string, number>;
 }
 
-/** A favorite that still exists: a folder, or an agent of the server. */
 export type LibraryFavorite =
   | { kind: "folder"; key: string; folder: LibraryFolder }
   | { kind: "agent"; key: string; agent: AgentProfile };
 
-/** With this many agents or fewer, the Agents section shows all of them and has no agent list. */
 const AGENTS_SHOWN = 6;
 
 interface LibraryFolderTreeProps {
   agents: readonly AgentProfile[];
-  /** The agents with files or folders, the agent with the newest file first. */
   activeAgents: readonly AgentProfile[];
   folders: readonly LibraryFolder[];
   counts: LibraryCounts;
-  /** The favorites that still exist, in the sequence that the viewer added them. */
   favorites: readonly LibraryFavorite[];
-  /** The place that the page shows. Its row is the current one. */
   place: LibraryLocation;
   search: string;
-  /** The search looks in the current place, so its field names that place. */
   searchLabel: string;
-  /** The folder whose row in the side panel shows the name field. */
   renaming: string | null;
-  /** The folder list under an agent (`agentKey`) or a folder (its id), or a section, does not show. */
   isCollapsed: (key: string) => boolean;
-  /** How the row of an agent (`folderId` null) or of a folder shows a drop. */
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
-  /** `""` for the folder that the pointer drags. */
   draggedFolder: (folderId: string) => "" | undefined;
-  /** `""` for a row that cannot take the drag that is on: see `dropOff` of the drag. */
   dropOff: (agentId: string | undefined, folderId?: string) => "" | undefined;
-  /** `""` for a short time after a drop on the row of an agent (`folderId` null) or a folder. */
   landed: (agentId: string, folderId: string | null) => "" | undefined;
-  /** How "Not in a folder" shows the drag: it takes files of one agent out of their folders. */
   outMark: () => "into" | undefined;
   outOff: () => "" | undefined;
   landedOut: () => "" | undefined;
-  /** The agent of the dragged files or folder. Its row shows while the drag is on. */
   dragAgent: string | null;
-  /** The server can hold one more folder. Without it, no row offers a new folder. */
   canCreate: boolean;
-  /** The viewer can change the folders of the agent. Without it, its rows offer no change. */
   canOrganize: (agentId: string) => boolean;
-  /** Files of deleted agents exist. They get a row after the agents. */
   removedFiles: boolean;
   onSearch: (search: string) => void;
   onGo: (place: LibraryLocation) => void;
   onOpenChange: (key: string, open: boolean) => void;
-  /** Makes a folder at the top level of the agent, or in the folder `parentId`. */
   onNewFolder: (agentId: string, parentId?: string) => void;
   onRename: (folderId: string) => void;
   onCommitName: (folderId: string, name: string) => void;
   onCancelName: (folderId: string) => void;
   onDelete: (folder: LibraryFolder) => void;
-  /** Adds a folder id or an agent key to the favorites, or removes it. */
   onToggleFavorite: (key: string) => void;
 }
 
-/** The parts of the panel that each row uses. */
 interface TreeRows {
   props: LibraryFolderTreeProps;
   children: (agentId: string, parentId: string | undefined) => readonly LibraryFolder[];
   isFavorite: (key: string) => boolean;
   current: (place: LibraryLocation) => boolean;
-  /** A click on a row: the current row shows or hides its folders, another row shows its place. */
   go: (place: LibraryLocation, branch?: string) => void;
 }
 
@@ -137,7 +113,6 @@ function agentPlace(agentId: string) {
   return { kind: "agent", agentId } satisfies LibraryLocation;
 }
 
-/** The name field of a folder. Enter or a click outside saves the name; Escape keeps the name before. */
 export function FolderNameField(props: {
   name: string;
   class: string;
@@ -161,7 +136,6 @@ export function FolderNameField(props: {
       maxlength={LIBRARY_FOLDER_LIMITS.name}
       value={name()}
       onValueChange={setName}
-      // The menu that started the rename gives the focus back to its button first.
       ref={(element) =>
         requestAnimationFrame(() => {
           element.focus();
@@ -181,17 +155,12 @@ export function FolderNameField(props: {
   );
 }
 
-/**
- * One row of the side panel. The count is at its end; the pointer or the focus shows the actions in its
- * place and the arrow that shows and hides the folders of the row.
- */
 function SideRow(props: {
   depth?: number;
   icon: JSX.Element;
   label: string;
   count?: number | undefined;
   current: boolean;
-  /** The key of the folders under the row. Undefined: the row has no folders under it. */
   branch?: string | undefined;
   onGo: () => void;
   onOpenChange?: ((open: boolean) => void) | undefined;
@@ -200,16 +169,11 @@ function SideRow(props: {
   agentId?: string | undefined;
   folderId?: string | undefined;
   drop?: LibraryDropMark | undefined;
-  /** `into`: the row takes a dragged folder only into it, not on a line beside it. */
   dropKind?: "into" | undefined;
   dragging?: "" | undefined;
-  /** `""`: the row cannot take the drag that is on. */
   off?: "" | undefined;
-  /** `""`: the row took a drop a moment ago. */
   landed?: "" | undefined;
-  /** The row takes files out of their folders. */
   out?: boolean | undefined;
-  /** The name field instead of the button. */
   editing?: JSX.Element | undefined;
 }) {
   const { t } = useText();
@@ -246,7 +210,6 @@ function SideRow(props: {
           aria-current={props.current ? "page" : undefined}
           onClick={() => props.onGo()}
           onKeyDown={(event) => {
-            // ArrowRight shows the folders of a row and ArrowLeft hides them, as in a file tree.
             if (!branched() || (event.key !== "ArrowRight" && event.key !== "ArrowLeft")) return;
             event.preventDefault();
             props.onOpenChange?.(event.key === "ArrowRight");
@@ -288,7 +251,6 @@ function SideRow(props: {
   );
 }
 
-/** A section of the side panel: a name that shows and hides its rows, and an action. */
 function SideSection(props: {
   rows: TreeRows;
   key: string;
@@ -325,7 +287,6 @@ function SideSection(props: {
   );
 }
 
-/** The "+" of a row: a new folder in the agent, or in the folder `parentId`. */
 function NewFolderButton(props: { rows: TreeRows; agentId: string; parentId?: string | undefined; label: string }) {
   const tree = () => props.rows.props;
   return (
@@ -345,7 +306,6 @@ function NewFolderButton(props: { rows: TreeRows; agentId: string; parentId?: st
   );
 }
 
-/** The favorite item of the folder menus. */
 export function FavoriteMenuItem(props: { favorite: boolean; onSelect: () => void }) {
   const { t } = useText();
   return (
@@ -358,7 +318,6 @@ export function FavoriteMenuItem(props: { favorite: boolean; onSelect: () => voi
   );
 }
 
-/** The menu of a folder row: favorite, rename and delete. Rename and delete need the agent to be organizable. */
 function FolderMenu(props: { rows: TreeRows; folder: LibraryFolder }) {
   const { t } = useText();
   const tree = () => props.rows.props;
@@ -393,7 +352,6 @@ function FolderMenu(props: { rows: TreeRows; folder: LibraryFolder }) {
   );
 }
 
-/** The folders of one parent, with a line along them, and below each folder the folders that are in it. */
 function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: string | undefined; depth: number }) {
   const { t } = useText();
   const tree = () => props.rows.props;
@@ -421,7 +379,6 @@ function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: st
               const place = () => folderPlace(folder());
               const nested = () => props.rows.children(folder().agentId, folder().id).length > 0;
               const current = () => props.rows.current(place());
-              /* The folder opens while it is the current place, or while a drag is on it. */
               const open = () => current() || tree().dropMark(folder().agentId, folder().id) === "into";
               return (
                 <li>
@@ -476,7 +433,6 @@ function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: st
   );
 }
 
-/** An agent row with its folders under it. */
 function AgentBranch(props: { rows: TreeRows; agent: AgentProfile }) {
   const { t } = useText();
   const tree = () => props.rows.props;
@@ -526,7 +482,6 @@ function AgentBranch(props: { rows: TreeRows; agent: AgentProfile }) {
   );
 }
 
-/** A row of the Favorites section. It takes a drop into it, and has no folders under it. */
 function FavoriteRow(props: { rows: TreeRows; favorite: LibraryFavorite }) {
   const tree = () => props.rows.props;
   return (
@@ -580,13 +535,6 @@ function FavoriteRow(props: { rows: TreeRows; favorite: LibraryFavorite }) {
   );
 }
 
-/**
- * The side panel of the Library: a search field; All files, Recent and the files in no folder; the
- * favorite folders and agents; the agents with their folders; and the files of deleted agents when
- * there are some. A server can have many agents: the Agents section shows the agents with the newest
- * files, and a searchable list finds the others. Rows that change folders need the viewer to be able to
- * change the folders of the agent.
- */
 export function LibraryFolderTree(props: LibraryFolderTreeProps) {
   const { t } = useText();
   const byParent = createMemo(() => {
@@ -612,14 +560,8 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
     },
   };
 
-  /** Agents that the viewer picked from the list of all agents in this visit. */
   const [picked, setPicked] = createSignal<readonly string[]>([]);
   const many = () => props.agents.length > AGENTS_SHOWN;
-  /**
-   * The agents of the section: all of them on a small server. On a large server, the agents with the
-   * newest files, the picked agents, the agent of the place, the agent of the folder being renamed and
-   * the agent of a drag, so its rows can take the drop, in the sequence of the server.
-   */
   const shownAgents = createMemo((): readonly AgentProfile[] => {
     if (!many()) return props.agents;
     const ids = new Set(props.activeAgents.slice(0, AGENTS_SHOWN).map((agent) => agent.id));
@@ -630,7 +572,6 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
     if (props.dragAgent) ids.add(props.dragAgent);
     return props.agents.filter((agent) => ids.has(agent.id));
   });
-  /** The agents with files first, so the list of all agents starts with the agents that the viewer uses. */
   const pickerAgents = createMemo(() => {
     const active = new Set(props.activeAgents.map((agent) => agent.id));
     return [...props.activeAgents, ...props.agents.filter((agent) => !active.has(agent.id))];

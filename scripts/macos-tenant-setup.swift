@@ -1,4 +1,3 @@
-// Administrator-only provisioning. The Host Manager daemon never calls this executable.
 import Darwin
 import Foundation
 import OpenDirectory
@@ -30,7 +29,6 @@ func generateTenantPassword() throws -> String {
     var bytes = [UInt8](repeating: 0, count: 24)
     guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess
     else { throw TenantSetupError.passwordFailure }
-    // 192 random bits, plus fixed characters to meet common local complexity policies.
     return "Aa1!" + Data(bytes).base64EncodedString()
 }
 
@@ -43,13 +41,11 @@ func provisionTenants(_ names: [String], using setup: TenantAccountSetup) throws
     let credentials = try zip(names, uids).map {
         TenantCredential(username: $0.0, uid: $0.1, password: try generateTenantPassword())
     }
-    // Persist first: even a partial failure must not lose the generated credentials.
     try setup.saveCredentials(credentials)
     for credential in credentials { try setup.createAccount(credential) }
     return credentials
 }
 
-// Descriptor-based operations never follow an existing tenant home or credential symlink.
 func openPrivateSetupDirectory(_ path: String, owner: uid_t) throws -> Int32 {
     let fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
     guard fd >= 0 else { throw TenantSetupError.unsafePath }
@@ -64,7 +60,6 @@ func openPrivateSetupDirectory(_ path: String, owner: uid_t) throws -> Int32 {
 
 func rejectWritableACL(_ fd: Int32) throws {
     guard let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) else {
-        // On a valid open descriptor, macOS reports ENOENT when no extended ACL exists.
         if errno == ENOENT { return }
         throw TenantSetupError.unsafePath
     }
@@ -122,7 +117,6 @@ final class MacTenantAccountSetup: TenantAccountSetup {
 
     init(quiet: Bool = false) throws {
         self.quiet = quiet
-        // All ancestors are fixed system directories, never supplied by a tenant.
         for path in ["/", "/private", "/private/var", "/private/var/run"] {
             let fd = try openPrivateSetupDirectory(path, owner: 0)
             close(fd)
@@ -184,12 +178,10 @@ final class MacTenantAccountSetup: TenantAccountSetup {
         try requireUnusedName(credential.username)
         guard try records(type: kODRecordTypeUsers, attribute: kODAttributeTypeUniqueID,
                           value: String(credential.uid)).isEmpty else { throw TenantSetupError.conflict }
-        // mkdirat is exclusive. Existing homes are never opened, repaired, scanned or removed.
         guard mkdirat(users, credential.username, 0o700) == 0 else { throw TenantSetupError.conflict }
         let home = openat(users, credential.username, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard home >= 0 else { throw TenantSetupError.unsafePath }
         defer { close(home) }
-        // Clear inherited ACLs only on the empty directory created by this invocation.
         try clearNewFileACL(home)
         guard fchmod(home, 0o700) == 0, fchown(home, credential.uid, 20) == 0
         else { throw TenantSetupError.unsafePath }
@@ -204,7 +196,6 @@ final class MacTenantAccountSetup: TenantAccountSetup {
             ])
         try record.synchronize()
         try requireStandardUser(credential.username)
-        // OpenDirectory receives the secret in memory, never through argv, env or a subprocess.
         try record.changePassword(nil, toPassword: credential.password)
         try record.synchronize()
         try record.verifyPassword(credential.password)
@@ -224,7 +215,6 @@ func requireStandardUser(_ name: String) throws {
     try command.run()
     let data = output.fileHandleForReading.readDataToEndOfFile()
     command.waitUntilExit()
-    // dseditgroup uses EX_NOUSER (67) for an existing user that is not a group member.
     guard command.terminationReason == .exit, command.terminationStatus == 67,
           String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
             == "no \(name) is NOT a member of admin"
@@ -259,7 +249,6 @@ enum TenantSetupCommand {
                 print("Account setup complete. Log each user into a GUI session, then enroll them with the host installer. In that account, open OpenBot → Server Settings → Remote desktop access. Grant Screen Recording and Accessibility, then select Check again. Use another computer to run Test remote desktop.")
             }
         } catch {
-            // Directory-service errors can contain credential data. Never print the raw error.
             fputs("Account setup stopped. Existing accounts are not reset. If a credential file was saved, keep it and inspect the partial setup as administrator before retrying.\n", stderr)
             exit(1)
         }

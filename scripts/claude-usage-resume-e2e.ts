@@ -1,12 +1,3 @@
-// Checks that a Claude turn after a resume books only its own requests. Runs the real agent service
-// on a temporary profile. Claude is the real `ClaudeAgentClient`, which the Claude Agent SDK connects
-// to a stand-in `claude` executable. Like the real CLI, the stand-in saves the session's cumulative
-// `modelUsage` and restores it on `--resume`, and it repeats each request's message once per content
-// block. A message `usage-prompts=<a>,<b>` makes one request per number, with that many cached input
-// tokens. Turns: two in a new process, an idle release of the process, then two in the resumed one.
-// Before this change, the first turn after the resume booked the whole session again. The SDK cost of
-// that turn is not known, so it gets the list-price estimate of its own tokens.
-// `bun run test:claude-usage-resume`. Writes .openbot-build/claude-usage-resume-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -31,15 +22,12 @@ const sessionsDir = join(root, "claude-sessions");
 const spawnLog = join(root, "claude-spawns.jsonl");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
-/** Claude keys `modelUsage` with the `[1m]` suffix of a 1M context, but its messages name the model without it. */
 const USAGE_MODEL = `${CLAUDE_MODEL}[1m]`;
-/** The stand-in's counts for each request, and its list-price cost. */
 const UNCACHED = 10;
 const CACHE_WRITE = 5;
 const OUTPUT = 20;
 const REQUEST_COST = 0.01;
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 mkdirSync(home, { recursive: true });
@@ -53,8 +41,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { estimateUsageCost } = await import("../src/backend/agent/usage-pricing");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end.
-// An even request reports its cache write; an odd one leaves the count out, as the API does for 0.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { join } = require("node:path");
@@ -74,7 +60,6 @@ const sessionId = resume ?? option("--session-id") ?? randomUUID();
 fs.appendFileSync(${JSON.stringify(spawnLog)}, JSON.stringify({ pid: process.pid, resume, sessionId }) + "\\n");
 const file = join(${JSON.stringify(sessionsDir)}, sessionId + ".json");
 const empty = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUSD: 0 };
-// The real CLI saves a \`cost-state\` entry and restores it with the session.
 const total = resume && fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { ...empty };
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 let requests = 0;
@@ -86,7 +71,6 @@ const turn = (message) => {
     if (requests % 2 === 0) usage.cache_creation_input_tokens = ${CACHE_WRITE};
     const last = index === prompts.length - 1;
     const content = last ? [{ type: "text", text: "Done." }] : [{ type: "tool_use", id: "tool_" + id, name: "Read", input: {} }];
-    // The first copy of the message has the count from the start of the stream.
     for (const copy of [{ ...usage, output_tokens: 1 }, usage])
       write({ type: "assistant", message: { id, type: "message", role: "assistant", model: ${JSON.stringify(CLAUDE_MODEL)},
         content, stop_reason: null, usage: copy }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
@@ -128,10 +112,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns and events go to the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -212,7 +192,6 @@ interface TurnReport {
 const report: {
   model: string;
   turns: TurnReport[];
-  /** What the release before this change booked for the first turn after the resume. */
   oldFirstResumedTurn?: UsageTokens;
   passed: boolean;
   error?: string;
@@ -239,7 +218,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -250,7 +228,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** Each start of the stand-in for a session. */
 function spawns(): { pid: number; resume: string | null; sessionId: string }[] {
   try {
     return readFileSync(spawnLog, "utf8")
@@ -262,7 +239,6 @@ function spawns(): { pid: number; resume: string | null; sessionId: string }[] {
   }
 }
 
-/** The tokens that the stand-in's requests for these prompts report. */
 function expected(prompts: number[], firstRequest: number): UsageTokens {
   return {
     uncachedInput: UNCACHED * prompts.length,
@@ -304,7 +280,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The provider turns of one agent, oldest first. */
 function turnsOf(agentId: string): string[] {
   return sqlite()
     .prepare(
@@ -330,10 +305,8 @@ function idle(agentId: string): boolean {
     .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
 }
 
-/** The stand-in process of the last turn, and the requests it has made. */
 let processes = 0;
 let requestsSoFar = 0;
-/** Sends the message of a turn, or with `send` false, waits for the agent's first turn. */
 async function runTurn(agentId: string, name: string, prompts: number[], send: boolean) {
   const index = send ? turnsOf(agentId).length : 0;
   if (send) {
@@ -353,7 +326,6 @@ async function runTurn(agentId: string, name: string, prompts: number[], send: b
   await waitFor(`${name} to leave the queue`, () => idle(agentId));
   const spawn = spawns().at(-1);
   assert.ok(spawn, `${name}: the stand-in never started`);
-  // Each process numbers its requests from 1.
   if (spawns().length !== processes) {
     processes = spawns().length;
     requestsSoFar = 0;

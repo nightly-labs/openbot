@@ -241,7 +241,6 @@ export const RequestError: Story = { args: { action: "cancel", error: true } };
 export const FailedAction: Story = { args: { failNext: true } };
 export const Narrow: Story = { args: { narrow: true } };
 
-/** The app's real controller and panel, with in-memory account API responses. "Add storage" moves a server up a tier. */
 function ApplicationBillingStory(props: { failNext?: boolean }) {
   const { t } = useText();
   let failNext = untrack(() => props.failNext) ?? false;

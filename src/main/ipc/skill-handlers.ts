@@ -1,15 +1,7 @@
-import { localSkillTools } from "../local-skill-tools";
-import {
-  parseCreateLocalSkill,
-  parseInstallLocalSkill,
-  parseReadLocalSkill,
-  parseReviseLocalSkill,
-} from "./local-skill-inputs";
-// The skill marketplace, and the skills installed into a workspace.
-
 import type { AppTranslate } from "@openbot/i18n";
 import { type BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { localSkillTools } from "../local-skill-tools";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseInstallSkill,
@@ -20,6 +12,12 @@ import {
   requireSkillId,
 } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
+import {
+  parseCreateLocalSkill,
+  parseInstallLocalSkill,
+  parseReadLocalSkill,
+  parseReviseLocalSkill,
+} from "./local-skill-inputs";
 import { nullishPayload, stringPayload } from "./validation";
 
 export interface SkillIpcDependencies {

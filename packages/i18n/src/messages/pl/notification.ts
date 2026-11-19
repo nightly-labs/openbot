@@ -7,9 +7,7 @@ export const messages = {
   "notification.needsBrowserStep": "Potrzebuje dokończenia kroku w przeglądarce.",
   "notification.needsApprovalFor": "Potrzebuje twojego zatwierdzenia: {action}",
   "notification.finished": "Zakończono pracę.",
-  // A workflow step that waits for a person to approve or reject it.
   "notification.workflowApproval": "Krok czeka na Twoje zatwierdzenie.",
-  // A workflow output step that tells the user its result.
   "notification.workflowOutput": "Przepływ pracy ma nowy wynik.",
   "notification.failed": "Zatrzymano z powodu błędu.",
   "notification.subagentFailed": "Subagent zatrzymał się z powodu błędu.",

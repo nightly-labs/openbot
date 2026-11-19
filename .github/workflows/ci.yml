@@ -368,6 +368,21 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:team-legacy-clients
 
+      - name: Run the Team API protocol 10 E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-protocol-v10
+
+      - name: Run the Team WebRTC wire parity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-webrtc-wire-parity
+
+      - name: Run the remote viewer proxy E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-viewer-proxy
+      - name: Run the server safe mode E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:server-safe-mode
+
       - name: Run the Team session revoke and reconnect E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-session-revoke
@@ -775,6 +790,10 @@ jobs:
           name: reverse-actions-e2e
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
+            .openbot-build/team-protocol-v10-e2e/
+            .openbot-build/team-webrtc-wire-parity-e2e/
+            .openbot-build/remote-viewer-proxy-e2e/
+            .openbot-build/server-safe-mode-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/

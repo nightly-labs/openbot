@@ -1,13 +1,3 @@
-// Reads the newest release of each provider CLI for each target, as each user's update check does.
-// Then it installs the newest release of each provider that it can run with no account, and runs the
-// conformance cases on it: model list, turn, cancel and a turn after it, resume in a new process, and a
-// missing session. OpenCode uses a fake model on loopback, given as a custom endpoint: the shared free OpenCode models have a
-// usage limit that the runners of all GitHub users reach, so a turn on them fails for no CLI fault.
-// A CLI release reaches users within an hour of its publication, so a scheduled run finds a broken
-// release before many users install it. Add the version to `provider-runtime-blocklist.json` to stop
-// the offer.
-// The run uses a new home folder, so it never reads the account of the person who runs it.
-// `bun run test:provider-cli-canary [-- opencode]`. Writes .openbot-build/provider-cli-canary/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -37,15 +27,12 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-cli-canary"
 const REQUEST_TIMEOUT_MS = 120_000;
 const TARGETS: readonly RuntimeTarget[] = ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64"];
 
-/** Each provider that the canary runs with no account, and its model. */
 const FREE_MODELS: Readonly<Partial<Record<ManagedProviderId, string>>> = {
   opencode: "canary/fake",
 };
-/** The prompt that the fake model answers slowly, so that a cancel arrives while the turn is open. */
 const LONG_PROMPT = "Count from 1 to 2000, one number on each line.";
 const FAKE_STREAM_LIMIT_MS = 30_000;
 
-/** Why the canary does not run a provider. */
 const NOT_COVERED: Readonly<Record<string, string>> = {
   codex: "Needs a ChatGPT account or an API key.",
   claude: "Needs a Claude account or an API key.",
@@ -64,7 +51,6 @@ const NOT_COVERED: Readonly<Record<string, string>> = {
 interface CanaryResult {
   provider: ManagedProviderId;
   version: string | null;
-  /** The version an update installs now: the newest release, unless it is blocked or older than the pin. */
   expected: string;
   model: string;
   listed: boolean;
@@ -76,7 +62,6 @@ interface CanaryResult {
 
 interface Report {
   passed: boolean;
-  /** The newest version of each provider for each target, or why it could not be read. */
   releases: Record<string, Record<string, string>>;
   results: CanaryResult[];
   failure: string | null;
@@ -96,7 +81,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-cli-canary-"));
 const report: Report = { passed: false, releases: {}, results: [], failure: null, notCovered: NOT_COVERED };
 const clients: AgentClient[] = [];
 
-// A new home for every CLI that this process starts, so that no stored account is used.
 const home = join(root, "home");
 Object.assign(process.env, {
   HOME: home,
@@ -109,7 +93,6 @@ Object.assign(process.env, {
 
 const lock = parseAgentRuntimeLock(lockValue);
 
-/** The part of an OpenAI chat completions request that the fake model reads. */
 const ChatRequest = Schema.fromJsonString(
   Schema.Struct({
     messages: Schema.Array(
@@ -121,7 +104,6 @@ const ChatRequest = Schema.fromJsonString(
   }),
 );
 
-/** The text of the last user message in a chat completions request. */
 function lastUserText(body: string): string {
   const request = Schema.decodeUnknownOption(ChatRequest)(body);
   if (Option.isNone(request)) return "";
@@ -129,7 +111,6 @@ function lastUserText(body: string): string {
   return typeof content === "string" ? content : content.map((part) => part.text ?? "").join("");
 }
 
-/** Answers each chat completion with "ok", and the long prompt with one number every 50 ms until the client stops. */
 function answerFakeModel(request: IncomingMessage, response: ServerResponse, body: string): void {
   if (!request.url?.endsWith("/chat/completions")) {
     response.writeHead(404).end();
@@ -172,7 +153,6 @@ const fakeAddress = fakeModel.address();
 if (!fakeAddress || typeof fakeAddress !== "object") throw new Error("The fake model server has no port.");
 const fakePort = fakeAddress.port;
 
-/** The fake model, given as a custom endpoint, as OpenBot gives a user's endpoint to OpenCode. */
 const CANARY_CREDENTIALS = {
   ...NO_PROVIDER_CREDENTIALS,
   customProviders: () => [
@@ -187,11 +167,8 @@ const CANARY_CREDENTIALS = {
   ],
 };
 
-/** Every provider's newest release must be readable for every target, or no user gets the update. */
 async function readReleases(): Promise<string[]> {
   const failures: string[] = [];
-  // Each target of a provider reads the same release, and GitHub allows 60 API requests an hour
-  // without a token, so each URL is read once.
   const responses = new Map<string, Promise<Response>>();
   const fetchOnce: LatestReleaseContext["fetch"] = (input, init) => {
     const url = input instanceof Request ? input.url : String(input);
@@ -217,15 +194,10 @@ async function readReleases(): Promise<string[]> {
   return failures;
 }
 
-/**
- * The version that an update installs on this computer now. The manager installs the pinned version
- * when its own release read fails, so an install that differs from this version fails the run.
- */
 async function expectedVersion(provider: ManagedProviderId): Promise<string> {
   const target = runtimeTarget(process.platform, process.arch);
   if (!target) throw new Error(`No provider runtime exists for ${process.platform}-${process.arch}.`);
   const newest = await runCauseEffect(latestRelease(provider, { target, lock, fetch }));
-  // The manager also blocks nothing when it cannot read the list.
   const blocked = await Effect.runPromise(
     fetchBlockedVersions(fetch).pipe(Effect.catch(() => Effect.succeed<BlockedVersions>(new Map()))),
   );
@@ -268,14 +240,12 @@ async function canary(manager: ProviderRuntimeManager, provider: ManagedProvider
   assert.equal(turn.status, "completed", `${provider} ${version}: the turn completes.`);
   assert.ok(turn.reply.trim().length > 0, `${provider} ${version}: the reply reaches the client.`);
 
-  // Cancel as soon as the turn starts. The prompt asks for a long answer, so the turn is still open.
   const started = new Promise<void>((started) => {
     client.on("notification", (notification) => {
       if (notification.method === "turn/started") started();
     });
   });
   const waiting = runTurn(client, thread, { model, text: LONG_PROMPT });
-  // A turn that fails before it starts ends the wait too.
   await Promise.race([started, waiting]);
   await runCauseEffect(client.request("turn/interrupt", { threadId: thread }, (value) => value));
   const cancelled = await waiting;
@@ -316,7 +286,6 @@ try {
   await mkdir(home, { recursive: true });
   await runCauseEffect(manager.initialize());
   await runCauseEffect(manager.checkForUpdates());
-  // Run the installs first, so that one release that cannot be read does not hide a broken CLI.
   for (const provider of requestedProviders()) {
     report.results.push(await canary(manager, provider));
     await stopClients(clients.splice(0));
