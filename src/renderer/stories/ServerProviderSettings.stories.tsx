@@ -96,22 +96,31 @@ const devinAgentStatus: AgentStatus = {
     { id: "devin", state: "available", version: "3000.11.234", message: null },
   ],
 };
+function devinModel(id: string, name: string): ClientAgentModelOption {
+  return {
+    provider: "devin",
+    id,
+    name,
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  };
+}
 const DEVIN_MODELS: ClientAgentModelOption[] = [
-  ["gpt-6-2-astra-medium", "GPT-6.2 Astra"],
-  ["gpt-6-1-sol-medium", "GPT-6.1 Sol"],
-  ["fusion-gpt-6-2-astra-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Astra High Thinking + SWE-2 Medium)"],
-  ["fusion-gpt-6-2-sol-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Sol High Thinking + SWE-2 Medium)"],
-  ["fusion-gpt-6-2-astra-high-thinking-gpt-5-6-luna-high", "Fusion (GPT-6.2 Astra High Thinking + GPT-5.6 Luna High)"],
-  ["fusion-gpt-6-2-sol-high-thinking-gpt-6-1-terra-high", "Fusion (GPT-6.2 Sol High Thinking + GPT-6.1 Terra High)"],
-  ["fusion-gpt-6-2-astra-high-thinking-glm-5-2-high", "Fusion (GPT-6.2 Astra High Thinking + GLM-5.2 High)"],
-].map(([id = "", name = ""]) => ({
-  provider: "devin",
-  id,
-  name,
-  description: "",
-  defaultReasoningEffort: "medium",
-  supportedReasoningEfforts: ["medium"],
-}));
+  devinModel("gpt-6-2-astra-medium", "GPT-6.2 Astra"),
+  devinModel("gpt-6-1-sol-medium", "GPT-6.1 Sol"),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Astra High Thinking + SWE-2 Medium)"),
+  devinModel("fusion-gpt-6-2-sol-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Sol High Thinking + SWE-2 Medium)"),
+  devinModel(
+    "fusion-gpt-6-2-astra-high-thinking-gpt-5-6-luna-high",
+    "Fusion (GPT-6.2 Astra High Thinking + GPT-5.6 Luna High)",
+  ),
+  devinModel(
+    "fusion-gpt-6-2-sol-high-thinking-gpt-6-1-terra-high",
+    "Fusion (GPT-6.2 Sol High Thinking + GPT-6.1 Terra High)",
+  ),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-glm-5-2-high", "Fusion (GPT-6.2 Astra High Thinking + GLM-5.2 High)"),
+];
 /** Codex with two connected accounts. Codex gave the own sign-in two usage resets, and the other none. */
 const usageResetAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
