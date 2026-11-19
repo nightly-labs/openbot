@@ -410,6 +410,15 @@ export class PlanContinuation {
   }
 
   /**
+   * Whether the lane still waits for the finish check that its last `consider` started. A Stop, a new
+   * chat or a new message ends the chain (`cancel`), and then the check has no use.
+   */
+  waitsForCheck(agentId: string, taskId: string | null): boolean {
+    const chain = this.#chains.get(laneKey(agentId, taskId));
+    return chain?.kind === "finishCheck" && chain.gap === null;
+  }
+
+  /**
    * Decides whether a turn that a failed compaction stopped continues: the connection failed or
    * stopped while the provider compacted the context of the turn (#5822). Once for each request, and
    * within the limit of the chain. Returns null when it does not continue; null also ends the chain.

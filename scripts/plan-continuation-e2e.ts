@@ -1149,15 +1149,16 @@ try {
   });
 
   await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
-    // The check answers "continue" after 20 s. Each request must end well before that.
-    const slow: Verdict = { verdict: "continue", missing: "Fix the rest.", delayMs: 20_000 };
+    // The check answers "continue" after 20 s. Each request must end well before that. The fake gives a
+    // verdict list once for each check, so each request gets its own.
+    const slow = (missing: string): Verdict => ({ verdict: "continue", missing, delayMs: 20_000 });
     const quick = 8_000;
     const stopped = await createAgent("Halted");
     let mark = loggedTurns().length;
     let checks = loggedChecks().length;
     const first = await send(
       stopped.id,
-      `Fix the stopped files. ${verdicts(slow)} ${plan({ steps: [], commands: ["fix a.ts"], answer: "I fixed a.ts." })}`,
+      `Fix the stopped files. ${verdicts(slow("Fix the stopped rest."))} ${plan({ steps: [], commands: ["fix a.ts"], answer: "I fixed a.ts." })}`,
     );
     await waitFor("the slow check", () => loggedChecks().length > checks);
     const turnId = turnsSince(mark)[0]?.turnId;
@@ -1172,7 +1173,7 @@ try {
     checks = loggedChecks().length;
     const second = await send(
       queued.id,
-      `Fix the queued files. ${verdicts(slow)} ${plan({ steps: [], commands: ["fix b.ts"], answer: "I fixed b.ts." })}`,
+      `Fix the queued files. ${verdicts(slow("Fix the queued rest."))} ${plan({ steps: [], commands: ["fix b.ts"], answer: "I fixed b.ts." })}`,
     );
     await waitFor("the slow check", () => loggedChecks().length > checks);
     const next = await send(queued.id, "Use tabs.");
@@ -1186,6 +1187,26 @@ try {
     );
     assert.ok(turns[1]?.text.includes("Use tabs."));
     assert.equal(continuationLines(queued.id).length, 0);
+
+    // In a side thread, the Stop comes after the turn ended, so only the end of the chain shows it.
+    const sided = await createAgent("Sided");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const task = await runCauseEffect(
+      current.service.startTask({
+        agentId: sided.id,
+        text: `Fix the thread files. ${verdicts(slow("Fix the thread rest."))} ${plan({ steps: [], commands: ["fix c.ts"], answer: "I fixed c.ts." })}`,
+      }),
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const taskDelivery = current.service
+      .readTask(sided.id, task.id)
+      .messages.find((message) => message.delivery !== undefined)?.delivery?.id;
+    assert.ok(taskDelivery, "The side thread holds the request's delivery.");
+    await runCauseEffect(current.service.stopTask({ agentId: sided.id, taskId: task.id }));
+    assert.ok(ended(await settled(taskDelivery, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(sided.id, task.threadId).length, 0);
     return { checks: loggedChecks().length - checks };
   });
 

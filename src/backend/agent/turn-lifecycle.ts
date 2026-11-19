@@ -996,8 +996,11 @@ export class TurnLifecycle {
       answer: redact(answer),
       continuations,
     };
-    // The check takes a few seconds, and the turn's deliveries hold the lane until it ends.
-    const aborted = Effect.sync(() => !this.#mayContinue(agentId, taskId, turnId, deliveries)).pipe(
+    // The check takes a few seconds, and the turn's deliveries hold the lane until it ends. A Stop in
+    // a task does not mark a turn that has ended, but it ends the lane's chain.
+    const mayContinue = () =>
+      this.#planContinuation.waitsForCheck(agentId, taskId) && this.#mayContinue(agentId, taskId, turnId, deliveries);
+    const aborted = Effect.sync(() => !mayContinue()).pipe(
       Effect.repeat({ until: (stop) => stop, schedule: Schedule.spaced(FINISH_CHECK_ABORT_POLL) }),
       Effect.as(null),
     );
@@ -1010,7 +1013,7 @@ export class TurnLifecycle {
     ).pipe(
       Effect.map((result) =>
         // The user can have stopped the turn or written between the last poll and the answer.
-        result === null || !this.#mayContinue(agentId, taskId, turnId, deliveries) ? null : finishCheckGap(result),
+        result === null || !mayContinue() ? null : finishCheckGap(result),
       ),
       Effect.catchCause((cause) =>
         Effect.sync(() => {
