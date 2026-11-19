@@ -120,6 +120,14 @@ export const messages = defineMessages("customProvider", {
   "customProvider.discovery.selectAll": "Select all",
   "customProvider.discovery.deselectAll": "Deselect all",
   "customProvider.discovery.noMatch": "No models match your search.",
+  // After a Find click: the saved models that the endpoint does not list. OpenBot never removes them
+  // itself, because an endpoint can list a part of the models that it serves.
+  "customProvider.discovery.unlisted": {
+    one: "{count} model is not in this list: {names}.",
+    other: "{count} models are not in this list: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "{count} more", other: "{count} more" },
+  "customProvider.discovery.removeUnlisted": { one: "Remove {count} model", other: "Remove {count} models" },
 
   // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "Add a provider or an agent",

@@ -119,6 +119,12 @@ export const messages = {
   "customProvider.discovery.selectAll": "Tout sélectionner",
   "customProvider.discovery.deselectAll": "Tout désélectionner",
   "customProvider.discovery.noMatch": "Aucun modèle ne correspond à votre recherche.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} modèle n’est pas dans cette liste : {names}.",
+    other: "{count} modèles ne sont pas dans cette liste : {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "{count} autre", other: "{count} autres" },
+  "customProvider.discovery.removeUnlisted": { one: "Retirer {count} modèle", other: "Retirer {count} modèles" },
 
   "customProvider.preset.title": "Ajouter un fournisseur ou un agent",
   "customProvider.preset.description":

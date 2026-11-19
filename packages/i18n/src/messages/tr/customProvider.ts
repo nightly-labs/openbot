@@ -122,6 +122,12 @@ export const messages = {
   "customProvider.discovery.selectAll": "Tümünü seç",
   "customProvider.discovery.deselectAll": "Seçimi kaldır",
   "customProvider.discovery.noMatch": "Aramanızla eşleşen model yok.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} model bu listede yok: {names}.",
+    other: "{count} model bu listede yok: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "{count} tane daha", other: "{count} tane daha" },
+  "customProvider.discovery.removeUnlisted": { one: "{count} modeli kaldır", other: "{count} modeli kaldır" },
 
   // Ekleme akışının ilk adımı: hazır bir ayar bir sonraki formu doldurur.
   "customProvider.preset.title": "Sağlayıcı veya ajan ekle",

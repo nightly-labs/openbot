@@ -115,6 +115,12 @@ export const messages = {
   "customProvider.discovery.selectAll": "Seleziona tutto",
   "customProvider.discovery.deselectAll": "Deseleziona tutto",
   "customProvider.discovery.noMatch": "Nessun modello corrisponde alla ricerca.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} modello non è in questo elenco: {names}.",
+    other: "{count} modelli non sono in questo elenco: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "un altro", other: "altri {count}" },
+  "customProvider.discovery.removeUnlisted": { one: "Rimuovi {count} modello", other: "Rimuovi {count} modelli" },
   "customProvider.preset.title": "Aggiungi un provider o un agente",
   "customProvider.preset.description": "Scegli un server di modelli locale, un endpoint o un agente ACP.",
   "customProvider.preset.heading": "Aggiungi personalizzato",

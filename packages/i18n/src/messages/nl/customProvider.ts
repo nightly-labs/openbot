@@ -116,6 +116,15 @@ export const messages = {
   "customProvider.discovery.selectAll": "Alles selecteren",
   "customProvider.discovery.deselectAll": "Alles deselecteren",
   "customProvider.discovery.noMatch": "Geen model past bij je zoekopdracht.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} model staat niet in deze lijst: {names}.",
+    other: "{count} modellen staan niet in deze lijst: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": { one: "{count} andere", other: "{count} andere" },
+  "customProvider.discovery.removeUnlisted": {
+    one: "{count} model verwijderen",
+    other: "{count} modellen verwijderen",
+  },
   "customProvider.preset.title": "Aanbieder of agent toevoegen",
   "customProvider.preset.description": "Kies een lokale modelserver, een endpoint of een ACP-agent.",
   "customProvider.preset.heading": "Eigen toevoegen",

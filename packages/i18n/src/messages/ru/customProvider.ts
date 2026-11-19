@@ -119,6 +119,24 @@ export const messages = {
   "customProvider.discovery.selectAll": "Выбрать все",
   "customProvider.discovery.deselectAll": "Снять выбор",
   "customProvider.discovery.noMatch": "Нет моделей по вашему запросу.",
+  "customProvider.discovery.unlisted": {
+    one: "{count} модели нет в этом списке: {names}.",
+    few: "{count} моделей нет в этом списке: {names}.",
+    many: "{count} моделей нет в этом списке: {names}.",
+    other: "{count} модели нет в этом списке: {names}.",
+  },
+  "customProvider.discovery.unlistedMore": {
+    one: "ещё {count}",
+    few: "ещё {count}",
+    many: "ещё {count}",
+    other: "ещё {count}",
+  },
+  "customProvider.discovery.removeUnlisted": {
+    one: "Удалить {count} модель",
+    few: "Удалить {count} модели",
+    many: "Удалить {count} моделей",
+    other: "Удалить {count} модели",
+  },
 
   "customProvider.preset.title": "Добавить провайдера или агента",
   "customProvider.preset.description": "Выберите локальный сервер моделей, эндпоинт или агента ACP.",

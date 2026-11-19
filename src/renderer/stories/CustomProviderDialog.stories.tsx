@@ -275,6 +275,22 @@ export const DiscoveryFoundValues: Story = {
   },
 };
 
+/**
+ * After Find again, the endpoint no longer lists two saved models (#12067). A line names them, and its
+ * button removes them from the form. Nothing goes until the user clicks it and submits.
+ */
+export const DiscoveryFoundUnlisted: Story = {
+  args: {
+    showFindResult: true,
+    draft: {
+      ...ollama,
+      models: [...localEndpoint.models, { id: "mistral-small:22b", name: "Mistral Small 22B" }],
+    },
+    onDiscoverModels: fn(),
+    discovery: { status: "found", models: discovered.slice(1) },
+  },
+};
+
 export const DiscoveryEmpty: Story = {
   args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "found", models: [] } },
 };
