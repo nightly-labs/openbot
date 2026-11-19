@@ -3559,6 +3559,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #turnRunsNowhere(agentId: string, turnId: string): boolean {
     return (
+      !this.#stopping &&
+      this.#turn.hasEnded(turnId) &&
       this.#turn.turnStartedAt(turnId) === null &&
       !this.#turn.isCompleting(turnId) &&
       this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
