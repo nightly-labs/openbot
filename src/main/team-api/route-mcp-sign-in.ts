@@ -19,15 +19,6 @@ import { requireMcpListFits } from "./route-mcp";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(MCP_SIGN_IN_ROUTES));
 
-/**
- * The MCP sign-ins of this host, started from a joined server. Frozen by `mcp-sign-in-v1`.
- *
- * The page opens in a private tab of this host's browser, and the administrator signs in through
- * its live view. The grant comes back to this host's own listener, so no route carries a credential.
- * An admin check runs on every route, as on the MCP list itself. With `mcp-member-access-v1`, a member
- * starts, cancels, or signs out only the sign-in of an address that no row of another person uses.
- * With `mcp-access-v1`, a member does not read the sign-in state of a row at `none`.
- */
 export async function routeMcpSignIn(
   context: TeamApiRequestContext,
   signIns: TeamApiMcpSignIns | undefined,
@@ -40,8 +31,6 @@ export async function routeMcpSignIn(
     throw new HttpError(400, sourceText("error.team.mcpUnsupported"));
   const access = requireMcpAccess(member, capabilities, owners);
   const servers = () => mcpServers?.listMcpServers() ?? [];
-  // A state shows when the member sees its row and the address of the row: the sign-in belongs to the
-  // address, so a row at `none` on it hides the state of each other row there too.
   const visible = (states: McpSignInState[]) => {
     const rows = servers();
     const urls = new Map(rows.map((row) => [row.id, row.transport === "http" ? row.url : null]));
@@ -50,7 +39,6 @@ export async function routeMcpSignIn(
       return seesMcpServer(access, state.mcpServerId) && (!url || seesMcpAddress(access, rows, url));
     });
   };
-  // `readJson` has already run the body through the `mcp-sign-in-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
     case MCP_SIGN_IN_ROUTES.start: {
@@ -70,7 +58,6 @@ export async function routeMcpSignIn(
       signIns.cancel(address);
       return json(200, {});
     }
-    // A sign-out names its row the way a removal does, so it is read by the same parser.
     case MCP_SIGN_IN_ROUTES.signOut: {
       const input = parseRemoveMcpServer(body);
       requireOwnMcpSignIn(access, servers(), input.mcpServerId);

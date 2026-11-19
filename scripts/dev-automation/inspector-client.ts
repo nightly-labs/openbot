@@ -1,10 +1,3 @@
-// The Electron main process runs the backend: the SQLite stores, the
-// conversation runtime and every provider client. Chromium's CDP port cannot
-// see its heap, so `dev:bench` reads it through the Node inspector that an
-// unpackaged build opens with `--inspect=<port>` on 127.0.0.1. A packaged build
-// ships the `enableNodeCliInspectArguments: false` fuse, so this never reaches
-// a user's app.
-
 import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -55,8 +48,6 @@ export class InspectorClient {
 
   static async connect(port: number): Promise<InspectorClient> {
     const url = await inspectorWebSocketUrl(port);
-    // Only loopback: the port came from our own allocation, and the URL from
-    // the inspector behind it.
     if (!url.startsWith("ws://127.0.0.1:") && !url.startsWith("ws://localhost:")) {
       throw new Error("The Node inspector named a non-loopback debugger address.");
     }
@@ -126,12 +117,6 @@ export class InspectorClient {
     };
   }
 
-  /**
-   * Runs an expression in the main process and returns its JSON value. The
-   * command-line API gives it `require`, so a scenario can reach Electron's
-   * `BrowserWindow` the way a user's click would, without a debug hook in the
-   * app.
-   */
   async evaluate(expression: string): Promise<unknown> {
     const result = await this.send("Runtime.evaluate", {
       expression: `Promise.resolve(${expression}).then((value) => JSON.stringify(value ?? null))`,
@@ -153,9 +138,6 @@ export class InspectorClient {
     await this.send("HeapProfiler.collectGarbage");
   }
 
-  // The snapshot of the main heap holds conversation text and can hold
-  // secrets, so it is written only under the build directory the caller named
-  // and is never printed.
   async writeHeapSnapshot(outPath: string): Promise<void> {
     await mkdir(dirname(outPath), { recursive: true });
     const stream = createWriteStream(outPath, { mode: 0o600 });

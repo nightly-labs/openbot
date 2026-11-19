@@ -9,11 +9,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * `custom-agents-v1`: the custom ACP agents of this host, for an owner or admin. The same parsers and
- * change service as the local Settings run here. An environment value only arrives here; no response
- * carries one.
- */
 export async function routeCustomAgents(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -40,7 +35,6 @@ export async function routeCustomAgents(
       }
     }
   } catch (error) {
-    // The parsers and the change service quote no environment value; the redaction is the second guard.
     throw new HttpError(
       409,
       redactText(error instanceof Error ? error.message : sourceText("error.provider.customAgentsUnavailable")),
@@ -48,7 +42,6 @@ export async function routeCustomAgents(
   }
 }
 
-/** The released fields only, so a field that this computer adds later does not reach a peer. */
 function wireCustomAgent(agent: CustomAgentSummary) {
   return {
     id: agent.id,

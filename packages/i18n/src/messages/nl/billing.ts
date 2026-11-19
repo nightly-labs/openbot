@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "Gepauzeerd",
   "billing.otherServers": "Andere servers",
   "billing.action.menu": "Abonnementsacties voor {server}",
-  "billing.action.change": "Abonnement wijzigen",
+  "billing.action.addStorage": "Opslag toevoegen",
   "billing.action.cancel": "Abonnement opzeggen",
   "billing.action.renew": "Abonnement verlengen",
   "billing.action.updatePayment": "Betaalmethode bijwerken",
+  "billing.storage.title": "Meer ruimte voor {server}",
+  "billing.storage.add": "{size} toevoegen",
+  "billing.storage.failed": "Kan geen opslag toevoegen.",
   "billing.lifecycle.cancelRenewal": "Verlenging opzeggen",
   "billing.lifecycle.cancelTitle": "Verlenging voor {name} opzeggen?",
   "billing.lifecycle.cancelDescription":
@@ -133,4 +136,10 @@ export const messages = {
     other:
       "Je licentie heeft {count} gebruikers, het maximum. Neem contact met ons op voor een grotere licentie. Nieuwe mensen kunnen niet meedoen op je servers.",
   },
+  "billing.details.country": "Factuurland",
+  "billing.details.countryPlaceholder": "Kies een land",
+  "billing.details.vatId": "EU-btw-nummer (optioneel)",
+  "billing.details.vatIdInvalid": "Dit is geen btw-nummer van het gekozen land.",
+  "billing.details.countryMissing": "Kies je factuurland.",
+  "billing.details.saveFailed": "Kan de factuurgegevens niet opslaan",
 } as const satisfies PartialTranslation<typeof source>;

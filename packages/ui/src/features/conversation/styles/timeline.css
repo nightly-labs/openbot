@@ -12,7 +12,6 @@
   width: 100%;
 }
 
-/* While the chat moves up under the working face, a new message comes up from behind the face line. */
 .virtual-chat-list[data-pushing] {
   overflow-y: clip;
 }
@@ -24,9 +23,12 @@
   padding-top: var(--openbot-chat-entry-gap);
 }
 
-/* Rows the timeline marks as grouped (marker runs, same-sender messages) sit tighter. */
 .virtual-chat-row[data-grouped] {
   padding-top: var(--openbot-chat-marker-gap);
+}
+
+.virtual-chat-row-activity {
+  padding-top: 0;
 }
 
 .virtual-chat-row > .chat-action-marker + .message-entry {
@@ -38,11 +40,6 @@
   inset: auto;
 }
 
-/*
- * The mark on a message that a quote opened. The band reaches 12px past the chat column, which is
- * the edge of the scroll area below the column width, and leaves out the gap above the row; it
- * holds, then fades out.
- */
 .virtual-chat-row[data-reply-flash] {
   isolation: isolate;
 }
@@ -83,12 +80,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/*
- * The way back to the newest message. The wrapper carries the pill, because the count turns one
- * round button into two buttons the reader reads as one control, and only the wrapper knows how
- * wide that is. The circle becomes a pill in one step: `44px` to `auto` cannot be animated, and a
- * scale would fight the centring transform.
- */
 .scroll-to-latest {
   position: sticky;
   z-index: 3;
@@ -110,11 +101,6 @@
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
-/*
- * With a count the pill wears the colours of the unread banner: it is the same news. It is also
- * lower than the round arrow, and the label makes it wider, so the bottom edge is held where the
- * circle had it: `100% - 58px` plus `44px` is the same line as `100% - 50px` plus `36px`.
- */
 .scroll-to-latest:is([data-new-messages], [data-reply-return]) {
   top: calc(100% - 50px);
   height: 36px;
@@ -141,11 +127,6 @@
     transform var(--openbot-duration-fast) cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/*
- * One padding on all four sides: `space-1-5` from the pill edge to the arrow, to the round dismiss
- * mark, and above and below both, because each is `22px` tall inside a `36px` pill with a `1px`
- * border. `space-2` divides arrow from label and label from mark.
- */
 .scroll-to-latest:is([data-new-messages], [data-reply-return]) .scroll-to-latest-button {
   width: auto;
   grid-auto-flow: column;
@@ -159,11 +140,6 @@
   white-space: nowrap;
 }
 
-/*
- * The whole height stays clickable, but nothing here is painted: a highlight on this button would
- * fill the end of the pill. The hover and focus marks sit on the icon below, which is round, and
- * that round mark is what separates the two halves. No rule divides them.
- */
 .scroll-to-latest-dismiss {
   display: grid;
   height: 100%;
@@ -185,7 +161,6 @@
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
-/* The mark is as tall as the arrow, so one padding can hold both away from every edge. */
 .scroll-to-latest-dismiss svg {
   box-sizing: content-box;
   width: 14px;
@@ -195,13 +170,11 @@
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
-/* The ring follows the pill: an offset ring would draw a circle around one half of it. */
 .scroll-to-latest-button:focus-visible {
   outline: 2px solid var(--openbot-border-focus);
   outline-offset: -2px;
 }
 
-/* The dismiss ring follows its round icon mark, for the same reason its hover does. */
 .scroll-to-latest-dismiss:focus-visible {
   outline: none;
 }
@@ -218,7 +191,6 @@
   outline-color: var(--openbot-unread-text);
 }
 
-/* The way back to a reply has a smaller arrow, so the label reads first. */
 .scroll-to-latest-button .scroll-to-latest-reply-icon {
   width: 18px;
   height: 18px;
@@ -230,15 +202,11 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* These are shared ghost buttons, whose own hover is written with two `:not()`s and so outweighs
-     a plain class. Each rule that has to replace it is matched at the same strength, or its own
-     hover paints over the pill and repaints the text for a light background. */
   .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
     background: var(--openbot-bg-control-active);
     color: inherit;
   }
 
-  /* The dismiss box itself stays unpainted: its mark is the round one on the icon. */
   .scroll-to-latest-dismiss:hover:not(:disabled):not([data-disabled]) {
     background: none;
     color: inherit;
@@ -248,9 +216,8 @@
     background: var(--openbot-bg-control-active);
   }
 
-  /* The pill has one hover, on the dismiss icon. Its body is a wide target and needs no mark. */
   .scroll-to-latest:is([data-new-messages], [data-reply-return])
-  .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
+    .scroll-to-latest-button:hover:not(:disabled):not([data-disabled]) {
     background: none;
   }
 
@@ -384,7 +351,6 @@
   flex: 0 0 auto;
 }
 
-/* A new NEW line: the badge comes in first, then each line grows out from it. */
 .unread-messages-divider[data-arrive] span {
   animation: unread-divider-badge-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
@@ -422,8 +388,6 @@
   }
 }
 
-/* The time stands in the middle of the space between two messages. The row above it already has
-   12px of padding at its top, so the time gets less margin above than under it. */
 .time-marker {
   display: flex;
   align-items: center;
@@ -438,7 +402,6 @@
   text-align: center;
 }
 
-/* The two lines grow out from the badge. In RTL the first line is on the right. */
 :dir(rtl) .unread-messages-divider[data-arrive] hr:first-child {
   transform-origin: left center;
 }

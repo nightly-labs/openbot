@@ -19,11 +19,9 @@ import {
 } from "@/features/onboarding/components/onboarding-motion";
 import { useText } from "@/shared/lib/text";
 
-// The space between the status bar and the title of a step.
 export const STEP_TOP_GAP = 24;
 const CONTROL_SIZE = 52;
 
-/** The scrolling body of a step. It starts below the status bar: the flow has no header. */
 export function StepScroll({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
@@ -41,7 +39,6 @@ export function StepScroll({ children }: { children: ReactNode }) {
   );
 }
 
-/** The title and text at the top of a step. The text follows the title by one beat. */
 export function StepHeader({ title, body, motion }: { title: string; body?: string; motion: OnboardingMotion }) {
   return (
     <View className="gap-2">
@@ -59,11 +56,6 @@ export function StepHeader({ title, body, motion }: { title: string; body?: stri
   );
 }
 
-/**
- * Shows a control in its slot. The slot keeps its size when the control is gone, so the controls
- * beside it stay still. A control grows in without a fade: glass does not draw under a parent
- * with no opacity.
- */
 function Slot({
   width,
   visible,
@@ -86,16 +78,9 @@ export interface FooterAction {
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  /** The agent's colour. Before there is an agent, the theme's action colour. */
   color?: string;
 }
 
-/**
- * The controls of the flow, at the bottom where the thumb is: Back on the left, the main action in
- * the middle and Skip on the right, as glass buttons on iOS and Material buttons on Android. They
- * stay from step to step: the main action only changes its label, and Back and Skip come and go
- * without moving it.
- */
 export function OnboardingFooter({
   motion,
   primary,
@@ -105,9 +90,7 @@ export function OnboardingFooter({
   primaryRef,
 }: {
   motion: OnboardingMotion;
-  /** Absent on a step whose own content holds its actions. */
   primary: FooterAction | null;
-  /** The place of the main action, which the empty home takes over when the user skips. */
   primaryRef?: RefObject<ViewInstance | null>;
   onBack: (() => void) | null;
   onSkip: (() => void) | null;
@@ -115,7 +98,6 @@ export function OnboardingFooter({
 }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
-  // The keyboard covers the home indicator, so its inset is not needed above the keyboard.
   const { progress } = useReanimatedKeyboardAnimation();
   const keyboardStyle = useAnimatedStyle(() => ({ transform: [{ translateY: insets.bottom * progress.get() }] }));
   return (

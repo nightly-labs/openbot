@@ -1,6 +1,3 @@
-// MCP sign-ins that an administrator starts on this host from another computer (`mcp-sign-in-v1`, and
-// `sign-in-relay-v1` through `SignInRelayHost`).
-
 import type {
   McpSignInAppInput,
   McpSignInAppState,
@@ -18,7 +15,6 @@ import type { BrowserHost } from "../backend/browser-host";
 import { mcpOAuthAccountKey } from "../backend/mcp-oauth-provider";
 import { HostSignInPages } from "./host-sign-in-pages";
 
-/** The bound of an error on the wire, as `mcp-sign-in-v1` reads it. */
 const ERROR_LIMIT = 2_000;
 
 export interface McpHostSignInDependencies {
@@ -35,14 +31,6 @@ export interface McpHostSignInDependencies {
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
 
-/**
- * A sign-in for an administrator who is not at this computer.
- *
- * The grant comes back to this host's loopback listener, and only a browser here can reach it. So the
- * page opens in a private tab of this host's browser, and the administrator signs in through the live
- * view of that tab. `start` returns at once; the client reads `status` until the sign-in ends. One
- * sign-in runs for each server address, as on this computer: a second start replaces the first.
- */
 export class McpHostSignIns {
   readonly #dependencies: McpHostSignInDependencies;
   readonly #pages: HostSignInPages<string, McpTestResult>;
@@ -60,20 +48,15 @@ export class McpHostSignIns {
     );
   }
 
-  /**
-   * The same sign-in, with no tab: the page address waits in `relayPage` for the administrator's own
-   * computer to open, and the grant comes back through `SignInRelayHost`.
-   */
-  startRelay(input: TestMcpServerInput) {
+  startRelay(input: TestMcpServerInput, deepLinkRedirectUrl?: string) {
     return this.#pages.start(
       signInKey(input.config.url),
-      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage),
+      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage, deepLinkRedirectUrl),
       resultOf,
       "relay",
     );
   }
 
-  /** The page address of a relayed sign-in, and how it ended. */
   relayStatus(url: string): { pageUrl: string | null; result: McpTestResult | null } {
     const key = signInKey(url);
     return { pageUrl: this.#pages.pageUrl(key), result: this.status(url).result };
@@ -100,7 +83,6 @@ export class McpHostSignIns {
     return onWire(this.#dependencies.service.listMcpSignIns());
   }
 
-  /** The sign-in app of one row (`mcp-sign-in-app-v1`). The next `start` uses it. */
   app(input: McpSignInAppInput): McpSignInAppState {
     return this.#dependencies.service.mcpSignInApp(input);
   }
@@ -118,7 +100,6 @@ export class McpHostSignIns {
   }
 }
 
-/** The states as `mcp-sign-in-v1` states them: `signedIn` and nothing more. */
 function onWire(states: readonly McpSignInState[]): McpSignInState[] {
   return states.map(({ mcpServerId, signedIn }) => ({ mcpServerId, signedIn }));
 }

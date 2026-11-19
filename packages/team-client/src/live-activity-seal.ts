@@ -2,29 +2,14 @@ import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { concatBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
-/**
- * The host updates the iOS Live Activity through Apple Push Notification service while iOS suspends
- * the app. The update goes through the OpenBot relay and Apple, so the host seals it with keys that
- * only the phone and the host know, and the widget extension opens it.
- *
- * The widget extension runs plain JavaScript with no crypto library, so the seal uses only
- * HMAC-SHA256: a keystream of HMAC blocks over a random nonce and a counter, and an HMAC tag over
- * the nonce and the ciphertext. `openSealedLiveActivity` in the mobile app is the opener, and its
- * test opens what this module seals.
- */
-
-/** The size of the secret that the phone makes and gives only to its host. */
 export const LIVE_ACTIVITY_SECRET_BYTES = 32;
 export const LIVE_ACTIVITY_NONCE_BYTES = 16;
 const TAG_BYTES = 16;
 const BLOCK_BYTES = 32;
 
 export interface LiveActivityKeys {
-  /** Makes the keystream. The widget extension has it. */
   seal: Uint8Array;
-  /** Tags the sealed content. The widget extension has it. */
   tag: Uint8Array;
-  /** Signs the button links. Only the app and the host have it, so the widget cannot make a link. */
   action: Uint8Array;
 }
 
@@ -34,15 +19,10 @@ export function liveActivityKeys(secret: Uint8Array): LiveActivityKeys {
   return { seal: derive("seal"), tag: derive("tag"), action: derive("action") };
 }
 
-/**
- * The secret that the phone gives one host. Each host gets its own, made from the phone secret, so
- * a host cannot seal content or sign a button link for another host.
- */
 export function liveActivityHostSecret(phoneSecret: Uint8Array, serverId: string): Uint8Array {
   return hmac(sha256, phoneSecret, utf8ToBytes(`openbot live activity host ${serverId}`));
 }
 
-/** Seals `text` for the widget extension. Use a new random `nonce` for each seal. */
 export function sealLiveActivity(
   text: string,
   keys: Pick<LiveActivityKeys, "seal" | "tag">,
@@ -61,7 +41,6 @@ export function sealLiveActivity(
   return base64Url(concatBytes(body, hmac(sha256, keys.tag, body).subarray(0, TAG_BYTES)));
 }
 
-/** The signature of a button link. The app accepts a link that changes host state only with it. */
 export function signLiveActivityLink(payload: string, key: Uint8Array): string {
   return base64Url(hmac(sha256, key, utf8ToBytes(payload)).subarray(0, TAG_BYTES));
 }

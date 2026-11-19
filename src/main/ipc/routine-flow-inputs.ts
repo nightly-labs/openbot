@@ -1,5 +1,3 @@
-// The payloads of the routine flow endpoints. Only a malformed payload fails here, so the text stays English.
-
 import {
   type ConnectRoutineFlowInput,
   type DisconnectRoutineFlowInput,
@@ -7,9 +5,11 @@ import {
   isDisconnectRoutineFlowInput,
   isRemoveRoutineFlowPositionInput,
   isSaveRoutineFlowPositionInput,
+  isStopRoutineFlowRunInput,
   isUpdateRoutineFlowLinkInput,
   type RemoveRoutineFlowPositionInput,
   type SaveRoutineFlowPositionInput,
+  type StopRoutineFlowRunInput,
   type UpdateRoutineFlowLinkInput,
 } from "@openbot/contracts/ipc";
 
@@ -41,4 +41,9 @@ export function parseDisconnectRoutineFlow(value: unknown): DisconnectRoutineFlo
 export function parseUpdateRoutineFlowLink(value: unknown): UpdateRoutineFlowLinkInput {
   if (!isUpdateRoutineFlowLinkInput(value)) throw new Error("Invalid routine flow link.");
   return { linkId: value.linkId, instruction: value.instruction };
+}
+
+export function parseStopRoutineFlowRun(value: unknown): StopRoutineFlowRunInput {
+  if (!isStopRoutineFlowRunInput(value)) throw new Error("Invalid routine run.");
+  return { routineId: value.routineId, runId: value.runId };
 }

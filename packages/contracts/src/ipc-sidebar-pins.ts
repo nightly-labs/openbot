@@ -1,26 +1,18 @@
 import { isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord, isString } from "./runtime-values";
 
-/** The kinds of chat that a user pins. A workflow pin stays on each phone. */
 export const SIDEBAR_PIN_KINDS = ["agent", "channel"] as const;
 export type SidebarPinKind = (typeof SIDEBAR_PIN_KINDS)[number];
 
-/** One pinned chat. */
 export interface SidebarPin {
   kind: SidebarPinKind;
   id: string;
 }
 
-/** The most pins in one list, as `sidebar-pins-v1` permits. */
 export const SIDEBAR_PIN_LIMIT = 1000;
 
-/**
- * The chats that the signed-in user pinned on one server, in their order. The host keeps the list for
- * each member, so the desktop app, the web client and the phones of that member show the same pins.
- */
 export interface SidebarPinsSnapshot {
   items: SidebarPin[];
-  /** ISO 8601 time of the last change, or `null` when the member never saved a list on this server. */
   updatedAt: string | null;
 }
 

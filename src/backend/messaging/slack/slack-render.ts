@@ -1,15 +1,7 @@
 import { chunkMarkdown, FENCE } from "../messaging-chunks";
 
-/** Slack cuts a message at 40,000 characters and folds long ones; this keeps each post readable. */
 const SLACK_CHUNK_CHARACTERS = 3_900;
 
-/**
- * Markdown as Slack `mrkdwn`. Content `&`, `<` and `>` are escaped, also in code, as Slack
- * requires. That also makes `<!channel>`, `<!here>` and `<!subteam^…>` inert: an answer cannot ping a
- * workspace or a group. With `userMentions`, a user mention `<@U…>` or `<@W…>` outside code and links
- * is made live again, so it pings that user. Only an answer or a post sets it: status text, such as
- * an approval's command, stays inert.
- */
 export function slackMrkdwn(markdown: string, userMentions = false): string {
   const lines = escapeSlack(markdown).split("\n");
   let inFence = false;
@@ -24,7 +16,6 @@ export function slackMrkdwn(markdown: string, userMentions = false): string {
     .join("\n");
 }
 
-/** The users that a post of `markdown` pings: each user mention that `slackMrkdwn` makes live. */
 export function slackPingedUsers(markdown: string): string[] {
   return [
     ...new Set(Array.from(slackMrkdwn(markdown, true).matchAll(/<@([UW][A-Z0-9]+)>/g), (match) => match[1] ?? "")),
@@ -46,7 +37,6 @@ function blockMrkdwn(line: string): string {
 }
 
 function inlineMrkdwn(line: string, userMentions: boolean): string {
-  // Code spans keep their text; everything else is converted between them.
   return line
     .split(/(`[^`]*`)/)
     .map((part) => {
@@ -62,7 +52,6 @@ function inlineMrkdwn(line: string, userMentions: boolean): string {
         .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
         .replace(/\uE001(\d+)\uE001/g, (_match, index: string) => `*${bold[Number(index)]}*`);
       if (!userMentions) return converted;
-      // Content `<` is escaped, so each `<…>` here is a link that this function made.
       return converted
         .split(/(<[^>]*>)/)
         .map((text) => (text.startsWith("<") ? text : text.replace(/&lt;@([UW][A-Z0-9]+)&gt;/g, "<@$1>")))
@@ -71,7 +60,6 @@ function inlineMrkdwn(line: string, userMentions: boolean): string {
     .join("");
 }
 
-/** Splits `mrkdwn` into posts of at most `limit` characters (`chunkMarkdown`). */
 export function slackChunks(text: string, limit = SLACK_CHUNK_CHARACTERS): string[] {
   return chunkMarkdown(text, limit);
 }

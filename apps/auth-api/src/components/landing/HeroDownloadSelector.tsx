@@ -1,38 +1,77 @@
 import { PlatformLogo } from "@openbot/brand";
 import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
+import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
 import {
   DOWNLOAD_PLATFORM_ORDER,
   DOWNLOAD_PLATFORMS,
   type DownloadPlatform,
   detectDownloadPlatform,
 } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import type { LandingPageText } from "../../lib/landing-page-text";
 import { detectMobilePlatform, MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatform } from "../../lib/mobile-apps";
 import { LandingIcon } from "./LandingIcon";
 import { useLandingText } from "./LandingText";
 
-type HeroPlatform = DownloadPlatform | MobilePlatform;
+const ANDROID_APK = "android-apk";
+
+const MAC_INTEL = "macos-intel";
+
+type HeroPlatform = DownloadPlatform | MobilePlatform | typeof ANDROID_APK | typeof MAC_INTEL;
+
+const HERO_DESKTOP_APPS: readonly HeroPlatform[] = DOWNLOAD_PLATFORM_ORDER.flatMap<HeroPlatform>((platform) =>
+  platform === "macos" ? [platform, MAC_INTEL] : [platform],
+);
+const MAC_SILICON_LABEL = "macOS · Apple silicon";
+const MAC_INTEL_LABEL = "macOS · Intel";
+
+const HERO_PHONE_APPS: readonly HeroPlatform[] = ANDROID_APK_AVAILABLE
+  ? [...MOBILE_APP_ORDER, ANDROID_APK]
+  : MOBILE_APP_ORDER;
+const ANDROID_PLAY_LABEL = "Android · Google Play";
+const ANDROID_APK_LABEL = "Android · APK";
+
+function heroSystem(platform: HeroPlatform): DownloadPlatform | MobilePlatform {
+  if (platform === ANDROID_APK) return "android";
+  if (platform === MAC_INTEL) return "macos";
+  return platform;
+}
 
 interface HeroOffer {
   action: string;
-  /** Missing while the installer is not out yet. */
   href?: string;
   label: string;
   status: string;
-  /** A store page on another site, which opens in a new tab. */
   external: boolean;
 }
 
 function heroOffer(platform: HeroPlatform, text: LandingPageText): HeroOffer {
-  const { available, desktop, phone } = text.download;
-  if (platform === "ios" || platform === "android")
-    return { ...MOBILE_APPS[platform], ...phone[platform], status: available, external: true };
+  const { apk, available, desktop, intelMac, phone } = text.download;
+  if (platform === MAC_INTEL)
+    return {
+      label: MAC_INTEL_LABEL,
+      action: intelMac,
+      href: OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
+      status: available,
+      external: false,
+    };
+  if (platform === ANDROID_APK)
+    return {
+      label: ANDROID_APK_LABEL,
+      action: apk,
+      href: OPENBOT_ANDROID_APK_LINK,
+      status: available,
+      external: false,
+    };
+  if (platform === "ios" || platform === "android") {
+    const label = platform === "android" && ANDROID_APK_AVAILABLE ? ANDROID_PLAY_LABEL : MOBILE_APPS[platform].label;
+    return { ...MOBILE_APPS[platform], ...phone[platform], label, status: available, external: true };
+  }
   const { href, ...details } = DOWNLOAD_PLATFORMS[platform];
-  // A platform that is not out yet keeps its English status: no catalog key names it.
   if (!details.available || !href) return { ...details, external: false };
-  return { ...details, action: desktop[platform], status: available, href, external: false };
+  const label = platform === "macos" ? MAC_SILICON_LABEL : details.label;
+  return { ...details, label, action: desktop[platform], status: available, href, external: false };
 }
 
 interface HeroMenuItemProps {
@@ -56,7 +95,7 @@ function HeroMenuItem(props: HeroMenuItemProps) {
           data-selected={props.selected ? "true" : undefined}
           onClick={() => props.onSelect()}
         >
-          <PlatformLogo platform={props.platform} />
+          <PlatformLogo platform={heroSystem(props.platform)} />
           <span>{offer().label}</span>
           <small>{offer().status}</small>
         </button>
@@ -73,7 +112,7 @@ function HeroMenuItem(props: HeroMenuItemProps) {
           data-selected={props.selected ? "true" : undefined}
           onClick={() => props.onSelect()}
         >
-          <PlatformLogo platform={props.platform} />
+          <PlatformLogo platform={heroSystem(props.platform)} />
           <span>{offer().label}</span>
           <small>{offer().status}</small>
         </a>
@@ -109,7 +148,7 @@ export function HeroDownloadSelector() {
 
   function selectPlatform(nextPlatform: HeroPlatform): void {
     setPlatform(nextPlatform);
-    landingAnalytics.trackDownloadSelected(nextPlatform, false);
+    landingAnalytics.trackDownloadSelected(heroSystem(nextPlatform), false);
     closeMenu(true);
   }
 
@@ -141,12 +180,9 @@ export function HeroDownloadSelector() {
   }
 
   onSettled(() => {
-    // A phone cannot run the desktop app, so a visitor on one is offered the phone app.
     const detected = detectMobilePlatform(globalThis.navigator) ?? detectDownloadPlatform(globalThis.navigator);
     if (detected) {
       setPlatform(detected);
-      // Reported separately from the click, so the offer the visitor was given can be compared with
-      // the one they took.
       landingAnalytics.trackDownloadSelected(detected, true);
     }
 
@@ -169,7 +205,7 @@ export function HeroDownloadSelector() {
           when={current().href}
           fallback={
             <span class="landing-download-primary" data-state="coming-soon" aria-disabled="true">
-              <PlatformLogo platform={platform()} solid />
+              <PlatformLogo platform={heroSystem(platform())} solid />
               {current().action}
             </span>
           }
@@ -182,7 +218,7 @@ export function HeroDownloadSelector() {
               rel={current().external ? EXTERNAL_LINK_REL : undefined}
               data-state="available"
             >
-              <PlatformLogo platform={platform()} solid />
+              <PlatformLogo platform={heroSystem(platform())} solid />
               {current().action}
             </a>
           )}
@@ -210,7 +246,7 @@ export function HeroDownloadSelector() {
           aria-label={text().hero.platforms}
           onKeyDown={handleKeyDown}
         >
-          <For each={DOWNLOAD_PLATFORM_ORDER}>
+          <For each={HERO_DESKTOP_APPS}>
             {(menuPlatform) => (
               <HeroMenuItem
                 platform={menuPlatform}
@@ -223,7 +259,7 @@ export function HeroDownloadSelector() {
           <span class="landing-download-menu-label" aria-hidden="true">
             {text().hero.phoneApps}
           </span>
-          <For each={MOBILE_APP_ORDER}>
+          <For each={HERO_PHONE_APPS}>
             {(menuPlatform) => (
               <HeroMenuItem
                 platform={menuPlatform}

@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const mobileRoot = join(repositoryRoot, "apps/mobile");
-// Without node_modules, Bun resolves expo from its global cache, where @expo/cli is missing.
 if (!existsSync(join(repositoryRoot, "node_modules/expo"))) {
   throw new Error("Dependencies are not installed in this worktree. Run `bun install --frozen-lockfile` first.");
 }
@@ -29,8 +28,6 @@ function readVariant(args: string[]): string {
   return "debug";
 }
 
-// The ABIs of the connected devices and running emulators. Expo builds only the device ABI for debug
-// variants and every ABI in gradle.properties for other variants.
 function connectedDeviceAbis(): string[] {
   const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT;
   const sdkAdb = sdk ? join(sdk, "platform-tools/adb") : null;
@@ -67,23 +64,16 @@ if (
 ) {
   const abis = connectedDeviceAbis();
   if (abis.length > 0) {
-    // A project property from the environment takes precedence over android/gradle.properties.
     process.env.ORG_GRADLE_PROJECT_reactNativeArchitectures = abis.join(",");
     process.stderr.write(`Building native code for ${abis.join(", ")} only. Pass --all-arch to build every ABI.\n`);
   }
 }
 
-// ccache shares C++ results between worktrees only when it removes the worktree path from the
-// compiler arguments. React Native's CMake setup uses ccache when it is on PATH.
 process.env.CCACHE_BASEDIR ??= repositoryRoot;
 process.env.CCACHE_NOHASHDIR ??= "true";
 
-// run:android skips prebuild when android/ exists. Apply config plugins to existing projects too.
 run("node", [expo, "prebuild", "--platform", "android", "--no-clean", "--no-install"]);
 
-// Gradle stores task outputs in ~/.gradle/caches/build-cache-1, which every worktree shares. The
-// property is local: android/ is generated and ignored, and the app config does not change, so the
-// fingerprint and runtimeVersion stay the same.
 const gradleProperties = join(mobileRoot, "android/gradle.properties");
 if (!/^org\.gradle\.caching=/m.test(readFileSync(gradleProperties, "utf8"))) {
   appendFileSync(gradleProperties, "\norg.gradle.caching=true\n");

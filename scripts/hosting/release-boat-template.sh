@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Run from the tagged repository root under the production Worker deployment lock.
 set -euo pipefail
 
 : "${RELEASE_TAG:?Set RELEASE_TAG.}"
@@ -37,7 +36,6 @@ if [[ ! $sha =~ ^[0-9a-f]{64}$ ]]; then
   exit 1
 fi
 
-# A create that has no sandbox yet sends its first request again, with the snapshot that it saved.
 in_use=$(node_modules/.bin/wrangler d1 execute DB --remote --json --config apps/auth-api/wrangler.jsonc \
   --command "SELECT DISTINCT provider_template FROM hosted_servers
     WHERE provider_sandbox_id IS NULL AND provider_template IS NOT NULL AND observed_state != 'deleted'" |
@@ -52,9 +50,7 @@ bun scripts/hosting/build-boat-template.ts \
   "--appimage-sha256=$sha" \
   --auth-api-url=https://api.openbot.run
 
-# Check again after the build. A retry of an old run must not select its template.
 require_latest
-# Keep the deployed Worker code and all other settings. Normal deploys preserve this secret.
 printf '%s\n' "$name" | node_modules/.bin/wrangler secret put HOSTED_SERVER_TEMPLATE \
   --config apps/auth-api/wrangler.jsonc
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

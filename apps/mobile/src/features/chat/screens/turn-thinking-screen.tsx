@@ -6,17 +6,7 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import Puzzle from "lucide-react-native/icons/puzzle";
-import {
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, View } from "react-native";
 import type { KeyboardAwareScrollViewRef } from "react-native-keyboard-controller";
 import Animated, {
@@ -38,28 +28,21 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ChatMarkdown } from "../components/chat-markdown";
 import { turnDuration } from "../components/chat-turn-steps-row";
+import { firstParam, useAgentConversation } from "../components/use-conversation-message";
 import { type TurnThinkingStep, turnStartLoaded, turnThinkingSteps, turnTimes } from "../model/turn-thinking";
 
-/** How near the end, in points, the reader counts as at the end, so the sheet follows new text. */
 const FOLLOW_SLACK = 48;
-/** How many more steps show when the reader gets near the top or the end of the window. */
 const STEP_PAGE = 30;
-/** How near the top or the end, in points, the window grows. */
 const WINDOW_EDGE = 600;
-/** How long, in milliseconds, the window waits for the steps it added above to lay out. */
 const ANCHOR_WAIT_MS = 1000;
-/** A running turn that the reader follows keeps at most this many steps drawn. */
 const FOLLOW_STEPS = STEP_PAGE * 2;
 const NO_MESSAGES: never[] = [];
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-// The fade shows that a step arrived, so it stays with reduced motion. The rise and the dot's pop
-// are decoration and stop with the system setting.
 const STEP_FADE = { duration: 280, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const STEP_MOVE = { duration: 360, easing: EASE_OUT, reduceMotion: ReduceMotion.System };
 const DOT_POP = { duration: 320, easing: EASE_OUT, reduceMotion: ReduceMotion.System };
 
-/** A new step fades in and rises into place. It runs on the UI thread. */
 function stepEntering() {
   "worklet";
   return {
@@ -71,7 +54,6 @@ function stepEntering() {
   };
 }
 
-/** A step with motion off in Settings: the fade only. */
 function stepFading() {
   "worklet";
   return {
@@ -80,7 +62,6 @@ function stepFading() {
   };
 }
 
-/** The dot of a new thought grows a little after its text starts to show. */
 function dotEntering() {
   "worklet";
   return {
@@ -89,11 +70,6 @@ function dotEntering() {
   };
 }
 
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-/** The seconds since `startedAt`, again each second while `running`. */
 function useElapsedSeconds(startedAt: number | null, running: boolean): number | null {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -102,14 +78,12 @@ function useElapsedSeconds(startedAt: number | null, running: boolean): number |
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [running]);
-  // The host and the phone clocks can differ, so a host start can be after the phone's now.
   return startedAt === null ? null : Math.max(0, Math.round((now - startedAt) / 1000));
 }
 
 interface TimelineStepProps {
   step: TurnThinkingStep;
   last: boolean;
-  /** True for a step that came while the sheet was open. Only these animate. */
   arrived: boolean;
   foreground: string;
   muted: string;
@@ -124,7 +98,6 @@ function sameStep(left: TurnThinkingStep, right: TurnThinkingStep): boolean {
   return left.kind !== "thought" || right.kind !== "thought" || left.streaming === right.streaming;
 }
 
-/** A streamed word draws only its own step again, also when the sheet holds many steps. */
 const TimelineStep = memo(
   function TimelineStep({
     step,
@@ -190,21 +163,9 @@ const TimelineStep = memo(
     left.onLayout === right.onLayout,
 );
 
-/**
- * The messages and the running turn of the agent's chat, or of one thread with `taskId`. The thread
- * screen under the sheet loads the thread and keeps it current, so the sheet only reads its cache.
- */
 function useTurnConversation(agentId: string, serverId: string, taskId: string | undefined) {
   const queryScope = useQueryScope();
-  const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
-  const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agentId, notify),
-    [agentId, conversationStore],
-  );
-  const conversation = useSyncExternalStore(
-    subscribe,
-    useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
-  );
+  const conversation = useAgentConversation(agentId);
   const taskConversation = useQuery<ConversationSnapshot>({
     queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId ?? ""),
     queryFn: skipToken,
@@ -213,7 +174,6 @@ function useTurnConversation(agentId: string, serverId: string, taskId: string |
     queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
     queryFn: skipToken,
   });
-  // A thread loads whole. The agent's chat loads by pages, and the sheet can read the older ones.
   if (taskId === undefined)
     return {
       messages: conversation?.messages ?? NO_MESSAGES,
@@ -232,17 +192,10 @@ function useTurnConversation(agentId: string, serverId: string, taskId: string |
 }
 
 interface StepWindow {
-  /** The first step that shows, or null for the first step that the phone holds. */
   topId: string | null;
-  /** The last step that shows, or null for the newest step. */
   bottomId: string | null;
 }
 
-/**
- * Each thought of one turn in full, with the progress lines between them, in the order they came.
- * While the turn runs, the sheet shows new text as it comes and keeps the newest text in view,
- * until the reader scrolls up. "Latest" then goes back to it.
- */
 export function TurnThinkingScreen() {
   const text = useText();
   const { t } = text;
@@ -267,11 +220,8 @@ export function TurnThinkingScreen() {
   const seconds = running ? elapsed : times ? Math.round((times.endedAt - times.startedAt) / 1000) : null;
   const reducedMotion = useReducedMotion();
   const [foreground, muted, accent, rail] = useThemeColor(["foreground", "muted", "accent", "separator"]);
-  // The start of a long turn can be in an older page, which the sheet reads when the reader gets to the top.
   const needsEarlier = hasOlder && !turnStartLoaded(messages, turnId);
 
-  // A long run has thousands of steps. Each one is Markdown, and all of them at once stop the app
-  // (#5554), so the sheet shows a window of them that grows as the reader scrolls.
   const openWindow = (): StepWindow =>
     running
       ? { topId: steps.length > STEP_PAGE ? (steps.at(-STEP_PAGE)?.id ?? null) : null, bottomId: null }
@@ -281,7 +231,6 @@ export function TurnThinkingScreen() {
   useEffect(() => {
     if (stepWindow === null && steps.length > 0) setStepWindow(shownWindow);
   });
-  // A progress line can leave the phone's memory. The window then keeps its last place.
   const lastIndices = useRef({ top: 0, bottom: STEP_PAGE });
   const indexOf = (id: string | null, empty: number, fallback: number) => {
     if (id === null) return empty;
@@ -292,8 +241,6 @@ export function TurnThinkingScreen() {
   const endIndex = Math.max(topIndex, indexOf(shownWindow.bottomId, steps.length - 1, lastIndices.current.bottom) + 1);
   const shownSteps = steps.slice(topIndex, endIndex);
 
-  // Steps that come after the newest step that the sheet already showed animate in. Steps above the
-  // window and steps of older pages do not.
   const seen = useRef<Set<string> | null>(null);
   seen.current ??= new Set(steps.map((step) => step.id));
   let newestSeen = steps.length - 1;
@@ -307,7 +254,6 @@ export function TurnThinkingScreen() {
   const scroll = useRef<KeyboardAwareScrollViewRef>(null);
   const following = useRef(true);
   const [behind, setBehind] = useState(false);
-  // Steps that show above the reader keep the reader's step in place: the offset moves as much as it.
   const offset = useRef(0);
   const atTop = useRef(true);
   const positions = useRef(new Map<string, number>()).current;
@@ -322,22 +268,18 @@ export function TurnThinkingScreen() {
     },
     [positions],
   );
-  // A step that is not laid out yet keeps the anchor of the last call, which then moves by both.
   const holdFirstStep = () => {
     const first = shownSteps[0];
     const y = first && positions.get(first.id);
     if (first && y !== undefined) anchor.current = { id: first.id, y, at: Date.now() };
   };
   const loadEarlier = () => {
-    // A failed read stops here, as in the chat. The next page that the host sends clears the error.
     if (topIndex !== 0 || !needsEarlier || olderLoading || olderError) return;
     holdFirstStep();
     void loadOlderMessages(agentId, serverId).catch(() => undefined);
   };
   const showEarlier = () => {
     if (topIndex === 0) return loadEarlier();
-    // The steps of the last call are not laid out yet. An anchor that never moves, such as of a step
-    // that left the phone, stops blocking after a short time.
     if (anchor.current && Date.now() - anchor.current.at < ANCHOR_WAIT_MS) return;
     holdFirstStep();
     const top = Math.max(0, topIndex - STEP_PAGE);
@@ -348,8 +290,6 @@ export function TurnThinkingScreen() {
     const bottom = endIndex - 1 + STEP_PAGE;
     setStepWindow({ ...shownWindow, bottomId: bottom >= steps.length - 1 ? null : (steps[bottom]?.id ?? null) });
   };
-  // A sheet that stays open on a run of hours gets new steps at the end. While the reader follows
-  // them, the steps far above leave the window, and they come back when the reader scrolls up.
   const followTopId =
     running && shownWindow.bottomId === null && endIndex - topIndex > FOLLOW_STEPS
       ? (steps[endIndex - STEP_PAGE]?.id ?? null)
@@ -358,7 +298,6 @@ export function TurnThinkingScreen() {
     if (followTopId !== null && following.current && !atTop.current)
       setStepWindow({ topId: followTopId, bottomId: null });
   }, [followTopId]);
-  // A sheet that opens at the top, or whose steps all fit, reads the older page of the turn at once.
   const loadEarlierNow = useRef(loadEarlier);
   loadEarlierNow.current = loadEarlier;
   useEffect(() => {
@@ -375,20 +314,14 @@ export function TurnThinkingScreen() {
     if (atTop.current) showEarlier();
     if (contentOffset.y + layoutMeasurement.height >= contentSize.height - WINDOW_EDGE) showLater();
   };
-  // iOS `scrollToEnd` sets an offset of 0 when the content is shorter than the sheet, and that puts
-  // the content under the transparent header. Content that fits below the header stays where the
-  // inset puts it. The sheet and the content can measure in either order, so both run the same check.
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
-  // iOS: the transparent header covers the top of the sheet. Android: the header is above the sheet.
   const coveredTop = isIOS ? headerHeight : 0;
   const viewportHeight = useRef(0);
   const contentHeight = useRef(0);
-  // A finished turn opens at its first thought. A running turn opens at its newest text.
   const opened = useRef(false);
   const placed = useRef(false);
   const follow = useCallback(() => {
     if (!running || viewportHeight.current === 0 || contentHeight.current === 0) return;
-    // The first measured pass puts the sheet at the end at once. After it, a new step slides into view.
     const first = !placed.current;
     placed.current = true;
     if (contentHeight.current <= viewportHeight.current - coveredTop) return;
@@ -442,7 +375,6 @@ export function TurnThinkingScreen() {
         contentContainerClassName="px-5 pb-safe-offset-8 pt-5"
         keyboardAware={false}
       >
-        {/* The steps that are there when the sheet opens show at once. Only new steps animate. */}
         <LayoutAnimationConfig skipEntering>
           <View className="mb-4 flex-row items-center gap-2">
             {running ? <View className="size-2 rounded-full bg-success" /> : null}

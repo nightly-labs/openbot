@@ -9,16 +9,11 @@ import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 export interface StageBackButtonProps {
   icon: "back" | "close";
   label: string;
-  /** The color of the iOS glass label: the eyes on the block, white over the camera. */
   color: string;
   disabled?: boolean;
   onPress: () => void;
 }
 
-/**
- * The back or close button on the stage. Android has no Liquid Glass, so it uses a HeroUI icon
- * button with the theme foreground on its own fill.
- */
 export function StageBackButton({ icon, label, disabled = false, onPress }: StageBackButtonProps) {
   const foreground = String(useThemeColor("foreground"));
   const Icon = icon === "close" ? X : ChevronLeft;

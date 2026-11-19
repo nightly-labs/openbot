@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/host";
 
 export const messages = {
-  // Status lines of the WebRTC host.
   "status.host.registered": "この OpenBot を WebRTC アクセス用に登録しました。",
   "status.host.keyRotated": "サーバーキーを変更しました。ペアリング済みのデバイスはそのままです。",
   "status.host.identityUpdated": "サーバーの ID を更新しました。",

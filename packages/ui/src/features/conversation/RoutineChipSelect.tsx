@@ -8,17 +8,12 @@ interface RoutineChipSelectProps {
   options: RoutineSelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean | undefined;
-  /** Shown in place of the selected option's label, when the chip says more than the menu. */
   valueLabel?: string | undefined;
-  /** A value chip that can cut its label short when the row is too narrow. */
   flexible?: boolean;
-  /** The element that holds the list. A select inside a modal popover opens in it, or the popover hides the list. */
   mount?: HTMLElement | undefined;
-  /** A pick is complete: the menu closed, or a key chose a value while the menu was closed. */
   onClose?: () => void;
 }
 
-/** A `Select` dressed as a chip. The chip has no icon: its fill shows that it opens a menu. */
 export function RoutineChipSelect(props: RoutineChipSelectProps) {
   const { t } = useText();
   const selected = () => props.options.find((option) => option.value === props.value) ?? null;
@@ -40,14 +35,11 @@ export function RoutineChipSelect(props: RoutineChipSelectProps) {
           props.onClose?.();
           return;
         }
-        // A long list, like the 31 days of a month, opens on the day already chosen.
         window.requestAnimationFrame(() =>
           document.querySelector(".routine-chip-select-content [data-selected]")?.scrollIntoView({ block: "center" }),
         );
       }}
       onChange={(option) => {
-        // Kobalte also reports the value it already has when the options change. That is not a pick:
-        // a consumer that saves on close would save its older draft over a newer saved value.
         if (!option || option.value === props.value) return;
         props.onChange(option.value);
         if (!open) props.onClose?.();

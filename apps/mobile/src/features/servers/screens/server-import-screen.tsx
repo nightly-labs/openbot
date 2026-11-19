@@ -10,16 +10,11 @@ import {
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 
-/** Product names, the same in each language. */
 export const IMPORT_SOURCE_NAMES = {
   "grok-bot": "Grok Bot",
   "hermes-agent": "Hermes Agent",
 } as const satisfies Record<AgentImportSkillSource, string>;
 
-/**
- * Server settings › Import agents (`agent-import-v1`): where the agents are now. Grok Bot and Hermes
- * each make an export file; another OpenBot server uses Transfer, for an owner or admin.
- */
 export function ServerImportScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

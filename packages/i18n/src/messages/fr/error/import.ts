@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} n’est pas un fichier JSON valide.",
   "error.import.notAgentExport": "{manifest} n’est pas une exportation d’agents OpenBot.",
   "error.import.newerExportSkill":
@@ -70,6 +69,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name} : le modèle « {model} » n’est pas encore disponible ici, donc l’agent utilise le modèle par défaut. Choisissez de nouveau le modèle quand son fournisseur est prêt.",
   "error.import.transferSettingSkipped": "{name} n’est pas importé. {reason}",
+  "error.import.transferRunsSkipped":
+    "{name} : l’historique des exécutions de la routine « {routine} » n’est pas importé.",
+  "error.import.transferSharedSkillsSkipped":
+    "Impossible de lire les compétences partagées, elles ne sont donc pas dans le fichier.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Les compétences partagées du fichier n’ont pas pu être ajoutées à ce serveur.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Les choix de {count} membre n’ont pas pu être enregistrés.",
+    other: "Les choix de {count} membres n’ont pas pu être enregistrés.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Une compétence partagée avec ce nom et d’autres fichiers existe déjà sur ce serveur.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} préférence du serveur dans le fichier n’est pas valide ici, elle n’est donc pas importée.",
+    other: "{count} préférences du serveur dans le fichier ne sont pas valides ici, elles ne sont donc pas importées.",
+  },
   "error.import.transferRoutineFlowSkipped": "L’import a laissé de côté un flux de routine. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name} : les agents personnalisés ne sont pas importés, car ils exécutent une commande. Vérifiez la commande « {command} » et ajoutez de nouveau l’agent dans les réglages.",
@@ -80,9 +95,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name} : saisissez de nouveau sa clé API dans les réglages.",
   "error.import.transferAgentEnv": "{name} : saisissez de nouveau les valeurs de {names} dans les réglages.",
   "error.import.transferMcpValues":
-    "{name} : le serveur MCP est ajouté désactivé. Vérifiez sa commande, saisissez de nouveau ses valeurs et son adresse complète, puis activez-le dans les réglages MCP.",
+    "{name} : le serveur MCP est ajouté désactivé. Vérifiez sa commande, saisissez de nouveau ses valeurs et son adresse complète, puis activez-le dans Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name} : les valeurs qui peuvent contenir un secret ont été retirées de ses arguments ou de son adresse. Saisissez-les de nouveau dans les réglages.",
   "error.import.transferSharedKept":
     "{number} fichiers du dossier partagé sont déjà présents ici. Ils restent tels quels.",
+  "error.import.transferPartSkipped":
+    "Certaines parties du fichier n’ont pas pu être importées. Les autres parties sont sur ce serveur : n’importez pas le fichier une deuxième fois.",
 } as const satisfies PartialTranslation<typeof source>;

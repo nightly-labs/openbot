@@ -1,4 +1,4 @@
-import type { RoutineSchedule } from "@openbot/contracts/ipc";
+import type { RoutineFields, RoutineSchedule } from "@openbot/contracts/ipc";
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { routineDraftSummary } from "@openbot/ui/features/conversation/routine-schedule-draft";
 import { routineScheduleToDraft } from "@openbot/ui/features/conversation/routine-schedule-saved";
@@ -16,10 +16,6 @@ export function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule
   return routine.trigger.schedule;
 }
 
-/**
- * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
- * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
- */
 export function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
   if (isEventRoutine(routine) && routine.trigger.kind === "webhook") {
     const eventType = routine.trigger.eventType;
@@ -31,4 +27,47 @@ export function routineListSummary(routine: RoutineEditorRecord, text: RoutineTe
   const draft = routineScheduleToDraft(schedule);
   if (draft.kind === "custom") return routineScheduleSummary(schedule, false, text);
   return routineDraftSummary(draft, text);
+}
+
+export function routinePausedByRunLabel(
+  routine: Pick<RoutineFields, "active" | "timezone" | "pausedByRun">,
+  text: RoutineText,
+  now = new Date(),
+): string | undefined {
+  const scheduledFor = routine.active ? undefined : routine.pausedByRun?.scheduledFor;
+  if (!scheduledFor) return undefined;
+  const runAt = new Date(scheduledFor);
+  if (Number.isNaN(runAt.getTime())) return undefined;
+  const timeZone = knownTimeZone(routine.timezone);
+  const day = (date: Date) => text.format.date(date, { year: "numeric", month: "numeric", day: "numeric", timeZone });
+  const time = text.format.date(
+    runAt,
+    day(runAt) === day(now)
+      ? { hour: "numeric", minute: "2-digit", timeZone }
+      : { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone },
+  );
+  return [text.t("routine.settings.pausedByRun", { time }), routineTimeZoneLabel(routine, text)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function localTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+export function routineTimeZoneLabel(routine: Pick<RoutineFields, "timezone">, text: RoutineText): string | undefined {
+  const timeZone = knownTimeZone(routine.timezone);
+  if (!timeZone || timeZone === localTimeZone()) return undefined;
+  const city = timeZone.split("/").at(-1)?.replaceAll("_", " ");
+  return text.t("routine.card.timeZone", { city: city ?? timeZone });
+}
+
+export function knownTimeZone(timeZone: string | undefined): string | undefined {
+  if (!timeZone) return undefined;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone });
+    return timeZone;
+  } catch {
+    return undefined;
+  }
 }

@@ -83,7 +83,6 @@ describe("billing sales migration", () => {
     expect(() => insert.run("bad", "payment_reversed", "evt_bad", null, null, null, null, 1, "{}", null, 1)).toThrow(
       /CHECK/u,
     );
-    // A paid invoice is still recorded once.
     expect(() =>
       insert.run("again", "payment_succeeded", "evt_again", "in_5", null, null, null, 1, "{}", null, 1),
     ).toThrow(/UNIQUE/u);

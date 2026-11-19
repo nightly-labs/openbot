@@ -3,30 +3,39 @@ import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts
 import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { base64ToBytes } from "@openbot/team-client/base64";
 import { currentText } from "@openbot/ui/text";
+import type { WebAttachmentMedia } from "./web-attachment-media";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
-/** Visual reply pages kept in memory. The chat list mounts a row again when it scrolls back. */
 const VISUAL_PAGE_CACHE = 8;
 
-/**
- * Host files in the browser. There is no host file URL here, so a file is read through the host
- * connection: saved as a download, or previewed from its bytes.
- */
 export function createWebAttachmentFiles(
   remote: Pick<WebWorkspaceRuntime, "download" | "sharedFile" | "workspaceFile">,
   hostId: () => string,
+  media: Pick<WebAttachmentMedia, "file" | "keep">,
 ) {
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
   return {
     async download(id: string): Promise<void> {
-      save(await remote.download(id));
+      const held = await media.file(id);
+      save(
+        held
+          ? { name: held.name, blob: new Blob([held.blob], { type: "application/octet-stream" }) }
+          : await remote.download(id),
+      );
     },
     async preview(attachment: AttachmentSummary): Promise<FilePreview> {
-      return filePreview(await remote.download(attachment.id));
+      const held = await media.file(attachment.id);
+      if (held) {
+        const bytes = new Uint8Array(await held.blob.arrayBuffer());
+        return previewOf(attachment.name, attachment.mimeType || held.blob.type, bytes);
+      }
+      const file = await remote.download(attachment.id);
+      const bytes = base64ToBytes(file.base64);
+      media.keep(attachment, bytes);
+      return previewOf(file.name, file.mimeType, bytes);
     },
-    /** The HTML of a visual reply page. Only an HTML file that is not too large is a page. */
     visualPage(attachment: AttachmentSummary): Promise<string> {
       const key = `${hostId()}:${attachment.id}`;
       const cached = pages.get(key);
@@ -50,7 +59,6 @@ export function createWebAttachmentFiles(
     async saveWorkspace(agentId: string, path: string): Promise<void> {
       save(await remote.workspaceFile(agentId, path));
     },
-    // The host sends a shared or workspace file as `application/octet-stream`, so its name gives the type.
     async previewShared(path: string): Promise<FilePreview> {
       const file = await remote.sharedFile(path);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
@@ -75,17 +83,19 @@ async function readVisualPage(
 }
 
 function filePreview(file: WebFile): FilePreview {
-  const bytes = base64ToBytes(file.base64);
+  return previewOf(file.name, file.mimeType, base64ToBytes(file.base64));
+}
+
+function previewOf(name: string, mimeType: string, bytes: Uint8Array<ArrayBuffer>): FilePreview {
   return {
-    name: file.name,
+    name,
     size: bytes.byteLength,
-    mimeType: file.mimeType,
-    previewKind: filePreviewKindForFile(file.name, file.mimeType),
+    mimeType,
+    previewKind: filePreviewKindForFile(name, mimeType),
     bytes,
   };
 }
 
-/** Opens a link from a message in a new tab. Only web links open; anything else is refused. */
 export async function openWebLink(value: string): Promise<void> {
   const url = new URL(value);
   if (url.protocol !== "https:" && url.protocol !== "http:")

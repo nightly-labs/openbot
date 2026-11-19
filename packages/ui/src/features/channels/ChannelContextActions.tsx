@@ -14,16 +14,10 @@ import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
-/**
- * "New conversation", "Compact now" and "Delete history" for a channel, as the agent settings offer
- * them for an agent's own chat. A new conversation and a delete ask first; a failure stays in the
- * dialog. A compaction failure shows under its row.
- */
 export function ChannelContextActions(props: {
   channelName: string;
   startNewConversation: () => Promise<void>;
   compact: () => Promise<void>;
-  /** Left out when the host cannot delete the history. */
   deleteHistory?: (() => Promise<void>) | undefined;
 }) {
   const { t, errorMessage } = useText();

@@ -42,7 +42,6 @@ describe("feedback daily counts migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // The deployed Worker does not know the table; it still adds and deletes accounts.
     database.exec(`
       INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
       VALUES ('new', 'email:new@example.test', 'new@example.test', 'New', NULL, 3, 3);
@@ -60,7 +59,6 @@ describe("feedback daily counts migration", () => {
     expect(count("owner", "2026-11-08")).toEqual([{ count: 1 }]);
     expect(count("owner", "2026-11-08")).toEqual([{ count: 2 }]);
     expect(count("owner", "2026-11-08")).toEqual([]);
-    // A send that GitHub refused gives its count back.
     database.prepare(UNCOUNT_FEEDBACK).run("owner", "2026-11-08");
     expect(count("owner", "2026-11-08")).toEqual([{ count: 2 }]);
     expect(count("owner", "2026-11-09")).toEqual([{ count: 1 }]);

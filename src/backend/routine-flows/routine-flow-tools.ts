@@ -1,9 +1,3 @@
-/**
- * The `openbot` tools that let an agent read and change routine flows, as the canvas does. A
- * request the model can correct, such as a cycle or an unknown agent, is a tool failure it reads;
- * other errors are faults.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Effect } from "effect";
 import { z } from "zod";

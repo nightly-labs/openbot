@@ -12,7 +12,6 @@ import { type AgentTemplatePublishCalls, agentTemplatesPort } from "./agent-temp
 
 type TemplateAction = DesktopAnalyticsProperties<"agent_template_action">["action"];
 
-/** Runs a publish action and records its result. A failure still rejects for the dialog. */
 async function tracked(action: TemplateAction, run: () => Promise<void>): Promise<void> {
   try {
     await run();
@@ -30,11 +29,6 @@ interface PublishState {
   loading: boolean;
 }
 
-/**
- * The publish dialog for agent settings and the calls behind it. `open` is what the settings
- * action runs; `dialog` is mounted once beside the conversation panels. `calls` is read on each call; by default
- * it is this computer's. `openLink` opens a link from the instructions.
- */
 export function createPublishAgent(
   openLink: (url: string) => void,
   calls: () => AgentTemplatePublishCalls = () => agentTemplatesPort().agentTemplates,
@@ -56,7 +50,6 @@ export function createPublishAgent(
       });
     } catch (error) {
       if (state.agentId !== agentId) return;
-      // Nothing can be shown without the preview, so the dialog closes and the toast says why.
       setState((draft) => {
         draft.open = false;
         draft.agentId = null;
@@ -79,7 +72,6 @@ export function createPublishAgent(
     void load(agentId);
   }
 
-  /** The preload rebuilt `shareUrl` from the id, on `openbot.run` or, in development, the local Worker. */
   async function copyShareLink(): Promise<boolean> {
     const publication = state.preview?.publication;
     if (!publication) return false;
@@ -104,8 +96,6 @@ export function createPublishAgent(
   }
 
   async function publishTemplate(agentId: string, preview: AgentTemplatePreview, update: boolean): Promise<void> {
-    // The card is only the link preview image: when it cannot be drawn, or is too large for the
-    // Worker to accept, the agent is published without it.
     const drawn = await renderAgentTemplateCard(preview).catch(() => null);
     const card = drawn && isAgentTemplateCardPng(drawn) ? drawn : null;
     const publication = await calls().publish({ agentId, card });
@@ -113,7 +103,6 @@ export function createPublishAgent(
     setState((draft) => {
       if (draft.preview) draft.preview.publication = publication;
     });
-    // The agent is published even when the copy fails, so that is said, not reported as a failure.
     const copied = await copyShareLink();
     const { t } = currentText();
     actionToast.success(update ? t("agentTemplate.publish.updated") : t("agentTemplate.publish.publishedToast"), {

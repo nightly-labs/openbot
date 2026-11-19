@@ -4,9 +4,6 @@ import { type CollectionArticle, findArticle } from "../../lib/content-collectio
 import { articleHead } from "../../lib/content-metadata";
 import { NEWS_COLLECTION } from "../../lib/news";
 
-// The lookup is in `loader` rather than in the component so an unknown slug ends
-// as a real not-found response instead of a 200 that renders an error card. A
-// crawler treats those two very differently.
 function loadNewsArticle(slug: string): CollectionArticle {
   const article = findArticle(NEWS_COLLECTION, slug);
   if (!article) throw notFound();

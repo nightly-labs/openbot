@@ -2,19 +2,6 @@ import type { BillingCurrency, BillingPlanId } from "@openbot/contracts/billing"
 import { LICENSE_DEVICES_PER_USER, type LicensePlan, type LicenseTier } from "@openbot/contracts/license";
 import { OPENBOT_DOWNLOAD_PAGE_LINKS, OPENBOT_LINKS } from "../lib/landing-links";
 
-// HTML and plain-text bodies for account email. Mail clients render HTML very differently, so the
-// markup keeps to what all of them share:
-// - Tables and inline styles only. Gmail and Outlook drop or limit `<style>`, so that block holds
-//   optional improvements (dark mode, narrow screens) and a client without it still gets the
-//   light layout.
-// - Outlook for Windows renders with Word: it ignores `max-width` and `border-radius` and padding
-//   on links, so `<!--[if mso]>` blocks give it a fixed-width frame and a VML button.
-// - Images are often blocked until the reader allows them, so the logo has styled alt text and no
-//   content is an image.
-// - Clients that force a dark theme (Outlook.com, Gmail apps) rewrite colours on their own; the
-//   `[data-ogsc]` rules answer Outlook.com, and the light palette inverts cleanly elsewhere.
-// Every message also carries the plain-text body, for clients and readers that do not show HTML.
-
 export interface RenderedEmail {
   subject: string;
   preheader: string;
@@ -47,35 +34,26 @@ export interface WelcomeEmailInput {
   serverName: string;
 }
 
-/** The first payment of a license. */
 interface LicenseWelcomeEmailInput {
   plan: LicensePlan;
   users: number;
   currency: BillingCurrency;
-  /** The list price of one period, in minor units of `currency`. Null when a discount changes it. */
   amount: number | null;
-  /** The next payment, in milliseconds since the epoch. Null when no payment follows. */
   nextPaymentAt: number | null;
 }
 
-/** A renewal payment of a license that failed. */
 interface LicensePaymentFailedEmailInput {
   plan: LicensePlan;
   users: number;
   currency: BillingCurrency;
-  /** The unpaid amount, in minor units of `currency`. */
   amount: number;
-  /** Stripe's next try, in milliseconds since the epoch. Null when Stripe does not try again. */
   nextAttemptAt: number | null;
-  /** Stripe's page for the unpaid invoice. Null sends the user to the web app. */
   invoiceUrl: string | null;
 }
 
-/** A license that ended. */
 interface LicenseEndedEmailInput {
   plan: LicensePlan;
   users: number;
-  /** `unpaid` after the last failed try; `canceled` for a cancel, a refund, or a dispute. */
   reason: "unpaid" | "canceled";
 }
 
@@ -98,7 +76,6 @@ const FOOTER_LINKS = [
 ] as const;
 const FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Helvetica, Arial, sans-serif";
 const MONO_STACK = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
-// Filler after the preheader, so a client's inbox preview does not continue into the body text.
 const PREHEADER_FILLER = "&#8199;&#65279;&#847; ".repeat(60);
 
 const COLOR = {
@@ -182,8 +159,6 @@ export function renderTeamInviteEmail(input: TeamInviteEmailInput): RenderedEmai
   };
 }
 
-// A message from the contact form on the site, to the team's own mailbox. The visitor wrote every
-// field, so the HTML escapes each one, and a reply goes to the visitor through `Reply-To`.
 export function renderContactMessageEmail(input: ContactMessageEmailInput): RenderedEmail {
   const sender = input.name ? `${input.name} <${input.email}>` : input.email;
   const fullSubject = `${input.topic} from ${input.name ?? input.email}`;
@@ -217,8 +192,6 @@ export function renderContactMessageEmail(input: ContactMessageEmailInput): Rend
   };
 }
 
-// Sent once to an account, when its first plan starts. Kamil signs it, and a reply goes to the
-// sending mailbox.
 export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   const serverName = input.serverName.trim();
   const planName = PLAN_NAMES[input.plan];
@@ -272,7 +245,6 @@ export function renderWelcomeEmail(input: WelcomeEmailInput): RenderedEmail {
   };
 }
 
-/** Each license email goes from the license sender, and a reply goes to that mailbox. */
 export function renderLicenseEmail(input: LicenseEmailInput): RenderedEmail {
   switch (input.kind) {
     case "welcome":
@@ -284,8 +256,6 @@ export function renderLicenseEmail(input: LicenseEmailInput): RenderedEmail {
   }
 }
 
-// Sent once for a license, at its first payment: at once for a paid Checkout, at the end of a free
-// trial for a trial. Kamil signs it.
 function renderLicenseWelcome(input: LicenseWelcomeEmailInput): RenderedEmail {
   const tierName = LICENSE_TIER_NAMES[input.plan.tier];
   const seats = `${input.users} seat${input.users === 1 ? "" : "s"}`;
@@ -342,8 +312,6 @@ function renderLicenseWelcome(input: LicenseWelcomeEmailInput): RenderedEmail {
   };
 }
 
-// Sent once for each unpaid renewal invoice, at its first failed try. Stripe tries again by itself, so
-// the license stays active until the last try fails.
 function renderLicensePaymentFailed(input: LicensePaymentFailedEmailInput): RenderedEmail {
   const tierName = LICENSE_TIER_NAMES[input.plan.tier];
   const subject = `Payment failed for your OpenBot ${tierName} license`;
@@ -401,7 +369,6 @@ function renderLicensePaymentFailed(input: LicensePaymentFailedEmailInput): Rend
   };
 }
 
-// Sent once when a license that had a payment ends. A trial that ends before its first payment gets none.
 function renderLicenseEnded(input: LicenseEndedEmailInput): RenderedEmail {
   const tierName = LICENSE_TIER_NAMES[input.plan.tier];
   const subject = `Your OpenBot ${tierName} license has ended`;
@@ -463,12 +430,10 @@ function licenseRows(plan: LicensePlan, users: number): [label: string, value: s
   ];
 }
 
-/** An amount in minor units, for example `€80.00`. */
 function formatAmount(amount: number, currency: BillingCurrency): string {
   return new Intl.NumberFormat("en", { style: "currency", currency: currency.toUpperCase() }).format(amount / 100);
 }
 
-/** A day in UTC, for example `2 Nov 2026`. */
 function formatDate(time: number): string {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" }).format(time);
 }

@@ -7,6 +7,7 @@ import {
   threadLists,
 } from "@openbot/ui/features/conversation/threads/thread-items";
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
+import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import type { AgentTasks } from "../agent-tasks/agent-tasks-state";
 import type {
   BrowserTakeoverRequest,
@@ -23,11 +24,8 @@ export interface ConversationThreadsInput {
   agent: { id: string; updatedAt: string };
   tasks: AgentTasks;
   tabs: AgentThreadTabsState;
-  /** The approvals that wait on the server. A side thread's turn waits for the one of its own thread. */
   approvals: readonly AgentApproval[];
-  /** The questions that wait on the server. A side thread's turn waits for the one of its own thread. */
   prompts: readonly PromptEvent[];
-  /** The browser takeovers that wait on the server. A side thread's turn waits for the one of its own thread. */
   takeovers: readonly BrowserTakeoverRequest[];
   newThreadTitle: string;
   onRespondApproval: (
@@ -35,21 +33,11 @@ export interface ConversationThreadsInput {
     decision: "accept" | "decline",
     options?: PromptAnswerOptions,
   ) => Promise<boolean>;
-  /**
-   * The context of each side thread that reported it, by thread id. Only this computer reports it.
-   * Read only by `contextState`, so a new runtime snapshot does not build the threads again.
-   */
   contextStates?: (() => Readonly<Record<string, AgentContextState>>) | undefined;
-  /** Missing when the host cannot compact a side thread. */
   onCompactContext?: ((taskId: string) => Promise<void>) | undefined;
-  /**
-   * Opens the agent's own chat at a message, as a search result does. Resolves false when the chat does
-   * not have the message. Without it, a click on "Branched from" opens the agent's own chat at its latest message.
-   */
   onOpenMainMessage?: ((messageId: string) => Promise<boolean>) | undefined;
 }
 
-/** The threads of one agent, for the conversation. Read it in a memo: it reads the thread state. */
 export function conversationThreads(input: ConversationThreadsInput): ConversationThreads {
   const { agent, tasks, tabs, approvals, prompts, takeovers, onCompactContext } = input;
   const agentId = agent.id;
@@ -60,14 +48,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     tasks: list,
     draftTitle: input.newThreadTitle,
     hidden: tabs.hidden(),
-    waitsFor: (task) =>
-      taskApproval(task, approvals) !== undefined
-        ? "approval"
-        : ofTaskThread(task, prompts) !== undefined
-          ? "question"
-          : ofTaskThread(task, takeovers) !== undefined
-            ? "takeover"
-            : undefined,
+    waitsFor: (task) => taskWaitsFor(task, { approvals, prompts, takeovers }),
     unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
@@ -89,7 +70,6 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     return newer ? { loading: newer.loading, onLoad: () => void tasks.loadLatest(agentId, taskId) } : undefined;
   };
   const focus = tabs.messageFocus();
-  /** A thread in the side panel, with the actions of its own message box. */
   const sideThread = (id: string): SideThread | undefined => {
     const task = list.find((entry) => entry.id === id);
     if (!task) return undefined;
@@ -113,10 +93,6 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onCompactContext: onCompactContext ? () => onCompactContext(task.id) : undefined,
     };
   };
-  /**
-   * The source of a branch. The list has the current title of a listed source. The list can leave out an
-   * archived source, so the link's title is the fallback; a link with no title is a deleted source.
-   */
   const branchSource = (task: AgentTask): ConversationBranchSource | undefined => {
     const branch = task.branch;
     if (!branch) return undefined;
@@ -189,7 +165,6 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       return open ? input.contextStates?.()[open.threadId] : undefined;
     },
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
-    // Only this computer moves a queued message to a new thread.
     onRunQueuedMessage: tasks.queuedMessageMovable()
       ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId)
       : undefined,
@@ -221,7 +196,6 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       return task !== undefined;
     },
     onOpenRoutineRun: async (routineId, messageId) => {
-      // An archived thread of the routine keeps its runs too. `openAt` restores it.
       const listed = () =>
         (tasks.snapshot(agentId)?.tasks ?? [])
           .filter((task) => task.routineId === routineId)
@@ -241,25 +215,33 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         tabs.open(agentId, MAIN_THREAD_ID);
         return (await input.onOpenMainMessage?.(messageId)) ?? false;
       }
-      // A deleted thread that waits for the end of its Undo time does not open.
       if (tabs.hidden().has(taskId)) return false;
-      // The part around the message loads first, so a pin of a deleted message or thread opens no tab.
       if (!(await tasks.loadMessage(agentId, taskId, messageId).catch(() => false))) return false;
-      // The thread scrolls to the message when its row shows. A restore that fails shows its own error.
       await tabs.openAt(agentId, taskId, messageId);
       return true;
     },
   };
 }
 
-/** The open side thread where the routine runs. */
 function routineTask(list: readonly AgentTask[], routineId: string): AgentTask | undefined {
   return list.find((task) => task.routineId === routineId && task.state !== "closed");
 }
 
 type TaskThread = { agentId: string; threadId: string };
 
-/** The question or takeover that the turn of this task waits for: the one of the task's own thread. */
+export interface ThreadWaits {
+  approvals: readonly AgentApproval[];
+  prompts: readonly PromptEvent[];
+  takeovers: readonly BrowserTakeoverRequest[];
+}
+
+export function taskWaitsFor(task: AgentTask, waits: ThreadWaits): SidebarWaitReason | undefined {
+  if (taskApproval(task, waits.approvals) !== undefined) return "approval";
+  if (ofTaskThread(task, waits.prompts) !== undefined) return "question";
+  if (ofTaskThread(task, waits.takeovers) !== undefined) return "takeover";
+  return undefined;
+}
+
 function ofTaskThread<Request extends TaskThread>(task: TaskThread, requests: readonly Request[]): Request | undefined {
   return requests.find((request) => request.agentId === task.agentId && request.threadId === task.threadId);
 }

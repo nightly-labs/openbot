@@ -6,11 +6,9 @@ import type { WebRuntimeFactory } from "../features/web-client/web-client-contex
 import type { WebRuntimeEvents, WebWorkspaceRuntime } from "../features/web-client/web-runtime";
 import { createMockOpenBot, type MockOpenBotControls } from "./mock-openbot";
 
-/** Use the desktop preview's data and actions for the browser composition too. */
 export const createMockWebRuntime: WebRuntimeFactory = (_accountId, events) =>
   mockWebRuntimeFor(createMockOpenBot(), events);
 
-/** The browser composition over a given mock host, for a fixture that also drives that host. */
 export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeEvents): WebWorkspaceRuntime {
   const agent = mock.api.agent;
   const host = {
@@ -38,7 +36,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     getSidebarLayout: () => agent.getSidebarLayout(),
     mutateSidebarLayout: (action) => agent.mutateSidebarLayout(action),
     channels: agent,
-    // The member the mock channels write as.
     currentMemberId: async () => "preview",
     respondToTakeover: (input) => agent.respondToBrowserTakeover(input),
     listHosts: async () => (removed ? [] : [host]),
@@ -77,8 +74,8 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         limit: 50,
         anchor: before ? { type: "before", cursor: before } : { type: "latest" },
       }),
-    conversationAround: (agentId, messageId) =>
-      agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
+    conversationAround: (agentId, messageId, limit = 50) =>
+      agent.readConversationPage({ agentId, limit, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     markUnreadFrom: (agentId, fromMessageId) => agent.markConversationUnread({ agentId, fromMessageId }),
     conversationReads: () => agent.listConversationReads(),
@@ -88,7 +85,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         : agent.deleteChannelMessage({ channelId: input.channelId, messageId: input.messageId }),
     listPinnedMessages: (agentId) => agent.listPinnedMessages(agentId),
     setMessagePinned: (input) => agent.setMessagePinned(input),
-    // The preview host is not a hosted server.
     focusUse: async () => undefined,
     send: async (agentId, text, attachmentDraftIds, replyToMessageId, clientMessageId) => {
       const receipt = await agent.sendMessage({
@@ -103,6 +99,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
     setTyping: () => {},
     queue: (agentId) => agent.listQueue(agentId),
+    activeQueues: async (agentIds) => (await agent.listActiveQueues(agentIds)) ?? { queues: [], omitted: agentIds },
     editQueue: (input) => agent.editQueuedMessage(input),
     cancelQueued: (input) => agent.cancelQueuedMessage(input),
     steerQueued: (input) => agent.steerQueuedMessage(input),
@@ -116,6 +113,11 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     cancelUpload: async () => {},
     discard: (id) => agent.discardDraftAttachment(id),
     download: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
+    downloadPreview: async () => ({
+      name: "preview.txt",
+      mimeType: "text/plain",
+      base64: btoa("OpenBot file preview"),
+    }),
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),

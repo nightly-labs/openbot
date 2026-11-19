@@ -5,6 +5,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentSummary,
   AgentTemplateSkill,
+  GithubSkillSource,
   InstalledSkill,
   InstallSkillInput,
   MarketplaceAgentSkill,
@@ -21,8 +22,11 @@ import {
   AGENT_TEMPLATE_LIMITS,
   decodeMarketplaceSkillDetail,
   decodeMarketplaceSkillPage,
+  isGithubSkillId,
+  isOtherGithubCommit,
   isSkillCategory,
   marketplaceQueryParams,
+  parseGithubSkillId,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -34,6 +38,7 @@ import { isHeldTargetError, writeFileAtomically } from "../backend/atomic-json-f
 import { causeHelpers } from "../backend/effect-boundary";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
+import type { GithubSkillSourceReader } from "./github-skill-source";
 import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
@@ -45,10 +50,10 @@ import {
   isRuntimeCacheFile,
   isRuntimeCacheFolder,
   normalizedFiles,
+  readSkillArchive,
 } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
-/** How long `listInstalled` keeps the newest catalog version of a skill. */
 const CATALOG_VERSION_LIFETIME = "60 seconds";
 const SKILL_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
@@ -68,7 +73,6 @@ interface LockEntry {
   files: Record<string, string>;
   enabled?: boolean;
   description?: string;
-  /** The skills of a pack, each installed as a folder of its own beside `slug`. */
   folders?: string[];
 }
 interface SkillsLock {
@@ -79,12 +83,6 @@ interface SkillsLock {
 export class SkillMarketplaceService {
   readonly #drafts = new Map<string, Draft>();
   readonly #writes = new Map<string, { gate: Semaphore.Semaphore; users: number }>();
-  /**
-   * The newest catalog version of each listed skill, for `listInstalled`. The Skills tab reads every
-   * agent at once and agents share skills, so one GET for each skill serves all agents for a short
-   * time. A read that starts while the GET of the same skill runs waits for that GET. A failed GET is
-   * not kept: the next read asks again, and this read keeps the installed version, as before.
-   */
   readonly #catalogVersions = Effect.runSync(
     Cache.makeWith((skillId: string) => this.get(skillId).pipe(Effect.map((detail) => detail.version)), {
       capacity: 1_000,
@@ -98,7 +96,15 @@ export class SkillMarketplaceService {
     private readonly refreshAgentRuntime: (agentId: string) => Effect.Effect<void, AgentLifecycleFailed> = () =>
       Effect.void,
     readonly localLibrary?: LocalSkillLibrary,
+    private readonly github?: GithubSkillSourceReader,
   ) {}
+
+  readGithub(link: string): Effect.Effect<GithubSkillSource, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<GithubSkillSource, SkillMarketplaceFailure> {
+      const github = yield* skillSync(() => this.requireGithub());
+      return yield* github.read(link).pipe(toSkillMarketplaceFailure);
+    });
+  }
 
   list(query: MarketplaceSkillQuery = {}): Effect.Effect<MarketplaceSkillPage, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillPage, SkillMarketplaceFailure> {
@@ -121,6 +127,8 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
       if (skillId.startsWith("local-skill-"))
         return yield* this.requireLocalLibrary().get(skillId).pipe(toSkillMarketplaceFailure);
+      if (isGithubSkillId(skillId))
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
       const detail = yield* this.auth
         .requestAuthorized(`/v1/skills/${encodeURIComponent(skillId)}`, { method: "GET" }, decodeMarketplaceSkillDetail)
         .pipe(toSkillMarketplaceFailure);
@@ -132,7 +140,6 @@ export class SkillMarketplaceService {
     });
   }
 
-  /** The skill a shared link names, by its slug. Only a link reads this; it never adds the skill. */
   getBySlug(slug: string): Effect.Effect<MarketplaceSkillDetail, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
       const detail = yield* this.auth
@@ -207,8 +214,10 @@ export class SkillMarketplaceService {
       const installed: InstalledSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         let availableVersion = entry.version;
-        const newest = yield* Effect.result(this.#availableVersion(entry.skillId));
-        if (Result.isSuccess(newest)) availableVersion = newest.success;
+        const newest = isGithubSkillId(entry.skillId)
+          ? undefined
+          : yield* Effect.result(this.#availableVersion(entry.skillId));
+        if (newest && Result.isSuccess(newest)) availableVersion = newest.success;
         const state = yield* installedState(agent.workspacePath, entry);
         installed.push(
           toInstalledSkill(
@@ -224,7 +233,13 @@ export class SkillMarketplaceService {
     });
   }
 
-  /** The revision of a skill in the agent's lock file, or null when the agent does not have it. */
+  lockedSkillIds(agentId: string): Effect.Effect<string[], SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string[], SkillMarketplaceFailure> {
+      const agent = yield* skillSync(() => this.requireAgent(agentId));
+      return Object.keys((yield* readLock(agent.workspacePath)).skills);
+    });
+  }
+
   installedRevision(agentId: string, skillId: string): Effect.Effect<number | null, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number | null, SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(agentId));
@@ -232,22 +247,23 @@ export class SkillMarketplaceService {
     });
   }
 
-  /** A local skill is read from this computer each time; a catalog skill comes from the short cache. */
   #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
     return skillId.startsWith("local-skill-")
       ? this.get(skillId).pipe(Effect.map((detail) => detail.version))
       : Cache.get(this.#catalogVersions, skillId);
   }
 
-  listInstalledForChatTags(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
+  listInstalledForChatTags(
+    agentId: string,
+    options: { problems?: boolean } = {},
+  ): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill[], SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(agentId));
       const lock = yield* readLock(agent.workspacePath);
       const installed: InstalledSkill[] = yield* listManagedSkillsForChat(agent).pipe(toSkillMarketplaceFailure);
-      // The skills of a pack are folders of their own, so the folder scan lists them for `$<name>`.
       const parents = new Set(Object.values(lock.skills).map((entry) => entry.slug));
       for (const skill of yield* listFolderSkills(agent, parents).pipe(toSkillMarketplaceFailure))
-        if (!skill.problem) installed.push(skill);
+        if (!skill.problem || options.problems) installed.push(skill);
       for (const entry of Object.values(lock.skills)) {
         if (entry.enabled === false) continue;
         installed.push(
@@ -259,15 +275,26 @@ export class SkillMarketplaceService {
           ),
         );
       }
-      installed.push(...(yield* listHomeFolderSkills(new Set(installed.map((skill) => skill.slug)))));
-      return installed.sort((a, b) => a.name.localeCompare(b.name));
+      const usableSlugs = new Set(installed.flatMap((skill) => (skill.problem ? [] : [skill.slug])));
+      const home = yield* listHomeFolderSkills(usableSlugs);
+      const homeSlugs = new Set(home.map((skill) => skill.slug));
+      return [...installed.filter((skill) => !(skill.problem && homeSlugs.has(skill.slug))), ...home].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
     });
   }
 
   install(input: InstallSkillInput): Effect.Effect<InstalledSkill, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill, SkillMarketplaceFailure> {
-      // A pinned version is served by the versions endpoint, which a local skill has no entry in: a
-      // local skill is held on this computer and has no published version to ask for.
+      const address = parseGithubSkillId(input.skillId);
+      if (address) {
+        const agent = yield* skillSync(() => this.requireAgent(input.agentId));
+        const github = yield* skillSync(() => this.requireGithub());
+        const { detail, bundle } = yield* github.download(address).pipe(toSkillMarketplaceFailure);
+        return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
+      }
+      if (isGithubSkillId(input.skillId))
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
       if (input.versionId) {
         if (input.skillId.startsWith("local-skill-"))
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.localHasNoVersion")) });
@@ -280,7 +307,6 @@ export class SkillMarketplaceService {
         : yield* this.auth
             .downloadAuthorized(`/v1/skills/${encodeURIComponent(input.skillId)}/content`)
             .pipe(toSkillMarketplaceFailure);
-      // The install read the newest version, so the next list does not show an older one as newest.
       if (!input.skillId.startsWith("local-skill-"))
         yield* Cache.set(this.#catalogVersions, input.skillId, detail.version);
       return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
@@ -320,16 +346,15 @@ export class SkillMarketplaceService {
         if (entry.enabled === false) continue;
         if (entry.skillId.startsWith("local-skill-"))
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.publishLocalFirst")) });
+        if (isGithubSkillId(entry.skillId))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.publishGithub", { name: entry.name })),
+          });
         result.push(yield* this.publishedReferenceEffect(agent, entry));
       }
       return result.sort((a, b) => a.name.localeCompare(b.name));
     });
   }
-
-  /**
-   * The skills an agent template carries. A marketplace skill is a reference to its exact version;
-   * a local or workspace skill is its `SKILL.md` text only, never its other files.
-   */
 
   listTemplateSkills(agentId: string): Effect.Effect<AgentTemplateSkill[], SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTemplateSkill[], SkillMarketplaceFailure> {
@@ -338,18 +363,15 @@ export class SkillMarketplaceService {
       const result: AgentTemplateSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         if (entry.enabled === false) continue;
-        if (entry.skillId.startsWith("local-skill-")) {
+        if (entry.skillId.startsWith("local-skill-") || isGithubSkillId(entry.skillId)) {
           const [directory] = targetDirectories(agent.workspacePath, entry.slug);
           result.push(yield* embeddedSkill(join(directory, "SKILL.md"), entry.name));
         } else result.push({ kind: "marketplace", ...(yield* this.publishedReferenceEffect(agent, entry)) });
       }
       for (const skill of yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)) {
-        // A managed skill without its ownership marker is still OpenBot's: every install writes its own.
         if (skill.problem || !skill.location || MANAGED_SKILL_SLUGS.has(skill.slug)) continue;
         result.push(yield* embeddedSkill(join(agent.workspacePath, skill.location, "SKILL.md"), skill.name));
       }
-      // An install writes each skill to a folder named by its slug, so two skills with one slug would
-      // make every install of the template fail.
       const slugs = new Set<string>();
       for (const skill of result) {
         if (slugs.has(skill.slug))
@@ -419,11 +441,6 @@ export class SkillMarketplaceService {
     return this.serialize(agent.id, this.writeResolvedEffect(agent, detail, bundle, replaceModified));
   }
 
-  /**
-   * The files of each other saved revision of a local skill, by folder. A copy with the files of a
-   * revision that the library keeps has no edits that a replace loses (#7072). A revision that does
-   * not read proves nothing, so it is left out and the install refuses as before.
-   */
   private savedRevisionFolders(
     detail: MarketplaceSkillDetail,
   ): Effect.Effect<Map<string, Record<string, Uint8Array>>[]> {
@@ -460,15 +477,24 @@ export class SkillMarketplaceService {
       const archive = yield* skillSync(() => inspectArchive(bundle));
       if (archive.slug !== detail.slug)
         return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.metadataMismatch")) });
-      const files = yield* skillSync(() => normalizedFiles(bundle));
+      const { files, executable } = yield* skillSync(() => readSkillArchive(bundle));
       const children = packChildren(detail.slug, files);
       const folders = skillFolders(detail.slug, files, children);
+      const executableFolders = skillFolders(
+        detail.slug,
+        Object.fromEntries([...executable].map((name) => [name, true])),
+        children,
+      );
       for (const folder of folders.keys()) yield* assertSkillPaths(agent.workspacePath, folder);
       const lock = yield* readLock(agent.workspacePath);
-      const existing = lock.skills[detail.id];
+      const replacedId = githubPredecessor(lock, detail.id);
+      const existing = lock.skills[detail.id] ?? (replacedId ? lock.skills[replacedId] : undefined);
       if (
         Object.values(lock.skills).some(
-          (entry) => entry.skillId !== detail.id && entryFolders(entry).some((folder) => folders.has(folder)),
+          (entry) =>
+            entry.skillId !== detail.id &&
+            entry.skillId !== replacedId &&
+            entryFolders(entry).some((folder) => folders.has(folder)),
         )
       )
         return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.folderTaken")) });
@@ -493,7 +519,6 @@ export class SkillMarketplaceService {
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
       for (const folder of folders.keys()) {
         if (owned.has(folder)) continue;
-        // OpenBot writes its own skill to this folder in every workspace, so only an older install can own it.
         if (MANAGED_SKILL_SLUGS.has(folder))
           return yield* new SkillMarketplaceFailure({
             cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
@@ -515,10 +540,13 @@ export class SkillMarketplaceService {
           (stayDisabled
             ? [disabledDirectory(agent.workspacePath, folder)]
             : targetDirectories(agent.workspacePath, folder)
-          ).map((target) => ({ target, files: folderFiles })),
+          ).map((target) => ({
+            target,
+            files: folderFiles,
+            executable: new Set(Object.keys(executableFolders.get(folder) ?? {})),
+          })),
         ),
       );
-      // A skill that a new version of the pack no longer has goes with it.
       for (const folder of existing ? entryFolders(existing) : [])
         if (!folders.has(folder)) yield* removeFolder(agent.workspacePath, folder, !stayDisabled);
       const entry: LockEntry = {
@@ -534,9 +562,10 @@ export class SkillMarketplaceService {
         ...(stayDisabled ? { enabled: false } : {}),
         ...(children.length > 0 ? { folders: children } : {}),
       };
+      if (replacedId) delete lock.skills[replacedId];
       lock.skills[detail.id] = entry;
       yield* writeLock(agent.workspacePath, lock);
-      if (!detail.id.startsWith("local-skill-"))
+      if (!detail.id.startsWith("local-skill-") && !isGithubSkillId(detail.id))
         yield* this.auth
           .requestAuthorized(
             `/v1/skills/${encodeURIComponent(detail.id)}/install`,
@@ -610,17 +639,17 @@ export class SkillMarketplaceService {
               });
           }
         }
-        const writes: Array<{ target: string; files: Record<string, Uint8Array> }> = [];
+        const writes: SkillFolderWrite[] = [];
         for (const folder of folders) {
-          const files = yield* readSkillFiles(disabledDirectory(agent.workspacePath, folder));
-          for (const target of targetDirectories(agent.workspacePath, folder)) writes.push({ target, files });
+          const { files, executable } = yield* readSkillFiles(disabledDirectory(agent.workspacePath, folder));
+          for (const target of targetDirectories(agent.workspacePath, folder))
+            writes.push({ target, files, executable });
         }
         yield* replaceTargets(writes);
         for (const folder of folders)
           yield* skillIO(() => rm(disabledDirectory(agent.workspacePath, folder), { recursive: true, force: true }));
         delete entry.enabled;
       } else {
-        // Every folder is checked before one moves, and a failed move puts back the ones before it.
         const moves: Array<{ source: string; stash: string }> = [];
         for (const folder of folders) {
           const [primary, fallback] = targetDirectories(agent.workspacePath, folder);
@@ -675,6 +704,11 @@ export class SkillMarketplaceService {
     return agent;
   }
 
+  private requireGithub(): GithubSkillSourceReader {
+    if (!this.github) throw new Error(sourceText("error.skill.githubUnavailable"));
+    return this.github;
+  }
+
   requireLocalLibrary(): LocalSkillLibrary {
     if (!this.localLibrary) throw new Error(sourceText("error.skill.localLibraryUnavailable"));
     return this.localLibrary;
@@ -714,10 +748,6 @@ function disabledDirectory(workspace: string, slug: string): string {
   return join(workspace, ".openbot", "skills-disabled", slug);
 }
 
-/**
- * The skills of a pack: each `skills/<slug>-<name>/SKILL.md` in the bundle. The installer writes each
- * one as the folder `<slug>-<name>` beside `<slug>`, where a provider finds it as a skill.
- */
 function packChildren(slug: string, files: Record<string, Uint8Array>): string[] {
   return Object.keys(files)
     .flatMap((path) => {
@@ -727,7 +757,6 @@ function packChildren(slug: string, files: Record<string, Uint8Array>): string[]
     .sort();
 }
 
-/** The files of each folder, by folder name. Files that no child owns stay in the `slug` folder. */
 function skillFolders<T>(slug: string, files: Record<string, T>, children: readonly string[]) {
   const folders = new Map<string, Record<string, T>>([[slug, {}]]);
   for (const [path, value] of Object.entries(files)) {
@@ -741,12 +770,10 @@ function skillFolders<T>(slug: string, files: Record<string, T>, children: reado
   return folders;
 }
 
-/** A lock entry written before packs has no `folders`, so its files keep their place in `slug`. */
 function entryFolders(entry: LockEntry): string[] {
   return [entry.slug, ...(entry.folders ?? [])];
 }
 
-/** A disabled skill owns only its stash: files in a provider folder are then the user's. */
 const removeFolder = Effect.fn("SkillMarketplace.removeFolder")(function* (
   workspace: string,
   folder: string,
@@ -755,6 +782,10 @@ const removeFolder = Effect.fn("SkillMarketplace.removeFolder")(function* (
   for (const target of [...(enabled ? targetDirectories(workspace, folder) : []), disabledDirectory(workspace, folder)])
     yield* skillIO(() => rm(target, { recursive: true, force: true }));
 });
+
+function githubPredecessor(lock: SkillsLock, skillId: string): string | undefined {
+  return Object.keys(lock.skills).find((key) => isOtherGithubCommit(skillId, key));
+}
 
 function toInstalledSkill(
   entry: LockEntry,
@@ -811,29 +842,26 @@ function parseSkillMarkdownDescription(text: string): string | undefined {
 
 const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
+  const executable = new Set<string>();
   const visit = (directory: string): Effect.Effect<void, SkillMarketplaceFailure> =>
     Effect.gen(function* () {
       for (const entry of yield* skillIO(() => readdir(directory, { withFileTypes: true }))) {
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        // The state check does not look in runtime caches, so turning a skill on leaves them out too.
         if (entry.isDirectory()) {
           if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
-        } else if (entry.isFile())
-          files[relative(root, path).replaceAll("\\", "/")] = new Uint8Array(yield* skillIO(() => readFile(path)));
+        } else if (entry.isFile()) {
+          const name = relative(root, path).replaceAll("\\", "/");
+          files[name] = new Uint8Array(yield* skillIO(() => readFile(path)));
+          if ((yield* skillIO(() => lstat(path))).mode & 0o111) executable.add(name);
+        }
       }
     });
   yield* visit(root);
-  return files;
+  return { files, executable };
 });
 
-/**
- * The waits before each new rename of a skill folder when Windows answers `EPERM`, `EACCES` or `EBUSY`.
- * Antivirus and the search indexer open the files just written to the stage for a moment, and Windows
- * does not rename a folder that has an open file. One try failed the install (#6750). About 3 s in all,
- * as for an attachment transfer, because the agent waits for the install.
- */
 const HELD_SKILL_FOLDER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000];
 
 const renameSkillFolder = Effect.fn("SkillMarketplace.renameFolder")(function* (from: string, to: string) {
@@ -846,27 +874,38 @@ const renameSkillFolder = Effect.fn("SkillMarketplace.renameFolder")(function* (
   }
 });
 
-/** Writes every target, or on a failure puts back each one it already replaced. */
+interface SkillFolderWrite {
+  target: string;
+  files: Record<string, Uint8Array>;
+  executable: ReadonlySet<string>;
+}
+
 const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
-  writes: ReadonlyArray<{ target: string; files: Record<string, Uint8Array> }>,
+  writes: ReadonlyArray<SkillFolderWrite>,
 ) {
   const completed: Array<{ target: string; backup: string | null }> = [];
   const outcome = yield* Effect.result(
     Effect.gen(function* () {
-      for (const { target, files } of writes) {
+      for (const { target, files, executable } of writes) {
         yield* skillIO(() => mkdir(dirname(target), { recursive: true, mode: 0o700 }));
         const stage = `${target}.openbot-stage-${randomUUID()}`;
         const backup = (yield* pathExists(target)) ? `${target}.openbot-backup-${randomUUID()}` : null;
         yield* Effect.gen(function* () {
-          yield* writeFiles(stage, files);
+          yield* writeFiles(stage, files, executable);
           if (backup) yield* renameSkillFolder(target, backup);
           const moved = yield* Effect.result(renameSkillFolder(stage, target));
-          if (Result.isFailure(moved)) {
-            if (backup) yield* renameSkillFolder(backup, target);
-            return yield* moved.failure;
+          if (Result.isSuccess(moved)) return;
+          if (isHeldTargetError(moved.failure.cause) && !(yield* pathExists(target))) {
+            const written = yield* Effect.result(writeFiles(target, files, executable));
+            if (Result.isSuccess(written)) {
+              yield* skillIO(() => rm(stage, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore);
+              return;
+            }
+            yield* skillIO(() => rm(target, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore);
           }
+          if (backup) yield* renameSkillFolder(backup, target);
+          return yield* moved.failure;
         }).pipe(
-          // A stage left beside the skill folder holds a SKILL.md, and a provider can load it as a skill.
           Effect.onError(() =>
             skillIO(() => rm(stage, { recursive: true, force: true, maxRetries: 5 })).pipe(Effect.ignore),
           ),
@@ -896,13 +935,14 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
 const writeFiles = Effect.fn("SkillMarketplace.writeFiles")(function* (
   root: string,
   files: Record<string, Uint8Array>,
+  executable: ReadonlySet<string>,
 ) {
   for (const [name, bytes] of Object.entries(files)) {
     const path = resolve(root, name);
     if (!path.startsWith(`${resolve(root)}/`) && !path.startsWith(`${resolve(root)}\\`))
       return yield* new SkillMarketplaceFailure({ cause: new Error("Unsafe skill path.") });
     yield* skillIO(() => mkdir(dirname(path), { recursive: true, mode: 0o700 }));
-    yield* skillIO(() => writeFile(path, bytes, { mode: 0o600 }));
+    yield* skillIO(() => writeFile(path, bytes, { mode: executable.has(name) ? 0o700 : 0o600 }));
   }
 });
 
@@ -917,7 +957,6 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
         const path = join(directory, entry.name);
         const name = relative(root, path).replaceAll("\\", "/");
         if (entry.isSymbolicLink()) return true;
-        // A save leaves out the Finder file and runtime caches, so a copy with them has no edit (#7072, #7350).
         if (entry.isDirectory()) {
           if (isRuntimeCacheFolder(entry.name)) continue;
           if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (yield* visit(path))) return true;
@@ -941,11 +980,6 @@ const installedState = Effect.fn("SkillMarketplace.installedState")(function* (
   return state;
 });
 
-/**
- * True when each installed copy has the files of its lock entry or exactly the files of one of
- * `accepted`, such as the install. An agent that edits its copy and publishes that folder as a new
- * revision changed nothing that the install then loses.
- */
 const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
   workspace: string,
   entry: LockEntry,
@@ -970,10 +1004,6 @@ const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
   return true;
 });
 
-/**
- * True when the folder has exactly these files with these hashes. A `SKILL.md` also matches when it
- * is the text that a save put quotes in: the copy that an agent saved from keeps the text before.
- */
 const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   target: string,
   files: Record<string, string>,
@@ -1008,7 +1038,6 @@ const installedFolderState = Effect.fn("SkillMarketplace.installedFolderState")(
     const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
     if (Result.isFailure(unexpected) || unexpected.success) return "modified";
     for (const [name, hash] of Object.entries(files)) {
-      // Python writes the cache files that an older package kept again, so their bytes are not an edit.
       if (isRuntimeCacheFile(name)) continue;
       const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
       if (Result.isSuccess(content)) {
@@ -1024,10 +1053,6 @@ const installedFolderState = Effect.fn("SkillMarketplace.installedFolderState")(
   return complete === expected && !missing ? "installed" : "needs-repair";
 });
 
-/**
- * One skill's `SKILL.md` as a template carries it. The slug and name are what an install derives
- * from the same text, so a folder name that is not a valid slug does not travel.
- */
 const embeddedSkill = Effect.fn("SkillMarketplace.embeddedSkill")(function* (
   path: string,
   label: string,
@@ -1071,7 +1096,6 @@ const readLock = Effect.fn("SkillMarketplace.readLock")(function* (
     return value;
   });
 });
-/** The folder of each installed pack and the folders of its skills. */
 export const readPackFolders = Effect.fn("SkillMarketplace.readPackFolders")(function* (workspace: string) {
   const lock = yield* readLock(workspace);
   return new Map(

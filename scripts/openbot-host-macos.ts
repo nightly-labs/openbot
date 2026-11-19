@@ -101,7 +101,6 @@ async function prepareApplication(): Promise<void> {
   await verifyBundleTree(SHARED_APP, false);
   await verifySignature(SHARED_APP);
   if (await macHostOperations().applicationInUse()) throw new Error("Quit all OpenBot sessions before initial setup.");
-  // A normal DMG copy may belong to its installing administrator. Never adopt a tenant-owned bundle.
   const admins = new Set<number>([0]);
   const checkOwner = async (path: string): Promise<void> => {
     const info = await lstat(path);
@@ -182,7 +181,6 @@ async function verifyIsolation(tenants: HostTenant[]): Promise<void> {
     for (const owner of tenants)
       for (const reader of tenants) {
         const same = owner.uid === reader.uid;
-        // Only harmless files in the root-created verification area are accessed. No tenant content.
         await hostCommand("/usr/bin/sudo", [
           "-n",
           "-u",
@@ -205,7 +203,6 @@ async function verifyIsolation(tenants: HostTenant[]): Promise<void> {
 
 export function macHostAdminOperations(): HostAdminOperations {
   let credentialFile: string | null = null;
-  // Account names do not change while one command runs, and watch would otherwise rescan on each refresh.
   const names = new Map<number, string>();
   return {
     verifyInstallation,
@@ -220,7 +217,6 @@ export function macHostAdminOperations(): HostAdminOperations {
     },
     checkNewUsers: async (names) => {
       if (!names.length) return;
-      // This lists only local account names. The native tool repeats directory-service preflight.
       const existing = (await hostCommand("/usr/bin/dscl", [".", "-list", "/Users"])).split("\n");
       for (const name of names) {
         if (existing.includes(name)) throw new Error("Requested account already exists.");
@@ -234,7 +230,6 @@ export function macHostAdminOperations(): HostAdminOperations {
       }
     },
     createUsers: async (names) => {
-      // Capture sensitive output in memory. Never print an exec error, stdout or stderr.
       let result: string;
       try {
         result = (
@@ -276,7 +271,6 @@ export function macHostAdminOperations(): HostAdminOperations {
     },
     presentCredentials: async (credentials) => {
       if (!credentials.length) return;
-      // /dev/tty avoids stdout redirection, pipes, service logs and diagnostic collectors.
       const terminal = await open("/dev/tty", "w");
       try {
         await terminal.writeFile(
@@ -310,11 +304,9 @@ export function macHostAdminOperations(): HostAdminOperations {
       }
     },
     readTenantStatus: async (uid) => {
-      // A logged-out, stopped or malformed tenant is a normal reading, not a command failure.
       try {
         const directory = await runCauseEffect(verifyTenantDirectory(ROOT, uid));
         const status = await runCauseEffect(readOwnedJson(join(directory, "status.json"), uid, tenantStatusSchema));
-        // The host ignores a report that claims another UID. Never show it as that tenant's state.
         return status.uid === uid ? status : null;
       } catch {
         return null;

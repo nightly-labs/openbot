@@ -20,17 +20,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/** The page adds this many rows at a time, so a provider with a thousand models opens at once. */
 const PAGE_SIZE = 100;
-/** The next rows come when the reader is this close to the end. */
 const END_DISTANCE = 600;
 
-/**
- * Server settings > Providers > a provider > Models: every model of the provider, and the ones that
- * the model picker of the server shows (`model-visibility-v1`). Agents still reach every model. The
- * selected models are in their own section above the others. Each section keeps the order of the
- * first answer. The header menu selects or deselects all models, or resets the list to the default.
- */
 export function ServerProviderModelsScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -51,13 +43,11 @@ export function ServerProviderModelsScreen() {
     const placed = new Set(kept);
     const shown = new Set(data.shown);
     const added = data.models.map((model) => model.id).filter((id) => !placed.has(id));
-    // Only the first answer, or models that came later, are sorted by their state.
     return [...kept, ...added.filter((id) => shown.has(id)), ...added.filter((id) => !shown.has(id))];
   }, [data]);
   const names = useMemo(() => new Map((data?.models ?? []).map((model) => [model.id, model.name])), [data]);
   const shown = useMemo(() => new Set(data?.shown ?? []), [data]);
   const needle = search.trim().toLowerCase();
-  // The search filters only the other models: the selected ones stay in view while the reader searches.
   const listed = useMemo(() => {
     const all = order.current.map((id) => ({ id, name: names.get(id) ?? id }));
     return [
@@ -116,7 +106,6 @@ export function ServerProviderModelsScreen() {
   const otherRows = visible.filter((model) => !shown.has(model.id));
   const summary = `${t("mobile.server.providers.modelsSelected", { shown: shown.size, total })} ${t("mobile.server.providers.modelsHint")}`;
   return (
-    // The native header holds the search field, which the Android blur header cannot draw.
     <SettingsContent androidNativeHeader onScroll={onScroll}>
       <Stack.Screen options={{ title: name ? t("mobile.server.providers.modelsTitle", { name }) : undefined }} />
       {total > 0 ? (
@@ -133,9 +122,7 @@ export function ServerProviderModelsScreen() {
         placeholder={t("mobile.server.providers.modelsSearch")}
         autoCapitalize="none"
         hideWhenScrolling={false}
-        // In a sheet, the header and its back button stay while the search has focus.
         hideNavigationBar={false}
-        // The native Android search view draws black icons and text in both themes.
         {...(isAndroid
           ? { headerIconColor: String(foreground), textColor: String(foreground), hintTextColor: String(muted) }
           : {})}
@@ -184,11 +171,6 @@ interface ModelsMenuProps {
   onReset: () => void;
 }
 
-/**
- * The header menu of the Models page: Select all, Deselect all and Reset to default. Select all
- * shows only while a model is not selected, and Deselect all only while a model is selected. iOS
- * shows a native toolbar menu. Android shows a menu button in the right slot of the header.
- */
 function ModelsMenu(props: ModelsMenuProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -198,7 +180,6 @@ function ModelsMenu(props: ModelsMenuProps) {
   const deselectAll = t("mobile.server.providers.modelsDeselectAll");
   const reset = t("mobile.server.providers.modelsReset");
   const { canSelectAll, canDeselectAll, canReset } = props;
-  // The header options change only when the menu looks different, as in `ProfileHeaderActions`.
   const actions = useRef(props);
   useLayoutEffect(() => {
     actions.current = props;

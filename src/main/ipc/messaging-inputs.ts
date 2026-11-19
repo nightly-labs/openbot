@@ -1,5 +1,3 @@
-// The messaging payloads. No message here quotes the input.
-
 import type {
   AddMessagingOrchestratorInput,
   AddTelegramOrchestratorInput,
@@ -16,6 +14,7 @@ import type {
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   StartWhatsAppLinkInput,
   WhatsAppSenderInput,
@@ -72,7 +71,6 @@ export function parseAddTelegramOrchestratorInput(value: unknown): AddTelegramOr
   return result;
 }
 
-/** A platform that a joined server's `connectors-v1` carries. WhatsApp uses `whatsapp-connector-v1`. */
 function parsePlatform(value: unknown): ConnectorMessagingPlatform {
   if (!isOneOf(CONNECTOR_MESSAGING_PLATFORMS, value)) throw new Error("A messaging request is invalid.");
   return value;
@@ -126,7 +124,6 @@ export function parseStartWhatsAppLinkInput(value: unknown): StartWhatsAppLinkIn
 
 export function parseWhatsAppSenderInput(value: unknown): WhatsAppSenderInput {
   if (!isObject(value)) throw new Error("A messaging request is invalid.");
-  // A contact can be typed with spaces, a plus or brackets; it is stored in digits.
   const sender =
     isObject(value.sender) && value.sender.kind === "contact"
       ? { ...value.sender, id: parseWhatsAppPhoneNumber(value.sender.id) ?? "" }
@@ -161,4 +158,9 @@ export function parseSetWhatsAppOwnNumberInput(value: unknown): SetWhatsAppOwnNu
 export function parseSetWhatsAppWorkingMessageInput(value: unknown): SetWhatsAppWorkingMessageInput {
   if (!isObject(value) || !isBoolean(value.workingMessage)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id"), workingMessage: value.workingMessage };
+}
+
+export function parseSetWhatsAppStatusReactionsInput(value: unknown): SetWhatsAppStatusReactionsInput {
+  if (!isObject(value) || !isBoolean(value.statusReactions)) throw new Error("A messaging request is invalid.");
+  return { workspaceId: requireString(value.workspaceId, "Workspace id"), statusReactions: value.statusReactions };
 }
