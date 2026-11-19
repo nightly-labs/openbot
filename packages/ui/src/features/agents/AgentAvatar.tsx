@@ -237,7 +237,7 @@ function GeneratedAvatar(props: {
     { equals: sameAppearance },
   );
   const flatBreathe = () => {
-    const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
+    const amount = flat() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
   };
   const spanStyle = () => {
