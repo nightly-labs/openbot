@@ -336,8 +336,11 @@ changed, on this computer and on a joined host.
   (`workflow-walk.ts`). Passes run one at a time; a pass runs after a turn or queue event, after
   each user action, and at startup. A node runs again when a node before it has a newer step, as
   after a retry. A retry uses the node's current settings, so a fix made after the failure applies;
-  it uses the run's copy when the node is gone or is now another kind. An edge back to an earlier node (`workflowLoopEdges` in the contracts) is a loop:
-  when its source is done and newer, the earlier node runs again with that answer as one more
+  it uses the run's copy when the node is gone or is now another kind. An edge back to the start of a group of nodes that each reach the
+  others (`workflowLoopEdges` in the contracts) is a loop. The start is the entry from outside the
+  group; when more than one node is an entry, it is the leftmost entry on the canvas, then the
+  topmost, then the first that the walk reaches. The edge order does not change it. When its source
+  is done and newer, the earlier node runs again with that answer as one more
   input. A loop has no pass limit. It ends when a condition takes the other branch, a step fails or
   is rejected, or the user stops the run. The canvas marks a loop with no condition as endless.
 - An agent step is a routine handoff (`AgentService.enqueueRoutineHandoff`, with the workflow as the

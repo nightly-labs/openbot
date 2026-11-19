@@ -206,6 +206,13 @@ try {
       (edges) => [...workflowLoopEdges(RESEARCH.nodes, edges)].join() === "enough>fork",
     ),
   );
+  const column = RESEARCH.nodes.map((node, index) => ({ ...node, at: { x: 0, y: index * 200 } }));
+  check(
+    "in one column, the loop goes back to its top entry, in any edge order",
+    [[...RESEARCH_CHAIN, TASK_TO_REVIEWER], RESEARCH.edges].every(
+      (edges) => [...workflowLoopEdges(column, edges)].join() === "enough>fork",
+    ),
+  );
   const research = await runCauseEffect(workflows.create({ title: "Research loop" }));
   const researchId = research.summary.id;
   const researchSaved = await runCauseEffect(

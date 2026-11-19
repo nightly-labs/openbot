@@ -389,14 +389,14 @@ export interface WorkflowGraph {
   strokes: WorkflowStroke[];
 }
 
-type LoopNode = { id: string; at?: { x: number } };
+type LoopNode = { id: string; at?: { x: number; y: number } };
 type LoopEdge = { id: string; from: string; to: string };
 
 export function workflowLoopEdges(nodes: readonly LoopNode[], edges: readonly LoopEdge[]): Set<string> {
   const { order, cyclic } = walkOrder(nodes, edges);
   const loops = new Set(edges.filter((edge) => edge.from === edge.to).map((edge) => edge.id));
   if (!cyclic) return loops;
-  const left = new Map(nodes.map((node) => [node.id, node.at?.x ?? Number.POSITIVE_INFINITY]));
+  const place = new Map(nodes.map((node) => [node.id, node.at]));
   const into = loopEdgesBy(edges, "to");
   const firstReached = (ids: readonly string[]) =>
     ids.reduce((best, id) =>
@@ -407,16 +407,21 @@ export function workflowLoopEdges(nodes: readonly LoopNode[], edges: readonly Lo
     const inside = edges.filter((edge) => group.has(edge.from) && group.has(edge.to) && !loops.has(edge.id));
     for (const loop of loopGroups(group, inside)) {
       const entries = [...loop].filter((id) => (into.get(id) ?? []).some((edge) => !loop.has(edge.from)));
-      const x = Math.min(...entries.map((id) => left.get(id) ?? Number.POSITIVE_INFINITY));
-      const start =
-        entries.length > 1 && x < Number.POSITIVE_INFINITY
-          ? firstReached(entries.filter((id) => left.get(id) === x))
-          : firstReached([...loop]);
+      const start = entries.length > 0 ? firstReached(topLeft(entries, place)) : firstReached([...loop]);
       for (const edge of inside) if (edge.to === start && loop.has(edge.from)) loops.add(edge.id);
       pending.push(loop);
     }
   }
   return loops;
+}
+
+function topLeft(ids: readonly string[], place: ReadonlyMap<string, { x: number; y: number } | undefined>): string[] {
+  const placed = ids.filter((id) => place.get(id));
+  if (placed.length < ids.length) return [...ids];
+  const x = Math.min(...placed.map((id) => place.get(id)?.x ?? 0));
+  const left = placed.filter((id) => place.get(id)?.x === x);
+  const y = Math.min(...left.map((id) => place.get(id)?.y ?? 0));
+  return left.filter((id) => place.get(id)?.y === y);
 }
 
 function walkOrder(
