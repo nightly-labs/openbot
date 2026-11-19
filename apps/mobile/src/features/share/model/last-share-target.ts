@@ -12,7 +12,7 @@ function lastShareTargetKey(apiUrl: string, userId: string): string {
   return `openbot.share-target.v1.${accountScope(apiUrl, userId)}`;
 }
 
-export async function loadLastShareTarget(apiUrl: string, userId: string): Promise<ShareTarget | null> {
+async function loadLastShareTarget(apiUrl: string, userId: string): Promise<ShareTarget | null> {
   try {
     const value = JSON.parse((await SecureStore.getItemAsync(lastShareTargetKey(apiUrl, userId))) ?? "null");
     if (!isDynamicRecord(value)) return null;
