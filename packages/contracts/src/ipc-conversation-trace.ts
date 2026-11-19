@@ -37,6 +37,12 @@ export interface ConversationTurnTrace {
   steps: ConversationTraceStep[];
   /** All the tokens that the provider reported for the turn: input, cached input, cache writes and output. */
   tokens?: number | undefined;
+  /**
+   * The cache reads in `tokens`. Show `tokens` without them (`analyticsTokens`), as the Usage tab
+   * does: each model call reads the cached conversation again. A trace from before this field has
+   * none, and its `tokens` shows as it is.
+   */
+  cachedInput?: number | undefined;
   /** The cost in US dollars. Null when one record of the turn has no cost; absent when no record has one. */
   costUsd?: number | null | undefined;
 }
@@ -54,6 +60,7 @@ export function isConversationTurnTrace(value: unknown): value is ConversationTu
     value.steps.length <= CONVERSATION_TRACE_STEP_LIMIT &&
     value.steps.every(isConversationTraceStep) &&
     (value.tokens === undefined || isCount(value.tokens)) &&
+    (value.cachedInput === undefined || isCount(value.cachedInput)) &&
     (value.costUsd === undefined || value.costUsd === null || isCost(value.costUsd))
   );
 }
