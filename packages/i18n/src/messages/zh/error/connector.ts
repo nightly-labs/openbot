@@ -10,6 +10,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub 不认识该 GitHub App 的客户端 ID。",
   "error.connector.githubUnexpected": "GitHub 返回了意外的响应：{detail}",
   "error.connector.githubUnreachable": "OpenBot 无法连接 GitHub：{detail}",
+  "error.connector.githubOffline":
+    "OpenBot 无法连接 GitHub。请检查运行 OpenBot 的电脑或服务器的网络连接和 DNS 设置，然后重试。",
   "error.connector.githubExpired": "GitHub 连接已过期，请重新连接 GitHub。",
   "error.connector.githubFileUnreadable": "GitHub 连接文件无法读取。",
   "error.connector.githubFileTooLarge": "GitHub 连接文件过大。",

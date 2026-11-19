@@ -10,6 +10,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub가 이 GitHub App의 Client ID를 알지 못해요.",
   "error.connector.githubUnexpected": "GitHub가 예상하지 못한 응답을 보냈어요: {detail}",
   "error.connector.githubUnreachable": "OpenBot이 GitHub에 연결할 수 없어요: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot이 GitHub에 연결할 수 없어요. OpenBot을 실행하는 컴퓨터나 서버의 인터넷 연결과 DNS 설정을 확인한 후 다시 시도해 주세요.",
   "error.connector.githubExpired": "GitHub 연결이 만료됐어요. GitHub를 다시 연결해 주세요.",
   "error.connector.githubFileUnreadable": "GitHub 연결 파일을 읽을 수 없어요.",
   "error.connector.githubFileTooLarge": "GitHub 연결 파일이 너무 커요.",

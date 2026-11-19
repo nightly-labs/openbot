@@ -30,6 +30,7 @@ import {
   GitHubDeviceFlowError,
   type GitHubFetch,
   type GitHubTokenSet,
+  githubUnreachable,
   pollGitHubDeviceToken,
   refreshGitHubToken,
   requestGitHubDeviceCode,
@@ -735,14 +736,7 @@ export class GitHubConnectorService {
     if (Result.isFailure(attempt2)) {
       const cause = attempt2.failure.cause;
       if (signal?.aborted) return yield* new GitHubOperationError({ cause: signal.reason });
-      return yield* new GitHubOperationError({
-        cause: new GitHubDeviceFlowError(
-          "unreachable",
-          sourceText("error.connector.githubUnreachable", {
-            detail: cause instanceof Error ? cause.message : String(cause),
-          }),
-        ),
-      });
+      return yield* new GitHubOperationError({ cause: githubUnreachable(cause) });
     }
     const response = attempt2.success;
     const answer = schema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
