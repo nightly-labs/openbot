@@ -1792,14 +1792,15 @@ export class MailboxStore {
         (delivery) =>
           delivery.messageId === requestId &&
           (delivery.status === "failed" || delivery.status === "interrupted" || delivery.status === "cancelled") &&
-          !this.#state.messages.some(
-            (message) =>
-              isAnswer(message) &&
-              message.sender.agentId === delivery.recipientAgentId &&
-              message.replyToMessageId === requestId,
-          ),
+          !this.#hasAnswered(requestId, delivery.recipientAgentId),
       )
       .map((delivery) => delivery.recipientAgentId);
+  }
+
+  #hasAnswered(requestId: string, agentId: string): boolean {
+    return this.#state.messages.some(
+      (message) => isAnswer(message) && message.sender.agentId === agentId && message.replyToMessageId === requestId,
+    );
   }
 
   #queuedFor(agentId: string): StoredDelivery[] {
@@ -1863,12 +1864,7 @@ export class MailboxStore {
         (delivery) =>
           delivery.messageId === requestId &&
           isActiveDelivery(delivery) &&
-          !this.#state.messages.some(
-            (message) =>
-              isAnswer(message) &&
-              message.sender.agentId === delivery.recipientAgentId &&
-              message.replyToMessageId === requestId,
-          ),
+          !this.#hasAnswered(requestId, delivery.recipientAgentId),
       )
       .map((delivery) => delivery.recipientAgentId);
   }

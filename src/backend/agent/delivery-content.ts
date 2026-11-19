@@ -585,7 +585,7 @@ export function combinedPromptInput(
   inputs: readonly DeliveryInputItem[][],
   unanswered: readonly string[],
   agentNames: ReadonlyMap<string, string>,
-  stillWorking: readonly string[] = [],
+  stillWorking: readonly string[],
 ): DeliveryInputItem[] {
   const [only] = inputs;
   if (inputs.length === 1 && only && unanswered.length === 0 && stillWorking.length === 0) return only;
