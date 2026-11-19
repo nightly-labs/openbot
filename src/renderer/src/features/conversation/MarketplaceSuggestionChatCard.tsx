@@ -1,4 +1,5 @@
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import type { AgentMessage } from "@openbot/ui/data";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { isConnectorId } from "@openbot/ui/features/connectors/connectors";
@@ -12,6 +13,7 @@ import { createMemo } from "solid-js";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import { MARKETPLACE_PLUGINS } from "../settings/marketplace-plugin-catalog";
 import { localizedPlugin } from "../settings/marketplace-plugin-text";
+import { useConversationViewScope } from "./conversation-scope";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
 
 export interface MarketplaceSuggestionChatCardProps {
@@ -77,6 +79,12 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     return known ? t(known.title) : (plugin()?.name ?? props.appId);
   };
   const open = (connect: boolean) => props.onOpenMarketplaceApp?.({ appId: props.appId, connect });
+  /** Why the user cannot connect it: a computer-only app, a member's role, or a host without it. */
+  const unavailableText = () => {
+    if (connector()?.access === "local-only") return t("chat.suggestion.localOnly", { name: name() });
+    if (props.connectors && !props.connectors.canManage()) return t("chat.suggestion.notAllowed", { name: name() });
+    return t("chat.suggestion.unavailable", { name: name() });
+  };
   return (
     <MarketplaceSuggestionCard
       kind="app"
@@ -85,11 +93,7 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
       iconUrl={plugin()?.iconUrl ?? null}
       mark={listing()?.Mark()}
       state={state()}
-      unavailableText={
-        connector()?.access === "local-only"
-          ? t("chat.suggestion.localOnly", { name: name() })
-          : t("chat.suggestion.unavailable", { name: name() })
-      }
+      unavailableText={unavailableText()}
       dismissed={marketplaceSuggestionDismissed(props.messageId)}
       onConnect={props.onOpenMarketplaceApp ? () => open(true) : undefined}
       onOpenDetails={props.onOpenMarketplaceApp && state() !== "unavailable" ? () => open(false) : undefined}
@@ -97,4 +101,25 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
       onRestore={() => dismissMarketplaceSuggestion(props.messageId, false)}
     />
   );
+}
+
+/**
+ * The suggestion card of a side thread message, as the agent's own chat draws it. Another message, or
+ * an app this client does not know, keeps its row.
+ */
+export function useThreadMarketplaceSuggestionCard() {
+  const { props, mcpServers } = useConversationViewScope();
+  return (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    if (marker?.kind !== "marketplace-suggestion" || !marketplaceSuggestionKnown(marker.appId)) return undefined;
+    return (
+      <MarketplaceSuggestionChatCard
+        messageId={message.id}
+        appId={marker.appId}
+        connectors={props.connectors}
+        mcpServers={mcpServers()}
+        onOpenMarketplaceApp={props.onOpenMarketplaceApp}
+      />
+    );
+  };
 }

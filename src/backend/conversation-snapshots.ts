@@ -8,12 +8,17 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_EXCHANGE_ITEM_TYPE,
-  isImageGenerationAspectRatio,
+  mergeImageGenerationInfo,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
-import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
+import {
+  imageGenerationAspectRatio,
+  imageGenerationFailure,
+  isImageGenerationItem,
+  isVideoGenerationItem,
+} from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 
@@ -109,9 +114,37 @@ export function messagesFromThreadItems(
         status: failed ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "image_generation",
         imageGeneration: {
-          ...(isString(item.revised_prompt) ? { prompt: item.revised_prompt } : {}),
-          resolution: isString(item.resolution) ? item.resolution : "1024 × 1024",
-          aspectRatio: isImageGenerationAspectRatio(item.aspectRatio) ? item.aspectRatio : "square",
+          ...(isString(item.revisedPrompt)
+            ? { prompt: item.revisedPrompt }
+            : isString(item.revised_prompt)
+              ? { prompt: item.revised_prompt }
+              : isString(item.prompt)
+                ? { prompt: item.prompt }
+                : {}),
+          // The stored message has the real size (`image-gen-runtime.ts`); the merge keeps it.
+          resolution: isString(item.resolution) ? item.resolution : "",
+          aspectRatio: imageGenerationAspectRatio(item) ?? "square",
+          ...(failure ? { error: failure } : {}),
+        },
+      });
+    }
+    if (isVideoGenerationItem(item) && isString(item.id)) {
+      const providerStatus = isString(item.status) ? item.status : turn.status;
+      const failure = imageGenerationFailure(item);
+      messages.push({
+        id: item.id,
+        turnId: turn.id,
+        author: "assistant",
+        text: "",
+        createdAt,
+        status: providerStatus === "failed" ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
+        itemType: "video_generation",
+        // The same values as the live item (`image-gen-runtime.ts`), so a merge keeps them.
+        videoGeneration: {
+          ...(isString(item.prompt) ? { prompt: item.prompt } : {}),
+          aspectRatio: imageGenerationAspectRatio(item) ?? "landscape",
+          ...(typeof item.duration === "number" && item.duration > 0 ? { durationSeconds: item.duration } : {}),
+          ...(isString(item.resolution) && item.resolution.length <= 40 ? { resolution: item.resolution } : {}),
           ...(failure ? { error: failure } : {}),
         },
       });
@@ -295,7 +328,8 @@ function mergeConversationMessages(
             ...message,
             ...(exchange ? { exchange } : {}),
             attachments: message.attachments ?? previous.attachments,
-            imageGeneration: message.imageGeneration ?? previous.imageGeneration,
+            imageGeneration: mergeImageGenerationInfo(previous.imageGeneration, message.imageGeneration),
+            videoGeneration: message.videoGeneration ?? previous.videoGeneration,
           }
         : message,
     );
@@ -316,8 +350,11 @@ function reconcileClaudeHistoryMessages(
      recorded, and the imported copy is dropped rather than stored a second time on every restart. */
   const storedNarrationTurns = new Set<string>();
   for (const message of stored) {
-    if (!isClaudeNarration(message) || !message.turnId) continue;
-    storedNarrationTurns.add(message.turnId);
+    if (!message.turnId) continue;
+    // A quiet turn kept its narration as a quiet answer, under the ID of the narration.
+    const quietNarration =
+      message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE && message.id.startsWith(`${message.turnId}:narration:`);
+    if (isClaudeNarration(message) || quietNarration) storedNarrationTurns.add(message.turnId);
   }
   const storedReasoning = new Map<string, ConversationMessage>();
   for (const message of stored) {
@@ -499,11 +536,23 @@ function isStoredClaudeNotice(message: ConversationMessage): boolean {
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {
-  return message.author === "assistant" && Boolean(message.turnId) && Boolean(message.text || message.imageGeneration);
+  return (
+    message.author === "assistant" &&
+    Boolean(message.turnId) &&
+    Boolean(message.text || message.imageGeneration || message.videoGeneration)
+  );
 }
 
 function providerMessageIdentity(message: ConversationMessage): string {
-  return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
+  // The live message has the size of the file; provider history does not.
+  const image = message.imageGeneration;
+  return JSON.stringify([
+    message.turnId,
+    message.itemType ?? null,
+    message.text,
+    image ? { ...image, resolution: null, aspectRatio: null } : null,
+    ...(message.videoGeneration ? [message.videoGeneration] : []),
+  ]);
 }
 
 export function newAssistantMessage(id: string, turnId: string): ConversationMessage {

@@ -381,7 +381,11 @@ export class DiscordState {
         {
           const [shard, count] = payload.d.shard ?? [0, 1];
           // A new session of a shard lists its guilds again; a guild that it does not list was left.
-          if (this.#shardCount !== count) this.#shardGuilds.clear();
+          // A new shard count, such as after a new connection, starts the list of every shard again.
+          if (this.#shardCount !== count) {
+            this.#shardGuilds.clear();
+            this.#closedShards.clear();
+          }
           this.#shardCount = count;
           this.#shardGuilds.set(shard, new Set(payload.d.guilds.map((guild) => guild.id)));
           this.#closedShards.delete(shard);

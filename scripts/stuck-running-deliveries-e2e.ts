@@ -9,7 +9,9 @@
 // (f) a turn end that fails after its deliveries settled still closes the stored turn;
 // (g) a delivery that runs again under the same turn id, after its session was refused, runs to its end (#2468);
 // (h) a turn row that stays `running` although no thread names it as its active turn is closed at restart,
-//     in the agent's own chat, a task thread and a channel thread.
+//     in the agent's own chat, a task thread and a channel thread;
+// (i) a failed request from another agent closes its turn row as failed, also when the failure note to
+//     that agent saved the chat first (#10698).
 // `bun scripts/stuck-running-deliveries-e2e.ts`. Writes .openbot-build/stuck-running-deliveries-e2e/report.json.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -53,7 +55,7 @@ const { StoredStateFailure } = await import("../src/backend/stored-state-effects
  * whether `turn/started` comes before the `turn/start` answer. With `clientTurnIds`, a turn takes the
  * `clientUserMessageId` as its id, as Claude, ACP and Pi do, and a new turn is refused while a turn of
  * the thread runs, as Claude refuses it. With `refuseOnce`, the first turn of each id fails as a
- * refused session.
+ * refused session. With `failTurns`, each turn fails with a provider error after `turnMs`.
  * Like Codex, `turn/interrupt` for a turn that does not run is refused.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
@@ -107,7 +109,7 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      const { holdTurns, turnMs, startedFirst, clientTurnIds, refuseOnce } = control();
+      const { holdTurns, turnMs, startedFirst, clientTurnIds, refuseOnce, failTurns } = control();
       const turnId = clientTurnIds && params.clientUserMessageId ? params.clientUserMessageId : prefix + "turn-" + (++turns);
       if (clientTurnIds && [...running.values()].some((turn) => turn.threadId === params.threadId))
         return write({ id: message.id, error: { code: -32600, message: "The thread already has an active turn." } });
@@ -123,6 +125,15 @@ const answer = (message) => {
           finish(turnId, "failed");
         };
         running.set(turnId, { threadId: params.threadId, timer: setTimeout(refuse, 200) });
+        return;
+      }
+      if (failTurns) {
+        const fail = () => {
+          const error = { message: "You have reached your usage limit." };
+          write({ method: "error", params: { threadId: params.threadId, turnId, error, willRetry: false } });
+          finish(turnId, "failed");
+        };
+        running.set(turnId, { threadId: params.threadId, timer: setTimeout(fail, turnMs) });
         return;
       }
       const timer = holdTurns ? undefined : setTimeout(() => finish(turnId, "completed"), turnMs);
@@ -244,6 +255,7 @@ async function control(value: {
   startedFirst?: boolean;
   clientTurnIds?: boolean;
   refuseOnce?: boolean;
+  failTurns?: boolean;
 }): Promise<void> {
   await writeFile(controlPath, JSON.stringify(value));
 }
@@ -655,6 +667,53 @@ try {
     return null;
   });
 
+  await runCase("i: a failed request from another agent closes its turn row", async (details) => {
+    await control({ holdTurns: false, turnMs: 100 });
+    const asker = await runCauseEffect(
+      second.agents.createAgent({
+        name: "Asker",
+        description: "Asks a teammate, whose turn fails.",
+        avatarSeed: "asker",
+        avatarHue: null,
+        initialMessage: "First message.",
+      }),
+    );
+    const askerFirst = await need("the first delivery of the asker", () => {
+      const id = second.agents.listQueue(asker.id).deliveries[0]?.id;
+      return id && isTerminal(status(mailbox, id)) ? id : null;
+    });
+    details.askerFirst = status(mailbox, askerFirst);
+    // The teammate is busy, so the request waits in its queue and starts when that turn ends.
+    await control({ holdTurns: false, turnMs: 1_500 });
+    const teammate = await agentWithRunningTurn(second, "Failed request");
+    await control({ holdTurns: false, turnMs: 200, failTurns: true });
+    const receipt = await runCauseEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: asker.id },
+        recipientAgentIds: [teammate.agentId],
+        text: "Please review this.",
+        expectsReply: true,
+      }),
+    );
+    const requestId = receipt.deliveries.find((delivery) => delivery.recipientAgentId === teammate.agentId)?.id;
+    if (!requestId) return "The request has no delivery.";
+    await waitFor(() => status(mailbox, requestId) === "failed");
+    const turnId = mailbox.getDelivery(requestId)?.delivery.turnId ?? null;
+    const closedRow = (id: string) => {
+      const row = turnRow(second.database, id);
+      return row?.completedAt ? row : null;
+    };
+    const row = turnId ? ((await waitFor(() => closedRow(turnId))) ?? turnRow(second.database, turnId)) : null;
+    details.request = status(mailbox, requestId);
+    details.turnRow = row;
+    if (status(mailbox, requestId) !== "failed") return "The request did not fail.";
+    if (!turnId) return "The failed request has no turn.";
+    if (row?.status !== "failed") return "The stored turn of the failed request is not closed as failed.";
+    return null;
+  });
+  // The next cases run turns that do not fail.
+  await control({ holdTurns: false, turnMs: 100 });
+
   await runCase("h: a running turn row that no thread names is closed at restart", async (details) => {
     const agent = second.store.list()[0];
     if (!agent?.threadId) return "No agent thread survived the restart.";
@@ -710,7 +769,7 @@ try {
     return null;
   });
 
-  report.passed = report.cases.length === 9 && report.cases.every((entry) => entry.passed);
+  report.passed = report.cases.length === 10 && report.cases.every((entry) => entry.passed);
   if (!report.passed) process.exitCode = 1;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -6,6 +6,7 @@ import type {
   ConversationSnapshot,
   StartAgentTaskInput,
 } from "@openbot/contracts/ipc";
+import { noteAgentRequest } from "../../agent-requests";
 
 export type TaskEvent = Extract<
   AgentEvent,
@@ -43,8 +44,14 @@ export function desktopTasksSource(): TasksSource {
   return {
     list: (agentId, serverId) => window.openbot.agent.listTasks(agentId, serverId),
     read: (input, serverId) => window.openbot.agent.readTask(input, serverId),
-    start: (input, serverId) => window.openbot.agent.startTask(input, serverId),
-    send: (input, serverId) => window.openbot.agent.sendMessage(input, serverId),
+    start: (input, serverId) => {
+      noteAgentRequest(serverId, input.agentId);
+      return window.openbot.agent.startTask(input, serverId);
+    },
+    send: (input, serverId) => {
+      noteAgentRequest(serverId, input.agentId);
+      return window.openbot.agent.sendMessage(input, serverId);
+    },
     stop: (input, serverId) => window.openbot.agent.stopTask(input, serverId),
     close: (input, serverId) => window.openbot.agent.closeTask(input, serverId),
     reopen: (input, serverId) => window.openbot.agent.reopenTask(input, serverId),

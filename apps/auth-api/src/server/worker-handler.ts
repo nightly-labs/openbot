@@ -1,11 +1,14 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
+import { createAccountAnalytics } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
+import { createHostedPoolAlert } from "./hosted-pool-alert";
+import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
@@ -121,11 +124,12 @@ export function createWorkerHandler(
               bindings.SITES ? new HostedSiteService(bindings.DB, bindings.SITES).cleanup(now) : Effect.succeed(null),
             ),
             Effect.exit(tickSalesAnalytics(bindings, now)),
+            Effect.exit(tickHostedPool(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit]),
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]),
           ),
         ),
       );
@@ -150,7 +154,12 @@ async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Prom
 }
 
 type SalesBindings = Pick<WorkerBindings, "DB"> &
-  Partial<Pick<WorkerBindings, "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">>;
+  Partial<
+    Pick<
+      WorkerBindings,
+      "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET" | "HOSTED_POOL_ALERT_WEBHOOK_URL"
+    >
+  >;
 
 const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings: SalesBindings, now: number) {
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
@@ -160,12 +169,35 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input: string, init: RequestInit) => fetch(input, init),
   };
-  const payments = yield* Effect.exit(new BillingSales(options).processPending());
+  // The scheduled handler has no `waitUntil`, so the run waits for each sale message.
+  const saleAlert = createHostedPoolAlert(bindings.HOSTED_POOL_ALERT_WEBHOOK_URL, options.fetch);
+  const payments = yield* Effect.exit(new BillingSales({ ...options, saleAlert }).processPending());
   const snapshot = yield* Effect.exit(captureBillingSnapshot(bindings, now));
   const result = yield* new SalesAnalyticsDelivery(options).drain();
   console.info("Sales analytics delivery completed.", result);
   yield* payments;
   yield* snapshot;
+});
+
+/**
+ * Each 5 minutes, the machines of the operator by location, product and state, for the "Server pool"
+ * dashboard (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the
+ * run waits for each send.
+ */
+const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
+  if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
+  const groups = yield* readHostedPool(bindings.DB, now);
+  if (groups.length === 0) return;
+  const sends: Effect.Effect<void>[] = [];
+  const analytics = createAccountAnalytics({
+    clientId: bindings.OPENPANEL_CLIENT_ID,
+    clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
+    fetch: (input, init) => fetch(input, init),
+    schedule: (send) => sends.push(send),
+    database: bindings.DB,
+  });
+  for (const group of groups) analytics.track(null, { name: "hosted_pool_snapshot", group });
+  yield* Effect.all(sends, { concurrency: "unbounded", discard: true });
 });
 
 const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function* (

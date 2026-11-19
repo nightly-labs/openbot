@@ -67,6 +67,7 @@ export const FALLBACK_HOST_STATUS: HostStatus = {
   serverId: null,
   serverName: null,
   logoUrl: null,
+  appearance: null,
   apiUrl: null,
   apiOnline: false,
   remoteDesktopReady: false,

@@ -112,6 +112,7 @@ export function RemoteControlPolicySection(props: { activeSessions: number; menu
                 </ItemContent>
                 <ItemActions>
                   <Select<RemoteControlAccess>
+                    class="settings-modal-select"
                     options={[...REMOTE_CONTROL_ACCESS_LEVELS]}
                     value={policy().access}
                     disabled={state.busy}

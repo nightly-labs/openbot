@@ -83,6 +83,9 @@ export const Removed: Story = { args: args([chat({ state: "removed" }), DIRECT])
 
 export const RelayUnavailable: Story = { args: args([chat({ state: "relay_unavailable" })]) };
 
+/** Signal sends the chat's updates to a different server: Reconnect links it to this one. */
+export const NotLinked: Story = { args: args([chat({ state: "not_linked" }), DIRECT]) };
+
 export const RateLimited: Story = {
   args: args([chat({ state: "rate_limited", retryAt: "2026-10-06T14:30:00.000Z" })]),
 };

@@ -8,6 +8,8 @@
 //    stored sessions, which the next run resumes.
 // 3. Control: a daemon that dies while OpenBot keeps running still deactivates them, because the live
 //    sessions then hold a tool set that is not the one they would be given now.
+// 4. The runtime then starts that daemon again by itself and gives the agents the tools again (#12347):
+//    on a server, no panel can check the driver again.
 // `bun run test:provider-exit-session`. Writes .openbot-build/provider-exit-session-e2e/report.json.
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -172,6 +174,7 @@ interface Report {
   secondTurn?: { pid: number; resumed: string | null; started: boolean; turnThread: string | null };
   driverExitAtQuit?: { announcements: number; sessionState: string | null };
   driverExitWhileRunning?: { announcements: number; sessionState: string | null };
+  driverBackAfterExit?: { announcements: number; status: string };
   error?: string;
 }
 
@@ -354,6 +357,13 @@ try {
   });
   report.driverExitWhileRunning = { announcements: whileRunning.announced.count, sessionState: deactivated };
 
+  // 5. With no panel open, the runtime checks the driver again and gives the agents the tools again.
+  await waitFor("the driver to be ready again", () => whileRunning.runtime.mcpServerForProviders());
+  report.driverBackAfterExit = {
+    announcements: whileRunning.announced.count,
+    status: whileRunning.runtime.lastState.status,
+  };
+
   report.passed =
     report.sessionAfterExit?.state === "active" &&
     report.secondTurn.resumed === firstThread &&
@@ -362,7 +372,9 @@ try {
     report.secondTurn.turnThread === firstThread &&
     report.driverExitAtQuit.announcements === 0 &&
     report.driverExitAtQuit.sessionState === "active" &&
-    report.driverExitWhileRunning.announcements === 1;
+    // One for the stop and one for the return.
+    report.driverBackAfterExit.announcements === 2 &&
+    report.driverBackAfterExit.status === "ready";
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

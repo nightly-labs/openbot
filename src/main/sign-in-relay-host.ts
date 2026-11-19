@@ -77,8 +77,15 @@ export interface SignInRelayHostDependencies {
   accounts: Pick<ProviderAccountsHost, "startRelay" | "relayStatus" | "cancelSignIn">;
   /** Gives an MCP grant to the sign-in on this host that waits for `state`, as the loopback listener does. */
   receiveMcpGrant: (state: string, code: string) => boolean;
+  /** Tells the MCP sign-in on this host that waits for `state` that its page refused, as the listener does. */
+  receiveMcpRefusal: (state: string) => boolean;
   /** Answers whether an agent message of `agentId` holds this exact address. */
   printedLink: (agentId: string, url: string) => boolean;
+  /**
+   * Answers whether the Team API session is of a user at this computer: the desktop app here, signed
+   * in as the owner of a server on this computer. A provider's sign-in for it can open its page here.
+   */
+  atHost?: (sessionId: string) => boolean;
   now?: () => number;
 }
 
@@ -101,18 +108,23 @@ export class SignInRelayHost {
     this.#now = dependencies.now ?? Date.now;
   }
 
+  #atHost(sessionId: string | undefined): boolean {
+    return sessionId !== undefined && (this.#dependencies.atHost?.(sessionId) ?? false);
+  }
+
   /** Starts the MCP sign-in of `input` with no tab, and returns its flow at once. */
-  startMcp(memberId: string, input: TestMcpServerInput) {
-    return this.#startMcp(memberId, input);
+  startMcp(memberId: string, input: TestMcpServerInput, deepLinkRedirectUrl?: string) {
+    return this.#startMcp(memberId, input, deepLinkRedirectUrl);
   }
 
   readonly #startMcp = Effect.fn("SignInRelayHost.startMcp")(function* (
     this: SignInRelayHost,
     memberId: string,
     input: TestMcpServerInput,
+    deepLinkRedirectUrl?: string,
   ) {
-    const { mcp, receiveMcpGrant } = this.#dependencies;
-    yield* mcp.startRelay(input);
+    const { mcp, receiveMcpGrant, receiveMcpRefusal } = this.#dependencies;
+    yield* mcp.startRelay(input, deepLinkRedirectUrl);
     const url = input.config.url;
     return this.#open(memberId, {
       key: `mcp\n${url}`,
@@ -125,22 +137,32 @@ export class SignInRelayHost {
           registerSecretValue(code);
           return receiveMcpGrant(state, code);
         }),
+      // The sign-in then ends with a sentence that says the page refused, not as a cancel that shows nothing.
+      refuse: (query) =>
+        Effect.sync(() => {
+          const state = query.get("state");
+          return state ? receiveMcpRefusal(state) : false;
+        }),
       cancel: () => Effect.sync(() => mcp.cancel(url)),
     });
   });
 
-  /** Starts the sign-in of a provider's CLI with no tab, and returns its flow at once. */
-  startProvider(memberId: string, provider: SignInRelayProvider) {
-    return this.#startProvider(memberId, provider);
+  /**
+   * Starts the sign-in of a provider's CLI with no tab, and returns its flow at once. `sessionId`: the
+   * Team API session that asked for it (`atHost`).
+   */
+  startProvider(memberId: string, provider: SignInRelayProvider, sessionId?: string) {
+    return this.#startProvider(memberId, provider, sessionId);
   }
 
   readonly #startProvider = Effect.fn("SignInRelayHost.startProvider")(function* (
     this: SignInRelayHost,
     memberId: string,
     provider: SignInRelayProvider,
+    sessionId?: string,
   ) {
     const { providers } = this.#dependencies;
-    yield* providers.startRelay(provider);
+    yield* providers.startRelay(provider, this.#atHost(sessionId));
     return this.startReplay(memberId, {
       key: `provider\n${provider}`,
       status: () => {
@@ -153,10 +175,16 @@ export class SignInRelayHost {
 
   /**
    * Starts the sign-in of a provider account after the first with no tab, and returns its flow at once
-   * (`provider-account-relay-v1` and `-v2`). A null `accountId` signs in a new account.
+   * (`provider-account-relay-v1` and `-v2`). A null `accountId` signs in a new account. `sessionId`: the
+   * Team API session that asked for it (`atHost`).
    */
-  startProviderAccount(memberId: string, provider: ProviderAccountRelayProvider, accountId: string | null) {
-    return this.#startProviderAccount(memberId, provider, accountId);
+  startProviderAccount(
+    memberId: string,
+    provider: ProviderAccountRelayProvider,
+    accountId: string | null,
+    sessionId?: string,
+  ) {
+    return this.#startProviderAccount(memberId, provider, accountId, sessionId);
   }
 
   readonly #startProviderAccount = Effect.fn("SignInRelayHost.startProviderAccount")(function* (
@@ -164,9 +192,10 @@ export class SignInRelayHost {
     memberId: string,
     provider: ProviderAccountRelayProvider,
     accountId: string | null,
+    sessionId?: string,
   ) {
     const { accounts } = this.#dependencies;
-    yield* accounts.startRelay(provider, accountId);
+    yield* accounts.startRelay(provider, accountId, this.#atHost(sessionId));
     // One account sign-in runs for each provider, so a new flow replaces the one of any account.
     return this.startReplay(memberId, {
       key: `account\n${provider}`,

@@ -58,6 +58,13 @@ export function hostedStartStep(server: {
 export const WAKE_RECONNECT_DELAY_MS = 5_000;
 /** A sleeping or ended server is asked again after this long, not on each failed connection. */
 const STATUS_RECHECK_MS = 60_000;
+/**
+ * A status check asks again about a host that is not a hosted server only after this long. The account
+ * server gives a new hosted server a new random ID, so a host ID that is not hosted stays so. The account
+ * directory keeps hosts that went away for good, and each one retries each 5 or 15 minutes, so a shorter
+ * time sent one status request for each retry. A wake or a restart from the user clears the result.
+ */
+const NOT_HOSTED_STATUS_RECHECK_MS = 6 * 60 * 60_000;
 /** The error code of the account server for a host that is not a hosted server of this account. */
 const NOT_FOUND_CODE = "hosted_server_not_found";
 
@@ -184,7 +191,7 @@ export function createHostedServerStatusCheck<E, R>(
   ): Effect.fn.Return<HostedServerAvailability, never, R> {
     const time = now();
     const last = known.get(hostId);
-    const recheck = last?.result === "not_hosted" ? NOT_HOSTED_RECHECK_MS : STATUS_RECHECK_MS;
+    const recheck = last?.result === "not_hosted" ? NOT_HOSTED_STATUS_RECHECK_MS : STATUS_RECHECK_MS;
     if (last && time - last.at < recheck) return last.result;
     const response = yield* requestStatus(hostId).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!response) return "offline";

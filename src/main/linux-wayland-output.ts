@@ -11,6 +11,10 @@
 // The agent dock and the Dynamic Island above other apps need X11 windows: a Wayland client cannot set
 // its position, stay above other windows or show on all workspaces. When the user chooses one of them
 // on a Wayland session, each start goes to XWayland in the same way, until the user turns it off.
+//
+// With software rendering (`linux-gpu-mode.ts`) on Wayland, Chromium can leave the main window with no
+// frame: KDE shows a 1x1 taskbar entry and no window (#8110, electron/electron#48859). Each start with
+// software rendering on a Wayland session also goes to XWayland, where the window shows.
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -22,13 +26,14 @@ import type { AboveAppsSupport } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
+import { relaunchApp } from "./linux-appimage-relaunch";
 
 const logger = createOpenBotLogger("main");
 
 /** Set on the new process only, so that it logs why it uses X11 and never starts again itself. */
 const RESTART_MARKER = "OPENBOT_XWAYLAND_RESTART";
-/** Why a process started again on XWayland: no monitor, or a window above other apps. */
-export type XWaylandRestartReason = "monitor" | "above-apps";
+/** Why a process started again on XWayland: no monitor, a window above other apps, or software rendering. */
+export type XWaylandRestartReason = "monitor" | "above-apps" | "software-rendering";
 /** The windows above other apps that need XWayland on a Wayland session. */
 export type AboveAppsFeature = "agent-dock" | "dynamic-island";
 /**
@@ -179,7 +184,7 @@ export function takeXWaylandRestartMarker(
   if (marker === undefined) return null;
   const index = argv.lastIndexOf(X11_ARGUMENT);
   if (index > 0) argv.splice(index, 1);
-  return marker === "above-apps" ? "above-apps" : "monitor";
+  return marker === "above-apps" || marker === "software-rendering" ? marker : "monitor";
 }
 
 /**
@@ -265,9 +270,7 @@ export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* 
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
   logger.info(`The ${feature} shows above other apps, so OpenBot starts again on XWayland.`);
-  // An AppImage mounts itself for each start, and the mount of this process goes away with it.
-  const execPath = process.env.APPIMAGE;
-  app.relaunch(execPath ? { execPath, args: process.argv.slice(1) } : { args: process.argv.slice(1) });
+  relaunchApp(app, process.argv.slice(1));
   app.quit();
 });
 
@@ -287,6 +290,28 @@ export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAbov
     Effect.catch((error) =>
       Effect.sync(() => {
         logger.warn("Could not start OpenBot on XWayland for the windows above other apps:", toLogValue(error.cause));
+        return false;
+      }),
+    ),
+  );
+});
+
+/**
+ * True when this start uses software rendering on Wayland, a new OpenBot process on XWayland has
+ * started, and this one must exit before Chromium connects to Wayland. Run it before the
+ * single-instance lock. An explicit `--ozone-platform=wayland` stays on Wayland.
+ */
+export const restartOnXWaylandForSoftwareRendering = Effect.fn("restartOnXWaylandForSoftwareRendering")(function* (
+  environment: NodeJS.ProcessEnv,
+  softwareRendering: boolean,
+) {
+  if (process.platform !== "linux" || !softwareRendering || !chromiumChoosesWayland() || !environment.DISPLAY)
+    return false;
+  return yield* startOnX11(environment, "software-rendering").pipe(
+    Effect.as(true),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        logger.warn("Could not start OpenBot on XWayland for software rendering:", toLogValue(error.cause));
         return false;
       }),
     ),

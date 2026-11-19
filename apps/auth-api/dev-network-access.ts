@@ -7,6 +7,7 @@ const MOBILE_LAN_PATHS = new Set([
   "/v1/me/analytics",
   "/v1/me/chat-color",
   "/v1/me/avatar",
+  "/v1/me/billing/",
   "/v1/mobile/features",
   "/v1/mobile/changelog",
   "/v2/remote/hosts/",
@@ -80,7 +81,8 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "remote" &&
     segments[2] === "hosts" &&
     segments[3] &&
-    segments[4] === "logo"
+    // The phone reads a server logo. A host on another computer of the LAN copies its logo and appearance.
+    (segments[4] === "logo" || segments[4] === "appearance")
   )
     return true;
   // The owner removes a host from the account. `register` is for a desktop host only.

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { chatVisualItemType } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_BACKDROP_ITEM_TYPE,
+  chatVisualItemType,
+  withChatBackdropBubbles,
+  withChatBackdropRequesters,
+} from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import {
   BUG_REPORT_AREAS,
@@ -14,11 +20,16 @@ import {
   FEEDBACK_SURFACES,
   type Feedback,
   type FeedbackFacts,
+  type FeedbackPhone,
   featureRequestFormUrl,
+  feedbackLacksPhone,
+  feedbackNeedsPhone,
   feedbackPreview,
   feedbackSentItemType,
+  mobileBugReportFormUrl,
   parseFeedback,
   type SimilarFeedbackIssue,
+  withFeedbackPhone,
 } from "@openbot/contracts/feedback";
 import {
   installServerCommand,
@@ -28,9 +39,11 @@ import {
 } from "@openbot/contracts/hosted-servers";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AgentApproval,
   AgentModelChoice,
   AgentModelOption,
   AgentSummary,
+  AvatarColor,
   AvatarImageInput,
   ConversationMessage,
   CreateAgentInput,
@@ -42,13 +55,19 @@ import type {
 import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
+  agentPermissionLevel,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   channelAllowsBrowser,
   channelBrowserAgent,
   isMessageReaction,
+  isSettingLinkId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
+  SETTING_LINK_SCOPES,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
+  sameAgentModelChoice,
+  settingLinkItemType,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
@@ -56,7 +75,7 @@ import {
 import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, maskIdentifiers, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
@@ -66,12 +85,14 @@ import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
+import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
-import type { MessagingThreads } from "../messaging/messaging-threads";
+import { type MessagingThreads, PLATFORM_NAMES } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
@@ -87,6 +108,7 @@ import {
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
   serverInstallCommandToolSchema,
+  setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
@@ -101,40 +123,67 @@ import {
 } from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import { AgentSettingsRefused } from "./agent-settings-refused";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
-import type { AttentionRegistry } from "./attention-registry";
+import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import {
+  type AgentBrowserProfiles,
+  agentBrowserProfileView,
+  handleSetBrowserProfileTool,
+} from "./browser-profile-tool";
 import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
   CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON,
+  channelAgentToolErrorMessage,
   handleChannelAgentTool,
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
+import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
 import { handleDataTool } from "./data-tools";
-import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
+import { handleDeleteAgentTool } from "./delete-agent-tool";
+import {
+  backdropMessageId,
+  responseAttachmentMessageId,
+  visualReplyFileName,
+  visualReplyMessageId,
+} from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
+import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
-import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
+import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from "./image-reader";
+import {
+  type AgentLibraryFolders,
+  libraryFileAgents,
+  listLibraryFolders,
+  listLibraryFoldersToolSchema,
+  organizeLibrary,
+  organizeLibraryToolSchema,
+} from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
+  findAgentMcpTool,
   handleMcpServerTool,
   isMcpServerTool,
   type MarketplaceAppServer,
   marketplaceAppStatus,
+  mcpToolCallResponse,
   searchSignIns,
 } from "./mcp-tools";
 import type { AgentPinRefusal, MessagePins } from "./message-pins";
 import {
   agentAccountSetup,
   agentReasoningEffort,
+  type ListedCustomEndpoint,
   listModelsPayload,
   modelList,
   type ProviderAccountRows,
@@ -143,11 +192,14 @@ import {
   requestedRuntime,
   requestedToolModel,
   requireReasoningEffort,
+  requireRunnableChange,
+  requireRunnableProvider,
 } from "./model-tools";
 import {
   createAgentToolSchema,
   listModelsToolSchema,
   PROFILE_TOOL_NAMES,
+  profileAgentToolErrorMessage,
   profileToolErrorMessage,
   readAgentToolSchema,
   restrictionInput,
@@ -165,26 +217,32 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
+import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
+  ANTIGRAVITY_DEFERRED_MCP_NOTE,
   browserToolsPrimer,
   CODEX_DEFERRED_MCP_NOTE,
   DEFERRED_MCP_NOTE,
+  deferredCall,
   deferredCallArgumentsError,
   discoverTools,
   givesBrowserSchemas,
+  mayNameMcpTool,
   namesInSearch,
   OPENCODE_DEFERRED_MCP_NOTE,
   resolveDeferredTool,
+  UnknownToolNamesError,
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
 import { unknownAgentMessage } from "./unknown-agent";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
 import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
+import { visualPageText } from "./visual-page-text";
 
 const logger = createOpenBotLogger("openbot-tool-router");
 
@@ -199,6 +257,11 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "save_api_key",
 ]);
 
+/** A `#rrggbb` color from a tool call, in the lower case that a chat color uses. */
+function lowerCaseColor(color: string): AvatarColor {
+  return `#${color.slice(1).toLowerCase()}`;
+}
+
 /**
  * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
  * interruption runs the operation's finalizers, which stop a browser action or a side Codex process.
@@ -212,7 +275,10 @@ function requestAborted(signal: AbortSignal | undefined) {
   });
 }
 
-/** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
+/**
+ * The characters of an agent description that `list_agents` returns, and of channel instructions that
+ * `list_channels` returns. `read_agent` returns all of a description.
+ */
 const LISTED_DESCRIPTION_LENGTH = 300;
 
 /** What `pin_message` tells the agent when the host refuses its pin. */
@@ -241,13 +307,24 @@ export type FeedbackSendResult =
   | { readonly status: "limited"; readonly daily: boolean; readonly retryAfterSeconds: number | null };
 
 /**
+ * What became of a withdrawal: the report is off GitHub, or the account did not send it, or the
+ * account service cannot move an issue now.
+ */
+export type FeedbackWithdrawResult =
+  | { readonly status: "withdrawn" }
+  | { readonly status: "signedOut" }
+  | { readonly status: "notYours" }
+  | { readonly status: "unavailable" }
+  | { readonly status: "moved" }
+  | { readonly status: "limited"; readonly retryAfterSeconds: number | null };
+
+/**
  * What became of a message from another agent while its recipient's chat turn runs: `steered` into
  * that turn, or the reason it waits for the next one. Null when no running chat turn could take it,
  * so the message starts when the recipient is free.
  */
 export type AgentMessageSteer =
   | "steered"
-  | "own-turn"
   | "recipient-queues"
   | "provider-unsupported"
   | "routine-run"
@@ -261,6 +338,8 @@ export interface AgentFeedback {
   /** The open issues with a similar title; empty when the search fails. */
   similar(title: string): Effect.Effect<SimilarFeedbackIssue[]>;
   send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
+  /** Takes a report that this account sent off GitHub, by its issue number. */
+  withdraw(number: number): Effect.Effect<FeedbackWithdrawResult, ToolOperationFailed>;
 }
 
 /** The errors of a chat that a report takes: the last few, from the last hour. */
@@ -269,6 +348,15 @@ const FEEDBACK_ERROR_AGE_MS = 60 * 60 * 1000;
 const FEEDBACK_ERROR_LENGTH = 280;
 /** The chats whose OpenBot tool failures the router keeps for reports. */
 const FEEDBACK_ERROR_THREADS = 200;
+/** The routine run turns whose pause or failure the router keeps; a run reports both in one turn. */
+const ROUTINE_RUN_TURNS = 200;
+
+/** What a routine run turn did to its own routines, so a failure and a pause in it agree (#9856). */
+interface RoutineRunTurn {
+  failed: boolean;
+  /** Each routine that the turn paused, with its `updatedAt` just after that pause. */
+  paused: { agentId: string; routineId: string; updatedAt: string }[];
+}
 
 /** Makes one-time claims for new servers of the signed-in account (`POST /v2/server-claims`). */
 export interface AgentServerClaims {
@@ -279,6 +367,12 @@ export interface AgentServerClaims {
 
 const FEEDBACK_SIGNED_OUT_NEXT =
   "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
+/**
+ * A link to the form for the phone app has no support log, and can have no phone data at all. The
+ * form requires the version and the device, and the repository closes a connection report with no log.
+ */
+const FEEDBACK_PHONE_FORM_NEXT =
+  " This is the form for the phone app. Tell the user to open the link on the phone, to complete the app version and the device when they are empty (Settings > About in the phone app), and to attach the support log (Settings > Support > Save log file).";
 
 /**
  * The account service takes a few reports from an account in a minute, and more in a UTC day. A send
@@ -298,6 +392,19 @@ function feedbackLimitedNext(limit: { readonly daily: boolean; readonly retryAft
     ? "this account sent the most reports that OpenBot takes in one day"
     : "this account sent too many reports in the last minute";
   return `OpenBot did not send it, because ${why}. It can send reports again ${wait}. Tell the user this in one sentence, and give them this link to the same text on GitHub, to check and submit. Do not call send_feedback again before then, and do not send it another way.`;
+}
+
+/** The phone's data, redacted and cut to the limits of a report. */
+function redactedPhone(phone: FeedbackPhone): FeedbackPhone {
+  return {
+    platform: phone.platform,
+    appVersion: redactText(phone.appVersion).slice(0, FEEDBACK_LIMITS.fact),
+    system: redactText(phone.system).slice(0, FEEDBACK_LIMITS.fact),
+    network: maskIdentifiers(redactText(phone.network)).slice(0, FEEDBACK_LIMITS.fact),
+    // The phone masks what points to the user. The host does it again, with its own rules, because
+    // the report is public and the phone app can be of an older version.
+    log: maskIdentifiers(redactText(phone.log)).slice(0, FEEDBACK_LIMITS.phoneLog),
+  };
 }
 
 /** The prefilled issue form, which the user submits in the browser. */
@@ -334,6 +441,8 @@ export interface OpenBotToolRouterHooks {
   providerAccounts: ProviderAccountRows;
   /** The provider rows of the settings page. */
   providerStatuses(): readonly ProviderStatusRow[];
+  /** The custom endpoints that the user saved, for `list_models`. */
+  customEndpoints(): readonly ListedCustomEndpoint[];
   preferredProvider(): AgentProvider;
   createAgent(
     input: CreateAgentInput,
@@ -341,6 +450,10 @@ export interface OpenBotToolRouterHooks {
   ): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** `initiatingAgentId` is the calling agent, recorded with a model change. */
   updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Effect.Effect<AgentSummary, ToolOperationFailed>;
+  /** Fails with the reason when the agent cannot be deleted now, such as a turn that runs. */
+  ensureAgentDeletable(agentId: string): Effect.Effect<void, ToolOperationFailed>;
+  /** Deletes the agent as the app's Delete agent does: its data, then its sidebar and Library places. */
+  deleteAgent(agentId: string): Effect.Effect<void, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
   /** With an agent, only the servers that the agent gets. */
@@ -360,7 +473,12 @@ export interface OpenBotToolRouterHooks {
    * Records a no-update tool call for the turn; null when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
    */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
+  requestNoUpdate(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    channelRun: boolean,
+  ): "quiet" | "shown" | "unanswered" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -408,10 +526,14 @@ export interface OpenBotToolRouterOptions {
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
   visualPreview?: ChatVisualPreviewHost | null | undefined;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
   videoReader?: VideoReaderHost | null | undefined;
+  /** Decodes and fits pictures for `read_image`; null where this process cannot decode them. */
+  fitImage?: ImageFitter | null | undefined;
   /** The MCP servers of this OpenBot server, for the MCP tools; null where nothing holds them. */
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
@@ -422,12 +544,24 @@ export interface OpenBotToolRouterOptions {
   feedbackFacts?: FeedbackFacts | null | undefined;
   /** Sends approved `send_feedback` text; null where this process has no account service. */
   feedback?: AgentFeedback | null | undefined;
+  /** Takes sent reports off GitHub for `withdraw_feedback`; absent where this process has no account service. */
+  feedbackWithdrawal?: FeedbackWithdrawal | undefined;
   /** Makes claims for `create_server_install_command`; null where this process has no account service. */
   serverClaims?: AgentServerClaims | null | undefined;
+  /** The named browser profiles, for `read_agent` and `set_browser_profile`; null where this process has none. */
+  browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The CRM, for the `crm_*` tools; null where this process has none. */
+  crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent. Without it, the CRM tools refuse every agent. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
+  /** Whether a person who sent a message can change the server settings. Without it, everyone can. */
+  personCanAdminister?: ((personId: string) => boolean) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
   vaultItems?: VaultItems | null | undefined;
+  /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
+  codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -445,6 +579,7 @@ export class OpenBotToolRouter {
   readonly #mailboxSync: MailboxSync;
   readonly #conversation: ConversationRuntime;
   readonly #attention: AttentionRegistry;
+  readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
   readonly #attachments: AttachmentGateway;
@@ -465,18 +600,27 @@ export class OpenBotToolRouter {
   readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
+  readonly #setCommitCoAuthor: SetCommitCoAuthor | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
+  readonly #fitImage: ImageFitter | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #githubConnected: () => boolean;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
+  readonly #feedbackWithdrawal: FeedbackWithdrawal | null;
   /** The last OpenBot tool failures of each provider thread, for the errors of a report. */
   readonly #toolFailures = new Map<string, { at: number; text: string }[]>();
   /** The turns whose report already got the similar issues, so the next call sends it. */
   readonly #feedbackSearched = new Set<string>();
+  /** Per routine run turn: whether it reported a failure, and the routines of its runs that it paused (#9856). */
+  readonly #routineRunTurns = new Map<string, RoutineRunTurn>();
   readonly #serverClaims: AgentServerClaims | null;
+  readonly #browserProfiles: () => AgentBrowserProfiles | null;
+  readonly #crm: () => CrmHandle | null;
+  readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
+  readonly #personCanAdminister: (personId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -489,13 +633,23 @@ export class OpenBotToolRouter {
       store: options.store,
       redact: options.hooks.redactMcpForAgent,
       capturedSteps: options.capturedSteps ?? (() => Effect.succeed(null)),
-      recentThreads: (agentId, after, limit) => options.tasks.recent(agentId, after, limit),
+      // A deleted or unreadable page file leaves the history answer with the title only.
+      pageText: (attachmentId) =>
+        options.mailbox.resolveAttachment(attachmentId).pipe(
+          Effect.flatMap((file) =>
+            file ? Effect.tryPromise(() => readFile(file.path, "utf8")) : Effect.succeed(null),
+          ),
+          Effect.map((html) => (html === null ? null : visualPageText(html))),
+          Effect.catch(() => Effect.succeed(null)),
+        ),
+      recentThreads: (agentId, after, limit, last) => options.tasks.recent(agentId, after, limit, last),
     });
     this.#store = options.store;
     this.#mailbox = options.mailbox;
     this.#mailboxSync = options.mailboxSync;
     this.#conversation = options.conversation;
     this.#attention = options.attention;
+    this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
     this.#attachments = options.attachments;
@@ -516,14 +670,21 @@ export class OpenBotToolRouter {
     this.#workflowTools = options.workflowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
+    this.#setCommitCoAuthor = options.setCommitCoAuthor ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
+    this.#fitImage = options.fitImage ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#githubConnected = options.githubConnected ?? (() => false);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
+    this.#feedbackWithdrawal = options.feedbackWithdrawal ?? null;
     this.#serverClaims = options.serverClaims ?? null;
+    this.#browserProfiles = options.browserProfiles ?? (() => null);
+    this.#crm = options.crm ?? (() => null);
+    this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
+    this.#personCanAdminister = options.personCanAdminister ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -539,6 +700,17 @@ export class OpenBotToolRouter {
         interrupt: (agentId, turnId, mayStop) => options.hooks.interrupt(agentId, turnId, mayStop),
       },
     });
+  }
+
+  /**
+   * A Codex subagent has the tools of the agent that started it, and calls them from its own thread.
+   * The call then runs as that agent, in its chat and its turn, as its approval cards do (#8188, #8657).
+   */
+  #asSubagentParent(params: DynamicToolCallParams): DynamicToolCallParams {
+    if (this.#conversation.agentForThread(params.threadId)) return params;
+    const parent = this.#codexSubagentParent(params.threadId);
+    if (!parent || this.#conversation.agentForThread(parent.threadId) !== parent.agentId) return params;
+    return { ...params, threadId: parent.threadId, turnId: parent.turnId };
   }
 
   readonly handle = Effect.fn("OpenBotToolRouter.handle")(function* (
@@ -578,12 +750,15 @@ export class OpenBotToolRouter {
           return;
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
-          let params = request.params;
+          let params = this.#asSubagentParent(request.params);
+          const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
-            const deferredMcp = this.#deferredMcpNote(client, params.threadId);
-            const invalid = deferredMcp
-              ? `${sourceText("error.agent.toolRequestInvalid")} ${deferredMcp}`
-              : sourceText("error.agent.toolRequestInvalid");
+            // Read only where it is used: the Antigravity note reads the agent's access list.
+            const { threadId } = params;
+            const invalid = (text = sourceText("error.agent.toolRequestInvalid")) => {
+              const note = this.#deferredMcpNote(client, threadId);
+              return note ? `${text} ${note}` : text;
+            };
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
               if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
@@ -591,15 +766,29 @@ export class OpenBotToolRouter {
               try {
                 this.#requireAgent(agentId);
                 result = discoverTools(params, client.provider);
-              } catch {
-                client.respond(request.id, openBotToolFailure(invalid));
+              } catch (error) {
+                client.respond(
+                  request.id,
+                  openBotToolFailure(
+                    !(error instanceof UnknownToolNamesError)
+                      ? invalid()
+                      : mayNameMcpTool(error.names)
+                        ? invalid(error.message)
+                        : error.message,
+                  ),
+                );
                 return;
               }
               if (givesBrowserSchemas(result)) this.#browserSchemasGiven.add(params.threadId);
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
-              const found =
-                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: deferredMcp } : result;
+              // A name that tool_describe did not find can be a tool of the user's MCP servers.
+              const deferredMcp =
+                params.tool === "tool_search" ||
+                ("notFound" in result && Array.isArray(result.notFound) && mayNameMcpTool(result.notFound))
+                  ? this.#deferredMcpNote(client, threadId)
+                  : null;
+              const found = deferredMcp ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,
                 openBotToolResult(signIns.length > 0 ? { ...found, mcpServers: signIns } : found),
@@ -609,7 +798,18 @@ export class OpenBotToolRouter {
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
-                client.respond(request.id, openBotToolFailure(deferredCallArgumentsError(params) ?? invalid));
+                const mcpResult =
+                  client.provider === "antigravity" ? yield* this.#userMcpTool(client, request, params) : null;
+                if (request.signal?.aborted || !client.running) return;
+                client.respond(
+                  request.id,
+                  mcpResult ??
+                    openBotToolFailure(
+                      deferredCallArgumentsError(params, client.provider, () =>
+                        this.#deferredMcpNote(client, threadId),
+                      ) ?? invalid(),
+                    ),
+                );
                 return;
               }
               params = resolved;
@@ -712,8 +912,13 @@ export class OpenBotToolRouter {
               );
             return;
           }
-          // Keep the transport identifiers and abort signal; enter the original dispatch below.
-          const toolRequest = { ...request, params };
+          // Keep the transport identifiers and abort signal; enter the original dispatch below. A card of
+          // a subagent's call then waits for the end of the subagent's turn, not of the parent's (#9727).
+          const toolRequest: AppServerRequest & { params: DynamicToolCallParams } = {
+            ...request,
+            params,
+            ...(fromSubagent ? { subagent: true as const } : {}),
+          };
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
@@ -743,18 +948,21 @@ export class OpenBotToolRouter {
               if (result && client.running) client.respond(toolRequest.id, result);
               return;
             }
-            if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
+            const params = {
+              ...toolRequest.params,
+              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              ownerAgentId: agentId,
+            };
+            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
+            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
+            const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
+            if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,
                 contentItems: [{ type: "inputText", text: "Browser tools are unavailable during user takeover." }],
               });
               return;
             }
-            const params = {
-              ...toolRequest.params,
-              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
-              ownerAgentId: agentId,
-            };
             // While the user controls the tab, the call waits for the release and does not run.
             const userControl = (tabId: string) =>
               this.#browser.awaitUserControlRelease(tabId).pipe(Effect.as(browserUserControlResult()));
@@ -856,7 +1064,11 @@ export class OpenBotToolRouter {
             // error with "dynamic tool request failed" (#1728, #6011, #6373).
             const correctableFailure = (error: unknown) =>
               Effect.sync(() => {
-                const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
+                const message = this.#hooks.redactMcp(
+                  CHANNEL_AGENT_TOOL_NAMES.has(tool)
+                    ? channelAgentToolErrorMessage(tool, error)
+                    : profileAgentToolErrorMessage(tool, error),
+                );
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
@@ -866,14 +1078,17 @@ export class OpenBotToolRouter {
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
+              tool === "read_image" ||
               tool === "list_library_folders" ||
+              tool === "organize_library" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
               tool === "create_server_install_command";
-            // A workflow tool reports its own correctable failures; only bad arguments reach this point.
+            // A workflow or CRM tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
-              correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
+              correctableTool ||
+              ((WORKFLOW_TOOL_NAMES.has(tool) || CRM_TOOL_NAMES.has(tool)) && cause instanceof z.ZodError);
             const response = this.#handleOpenBotTool(client, toolRequest, toolRequest.params).pipe(
               Effect.catch((failure) =>
                 correctable(failure.cause) ? correctableFailure(failure.cause) : Effect.fail(failure),
@@ -886,8 +1101,9 @@ export class OpenBotToolRouter {
                 }),
               ),
             );
-            // Both store a file and then add the message that names it.
-            if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
+            // Each stores a file and then adds the message that names it.
+            if (tool === "attach_files_to_response" || tool === "html_render" || tool === "set_backdrop")
+              yield* Effect.uninterruptible(response);
             // A side Codex search can take up to two minutes on the user's ChatGPT quota, and a video
             // download and transcript can take longer, so Stop ends them.
             else if (tool === "web_search" || tool === "read_video") {
@@ -928,9 +1144,59 @@ export class OpenBotToolRouter {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider === "opencode")
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
+    // The servers that tool_call runs for this agent (`#userMcpTool`), so the note never names a call
+    // that always fails.
+    if (client.provider === "antigravity") {
+      const agentId = this.#conversation.agentForThread(threadId);
+      return agentId && (this.#mcpServers?.forAgent(agentId).length ?? 0) > 0 ? ANTIGRAVITY_DEFERRED_MCP_NOTE : null;
+    }
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
+
+  /**
+   * A `tool_call` that names a tool of one of the agent's saved MCP servers or of the GitHub connection
+   * (`forAgent`, #12035). Antigravity 1.5 leaves the tools over its schema budget out of the tool list,
+   * with no `call_mcp_tool` for them (#7427), so OpenBot runs the tool itself, with the sign-in of the
+   * server's address or the GitHub connection's bearer. The user approves it as a
+   * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
+   */
+  readonly #userMcpTool = Effect.fn("OpenBotToolRouter.userMcpTool")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const servers = this.#mcpServers;
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    const call = deferredCall(params);
+    const found = servers && agentId && call ? findAgentMcpTool(servers.forAgent(agentId), call.name) : null;
+    if (!servers || !agentId || !call || !found) return null;
+    const decision = yield* this.#attention
+      .awaitToolApproval(client, request, {
+        requestId: request.id,
+        agentId,
+        threadId: this.#conversation.publicThreadId(agentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason: sourceText("status.agent.mcpToolCall", { tool: found.tool, name: found.config.name }),
+        grantRoot: null,
+        permissions: null,
+      })
+      .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
+    if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
+    // Stop cancels the call, as it cancels the provider's own MCP call.
+    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments)).pipe(
+      Effect.raceFirst(requestAborted(request.signal)),
+    );
+    if (Result.isFailure(outcome))
+      return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
+    return "error" in outcome.success
+      ? openBotToolFailure(servers.redact(outcome.success.error))
+      : mcpToolCallResponse(outcome.success.result);
+  });
 
   /**
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
@@ -990,10 +1256,10 @@ export class OpenBotToolRouter {
       return yield* apiKeys.remove(agentId, name).pipe(
         Effect.map((removed) => {
           if (removed) return openBotToolResult({ status: "removed", name });
-          // Agents cannot delete a Vault key: every agent reads it.
-          if (this.#vaultItems?.apiKeys().some((key) => key.name === name))
+          // Agents cannot delete a Vault key that is not for them only: other agents can read it.
+          if (this.#vaultItems?.apiKeys(agentId).some((key) => key.name === name))
             return openBotToolFailure(
-              `${name} is in the Vault, which every agent uses. Only the user can delete it, in Server settings > Vault.`,
+              `${name} is in the Vault, and other agents can use it. Only the user can delete it, in Server settings > Vault.`,
             );
           return openBotToolResult({ status: "not_found", name });
         }),
@@ -1046,14 +1312,31 @@ export class OpenBotToolRouter {
         "save_api_key does not work in an external chat. Ask the user to add the key in Server settings > Vault.",
       );
     // A team member, a routine, another agent or a web page must not replace the key of every agent.
-    if (!this.#requestedByPerson(agentId, params.turnId, threadId))
+    // In a channel, the key must be in the request of this computer's user that started the task.
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (channelId) {
+      if (
+        !(yield* this.#channels
+          .localRequestHolds(channelId, agentId, params.turnId, key)
+          .pipe(Effect.catch(() => Effect.succeed(false))))
+      )
+        return openBotToolFailure(
+          "In a channel, you can save only a key that this computer's user wrote in the request that started your task. Call request_api_key: the user types the key in a form.",
+        );
+      // Other members' words can still choose a token of the request, so a channel never replaces a saved key.
+      const existing = yield* Effect.result(apiKeys.list(agentId));
+      if (Result.isFailure(existing) || existing.success.some((entry) => entry.name === name))
+        return openBotToolFailure(
+          `In a channel, you can only add a key with a new name, and ${name} is saved already. Call request_api_key: the user types the new key in a form.`,
+        );
+    } else if (!this.#requestedByPerson(agentId, params.turnId, threadId))
       return openBotToolFailure(
         "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
     const vault = this.#vaultItems;
     if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
     const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
-    const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, agentName));
+    const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, { id: agentId, name: agentName }, false));
     if (Result.isFailure(saved)) {
       // The Vault's own errors are user text with no secret in them. A file error gets a fixed text.
       const { cause } = saved.failure;
@@ -1070,7 +1353,7 @@ export class OpenBotToolRouter {
         name: saved.success.name,
       }),
     );
-    // The agent's own key of this name wins over the Vault key, so the older value goes.
+    // A plain key file of this agent wins over the Vault key, so the older value goes.
     const removed = yield* Effect.result(apiKeys.remove(agentId, name));
     if (Result.isFailure(removed)) {
       logger.warn("Unable to delete an agent's own API key after a Vault save", {
@@ -1094,7 +1377,7 @@ export class OpenBotToolRouter {
       name,
       path,
       apps,
-      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Server settings, MCP servers, edit the server, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
+      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Marketplace, Apps, open the server, click Edit, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
     });
   });
 
@@ -1189,12 +1472,18 @@ export class OpenBotToolRouter {
       problem: text(args.details),
       ...(isOneOf(FEATURE_REQUEST_TYPES, args.type) ? { type: args.type } : {}),
     };
-    const form = (next: string) =>
+    const surface = isOneOf(FEEDBACK_SURFACES, args.surface) ? args.surface : null;
+    // A bug in the phone app needs the phone's version, system and log, which only the phone has.
+    const phoneReport = feedbackNeedsPhone({ kind: idea ? "idea" : "bug", surface });
+    // The form for the phone app requires the version and the device, so a link has them too.
+    const form = (next: string, phone?: FeedbackPhone) =>
       feedbackForm(
         idea
           ? featureRequestFormUrl(feature)
-          : bugReportFormUrl(facts, { ...bug, provider, ...(providerVersion ? { providerVersion } : {}) }),
-        next,
+          : phoneReport
+            ? mobileBugReportFormUrl(bug, phone, facts)
+            : bugReportFormUrl(facts, { ...bug, provider, ...(providerVersion ? { providerVersion } : {}) }),
+        phoneReport ? `${next}${FEEDBACK_PHONE_FORM_NEXT}` : next,
       );
     const sender = this.#feedback;
     if (!sender || !facts.version || !facts.os)
@@ -1212,7 +1501,7 @@ export class OpenBotToolRouter {
       model: String(agent.model).slice(0, FEEDBACK_LIMITS.fact),
       effort: String(agent.reasoningEffort).slice(0, FEEDBACK_LIMITS.fact),
       host: facts.host ?? null,
-      surface: isOneOf(FEEDBACK_SURFACES, args.surface) ? args.surface : null,
+      surface,
       foundBy: args.found_by === "agent" ? "agent" : "user",
       recentErrors: this.#recentErrors(senderAgentId, params.threadId, params.turnId),
       sameAs,
@@ -1243,51 +1532,64 @@ export class OpenBotToolRouter {
         });
       }
     }
-    const decision = yield* this.#attention.awaitToolApproval(
-      client,
-      request,
-      {
-        requestId: request.id,
-        agentId: senderAgentId,
-        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-        turnId: params.turnId,
-        kind: "permissions",
-        command: feedbackPreview(feedback, {
-          recentErrors: sourceText("status.agent.feedbackRecentErrors"),
-          sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
-        }),
-        cwd: null,
-        reason: sourceText(idea ? "status.agent.sendIdea" : "status.agent.reportProblem"),
-        grantRoot: null,
-        permissions: null,
-      },
-      // The text goes out with the owner's account, and Full access does not answer for a public post.
-      { ownerOnly: true },
-    );
-    if (decision === "cancel")
+    const approval: AgentApproval = {
+      requestId: request.id,
+      agentId: senderAgentId,
+      threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+      turnId: params.turnId,
+      kind: "permissions",
+      command: feedbackPreview(feedback, {
+        recentErrors: sourceText("status.agent.feedbackRecentErrors"),
+        sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
+      }),
+      cwd: null,
+      // The notice marks the card on each client. The one for the phone app has no Send off the phone.
+      reason: sourceText(
+        idea ? "status.agent.sendIdea" : phoneReport ? "status.agent.reportPhoneProblem" : "status.agent.reportProblem",
+      ),
+      grantRoot: null,
+      permissions: null,
+    };
+    // The text goes out with the owner's account, and Full access does not answer for a public post.
+    // A report about the phone app waits for a Send on the phone, which brings the phone's data.
+    const answer = phoneReport
+      ? yield* this.#attention.awaitPhoneFeedbackApproval(client, request, approval)
+      : { decision: yield* this.#attention.awaitToolApproval(client, request, approval, { ownerOnly: true }) };
+    if (answer.decision === "cancel")
       return openBotToolResult({
         status: "cancelled",
-        next: "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
+        next: phoneReport
+          ? "Nobody sent the report from the phone app, so OpenBot did not send it. A report about the phone app goes out only from the phone, with its version, system and support log. Tell the user in one sentence to open this chat in the phone app and to select Send there when they want to report it. Do not send it another way."
+          : "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
       });
-    if (decision !== "accept")
+    if (answer.decision !== "accept")
       return openBotToolResult({
         status: "declined",
-        next: "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
+        next: phoneReport
+          ? "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
+          : "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. Continue to help the user.",
       });
-    const sent = yield* Effect.result(sender.send(feedback));
+    // The phone redacts its log when it writes each line. This is the last place before the text leaves.
+    const phone = "phone" in answer && answer.phone ? redactedPhone(answer.phone) : undefined;
+    const report = feedback.kind === "bug" && phone ? withFeedbackPhone(feedback, phone) : feedback;
+    // The approval gives no "accept" without the phone's data, so this guards a later change only.
+    if (feedbackLacksPhone(report))
+      return openBotToolFailure("The report has no data from the phone app, so OpenBot did not send it.");
+    const sent = yield* Effect.result(sender.send(report));
     if (Result.isFailure(sent)) {
       logger.warn("Feedback could not be sent.", { error: toLogValue(sent.failure.cause) });
       return form(
         "OpenBot could not send it. Give the user this link to the same text on GitHub, to check and submit.",
+        phone,
       );
     }
-    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
+    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT, phone);
     if (sent.success.status === "limited") {
       logger.warn("The account service limits feedback for this account.", {
         daily: sent.success.daily,
         retryAfterSeconds: sent.success.retryAfterSeconds,
       });
-      return form(feedbackLimitedNext(sent.success));
+      return form(feedbackLimitedNext(sent.success), phone);
     }
     const issue = sent.success;
     // The thank-you card in the chat links the issue. The issue is open also when the card fails.
@@ -1319,6 +1621,85 @@ export class OpenBotToolRouter {
         ? `${where} Give the user this link.`
         : `${where} A card in the chat thanks the user and links the issue, so do not repeat the link: thank the user in one short sentence.`,
     });
+  });
+
+  /**
+   * `withdraw_feedback`: takes a report that this account sent off GitHub after the owner approves, and
+   * marks its card in this chat as removed. The account service checks that this account sent it.
+   */
+  readonly #withdrawFeedback = Effect.fn("OpenBotToolRouter.withdrawFeedback")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const issue = isRecord(params.arguments) ? params.arguments.issue : undefined;
+    if (!isIssueNumber(issue)) return openBotToolFailure("issue must be the number of a sent report.");
+    const withdrawal = this.#feedbackWithdrawal;
+    if (!withdrawal || !this.#feedback?.signedIn())
+      return openBotToolFailure(
+        "OpenBot cannot remove the report, because the user is not signed in to OpenBot. Ask them to sign in and try again.",
+      );
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can remove a report.",
+      );
+    const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId,
+        turnId: params.turnId,
+        kind: "permissions",
+        command: sourceText("status.agent.feedbackWithdrawCommand", { issue: String(issue) }),
+        cwd: null,
+        reason: sourceText("status.agent.feedbackWithdrawReason"),
+        grantRoot: null,
+        permissions: null,
+      },
+      // The report went out with the owner's account, so only the owner takes it back.
+      { ownerOnly: true },
+    );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so the report is still on GitHub.",
+      });
+    if (decision !== "accept")
+      return openBotToolResult({
+        status: "declined",
+        next: "The user selected Not now. The report is still on GitHub. Do not remove it another way.",
+      });
+    const result = yield* withdrawal.withdraw(senderAgentId, threadId, issue);
+    switch (result.status) {
+      case "withdrawn":
+        return openBotToolResult({
+          status: "withdrawn",
+          next: "The report is not on GitHub anymore. Tell the user in one short sentence. If they wanted to correct it, call send_feedback with the corrected text: it becomes a new report.",
+        });
+      case "signedOut":
+        return openBotToolFailure(
+          "The user is not signed in to OpenBot, so OpenBot cannot remove the report. Ask them to sign in and try again.",
+        );
+      case "notYours":
+        return openBotToolFailure(
+          "This account did not send a report on that issue, or the report was sent before OpenBot could remove reports. Tell the user that only the OpenBot team can remove it now, at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "unavailable":
+        return openBotToolFailure(
+          "OpenBot cannot remove a whole issue now. Tell the user to try again later, or to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "moved":
+        return openBotToolFailure(
+          "The issue moved to another public repository, so OpenBot cannot remove the report. Tell the user to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "limited":
+        return openBotToolFailure("Too many tries. Wait one minute, then try again once.");
+    }
   });
 
   /** Keeps a failed OpenBot tool call of a thread, so that a report can show what failed. */
@@ -1371,6 +1752,37 @@ export class OpenBotToolRouter {
       ),
     ];
     return lines.slice(-FEEDBACK_ERRORS).join("\n").slice(0, FEEDBACK_LIMITS.errors);
+  }
+
+  /**
+   * A card with only a reason that only the owner answers, also for an agent with Full access. For
+   * `set_browser_profile`, whose profile holds sign-ins of other agents, `set_commit_co_author`, which
+   * changes every agent, and `delete_agent`, which cannot be undone.
+   */
+  #ownerApproval(
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    reason: string,
+  ) {
+    return this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason,
+        grantRoot: null,
+        permissions: null,
+      },
+      { ownerOnly: true },
+    );
   }
 
   /**
@@ -1462,9 +1874,21 @@ export class OpenBotToolRouter {
     });
   });
 
+  /** The agent's browser profile and the names of all profiles, so a change can reuse a name. */
+  #agentBrowserProfile(agent: AgentSummary) {
+    const profiles = this.#browserProfiles()?.list().profiles;
+    if (!profiles) return {};
+    return {
+      browserProfile: agentBrowserProfileView(agent, profiles),
+      browserProfileNames: profiles.map((profile) => profile.name),
+    };
+  }
+
   #requireAgent(agentId: string): AgentSummary {
-    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    const agents = this.#hooks.listAgents();
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    // The error names the agent that a mistyped id or an id without `agent-` most likely means (#9658).
+    if (!agent) throw new Error(unknownAgentMessage(agentId, agents));
     return agent;
   }
 
@@ -1504,6 +1928,13 @@ export class OpenBotToolRouter {
       // The rest of the setup stays readable when the skill folders cannot be read.
       skillsError = error instanceof Error ? error.message : String(error);
     }
+    const access = workspaceAccessEnforced(agent) ? "workspace" : "full";
+    // The level that applies, as the settings show it. A Workspace only agent keeps its stored grant, but
+    // the grant answers nothing there, so reporting it as on hid the reason for each card (#8308).
+    const permissions = agentPermissionLevel({
+      access,
+      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+    });
     return {
       id: agent.id,
       name: agent.name,
@@ -1515,15 +1946,19 @@ export class OpenBotToolRouter {
         agent,
         this.#hooks.agentModels({ provider: agent.provider, providerAccountId: agent.providerAccountId }),
       ),
+      // A runtime change saved during work, which applies before the next turn, as update_profile returns it.
+      ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
       ...agentAccountSetup(agent),
-      access: workspaceAccessEnforced(agent) ? "workspace" : "full",
+      access,
+      permissions,
       computerUse,
       // The setting can be on while the driver is not ready, and then the agent has no driver tools (#6612).
       ...(computerUse
         ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
         : {}),
       notifications: agent.notifications,
-      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+      ...this.#agentBrowserProfile(agent),
+      autoApprove: permissions === "full",
       ...(skills ? { skills } : { skillsError }),
       routines: this.#routines.list(agent.id).map((routine) => ({
         id: routine.id,
@@ -1669,7 +2104,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_channels") {
       const args = listChannelsToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
+      // An agent that created or changed a channel can check its instructions here (#8627).
+      return openBotToolResult({
+        channels: this.#channels
+          .handoffTargets(args.archived === true)
+          .map((channel) => ({ ...channel, instructions: listedDescription(channel.instructions) })),
+      });
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       // In a channel task, the request that started the task must come from this computer's user.
@@ -1720,6 +2160,10 @@ export class OpenBotToolRouter {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
     }
 
+    if (params.tool === "set_backdrop") {
+      return yield* this.#setBackdrop(params, senderAgentId, executionThreadId);
+    }
+
     if (params.tool === "web_search") {
       const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
@@ -1728,6 +2172,10 @@ export class OpenBotToolRouter {
 
     if (params.tool === "read_video") {
       return yield* this.#readVideo(params);
+    }
+
+    if (params.tool === "read_image") {
+      return yield* this.#readImage(senderAgentId, params);
     }
 
     if (params.tool === "list_sites") {
@@ -1756,10 +2204,21 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_library_folders") {
       const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      const store = this.#libraryFolders;
-      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const storedFiles = this.#mailbox.listStoredFiles();
+      const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+      );
+    }
+
+    if (params.tool === "organize_library") {
+      const args = organizeLibraryToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
       );
     }
 
@@ -1778,6 +2237,8 @@ export class OpenBotToolRouter {
             ?.activeTurnId ??
           null;
         const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
+        // A turn that waits for a person stays open, so status stays "working" and waitingFor says what it waits for.
+        const waitingFor = working ? this.#attention.waitsFor(agent.id) : [];
         // A restart loses the provider clock, so the newest message for the agent stands in for it.
         const lastActivity = deliveries.reduce(
           (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
@@ -1791,6 +2252,7 @@ export class OpenBotToolRouter {
           status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
           queuedMessages,
           ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
+          ...(waitingFor.length > 0 ? { waitingFor } : {}),
           ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
           ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
         };
@@ -1814,6 +2276,7 @@ export class OpenBotToolRouter {
               { provider: agent.provider, model: agent.model },
               ...(agent.backupModels?.order ?? []),
             ]),
+          customEndpoints: this.#hooks.customEndpoints(),
         },
       );
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
@@ -1844,7 +2307,7 @@ export class OpenBotToolRouter {
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
+        note: "The new chat starts when this turn ends, your background subagents and commands finish, and your queue is empty. A queued message that runs first ends the request. When only routine runs wait and no background work runs, the new chat starts before them; otherwise a routine run also ends the request. Finish your answer now.",
       });
     }
 
@@ -1867,7 +2330,12 @@ export class OpenBotToolRouter {
           : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
-          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+          "Use this tool only in a routine run, for a teammate's message (an update that wants no answer, or a request after your reply to it), or when your background work wakes you again after your report. Give your answer as usual.",
+        );
+      // A teammate's request ends quiet only after its result went back to that teammate (#7465).
+      if (outcome === "unanswered")
+        return openBotToolFailure(
+          "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
       return openBotToolResult(
         outcome === "quiet"
@@ -1892,20 +2360,56 @@ export class OpenBotToolRouter {
         );
       if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
-      return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
+      // A failure is not a stop condition: a run that paused its own routine turns it on again (#9856).
+      // The failure ends every routine run of the turn, so each routine that the turn paused counts.
+      const paused = this.#routineRunTurns.get(params.turnId)?.paused ?? [];
+      this.#noteRoutineRunTurn(params.turnId, { failed: true, paused: [] });
+      if (paused.length === 0)
+        return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
+      const results = paused.map((pause) => this.#routines.resumeAfterFailedRun(pause, params));
+      return openBotToolResult({
+        status: "failed",
+        note: results.includes("failed")
+          ? "This run ends as failed. OpenBot could not turn the routine on again, so it stays paused. Tell the user that the routine is paused and that they can turn it on again."
+          : results.includes("resumed")
+            ? "This run ends as failed. A failed run does not stop its routine, so the routine is on again. Give your answer as usual."
+            : "This run ends as failed. Give your answer as usual.",
+      });
     }
 
     const sidebarResult = yield* handleSidebarTool(
       params.tool,
       params.arguments,
       this.#sidebarLayout,
-      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      () => new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      // Archived channels too: the sidebar keeps their folder (`ChannelStore.ids`).
+      () => new Set(this.#channels.store.ids()),
     );
     if (sidebarResult) return sidebarResult;
 
+    const runPause = this.#runRoutinePause(params, senderAgentId);
+    const runTurn = this.#routineRunTurns.get(params.turnId);
+    if (runPause !== null && runTurn?.failed)
+      return openBotToolFailure(
+        "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual.",
+      );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
       this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
     );
+    // The saved `updatedAt` lets a later resume see a change that the user made after this pause.
+    const pausedRoutine =
+      runPause !== null && routineResult?.success
+        ? this.#routines.listFor(runPause.agentId).find((routine) => routine.id === runPause.routineId)
+        : undefined;
+    if (runPause !== null && pausedRoutine) {
+      const { scheduledFor, ...pause } = runPause;
+      this.#noteRoutineRunTurn(params.turnId, {
+        failed: false,
+        paused: [...(runTurn?.paused ?? []), { ...pause, updatedAt: pausedRoutine.updatedAt }],
+      });
+      // Routines and the chat card say which run paused the routine (#10048).
+      if (!pausedRoutine.active) this.#routines.notePausedByRun(pause.agentId, pause.routineId, scheduledFor);
+    }
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -1917,12 +2421,43 @@ export class OpenBotToolRouter {
     );
     if (flowResult) return flowResult;
 
+    if (CRM_TOOL_NAMES.has(params.tool)) {
+      // The Team API gives the CRM to owners and admins only, so a member's message does not reach it here.
+      if (this.#fromRemoteMember(senderAgentId, params.turnId))
+        return openBotToolFailure("A team member's message cannot use the CRM. Ask the member to use the CRM page.");
+      // A member who can see the agent reads its chat and can add a routine to it.
+      if (this.#crmAgentVisibleToMembers(senderAgentId))
+        return openBotToolFailure(
+          "Team members can see this agent, so it cannot use the CRM. Ask an owner or admin to set this agent to No access for Everyone and for each role, in the server's Roles settings.",
+        );
+      // People who are not owners or admins read the replies in an external chat or a channel.
+      if (
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#channels.store.channelForThread(executionThreadId)
+      )
+        return openBotToolFailure(
+          "The CRM does not work in an external chat or a channel. Use it in your own OpenBot chat.",
+        );
+      const crmResult = yield* handleCrmTool(
+        params.tool,
+        params.arguments,
+        this.#crm(),
+        senderAgentId,
+        this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        (text) => this.#hooks.redactMcp(text),
+      );
+      if (crmResult) return crmResult;
+    }
+
     if (
       WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&
       !this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId)
     )
+      // A team member's new message is refused too, so the member is sent to Workflows instead.
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
+        this.#fromRemoteMember(senderAgentId, params.turnId)
+          ? "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. A team member's message cannot. Do not retry: ask the member to use Workflows."
+          : "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. This turn did not start with one, and an answer to ask_user or ask_ui does not change that. Do not retry in this turn: ask the user to send the request there as a new message.",
       );
     // A read gives every workflow, its webhook URLs and its run outputs. The Team API hides these
     // from a member by agent access and admin rights, so a member's message does not get them here.
@@ -2040,6 +2575,19 @@ export class OpenBotToolRouter {
           app: args.app,
           next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
+      // Slack, Discord, Telegram and WhatsApp have no MCP server: the messaging tools reach a connected one (#9696).
+      // A paused or stopped connection still gets the card, which shows its Resume or Reconnect action.
+      const connection = this.#messaging.store
+        .connections()
+        .find((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      if (connection) {
+        const name = PLATFORM_NAMES[connection.platform];
+        return openBotToolResult({
+          status: "connected",
+          app: args.app,
+          next: `${name} is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Call openbot.messaging_list_places for the connection and place ids, then openbot.messaging_post to send the message; search your tools for messaging when they are not in your tool list. When the place is not in the list, tell the user what its result says.`,
+        });
+      }
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
@@ -2056,15 +2604,94 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. End your answer: tell the user to connect GitHub in Server settings, Connectors. This connection also signs in gh and git."
-            : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Marketplace > Apps > GitHub also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
+      });
+    }
+
+    if (params.tool === "show_setting") {
+      const args = params.arguments;
+      if (!isRecord(args) || !isString(args.setting)) throw new Error("setting must be a setting id or words.");
+      const setting = args.setting.trim();
+      if (!isSettingLinkId(setting)) {
+        const matches = searchSettingLinks(setting);
+        const serverPlaces = searchServerPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0;
+        return openBotToolResult({
+          status: found ? "matches" : "not_found",
+          matches,
+          ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          next: found
+            ? [
+                matches.length > 0
+                  ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id."
+                  : "",
+                serverPlaces.length > 0
+                  ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                "When none fits, try other English words once, then say that you found no setting for it.",
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
+        });
+      }
+      const shown = settingLinkSummary(setting);
+      this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
+        itemType: settingLinkItemType(setting),
+        text: sourceText("status.agent.settingShown", { setting: shown.title }),
+        eventType: "setting.shown",
+        detail: { settingId: setting },
+      });
+      return openBotToolResult({
+        status: "shown",
+        setting: shown,
+        next:
+          SETTING_LINK_SCOPES[setting] === "agent"
+            ? "The card is in the chat. Its Open button shows the row in your agent settings in the side panel. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
+            : "The card is in the chat. On the OpenBot desktop app, its Open button shows the row in OpenBot Settings of the computer that shows the chat; the web client shows only where it is. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card.",
       });
     }
 
     if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
+    if (params.tool === "withdraw_feedback")
+      return yield* this.#withdrawFeedback(client, request, params, senderAgentId);
 
     if (params.tool === "create_server_install_command")
       return yield* this.#serverInstallCommand(client, request, params, senderAgentId);
+
+    if (params.tool === "set_browser_profile")
+      return yield* handleSetBrowserProfileTool(params, {
+        listAgents: () => this.#hooks.listAgents(),
+        profiles: this.#browserProfiles(),
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        requestersCanAdminister: this.#turnRequesters(senderAgentId, params.turnId).every((personId) =>
+          this.#personCanAdminister(personId),
+        ),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+        redactMcp: (text) => this.#hooks.redactMcp(text),
+      });
+
+    if (params.tool === "set_commit_co_author") {
+      const setCommitCoAuthor = this.#setCommitCoAuthor;
+      if (!setCommitCoAuthor) return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
+      return yield* handleSetCommitCoAuthorTool(params, {
+        current: () => this.#store.agentDefaults().commitCoAuthor,
+        set: setCommitCoAuthor,
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+      });
+    }
+
+    if (params.tool === "delete_agent")
+      return yield* handleDeleteAgentTool(params, senderAgentId, {
+        listAgents: () => this.#hooks.listAgents(),
+        ensureDeletable: (agentId) => this.#hooks.ensureAgentDeletable(agentId),
+        deleteAgent: (agentId) => this.#hooks.deleteAgent(agentId),
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+        redactMcp: (text) => this.#hooks.redactMcp(text),
+      });
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 
@@ -2109,6 +2736,65 @@ export class OpenBotToolRouter {
       detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
     });
     return openBotToolResult({ status: "shown", messageId });
+  });
+
+  /**
+   * `set_backdrop`: stores the page as an HTML attachment and adds a backdrop message. Each client of
+   * the chat puts the newest one behind its window (`agent-backdrops.ts` in the renderer). A channel or
+   * external chat turn cannot use it: someone else's request would change the user's window. A task
+   * thread cannot use it either: the clients do not watch it. On a joined server, members share the
+   * agent's chat, so the page names the people who asked in this turn, and only their clients show it.
+   */
+  readonly #setBackdrop = Effect.fn("OpenBotToolRouter.setBackdrop")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    executionThreadId: string,
+  ) {
+    if (
+      this.#channels.store.channelForThread(executionThreadId) ||
+      this.#messaging.store.linkForThread(executionThreadId)
+    ) {
+      return openBotToolFailure("Only a turn in your own OpenBot chat can set the backdrop.");
+    }
+    // The clients watch the agent's own chat only, so a page from a task thread would not show.
+    if (this.#conversation.isTaskThread(executionThreadId)) {
+      return openBotToolFailure("Set the backdrop from your own chat, not from a task thread.");
+    }
+    const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
+    const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
+    if (
+      this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
+    ) {
+      return openBotToolResult({ status: "set", messageId });
+    }
+    yield* this.#addGeneratedMessage({
+      agentId: senderAgentId,
+      threadId: executionThreadId,
+      turnId: params.turnId,
+      messageId,
+      file: {
+        // The colors go in the page, so each client gets them with the page file.
+        bytes: new TextEncoder().encode(
+          withChatBackdropRequesters(
+            withChatBackdropBubbles(args.html, {
+              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+            }),
+            this.#turnRequesters(senderAgentId, params.turnId),
+          ),
+        ),
+        name: `${visualReplyFileName(args.title)}.html`,
+        mimeType: "text/html",
+      },
+      text: args.title,
+      itemType: CHAT_BACKDROP_ITEM_TYPE,
+      eventType: "response.backdrop-set",
+      detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
+    });
+    return openBotToolResult({ status: "set", messageId });
   });
 
   /**
@@ -2195,6 +2881,50 @@ export class OpenBotToolRouter {
         ),
         Effect.catchTag("ChatVisualPreviewFailed", (failure) => Effect.succeed(openBotToolFailure(failure.reason))),
       );
+  });
+
+  /**
+   * `read_image`: gives the agent a local picture that a model can take. In Code Mode, Codex drops an
+   * image file over about 6 MB that `view_image` reads (#9522).
+   */
+  readonly #readImage = Effect.fn("OpenBotToolRouter.readImage")(function* (
+    this: OpenBotToolRouter,
+    senderAgentId: string,
+    params: DynamicToolCallParams,
+  ) {
+    const parsed = readImageToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const fitImage = this.#fitImage;
+    if (!fitImage) return openBotToolFailure("This OpenBot cannot open images.");
+    // An agent can read each file that its user can: Workspace limits only writes (`AttachmentSourceScope`).
+    const bytes = yield* Effect.acquireUseRelease(
+      this.#attachments.openSources(senderAgentId, [parsed.data.path], { allowAnyReadablePath: true }),
+      ([source]) =>
+        attachmentCall(async () => {
+          if (!source) throw new Error("The image file was not found.");
+          const { size } = await source.handle.stat();
+          if (size > READ_IMAGE_MAX_FILE_BYTES)
+            throw new Error(`The image file is larger than ${READ_IMAGE_MAX_FILE_BYTES / 1024 / 1024} MB.`);
+          // A file that grows after the check is read only to the size it had.
+          const bytes = Buffer.alloc(size);
+          const { bytesRead } = await source.handle.read(bytes, 0, size, 0);
+          return bytes.subarray(0, bytesRead);
+        }),
+      (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+    );
+    const image = fitImage(bytes);
+    if (image === "unsupported")
+      return openBotToolFailure("OpenBot can open only PNG and JPEG images. Make a PNG or JPEG copy first.");
+    if (image === "tooLarge")
+      return openBotToolFailure("The image has too many pixels. Make a smaller copy first, such as 4000 pixels wide.");
+    const { dataUrl, ...size } = image;
+    return {
+      success: true,
+      contentItems: [
+        { type: "inputText", text: JSON.stringify(size) },
+        { type: "inputImage", imageUrl: dataUrl },
+      ],
+    } satisfies DynamicToolResult;
   });
 
   /**
@@ -2320,6 +3050,7 @@ export class OpenBotToolRouter {
     const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
     return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
+      agentId,
       arguments: params.arguments,
       approve: (reason, cwd) =>
         this.#attention
@@ -2394,6 +3125,37 @@ export class OpenBotToolRouter {
   }
 
   /**
+   * The routine, with its agent, that this `update_routine` call pauses when the call comes from a run
+   * of that same active routine; null for every other call. A one-time routine is already off when
+   * its run starts, so it never counts.
+   */
+  #runRoutinePause(
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): { agentId: string; routineId: string; scheduledFor: string } | null {
+    if (params.tool !== "update_routine" || !isRecord(params.arguments) || params.arguments.active !== false)
+      return null;
+    const { agentId, routineId } = params.arguments;
+    if ((agentId !== undefined && agentId !== senderAgentId) || !isString(routineId)) return null;
+    const ownRun = this.#mailbox
+      .findDeliveriesByTurn(senderAgentId, params.turnId)
+      .map(({ delivery }) => delivery.sender)
+      .find((sender) => sender.kind === "routine" && sender.routineId === routineId);
+    const active =
+      ownRun?.kind === "routine" &&
+      this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
+    return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
+  }
+
+  #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {
+    this.#routineRunTurns.delete(turnId);
+    this.#routineRunTurns.set(turnId, state);
+    if (this.#routineRunTurns.size <= ROUTINE_RUN_TURNS) return;
+    const [oldest] = this.#routineRunTurns.keys();
+    if (oldest !== undefined) this.#routineRunTurns.delete(oldest);
+  }
+
+  /**
    * Whether only a person in this computer's own chat asked for the turn. As for webhook routines: an
    * external chat, a routine or workflow run, or an agent message can carry text from outside, such
    * as a webhook body. A message steered into a run shares the run's turn. A team member's message is
@@ -2440,6 +3202,20 @@ export class OpenBotToolRouter {
     return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
   }
 
+  /**
+   * The people who sent the messages of this turn, as their `senderMember` ids. A message with no
+   * sender is from a person on this computer who is signed out. A turn with no person's message, such
+   * as a routine run, has none.
+   */
+  #turnRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind !== "user") continue;
+      ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
+    }
+    return [...ids];
+  }
+
   /** Whether a team member on another computer sent a message of this turn. */
   #fromRemoteMember(agentId: string, turnId: string): boolean {
     return this.#mailbox
@@ -2466,7 +3242,7 @@ export class OpenBotToolRouter {
       itemType: string;
       text: string;
       eventType: string;
-      detail: { appId: string } | { mcpServerId: string } | Record<string, never>;
+      detail: { appId: string } | { mcpServerId: string } | { settingId: string } | Record<string, never>;
     },
   ): void {
     const snapshot = structuredClone(this.#conversation.ensureSnapshot(agentId, threadId));
@@ -2579,13 +3355,23 @@ export class OpenBotToolRouter {
       // Checked before the agent exists: a named model the provider does not list, or an effort the
       // model does not support, is an error the calling agent can correct, never a silent default.
       const named = requestedToolModel(args, listed);
-      // A request that names no provider and no model gives the new agent the caller's own model, so
-      // a team that one agent recruits runs where that agent runs. When the caller's provider no
-      // longer lists that model, the new agent starts where one the user creates does.
+      if (named) requireRunnableProvider(named, this.#hooks.providerStatuses());
+      // A request that names no provider and no model gives the new agent the caller's own model and
+      // account, so a team that one agent recruits runs where that agent runs (#9701). When the caller's
+      // provider no longer lists that model, the new agent starts where one the user creates does.
       const inherited =
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
           : null;
+      // A provider that lists no model now, or a custom agent whose list is not loaded, is no proof that the
+      // caller's model is gone: the caller runs on it. Before, the new agent started on another provider (#11033).
+      if (
+        named === null &&
+        inherited === null &&
+        (caller.provider === "acp" || !listed.some((model) => model.provider === caller.provider))
+      ) {
+        throw new AgentSettingsRefused(sourceText("error.agent.creatorModelNotListed", { model: caller.model }));
+      }
       if (inherited && args.reasoningEffort !== undefined) requireReasoningEffort(inherited, args.reasoningEffort);
       const requested = named ?? inherited;
       const reasoningEffort = args.reasoningEffort ?? (inherited ? caller.reasoningEffort : undefined);
@@ -2611,6 +3397,7 @@ export class OpenBotToolRouter {
                   provider: requested.provider,
                   model: requested.id,
                   ...(reasoningEffort ? { reasoningEffort } : {}),
+                  ...(inherited && caller.providerAccountId ? { providerAccountId: caller.providerAccountId } : {}),
                 }
               : {}),
           },
@@ -2682,8 +3469,8 @@ export class OpenBotToolRouter {
         computerUse,
         ...fields
       } = args;
-      if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
-        throw new Error("Use avatarPath or generated avatar settings, not both.");
+      if (avatarPath !== undefined && args.avatarSeed !== undefined) {
+        throw new Error("Use avatarPath or avatarSeed, not both.");
       }
       const runtimeRequest = { provider, model, reasoningEffort };
       if (
@@ -2721,13 +3508,23 @@ export class OpenBotToolRouter {
         runtimeRequest,
         this.#hooks.agentModels({ provider: requestedProvider, providerAccountId: accountFor(requestedProvider) }),
       );
-      // The model and account the agent has after this call.
+      requireRunnableChange(target, runtime, this.#hooks.providerStatuses());
+      // The model and account the agent has after this call. While a usage limit or a provider error
+      // keeps the agent on a backup, its own model is the one it goes back to, as on the settings page:
+      // the backup in use stays in the order, and the model it goes back to is no backup (#11741).
       const ownProvider = runtime.provider ?? target.provider;
-      const own: AgentModelChoice = {
+      const after: AgentModelChoice = {
         provider: ownProvider,
         model: runtime.model ?? target.model,
         providerAccountId: accountFor(ownProvider),
       };
+      const current: AgentModelChoice = {
+        provider: target.provider,
+        model: target.model,
+        providerAccountId: target.providerAccountId,
+      };
+      // A change of model or account ends the way back, so the new model is then the agent's own.
+      const own = target.usageLimitReturn && sameAgentModelChoice(after, current) ? target.usageLimitReturn : after;
       const backups =
         backupModels === undefined
           ? undefined
@@ -2758,7 +3555,8 @@ export class OpenBotToolRouter {
       let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
         updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
-      } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+      } else if (args.avatarSeed !== undefined) {
+        // Only a new generated face replaces an image. A color keeps it, as in the agent settings (#10431).
         updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
       return {
@@ -2805,6 +3603,12 @@ export class OpenBotToolRouter {
       if (!isRecord(args) || !isMessageReaction(args.emoji)) {
         throw new Error("emoji must be exactly one complete Unicode emoji.");
       }
+      // Only the agent's own chat shows reactions. A side thread, a channel or a messaging thread
+      // does not, so a reaction there would report success that the person never sees.
+      if (this.#conversation.isExecutionThread(this.#conversation.publicThreadId(senderAgentId, params.threadId)))
+        return openBotToolFailure(
+          "Reactions show only in your own chat, not in this thread. Do not react here; answer in text if needed.",
+        );
       // The newest one when the turn started with several of the person's messages.
       const delivery = this.#mailbox
         .findDeliveriesByTurn(senderAgentId, params.turnId)
@@ -2973,8 +3777,18 @@ export class OpenBotToolRouter {
               ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
             )
             .map(({ delivery }) => delivery.messageId);
+      // Without replyToMessageId, a message that needs no answer, such as the recipient's answer or
+      // notice, selects its side thread only while that thread waits for this agent. Otherwise the
+      // message is a new request: it goes to the recipient's own chat, where it can start a task
+      // (#10273). To continue the recipient's thread, the agent replies to the recipient's message.
+      const threadRequestIds = replyTo
+        ? answeredRequestIds
+        : answeredRequestIds.filter(
+            (requestId) =>
+              this.#mailbox.expectsReply(requestId) || this.#mailbox.sideThreadWaitsFor(senderAgentId, requestId),
+          );
       const answerTaskIds = new Set(
-        answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
+        threadRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
@@ -3029,10 +3843,6 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   note?: string;
 };
 
-/** A request does not join the recipient's running turn, so the sender does not wait for a steer. */
-const OWN_TURN_NOTE =
-  "The recipient works now. A request gets a turn of its own after that work, so its result stays separate.";
-
 /** The one reason that the user can change, named as the agent settings show it. */
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
@@ -3045,7 +3855,6 @@ const RECIPIENT_QUEUES_NOTE =
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;
-  if (steer === "own-turn") return { ...delivery, outcome: "queued", queuedBecause: steer, note: OWN_TURN_NOTE };
   if (steer === "recipient-queues")
     return { ...delivery, outcome: "queued", queuedBecause: steer, note: RECIPIENT_QUEUES_NOTE };
   return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };

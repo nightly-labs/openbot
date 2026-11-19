@@ -15,8 +15,8 @@ import {
 
 /**
  * Finds the open app issues with a title similar to a report's title, so that the agent can add the
- * report to one of them. The title comes in the body, not in the URL, because Workers Logs keep the
- * URL and the user has not approved the report yet.
+ * report to one of them. The title comes in the body, not in the URL, because request logs such as
+ * `wrangler tail` show the URL and the user has not approved the report yet.
  */
 export const Route = createFileRoute("/v1/feedback/similar")({
   server: {

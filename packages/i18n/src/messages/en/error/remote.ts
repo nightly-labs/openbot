@@ -23,6 +23,15 @@ export const messages = defineMessages("error.remote", {
   "error.remote.testActive": "A remote desktop test is active. Try again when it ends.",
   "error.remote.screenRecordingDenied":
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
+  "error.remote.windowsSessionDisconnected":
+    "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  // The remote desktop viewer decoded no frame for 20 seconds: the connection cannot carry the stream.
+  // The desktop app and the browser then use a lower quality for the next stream.
+  "error.remote.streamTooSlowLowerQuality":
+    "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
+  // The same stall on the phone app, which has its own quality menu, or at the lower quality already.
+  "error.remote.streamTooSlow":
+    "The connection to the host is too slow for the picture. Use a faster network, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",
@@ -79,10 +88,14 @@ export const messages = defineMessages("error.remote", {
   "error.remote.ownerOnlyRemove": "Only the owner can remove this server.",
   "error.remote.requestTimeout": "The remote request timed out.",
   "error.remote.requestFailed": "The remote request failed.",
-  "error.remote.pinnedKeyMissing": "The remote host does not have a pinned device key.",
+  "error.remote.hostKeyMissing":
+    "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
+  "error.remote.connectionNotStarted":
+    "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
   "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
-  "error.remote.hostDisconnected": "The WebRTC host disconnected.",
+  "error.remote.hostDisconnected":
+    "The connection to the server was lost. Check whether the action finished, then try again.",
   "error.remote.eventGap": "The host event sequence has a gap.",
   "error.remote.malformedKnownEvent": "The host returned a malformed known event.",
   "error.remote.fileTransportIsStopped": "The WebRTC file transport is stopped.",
@@ -148,6 +161,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.attachmentRejected": "The host rejected the attachment.",
   "error.remote.attachmentTooLarge": "Attachments must be 10 MB or smaller.",
   "error.remote.attachmentBusy": "Wait for the current attachment to finish.",
+  "error.remote.attachmentChanged": "The file changed or is not available. Select it again.",
   "error.remote.uploadTimeout": "The attachment upload timed out.",
   "error.remote.hostSessionActive": "The host already has an active remote session.",
   "error.remote.tooManyConnections": "Too many active remote connections.",
@@ -202,8 +216,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
   "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
+  "error.remote.serverNotLoaded": "OpenBot could not load the server. Try again.",
   // Servers that the desktop app starts on this computer.
-  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.localServerNotStarted":
+    "The server on this computer did not start. Try again. If it does not start, restart OpenBot on this computer.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
   "error.remote.localServerAccountRemovalFailed":
     "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",

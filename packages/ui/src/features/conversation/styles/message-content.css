@@ -23,7 +23,8 @@
 /* Each line of a block takes its direction and its start side from its own text, so a Hebrew
    line after a line break aligns right in an English paragraph. A table cell keeps the table's
    direction, so its borders stay on the same side in each cell. */
-.message-markdown :is(p, li, h1, h2, h3, h4, h5, h6, th, td) {
+.message-markdown :is(p, li, h1, h2, h3, h4, h5, h6, th, td),
+.message-markdown-task-body {
   unicode-bidi: plaintext;
 }
 
@@ -83,7 +84,8 @@
 }
 
 .message-markdown li + li,
-.message-markdown li > :is(ul, ol) {
+.message-markdown li > :is(ul, ol),
+.message-markdown .message-markdown-task-body > :is(ul, ol) {
   margin-top: var(--openbot-space-1);
 }
 
@@ -92,6 +94,12 @@
   align-items: flex-start;
   gap: var(--openbot-space-1-5);
   list-style: none;
+}
+
+/* The body takes the rest of the row, so the text of the item wraps as one block. */
+.message-markdown-task-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .message-markdown-checkbox {
@@ -144,6 +152,33 @@
   object-fit: contain;
 }
 
+/* In an agent reply, a taller window shows more of a chart or a screenshot. */
+.message-entry-agent .message-content-blocks .message-markdown-image {
+  max-height: clamp(360px, 55vh, 640px);
+}
+
+/*
+ * A picture in a list item or a table cell is one of a set, such as one picture for each suggestion.
+ * Each one fits the same box, so the pictures of a set have a similar size and a table row stays
+ * short. The image viewer shows the full size.
+ */
+.message-entry-agent .message-content-blocks li .message-markdown-image {
+  max-width: min(100%, 360px);
+  max-height: 360px;
+}
+
+.message-entry-agent .message-content-blocks :is(td, th) .message-markdown-image {
+  max-width: min(100%, 240px);
+  max-height: 240px;
+}
+
+/* The label takes the place of a block picture, so it stays on its own line. */
+.message-markdown-image-unavailable {
+  display: block;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
 /* The image opens in the image viewer. The button keeps the image's own size. */
 .message-markdown-image-button {
   display: block;
@@ -160,12 +195,20 @@
   outline-offset: 2px;
 }
 
+/* The table frame is a ScrollEdges. The fade masks the scroll area, so the ring is on the frame. */
+.message-table-frame {
+  width: 100%;
+  border-radius: var(--openbot-radius-lg);
+}
+
+.message-markdown-table-frame {
+  border-radius: var(--openbot-radius-md);
+  box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
+}
+
 .message-markdown-table-scroll {
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  border-radius: var(--openbot-radius-md);
-  box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
 }
 
 /* Each column keeps the data table minimum, so a narrow message scrolls sideways and does not
@@ -209,6 +252,10 @@
   text-align: right;
 }
 
+/* The selection of message text has the color of the highlight that keeps it after the
+   instruction field takes focus, so the passage keeps one color. */
+:is([data-selection-message-id], [data-selection-file-quote])::selection,
+:is([data-selection-message-id], [data-selection-file-quote]) ::selection,
 ::highlight(openbot-message-selection) {
   background: var(--openbot-accent-strong);
   color: inherit;
@@ -645,7 +692,50 @@
   max-width: var(--message-wide-bubble-width);
 }
 
-.message-entry-agent .ui-bubble:has(.message-data-table-scroll) > .ui-bubble-content {
+/*
+ * A table or an image can need more than the wide width. The bubble then grows to the width that
+ * the table or the image needs, up to the full chat row, so a data table does not scroll sideways
+ * while the chat has free space. The text does not ask for width, so a long sentence does not make
+ * the bubble wider. Beside a small image, the text keeps a readable measure. Only the reply body
+ * counts: a table in the quote of the replied message does not make the bubble wider.
+ */
+.message-entry-agent
+.ui-bubble:has(
+  .message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)
+) {
+  width: fit-content;
+  min-width: min(100%, 560px);
+  max-width: 100%;
+}
+
+/* A table or code keeps at least the wide width, as it has without an image. */
+.message-entry-agent
+.ui-bubble:has(.message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll)),
+.message-entry-agent .ui-bubble:has(.message-content-blocks .message-markdown-image):has(.message-code-block) {
+  min-width: var(--message-wide-bubble-width);
+}
+
+/*
+ * The "Show full" button keeps its own width: with containment, its width would be its padding only.
+ * A block that holds a table, such as a quote, is not contained: the table gives the bubble its width.
+ * The other parts of that block are contained, so their text does not make the bubble wider.
+ */
+.message-entry-agent
+  .ui-bubble:has(
+    .message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)
+  )
+  :is(
+    .message-content-blocks
+      > :not(.message-markdown, .message-data-table-frame, .message-table-frame, .message-show-full),
+    .message-markdown > :not(.message-table-frame, :has(.message-markdown-image, .message-table-frame)),
+    .message-markdown
+      :has(.message-table-frame)
+      > :not(.message-table-frame, :has(.message-markdown-image, .message-table-frame))
+  ) {
+  contain: inline-size;
+}
+
+.message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block)) > .ui-bubble-content {
   width: 100%;
 }
 
@@ -795,15 +885,32 @@
   tab-size: 2;
 }
 
-.message-code-scroll:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
+.message-code-frame {
+  width: 100%;
+}
+
+/* The code block clips its children, so the focus ring is inside the frame. */
+.message-code-frame:has(> .scroll-edges-view:focus-visible) {
   outline-offset: -2px;
 }
 
-.message-code-scroll > code {
+.message-code-pre {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  font: inherit;
+}
+
+.message-code-pre > code {
   min-width: 100%;
   display: block;
   font: inherit;
+}
+
+/* A generated image or video reply has no bubble, and the sidebar colour is the chat canvas colour, so its
+   code would sit on the chat. It takes the surface of the block, as the text of a reply takes its bubble. */
+.message-entry-agent .ui-bubble-variant-ghost .message-code-scroll {
+  background: transparent;
 }
 
 .message-code-line {
@@ -883,9 +990,6 @@
 .message-data-table-scroll {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  border-radius: var(--openbot-radius-lg);
-  overscroll-behavior-inline: contain;
 }
 
 .message-data-table-frame {
@@ -899,11 +1003,6 @@
   justify-content: flex-end;
   gap: var(--openbot-space-1);
   margin-top: var(--openbot-space-1);
-}
-
-.message-data-table-scroll:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
-  outline-offset: 2px;
 }
 
 .message-data-table {
@@ -1288,6 +1387,15 @@
 [data-slot="bubble"][data-author="user"] .message-reply-context {
   border-inline-start-color: var(--openbot-border-strong);
   color: var(--openbot-text-readable);
+}
+
+/*
+ * A solid bubble is the agent's color, light or dark in both themes. Its quote takes the text color
+ * of the bubble, as its other text does, and not the theme color, which can be the bubble color.
+ */
+.ui-bubble.message-bubble-solid .message-reply-context {
+  border-inline-start-color: var(--openbot-text-dim);
+  color: var(--openbot-text-secondary);
 }
 
 /* A quote that opens its original. The button lies over the whole quote, its start mark included. */

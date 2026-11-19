@@ -20,6 +20,10 @@ export const messages = {
   "computerUse.ready.description":
     "يمكن لـ OpenBot رؤية التطبيقات على هذا الحاسوب والتفاعل معها. لا يطلب هذا النظام أي إذن إضافي.",
   "computerUse.openSettingsFailed.title": "تعذّر فتح إعدادات النظام",
+  "computerUse.restartRequired.title": "يلزم إعادة التشغيل",
+  "computerUse.restartRequired.description":
+    "لا يزال macOS يمنع النقر والكتابة. إذا تكرر ذلك بعد إعادة التشغيل، فأزل OpenBot من «إمكانية الوصول» ثم أضفه مرة أخرى.",
+  "computerUse.restartRequired.action": "إعادة تشغيل OpenBot",
   "computerUse.compact.title": "تفعيل التحكم في الحاسوب",
   "computerUse.compact.description": "اسمح لـ OpenBot برؤية التطبيقات على هذا الحاسوب والتفاعل معها.",
   "computerUse.granted": "ممنوح",

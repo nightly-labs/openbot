@@ -20,9 +20,12 @@ export const messages = {
   "error.host.publishFailed": "この OpenBot を公開できませんでした。",
   "error.host.mobileConnectPublishFailed": "この OpenBot を Mobile Connect 用に公開できませんでした。",
   "error.host.mobileConnectHostChanged": "Mobile Connect のホストが変わりました。再試行してください。",
+  "error.host.mobileConnectHostMismatch":
+    "アカウントにはこのサーバーの別のキーが登録されています。再試行してください。",
   "error.host.noServer": "このコンピューターには変更できるサーバーがありません。",
   "error.host.identityLocalOnly": "サーバーの名前とロゴは、サーバーを実行しているコンピューターでのみ変更できます。",
   "error.host.timezoneInvalid": "このタイムゾーンは不明です。",
+  "error.host.turnLimitInvalid": "このスレッド数の上限は無効です。",
   "error.host.maintenanceInterrupted":
     "ホストのメンテナンスが中断されました。再試行する前に、アプリケーションを確認し、ホストの状態をリセットしてください。",
   "error.host.updateFailed":

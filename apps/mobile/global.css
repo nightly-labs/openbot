@@ -46,6 +46,26 @@
   --tracking-openbot-wide: var(--openbot-tracking-wide);
 }
 
+/* The press highlight of a primary button. HeroUI mixes it from the accent, which flashed blue on
+ * the action color of the button below. HeroUI reads it at runtime (`useThemeColor`), so it must be
+ * `static`: without it Tailwind keeps only the variables that a class uses, the variable is missing,
+ * and the Android ripple of every primary button gets the color "invalid" and stops the app. */
+@theme static {
+  --color-accent-hover: color-mix(in oklab, var(--openbot-action) 90%, var(--openbot-action-foreground) 10%);
+}
+
+/* A primary button uses the action color, white on dark and black on light, as on desktop. The accent
+ * stays for links, focus and selection. */
+@layer components {
+  .button__root--variant-primary {
+    background-color: var(--color-action);
+  }
+
+  .button__label--variant-primary {
+    color: var(--color-action-foreground);
+  }
+}
+
 @layer theme {
   :root {
     color-scheme: light dark;

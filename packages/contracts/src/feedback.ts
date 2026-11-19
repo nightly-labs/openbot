@@ -24,6 +24,15 @@ const FEEDBACK_SENT_LABEL = "from-app";
 /** The label of a report that the agent sent for a problem that it found itself, such as a tool error. */
 const FEEDBACK_AGENT_LABEL = "agent-reported";
 
+/** The form for a problem in the phone app (`mobile_bug_report.yml`), which asks for the phone's version and device. */
+const MOBILE_BUG_FORM = { template: "mobile_bug_report.yml", titlePrefix: "[Mobile]: " } as const;
+/** The `server-kind` options of the mobile form for each place where the agent runs. */
+const MOBILE_SERVER_KINDS = {
+  "Desktop app": "Desktop app on my computer",
+  Server: "Self-hosted server",
+  "Hosted server": "Hosted server",
+} as const satisfies Record<FeedbackHost, string>;
+
 const ISSUE_FORMS = {
   bug: { template: "bug_report.yml", titlePrefix: "[Bug]: ", labels: ["bug", "needs-triage"] },
   idea: { template: "feature_request.yml", titlePrefix: "[Feature]: ", labels: ["enhancement", "needs-triage"] },
@@ -123,13 +132,38 @@ export type FeedbackSurface = (typeof FEEDBACK_SURFACES)[number];
 export const FEEDBACK_FINDERS = ["user", "agent"] as const;
 export type FeedbackFinder = (typeof FEEDBACK_FINDERS)[number];
 
+/** The systems of the phone app, as the `platform` options of `mobile_bug_report.yml`. */
+export const FEEDBACK_PHONE_PLATFORMS = ["iOS", "Android"] as const;
+export type FeedbackPhonePlatform = (typeof FEEDBACK_PHONE_PLATFORMS)[number];
+
 export const FEEDBACK_LIMITS = {
   title: 200,
   fact: 200,
   text: 1000,
   /** The redacted errors of the chat, one per line. */
   errors: 1500,
+  /** The redacted lines of the phone's support log. */
+  phoneLog: 6000,
 } as const;
+
+/**
+ * What only the phone knows about a problem in the phone app. The agent runs on the host, which has
+ * none of it, so the phone adds it when the user sends the report there.
+ */
+export interface FeedbackPhone {
+  readonly platform: FeedbackPhonePlatform;
+  /** The version, the build and the update, such as `1.4.9 (212) · a1b2c3d4`. */
+  readonly appVersion: string;
+  /** The system and the device, such as `iOS 27.0, iPhone 16 Plus (iPhone17,4)`. */
+  readonly system: string;
+  /**
+   * The connection and the VPN or mesh network that is on, such as `Wi-Fi · VPN: Tailscale` or
+   * `Mobile data · no VPN found`. It has the name of a product, never an address.
+   */
+  readonly network: string;
+  /** The last warnings, errors and connection events of the phone's support log, redacted, one per line. */
+  readonly log: string;
+}
 
 export interface FeedbackFacts {
   readonly platform: BugReportPlatform;
@@ -187,6 +221,33 @@ export function bugReportFormUrl(facts: FeedbackFacts, details: BugReportDetails
   return issueFormUrl("bug", details.title, query);
 }
 
+/**
+ * The prefilled form for a problem in the phone app. The form requires the phone's app version and
+ * device, so a report that the app cannot send still has them: `phone` fills them, and without it
+ * the user does. A link cannot hold the support log; the user attaches the saved file.
+ */
+export function mobileBugReportFormUrl(
+  details: Pick<BugReportDetails, "title" | "description" | "reproduction" | "severity" | "frequency"> = {},
+  phone?: Omit<FeedbackPhone, "log"> | null,
+  server: Pick<FeedbackFacts, "version" | "host"> = {},
+): string {
+  const query = new URLSearchParams();
+  if (phone) {
+    query.set("platform", phone.platform);
+    query.set("app-version", phone.appVersion);
+    query.set("device", phone.system);
+    query.set("network", phone.network);
+  }
+  if (server.version) query.set("server-version", server.version);
+  if (server.host) query.set("server-kind", MOBILE_SERVER_KINDS[server.host]);
+  if (details.severity) query.set("severity", details.severity);
+  if (details.frequency) query.set("frequency", details.frequency);
+  if (details.description) query.set("description", details.description);
+  if (details.reproduction) query.set("reproduction", details.reproduction);
+  if (details.title) query.set("title", `${MOBILE_BUG_FORM.titlePrefix}${details.title}`);
+  return `${ISSUE_FORM}${MOBILE_BUG_FORM.template}&${query.toString()}`;
+}
+
 /** The feature request form has no fields for the version and the system; the user answers the rest. */
 export function featureRequestFormUrl(details: FeatureRequestDetails = {}): string {
   const query = new URLSearchParams({ contribution: "No" });
@@ -234,6 +295,26 @@ export interface BugReport extends SentFacts {
   readonly description: string;
   /** Empty when the agent does not know the steps. */
   readonly reproduction: string;
+  /** The phone's version, system and log. Null in a report that is not about the phone app. */
+  readonly phone: FeedbackPhone | null;
+}
+
+/**
+ * True for a bug that the user saw in the phone app. Such a report must have the phone's version,
+ * system and log: without them, triage cannot find the cause. A feature idea needs none of them.
+ */
+export function feedbackNeedsPhone(feedback: Pick<Feedback, "kind" | "surface">): boolean {
+  return feedback.kind === "bug" && feedback.surface === "Phone app";
+}
+
+/** True when a report that needs the phone's data does not have it. Nothing sends such a report. */
+export function feedbackLacksPhone(feedback: Feedback): boolean {
+  return feedback.kind === "bug" && feedbackNeedsPhone(feedback) && feedback.phone === null;
+}
+
+/** The report with the data of the phone that sends it. */
+export function withFeedbackPhone(feedback: BugReport, phone: FeedbackPhone): BugReport {
+  return { ...feedback, phone };
 }
 
 export interface FeatureRequest extends SentFacts {
@@ -263,6 +344,7 @@ export function bugReportProviderFacts(
 type Section = readonly [label: string, value: string | null, required: boolean];
 
 function factSections(feedback: Feedback): Section[] {
+  const phone = feedback.kind === "bug" ? feedback.phone : null;
   return [
     ["Platform", feedback.platform, true],
     ["Installation source", feedback.installSource, true],
@@ -270,6 +352,11 @@ function factSections(feedback: Feedback): Section[] {
     ["Operating system and hardware", feedback.os, true],
     ["Agent runs on", feedback.host, false],
     ["Seen in", feedback.surface, false],
+    // The labels of `mobile_bug_report.yml`, so that triage reads the phone's data as in that form.
+    ["Phone platform", phone?.platform ?? null, false],
+    ["Mobile app version", phone?.appVersion ?? null, false],
+    ["Device and system version", phone?.system ?? null, false],
+    ["Network and VPN", phone?.network ?? null, false],
     ["Providers", feedback.provider, true],
     ["Provider CLI version", feedback.providerVersion, false],
     ["Model", feedback.model, false],
@@ -310,6 +397,12 @@ function sectionsMarkdown(sections: readonly Section[], feedback: Feedback): str
   });
   if (feedback.recentErrors.trim())
     answers.push(`### Recent errors in the chat\n\n${codeBlock(noMentions(feedback.recentErrors.trim()))}`);
+  const phoneLog = feedback.kind === "bug" ? feedback.phone?.log.trim() : "";
+  // The log is long, so the issue shows it closed. GitHub needs the empty lines around the block.
+  if (phoneLog)
+    answers.push(
+      `### Phone support log\n\n<details>\n<summary>Warnings, errors and connection events</summary>\n\n${codeBlock(noMentions(phoneLog))}\n\n</details>`,
+    );
   return answers;
 }
 
@@ -330,8 +423,10 @@ export function feedbackIssue(feedback: Feedback): { title: string; body: string
       ? [...factSections(feedback), ...textSections(feedback)]
       : [...textSections(feedback), ...factSections(feedback)];
   const form = ISSUE_FORMS[feedback.kind];
+  // A bug in the phone app has the title prefix of the form for the phone app, so triage finds both.
+  const titlePrefix = feedbackNeedsPhone(feedback) ? MOBILE_BUG_FORM.titlePrefix : form.titlePrefix;
   return {
-    title: `${form.titlePrefix}${noMentions(feedback.title)}`,
+    title: `${titlePrefix}${noMentions(feedback.title)}`,
     body: [...sectionsMarkdown(sections, feedback), "---", feedbackFooter(feedback)].join("\n\n"),
     labels: [...form.labels, FEEDBACK_SENT_LABEL, ...(feedback.foundBy === "agent" ? [FEEDBACK_AGENT_LABEL] : [])],
   };
@@ -408,17 +503,34 @@ export function feedbackPreview(
   return parts.filter((part) => part.trim()).join("\n\n");
 }
 
+/** A text field, or null when it is missing, too long, or empty where it is required. An absent optional field is empty. */
+function text(field: unknown, limit: number, required: boolean): string | null {
+  if ((field === undefined || field === null) && !required) return "";
+  if (!isString(field) || field.length > limit) return null;
+  return required && !field.trim() ? null : field;
+}
+
+/**
+ * The phone's data in a request body, or null when a field is missing, empty, too long, or not a
+ * system of the phone app. The host and the Worker trust nothing else from a phone.
+ */
+export function parseFeedbackPhone(value: unknown): FeedbackPhone | null {
+  if (!isDynamicRecord(value) || !isOneOf(FEEDBACK_PHONE_PLATFORMS, value.platform)) return null;
+  const appVersion = text(value.appVersion, FEEDBACK_LIMITS.fact, true);
+  const system = text(value.system, FEEDBACK_LIMITS.fact, true);
+  const network = text(value.network, FEEDBACK_LIMITS.fact, true);
+  const log = text(value.log, FEEDBACK_LIMITS.phoneLog, true);
+  if (appVersion === null || system === null || network === null || log === null) return null;
+  return { platform: value.platform, appVersion, system, network, log };
+}
+
 /**
  * The feedback in a request body, or null when a field is missing, too long, or not a form option.
- * The Worker trusts nothing else: it opens a public issue with this text.
+ * The Worker trusts nothing else: it opens a public issue with this text. A report that needs the
+ * phone's data and does not have it parses; `feedbackLacksPhone` refuses it where it is sent.
  */
 export function parseFeedback(value: unknown): Feedback | null {
   if (!isDynamicRecord(value)) return null;
-  const text = (field: unknown, limit: number, required: boolean): string | null => {
-    if ((field === undefined || field === null) && !required) return "";
-    if (!isString(field) || field.length > limit) return null;
-    return required && !field.trim() ? null : field;
-  };
   const choice = <const T extends readonly string[]>(options: T, field: unknown): T[number] | null | undefined => {
     if (field === undefined || field === null) return null;
     return isOneOf(options, field) ? field : undefined;
@@ -484,16 +596,19 @@ export function parseFeedback(value: unknown): Feedback | null {
   const severity = choice(BUG_REPORT_SEVERITIES, value.severity);
   const frequency = choice(BUG_REPORT_FREQUENCIES, value.frequency);
   const regression = choice(BUG_REPORT_REGRESSIONS, value.regression);
+  // An older app sends no phone data. Data that is present and wrong makes the report invalid.
+  const phone = value.phone === undefined || value.phone === null ? null : parseFeedbackPhone(value.phone);
   if (
     description === null ||
     reproduction === null ||
     area === undefined ||
     severity === undefined ||
     frequency === undefined ||
-    regression === undefined
+    regression === undefined ||
+    (phone === null && value.phone !== undefined && value.phone !== null)
   )
     return null;
-  return { kind: "bug", ...facts, area, severity, frequency, regression, description, reproduction };
+  return { kind: "bug", ...facts, area, severity, frequency, regression, description, reproduction, phone };
 }
 
 function isIssueNumber(value: unknown): value is number {
@@ -506,6 +621,8 @@ function noMentions(text: string): string {
 }
 
 const FEEDBACK_SENT_ITEM_TYPE_PREFIX = "feedback-sent:";
+/** The same card after the user took the report back. An older client shows its text. */
+const FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX = "feedback-withdrawn:";
 
 /** The issue that the account service opened for approved feedback. */
 export interface FeedbackIssue {
@@ -513,19 +630,37 @@ export interface FeedbackIssue {
   readonly url: string;
 }
 
+/** The issue of a thank-you card, and whether the user took the report back. */
+export interface FeedbackCardIssue extends FeedbackIssue {
+  readonly withdrawn: boolean;
+}
+
+function feedbackItemType(prefix: string, number: number): string {
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error("A valid issue number is required.");
+  return `${prefix}${number}`;
+}
+
 /** The item type of the chat card that thanks the user for sent feedback. It holds the issue number. */
 export function feedbackSentItemType(number: number): string {
-  if (!Number.isSafeInteger(number) || number < 1) throw new Error("A valid issue number is required.");
-  return `${FEEDBACK_SENT_ITEM_TYPE_PREFIX}${number}`;
+  return feedbackItemType(FEEDBACK_SENT_ITEM_TYPE_PREFIX, number);
+}
+
+/** The item type of a thank-you card whose report the user took off GitHub. */
+export function feedbackWithdrawnItemType(number: number): string {
+  return feedbackItemType(FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX, number);
 }
 
 /** The issue of a thank-you card, or null for any other message. The URL comes from the number only. */
-export function feedbackSentIssue(message: ConversationMessage): FeedbackIssue | null {
+export function feedbackSentIssue(message: ConversationMessage): FeedbackCardIssue | null {
   if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
-  if (!message.itemType?.startsWith(FEEDBACK_SENT_ITEM_TYPE_PREFIX)) return null;
-  const digits = message.itemType.slice(FEEDBACK_SENT_ITEM_TYPE_PREFIX.length);
+  const itemType = message.itemType ?? "";
+  const withdrawn = itemType.startsWith(FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX);
+  if (!withdrawn && !itemType.startsWith(FEEDBACK_SENT_ITEM_TYPE_PREFIX)) return null;
+  const digits = itemType.slice(
+    (withdrawn ? FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX : FEEDBACK_SENT_ITEM_TYPE_PREFIX).length,
+  );
   if (!/^[1-9][0-9]{0,15}$/u.test(digits)) return null;
   const number = Number(digits);
   if (!Number.isSafeInteger(number)) return null;
-  return { number, url: `https://github.com/${FEEDBACK_REPOSITORY}/issues/${number}` };
+  return { number, url: `https://github.com/${FEEDBACK_REPOSITORY}/issues/${number}`, withdrawn };
 }

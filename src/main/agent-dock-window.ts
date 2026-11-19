@@ -22,6 +22,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 import { forceActivateX11Window } from "./linux-x11-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
+import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("agent-dock-window");
 
@@ -30,6 +31,10 @@ const logger = createOpenBotLogger("agent-dock-window");
  * spreads above, below and left of them.
  */
 const AGENT_DOCK_WINDOW_SIZE = { width: 502, height: 640 } as const;
+
+/** A dock window whose page stopped opens again, as many times as this in `DOCK_REOPEN_WINDOW_MS`. */
+const DOCK_REOPEN_MAX = 3;
+const DOCK_REOPEN_WINDOW_MS = 60_000;
 
 export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" }>;
 
@@ -60,6 +65,8 @@ export interface AgentDockWindowControllerOptions {
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
   /** Windows: forwards the pointer moves to a dock window only near the dock. */
   pointerForwarding?: PointerForwardingGate | null;
+  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
+  topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
@@ -70,6 +77,8 @@ interface DockWindow {
   displayId: number;
   /** X11 and Windows: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
   shape?: AgentDockInputRect[];
+  /** The window takes key input: the renderer has a chat or a menu open. */
+  keyboard?: boolean;
 }
 
 export class AgentDockWindowController {
@@ -90,6 +99,8 @@ export class AgentDockWindowController {
   #drag: { rendererId: number; pointerY: number; windowY: number } | null = null;
   /** The main windows whose moves the dock follows. A new main window is added when it publishes. */
   readonly #followedWindows = new WeakSet<BrowserWindow>();
+  /** When a dock window was opened again after its page stopped. */
+  #reopens: number[] = [];
   #destroyed = false;
 
   constructor(options: AgentDockWindowControllerOptions) {
@@ -196,18 +207,22 @@ export class AgentDockWindowController {
    * only while the chat composer needs it: a panel becomes key without activating the app.
    */
   setInteractive(rendererId: number, input: SetAgentDockInteractiveInput): void {
-    const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
-    if (!window) return;
+    const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
+    if (!entry) return;
+    const { window } = entry;
     // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
     if (this.#options.windowKind !== "x11")
       letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
-    if (keyboard && !window.isFocused()) {
+    // The window takes the focus only when a chat or a menu opens. A pinned chat stays open when another
+    // window takes the focus, and a later pointer move on the dock must not take the focus back.
+    if (keyboard && !entry.keyboard && !window.isFocused()) {
       window.focus();
       // KWin of Plasma 6.3 and older does not focus a dock window for `focus()` or a click (#7415).
       if (this.#options.windowKind === "x11") forceActivateX11Window(window);
     }
+    entry.keyboard = keyboard;
   }
 
   /**
@@ -408,7 +423,10 @@ export class AgentDockWindowController {
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
         window.setHasShadow(false);
-        window.setAlwaysOnTop(true, "floating");
+        // Only macOS uses the level. On Windows, Electron puts a "floating" window just behind the taskbar,
+        // and the window then goes under other apps when a full-screen app makes the taskbar not topmost.
+        window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "floating" : "normal");
+        this.#options.topmost?.keep(window);
         // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
         // defined on Windows, so a call there throws.
         if (this.#options.windowKind === "panel") {
@@ -434,8 +452,13 @@ export class AgentDockWindowController {
           this.#release(entry);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
         });
+        // A stopped page shows nothing, but its window still takes the pointer if the pointer was on the
+        // dock: a clear window above the other apps then catches their clicks (#11606). A new window lets
+        // the pointer through until its page loads.
         window.webContents.on("render-process-gone", () => {
-          if (owned()) this.#release(entry);
+          if (!owned()) return;
+          this.#closeWindow(window);
+          if (this.#mayReopen()) void Effect.runPromise(this.reconcileWindow());
         });
         window.once("ready-to-show", () => {
           if (!owned() || this.#presentation === null) return;
@@ -464,6 +487,15 @@ export class AgentDockWindowController {
         }).pipe(Effect.tapError(() => Effect.sync(() => this.#closeWindow(window)))),
       ),
     );
+  }
+
+  /** A dock page that stops each time it loads stays closed until the dock moves or the app starts again. */
+  #mayReopen(): boolean {
+    const now = Date.now();
+    this.#reopens = this.#reopens.filter((time) => now - time < DOCK_REOPEN_WINDOW_MS);
+    if (this.#reopens.length >= DOCK_REOPEN_MAX) return false;
+    this.#reopens.push(now);
+    return true;
   }
 
   #show(window: BrowserWindow): void {
@@ -498,6 +530,8 @@ export class AgentDockWindowController {
    * renderer stops reading it. Its drag ends too.
    */
   #release(entry: DockWindow): void {
+    // A new renderer has no chat or menu open.
+    entry.keyboard = false;
     if (this.#drag?.rendererId === entry.rendererId) this.#drag = null;
     if (this.#chatOwner !== entry.rendererId) return;
     this.#chatOwner = null;

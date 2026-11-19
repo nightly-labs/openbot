@@ -26,6 +26,7 @@ import {
   SERVER_NOTIFICATION_LEVELS,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -71,7 +72,7 @@ export function parseHostConfig(value: unknown): ConfigureHostInput {
 
 export function parseHostIdentity(value: unknown): UpdateHostIdentityInput {
   if (!isObject(value)) throw new Error("Host identity is required.");
-  if (value.serverName === undefined && value.logo === undefined) {
+  if (value.serverName === undefined && value.logo === undefined && value.appearance === undefined) {
     throw new Error("A host identity change is required.");
   }
   const serverName =
@@ -82,7 +83,15 @@ export function parseHostIdentity(value: unknown): UpdateHostIdentityInput {
   return {
     ...(serverName === undefined ? {} : { serverName }),
     ...(value.logo === undefined ? {} : { logo: parseAvatarImage(value.logo) }),
+    ...(value.appearance === undefined ? {} : { appearance: parseServerAppearance(value.appearance) }),
   };
+}
+
+function parseServerAppearance(value: unknown): ServerAppearance | null {
+  if (value === null) return null;
+  const appearance = serverAppearanceOrNull(value);
+  if (!appearance) throw new Error("Invalid server appearance.");
+  return appearance;
 }
 
 export function parseJoinServer(value: unknown): JoinServerInput {

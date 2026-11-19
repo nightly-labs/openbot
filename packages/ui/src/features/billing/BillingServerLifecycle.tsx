@@ -26,7 +26,8 @@ export interface BillingServerLifecycleProps {
   price: string;
   running: boolean;
   statusLabel?: string;
-  onChangePlan?: (() => void) | undefined;
+  /** Opens the choice of a larger storage tier. Absent when the server has no tier to buy. */
+  onAddStorage?: (() => void) | undefined;
   onWake?: (() => void) | undefined;
   cancelAtPeriodEnd: boolean;
   deletionTiming: "period-end" | "now";
@@ -133,9 +134,9 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
                     });
                   }}
                 >
-                  <Show when={props.onChangePlan}>
-                    <DropdownMenu.Item onSelect={() => props.onChangePlan?.()}>
-                      {t("billing.action.change")}
+                  <Show when={props.onAddStorage}>
+                    <DropdownMenu.Item onSelect={() => props.onAddStorage?.()}>
+                      {t("billing.action.addStorage")}
                     </DropdownMenu.Item>
                   </Show>
                   <Show when={props.onWake}>

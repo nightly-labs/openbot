@@ -4,7 +4,12 @@
  * codec has already checked the fields; this gives them their IPC type and fails closed on anything else.
  */
 
-import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
+import {
+  type AgentProviderRef,
+  agentProviderDescriptor,
+  isAgentProviderRef,
+  isKnownAgentProvider,
+} from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { AGENT_MODEL_LISTINGS, type AgentModelId, type AgentModelListing, isAgentModel } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
@@ -113,5 +118,53 @@ export function withModelListings<Model extends { provider: string; id: string; 
   return models.map((model) => {
     const listing = byKey.get(`${model.provider}\u0000${model.id}`);
     return listing ? { ...model, listing } : model;
+  });
+}
+
+/** A model of a host whose agent takes a message into its running turn (`model-steering-v1`). */
+export interface AgentSteeringModel {
+  provider: AgentProviderRef;
+  id: AgentModelId;
+}
+
+export function decodeAgentSteeringModels(value: unknown): AgentSteeringModel[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.models) ||
+    value.models.length > MODEL_VISIBILITY_LIMIT ||
+    !value.models.every(
+      (model: unknown) => isDynamicRecord(model) && isAgentProviderRef(model.provider) && isAgentModel(model.id),
+    )
+  )
+    throw new Error("Invalid model list.");
+  return value.models.map((model: AgentSteeringModel) => ({ provider: model.provider, id: model.id }));
+}
+
+/** Marks each model of `models` that the `model-steering-v1` route lists, as `withModelListings` gives the listing. */
+export function withSteeringModels<Model extends { provider: string; id: string; steersTurns?: boolean }>(
+  models: readonly Model[],
+  steering: readonly AgentSteeringModel[],
+): Model[] {
+  const keys = new Set(steering.map((entry) => `${entry.provider}\u0000${entry.id}`));
+  return models.map((model) =>
+    keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, steersTurns: true } : model,
+  );
+}
+
+/**
+ * Marks each model whose provider runs in a process of its own (`confined-process`) when the host
+ * cannot run that process with Workspace only: this computer off macOS, or a joined server with
+ * `workspace-only-process-limit-v1`. It replaces any mark from a host, so only the client sets it.
+ */
+export function withWorkspaceOnlyLimit<
+  Model extends { provider: AgentProviderRef; workspaceOnlyUnavailable?: boolean },
+>(models: readonly Model[], limited: boolean): Model[] {
+  return models.map((model) => {
+    const unavailable =
+      limited &&
+      isKnownAgentProvider(model.provider) &&
+      agentProviderDescriptor(model.provider).workspaceEnforcement === "confined-process";
+    if (unavailable) return { ...model, workspaceOnlyUnavailable: true };
+    return model.workspaceOnlyUnavailable === undefined ? model : { ...model, workspaceOnlyUnavailable: false };
   });
 }

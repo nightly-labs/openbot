@@ -5,6 +5,7 @@ import type {
   ServerSummary,
   UpdateStatus,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Button, Toaster, toast } from "@openbot/ui";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { createSignal, onCleanup } from "solid-js";
@@ -52,7 +53,16 @@ const storyUpdateStatus: UpdateStatus = {
 function storyInitialUpdateStatus(props: {
   scheduledRestart?: UpdateStatus["scheduledRestart"];
   stagedVersion?: string;
+  notInstalled?: boolean;
 }): UpdateStatus {
+  if (props.notInstalled)
+    return {
+      ...storyUpdateStatus,
+      phase: "ready",
+      availableVersion: "0.3.0",
+      progress: 100,
+      message: sourceText("error.update.notInstalled"),
+    };
   if (props.scheduledRestart)
     return {
       ...storyUpdateStatus,
@@ -88,6 +98,8 @@ function SettingsModalStory(props: {
   scheduledRestart?: UpdateStatus["scheduledRestart"];
   /** A release in its staged rollout that the automatic check did not offer. Check for updates gets it. */
   stagedVersion?: string;
+  /** macOS: the last restart did not install the update that is ready again. */
+  notInstalled?: boolean;
   /** The downloaded dictation models and the saved voice setting. */
   voice?: MockVoiceOptions;
   /** Whether Codex can open live voice. */
@@ -251,6 +263,7 @@ function SettingsModalStory(props: {
               onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
               onUpdateAction={runUpdateAction}
               billingApi={billingApi}
+              referralApi={mock.api.referral}
               hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
               onAddHostedServer={props.hostedServers ? fn() : undefined}
               agentDock={props.agentDock ? storyAgentDock : undefined}
@@ -401,6 +414,11 @@ export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,
 };
 
+/** 45 friends in three statuses, with credit. The filter and the pages change the mock list. */
+export const InviteFriends: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="referral" />,
+};
+
 /** An account that can create hosted servers. Start, renew and delete change the mock list. */
 export const HostedServers: Story = {
   render: () => <SettingsModalStory initialOpen hostedServers initialTab="hosted-servers" />,
@@ -428,6 +446,10 @@ export const ScheduledRemoteUpdate: Story = {
 
 export const StagedRollout: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="updates" stagedVersion="0.3.0" />,
+};
+
+export const UpdateNotInstalled: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="updates" notInstalled />,
 };
 
 export const Interactive: Story = {

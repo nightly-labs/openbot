@@ -1,7 +1,8 @@
 // Two-step (TOTP, RFC 6238) codes for a Vault login. The key is a base32 setup key or an
 // `otpauth://totp/` link, as a site shows it under its QR code. Main makes the codes from a saved key;
 // the window makes them only from a key that the user typed in the setup dialog and has not saved.
-// `crypto.subtle` is in Node, Electron and every browser, so one helper serves all of them.
+// `crypto.subtle` is in Node, Electron and every browser, so one helper serves all of them. The phone
+// has no `crypto.subtle`: it makes the HMAC itself and uses `twoStepMessage` and `twoStepCodeFromMac`.
 
 export type TwoStepAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
 
@@ -113,18 +114,29 @@ export function twoStepKeySecret(text: string): string | null {
   return keyParts(text)?.base32 ?? null;
 }
 
-/** The code at `at` (milliseconds since 1970). */
-export async function twoStepCode(key: TwoStepKey, at: number): Promise<string> {
-  const counter = Math.floor(at / 1000 / key.period);
+/** The HMAC message of the time step at `at` (milliseconds since 1970): the step as 8 big-endian bytes. */
+export function twoStepMessage(period: number, at: number): Uint8Array<ArrayBuffer> {
+  const counter = Math.floor(at / 1000 / period);
   const message = new DataView(new ArrayBuffer(8));
   message.setUint32(0, Math.floor(counter / 2 ** 32));
   message.setUint32(4, counter >>> 0);
+  return new Uint8Array(message.buffer);
+}
+
+/** The code in the HMAC of `twoStepMessage` (RFC 4226 dynamic truncation). */
+export function twoStepCodeFromMac(mac: Uint8Array, digits: number): string {
+  const view = new DataView(mac.buffer, mac.byteOffset, mac.byteLength);
+  const offset = view.getUint8(view.byteLength - 1) & 0x0f;
+  return String((view.getUint32(offset) & 0x7fffffff) % 10 ** digits).padStart(digits, "0");
+}
+
+/** The code at `at` (milliseconds since 1970). */
+export async function twoStepCode(key: TwoStepKey, at: number): Promise<string> {
   const cryptoKey = await crypto.subtle.importKey("raw", key.secret, { name: "HMAC", hash: key.algorithm }, false, [
     "sign",
   ]);
-  const mac = new DataView(await crypto.subtle.sign("HMAC", cryptoKey, message.buffer));
-  const offset = mac.getUint8(mac.byteLength - 1) & 0x0f;
-  return String((mac.getUint32(offset) & 0x7fffffff) % 10 ** key.digits).padStart(key.digits, "0");
+  const mac = await crypto.subtle.sign("HMAC", cryptoKey, twoStepMessage(key.period, at));
+  return twoStepCodeFromMac(new Uint8Array(mac), key.digits);
 }
 
 /** Milliseconds until the next code. */

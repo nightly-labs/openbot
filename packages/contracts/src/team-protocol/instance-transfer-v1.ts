@@ -81,7 +81,7 @@ export const INSTANCE_TRANSFER_PREVIEW = fields({
   warnings: messages,
 });
 
-const result = fields({
+export const INSTANCE_TRANSFER_RESULT = fields({
   agents: list(fields({ agentId: identifier, name }), 100),
   skipped: list(fields({ key, name, reason: string(500) }), 100),
   signIn: list(string(32), 32),
@@ -101,7 +101,7 @@ export const INSTANCE_TRANSFER_CODECS: ReadonlyMap<string, OptionalRouteCodec> =
     INSTANCE_TRANSFER_ROUTES.apply,
     adminRoute(
       fields({ token: identifier, keys: list(key, 100), includeSettings: boolean, timezone: string(255) }),
-      result,
+      INSTANCE_TRANSFER_RESULT,
     ),
   ],
   [INSTANCE_TRANSFER_ROUTES.discard, adminRoute(fields({ token: identifier }), empty)],

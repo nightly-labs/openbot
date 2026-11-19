@@ -69,4 +69,10 @@ export const messages = {
   "update.whatsNew.changelog": "Todos los cambios",
   "update.whatsNew.changelogFailed": "OpenBot no pudo abrir el registro de cambios.",
   "update.whatsNew.done": "Entendido",
+  "update.required.title": "Actualización necesaria",
+  "update.required.description":
+    "OpenBot {version} ya no tiene soporte. Actualiza a {minimum} o posterior para continuar.",
+  "update.required.download": "Descargar OpenBot",
+  "update.required.continue": "Continuar sin actualizar",
+  "update.required.failed": "La actualización no terminó.",
 } as const satisfies PartialTranslation<typeof source>;

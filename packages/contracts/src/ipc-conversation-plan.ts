@@ -104,3 +104,33 @@ export function parseConversationPlanText(text: string): ConversationPlan | null
   const explanation = lines.slice(0, firstStep).join("\n").trim();
   return clampConversationPlan({ explanation: explanation || null, steps });
 }
+
+/**
+ * One chat row, as `replacedConversationPlans` reads it. `agent` names the agent whose turn wrote the
+ * row: "" for the agent of the chat. It is null for a row that is not agent output, such as a
+ * system row or a message from a teammate.
+ */
+export interface ConversationPlanRow {
+  id: string;
+  turnId: string | undefined;
+  agent: string | null;
+  plan: boolean;
+}
+
+/**
+ * The plan rows that a later turn of the same agent replaced. The work of a stopped turn goes on in
+ * a later turn, for example on a backup model or after a new request, and that turn does not change
+ * the earlier plan. So only a plan with no later turn shows as stopped (#9876).
+ */
+export function replacedConversationPlans(rows: readonly ConversationPlanRow[]): ReadonlySet<string> {
+  const replaced = new Set<string>();
+  const laterTurns = new Map<string, Set<string>>();
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (!row?.turnId || row.agent === null) continue;
+    const turns = laterTurns.get(row.agent) ?? new Set<string>();
+    if (row.plan && (turns.size > 1 || (turns.size === 1 && !turns.has(row.turnId)))) replaced.add(row.id);
+    laterTurns.set(row.agent, turns.add(row.turnId));
+  }
+  return replaced;
+}

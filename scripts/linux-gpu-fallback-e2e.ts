@@ -1,10 +1,13 @@
 // Runs the real Electron with the Linux GPU mode of `src/main/linux-gpu-mode.ts` (#992):
 // 1. A first start uses the GPU. A crash of the real GPU process (SIGSEGV) writes `gpu-crash.json`.
-// 2. The next start uses software rendering. `OPENBOT_DISABLE_GPU=0` uses the GPU again.
+// 2. The next start uses software rendering. `OPENBOT_DISABLE_GPU=0` uses the GPU again. With software
+//    rendering, three GPU process exits do not end the app (#12520), and a GPU process that stops again
+//    and again makes the app quit cleanly.
 // 3. A crash file from another Chromium major version does not count, and a clean quit removes the start file.
 //    A GPU process exit after a GPU context loss, which Chromium restarts, writes no crash file.
-// 4. A start that is killed before it is confirmed makes the next start use software rendering. A quit
-//    that starts confirms the start, also when the teardown is killed before it ends.
+// 4. A start that is killed before it is confirmed leaves no crash dump, so the next start tries the GPU
+//    once more. A kill of that start, or a crash of the main process, makes the next start use software
+//    rendering. A quit that starts confirms the start, also when the teardown is killed before it ends.
 // 5. `OPENBOT_DISABLE_GPU=1` uses software rendering and writes no start file.
 // 6. A server composites on the CPU, has WebGL (#6404), and writes no start file, also with
 //    `OPENBOT_DISABLE_GPU=0`. A GPU process crash turns off hardware acceleration at the next start,
@@ -20,6 +23,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { countCrashDumps } from "../src/main/run-marker";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -48,6 +52,7 @@ interface ReadyLine {
   hardwareAccelerationEnabled: boolean;
   gpuCompositing: string;
   webglRenderer: string | null;
+  crashDumps: string;
 }
 
 interface Step {
@@ -101,7 +106,30 @@ try {
   assert.equal(launch.ready.hardwareAccelerationEnabled, false);
   assert.equal(existsSync(join(data, GPU_START_FILE)), false, "a software start writes no start file");
   steps.push({ step: "after gpu crash", ready: launch.ready });
+  // Three exits of the GPU process, as when Linux kills it for memory, ended the app before #12520.
+  let softwareGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
+  for (let exit = 0; exit < 3; exit += 1) softwareGpuProcess = await stopGpuProcess(launch, softwareGpuProcess);
+  steps.push({ step: "software start after 3 GPU process exits", ready: launch.ready, gpuProcess: softwareGpuProcess });
   await quit(launch);
+  // A GPU process that stops again and again makes the app quit, not restart it forever.
+  launch = await start(data, 1_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
+  softwareGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
+  let looping = true;
+  void launch.exited.then(() => {
+    looping = false;
+  });
+  while (looping) {
+    process.kill(softwareGpuProcess, "SIGKILL");
+    const previous = softwareGpuProcess;
+    const next = await until(
+      () => !looping || descendantWithType(launch.ready.pid, "gpu-process", previous),
+      "a new GPU process or the quit",
+    );
+    if (typeof next === "number") softwareGpuProcess = next;
+  }
+  assert.equal(await launch.exited, 0, "a GPU process restart loop ends with a clean quit");
+  steps.push({ step: "software start with a GPU process restart loop", ready: launch.ready });
   launch = await start(data, 1_000, { OPENBOT_DISABLE_GPU: "0" });
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "environment-on" });
   steps.push({ step: "OPENBOT_DISABLE_GPU=0", ready: launch.ready });
@@ -124,15 +152,33 @@ try {
   steps.push({ step: "after a GPU context loss", ready: launch.ready });
   await quit(launch);
 
-  // 4. A start that stops before it is confirmed (as with SIGTRAP in #992) turns off the GPU.
+  // 4. A killed start (#6208) gets one retry. A second stop, or a crash (as with SIGTRAP in #992), turns off the GPU.
   const killed = join(root, "killed-start");
   launch = await start(killed, 600_000);
   await killTree(launch.ready.pid, launch.exited);
   assert.equal(existsSync(join(killed, GPU_START_FILE)), true, "a killed start leaves the start file");
+  launch = await start(killed, 600_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "unfinished-start-retry" });
+  assert.equal(launch.ready.hardwareAccelerationEnabled, true);
+  steps.push({ step: "retry after a killed start", ready: launch.ready });
+  await killTree(launch.ready.pid, launch.exited);
   launch = await start(killed, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "unfinished-start" });
   assert.equal(launch.ready.hardwareAccelerationEnabled, false);
-  steps.push({ step: "after unfinished start", ready: launch.ready });
+  steps.push({ step: "after a killed retry", ready: launch.ready });
+  await quit(launch);
+  const crashed = join(root, "crashed-start");
+  launch = await start(crashed, 600_000);
+  launch.child.stdin?.write("crash\n");
+  await launch.exited;
+  const crashDumps = launch.ready.crashDumps;
+  await until(
+    () => countCrashDumps(crashDumps, 0, Number.POSITIVE_INFINITY) > 0,
+    "the main process crash writes a dump",
+  );
+  launch = await start(crashed, 1_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "unfinished-start" });
+  steps.push({ step: "after a crashed start", ready: launch.ready });
   await quit(launch);
   const hung = join(root, "hung-quit");
   launch = await start(hung, 600_000, {}, ["--hang-on-quit"]);
@@ -271,9 +317,18 @@ function descendantsOf(root: number): number[] {
   });
 }
 
-/** The PID of a process under `root` whose command line has `--type=<type>`. */
-function descendantWithType(root: number, type: string): number | undefined {
+/** Kills the GPU process as the Linux OOM killer does, and returns the GPU process that Chromium starts. */
+async function stopGpuProcess(launch: Launch, gpuProcess: number): Promise<number> {
+  process.kill(gpuProcess, "SIGKILL");
+  const next = await until(() => descendantWithType(launch.ready.pid, "gpu-process", gpuProcess), "a new GPU process");
+  assert.equal(launch.child.exitCode ?? launch.child.signalCode, null, "the app runs after a GPU process exit");
+  return next;
+}
+
+/** The PID of a process under `root` whose command line has `--type=<type>`, other than `except`. */
+function descendantWithType(root: number, type: string, except?: number): number | undefined {
   return descendantsOf(root).find((pid) => {
+    if (pid === except) return false;
     try {
       // Chromium rewrites its process title, so the arguments can be one string with spaces.
       return readFileSync(`/proc/${pid}/cmdline`, "utf8").split(/[\0 ]/u).includes(`--type=${type}`);

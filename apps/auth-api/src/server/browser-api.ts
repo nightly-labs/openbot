@@ -1,5 +1,6 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
-import { parseBillingPortalRequest } from "@openbot/contracts/billing";
+import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
+import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import {
@@ -9,6 +10,8 @@ import {
   parseLicenseRenewalRequest,
   parseLicenseUsersRequest,
 } from "@openbot/contracts/license";
+import { parsePromotionCode } from "@openbot/contracts/promotion-code";
+import { isReferralCode } from "@openbot/contracts/referral";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect } from "effect";
@@ -16,7 +19,8 @@ import { type AccountAttribution, requestFirstTouch } from "./account-attributio
 import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
-import { companySignInApiOrigin } from "./canonical-redirect";
+import { withSuggestedCountry } from "./billing-tax";
+import { companySignInApiOrigin, inviteLinkOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
 import { runApiResponse } from "./effect-runtime";
@@ -25,6 +29,7 @@ import type { HostedServerService } from "./hosted-server-service";
 import { HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
 import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
+import { type Referrals, referralPageQuery, referralState } from "./referrals";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
 import type { AuthUser, TeamInviteEmailDelivery } from "./types";
@@ -83,7 +88,17 @@ export interface BrowserApiServices {
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
   /** The billing service, or null when this deployment has no Stripe key. */
-  billing: () => Pick<BillingService, "getState" | "createPortal" | "license"> | null;
+  billing: () => Pick<
+    BillingService,
+    | "getState"
+    | "createPortal"
+    | "buyStorage"
+    | "getBillingDetails"
+    | "setBillingDetails"
+    | "license"
+    | "referralCredit"
+  > | null;
+  referrals: () => Pick<Referrals, "page">;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   sourceIp: (request: Request) => string;
@@ -249,6 +264,7 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       sourceIp: services.sourceIp(request),
       surface: "web",
       firstTouch: requestFirstTouch(body.firstTouch),
+      referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
     });
     const previous = browserSessionToken(request);
     if (previous) {
@@ -423,6 +439,19 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
     return yield* handleBilling(request, path, user, services);
+  if (path === "v1/me/referrals" && request.method === "GET") {
+    const url = new URL(request.url);
+    const billing = services.billing();
+    return json(
+      yield* referralState(
+        services.referrals(),
+        billing ? (userId) => billing.referralCredit(userId) : null,
+        user.id,
+        referralPageQuery(url),
+        inviteLinkOrigin(url),
+      ).pipe(refuseWith(BillingError)),
+    );
+  }
   // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
   const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
   if (sessionId !== undefined && request.method === "DELETE") {
@@ -446,11 +475,24 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   const billing = services.billing();
   if (path === "v1/me/billing" && request.method === "GET")
     return json(billing ? yield* billing.getState(user.id) : BILLING_UNAVAILABLE_STATE);
+  if (path === "v1/me/billing/details" && (request.method === "GET" || request.method === "PUT")) {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    if (request.method === "GET") return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
+    const input = parseBillingDetailsRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_details", sourceText("error.billing.detailsInvalid"));
+    return json(yield* billing.setBillingDetails(user, input));
+  }
   if (path === "v1/me/billing/portal" && request.method === "POST") {
     if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
     const input = parseBillingPortalRequest(yield* readJsonObject(request));
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json({ url: yield* billing.createPortal(user.id, input, "web", origin) });
+  }
+  if (path === "v1/me/billing/storage" && request.method === "POST") {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    const input = parseBillingStorageRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.buyStorage(user.id, input));
   }
   if (path === "v1/me/license" && request.method === "GET")
     return json(billing ? yield* billing.license.getState(user.id) : LICENSE_UNAVAILABLE_STATE);
@@ -460,7 +502,8 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   if (path === "v1/me/license/checkout") {
     const input = parseLicenseCheckoutRequest(body);
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
-    return json({ url: yield* billing.license.createCheckout(user, input, "web", origin) });
+    const promotionCode = parsePromotionCode(body.promotionCode);
+    return json({ url: yield* billing.license.createCheckout(user, input, "web", origin, promotionCode) });
   }
   if (path === "v1/me/license/users") {
     const input = parseLicenseUsersRequest(body);
@@ -494,6 +537,7 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
     if (request.method === "GET") return json(yield* services.hosting().list(user));
     if (request.method !== "POST") return null;
     const body = yield* readJsonObject(request);
+    const promotionCode = parsePromotionCode(body.promotionCode);
     return json(
       yield* services.hosting().create(
         user,
@@ -504,9 +548,10 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
           currency: body.currency,
           entryPoint: body.entryPoint,
           license: body.license,
+          earlyStart: body.earlyStart,
         },
         request.headers.get("Idempotency-Key"),
-        returnTo,
+        promotionCode ? { ...returnTo, promotionCode } : returnTo,
       ),
       201,
     );
@@ -526,7 +571,10 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   if (action === "restart" && request.method === "POST") return json(yield* services.hosting().restart(user, serverId));
   if (action === "status" && request.method === "GET") return json(yield* services.hosting().status(user, serverId));
   if (action === "checkout" && request.method === "POST") {
-    return json(yield* services.hosting().checkout(user, serverId, returnTo));
+    const promotionCode = parsePromotionCode((yield* readJsonObject(request)).promotionCode);
+    return json(
+      yield* services.hosting().checkout(user, serverId, promotionCode ? { ...returnTo, promotionCode } : returnTo),
+    );
   }
   if (action === undefined && request.method === "DELETE") {
     const body = yield* readJsonObject(request);

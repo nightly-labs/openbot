@@ -1,4 +1,5 @@
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "./capability-limits";
 
 export const TEAM_PROTOCOL_V1 = 1;
 export const TEAM_PROTOCOL_VERSION_HEADER = "OpenBot-Protocol-Version";
@@ -998,7 +999,7 @@ export function decodeTeamProtocolSupportV1(value: unknown): TeamProtocolSupport
     !isProtocolVersion(protocol.maximum) ||
     protocol.minimum > protocol.maximum ||
     !Array.isArray(value.capabilities) ||
-    value.capabilities.length > 64 ||
+    value.capabilities.length > TEAM_PROTOCOL_CAPABILITY_LIMITS[1] ||
     !value.capabilities.every(isCapability)
   ) {
     throw new Error("Invalid Team API compatibility response.");

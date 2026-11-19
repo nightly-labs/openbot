@@ -91,6 +91,13 @@ export class AgentInterruptTool {
       return openBotToolFailure(sourceText("error.backend.interruptStarting"));
     }
 
+    // Before the checks: a refused stop leaves the turn, but the caller's queued requests are still the
+    // caller's to cancel, or they start after it. Before the interrupt: the interrupted turn schedules
+    // the next drain as it completes, and that drain would start the next of these messages.
+    const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
+    const refuse = (message: string) =>
+      openBotToolFailure(message, cancelledMessages > 0 ? { cancelledMessages } : undefined);
+
     const turnId = this.#activeTurnId(agentId);
     let deliveries: DeliveryContext[] = [];
     if (turnId) {
@@ -100,19 +107,22 @@ export class AgentInterruptTool {
         (snapshot?.activeTurnId === turnId && this.#conversation.isExecutionThread(snapshot.threadId)) ||
         deliveries.some((context) => this.#channels.store.assignmentForDelivery(context.delivery.id))
       ) {
-        return openBotToolFailure(sourceText("error.backend.useChannelTaskControlsWork"));
+        return refuse(sourceText("error.backend.useChannelTaskControlsWork"));
       }
       if (!ownedBy(deliveries, callerAgentId)) {
-        return openBotToolFailure(sourceText("error.backend.interruptOtherWork"));
+        // The caller's message can start the turn and another sender's message join it later, for
+        // example a message that the user steers in. Then only the user can stop it.
+        return refuse(
+          deliveries.some((context) => sentBy(context, callerAgentId))
+            ? sourceText("error.backend.interruptSharedWork")
+            : sourceText("error.backend.interruptOtherWork"),
+        );
       }
       if (!this.#store.activeProviderSession(agentId) && !this.#conversation.hasRoutineSession(agentId)) {
-        return openBotToolFailure(sourceText("error.backend.interruptNoSession"));
+        return refuse(sourceText("error.backend.interruptNoSession"));
       }
     }
 
-    // Before the interrupt: the interrupted turn schedules the next drain as it completes, and that
-    // drain would start the next of these messages.
-    const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
     if (!turnId) {
       // A task or channel turn never runs the caller's message, so it is never the caller's to stop.
       // Say so, or the caller reads "nothing ran" while `list_agents` shows the agent as working.
@@ -224,8 +234,9 @@ export class AgentInterruptTool {
 
 /** Every delivery the turn runs came from the caller, and it runs at least one. */
 function ownedBy(deliveries: readonly DeliveryContext[], callerAgentId: string): boolean {
-  return (
-    deliveries.length > 0 &&
-    deliveries.every(({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === callerAgentId)
-  );
+  return deliveries.length > 0 && deliveries.every((context) => sentBy(context, callerAgentId));
+}
+
+function sentBy({ delivery }: DeliveryContext, agentId: string): boolean {
+  return delivery.sender.kind === "agent" && delivery.sender.agentId === agentId;
 }

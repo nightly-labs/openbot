@@ -5,7 +5,6 @@ import type { LucideIcon } from "lucide-react-native";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
@@ -127,7 +126,6 @@ export function androidBackOptions(
 function GlassCircle({ glass, children }: { glass?: ViewStyle; children: ReactNode }) {
   return (
     <View className="size-10 items-center justify-center overflow-hidden rounded-full" style={glass}>
-      {glass ? <ChromeGlassSheen /> : null}
       {children}
     </View>
   );

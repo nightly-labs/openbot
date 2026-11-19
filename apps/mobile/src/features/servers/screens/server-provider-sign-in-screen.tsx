@@ -26,15 +26,19 @@ import { currentText, useText } from "@/shared/lib/text";
 /** How often the host is asked how a relayed sign-in is, as on the web. */
 const RELAY_POLL_MS = 1000;
 
-/** A sign-in that runs on the host while this page shows it. */
+/**
+ * A sign-in that runs on the host while this page shows it. `accountId` is the account of an
+ * `account-code` sign-in (`provider-account-code-v1`), once the host named it: its status, its code
+ * and its cancel name that account.
+ */
 type SignIn =
-  | { kind: "starting" }
+  | { kind: "starting"; accountId?: string }
   /** A device code that the user types on the provider's page. */
-  | { kind: "code"; userCode: string; url: string }
+  | { kind: "code"; userCode: string; url: string; accountId?: string }
   /** The provider's page shows a code that the user pastes back here. */
-  | { kind: "paste"; url: string }
+  | { kind: "paste"; url: string; accountId?: string }
   /** The provider sees the sign-in on the page by itself. */
-  | { kind: "link"; url: string }
+  | { kind: "link"; url: string; accountId?: string }
   /** `sign-in-relay-v1`: the host waits for its page; `paste` pages return to the host's loopback address. */
   | { kind: "relay"; flowId: string; page: { url: string; state: string | null; paste: boolean } | null };
 
@@ -43,8 +47,9 @@ type SignIn =
  * host's provider. The sign-in starts when the page opens and the page closes when it ends. Leaving
  * the page cancels it. A code goes to the host only, and the phone does not keep it.
  *
- * `account` signs in that account of the provider again and `add` adds an account, both on the page
- * that the host relays.
+ * `account` signs in that account of the provider again and `add` adds an account: with `relay` on
+ * the page that the host relays, and with `account-code` with the code sign-in of the account. The
+ * phone shows no QR code: it opens the page itself.
  */
 export function ServerProviderSignInScreen() {
   const { t, sourceText, errorMessage } = useText();
@@ -57,10 +62,14 @@ export function ServerProviderSignInScreen() {
   }>();
   const serverId = params.serverId;
   const provider = isAgentProvider(params.provider) ? params.provider : null;
-  const method = params.method === "code" || params.method === "relay" ? params.method : null;
+  const method =
+    params.method === "code" || params.method === "relay" || params.method === "account-code" ? params.method : null;
   const account = params.account ? params.account : params.add === "1" ? null : undefined;
   const [signIn, setSignIn] = useState<SignIn | null>(null);
-  const providers = useServerProviders(serverId, { watchStatus: signIn !== null && signIn.kind !== "relay" });
+  // The provider's own status does not say how a sign-in of one account ended, so it is not watched.
+  const providers = useServerProviders(serverId, {
+    watchStatus: signIn !== null && signIn.kind !== "relay" && method !== "account-code",
+  });
   const { available, admin, status, rows, applyStatus, refreshStatus } = providers;
   const refreshAccounts = useRefreshProviderAccounts(serverId);
   const row = rows.find((candidate) => candidate.id === provider);
@@ -118,13 +127,17 @@ export function ServerProviderSignInScreen() {
   }, [signIn, connecting]);
   useEffect(() => {
     if (state !== "available" || signIn === null || signIn.kind === "relay" || signIn.kind === "starting") return;
+    if (method === "account-code") return;
     if (reconnecting && (connecting || !sawConnecting)) return;
     finish();
-  }, [state, connecting, signIn, reconnecting, sawConnecting, finish]);
+  }, [state, connecting, signIn, reconnecting, sawConnecting, finish, method]);
 
   useEffect(() => {
     if (finished.current) return;
-    active.current = admin && provider && signIn && signIn.kind !== "starting" ? { admin, signIn, provider } : null;
+    active.current =
+      admin && provider && signIn && (signIn.kind !== "starting" || signIn.accountId !== undefined)
+        ? { admin, signIn, provider }
+        : null;
   }, [admin, provider, signIn]);
   // A start that answers after the page closed is cancelled where it resolves, in `startSignIn`. The
   // page under this one shows the status that the cancel answers, and a cancelled new account goes.
@@ -197,6 +210,46 @@ export function ServerProviderSignInScreen() {
     };
   }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, refreshAccounts, finish]);
 
+  // An account's code sign-in ends when its own status says so, as on desktop and the web.
+  const accountCode = admin?.accounts?.code ?? null;
+  const accountCodeId = signIn && signIn.kind !== "relay" ? (signIn.accountId ?? null) : null;
+  useEffect(() => {
+    if (!accountCode || !provider || !accountCodeId) return;
+    let current = true;
+    const timer = setInterval(() => {
+      accountCode.status(provider, accountCodeId).then(
+        (status) => {
+          if (!current || !status.result) return;
+          if (!status.result.error) {
+            finish();
+            return;
+          }
+          setSignIn(null);
+          setCode("");
+          setError(sourceText(status.result.error));
+          void haptics.notification("error");
+          void refreshAccounts();
+        },
+        (cause: unknown) => {
+          if (!current) return;
+          // Nobody watches the sign-in any more, so it must not stay open until the code expires.
+          void accountCode
+            .cancel(provider, accountCodeId)
+            .catch(() => undefined)
+            .finally(() => void refreshAccounts());
+          setSignIn(null);
+          setCode("");
+          setError(currentText().errorMessage(cause, currentText().t("mobile.server.providers.actionFailed")));
+          void haptics.notification("error");
+        },
+      );
+    }, RELAY_POLL_MS);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [accountCode, provider, accountCodeId, sourceText, refreshAccounts, finish]);
+
   function startSignIn() {
     if (!admin || !provider || !method || locked.current) return;
     setReconnecting(state === "available");
@@ -214,6 +267,31 @@ export function ServerProviderSignInScreen() {
             return;
           }
           setSignIn({ kind: "relay", flowId, page: null });
+          return;
+        }
+        if (method === "account-code") {
+          const accountSignIn = admin.accounts?.code;
+          if (!accountSignIn || account === undefined)
+            throw new Error(currentText().t("mobile.server.providers.signInUnsupported"));
+          const { accountId, start } = await accountSignIn.start(provider, account);
+          if (!mounted.current) {
+            void accountSignIn
+              .cancel(provider, accountId)
+              .catch(() => undefined)
+              .finally(() => void refreshAccounts());
+            return;
+          }
+          // A new account shows in the list under this page at once.
+          void refreshAccounts();
+          if (start.kind === "connected") setSignIn({ kind: "starting", accountId });
+          else if (start.kind === "code")
+            setSignIn({
+              kind: "code",
+              userCode: start.userCode,
+              url: start.verificationUrlComplete ?? start.verificationUrl,
+              accountId,
+            });
+          else setSignIn({ kind: start.kind, url: start.verificationUrl, accountId });
           return;
         }
         const started = await admin.startCodeSignIn(provider);
@@ -298,8 +376,11 @@ export function ServerProviderSignInScreen() {
           onSubmitCode={() =>
             void run("submit", async () => {
               // The host only gives the code to the CLI. The sign-in stays open, so the status is
-              // read until the host reports the provider connected.
-              await applyStatus(await admin.submitCode(provider, code.trim()));
+              // read until the host reports the provider or the account connected.
+              if (signIn.kind === "paste" && signIn.accountId !== undefined) {
+                if (!admin.accounts?.code) return;
+                await admin.accounts.code.submit(provider, signIn.accountId, code.trim());
+              } else await applyStatus(await admin.submitCode(provider, code.trim()));
               setCode("");
             })
           }
@@ -335,6 +416,12 @@ export function ServerProviderSignInScreen() {
 /** Asks the host to end a sign-in. It answers with its status after it. */
 function cancelSignIn(admin: ProviderAdmin, provider: AgentProviderId, signIn: SignIn) {
   if (signIn.kind === "relay") return admin.cancelRelay(signIn.flowId);
+  const accountId = signIn.accountId;
+  if (accountId !== undefined) {
+    const accountSignIn = admin.accounts?.code;
+    if (!accountSignIn) return admin.readStatus();
+    return accountSignIn.cancel(provider, accountId).then(() => admin.readStatus());
+  }
   return admin.cancelCodeSignIn(provider);
 }
 

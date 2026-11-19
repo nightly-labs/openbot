@@ -10,7 +10,7 @@ import type { JSX } from "@solidjs/web";
 import { For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { DiscordMark, SlackMark, TelegramMark, WhatsAppMark } from "../settings/brand-marks";
-import { type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
+import { createPickerFades, type PickerGroup, PickerHeading, PickerMenu, PickerRow } from "./WorkflowPicker";
 import { useBoard, type WfnFieldValue } from "./workflow-board";
 import { asString, type Choice, placeKey, useField, usePlace } from "./workflow-node-parts";
 
@@ -96,6 +96,7 @@ export function SettingListRow(props: {
   agent?: { on: boolean; onChange: (on: boolean) => void } | undefined;
 }) {
   const { t } = useText();
+  const fades = createPickerFades();
   const byAgent = () => props.agent?.on === true;
   const agentText = () =>
     props.values.length > 0
@@ -160,7 +161,7 @@ export function SettingListRow(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content class="wfn-menu wfn-picker" data-wfn-portal="" aria-label={props.name}>
-          <div class="wfn-picker-list">
+          <div ref={fades.bind} class={["wfn-picker-list", fades.classes()]} onScroll={fades.measure}>
             <Show when={props.agent}>
               {(agent) => (
                 <fieldset class="wfn-picker-group" aria-label={t("workflow.row.whoChooses")}>

@@ -18,7 +18,9 @@ import {
   NO_ACCOUNT_ANALYTICS,
 } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
+import { alertAmount, alertCode, alertLine, alertUsers } from "./billing-purchase";
 import { BillingUsd, BillingUsdError } from "./billing-usd";
+import type { HostedPoolAlert } from "./hosted-pool-alert";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import type { StripeEvent } from "./stripe-client";
 
@@ -41,6 +43,12 @@ export interface BillingSalesOptions {
   clientId: string | undefined;
   clientSecret: string | undefined;
   now?: () => number;
+  /**
+   * Sends the operator one message, with the account email, for each paid or failed invoice line, refund
+   * and dispute of a server plan or a license (docs/hosted-servers.md#pool-alerts). Only
+   * `processPending` sends it.
+   */
+  saleAlert?: HostedPoolAlert | null;
 }
 
 export interface BillingSalesCheckout {
@@ -96,6 +104,9 @@ export type BillingSalesSynced = BillingSalesSyncedSubscription | BillingSalesSy
 export interface BillingSalesPayment {
   invoiceId: string;
   subscriptionId: string;
+  /** The invoice total with and without tax, to take VAT out of a refund. */
+  total?: number | null;
+  totalExcludingTax?: number | null;
 }
 
 /**
@@ -155,6 +166,47 @@ interface FactAttributes {
   suppressBillingAction?: boolean;
 }
 
+/** The emoji and the word that start the operator message of each fact that moves money or fails to. */
+const SALE_EVENT_TEXT: Partial<Record<FactType, string>> = {
+  payment_succeeded: "💵 **Paid**",
+  payment_failed: "⚠️ **Payment failed**",
+  payment_refunded: "↩️ **Refunded**",
+  refund_failed: "❗ **Refund failed**",
+  payment_disputed: "🚨 **Disputed**",
+  dispute_lost: "🚨 **Dispute lost**",
+};
+
+/**
+ * The operator message of one payment fact, in the form of `purchaseAlertText`: the event, the product,
+ * the account email, the plan, and the amount. Only the payment of a renewal is the amount of one period,
+ * so only it has the period. `event` is the `SALE_EVENT_TEXT` of the fact. `email` is null when the
+ * account is gone.
+ */
+function saleAlertText(type: FactType, event: string, attributes: FactAttributes, email: string | null): string {
+  const license = (attributes.product ?? "server") === "license";
+  const renewal = attributes.paymentKind === "renewal";
+  const paid = type === "payment_succeeded";
+  return alertLine(`${paid && renewal ? "💵 **Renewed**" : event} ${license ? "license" : "server"}`, [
+    email === null ? "unknown account" : alertCode(email),
+    ...(license
+      ? attributes.users === undefined
+        ? []
+        : [alertUsers(attributes.users)]
+      : [attributes.plan ?? "plan not known"]),
+    ...(attributes.currency
+      ? [
+          alertAmount(
+            attributes.amount ?? null,
+            attributes.currency,
+            renewal && (paid || type === "payment_failed") ? attributes.interval : undefined,
+          ),
+        ]
+      : []),
+    ...(paid && (attributes.paymentKind ?? "adjustment") === "adjustment" ? ["adjustment"] : []),
+    ...(type === "payment_failed" && attributes.failureReason ? [attributes.failureReason] : []),
+  ]);
+}
+
 interface CheckoutRow {
   session_id: string;
   user_id: string;
@@ -179,8 +231,10 @@ export class BillingSales {
   readonly #now: () => number;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   readonly #delivery: SalesAnalyticsDelivery;
+  readonly #saleAlert: HostedPoolAlert | null;
 
   constructor(options: BillingSalesOptions) {
+    this.#saleAlert = options.saleAlert ?? null;
     this.#database = options.database;
     this.#now = options.now ?? Date.now;
     this.#fetch = options.fetch;
@@ -585,7 +639,9 @@ export class BillingSales {
     const currency =
       billingCurrency(stringValue(object.currency)) ?? synced?.currency ?? stored?.currency ?? license?.currency;
     const amountValue = event.type === "invoice.paid" ? object.amount_paid : object.amount_due;
-    const amount = isBillingAmount(amountValue) ? amountValue : null;
+    const amount = isBillingAmount(amountValue)
+      ? withoutTax(amountValue, object.total, object.total_excluding_tax)
+      : null;
     // A server order invoices the server and the license together. Each is its own sale line, with its
     // share of the amount from the invoice lines.
     const lines = license ? null : orderLicenseLines(object);
@@ -683,20 +739,21 @@ export class BillingSales {
     // A payment of a subscription that is not an OpenBot plan or license is not an OpenBot sale.
     if (!stored && !license) return;
     const syncedPlan = synced?.product === "license" ? null : synced;
+    const amount = withoutTax(reversal.amount, payment.total, payment.totalExcludingTax);
     const attributes: FactAttributes = stored
       ? {
           product: "server",
           plan: syncedPlan?.plan ?? stored.plan,
           interval: syncedPlan?.interval ?? stored.interval,
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         }
       : {
           product: "license",
           ...(license && isAnalyticsLicenseUsers(license.users) ? { users: license.users } : {}),
           interval: license?.interval ?? "month",
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         };
     const ownerId = synced?.userId ?? stored?.user_id ?? license?.userId ?? null;
     const prefix = reversal.type === "payment_refunded" || reversal.type === "refund_failed" ? "refund" : "dispute";
@@ -883,7 +940,7 @@ export class BillingSales {
                 };
       yield* this.#enqueue(`billing:${row.source_key}`, profileId, eventName, eventProperties, eventTimestamp);
     }
-    yield* d1(this.#database, () =>
+    const marked = yield* d1(this.#database, () =>
       this.#database
         .prepare(
           `UPDATE billing_sales_facts SET delivery_enqueued_at = ?
@@ -892,6 +949,25 @@ export class BillingSales {
         .bind(this.#now(), row.source_key)
         .run(),
     );
+    // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
+    // FX lookup, or that two cron runs read, sends one message. An imported payment sends none, and a
+    // $0 invoice (a trial start or a $0 proration) moves no money, so it sends none too.
+    const event = SALE_EVENT_TEXT[row.fact_type];
+    if (!this.#saleAlert || !event || marked.meta.changes !== 1) return;
+    if (attributes.suppressBillingAction) return;
+    // A first purchase is the start of a subscription, which sends its own `New` message.
+    if (
+      row.fact_type === "payment_succeeded" &&
+      (attributes.amount === 0 || attributes.paymentKind === "first_purchase")
+    )
+      return;
+    // The fact is ended, so a failed read of the email must not fail the run.
+    const account = row.user_id
+      ? yield* d1(this.#database, () =>
+          this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(row.user_id).first<{ email: string }>(),
+        ).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null;
+    yield* this.#saleAlert(saleAlertText(row.fact_type, event, attributes, account?.email ?? null));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (
@@ -1064,6 +1140,16 @@ export function paymentReversal(event: StripeEvent): PaymentReversal | null {
     amount: object.amount,
     currency: billingCurrency(stringValue(object.currency)),
   };
+}
+
+/**
+ * The part of `amount` that is not tax. VAT goes on top of the price and is not revenue, so a payment or a
+ * refund counts the share of the invoice total without tax. An invoice with no tax keeps the amount.
+ */
+export function withoutTax(amount: number, total: unknown, totalExcludingTax: unknown): number {
+  if (!isBillingAmount(total) || total === 0 || !isBillingAmount(totalExcludingTax) || totalExcludingTax >= total)
+    return amount;
+  return Math.round((amount * totalExcludingTax) / total);
 }
 
 function isReversalFact(type: FactType): type is PaymentReversalType {

@@ -19,6 +19,7 @@ import {
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { databaseRow, databaseRows, placeholders } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-graph";
 
@@ -337,17 +338,7 @@ export class RoutineFlowStore {
   }
 
   #transaction<T>(work: () => T): T {
-    const db = this.#database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = work();
-      db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(this.#database.connection, work);
   }
 }
 

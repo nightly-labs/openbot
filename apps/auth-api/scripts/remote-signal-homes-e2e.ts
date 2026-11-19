@@ -3,7 +3,8 @@
 // moves only when that home failed for it, and its members follow it. Other host tickets, and a
 // Worker with no homes, name the entry Signal and no `signal` claim. Two requests that race store
 // one home. With home locations, a host gets one of the homes near the place of its request and
-// moves to it from a far home, but only when that home answers `/health/ready`.
+// moves to it from a far home, but only when that home answers `/health/ready`. With a country rule,
+// a host in a listed country gets one of the homes of that country, wherever the map puts it.
 //
 // Run: bun apps/auth-api/scripts/remote-signal-homes-e2e.ts
 // It writes .openbot-build/remote-signal-homes-e2e/report.json and exits non-zero on a failure.
@@ -38,6 +39,7 @@ const PLACES = {
   newYork: { latitude: 40.71, longitude: -74.01 },
   sydney: { latitude: -33.87, longitude: 151.21 },
   tokyo: { latitude: 35.68, longitude: 139.69 },
+  beijing: { latitude: 39.9, longitude: 116.4 },
 };
 const WAIT_LIMIT_MS = 10_000;
 
@@ -129,7 +131,13 @@ async function healthFetch(input: string | URL | Request): Promise<Response> {
   return new Response("{}", { status: 200 });
 }
 
-function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = ENTRY_URL, locations = "") {
+function plane(
+  database: D1Database | DatabaseSync,
+  homes: string,
+  entryUrl = ENTRY_URL,
+  locations = "",
+  countries = "",
+) {
   return new RemoteControlPlane(
     {
       DB: database instanceof DatabaseSync ? sqliteD1(database) : database,
@@ -137,6 +145,7 @@ function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = EN
       REMOTE_SIGNAL_URL: entryUrl,
       REMOTE_SIGNAL_HOMES: homes,
       REMOTE_SIGNAL_HOME_LOCATIONS: locations,
+      REMOTE_SIGNAL_HOME_COUNTRIES: countries,
     },
     { fetch: healthFetch },
   );
@@ -145,7 +154,12 @@ function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = EN
 async function hostTicket(
   remote: RemoteControlPlane,
   hostId: string,
-  placement?: { signalHome: boolean | null; failedSignalUrl: string | null; location?: SignalLocation | null },
+  placement?: {
+    signalHome: boolean | null;
+    failedSignalUrl: string | null;
+    location?: SignalLocation | null;
+    country?: string | null;
+  },
 ) {
   const answer = await Effect.runPromise(remote.issueHostTicket(hostId, machineToken(hostId), placement));
   return { signalUrl: answer.signalUrl, signal: await signalClaim(answer.ticket) };
@@ -174,6 +188,12 @@ const asksFrom = (location: SignalLocation | null, failedSignalUrl: string | nul
   signalHome: true,
   failedSignalUrl,
   location,
+});
+const asksFromCountry = (location: SignalLocation | null, country: string, failedSignalUrl: string | null = null) => ({
+  signalHome: true,
+  failedSignalUrl,
+  location,
+  country,
 });
 
 async function aHostGetsKeepsAndMovesItsHome() {
@@ -496,6 +516,120 @@ async function invalidLocationsFailClosed() {
   );
 }
 
+async function hostsInAListedCountryGetItsHomes() {
+  const hostIds = ["cn-1", "cn-2", "cn-3", "cn-4", "cn-5", "cn-6", "cn-7", "cn-8", "de-1"];
+  const database = await hostsWithSessions(hostIds);
+  const remote = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS, "CN=us+au");
+  const chinaHomes = ["us", "au"] as const;
+  const withoutRule = await hostTicket(
+    plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS),
+    "cn-8",
+    asksFromCountry(PLACES.beijing, "CN"),
+  );
+  check("with no country rule, a host in Beijing gets a Helsinki home", ["a", "b"].includes(withoutRule.signal), {
+    withoutRule,
+  });
+  const placed: Record<string, string> = {};
+  for (const hostId of ["cn-1", "cn-2", "cn-3", "cn-4", "cn-5"])
+    placed[hostId] = (await hostTicket(remote, hostId, asksFromCountry(PLACES.beijing, "CN"))).signal;
+  check(
+    "hosts in Beijing get the rendezvous choice of the homes of their country, and use both",
+    Object.entries(placed).every(([hostId, home]) => home === rendezvousOf(hostId, chinaHomes)) &&
+      new Set(Object.values(placed)).size === 2,
+    { placed },
+  );
+  const noPlace = await hostTicket(remote, "cn-6", asksFromCountry(null, "CN"));
+  check(
+    "a host in a listed country with no known place gets a home of its country",
+    noPlace.signal === rendezvousOf("cn-6", chinaHomes),
+    { noPlace },
+  );
+  const berlin = await hostTicket(remote, "de-1", asksFromCountry(PLACES.berlin, "DE"));
+  check("a host in a country that is not listed keeps the distance rule", ["a", "b"].includes(berlin.signal), {
+    berlin,
+  });
+
+  database.prepare("UPDATE remote_hosts SET signal_home = 'a' WHERE host_id = 'cn-7'").run();
+  const before = await sessionTicket(remote, "cn-7");
+  const moved = await hostTicket(remote, "cn-7", asksFromCountry(PLACES.beijing, "CN"));
+  const followed = await sessionTicket(remote, "cn-7");
+  check(
+    "a host in China with a stored Helsinki home moves to a home of its country, and its members follow",
+    before.signal === "a" &&
+      moved.signal === rendezvousOf("cn-7", chinaHomes) &&
+      storedHome(database, "cn-7") === moved.signal &&
+      followed.signal === moved.signal,
+    { before, moved, followed },
+  );
+  const other = rendezvousOf("cn-1", chinaHomes) === "us" ? "au" : "us";
+  database.prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = 'cn-1'").run(other);
+  const kept = await hostTicket(remote, "cn-1", asksFromCountry(PLACES.beijing, "CN"));
+  check("a host in China keeps a stored home of its country that the hash would not choose", kept.signal === other, {
+    kept,
+    other,
+  });
+  const failed = await hostTicket(remote, "cn-1", asksFromCountry(PLACES.beijing, "CN", REGION_URLS[other]));
+  check(
+    "a host in China whose home failed gets the other home of its country",
+    failed.signal === (other === "us" ? "au" : "us") && storedHome(database, "cn-1") === failed.signal,
+    { failed },
+  );
+  const usOnly = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS, "CN=us");
+  const fallback = await hostTicket(usOnly, "cn-2", asksFromCountry(PLACES.beijing, "CN", REGION_URLS.us));
+  check(
+    "when the only home of its country failed, the distance rule chooses again (Helsinki for Beijing)",
+    ["a", "b"].includes(fallback.signal),
+    { fallback },
+  );
+  const placedInChina = await hostTicket(remote, "cn-3", asksFromCountry(PLACES.beijing, "CN"));
+  const reverted = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS, "");
+  const movedBack = await hostTicket(reverted, "cn-3", asksFromCountry(PLACES.beijing, "CN"));
+  const membersBack = await sessionTicket(reverted, "cn-3");
+  check(
+    "after the country rule is set to empty, a host in China moves back to a Helsinki home, and its members follow",
+    ["us", "au"].includes(placedInChina.signal) &&
+      ["a", "b"].includes(movedBack.signal) &&
+      storedHome(database, "cn-3") === movedBack.signal &&
+      membersBack.signal === movedBack.signal,
+    { placedInChina, movedBack, membersBack },
+  );
+}
+
+async function invalidCountriesFailClosed() {
+  const database = await hostsWithSessions(["host-1"]);
+  const invalid = {
+    "a country rule with a home that is not configured": "CN=us+hk",
+    "a country rule with no home": "CN=",
+    "a lower-case country code": "cn=us",
+    "a country code with three letters": "CHN=us",
+    "a duplicate country": "CN=us, CN=au",
+    "a duplicate home in one country": "CN=us+us",
+    "a country rule with no equals sign": "CN",
+  };
+  for (const [name, countries] of Object.entries(invalid)) {
+    const remote = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS, countries);
+    const host = await outcome(
+      remote.issueHostTicket("host-1", machineToken("host-1"), asksFromCountry(PLACES.beijing, "CN")),
+    );
+    const member = await outcome(remote.issueSessionTicket("owner", "session-host-1", "client-public-key"));
+    check(
+      `${name} fails each ticket with remote_not_configured`,
+      host === "remote_not_configured" && member === "remote_not_configured",
+      { host, member },
+    );
+  }
+  const rolledBack = await hostTicket(
+    plane(database, "", ENTRY_URL, REGION_LOCATIONS, "CN=us+au"),
+    "host-1",
+    asksFromCountry(PLACES.beijing, "CN"),
+  );
+  check(
+    "an empty home list with a country rule still set rolls back to the entry Signal",
+    rolledBack.signal === "none" && rolledBack.signalUrl === ENTRY_URL,
+    { rolledBack },
+  );
+}
+
 const scenarios = [
   aHostGetsKeepsAndMovesItsHome,
   noHomesKeepsTheEntrySignal,
@@ -504,6 +638,8 @@ const scenarios = [
   hostsSpreadOverTheHomes,
   hostsGetANearHome,
   invalidLocationsFailClosed,
+  hostsInAListedCountryGetItsHomes,
+  invalidCountriesFailClosed,
 ];
 for (const scenario of scenarios) {
   try {

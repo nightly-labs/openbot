@@ -1,4 +1,10 @@
-import type { AddedAgent, AgentProviderId, NotificationOpenedEvent, ServerSummary } from "@openbot/contracts/ipc";
+import type {
+  AddedAgent,
+  AgentProviderId,
+  NotificationOpenedEvent,
+  ServerSummary,
+  WorkflowNotificationOpenedEvent,
+} from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { onSettled } from "solid-js";
 import { actionToast } from "../../action-toast";
@@ -11,6 +17,7 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useSettings } from "../settings/settings-context";
+import { useWindowPage } from "../window/window-page-context";
 import { useServerSwitch } from "./server-switch";
 import { useServers } from "./servers-context";
 import { activeServerId, serversPort } from "./servers-port";
@@ -52,6 +59,7 @@ const ServerSelection = createSimpleContext({
     const { stopComposerTyping } = useConversationController();
     const { setDirectTyping } = useDirectMessages();
     const { chatWindow } = usePlatform();
+    const windowPage = useWindowPage();
 
     async function selectServer(
       serverId: string,
@@ -165,6 +173,20 @@ const ServerSelection = createSimpleContext({
     onSettled(() =>
       serversPort().notifications.onOpened((event) => {
         void openNotifiedAgent(event).catch(() => undefined);
+      }),
+    );
+
+    /** Opens the workflow of a clicked notification, where the user approves a step that waits. */
+    async function openNotifiedWorkflow(event: WorkflowNotificationOpenedEvent): Promise<void> {
+      const onServer = servers().find((server) => server.active)?.id === event.serverId;
+      if (!onServer && !(await selectServer(event.serverId, false))) return;
+      // The window page sits above the server scope, so it opens the page on the new server too.
+      windowPage.openWorkflows(null, event);
+    }
+
+    onSettled(() =>
+      serversPort().notifications.onWorkflowOpened((event) => {
+        void openNotifiedWorkflow(event).catch(() => undefined);
       }),
     );
 

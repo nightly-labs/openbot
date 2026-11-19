@@ -1,7 +1,7 @@
 // Frozen optional channel-chats-v1 wire contract. Keep IPC types and limits out of this file.
 import { isDynamicRecord, isString } from "../runtime-values";
 import { decodeTeamProtocolV1HttpRequest, decodeTeamProtocolV1HttpResponse } from "./v1";
-import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./v2";
+import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./webrtc-framing";
 
 export const CHANNEL_ROUTES = {
   list: "/v1/channels",

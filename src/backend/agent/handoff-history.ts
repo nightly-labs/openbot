@@ -188,6 +188,9 @@ export function renderRoutineHandoff(
   const header = [
     HANDOFF_START,
     "This routine run has its own session. These are the newest messages of your conversation. Do not repeat completed work.",
+    // The routine task is saved text, so a reminder told the user to do what the chat had since
+    // found impossible (#12440).
+    "When a newer message shows that what the routine task asks for is done, has changed, or is not possible, do not repeat the outdated request or steps. Unless the user asked to stop or skip it, still give a requested reminder, and say that newer result in it.",
     "Omitted details remain available: discover openbot.history_search and openbot.history_read.",
   ].join("\n");
   const runsHeader = "--- earlier runs of this routine (its own thread) ---";
@@ -238,6 +241,15 @@ export function unsentHandoff(current: string, sent: string | undefined): string
   if (sent === undefined || !now.packet || now.history !== before.history) return current;
   const unsent = now.digests.filter((digest) => !before.digests.includes(digest));
   return unsent.length > 0 ? handoffPacket(HANDOFF_START, unsent) : undefined;
+}
+
+/**
+ * Whether a handoff holds the conversation history: the first turn of a new session sends it. A
+ * handoff with only routine digests goes to a session that already had turns.
+ */
+export function handoffHasHistory(handoff: string): boolean {
+  const { packet, history } = handoffParts(handoff);
+  return packet && history !== HANDOFF_START;
 }
 
 const HANDOFF_PACKET_END = `\n${HANDOFF_END}`;

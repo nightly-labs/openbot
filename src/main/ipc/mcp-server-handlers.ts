@@ -1,4 +1,4 @@
-import { Duration, Effect, Result } from "effect";
+import { Duration, Effect, Result, Schema } from "effect";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 // MCP servers: the model-context servers an agent on this server may use.
 //
@@ -7,6 +7,7 @@ import type { RemoteWorkflowError } from "../remote-service-effects";
 // why nothing routes through the selected server.
 
 import {
+  canAdministerServer,
   decodeMcpAccessSnapshot,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
@@ -14,12 +15,15 @@ import {
   decodeMcpSignInStatus,
   decodeMcpTestResult,
   decodeSignInRelayFlow,
+  hostOnlySignInPage,
   MCP_SERVERS_CAPABILITY,
   type McpAccessSnapshot,
   type McpServerConfig,
   parseSetMcpAccessInput,
+  type ServerSummary,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import {
@@ -28,6 +32,10 @@ import {
 } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY, MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_ROUTES,
+} from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
@@ -63,6 +71,7 @@ type McpServerService = Pick<
   | "testMcpServer"
   | "signInMcpServer"
   | "cancelMcpSignIn"
+  | "mcpSignInLink"
   | "signOutMcpServer"
   | "listMcpSignIns"
   | "mcpSignInApp"
@@ -72,6 +81,7 @@ type McpServerService = Pick<
 
 /** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface McpRemoteServers {
+  list(): ServerSummary[];
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(
     serverId: string,
@@ -131,7 +141,9 @@ interface McpServerIpcDependencies {
   /** What the managed store holds right now, so an installed command waits for no download. */
   toolRuntimes: () => McpToolRuntimes;
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
-  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste" | "receivesDeepLink">;
+  /** Puts text on this computer's clipboard. */
+  writeClipboard: (text: string) => Promise<void>;
 }
 
 /** How long a connection test waits for the managed runtimes before probing without them. */
@@ -152,6 +164,7 @@ export function mcpServerIpcHandlers({
   ensureToolRuntimesReady,
   toolRuntimes,
   relay,
+  writeClipboard,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
@@ -190,11 +203,19 @@ export function mcpServerIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)) signInOnHost();
   }
 
-  /** The `sign-in-relay-v1` routes of one MCP sign-in on a joined server. */
+  /**
+   * The `sign-in-relay-v1` routes of one MCP sign-in on a joined server. When this computer opens
+   * `openbot://mcp-auth`, the host can return there after both loopback names failed: TradingView's
+   * firewall blocks a sign-in page that returns to a loopback name (#9209).
+   */
   function relayRemote(serverId: string, input: TestMcpServerInput): SignInRelayRemote<RemoteWorkflowError> {
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
-    return signInRelayRemote(post, post(SIGN_IN_RELAY_ROUTES.mcpStart, decodeSignInRelayFlow, input));
+    const start =
+      remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_DEEP_LINK_CAPABILITY) && relay.receivesDeepLink()
+        ? SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart
+        : SIGN_IN_RELAY_ROUTES.mcpStart;
+    return signInRelayRemote(post, post(start, decodeSignInRelayFlow, input));
   }
 
   /** A sign-in app is the host's: an older host cannot keep one, so the reason is stated first. */
@@ -214,10 +235,26 @@ export function mcpServerIpcHandlers({
    */
   const signInRemotely = Effect.fn("Mcp.signInRemotely")(function* (serverId: string, input: TestMcpServerInput) {
     const key = remotePageKey(serverId, input.config.url);
-    // The user's own browser keeps their sessions and passkeys, so a host that can relay never shows
-    // its own tab. A relayed sign-in that fails does not fall back: the host already started it.
-    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY))
-      return yield* relay.run(key, relayRemote(serverId, input));
+    // The user's own browser keeps their sessions and passkeys, so a host that can relay shows its own
+    // tab only for a page that only the host can reach. Any other relayed sign-in that fails does not
+    // fall back: the host already started it.
+    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY)) {
+      const relayed = yield* relay
+        .run(key, hostOnlyRelayRemote(relayRemote(serverId, input)))
+        .pipe(Effect.catchTag("McpHostOnlySignInPage", () => Effect.succeed(null)));
+      if (relayed !== null) return relayed;
+      // The relay already ended on the host. The live view shows only the active server, and the host
+      // shows its private sign-in tabs only to an owner or admin.
+      const server = remoteServers.list().find((summary) => summary.id === serverId);
+      if (!canAdministerServer(server?.role))
+        return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") };
+      if (
+        !remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY) ||
+        !remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY)
+      )
+        return { toolCount: 0, error: sourceText("error.mcp.signInOnHost") };
+      if (!server?.active) return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServerSwitch") };
+    }
     const body = { url: input.config.url };
     yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.start, () => undefined, { method: "POST", body: input });
     remotePages.set(key, null);
@@ -359,6 +396,16 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
+      copyMcpSignInLink: scopedHandler(parseCancelMcpSignIn, {
+        local: (parsed) => {
+          const link = service.mcpSignInLink(parsed);
+          if (!link) throw new Error(sourceText("error.mcp.signInLinkNotReady"));
+          return writeClipboard(link);
+        },
+        // A joined server's page opens in the host's browser or through the relay, which has its own
+        // controls, and the host sends no client the address of its sign-in.
+        remote: () => signInOnHost(),
+      }),
       // A sign-out names its row the way a removal does, so it is read by the same parser.
       signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
         local: (parsed) => runCauseEffect(service.signOutMcpServer(parsed)),
@@ -404,6 +451,29 @@ export function mcpServerIpcHandlers({
 
 /** How often a remote sign-in asks the host whether it ended. */
 const REMOTE_SIGN_IN_POLL = Duration.seconds(1);
+
+/** A relayed sign-in whose page only the host can reach, such as an MCP server on the host's loopback. */
+class McpHostOnlySignInPage extends Schema.TaggedError<McpHostOnlySignInPage>()("McpHostOnlySignInPage", {}) {}
+
+/**
+ * The relay routes of one sign-in, which stop at a page that only the host can reach. The relay then
+ * cancels the flow on the host, as for any failure, and the caller signs in through the host's tab.
+ */
+function hostOnlyRelayRemote<E>(remote: SignInRelayRemote<E>): SignInRelayRemote<E | McpHostOnlySignInPage> {
+  return {
+    ...remote,
+    status: (flowId) =>
+      remote
+        .status(flowId)
+        .pipe(
+          Effect.flatMap((status) =>
+            status.result === null && status.authorizeUrl !== null && hostOnlySignInPage(status.authorizeUrl)
+              ? Effect.fail(new McpHostOnlySignInPage())
+              : Effect.succeed(status),
+          ),
+        ),
+  };
+}
 
 function remotePageKey(serverId: string, url: string): string {
   return `${serverId}\n${url}`;

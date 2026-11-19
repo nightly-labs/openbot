@@ -64,12 +64,25 @@ not_answering() {
   fail "OpenBot does not answer. Read the log with: openbot logs"
 }
 
+not_running() {
+  if start_loop_stopped; then
+    fail "OpenBot stopped because its start failed again and again. Read the log with: openbot logs
+Install a new release with: sudo openbot update. Or try again with: sudo openbot restart"
+  fi
+  fail "OpenBot is not running. Start it with: sudo openbot start"
+}
+
 # Waits for the socket after a start. A user that cannot enter /run/openbot never sees it.
 wait_for_socket() {
   local second
   for ((second = 0; second < 30; second++)); do
     [ -S "$SOCKET" ] && return 0
-    in_container || systemctl is-active --quiet "$UNIT" || fail "OpenBot is not running. Start it with: sudo openbot start"
+    in_container || systemctl is-active --quiet "$UNIT" || not_running
+    # The safe mode has no control socket (src/main/server-safe-mode.ts).
+    if ! in_container && safe_mode_running; then
+      fail "OpenBot does not start, so it runs its safe mode: members see why. Read the log with: openbot logs
+Install a new release with: sudo openbot update. Or try again with: sudo openbot restart"
+    fi
     if [ -d /run/openbot ] && [ ! -x /run/openbot ]; then
       fail "Run this with sudo, or as the user $(service_user)."
     fi
@@ -144,7 +157,8 @@ show_status() {
   limit=$(value memory_limit)
   if [ -n "$limit" ]; then
     echo "Memory: $(($(value memory_available) / 1048576)) MiB free of $((limit / 1048576)) MiB ($(value memory_level))"
-    echo "Turns at the same time: at most $(value turn_limit)"
+    turns=$(value turn_limit)
+    if [ "$turns" = unlimited ]; then echo "Turns at the same time: no limit"; else echo "Turns at the same time: at most $turns"; fi
   fi
   staged=$(staged_version)
   if [ -n "$staged" ]; then echo "OpenBot $staged is ready to install. Run: sudo openbot update"; fi
@@ -305,6 +319,12 @@ uninstall_command() {
   if [ -f /etc/apparmor.d/openbot-hosted ] && command -v apparmor_parser >/dev/null &&
     [ -d /sys/kernel/security/apparmor ]; then
     apparmor_parser --remove /etc/apparmor.d/openbot-hosted 2>/dev/null || true
+    # The rule that openbot-hosted-update added for the Claude sandbox.
+    if grep -qs '^# OpenBot: ' /etc/apparmor.d/local/bwrap-userns-restrict; then
+      sed -i -e '/^# OpenBot: /d' -e '/^priority=1 allow pix \/\*\* -> &bwrap,$/d' \
+        /etc/apparmor.d/local/bwrap-userns-restrict
+      apparmor_parser --replace /etc/apparmor.d/bwrap-userns-restrict 2>/dev/null || true
+    fi
   fi
   rm -f /etc/apparmor.d/openbot-hosted /usr/local/bin/openbot
   # The desktop .deb also installs into /opt/OpenBot, so only the entries of a server go.
@@ -338,6 +358,9 @@ case $command in
     require_host "run docker $command <container> on the host"
     require_root "$command"
     systemctl "$command" "$UNIT"
+    # A stop leaves a unit that failed in the `failed` state. Clear it, so that the update timer
+    # does not take the stop for a stopped start loop and start OpenBot again.
+    if [ "$command" = stop ]; then systemctl reset-failed "$UNIT" 2>/dev/null || true; fi
     ;;
   update) update_command ;;
   uninstall) uninstall_command ;;

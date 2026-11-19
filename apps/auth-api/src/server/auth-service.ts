@@ -15,6 +15,7 @@ import { type AccountAnalytics, type AccountSurface, NO_ACCOUNT_ANALYTICS } from
 import type { AccountAttribution } from "./account-attribution";
 import { randomToken, sha256 } from "./crypto";
 import type { AuthStoreError } from "./d1-auth-repository";
+import type { Referrals } from "./referrals";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import {
@@ -56,6 +57,8 @@ interface AuthServiceOptions {
   analytics?: AccountAnalytics;
   /** Saves the first website visit that a sign-in on the web sends. */
   attribution?: AccountAttribution;
+  /** Links a new account to the account whose invite link it used. */
+  referrals?: Referrals;
   /** True when the email's domain signs in at its company provider, which then replaces email codes. */
   usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
 }
@@ -85,6 +88,7 @@ class AuthDependencies extends Context.Service<
     profileChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
     analytics: AccountAnalytics;
     attribution: AccountAttribution | null;
+    referrals: Referrals | null;
     usesCompanySignIn: (email: string) => Effect.Effect<boolean, AuthOperationError>;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
@@ -127,6 +131,7 @@ export class AuthService {
       profileChanged: options.profileChanged ?? (() => Effect.void),
       analytics: options.analytics ?? NO_ACCOUNT_ANALYTICS,
       attribution: options.attribution ?? null,
+      referrals: options.referrals ?? null,
       usesCompanySignIn: options.usesCompanySignIn ?? (() => Effect.succeed(false)),
     });
   }
@@ -304,6 +309,8 @@ export class AuthService {
         surface: Exclude<AccountSurface, "mobile">;
         /** Only the web client sends one; it is already checked. */
         firstTouch?: FirstTouch | null;
+        /** The invite code that the user typed or the web client kept from an invite link. Only a new account uses it. */
+        referralCode?: string | null;
       },
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
       return yield* this.#verifyEmailChallenge(input);
@@ -320,6 +327,8 @@ export class AuthService {
         code: string;
         sourceIp: string;
         device: MobileAuthDeviceIdentity;
+        /** The invite code that the user typed. Only a new account uses it. */
+        referralCode?: string | null;
       },
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
@@ -340,6 +349,7 @@ export class AuthService {
       sourceIp: string;
       surface: AccountSurface;
       firstTouch?: FirstTouch | null;
+      referralCode?: string | null;
       device?: MobileAuthDeviceIdentity;
     },
   ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
@@ -374,6 +384,13 @@ export class AuthService {
     }
     if (result.status === "verified" && result.created) {
       dependencies.analytics.track(session.user.id, { name: "account_created", surface: input.surface, firstTouch });
+      const { referrals } = dependencies;
+      if (input.referralCode && referrals) {
+        // The invite link gives a discount and credit only. Its failure must not fail the sign-in.
+        yield* referrals
+          .record(session.user.id, input.referralCode)
+          .pipe(Effect.catch(() => Effect.sync(() => console.warn("Invite link save failed."))));
+      }
     }
     return session;
   });

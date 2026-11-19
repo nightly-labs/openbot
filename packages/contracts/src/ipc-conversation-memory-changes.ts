@@ -7,7 +7,8 @@ import { isDynamicRecord, isOneOf } from "./runtime-values";
  * could not change because another thread of the agent changed that memory first. The backend
  * writes them on one system message of the turn after the commit, so a turn that did not complete
  * has none. The text of the message counts the changes, for a client that does not know the field.
- * The Team API does not send the field: a remote client shows the text.
+ * The Team API sends the field only to a client with memory-changes-v1 (`memory-changes-v1.ts`); a
+ * remote client without it shows the text.
  */
 export const CONVERSATION_MEMORY_CHANGES_ITEM_TYPE = "memory-changes";
 

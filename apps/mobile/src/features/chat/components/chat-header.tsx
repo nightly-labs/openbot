@@ -5,9 +5,8 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
-import Globe from "lucide-react-native/icons/globe";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { useMemo } from "react";
+import Trash from "lucide-react-native/icons/trash";
+import { memo, useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
@@ -17,6 +16,7 @@ import { useBrowserFeature } from "@/features/browser/components/use-browser-fea
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
+import { useMessagePinsEnabled } from "@/features/chat/components/use-message-pins";
 import { useSplitDetailRoot } from "@/features/chat/components/use-split-detail-root";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
@@ -40,7 +40,7 @@ interface ChatHeaderProps {
   liquidGlassAvailable: boolean;
   topInset: number;
   onBack: () => void;
-  /** A channel task needs the user: the header shows the button that opens the channel actions. */
+  /** A channel task needs the user: the More menu has the channel actions, and its button a warning dot. */
   needsAction?: boolean;
   /**
    * The member whose browser the browser button of a channel opens, the tab of its request, and the
@@ -54,16 +54,18 @@ interface ChatHeaderProps {
   /** Shown before the title with a dot between them, such as "Task". */
   kicker?: string;
   /**
-   * A menu in place of the browser button, such as the actions of a task. Its actions go to the
-   * native bar menu when iOS shows the vertical bar. Null keeps the place empty, as for a task that
-   * has not loaded.
+   * A menu in place of the More menu, such as the actions of a task. Its actions go to the native bar
+   * menu when iOS shows the vertical bar. Null keeps the place empty, as for a task that has not loaded.
    */
   actionsMenu?: { label: string; actions: MenuAction[]; onPressAction: (id: string) => void } | null;
   /** The agent's threads. The agent's name then opens this menu, and the menu has the agent's info. */
   threadMenu?: ChatThreadMenu;
+  /** A delete button in place of the More menu, such as on a side question. */
+  deleteAction?: { label: string; disabled: boolean; onPress: () => void };
 }
 
-export function ChatHeader({
+/** In `memo`: the chat renders again on each streamed chunk, and the header reads nothing of it. */
+export const ChatHeader = memo(function ChatHeader({
   target,
   fallbackBackground,
   foreground,
@@ -77,6 +79,7 @@ export function ChatHeader({
   kicker,
   actionsMenu,
   threadMenu,
+  deleteAction,
 }: ChatHeaderProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -95,8 +98,16 @@ export function ChatHeader({
   // A channel opens the browser of one member: the browser is the browser of an agent.
   const browserAgent =
     target.kind === "agent" ? { agentId: target.id, agentIds: [], tabId: undefined } : channelBrowser;
-  const browserShown =
-    actionsMenu === undefined && browserAllowed && !disconnected && browserView && Boolean(browserAgent);
+  // A screen with its own trailing action, such as a side question, has no More menu.
+  const plainChat = actionsMenu === undefined && deleteAction === undefined;
+  const browserShown = plainChat && browserAllowed && !disconnected && browserView && Boolean(browserAgent);
+  // The pins of the agent's chats, on a host with `message-pins-v1`. A channel has no pins.
+  const pinsEnabled = useMessagePinsEnabled(target.serverId);
+  const pinsShown = plainChat && target.kind === "agent" && pinsEnabled;
+  const attention = plainChat && target.kind === "channel" && needsAction;
+  // A question about the agent's chat that stays out of it, on a host with `side-question-v1`.
+  const sideQuestionEnabled = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(target.serverId));
+  const sideQuestionShown = plainChat && target.kind === "agent" && sideQuestionEnabled;
   const members = useMemo(
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
     [target],
@@ -170,10 +181,90 @@ export function ChatHeader({
       params: { channelId: target.id, serverId: target.serverId },
     });
   };
+  const openSideQuestion = () => {
+    void haptics.impact("soft");
+    router.push({ pathname: "/side-question/[agentId]", params: { agentId: target.id, serverId: target.serverId } });
+  };
+  const openPins = () => {
+    void haptics.impact("soft");
+    router.push({ pathname: "/pinned-messages", params: { agentId: target.id, serverId: target.serverId } });
+  };
   const goBack = () => {
     void haptics.impact("soft");
     onBack();
   };
+  // The More menu in the top right corner: the agent's browser, the pinned messages, the side question
+  // in its own section and, last in its own section, the channel actions when a task needs the user,
+  // with a triangle in the warning color. The button has a warning dot then. The iOS system menu draws item titles in its own color: only
+  // Android shows the title in the warning color.
+  const browserAction: MenuAction = { id: "browser", title: t("mobile.browser.open"), image: "globe" };
+  const pinsAction: MenuAction = { id: "pins", title: t("mobile.chat.pins.title"), image: "pin" };
+  const sideQuestionAction: MenuAction = {
+    id: "side-question",
+    title: t("mobile.chat.sideQuestion.title"),
+    image: "questionmark.bubble",
+  };
+  const attentionAction: MenuAction = {
+    id: "attention",
+    title: t("mobile.chat.header.actionsNeeded"),
+    titleColor: String(warning),
+    image: "exclamationmark.triangle",
+    imageColor: String(warning),
+  };
+  const moreActions: MenuAction[] = [
+    ...(browserShown ? [browserAction] : []),
+    ...(pinsShown ? [pinsAction] : []),
+    ...(sideQuestionShown
+      ? [{ id: "side-question-section", title: "", displayInline: true, subactions: [sideQuestionAction] }]
+      : []),
+    ...(attention ? [{ id: "attention-section", title: "", displayInline: true, subactions: [attentionAction] }] : []),
+  ];
+  const onMoreAction = (id: string) => {
+    if (id === "attention") openChannelActions();
+    else if (id === "browser") openBrowser();
+    else if (id === "pins") openPins();
+    else if (id === "side-question") openSideQuestion();
+  };
+  const moreLabel = attention ? t("mobile.chat.header.moreAttention") : t("mobile.chat.header.more");
+  const moreHidden = moreActions.length === 0;
+  // Not in a BlurReveal: glass stops rendering under an ancestor with zero opacity, so the button hides
+  // itself, and its glass turns off with the native animation. A menu with no items, such as a channel
+  // on a host that cannot stream a tab, shows no button. The button is drawn, not a native bar menu,
+  // so that the menu can tint the warning dot of its item and the button can draw a small dot.
+  const moreButton = (size: number) => (
+    <MenuView
+      colorScheme={theme === "dark" ? "dark" : "light"}
+      actions={moreActions}
+      onPressAction={({ nativeEvent }) => onMoreAction(nativeEvent.event)}
+    >
+      <GlassView
+        accessible={!moreHidden}
+        accessibilityRole="button"
+        accessibilityLabel={moreLabel}
+        glassEffectStyle={{
+          style: liquidGlassAvailable && !moreHidden ? "regular" : "none",
+          animate: true,
+          animationDuration: 0.2,
+        }}
+        isInteractive={liquidGlassAvailable && !moreHidden}
+        pointerEvents={moreHidden ? "none" : "auto"}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: liquidGlassAvailable || moreHidden ? "transparent" : fallbackBackground,
+          opacity: moreHidden ? 0 : 1,
+        }}
+      >
+        <Ellipsis color={iconColor} size={24} strokeWidth={2} />
+        {attention ? (
+          <View className="absolute top-2 right-2 size-2 rounded-full" style={{ backgroundColor: String(warning) }} />
+        ) : null}
+      </GlassView>
+    </MenuView>
+  );
 
   // The row's side padding, and on the drawn header the gap after the pill and a 48 pt button with its
   // 8 pt gap for Back and for the trailing button. The vertical bar has these buttons in the native bar.
@@ -252,6 +343,17 @@ export function ChatHeader({
     </GlassView>
   );
 
+  const deleteButton = deleteAction ? (
+    <ChatGlassIconButton
+      accessibilityLabel={deleteAction.label}
+      disabled={deleteAction.disabled}
+      fallbackBackground={fallbackBackground}
+      liquidGlassAvailable={liquidGlassAvailable}
+      onPress={deleteAction.onPress}
+    >
+      <Trash color={iconColor} size={22} strokeWidth={2} />
+    </ChatGlassIconButton>
+  ) : null;
   const trailingButtons =
     actionsMenu === null ? null : actionsMenu ? (
       <MenuView
@@ -278,32 +380,7 @@ export function ChatHeader({
         </GlassView>
       </MenuView>
     ) : (
-      <View className="flex-row items-center gap-2">
-        {target.kind === "channel" && needsAction ? (
-          <ChatGlassIconButton
-            accessibilityLabel={t("mobile.chat.header.actionsNeeded")}
-            fallbackBackground={fallbackBackground}
-            liquidGlassAvailable={liquidGlassAvailable}
-            onPress={openChannelActions}
-          >
-            <TriangleAlert color={String(warning)} size={24} strokeWidth={2.5} />
-          </ChatGlassIconButton>
-        ) : null}
-        {/* Not in a BlurReveal: glass stops rendering under an ancestor with zero opacity, so the
-          button hides itself, and its glass turns off with the native animation. The agent's
-          browser on the host, live. The button shows when the agent has no tab yet too: the
-          browser screen opens a new one. A host that cannot stream a tab, or an app version
-          the account server has the browser off for, shows no button. */}
-        <ChatGlassIconButton
-          accessibilityLabel={t("mobile.browser.open")}
-          fallbackBackground={fallbackBackground}
-          hidden={!browserShown}
-          liquidGlassAvailable={liquidGlassAvailable}
-          onPress={openBrowser}
-        >
-          <Globe color={iconColor} size={24} strokeWidth={2} />
-        </ChatGlassIconButton>
-      </View>
+      moreButton(BAR_BUTTON_SIZE)
     );
 
   if (isIOS) {
@@ -329,19 +406,32 @@ export function ChatHeader({
           )}
         </Stack.Toolbar>
         <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="exclamationmark.triangle"
-            accessibilityLabel={t("mobile.chat.header.actionsNeeded")}
-            tintColor={String(warning)}
-            hidden={accessibilityHidden || !(target.kind === "channel" && needsAction)}
-            onPress={openChannelActions}
-          />
-          <Stack.Toolbar.Button
-            icon="globe"
-            accessibilityLabel={t("mobile.browser.open")}
-            hidden={accessibilityHidden || !browserShown}
-            onPress={openBrowser}
-          />
+          {deleteAction ? (
+            <Stack.Toolbar.Button
+              icon="trash"
+              accessibilityLabel={deleteAction.label}
+              disabled={deleteAction.disabled}
+              hidden={accessibilityHidden}
+              onPress={deleteAction.onPress}
+            />
+          ) : actionsMenu ? null : !verticalBar ? (
+            <Stack.Toolbar.View hidesSharedBackground hidden={accessibilityHidden || moreHidden}>
+              <View style={{ width: NATIVE_BAR_HEIGHT, height: NATIVE_BAR_HEIGHT }}>
+                {moreButton(NATIVE_BAR_HEIGHT)}
+              </View>
+            </Stack.Toolbar.View>
+          ) : (
+            // iOS hides a custom view of the vertical bar while the content scrolls, so the menu is a
+            // native bar menu there. iOS 26 draws the badge with no text as a dot on the button.
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              accessibilityLabel={moreLabel}
+              hidden={accessibilityHidden || moreHidden}
+            >
+              {attention ? <Stack.Toolbar.Badge style={{ backgroundColor: String(warning) }} /> : null}
+              {toolbarMenuItems(moreActions, onMoreAction)}
+            </Stack.Toolbar.Menu>
+          )}
           {actionsMenu ? (
             <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel={actionsMenu.label} hidden={accessibilityHidden}>
               {toolbarMenuItems(actionsMenu.actions, actionsMenu.onPressAction)}
@@ -396,11 +486,11 @@ export function ChatHeader({
         {titlePill}
 
         <View className="flex-1" />
-        {trailingButtons}
+        {deleteButton ?? trailingButtons}
       </View>
       <SheetScrollEdgeEffect
         style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}
       />
     </>
   );
-}
+});

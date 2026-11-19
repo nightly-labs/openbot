@@ -11,6 +11,7 @@ import {
   type McpSignInRelayPage,
   type ProviderAdminDesktopApi,
   relayCallbackQuery,
+  relayPageUrl,
 } from "@openbot/contracts/ipc";
 import type { ProviderAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -172,6 +173,11 @@ function takePage(entry: RelayedSignIn, address: string): string | null {
   if (!state && returns) return sourceText("error.mcp.relayNoState");
   entry.url = page.toString();
   entry.state = state;
-  entry.page = { authorizeHost: page.host, listening: false, pasteable: returns || state !== null };
+  entry.page = {
+    authorizeHost: page.host,
+    url: relayPageUrl(page),
+    listening: false,
+    pasteable: returns || state !== null,
+  };
   return null;
 }

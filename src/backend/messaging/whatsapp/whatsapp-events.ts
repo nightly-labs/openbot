@@ -13,12 +13,19 @@ import {
 } from "@openbot/whatsapp/baileys";
 import type { InboundAction, InboundFile, InboundMessage, MessageTarget } from "../messaging-types";
 import type { WhatsAppChatState } from "./whatsapp-chats";
+import { isOtherOpenBotPost } from "./whatsapp-loop-guard";
 import { type SenderDecision, senderDecision, type WhatsAppSenderRules } from "./whatsapp-senders";
 
 /** The conversation of a direct chat: the whole chat. */
 export const WHATSAPP_DIRECT_THREAD = "dm";
-/** An `append` message older than the connect time minus this is history, not a new message. */
+/** On a new link, an `append` message older than the connect time minus this is history, not a new message. */
 const APPEND_GRACE_MS = 60_000;
+/**
+ * WhatsApp sends the messages that it held while this device was away (asleep, closed, a dead socket)
+ * as `append` after the connect. Only the first socket after a link gets history, so on a later socket
+ * an `append` message this recent is a held message that still gets an answer.
+ */
+const HELD_MAX_AGE_MS = 20 * 60_000;
 /** A message older than this is not answered: its asker has moved on. */
 const MESSAGE_MAX_AGE_MS = 24 * 60 * 60_000;
 const APPROVE_TEXT = /^(1|approve|yes)$/iu;
@@ -44,18 +51,36 @@ export interface WhatsAppInboundContext {
   threadOf(messageId: string): string | null;
   /** The phone number of a LID user, from WhatsApp's mapping. */
   numberForLid(lid: string): Promise<string | null>;
+  /** The message is older than a new one can be (see `freshUpsert`): it is saved, and nothing answers it. */
+  historyOnly?: boolean;
 }
 
 export type WhatsAppEvent =
   | { type: "message"; message: InboundMessage; chatJid: string; isGroup: boolean }
   | { type: "action"; action: InboundAction }
   /** An unknown person wrote to a dedicated number. */
-  | { type: "pairing"; chatJid: string; senderId: string; name: string };
+  | { type: "pairing"; chatJid: string; senderId: string; name: string }
+  /** Another OpenBot linked to the same number posted in the owner's own chat. Nothing answers it. */
+  | { type: "otherOpenBot"; chatJid: string };
+
+/** The socket facts that tell a held message from history. */
+export interface WhatsAppUpsertWindow {
+  /** When the socket opened, in milliseconds. */
+  openedAt: number;
+  /** WhatsApp sent the number its history before this socket opened, so an `append` is not history. */
+  synced: boolean;
+  now: number;
+}
 
 /** True for an upsert that can carry a new message: live ones, and recent `append` ones. */
-export function freshUpsert(type: string, message: WAMessage, openedAt: number): boolean {
+export function freshUpsert(type: string, message: WAMessage, upsertWindow: WhatsAppUpsertWindow): boolean {
   if (type === "notify") return true;
-  return type === "append" && sentAt(message) >= openedAt - APPEND_GRACE_MS;
+  if (type !== "append") return false;
+  const sent = sentAt(message);
+  return (
+    sent >= upsertWindow.openedAt - APPEND_GRACE_MS ||
+    (upsertWindow.synced && sent >= upsertWindow.now - HELD_MAX_AGE_MS)
+  );
 }
 
 /** The dedup key of a message, stable across redeliveries. */
@@ -68,6 +93,8 @@ export function whatsAppDedupKey(message: WAMessage): string | null {
 /**
  * Turns one WhatsApp message into a message for the agents, an answer to an approval menu, a pairing
  * request, or nothing. The sender rules run first, so a chat that may not give work leaves no trace.
+ * A message that only goes into the saved history, such as the owner's own message in an allowed group,
+ * gives nothing.
  */
 export async function whatsAppInbound(
   message: WAMessage,
@@ -82,7 +109,9 @@ export async function whatsAppInbound(
   if (key.fromMe && context.isOwnPost(id)) return null;
   if (context.now - sentAt(message) > MESSAGE_MAX_AGE_MS) return null;
   const content = normalizeMessageContent(message.message);
-  if (!content || content.protocolMessage || content.reactionMessage) return null;
+  if (!content || content.reactionMessage) return null;
+  const protocol = content.protocolMessage;
+  if (protocol && !savedChange(protocol)) return null;
 
   const rawChatJid = jidNormalizedUser(rawChat);
   const isGroup = Boolean(isJidGroup(rawChatJid));
@@ -108,10 +137,20 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
-  const name = message.pushName?.trim() || authorNumber || "WhatsApp";
-  if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
-
+  const historyOnly = decision.type === "save" || context.historyOnly === true;
   const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
+  if (protocol) {
+    applyChange(protocol, chatJid, authorId, context.chats);
+    return null;
+  }
+  // An HD photo or video comes twice: the normal copy, then the HD copy, which names the first. When
+  // the first copy was read, the second is not a new message.
+  const firstCopy = firstCopyId(message.message);
+  if (firstCopy && context.chats.keyOf(firstCopy)) return null;
+  const name = message.pushName?.trim() || authorNumber || "WhatsApp";
+  if (decision.type === "pair")
+    return authorNumber && !historyOnly ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
+
   context.chats.rememberName(authorId, key.fromMe ? null : message.pushName);
   const contextInfo = contextOf(content);
   const quotedId = contextInfo?.stanzaId ?? null;
@@ -122,6 +161,7 @@ export async function whatsAppInbound(
     (context.isOwnPost(quotedId) ||
       (contextInfo?.participant ? isMe(jidNormalizedUser(contextInfo.participant), context.me) : false));
   const text = textOf(content);
+  if (isSelfChat && isOtherOpenBotPost(text)) return historyOnly ? null : { type: "otherOpenBot", chatJid };
   const files = filesOf(content, chatJid, id);
   context.chats.rememberKey(id, { fromMe: Boolean(key.fromMe), participant: key.participant ?? null, text });
   if (files[0]) context.chats.rememberMedia(files[0].id, message);
@@ -136,7 +176,7 @@ export async function whatsAppInbound(
 
   // A numbered answer to an approval menu: the quoted menu, or the newest one of the conversation.
   const approve = APPROVE_TEXT.test(text.trim());
-  if ((approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
+  if (!historyOnly && (approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
     const menu =
       (quotedId ? ((m) => (m ? { messageId: quotedId, menu: m } : null))(context.chats.menu(quotedId)) : null) ??
       context.chats.latestMenu(chatJid, threadKey);
@@ -157,11 +197,25 @@ export async function whatsAppInbound(
 
   // In a group, only a mention, or a message of a conversation that an agent answers, counts.
   const addressed = !isGroup || namesMe;
-  if (isGroup && !addressed && !quotedThread) {
-    context.chats.rememberMessage({ id, chatJid, threadKey, authorName: name, text, sentAt: isoTime(message) });
+  // Saved with its file, which an agent can read later with `messaging_history`.
+  const remembered = {
+    id,
+    chatJid,
+    threadKey,
+    authorId,
+    authorName: name,
+    text: text || files.map((file) => file.name).join(", "),
+    sentAt: isoTime(message),
+    ...(files.length ? { files } : {}),
+  };
+  if (historyOnly || (isGroup && !addressed && !quotedThread)) {
+    context.chats.rememberMessage(remembered);
     return null;
   }
-  const replyTo = quotedId && contextInfo?.quotedMessage && !repliesToMe ? quoteOf(contextInfo, context) : null;
+  const replyTo =
+    quotedId && contextInfo?.quotedMessage && !repliesToMe
+      ? quoteOf(contextInfo, { rawChat, chatJid, quotedId, isGroup }, context)
+      : null;
   const inbound: InboundMessage = {
     dedupKey: `${chatJid}:${id}`,
     platformChannelId: chatJid,
@@ -176,15 +230,7 @@ export async function whatsAppInbound(
     files,
     ...(replyTo ? { replyTo } : {}),
   };
-  context.chats.rememberMessage({
-    id,
-    chatJid,
-    threadKey,
-    authorName: name,
-    text: text || files.map((file) => file.name).join(", "),
-    sentAt: isoTime(message),
-    ...(files.length ? { files } : {}),
-  });
+  context.chats.rememberMessage(remembered);
   return { type: "message", message: inbound, chatJid, isGroup };
 }
 
@@ -199,6 +245,51 @@ export function whatsAppQuoteId(target: MessageTarget): string | null {
   const [threadKey = "", replyTo = ""] = target.replyThreadId.split(":");
   if (replyTo) return replyTo;
   return threadKey && threadKey !== WHATSAPP_DIRECT_THREAD ? threadKey : null;
+}
+
+const SECOND_UPLOADS: ReadonlySet<number> = new Set([
+  proto.MessageAssociation.AssociationType.HD_IMAGE_DUAL_UPLOAD,
+  proto.MessageAssociation.AssociationType.HD_VIDEO_DUAL_UPLOAD,
+  proto.MessageAssociation.AssociationType.HEVC_VIDEO_DUAL_UPLOAD,
+]);
+
+/** The id of the normal copy that this HD copy of a photo or video names, or null for any other message. */
+function firstCopyId(message: proto.IMessage): string | null {
+  let current: proto.IMessage | null | undefined = message;
+  // The link can be on the outer message or inside its envelopes (a disappearing chat, the HD wrapper).
+  for (let depth = 0; current && depth < 4; depth++) {
+    const association = current.messageContextInfo?.messageAssociation;
+    if (association?.associationType != null && SECOND_UPLOADS.has(association.associationType))
+      return association.parentMessageKey?.id ?? null;
+    current = current.ephemeralMessage?.message ?? current.associatedChildMessage?.message;
+  }
+  return null;
+}
+
+/** A delete for everyone or a change of text, which the saved copy of the message follows. */
+function savedChange(protocol: proto.Message.IProtocolMessage): boolean {
+  return (
+    protocol.type === proto.Message.ProtocolMessage.Type.REVOKE ||
+    protocol.type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT
+  );
+}
+
+/** Only the author's own edit or delete counts. A group admin's delete of another person's message is not followed. */
+function applyChange(
+  protocol: proto.Message.IProtocolMessage,
+  chatJid: string,
+  authorId: string,
+  chats: WhatsAppChatState,
+): void {
+  const messageId = protocol.key?.id;
+  if (!messageId) return;
+  if (protocol.type === proto.Message.ProtocolMessage.Type.REVOKE) {
+    chats.forgetMessage(chatJid, messageId, authorId);
+    return;
+  }
+  const edited = normalizeMessageContent(protocol.editedMessage);
+  const text = edited ? textOf(edited) : "";
+  if (text) chats.editMessage(chatJid, messageId, authorId, text);
 }
 
 function contextOf(content: proto.IMessage): proto.IContextInfo | null {
@@ -277,15 +368,46 @@ function extension(mimeType: string | null | undefined, fallback: string): strin
   return subtype && /^[a-z0-9.+-]{1,12}$/u.test(subtype) ? subtype.replace("jpeg", "jpg") : fallback;
 }
 
-function quoteOf(contextInfo: proto.IContextInfo, context: WhatsAppInboundContext) {
+/**
+ * The replied-to message, with its files apart from the reply's own. A file comes from the stored
+ * message when OpenBot saw it arrive, or else from the copy that the reply carries, which is then
+ * stored for the download.
+ */
+function quoteOf(
+  contextInfo: proto.IContextInfo,
+  where: { rawChat: string; chatJid: string; quotedId: string; isGroup: boolean },
+  context: WhatsAppInboundContext,
+) {
   const quoted = normalizeMessageContent(contextInfo.quotedMessage);
   if (!quoted) return null;
   const author = contextInfo.participant ? userOf(jidNormalizedUser(contextInfo.participant)) : null;
+  const stored = context.chats.media(`${where.chatJid}|${where.quotedId}`);
+  const files = filesOf(
+    (stored?.message ? normalizeMessageContent(stored.message) : null) ?? quoted,
+    where.chatJid,
+    where.quotedId,
+  );
+  if (files[0] && !stored)
+    context.chats.rememberMedia(files[0].id, {
+      // The key of the quoted message, for a re-upload request. A reply to this number gets no quote,
+      // so another person wrote it; only a group message names its author.
+      key: {
+        remoteJid: where.rawChat,
+        id: where.quotedId,
+        fromMe: false,
+        ...(where.isGroup && contextInfo.participant ? { participant: contextInfo.participant } : {}),
+      },
+      message: contextInfo.quotedMessage ?? null,
+    });
+  // Names its files, so that the agent knows which of the message's files are the replied-to ones.
+  const names = files.length ? `(Attached files: ${files.map((file) => file.name).join(", ")})` : "";
   return {
     authorName: (author && context.chats.name(author)) ?? author ?? "WhatsApp",
-    text: textOf(quoted),
+    text: [textOf(quoted), names].filter(Boolean).join("\n"),
     mentionedUserIds: [],
     sentAt: new Date(context.now).toISOString(),
+    messageId: where.quotedId,
+    files,
   };
 }
 
@@ -335,7 +457,8 @@ function userOf(jid: string | null | undefined): string | null {
 }
 
 /** The send time in milliseconds. Baileys gives a number, or a protobuf Long after a decode. */
-function sentAt(message: WAMessage): number {
+/** When the message was sent, in milliseconds, or 0 when WhatsApp did not say. */
+export function sentAt(message: WAMessage): number {
   const value = message.messageTimestamp;
   const seconds = typeof value === "number" ? value : value ? value.toNumber() : 0;
   return seconds * 1_000;

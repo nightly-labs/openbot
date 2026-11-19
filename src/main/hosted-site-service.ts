@@ -238,7 +238,19 @@ export class HostedSiteDesktopService {
     const done = Deferred.makeUnsafe<HostedSiteSummary, HostedSiteFailure>();
     pending.inFlight = done;
     const entry = pending;
+    const resumed = entry.session !== null;
     return yield* this.performUpload(input, siteId, prepared, entry).pipe(
+      // A session that a retry resumes can end before it: it expired, or a newer replace of the site freed its slot.
+      // Start one new session for the same files.
+      Effect.catch((failure) => {
+        if (!resumed || authErrorCode(failure.cause) !== "upload_expired") return Effect.fail(failure);
+        entry.uploadKey = operationKey(siteId ? "replace" : "publish");
+        entry.activationKey = operationKey("activate");
+        entry.session = null;
+        entry.uploadedPaths.clear();
+        entry.createdAt = Date.now();
+        return this.performUpload(input, siteId, prepared, entry);
+      }),
       Effect.catch((failure) => this.siteLimitFailure(failure, entry.serverScoped)),
       Effect.tap(() => Effect.sync(() => this.#pendingUploads.delete(signature))),
       Effect.onExit((exit) => Deferred.done(done, exit)),
@@ -293,10 +305,9 @@ export class HostedSiteDesktopService {
             `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/file?path=${encodeURIComponent(file.path)}`,
             {
               method: "PUT",
-              headers: {
-                "Content-Type": file.mimeType,
-                "Content-Length": String(file.size),
-              },
+              // The fetch sets `Content-Length` from the body. Chromium's `net.fetch` refuses a request
+              // that sets it as a header (`net::ERR_INVALID_ARGUMENT`), and the upload then fails (#12282).
+              headers: { "Content-Type": file.mimeType },
               body: arrayBuffer(file.bytes),
             },
             decodeUploadResult,

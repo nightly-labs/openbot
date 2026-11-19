@@ -29,6 +29,12 @@
   padding-top: var(--openbot-chat-marker-gap);
 }
 
+/* As in the agent's chat, the working line of a thread stands right under the last message. Its own
+   top padding keeps the face clear of the message. */
+.virtual-chat-row-activity {
+  padding-top: 0;
+}
+
 .virtual-chat-row > .chat-action-marker + .message-entry {
   margin-top: var(--openbot-chat-marker-gap);
 }

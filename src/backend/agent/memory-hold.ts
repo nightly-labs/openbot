@@ -1,5 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Exit, Scope } from "effect";
+import { Duration, Effect, Exit, Schedule, Scope } from "effect";
 import type { HostMemory } from "../host-memory";
 import type { ProviderClientOperationError } from "../provider-client-effects";
 
@@ -27,6 +27,12 @@ export interface MemoryHoldHooks {
 export interface MemoryHoldOptions {
   /** Null on a desktop computer: nothing is held there. */
   memory: HostMemory | null;
+  /**
+   * The total that an owner or admin set, "unlimited" for no limit, or null for automatic: the memory
+   * sets it on a server, and a desktop computer has no limit. A set total can be above the automatic
+   * one; low memory still holds a new turn.
+   */
+  chosenTurnLimit?: () => number | "unlimited" | null;
   hooks: MemoryHoldHooks;
 }
 
@@ -38,8 +44,12 @@ export interface MemoryHoldOptions {
  * holds close.
  * It never imports the service.
  */
+/** The memory sample interval of a server, used for the slot retry of a desktop computer. */
+const SLOT_RETRY_INTERVAL = Duration.seconds(5);
+
 export class MemoryHold {
   readonly #memory: HostMemory | null;
+  readonly #chosenTurnLimit: () => number | "unlimited" | null;
   readonly #hooks: MemoryHoldHooks;
   #scope = Scope.makeUnsafe();
   readonly #told = new Set<string>();
@@ -56,11 +66,25 @@ export class MemoryHold {
 
   constructor(options: MemoryHoldOptions) {
     this.#memory = options.memory;
+    this.#chosenTurnLimit = options.chosenTurnLimit ?? (() => null);
     this.#hooks = options.hooks;
   }
 
   start(): void {
-    if (!this.#memory || this.#unsubscribe) return;
+    if (this.#unsubscribe) return;
+    if (!this.#memory) {
+      // A desktop computer has no memory sample, but a total that an owner set can make a lane wait
+      // for a slot. The retry does nothing while no lane waits.
+      const retry = Effect.sync(() => {
+        if (typeof this.#chosenTurnLimit() === "number") this.#hooks.retryWaiting();
+      }).pipe(
+        Effect.repeat(Schedule.spaced(SLOT_RETRY_INTERVAL)),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      );
+      Effect.runFork(retry);
+      this.#unsubscribe = () => {};
+      return;
+    }
     this.#unsubscribe = this.#memory.subscribe(() =>
       Effect.runFork(this.#sampled().pipe(Effect.forkIn(this.#scope, { startImmediately: true }))),
     );
@@ -94,7 +118,9 @@ export class MemoryHold {
 
   /** The most turns that run at the same time, or null for no limit. */
   turnLimit(): number | null {
-    return this.#memory?.turnLimit() ?? null;
+    const chosen = this.#chosenTurnLimit();
+    if (chosen === "unlimited") return null;
+    return chosen ?? this.#memory?.turnLimit() ?? null;
   }
 
   readonly #sampled = Effect.fn("MemoryHold.sampled")(function* (this: MemoryHold) {

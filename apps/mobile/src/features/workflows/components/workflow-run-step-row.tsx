@@ -3,6 +3,7 @@ import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
+import { rowIndent } from "@/features/workflows/components/workflow-steps-list";
 import { STEP_STATUS_LABEL, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -30,6 +31,7 @@ export function WorkflowRunStepRow({
   onDecide,
   onRetry,
   onStop,
+  depth,
 }: {
   node: WorkflowNode;
   step: WorkflowStep | undefined;
@@ -38,13 +40,19 @@ export function WorkflowRunStepRow({
   onDecide: (step: WorkflowStep, approved: boolean) => void;
   onRetry: (step: WorkflowStep) => void;
   onStop: (step: WorkflowStep) => void;
+  /** The depth of the path of the step: each path sits one level deeper than its split. */
+  depth?: number;
 }) {
   const { t } = useText();
   const [open, setOpen] = useState(false);
   const status = step?.status;
-  const output = step?.output?.trim() ? step.output : null;
+  // The output of an image or video step is the id of the file that it made, not text to read.
+  const output = node.kind !== "image" && step?.output?.trim() ? step.output : null;
   return (
-    <View className={`flex-row gap-3 px-4 py-3 ${status === "skipped" || !status ? "opacity-60" : ""}`}>
+    <View
+      className={`flex-row gap-3 py-3 pr-4 ${depth === undefined ? "pl-4" : ""} ${status === "skipped" || !status ? "opacity-60" : ""}`}
+      style={depth === undefined ? undefined : { paddingLeft: rowIndent(depth) }}
+    >
       <WorkflowKindTile kind={node.kind} trigger={node.kind === "trigger" ? triggerType(node) : undefined} size={30} />
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center justify-between gap-2">

@@ -1,0 +1,20 @@
+# On a prepared machine of the pool that has no server. openbot-pool-wait asks the account service for
+# the server of a new customer, starts OpenBot for it, and disables this unit. `move-from-boat.sh offer`
+# installs and enables the unit; a machine with no token does not start it.
+[Unit]
+Description=OpenBot pool machine waits for a server
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/openbot-pool/token
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/openbot-pool/openbot-pool-wait
+RuntimeDirectory=openbot-pool
+RuntimeDirectoryMode=0700
+# The script ends with 0 when a server starts or when the offer is over. Another end is an error.
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

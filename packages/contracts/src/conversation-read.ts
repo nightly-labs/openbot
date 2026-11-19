@@ -15,12 +15,14 @@ import {
   PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
 } from "./ipc-conversation-events";
 import { CONVERSATION_MEMORY_CHANGES_ITEM_TYPE } from "./ipc-conversation-memory-changes";
 import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "./ipc-conversation-messages";
 import { CONVERSATION_PLAN_ITEM_TYPE } from "./ipc-conversation-plan";
 import { CONVERSATION_SUBAGENTS_ITEM_TYPE } from "./ipc-conversation-subagents";
 import { MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX } from "./marketplace-suggestion-events";
+import { SETTING_LINK_ITEM_TYPE_PREFIX } from "./setting-links";
 import { SKILL_EVENT_ITEM_TYPE_PREFIX } from "./skill-conversation-events";
 
 /** Item types that never make a chat unread: the agent's own work, and messages between agents. */
@@ -45,7 +47,9 @@ export const READ_EXCLUDED_ITEM_TYPE_PREFIXES = [
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
 ] as const;
 
 const excludedItemTypes: ReadonlySet<string> = new Set(READ_EXCLUDED_ITEM_TYPES);

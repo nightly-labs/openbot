@@ -13,7 +13,7 @@ import size1Regular from "katex/dist/fonts/KaTeX_Size1-Regular.ttf";
 import size2Regular from "katex/dist/fonts/KaTeX_Size2-Regular.ttf";
 import typewriterRegular from "katex/dist/fonts/KaTeX_Typewriter-Regular.ttf";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
-import { type ColorValue, type LayoutChangeEvent, ScrollView, View, type ViewStyle } from "react-native";
+import { type ColorValue, type LayoutChangeEvent, View, type ViewStyle } from "react-native";
 import {
   LARGE_OPERATORS,
   type MathElement,
@@ -23,6 +23,7 @@ import {
   mathTree,
   operatorSpacing,
 } from "../model/chat-math";
+import { ChatHorizontalScrollView } from "./chat-swipe-gesture";
 
 const KATEX_FONTS = {
   "KaTeX_AMS-Regular": amsRegular,
@@ -405,8 +406,7 @@ export const ChatMath = memo(function ChatMath({
   const formula = ready ? <MathRow nodes={tree.children} context={context} /> : null;
   if (block) {
     return (
-      <ScrollView
-        horizontal
+      <ChatHorizontalScrollView
         alwaysBounceHorizontal={false}
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
@@ -415,7 +415,7 @@ export const ChatMath = memo(function ChatMath({
         accessibilityLabel={tex}
       >
         {formula}
-      </ScrollView>
+      </ChatHorizontalScrollView>
     );
   }
   // The middle of the formula is its math axis. A view inside text has its bottom a descender below

@@ -38,6 +38,19 @@ export interface SidebarDragMeasurement {
   sections: Map<string, SectionDragSlot>;
 }
 
+/**
+ * The empty pin area slides open inside the pinned group, which clips it. Its own box has the full
+ * height from the first frame, so it would cover the rows that have not moved down yet.
+ */
+function visiblePinnedBounds(group: HTMLElement, target: HTMLElement): DOMRect {
+  const bounds = target.getBoundingClientRect();
+  if (target === group) return bounds;
+  const clip = group.getBoundingClientRect();
+  const top = Math.max(bounds.top, clip.top);
+  const bottom = Math.min(bounds.bottom, clip.bottom);
+  return new DOMRect(bounds.left, top, bounds.width, Math.max(0, bottom - top));
+}
+
 export function measureSidebarDragSlots(
   list: HTMLElement,
   assignedSectionId: (chatId: string) => string,
@@ -51,7 +64,7 @@ export function measureSidebarDragSlots(
   const listBounds = list.getBoundingClientRect();
   const geometry: SidebarDragGeometry = {
     list: listBounds,
-    pinned: pinnedTarget?.getBoundingClientRect() ?? null,
+    pinned: pinnedGroup && pinnedTarget ? visiblePinnedBounds(pinnedGroup, pinnedTarget) : null,
   };
   for (const section of list.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.sectionRegion)) {
     const sectionId = section.dataset.sectionId;

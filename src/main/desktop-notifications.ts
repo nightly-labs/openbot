@@ -74,6 +74,9 @@ export function closeRetainedNotification(notification: Notification): void {
   notification.close();
 }
 
+/** The chat of a notification: the agent's own chat, or a channel. Reading the chat closes its notifications. */
+export type NotificationChat = { agentId: string } | { channelId: string };
+
 export interface NotificationPermissionRequest {
   platform: NodeJS.Platform;
   preference: Pick<NotificationPreferenceStore, "get" | "permissionRequested" | "markPermissionRequested">;

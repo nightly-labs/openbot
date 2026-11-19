@@ -2,7 +2,8 @@
 // delete, on a temporary profile. Only the agent mailbox is a stand-in that keeps each delivery
 // running, so no provider, app, account or network is started. A deleted agent fails the step that it
 // was answering, removes the agent from the graph and fails the run; a run that a restart cut off
-// while it stopped ends stopped at the first sweep, and the sweep stops its delivery.
+// while it stopped ends stopped at the first sweep, and the sweep stops its delivery. The files of
+// the image and asset steps before an agent step go with its message, each one time.
 //
 // Run: bun scripts/workflow-agent-step-e2e.ts
 // Writes .openbot-build/workflow-agent-step-e2e/report.json and exits non-zero on a failure.
@@ -11,6 +12,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { WorkflowGraph, WorkflowRunDetail } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -27,7 +29,7 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  handoffs: { agentId: string; deliveryId: string }[];
+  handoffs: { agentId: string; deliveryId: string; sourcePaths: readonly string[] }[];
   stopped: { agentId: string; deliveryId: string }[];
   passed: boolean;
   failure?: string;
@@ -45,6 +47,42 @@ const graphOf = (agentId: string): WorkflowGraph => ({
     { id: "agent", kind: "agent", at: { x: 300, y: 0 }, fields: { agentId, task: "Write a short note." } },
   ],
   edges: [{ id: "edge", from: "prompt", to: "agent", type: "text" }],
+  strokes: [],
+});
+
+/** A picture and a file that feed an agent step: two edges from the asset, one from the image step. */
+const picturesGraph = (agentId: string): WorkflowGraph => ({
+  nodes: [
+    { id: "prompt", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Compare the two pictures." } },
+    { id: "asset", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId: "asset-file" } },
+    { id: "image", kind: "image", at: { x: 0, y: 400 }, fields: { prompt: "A red bicycle." } },
+    { id: "agent", kind: "agent", at: { x: 300, y: 0 }, fields: { agentId, task: "Describe the pictures." } },
+  ],
+  edges: [
+    { id: "text", from: "prompt", to: "agent", type: "text" },
+    { id: "asset-image", from: "asset", to: "agent", type: "image" },
+    { id: "asset-file", from: "asset", to: "agent", type: "file" },
+    { id: "image-image", from: "image", to: "agent", type: "image" },
+  ],
+  strokes: [],
+});
+const GENERATED_FILE = "generated-file";
+/** A file that Storage no longer has. */
+const DELETED_FILE = "deleted-file";
+const storedPath = (attachmentId: string) => `/stored/${attachmentId}`;
+
+/** An agent step after one asset step for each file. */
+const assetsGraph = (agentId: string, fileIds: readonly string[]): WorkflowGraph => ({
+  nodes: [
+    ...fileIds.map((fileId, index) => ({
+      id: `asset-${index}`,
+      kind: "asset" as const,
+      at: { x: 0, y: index * 200 },
+      fields: { fileId },
+    })),
+    { id: "agent", kind: "agent", at: { x: 300, y: 0 }, fields: { agentId, task: "Describe the files." } },
+  ],
+  edges: fileIds.map((_, index) => ({ id: `edge-${index}`, from: `asset-${index}`, to: "agent", type: "file" })),
   strokes: [],
 });
 
@@ -67,7 +105,7 @@ async function open() {
       sendHandoff: (input) =>
         Effect.sync(() => {
           const deliveryId = `delivery-${report.handoffs.length + 1}`;
-          report.handoffs.push({ agentId: input.agentId, deliveryId });
+          report.handoffs.push({ agentId: input.agentId, deliveryId, sourcePaths: input.sourcePaths });
           return deliveryId;
         }),
       stopDelivery: (agentId, deliveryId) =>
@@ -75,6 +113,8 @@ async function open() {
           report.stopped.push({ agentId, deliveryId });
         }),
       generateText: () => Effect.fail({ message: "No model step runs in this test." }),
+      generateMedia: () => Effect.succeed(GENERATED_FILE),
+      filePath: (attachmentId) => Effect.succeed(attachmentId === DELETED_FILE ? null : storedPath(attachmentId)),
       notify: () => {},
       connectionOn: () => false,
       post: () => Effect.die(new Error("No output step runs in this test.")),
@@ -110,10 +150,10 @@ async function runUntil(
 const agentStep = (detail: WorkflowRunDetail) => detail.steps.find((step) => step.nodeId === "agent");
 const answering = (detail: WorkflowRunDetail) => agentStep(detail)?.status === "running";
 
-async function startRun(workflows: WorkflowsHandle, title: string, agentId: string) {
+async function startRun(workflows: WorkflowsHandle, title: string, agentId: string, graph = graphOf(agentId)) {
   const created = await runCauseEffect(workflows.create({ title }));
   const saved = await runCauseEffect(
-    workflows.saveGraph({ workflowId: created.summary.id, baseRevision: created.revision, graph: graphOf(agentId) }),
+    workflows.saveGraph({ workflowId: created.summary.id, baseRevision: created.revision, graph }),
   );
   assert.ok(saved.ok);
   const started = await runCauseEffect(
@@ -177,6 +217,55 @@ try {
   check(
     "the agent gets no second message",
     report.handoffs.filter((handoff) => handoff.agentId === "agent-writer").length === 1,
+    report.handoffs,
+  );
+
+  // 3. An agent step after an image step and an asset gets their files with its message.
+  const viewer = await startRun(workflows, "Picture review", "agent-viewer", picturesGraph("agent-viewer"));
+  await runUntil(workflows, viewer.runId, answering);
+  const viewerHandoff = report.handoffs.find((handoff) => handoff.agentId === "agent-viewer");
+  check(
+    "the agent step gets the files of the image step and the asset, each one time",
+    JSON.stringify(viewerHandoff?.sourcePaths) ===
+      JSON.stringify([storedPath("asset-file"), storedPath(GENERATED_FILE)]),
+    viewerHandoff,
+  );
+  check(
+    "an agent step with only a text edge gets no file",
+    report.handoffs
+      .filter((handoff) => handoff.agentId !== "agent-viewer")
+      .every((handoff) => handoff.sourcePaths.length === 0),
+    report.handoffs,
+  );
+
+  // 4. A file that Storage no longer has fails the step with its reason, and the agent gets nothing.
+  const lost = await startRun(workflows, "Lost picture", "agent-lost", assetsGraph("agent-lost", [DELETED_FILE]));
+  const lostEnd = await runUntil(workflows, lost.runId, (detail) => detail.run.status !== "running");
+  check(
+    "a deleted file fails the agent step with the missing-picture reason",
+    agentStep(lostEnd)?.status === "failed" &&
+      agentStep(lostEnd)?.error === sourceText("error.workflow.mediaInputMissing"),
+    agentStep(lostEnd),
+  );
+  check(
+    "the agent of a deleted file gets no message",
+    !report.handoffs.some((handoff) => handoff.agentId === "agent-lost"),
+    report.handoffs,
+  );
+
+  // 5. More files than a message can carry fail the step with the limit.
+  const fileIds = Array.from({ length: INPUT_LIMITS.attachments + 1 }, (_, index) => `file-${index}`);
+  const many = await startRun(workflows, "Many files", "agent-many", assetsGraph("agent-many", fileIds));
+  const manyEnd = await runUntil(workflows, many.runId, (detail) => detail.run.status !== "running");
+  check(
+    "too many files fail the agent step with the attachment limit",
+    agentStep(manyEnd)?.status === "failed" &&
+      agentStep(manyEnd)?.error === sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }),
+    agentStep(manyEnd),
+  );
+  check(
+    "the agent of too many files gets no message",
+    !report.handoffs.some((handoff) => handoff.agentId === "agent-many"),
     report.handoffs,
   );
 

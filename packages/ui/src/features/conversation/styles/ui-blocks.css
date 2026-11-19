@@ -7,6 +7,21 @@
   max-width: 100%;
 }
 
+/*
+ * A table or code in the preview uses the wide width of an agent reply (messages.css), so the columns
+ * do not break each line while the chat row has free space. The width is fixed, not the width of the
+ * table: the content is the size container of the narrow layout below, so it cannot ask for width. A
+ * wider table scrolls sideways in the card. The history entry around an answered card has the 540px
+ * limit too, so it lets the card set its own width.
+ */
+.ui-block-card.ui-bubble:has(.ui-block-preview :is(.message-markdown-table-scroll, .message-code-block)) {
+  width: var(--message-wide-bubble-width);
+}
+
+.question-prompt-history-entry:has(.ui-block-preview :is(.message-markdown-table-scroll, .message-code-block)) {
+  width: 100%;
+}
+
 /* The card has a fixed width, so its content can be a size container for the narrow layout below. */
 .ui-block-card > .ui-block-content {
   container: ui-block / inline-size;
@@ -190,8 +205,8 @@
 }
 
 /* The outcome of a short block takes the place of its buttons, so it has their size and shape, as the
-   Connected button of a Marketplace suggestion. */
-.ui-block-card[data-inline-actions] .ui-block-header > .ui-block-status {
+   Connected button of a Marketplace suggestion. Every outcome badge has this shape, so the cards agree. */
+.ui-block-card:is([data-inline-actions], :not([data-status="pending"])) .ui-block-header > .ui-block-status {
   height: var(--openbot-control-md);
   padding-inline: var(--openbot-space-4);
   border-radius: var(--openbot-radius-pill);
@@ -200,17 +215,14 @@
 }
 
 /* An answer is a status: the same success fill as Connected. On-light text keeps AA on the dark-theme fill. */
-.ui-block-card[data-inline-actions][data-status="answered"] .ui-block-header > .ui-block-status {
+.ui-block-card[data-status="answered"] .ui-block-header > .ui-block-status {
   border-color: transparent;
   background: var(--openbot-success);
   color: var(--openbot-text-on-light);
 }
 
 /* On-light text on the light-theme success fill is 3:1. The darker success-text fill keeps AA. */
-:root[data-openbot-color-scheme="light"]
-  .ui-block-card[data-inline-actions][data-status="answered"]
-  .ui-block-header
-  > .ui-block-status {
+:root[data-openbot-color-scheme="light"] .ui-block-card[data-status="answered"] .ui-block-header > .ui-block-status {
   background: var(--openbot-success-text);
 }
 
@@ -317,9 +329,10 @@
 }
 
 /* Confirm */
+/* The value column keeps a minimum width: a long label wraps, and a select still shows its option. */
 .ui-block-fields {
   display: grid;
-  grid-template-columns: minmax(64px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(64px, max-content) minmax(min(192px, 50%), 1fr);
   align-items: center;
   gap: var(--openbot-space-2) var(--openbot-space-3);
   margin: 0;
@@ -328,6 +341,7 @@
 
 .ui-block-fields dt {
   color: var(--openbot-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .ui-block-fields dd {

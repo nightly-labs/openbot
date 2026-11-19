@@ -38,16 +38,33 @@ export interface VaultLogin {
   hasOneTimePassword: boolean;
 }
 
-/** Keeps the original vault failure private; callers log it and give the agent a fixed message. */
+const vaultLoginSchema = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  username: Schema.NullOr(Schema.String),
+  hasOneTimePassword: Schema.Boolean,
+});
+
+/**
+ * Keeps the original vault failure private; callers log it and give the agent a fixed message.
+ * When some login sources of the router could not be read, `sources` names them and `logins` holds
+ * the logins of the other sources.
+ */
 export class PasswordVaultError extends Schema.TaggedError<PasswordVaultError>()("PasswordVaultError", {
   cause: Schema.Defect(),
+  sources: Schema.optionalKey(Schema.Array(Schema.String)),
+  logins: Schema.optionalKey(Schema.Array(vaultLoginSchema)),
 }) {}
 
 export interface PasswordVault {
   /** Whether a vault is connected now. Agents are told about the vault only while it is. */
   connected(): boolean;
-  /** The logins saved for `origin`, or null while no vault is connected. */
-  loginsFor(origin: string): Effect.Effect<VaultLogin[] | null, PasswordVaultError>;
+  /**
+   * The logins saved for `origin`, or null while no vault is connected. `agentId` is the agent that
+   * fills: the OpenBot Vault gives it only the logins that it can use, and without it only the logins
+   * for every agent. A password manager of the user has no agent scope and ignores it.
+   */
+  loginsFor(origin: string, agentId?: string): Effect.Effect<VaultLogin[] | null, PasswordVaultError>;
   /**
    * The password or the current one-time code of `loginId`, or null when that login is not saved for
    * `origin` or has no such value. The answer goes to the browser only, never to an agent.
@@ -56,6 +73,7 @@ export interface PasswordVault {
     loginId: string,
     origin: string,
     kind: "password" | "totp",
+    agentId?: string,
   ): Effect.Effect<string | null, PasswordVaultError>;
 }
 
