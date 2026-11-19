@@ -1,10 +1,5 @@
 import { limitedQuoteText, serializeChatTagReference } from "./chat-tag-references";
 
-/**
- * A message that asks an agent to change or explain part of an earlier message. Desktop and
- * mobile send the same body, a reply to the quoted message, so each client shows the quote of the
- * other. The instructions stay in English: they are for the model, not for the reader.
- */
 export const SELECTION_ACTION_INSTRUCTIONS = {
   Explain: "Explain this selected text.",
   Improve: "Improve this selected text.",
@@ -30,10 +25,6 @@ export function serializeSelectionInstruction(instruction: string, quote: string
   return `${normalizedInstruction}\n\n${quoted}`;
 }
 
-/**
- * A passage of a file is a quote tag, so the agent reads the file path and lines with the text. The
- * message is not a reply: no message holds the passage.
- */
 export function serializeFileSelectionInstruction(instruction: string, quote: string, quoteId: string): string {
   return `${serializeChatTagReference("quote", limitedQuoteText(quote.trim()), quoteId)}\n\n${instruction.trim()}`;
 }

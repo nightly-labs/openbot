@@ -11,10 +11,6 @@ import {
 } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server sheet > Server settings > Roles: Everyone, then the roles that add agents for their members. An
- * owner or admin opens a role to set its agents, and creates a role with the header "+".
- */
 export function ServerRolesScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

@@ -1,14 +1,3 @@
-// Drives the `@` list of an agent's composer in this worktree's running dev app, through the real UI,
-// preload bridge and message search. It changes the data of the profile, so start the app with
-// `bun run dev` (never `--shared`):
-// `bun scripts/composer-thread-search-e2e.ts --allow-mutations [--agent=<agent id>]`.
-//
-// It starts two side threads whose first message holds one new word. Thread A gets a title without
-// the word, and thread B a title with it. Then `@` and the word shows B under "Threads" and A under
-// "In messages", with the matched text. With only two letters of the word, the "In messages" section
-// goes. A pick of the A row puts a chip of thread A in the draft. Each thread start sends one
-// short provider turn. Both threads are deleted at the end.
-// Writes .openbot-build/composer-thread-search-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -55,7 +44,6 @@ async function shot(label: string): Promise<void> {
   report.screenshots.push(path);
 }
 
-/** The rows of the open `@` list in screen order, each with the title of the section above it. */
 function pickerRows(): Promise<PickerRow[]> {
   return picker().evaluate((list) => {
     const rows: PickerRow[] = [];
@@ -96,7 +84,6 @@ async function startThread(title: string): Promise<void> {
     text: `${SHORT_PROMPT} The code word is ${word}.`,
   });
   report.threads.push({ id: task.id, title });
-  // The provider can name the thread from its first message, so the title is set after the turn ends.
   await waitFor(
     page,
     `the first turn of ${title}`,
@@ -127,7 +114,6 @@ try {
   await composer.pressSequentially(`@${word.slice(0, 2)}`);
   await picker().waitFor({ timeout: UI_WAIT_MS });
 
-  // 1. The full word: B matches by title, A by its message.
   await composer.pressSequentially(word.slice(2));
   await picker().getByText(messagesSection, { exact: true }).waitFor({ timeout: UI_WAIT_MS });
   const rows = await pickerRows();
@@ -143,14 +129,12 @@ try {
   assert.equal(rowB[0]?.section, threadsSection);
   assert.ok(rows.filter((row) => row.section === messagesSection).length <= 5);
 
-  // 2. Under three letters, the message search stops and its section goes.
   for (let index = 2; index < word.length; index += 1) await composer.press("Backspace");
   await picker().getByText(messagesSection, { exact: true }).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   report.shortQuery = { sections: await pickerSections() };
   await composer.pressSequentially(word.slice(2));
   await picker().getByText(messagesSection, { exact: true }).waitFor({ timeout: UI_WAIT_MS });
 
-  // 3. A pick puts the chip of thread A in the draft.
   await picker()
     .getByRole("option", { name: threadName("E2E search alpha") })
     .click();

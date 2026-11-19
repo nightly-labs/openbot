@@ -1,5 +1,4 @@
 .agent-queue-panel-list {
-  /* Seven rows, then the list scrolls. */
   max-height: calc(7 * var(--queue-row-height) + 2 * var(--queue-row-gutter));
   overflow-y: auto;
   padding-block: var(--queue-row-gutter);
@@ -49,7 +48,6 @@
   will-change: transform;
 }
 
-/* The fill reaches past the row to the gutter, which the two insets above leave unequal. */
 .agent-queue-item::before {
   position: absolute;
   z-index: 0;

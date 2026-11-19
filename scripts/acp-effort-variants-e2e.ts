@@ -1,13 +1,3 @@
-// Lists and selects Gemini models end to end on the real Antigravity driver, with a fake CLI that
-// answers as Antigravity 1.3.0 and later do: the `models` field lists each reasoning effort as a model
-// of its own, and `configOptions` offers each family once, with a `thought_level` option. Checks that
-// the picker gets one model for each family with that family's efforts, that the discovery session
-// goes back to the exact model it opened on, that a selected family and effort reach the session, and
-// that an agent whose option lists the same models keeps today's catalog, also with a provider option,
-// and is asked for each model's efforts only when its opening model has no effort option (#10976).
-// Like the Antigravity CLI 1.5.4, the fake offers its Claude and GPT models to every client, so OpenBot
-// sends its own name (`openbot`), not `zed` as it did for Antigravity 1.4.
-// `bun scripts/acp-effort-variants-e2e.ts`. Writes .openbot-build/acp-effort-variants-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,10 +15,6 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-effort-variants-e2e");
 
-// The selection rules of Antigravity's `config_options.py`: a family value resolves to the variant
-// nearest the current effort, and a listed model ID passes through. `FAKE_AGY_MODE=flat` offers the
-// listed models in the option, with no effort option, as an agent that does not group.
-// `FAKE_AGY_MODE=provider` also puts a provider option of the model category first, as Cline does.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -183,7 +169,6 @@ const log = join(root, "agy.jsonl");
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 process.env.FAKE_AGY_LOG = log;
-// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
 
 async function readLog(): Promise<LogEntry[]> {
@@ -206,9 +191,7 @@ async function listModels(client: AgentClient): Promise<ModelListResponse["data"
   return response.data;
 }
 
-/** Starts a turn and waits for its completion. */
 async function runTurn(client: AgentClient, thread: string, model: string, effort: string): Promise<void> {
-  // `AgentClient` has no `off`, so a finished turn's listener stays and ignores what follows.
   let finished = false;
   const done = new Promise<void>((finish, fail) => {
     client.on("notification", (notification: AppServerNotification) => {
@@ -239,7 +222,6 @@ try {
   await chmod(executable, 0o755);
   const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
 
-  // 1. A grouping agent: one model for each family, with the efforts of that family alone.
   process.env.FAKE_AGY_MODE = "grouped";
   const client = open(cli);
   const models = await listModels(client);
@@ -261,7 +243,6 @@ try {
     "The picker lists each family once, with its own efforts, and the Claude and GPT models.",
   );
 
-  // 2. Each discovery session goes back to the exact model it opened on, not to its family.
   const discovery = await readLog();
   const clientNames = discovery.filter((entry) => entry.event === "initialize").map((entry) => entry.value);
   assert.ok(clientNames.length > 0, "The discovery process is initialized.");
@@ -276,7 +257,6 @@ try {
     assert.equal(model, "gemini-3.8-flash-high", `Discovery session ${session} goes back to its opening model.`);
   }
 
-  // 3. A selected family and effort reach the session, on start and on each turn.
   const started = await runCauseEffect(
     client.request("thread/start", { model: "gemini-3.1-pro", effort: "low", cwd: workspace }, (value) => value),
   );
@@ -296,10 +276,6 @@ try {
   }
   report.grouped = { clientNames, models: grouped, discoveryEndsOn, turns };
 
-  // 4. An agent whose option lists the same models keeps the listed catalog. When its session opened
-  // on a model with no effort option, each model is asked for its own (#10976): this fake has none,
-  // so no model gets an Effort menu, and the session goes back to its opening model. A provider
-  // option of the model category before the model option (Cline) is not asked.
   await runCauseEffect(client.stop());
   for (const mode of ["flat", "provider"] as const) {
     await rm(log, { force: true });

@@ -57,7 +57,6 @@ export function browserControlAction(call: BrowserToolCall): BrowserControlActio
       return "screenshot";
     case "act":
       return call.args.action.type;
-    // The Team API projects this action, so a call of many steps keeps a released value.
     case "run_script":
       return "click";
     default:

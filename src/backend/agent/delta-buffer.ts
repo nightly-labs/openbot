@@ -5,8 +5,6 @@ import type { ConversationRuntime } from "./conversation-runtime";
 
 const logger = createOpenBotLogger("delta-buffer");
 
-// SQLite primary result codes after which a later write can work: SQLITE_BUSY, SQLITE_LOCKED,
-// SQLITE_IOERR and SQLITE_FULL. `node:sqlite` reports extended codes, whose low byte is the primary one.
 const STORAGE_FAILURE_CODES = new Set([5, 6, 10, 13]);
 
 function isStorageFailure(error: unknown): boolean {
@@ -25,12 +23,7 @@ export interface PendingDeltaInput {
 }
 
 interface BufferedDelta extends PendingDeltaInput {
-  /**
-   * The UTF-8 size of `text`, added up for each delta, so the size cap does not measure the whole
-   * text again on each one. A character split between two deltas counts as two, so it can be a few bytes high.
-   */
   bytes: number;
-  /** The last save failed. The size cap then waits for the timer, so a failing disk gets one write per 100 ms. */
   retrying?: boolean;
 }
 
@@ -44,25 +37,12 @@ export interface DeltaBufferOptions {
   hooks: DeltaBufferHooks;
 }
 
-/**
- * Coalesces `item/agentMessage/delta` notifications into `conversation-delta`
- * events. Deltas accumulate per message and flush at most 100 ms after the
- * first one, at an 8 KiB cap, at item completion, or at turn completion —
- * whichever comes first. All messages that wait for the 100 ms tick are saved
- * in one transaction.
- *
- * Owns the pending map and its timers. Persistence goes through the database,
- * snapshots through the conversation runtime, delivery through `emit`; the
- * class never imports the facade.
- */
 export class DeltaBuffer {
   readonly #conversation: ConversationRuntime;
   readonly #database: OpenBotDatabase;
   readonly #hooks: DeltaBufferHooks;
   readonly #pending = new Map<string, BufferedDelta>();
-  /** One timer for all waiting messages: with many agents, one timer for each message made one commit for each. */
   #tick: NodeJS.Timeout | null = null;
-  /** A save failed and no save worked since, so later failures are not logged again. */
   #saveFailing = false;
 
   constructor(options: DeltaBufferOptions) {
@@ -88,21 +68,10 @@ export class DeltaBuffer {
     this.#tick ??= setTimeout(() => this.#flushWaiting(), 100);
   }
 
-  /**
-   * Saves and sends the buffered text of one message now, before its item or turn completes. The
-   * write of that completion sends the whole message, so text that this save cannot store is not kept.
-   */
   flush(key: string): void {
     this.#flush(key, false);
   }
 
-  /**
-   * A short storage failure (an antivirus scan, memory pressure) must not reach the process as an
-   * uncaught exception: on the desktop, Electron shows that as an error box (#10504). The text is
-   * still in the snapshot, and each save writes the whole message, so a later save stores it. While
-   * the message streams, the text stays here and goes out with the next save that works: the
-   * renderer drops a delta that has no new revision, and a revision only comes from a stored write.
-   */
   #flush(key: string, keepOnFailure: boolean): void {
     const pending = this.#pending.get(key);
     if (!pending) return;
@@ -121,7 +90,6 @@ export class DeltaBuffer {
     this.#send(snapshot, pending, revision);
   }
 
-  /** Saves every waiting message in one transaction, then sends the text of each one that was kept. */
   #flushWaiting(): void {
     this.#tick = null;
     if (this.#pending.size === 0) return;
@@ -148,8 +116,6 @@ export class DeltaBuffer {
       const result = results[index];
       if (!result) continue;
       if ("error" in result) {
-        // An error that is not a storage failure drops that message's buffer and is thrown, as a
-        // save of one message does. The other messages are kept and sent first.
         if (!isStorageFailure(result.error)) {
           unexpected ??= result;
           continue;
@@ -165,7 +131,6 @@ export class DeltaBuffer {
     if (unexpected) throw unexpected.error;
   }
 
-  /** The text stays here and goes out with the next save that works. */
   #keep(key: string, pending: BufferedDelta): void {
     pending.retrying = true;
     this.#pending.set(key, pending);
@@ -209,9 +174,6 @@ export class DeltaBuffer {
   }
 }
 
-// Only the streamed message changed, and a flush lands ten times a second per streaming message.
-// Writing the whole thread here made the cost of one flush grow with the thread's whole history,
-// which is what saturated the main process when several agents streamed at once.
 function streamingWrite(snapshot: ConversationSnapshot, pending: BufferedDelta): StreamingMessageWrite {
   return {
     snapshot,

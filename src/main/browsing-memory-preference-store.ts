@@ -4,14 +4,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * Whether the host records what a person does in a tab of an agent while they hold it, so that the
- * memory review learns how those sites work. The browser reads it on each step, so it is held in
- * memory after `load` rather than read from disk each time.
- *
- * A file that is missing, unreadable as JSON or has no boolean reads as the default: off. Writes are
- * chained for the reason `update-preference-store.ts` chains its own.
- */
 export class BrowsingMemoryPreferenceStore {
   readonly #path: string;
   #preference: BrowsingMemoryPreference = { ...DEFAULT_BROWSING_MEMORY_PREFERENCE };
@@ -42,7 +34,6 @@ export class BrowsingMemoryPreferenceStore {
     return { ...this.#preference };
   }
 
-  /** Calls `listener` after each saved change. Returns the function that removes it. */
   onChange(listener: (preference: BrowsingMemoryPreference) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);

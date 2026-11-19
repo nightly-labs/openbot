@@ -24,17 +24,11 @@ function sendShortcutOption(id: SendShortcutMode, devicePlatform: "darwin" | "wi
 export interface SendShortcutSelectProps {
   value: SendShortcutMode;
   onChange: (value: SendShortcutMode) => void;
-  /** The device with the keyboard, so the modifier option names ⌘ or Ctrl. */
   devicePlatform: "darwin" | "win32" | "linux";
   disabled?: boolean;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/**
- * The send shortcut row control. It is a plain `Select`, the same shape as the rows beside it,
- * because a settings list that mixes control styles reads as two different screens.
- */
 export function SendShortcutSelect(props: SendShortcutSelectProps): JSX.Element {
   const { t } = useText();
   const options = () => SEND_SHORTCUT_MODES.map((id) => sendShortcutOption(id, props.devicePlatform));

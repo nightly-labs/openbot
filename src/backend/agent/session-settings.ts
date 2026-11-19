@@ -41,7 +41,6 @@ export interface SessionSettingsOptions {
   exclusive<A>(run: () => Effect.Effect<A, SessionSettingsFailed>): Effect.Effect<A, SessionSettingsFailed>;
 }
 
-/** Owns saved session settings and their application. Provider clients own effective option values. */
 export class SessionSettings {
   constructor(private readonly options: SessionSettingsOptions) {}
 
@@ -51,7 +50,6 @@ export class SessionSettings {
     return agent;
   }
 
-  /** The caller serializes this operation with profile and provider changes. */
   readonly read = Effect.fn("SessionSettings.read")(function* (this: SessionSettings, agentId: string) {
     return yield* this.#withHold(agentId, this.#read(agentId));
   });
@@ -162,8 +160,6 @@ export class SessionSettings {
       snapshot = yield* client
         .readSessionSettings(threadId)
         .pipe(Effect.mapError((failure) => new SessionSettingsFailed({ cause: failure.cause })));
-      // Notification reads report provider state. Only an explicit edit writes here;
-      // saved overrides are also applied by the ACP client before the next turn.
       if (!busy && applySettingId !== undefined && client.setSessionSetting) {
         for (const [id, value] of Object.entries(overrides)) {
           if (id !== applySettingId) continue;

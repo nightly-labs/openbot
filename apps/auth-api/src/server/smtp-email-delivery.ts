@@ -14,11 +14,6 @@ import {
   type WelcomeEmailInput,
 } from "./email-templates";
 
-/**
- * The `EMAIL_RELAY` service binding: the `openbot-email-relay` Worker in `src/email-relay-entry.ts`.
- * Cloudflare runs that Worker near the mail host, because some Cloudflare locations cannot open a
- * socket to it (#4578).
- */
 interface EmailRelay {
   fetch(request: Request): Promise<Response>;
 }
@@ -29,7 +24,6 @@ export interface SmtpEmailConfig {
   username: string;
   password: string;
   from: string;
-  /** Sends through the relay Worker instead of a socket from this Worker. */
   relay?: EmailRelay;
 }
 
@@ -53,12 +47,10 @@ export interface SmtpWelcomeMessage extends WelcomeEmailInput {
   email: string;
 }
 
-/** A license email and its address. */
 export type SmtpLicenseMessage = LicenseEmailInput & { email: string };
 
 export interface PreparedEmailMessage {
   email: string;
-  /** The address a reply goes to, when it is not the sender. */
   replyTo?: string;
   content: RenderedEmail;
 }
@@ -66,7 +58,6 @@ export interface PreparedEmailMessage {
 interface SmtpAttemptState {
   submissionStarted: boolean;
   accepted: boolean;
-  // Milliseconds from the connect call to each reply, for the timing log. No addresses or content.
   replyAt: Record<string, number>;
 }
 
@@ -77,8 +68,6 @@ interface SmtpSocket {
   close(): void | Promise<void>;
 }
 
-// Carries the reply that refused a stage. `message` keeps the same `smtp_<stage>_failed` shape the
-// service logs and tests read, so only the added fields are new.
 class SmtpReplyError extends Schema.TaggedError<SmtpReplyError>()("SmtpReplyError", {
   stage: Schema.String,
   replyCode: Schema.Number,
@@ -108,31 +97,19 @@ export type SmtpConnector = (
 ) => SmtpSocket;
 
 export const EMAIL_CODE_DELIVERY_BUDGET_MS = 25_000;
-// `auth-service` answers 429 for this message instead of a permanent 502. Every delivery method
-// raises it, so the service stays free of provider detail.
 export const RATE_LIMITED_DELIVERY_ERROR = "email_delivery_rate_limited";
-/** The messages of a send that the server may have taken, so the recipient can still get it. */
 export const AMBIGUOUS_DELIVERY_ERRORS: ReadonlySet<string> = new Set([
   "smtp_delivery_unknown",
   "email_delivery_unknown",
 ]);
-// A sender-limit refusal that arrives with a permanent 5xx reply. Namecheap Private Email answers
-// `554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60
-// minutes` when the hourly quota of the sending mailbox is spent, which is a temporary condition
-// reported with a permanent code. Recipient-side limits such as `552 Mailbox quota exceeded` must
-// not match: the sender can do nothing about those, and a countdown would be a lie.
 const SENDER_LIMIT_REPLY = /too many (?:messages|emails|recipients)|(?:sending|send|message|rate) limit|rate limited/iu;
 const SMTP_TIMEOUT_MS = 7_500;
 const SMTP_CLOSE_TIMEOUT_MS = 250;
 const SMTP_MAX_ATTEMPTS = 3;
-// A service binding needs an absolute URL. The relay reads only the body.
 const RELAY_URL = "https://openbot-email-relay.internal/send";
-// The relay ends its own attempts inside the delivery budget, so its result must arrive before this
-// limit. The margin covers the binding hop and a cold start. Only a relay that hangs reaches it.
 const RELAY_TIMEOUT_MS = EMAIL_CODE_DELIVERY_BUDGET_MS + 5_000;
 const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+$/iu;
 
-/** Checks a sign-in code message and renders it. */
 export const prepareEmailCode = Effect.fn("Email.prepareCode")(function* (
   message: SmtpEmailMessage,
 ): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
@@ -179,7 +156,6 @@ export const prepareTeamInvite = Effect.fn("Email.prepareTeamInvite")(function* 
   };
 });
 
-/** The welcome email of an account's first plan. A reply goes to the team's inbox. */
 export const prepareWelcomeEmail = Effect.fn("Email.prepareWelcome")(function* (
   message: SmtpWelcomeMessage,
 ): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
@@ -199,7 +175,6 @@ export function prepareLicenseEmail(message: SmtpLicenseMessage): Effect.Effect<
   return Effect.sync(() => ({ email: message.email, content: renderLicenseEmail(message) }));
 }
 
-/** A message from the site's contact form to `recipient`, the team's inbox. A reply goes to the visitor. */
 export function prepareContactMessage(
   recipient: string,
   message: SmtpContactMessage,
@@ -207,10 +182,6 @@ export function prepareContactMessage(
   return Effect.sync(() => ({ email: recipient, replyTo: message.email, content: renderContactMessageEmail(message) }));
 }
 
-/**
- * The SMTP headers that both senders add: `Auto-Submitted` (RFC 3834) and `X-Auto-Response-Suppress`
- * (Exchange and Outlook) stop vacation and out-of-office replies to the sending mailbox.
- */
 export const AUTOMATED_EMAIL_HEADERS = {
   "Auto-Submitted": "auto-generated",
   "X-Auto-Response-Suppress": "All",
@@ -245,8 +216,6 @@ export const sendPrivateEmail = Effect.fn("SmtpEmail.send")(function* (
   }
 });
 
-// The relay request. The password crosses only the service binding, inside Cloudflare, and neither
-// Worker logs a request body.
 const RelayedEmail = Schema.Struct({
   config: Schema.Struct({
     host: Schema.String,
@@ -266,12 +235,9 @@ const RelayedEmail = Schema.Struct({
     }),
   }),
 });
-// The relay answers 204 when the mail host took the message, and 502 with the message of the failure.
 const RelayFailure = Schema.Struct({ error: Schema.String });
 const DELIVERY_ERROR_PATTERN = /^(?:smtp|email_delivery)_[a-z_]+$/u;
 
-// The relay runs the same send, with its retries and sender-limit check, so its failure message keeps
-// its meaning here. When the relay does not answer, it can have sent the message.
 const sendThroughRelay = Effect.fn("SmtpEmail.relay")(function* (
   relay: EmailRelay,
   config: SmtpEmailConfig,
@@ -301,7 +267,6 @@ const sendThroughRelay = Effect.fn("SmtpEmail.relay")(function* (
   if (failure) return yield* failure;
 });
 
-/** Sends one relay request in the relay Worker. A request that does not decode fails permanently. */
 export const sendRelayedEmail = Effect.fn("SmtpEmail.sendRelayed")(function* (
   request: Request,
   connector?: SmtpConnector,
@@ -336,8 +301,6 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
     }),
     ({ session }) =>
       Effect.gen(function* () {
-        // Observe the deadline only. The release step stops the session, so `state` is final when the
-        // result is decided after it.
         const result = yield* Fiber.join(session).pipe(
           Effect.timeoutOrElse({
             duration: SMTP_TIMEOUT_MS,
@@ -351,9 +314,6 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
               : result.failure;
         }
       }),
-    // Stop the session before the close, so it cannot write again and `state` is final. A session that
-    // did not start the submission did not send the message, whether or not the close is confirmed, so
-    // a relay that stalls before `DATA` gets a new attempt instead of an unknown result.
     ({ socket, session }) =>
       Effect.gen(function* () {
         yield* Fiber.interrupt(session);
@@ -372,7 +332,6 @@ const sendPrivateEmailAttempt = Effect.fn("SmtpEmail.attempt")(function* (
   return yield* new SmtpError("smtp_delivery_unknown");
 });
 
-/** Waits for the socket close until the deadline. */
 function closeSmtpSocket(socket: SmtpSocket): Effect.Effect<void> {
   return Effect.tryPromise(async () => socket.close()).pipe(Effect.timeoutOption(SMTP_CLOSE_TIMEOUT_MS), Effect.ignore);
 }
@@ -387,8 +346,6 @@ function wrapTransportError(): SmtpError {
   return new SmtpError("smtp_transport_failed");
 }
 
-// A 4xx reply is temporary by definition, so waiting is the right answer whichever stage refused.
-// A 5xx reply counts only when it names a sender-side message limit.
 function isSenderRateLimited(error: SmtpReplyError): boolean {
   if (error.replyCode >= 400 && error.replyCode < 500) return true;
   return SENDER_LIMIT_REPLY.test(error.replyText);
@@ -398,11 +355,6 @@ function isRetryableSmtpError(error: Error): boolean {
   return ["smtp_transport_failed", "smtp_timeout", "smtp_connection_closed"].includes(error.message);
 }
 
-// Each round trip to the relay costs about 190 ms from Europe, so the session sends as few as it
-// can: `AUTH PLAIN` carries the credentials in one command (RFC 4954), and with `PIPELINING`
-// (RFC 2920) the envelope and `DATA` leave in one write. The replies still arrive in order, so each
-// stage keeps its own refusal. The relay owns the message after the `250` that follows it, so the
-// session sends `QUIT` and does not wait for `221`.
 const runSmtpSession = Effect.fn("SmtpEmail.session")(function* (
   socket: SmtpSocket,
   config: SmtpEmailConfig,
@@ -482,7 +434,6 @@ class SmtpResponseReader {
     if (!expectedCodes.includes(responseCode)) {
       return yield* new SmtpReplyError(stage, responseCode, lines.join(" "));
     }
-    // The reply text without the code, such as `PIPELINING` from an `EHLO` reply.
     return lines.map((line) => line.slice(4));
   }).bind(this);
 
@@ -504,9 +455,6 @@ class SmtpResponseReader {
   });
 }
 
-// Plain text first and HTML last: a client shows the last part it can render. Both parts are
-// quoted-printable, so the message is 7-bit clean and no line passes the 998-octet limit, whatever
-// the relay supports.
 function createMimeMessage(from: string, message: PreparedEmailMessage): string {
   const boundary = `openbot-${crypto.randomUUID()}`;
   return dotStuff(
@@ -537,8 +485,6 @@ function createMimeMessage(from: string, message: PreparedEmailMessage): string 
   );
 }
 
-// RFC 2047 encoded words for a subject with non-ASCII text, such as a server name in Polish. Each
-// word holds whole characters and stays under the 75-character limit.
 function encodeHeaderValue(value: string): string {
   if (/^[\x20-\x7e]*$/u.test(value)) return value;
   const words: string[] = [];
@@ -554,7 +500,6 @@ function encodeHeaderValue(value: string): string {
   return words.map((word) => `=?UTF-8?B?${encodeBase64(word)}?=`).join("\r\n ");
 }
 
-// RFC 2045 quoted-printable over UTF-8, with lines of at most 76 characters.
 function encodeQuotedPrintable(value: string): string {
   return value
     .replace(/\r?\n/gu, "\n")

@@ -83,14 +83,12 @@ export const MuseUserInput = Schema.Struct({
   ),
 });
 
-/** Converts a native item without exposing raw provider arguments as diagnostic text. */
 export function museThreadItem(item: MuseItem): ThreadItem {
   const common = { id: item.itemId, status: item.status };
   switch (item.kind) {
     case "agentMessage":
       return { ...common, type: "agentMessage", text: item.text ?? "" };
     case "userMessage":
-      // OpenBot's memory and section-mate blocks are not text that the user wrote.
       return {
         ...common,
         type: "userMessage",

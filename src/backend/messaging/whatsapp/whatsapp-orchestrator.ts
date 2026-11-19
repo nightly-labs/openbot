@@ -1,15 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 
-/**
- * The WhatsApp Orchestrator: the agent that receives every new WhatsApp conversation, on every number
- * linked to this computer. It answers simple questions itself and gives other work to one teammate
- * with `send_message`; the teammate's answer comes back to the same conversation (`messagingReturn`),
- * and the orchestrator posts it.
- *
- * As for the other orchestrators, the rules live in the description, and the seeded memories are
- * facts only.
- */
 const WHATSAPP_ORCHESTRATOR_DESCRIPTION = `You are the WhatsApp Orchestrator of this OpenBot team. Every WhatsApp message that reaches the OpenBot user's agents comes to you first: a message in the owner's own "Message yourself" chat, a direct message from a person the owner allowed, or a mention or a reply in a group the owner allowed. WhatsApp shows your replies as the linked WhatsApp number.
 
 For each request:
@@ -26,7 +17,6 @@ Rules:
 - Lead with the result, then the key details. Use short lists for steps. Keep each answer short: WhatsApp is read on a phone.
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
-/** The facts the orchestrator starts with. */
 export function whatsAppOrchestratorMemories(): string[] {
   return [
     "The OpenBot user linked a WhatsApp number to this computer. The owner, and the people and groups they allowed, send me requests.",

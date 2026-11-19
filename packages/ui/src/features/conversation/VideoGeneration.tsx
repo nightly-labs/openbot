@@ -18,13 +18,10 @@ export interface VideoGenerationProps {
   status: MediaGenerationStatus;
   prompt?: string | undefined;
   aspectRatio: ImageGenerationAspectRatio;
-  /** The length that the model was asked for, until the video gives its real length. */
   durationSeconds?: number | undefined;
-  /** The resolution that the model was asked for, such as "720p", until the video gives its size. */
   resolution?: string | undefined;
   attachment?: AttachmentSummary | undefined;
   error?: string | undefined;
-  /** Reads a video that has no `previewUrl`, as in the web client. */
   mediaSource?: AttachmentMediaSource | undefined;
   onOpen?: ((attachment: AttachmentSummary) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
@@ -35,15 +32,12 @@ interface VideoPlayerState {
   width: number;
   height: number;
   loading: boolean;
-  /** The web client loads the file on a click, then the video plays at once. */
   playOnLoad: boolean;
   failed: boolean;
 }
 
-/** A video that an agent made: the frame while it is made, then a player with its own controls. */
 export function VideoGeneration(props: VideoGenerationProps) {
   const { t, format, errorMessage } = useText();
-  // A video that loaded before in this window has its shape before its metadata loads again.
   const remembered = untrack(() => rememberedMediaSize(props.attachment?.id));
   const [player, setPlayer] = createStore<VideoPlayerState>({
     duration: 0,
@@ -66,8 +60,6 @@ export function VideoGeneration(props: VideoGenerationProps) {
     return Boolean(attachment && !attachment.previewUrl && source && attachment.size <= source.mediaLimit);
   };
   const completed = () => props.status === "completed" && Boolean(props.attachment);
-  // The host marks the video completed, then copies its file. The copy ends with the file or with a
-  // failure, so the frame stays until then.
   const generating = () => props.status === "generating" || (props.status === "completed" && !props.attachment);
   const unavailable = () => completed() && (player.failed || (!sourceUrl() && !canLoad()));
   const failed = () => props.status === "failed" || props.status === "interrupted" || unavailable();
@@ -112,7 +104,6 @@ export function VideoGeneration(props: VideoGenerationProps) {
           props.status === "interrupted" ? t("chat.video.wasInterrupted") : t("chat.video.didNotComplete"),
         );
 
-  // A finished video shows only its player. Its details show on hover, and its actions on a right click.
   const menu = (): VideoStageMenu | undefined => {
     const attachment = props.attachment;
     if (!ready() || !attachment) return undefined;
@@ -128,13 +119,11 @@ export function VideoGeneration(props: VideoGenerationProps) {
       });
     if (onDownload) actions.push({ label: t("common.download"), onSelect: () => onDownload(attachment) });
     return {
-      // The same details as a video file. The length is in the controls.
       details: [attachment.name, format.fileSize(attachment.size), size()],
       actions,
     };
   };
 
-  /** The web client loads the file on Play, then the video plays at once. */
   const load = async () => {
     const attachment = props.attachment;
     if (!attachment || !props.mediaSource || !canLoad() || player.loading) return;

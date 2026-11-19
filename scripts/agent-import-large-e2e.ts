@@ -1,13 +1,3 @@
-// Run: bun scripts/agent-import-large-e2e.ts
-// Report: .openbot-build/agent-import-large-e2e.json
-//
-// Imports Grok Bot exports that real zip tools write in the ZIP64 format through the real
-// AgentImportService and local skill library: Info-ZIP `zip -fz`, and Python `zipfile` with more than
-// 65,535 entries and with an entry over 4 GiB. It checks that the files arrive unchanged, that a large
-// file streams to disk instead of into memory, that an agent whose files do not fit on the disk is
-// skipped, that a replaced export is refused, and that a damaged entry is skipped with a warning.
-// Needs `python3` and `zip` on PATH. It writes about 1 GB of temporary files and removes them.
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -136,7 +126,6 @@ function manifest(key: string, options: { skill?: boolean } = {}): string {
   });
 }
 
-/** Runs Python with the script on stdin, so nothing in the export folders can load as a module. */
 function python(script: string, ...args: string[]): void {
   const result = spawnSync("python3", ["-I", "-", ...args], { input: script, encoding: "utf8" });
   assert.equal(result.status, 0, `python3 failed: ${result.stderr}`);
@@ -179,7 +168,6 @@ function importedFolder(agentId: string | undefined): string {
 }
 
 try {
-  // 1. Info-ZIP with -fz: the ZIP64 extra field holds only the compressed size, and a ZIP64 end record.
   const source = join(root, "source-fz");
   const files = join(source, "agents/alpha/files");
   await mkdir(join(files, "notes/deep"), { recursive: true });
@@ -195,7 +183,6 @@ try {
   await writeFile(join(files, "run.sh"), "#!/bin/sh\necho ok\n");
   await chmod(join(files, "run.sh"), 0o755);
   const expected = await tree(files);
-  // A tool makes these again: the import leaves them out with one warning, and keeps the rest.
   await mkdir(join(files, "node_modules/pkg"), { recursive: true });
   await writeFile(join(files, "node_modules/pkg/index.js"), "module.exports = 1;\n");
   await mkdir(join(files, ".git"), { recursive: true });
@@ -224,7 +211,6 @@ try {
   assert.ok(skill, "The skill is published to the library.");
   assert.deepEqual(result.warnings, []);
 
-  // 2. Python zipfile with more than 65,535 entries: only the ZIP64 end record has the count.
   const many = join(root, "export-many.zip");
   python(
     `import sys, zipfile
@@ -252,8 +238,6 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   assert.equal(report.manyEntries.written, MANY_FILES);
   assert.equal(await readFile(join(manyFolder, "part-069/69999.txt"), "utf8"), "file 69999\n");
 
-  // 3. An entry over 4 GiB, from the ZIP64 extra field. The disk reports 1 GiB free, so the agent
-  //    is skipped and removed before any file is written.
   const huge = join(root, "export-huge.zip");
   python(
     `import sys, zipfile
@@ -287,7 +271,6 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   assert.equal(hugeResult.agents.length, 0);
   assert.equal(deleted.length, 1, "The skipped agent is deleted.");
 
-  // 4. A 600 MiB file streams to disk: memory grows much less than the file.
   const big = join(root, "export-big.zip");
   python(
     `import sys, zipfile
@@ -319,7 +302,6 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   assert.equal(report.bigEntry.fileBytes, BIG_BYTES);
   assert.ok(report.bigEntry.rssGrowthMiB < 200, "The file is not read into memory.");
 
-  // 5. An export replaced after the preview is refused.
   const changed = join(root, "export-changed.zip");
   await copyFile(infoZip, changed);
   const changedPreview = await run(local.stage(changed));
@@ -331,7 +313,6 @@ with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as z:
   report.changedExport = changedMessage;
   assert.equal(changedMessage, sourceText("error.import.exportChanged"));
 
-  // 6. A damaged entry fails its CRC check: that file is skipped, and the agent still imports.
   const damaged = join(root, "export-damaged.zip");
   await copyFile(infoZip, damaged);
   python(
@@ -362,8 +343,6 @@ with open(sys.argv[1], "r+b") as f:
     }),
   ]);
 
-  // 7. The end record says 1 entry, as a tool that keeps only the low 16 bits of a count can write.
-  //    The reader uses the whole central directory, so all 3 files arrive.
   const counted = join(root, "export-count.zip");
   python(
     `import sys, zipfile
@@ -387,7 +366,6 @@ open(sys.argv[1], "wb").write(data)
   };
   assert.equal(report.wrongCount.written, 2);
 
-  // 8. A deflate stream with an invalid block type: zlib fails, and the warning is the catalog text.
   const broken = join(root, "export-broken.zip");
   python(
     `import sys, zipfile

@@ -17,20 +17,14 @@ interface ServerCopyState {
   toId: string | null;
   fromAgents: CopyAgentsAgent[] | null;
   toAgents: CopyAgentsAgent[] | null;
-  /** The load error of each side. A load of one side keeps the error of the other. */
   fromError: string | null;
   toError: string | null;
   phase: CopyAgentsPhase;
-  /** The bytes that a joined destination has, while `copying`. */
   progress: TransferUploadState | null;
   result: InstanceTransferResult | null;
   error: string | null;
 }
 
-/**
- * Server settings > Transfer > Copy to another server. It starts from the server of the settings,
- * to the first other server. A choice of the server on the other side swaps the two.
- */
 export function createServerCopyStore(
   serverId: string,
   servers: () => readonly CopyAgentsServer[],
@@ -48,7 +42,6 @@ export function createServerCopyStore(
     result: null,
     error: null,
   });
-  /** The destination of the copy that runs now. */
   let copyingTo: string | null = null;
 
   const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
@@ -74,7 +67,6 @@ export function createServerCopyStore(
       .summary(id)
       .then((summary) =>
         setState((draft) => {
-          // A later choice of the server replaces this answer.
           if ((side === "from" ? draft.fromId : draft.toId) !== id) return;
           if (side === "from") draft.fromAgents = summary.agents;
           else draft.toAgents = summary.agents;
@@ -115,7 +107,6 @@ export function createServerCopyStore(
     });
   }
 
-  /** A new pair of servers starts a new copy. The result of the last copy names the old destination. */
   function reset(draft: ServerCopyState): void {
     draft.phase = "idle";
     draft.progress = null;

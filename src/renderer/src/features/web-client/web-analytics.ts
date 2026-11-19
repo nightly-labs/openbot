@@ -11,25 +11,15 @@ import {
 } from "../../error-reports";
 import type { WebAccountCalls } from "./web-account";
 
-/**
- * Starts product analytics for the signed-in account of this browser. The sign-in screen loads this
- * module later than failure reports, so the event catalogue is not in its first download.
- */
 export function configureWebAnalytics(account: CentralAuthUser | null): void {
   desktopAnalytics.configureWeb({ version, user: account, enabled: webReportsEnabled() });
 }
 
-/** Records a return from a Stripe page to the web client. */
 export function trackBillingReturn(event: DesktopAnalyticsProperties<"billing_return_viewed">): void {
   desktopAnalytics.track("billing_return_viewed", event);
 }
 
-/**
- * Sets the one web preference for failure reports and product analytics, and marks it for the
- * account. Returns the stored value.
- */
 export function setWebAnalyticsEnabled(value: boolean): boolean {
-  // Product analytics stops first, so its opt-out event goes before the reports stop too.
   if (!value) desktopAnalytics.setTrackingEnabled(false, { recordOptOut: true });
   const enabled = setWebReportsEnabled(value);
   desktopAnalytics.setTrackingEnabled(enabled);
@@ -39,14 +29,7 @@ export function setWebAnalyticsEnabled(value: boolean): boolean {
 
 let sending = false;
 
-/**
- * Sends the choice that the account does not have yet, also a newer one that the user makes during
- * the send. The account keeps a newer answer from another device, and this browser follows it,
- * except for an "on" over a kept "off". A failed send stays marked; the next session check or
- * choice sends it again.
- */
 export async function sendWebAnalyticsChoice(calls: Pick<WebAccountCalls, "updateAnalytics">): Promise<void> {
-  // The send in progress reads the latest choice when it ends.
   if (sending) return;
   sending = true;
   try {
@@ -63,10 +46,6 @@ export async function sendWebAnalyticsChoice(calls: Pick<WebAccountCalls, "updat
   }
 }
 
-/**
- * Follows the saved answer of the sign-in screen. The user has not used the app yet, so an answer of
- * off records no opt-out event.
- */
 export function followWebReportsPreference(): void {
   desktopAnalytics.setTrackingEnabled(webReportsEnabled());
 }

@@ -164,9 +164,6 @@ export class TeamChatStore {
     }
     const messages = rows.map((row) => decodeDirectMessage(JSON.parse(requiredStringColumn(row, "message_json"))));
     const firstSequence = rows[0] ? requiredNumberColumn(rows[0], "last_event_sequence") : 0;
-    // How much is older than the page, and since when: the day rail draws the unloaded part from it.
-    // Both read the (thread_id, last_event_sequence) index: the count does not read a row, and the time
-    // is from the first row by sequence alone.
     const older =
       firstSequence > 0
         ? databaseRow(

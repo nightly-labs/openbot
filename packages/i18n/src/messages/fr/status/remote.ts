@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/remote";
 
 export const messages = {
-  // Status lines of remote desktop setup and remote connection recovery.
   "status.remote.setupMacOnly": "La configuration des autorisations est disponible sous macOS.",
   "status.remote.setupInstallHost": "Installez le composant d’hôte du bureau à distance, puis vérifiez à nouveau.",
   "status.remote.setupUpdateRuntime":

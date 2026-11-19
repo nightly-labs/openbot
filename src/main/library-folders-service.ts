@@ -1,8 +1,3 @@
-// Library folders of this host: the one place that gives a folder change what the stored snapshot
-// does not hold, which is the agents that exist and the agent of each file. The IPC handler of this
-// computer and the `library-folders-v1` route of the Team API both change the folders through it, so
-// a joined server applies the same rules.
-
 import type { LibraryFolderAction, LibraryFolderContext, LibraryFoldersSnapshot } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentLibraryFolders, LibraryFileStamp } from "../backend/agent/library-folder-tools";
@@ -12,19 +7,10 @@ import { storedSync } from "../backend/stored-state-effects";
 
 export interface LibraryFoldersSources {
   store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "placeInPath" | "removeAgent" | "removeFiles">;
-  /**
-   * The Library shows the files of the host scan, each below the agent that the scan gives it. A
-   * folder change must use the same agent, so it reads the same scan.
-   */
   storage: Pick<StorageUsageService, "usage" | "invalidate">;
   agents: () => readonly { id: string }[];
 }
 
-/**
- * The agents and the folders that an action names, and the files whose agent it needs. A file that
- * goes out of its folder needs no scan: a folder holds only files of its own agent, so the folder
- * gives the agent.
- */
 function actionTargets(
   action: LibraryFolderAction,
   snapshot: LibraryFoldersSnapshot,
@@ -65,21 +51,11 @@ function actionTargets(
   }
 }
 
-/**
- * The agents whose Library an action changes, so the Team API can check the level of the member for
- * each one. A file whose agent the host does not have (a deleted agent, or no agent) cannot go into a
- * folder: `orphanFile` names it, so the route answers as for a file that is gone.
- */
 export interface LibraryFolderActionAgents {
   agentIds: ReadonlySet<string>;
   orphanFile: boolean;
 }
 
-/**
- * The agents that an action names, the agents of the folders that it names, and the agents of the
- * files that it names. A folder or a file that the host does not have adds no agent; the change then
- * refuses it.
- */
 function actionAgents(
   targets: ReturnType<typeof actionTargets>,
   snapshot: LibraryFoldersSnapshot,
@@ -103,7 +79,6 @@ function actionAgents(
 }
 
 interface KnownFileAgents {
-  /** Milliseconds since the epoch. */
   at: number;
   agents: ReadonlyMap<string, string | null>;
 }
@@ -119,11 +94,6 @@ export class LibraryFoldersService {
     return this.#sources.store.getSnapshot();
   }
 
-  /**
-   * Applies one change. `authorize` gets the agents whose Library the change changes, from the same
-   * scan as the change, and throws to refuse it: its error is then the cause of the failure. The store
-   * refuses a change that the rules do not permit with a `LibraryFolderChangeRefused` as the cause.
-   */
   readonly change = Effect.fn("LibraryFolders.change")(function* (
     this: LibraryFoldersService,
     action: LibraryFolderAction,
@@ -147,15 +117,10 @@ export class LibraryFoldersService {
     return yield* this.#sources.store.mutate(action, context);
   }).bind(this);
 
-  /** Removes the folders of a deleted agent and the entries of its files. */
   removeAgent(agentId: string) {
     return this.#sources.store.removeAgent(agentId);
   }
 
-  /**
-   * Removes the entries of deleted files. The files are already gone, so a failed write does not fail
-   * the delete: the next start removes the entries.
-   */
   removeFiles(fileIds: readonly string[]) {
     const known = this.#known;
     if (known) {
@@ -166,10 +131,6 @@ export class LibraryFoldersService {
     return this.#sources.store.removeFiles(fileIds).pipe(Effect.catch(() => Effect.void));
   }
 
-  /**
-   * The folders for the agent tools of this host: the same store, and the agent of each file from the
-   * same scan, so an agent can organize each file that the Library shows under it.
-   */
   forAgents(): AgentLibraryFolders {
     const store = this.#sources.store;
     return {
@@ -181,20 +142,8 @@ export class LibraryFoldersService {
     };
   }
 
-  /**
-   * The last host scan: the agent of each file that it lists, and the time of the scan. The agent of a
-   * stored file does not change, so the agent tools use the map with no time limit: they find a deleted
-   * file in the stored files first. A member's change uses the scan of the storage service, which is
-   * kept for a short time only, so it refuses a file that a path other than `removeFiles` deleted.
-   */
   #known: KnownFileAgents | null = null;
 
-  /**
-   * The agent of each file that the host scan lists. With `useKept`, the kept map answers, and a new scan
-   * runs only when a file is not in it and was stored after it, or has no stored time: a file that the
-   * scan leaves out (it lists the largest files only) thus does not start a scan on each call. Without
-   * `useKept`, the scan of the storage service answers.
-   */
   readonly #lookUp = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
     files: readonly LibraryFileStamp[],

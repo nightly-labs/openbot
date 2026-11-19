@@ -1,18 +1,3 @@
-// Measures the local voice hosts on this computer: load time, decode or synthesis time and resident
-// memory for each ONNX Runtime thread count and session settings file. Then it checks that the real
-// services stop an idle host.
-//
-// The hosts run in Electron as Node through `child_process.fork`, as in `voice-transcription-smoke.ts`.
-// macOS `say` speaks the fixed clips in Samantha. By default each model runs with the ONNX Runtime
-// defaults ("default") and with the settings file that the app gives it. Memory is the resident set
-// size that `ps` reports for the host process.
-//
-// Writes `report.json` to `.openbot-build/voice-host-bench/`.
-// Run `bun run voice:prepare-runtime` first. Models download with the pinned checksums. macOS only.
-//
-//   bun scripts/voice-host-bench.ts [--threads=4,6,8] [--runs=5] [--models=parakeet-tdt-0.6b-v3,...]
-//                                   [--configs=default,no-arena.cfg,...] [--no-speech] [--no-idle]
-
 import { execFileSync, fork } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { availableParallelism, cpus, tmpdir, totalmem } from "node:os";
@@ -64,7 +49,6 @@ const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "cohere-transcribe-03-2026": join(RESOURCES_ROOT, COHERE_TRANSCRIBE_MODEL_DIRECTORY),
 };
 const PCM_FROM_JSON = `data:text/javascript,process.prependListener("message",(m)=>{if(m&&typeof m==="object"&&Array.isArray(m.pcm))m.pcm=Uint8Array.from(m.pcm)});`;
-/** The services stop an idle host after 60 s; the check fails when it waits longer than this. */
 const IDLE_STOP_LIMIT_MS = 90_000;
 
 const CLIPS: readonly { name: string; text: string }[] = [
@@ -78,7 +62,6 @@ const CLIPS: readonly { name: string; text: string }[] = [
     text: "Can you check why the build failed on the main branch this morning? I think the new test for the login page is flaky, so please run it again and tell me what you find. If it fails a second time, open an issue with the log, assign it to me, and add the release label so that we look at it before the next version ships.",
   },
   {
-    // About 40 s: a long turn, which the live preview decodes again about once per second.
     name: "extended",
     text: "Can you check why the build failed on the main branch this morning? I think the new test for the login page is flaky, so please run it again and tell me what you find. If it fails a second time, open an issue with the log, assign it to me, and add the release label so that we look at it before the next version ships. After that, read the latest reply from the team and summarize it for me, then send the report to everyone on the project. Also look at the open pull requests that wait for my review, sort them by age, and tell me which of them touch the voice settings or the speech model, because I want to test those first on the Windows laptop before the release goes out on Friday afternoon.",
   },
@@ -105,7 +88,6 @@ function residentMegabytes(pid: number | undefined): number {
   return Math.round(Number(execFileSync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8" }).trim()) / 1024);
 }
 
-/** Spoken 16 kHz mono PCM of the text, without the WAV header. */
 async function spokenPcm(text: string, directory: string): Promise<Uint8Array> {
   const path = join(directory, "clip.wav");
   execFileSync("say", ["-v", "Samantha", "-o", path, "--data-format=LEI16@16000", "--channels=1", text]);
@@ -121,7 +103,6 @@ async function spokenPcm(text: string, directory: string): Promise<Uint8Array> {
   throw new Error("`say` wrote a WAV file with no data chunk.");
 }
 
-/** The canonical 44-byte WAV that dictation sends. */
 function wav(pcm: Uint8Array): Uint8Array {
   const file = new Uint8Array(44 + pcm.byteLength);
   const header = new DataView(file.buffer);
@@ -141,10 +122,8 @@ function wav(pcm: Uint8Array): Uint8Array {
   return file;
 }
 
-/** A transcription request as JSON sends it: `PCM_FROM_JSON` turns the array back into bytes in the host. */
 type TranscriptionWireRequest = Omit<VoiceTranscriptionRequest, "pcm"> & { pcm: number[] };
 
-/** One forked host that answers one request at a time. */
 function startHost<
   Request extends TranscriptionWireRequest | VoiceSpeechRequest,
   Response extends VoiceTranscriptionResponse | VoiceSpeechResponse,
@@ -287,7 +266,6 @@ async function benchSpeech(sessionConfig: VoiceSessionConfig, numThreads: number
   }
 }
 
-/** The services read a host reply as a protocol response; JSON turns a `Uint8Array` into an object. */
 function transcriptionResponse(message: unknown): VoiceTranscriptionResponse {
   if (typeof message !== "object" || message === null || !("id" in message) || typeof message.id !== "number")
     throw new Error("The host sent a message with no id.");
@@ -305,7 +283,6 @@ function speechResponse(message: unknown): VoiceSpeechResponse {
   return { id: message.id, pcm: Uint8Array.from(bytes), sampleRate };
 }
 
-/** Resolves with the time from the last reply to the host's exit, or rejects after the limit. */
 function exitAfterReply(exit: Promise<void>): Promise<number> {
   const repliedAt = Date.now();
   return new Promise<number>((resolveStop, reject) => {
@@ -317,10 +294,8 @@ function exitAfterReply(exit: Promise<void>): Promise<number> {
   });
 }
 
-/** The bench saves no key. */
 const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
 
-/** The cloud dictation keys, with none saved: the bench transcribes with local models only. */
 function noDictationKeys(temporary: string) {
   return {
     elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "voice-api-key.json"), cipher: NO_CIPHER }),
@@ -328,7 +303,6 @@ function noDictationKeys(temporary: string) {
   };
 }
 
-/** The cloud speech keys, with none saved: the bench reads with Supertonic only. */
 function noSpeechKeys(temporary: string) {
   return {
     elevenlabs: new VoiceApiKeyStore({ path: join(temporary, "speech-elevenlabs-key.json"), cipher: NO_CIPHER }),
@@ -336,7 +310,6 @@ function noSpeechKeys(temporary: string) {
   };
 }
 
-/** Uses the real services: each must stop its host when no request comes for its idle time. */
 async function checkIdleStop(modelId: LocalVoiceModelId, temporary: string, clip: Uint8Array, speech: boolean) {
   const exits: { transcription?: Promise<void>; speech?: Promise<void> } = {};
   const transcriptionService = new VoiceTranscriptionService({
@@ -430,7 +403,6 @@ async function main(): Promise<void> {
   await mkdir(OUTPUT, { recursive: true });
   const temporary = await mkdtemp(join(tmpdir(), "openbot-voice-host-bench-"));
   try {
-    // The services download any missing model with the pinned checksums.
     const downloader = new VoiceTranscriptionService({
       resourcesRoot: RESOURCES_ROOT,
       modelDirectories: MODEL_DIRECTORIES,
@@ -488,7 +460,6 @@ async function main(): Promise<void> {
     let idleStop: Awaited<ReturnType<typeof checkIdleStop>> | null = null;
     if (idle) {
       logger.info("Waiting for the services to stop the idle hosts…");
-      // The first requested model is already downloaded, so the check downloads nothing more.
       const idleModel = modelIds.find(isLocalVoiceModelId) ?? "parakeet-tdt-0.6b-v3";
       idleStop = await checkIdleStop(idleModel, temporary, clips.get("short") ?? new Uint8Array(0), speech);
       logger.info(`Idle stop: transcription ${idleStop.transcriptionStopMs} ms, speech ${idleStop.speechStopMs} ms`);

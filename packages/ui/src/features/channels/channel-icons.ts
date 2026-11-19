@@ -23,11 +23,6 @@ import {
   Zap,
 } from "@openbot/ui";
 
-/**
- * The glyph of each icon a reader can give a channel. `CHANNEL_ICON_NAMES` in the contracts owns the
- * names and their order, so the agent tools accept the same set. A saved name that this version does
- * not know shows the member faces.
- */
 export const CHANNEL_ICONS = {
   megaphone: { component: Megaphone, label: "channel.picture.icon.megaphone" },
   chart: { component: ChartArea, label: "channel.picture.icon.chart" },
@@ -51,14 +46,12 @@ export const CHANNEL_ICONS = {
   card: { component: CreditCard, label: "channel.picture.icon.card" },
 } as const satisfies Record<ChannelIconName, { component: unknown; label: AppTextKey }>;
 
-/** The colour of a new icon, before the reader chooses one. */
 export const DEFAULT_CHANNEL_ICON_HUE: AvatarHue = 215;
 
 function isChannelIconName(name: string): name is ChannelIconName {
   return Object.hasOwn(CHANNEL_ICONS, name);
 }
 
-/** A saved icon this version can draw, or null. A hue from a later version takes the default colour. */
 export function knownChannelIcon(
   icon: ChannelIcon | null | undefined,
 ): { name: ChannelIconName; hue: AvatarHue } | null {

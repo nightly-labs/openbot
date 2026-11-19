@@ -1,14 +1,3 @@
-// Frozen optional agent-import-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: any member of a server, not
-// only an owner or admin, can import agents from a Grok Bot export into the host. The member sends
-// the export `.zip`, at most 100 MB, as the raw body of `stage`. The host reads it and keeps it under
-// a token that only that member can apply or discard; a new `stage` by the same member releases the
-// member's earlier one. The preview carries no avatars. `apply` creates the chosen agents with their
-// skills, routines, memories and files, and the chosen group chats as channels created by the calling
-// member. A skill whose name is already in the host's skill library is installed as it is: a member
-// never adds a revision to a skill of the host. The response names the new agents only; the client
-// reads them with the agent list. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,
@@ -24,7 +13,6 @@ import {
 
 export const AGENT_IMPORT_CAPABILITY = "agent-import-v1";
 
-/** The largest export a member can send to a host. */
 export const AGENT_IMPORT_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 export const AGENT_IMPORT_ROUTES = {
@@ -38,7 +26,6 @@ const name = string(80);
 const messages = list(string(500), 200);
 const skipped = list(fields({ key, name, reason: string(500) }), 200);
 
-/** The preview `stage` answers. `agent-import-v2` answers the same one. */
 export const AGENT_IMPORT_PREVIEW = fields({
   token: identifier,
   sourceApp: string(64),
@@ -82,7 +69,6 @@ const result = fields({
 });
 
 export const AGENT_IMPORT_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
-  // The request body is the raw `.zip`, so its decoder never reads it.
   [AGENT_IMPORT_ROUTES.stage, adminRoute(empty, AGENT_IMPORT_PREVIEW)],
   [
     AGENT_IMPORT_ROUTES.apply,

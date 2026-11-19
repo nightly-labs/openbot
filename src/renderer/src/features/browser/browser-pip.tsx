@@ -8,7 +8,6 @@ import { syncAppearance } from "../../appearance-choice";
 import { I18nProvider } from "../../i18n-context";
 import { browserPort } from "./browser-port";
 
-/** Main opens the window on a host's tab with `view=live`: the page is drawn here, not placed over it. */
 const page = new URLSearchParams(window.location.search);
 const liveView = page.get("view") === "live";
 const liveViewClipboard = page.get("clipboard") === "1";

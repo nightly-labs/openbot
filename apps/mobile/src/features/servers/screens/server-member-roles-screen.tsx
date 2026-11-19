@@ -13,10 +13,6 @@ import { SettingsSwitch } from "@/features/settings/components/settings-controls
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server sheet > Members > one member > Roles: a switch for each role of the server. Server settings >
- * Roles creates, edits and deletes the roles.
- */
 export function ServerMemberRolesScreen() {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();

@@ -16,34 +16,23 @@ import { useReducedMotion } from "@/shared/lib/motion";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// Drawn at the size of the attachment menu's other icons.
 const SIZE = 21;
 const STROKE = 2.5;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-// While the host compacts, a fixed arc turns, as on the desktop: the fill means nothing until it ends.
 const COMPACTING_SHARE = 0.28;
 const SPIN_MS = 900;
-// A new reading eases to its value instead of jumping. Strong ease-out: it answers a turn that just ended.
 const FILL_MS = 300;
 const FILL_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 
-/** What the context ring shows, and what a press on its row in the attachment menu does. */
 export interface ComposerContextMeter {
-  /** The used share of the window, 0 to 1. */
   share: number;
   level: ContextMeterLevel;
   compacting: boolean;
-  /** "Context 42% full", for a screen reader. */
   label: string;
   onPress: () => void;
 }
 
-/**
- * How full the chat's context is, as the ring of the desktop composer. It is the icon of the Context
- * row in the attachment menu, and the row owns the press. The fill and the turn of a compaction run
- * on the UI thread: a new reading sets their target, and React draws nothing per frame.
- */
 export const ComposerContextRing = memo(function ComposerContextRing({ meter }: { meter: ComposerContextMeter }) {
   const [dim, secondary, warning, danger, accent] = useCSSVariable([
     "--openbot-text-dim",
@@ -94,7 +83,6 @@ export const ComposerContextRing = memo(function ComposerContextRing({ meter }: 
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={RADIUS}
-            // The track of the desktop meter: the dim text colour, faint.
             stroke={String(dim)}
             strokeOpacity={0.35}
             strokeWidth={STROKE}

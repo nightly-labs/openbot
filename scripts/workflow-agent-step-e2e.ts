@@ -1,12 +1,3 @@
-// Checks agent steps of workflows on the real SQLite, the real workflow service and the real agent
-// delete, on a temporary profile. Only the agent mailbox is a stand-in that keeps each delivery
-// running, so no provider, app, account or network is started. A deleted agent fails the step that it
-// was answering, removes the agent from the graph and fails the run; a run that a restart cut off
-// while it stopped ends stopped at the first sweep, and the sweep stops its delivery. The files of
-// the image and asset steps before an agent step go with its message, each one time.
-//
-// Run: bun scripts/workflow-agent-step-e2e.ts
-// Writes .openbot-build/workflow-agent-step-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -50,7 +41,6 @@ const graphOf = (agentId: string): WorkflowGraph => ({
   strokes: [],
 });
 
-/** A picture and a file that feed an agent step: two edges from the asset, one from the image step. */
 const picturesGraph = (agentId: string): WorkflowGraph => ({
   nodes: [
     { id: "prompt", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Compare the two pictures." } },
@@ -67,11 +57,9 @@ const picturesGraph = (agentId: string): WorkflowGraph => ({
   strokes: [],
 });
 const GENERATED_FILE = "generated-file";
-/** A file that Storage no longer has. */
 const DELETED_FILE = "deleted-file";
 const storedPath = (attachmentId: string) => `/stored/${attachmentId}`;
 
-/** An agent step after one asset step for each file. */
 const assetsGraph = (agentId: string, fileIds: readonly string[]): WorkflowGraph => ({
   nodes: [
     ...fileIds.map((fileId, index) => ({
@@ -99,7 +87,6 @@ async function open() {
       runs,
       github: new WorkflowGitHubStore({ database }),
       githubApp: () => null,
-      // Each delivery stays running: only a delete, a stop or a restart ends the step.
       delivery: () => ({ status: "running", turnId: null, error: null }),
       turnAnswer: () => null,
       sendHandoff: (input) =>
@@ -133,7 +120,6 @@ async function close() {
   database.close();
 }
 
-/** Waits for a run to reach a state; a step is sent in the pass after the start. */
 async function runUntil(
   workflows: WorkflowsHandle,
   runId: string,
@@ -165,7 +151,6 @@ async function startRun(workflows: WorkflowsHandle, title: string, agentId: stri
 try {
   let { workflows, runs } = await open();
 
-  // 1. A deleted agent fails the step that it was answering.
   const research = await startRun(workflows, "Competitor watch", "agent-research");
   await runUntil(workflows, research.runId, answering);
   check(
@@ -174,7 +159,6 @@ try {
     report.handoffs,
   );
   database.hardDeleteAgent(`agents:hard-delete:${crypto.randomUUID()}`, "agent-research", null, []);
-  // The agent service asks for a sweep on `agents-changed`.
   await Effect.runPromise(workflows.sweep());
   const failed = await runUntil(workflows, research.runId, (detail) => detail.run.status !== "running");
   check(
@@ -191,7 +175,6 @@ try {
     { revision: afterDelete.revision, nodes: afterDelete.graph.nodes },
   );
 
-  // 2. A restart cut a stop off: the run is stopping and its step still runs.
   const writer = await startRun(workflows, "Weekly note", "agent-writer");
   await runUntil(workflows, writer.runId, answering);
   const writerDelivery = report.handoffs.find((handoff) => handoff.agentId === "agent-writer")?.deliveryId;
@@ -220,7 +203,6 @@ try {
     report.handoffs,
   );
 
-  // 3. An agent step after an image step and an asset gets their files with its message.
   const viewer = await startRun(workflows, "Picture review", "agent-viewer", picturesGraph("agent-viewer"));
   await runUntil(workflows, viewer.runId, answering);
   const viewerHandoff = report.handoffs.find((handoff) => handoff.agentId === "agent-viewer");
@@ -238,7 +220,6 @@ try {
     report.handoffs,
   );
 
-  // 4. A file that Storage no longer has fails the step with its reason, and the agent gets nothing.
   const lost = await startRun(workflows, "Lost picture", "agent-lost", assetsGraph("agent-lost", [DELETED_FILE]));
   const lostEnd = await runUntil(workflows, lost.runId, (detail) => detail.run.status !== "running");
   check(
@@ -253,7 +234,6 @@ try {
     report.handoffs,
   );
 
-  // 5. More files than a message can carry fail the step with the limit.
   const fileIds = Array.from({ length: INPUT_LIMITS.attachments + 1 }, (_, index) => `file-${index}`);
   const many = await startRun(workflows, "Many files", "agent-many", assetsGraph("agent-many", fileIds));
   const manyEnd = await runUntil(workflows, many.runId, (detail) => detail.run.status !== "running");

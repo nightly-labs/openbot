@@ -1,21 +1,13 @@
-// The workflows of the server in an instance transfer file, with the server settings. A workflow
-// names agents, channels and messaging connections by id. The file names an agent or a channel by its
-// key in the file, and the import puts the id of its copy there. A step whose agent or channel is not
-// in the file is left empty, as a new step is. A messaging connection and a webhook address belong to
-// the other computer: the import leaves them empty and asks the user to choose them again.
-
 import { isWorkflowGraph, type WorkflowGraph, type WorkflowNode } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import { reason } from "./instance-transfer-preferences";
 
-/** The most workflows a file carries. */
 export const TRANSFER_WORKFLOWS = 200;
 
 export interface TransferWorkflow {
   title: string;
   graph: WorkflowGraph;
-  /** The export left a messaging connection empty: the user chooses it again. */
   relink?: boolean;
 }
 
@@ -24,7 +16,6 @@ export interface TransferWorkflowPort {
   createWorkflow(input: TransferWorkflow): Effect.Effect<unknown, unknown>;
 }
 
-/** The workflows as the file keeps them. */
 export function exportWorkflows(
   workflows: readonly TransferWorkflow[],
   agentKeys: ReadonlyMap<string, string>,
@@ -37,7 +28,6 @@ export function exportWorkflows(
   }));
 }
 
-/** Adds the workflows of the file. One that this computer refuses is a warning. */
 export const importWorkflows = Effect.fn("InstanceTransfer.importWorkflows")(function* (
   values: readonly unknown[],
   port: TransferWorkflowPort,
@@ -65,10 +55,6 @@ export const importWorkflows = Effect.fn("InstanceTransfer.importWorkflows")(fun
   }
 });
 
-/**
- * The graph with each agent and channel id passed through `ids`. An id with no entry becomes empty.
- * On export, a messaging connection becomes empty too; "trigger" names the trigger's own and stays.
- */
 function remapGraph(
   graph: WorkflowGraph,
   agentIds: ReadonlyMap<string, string>,

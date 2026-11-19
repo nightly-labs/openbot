@@ -1,12 +1,3 @@
-// Runs OpenBot's own provider driver against each recorded transcript of a real CLI in
-// `scripts/provider-fakes/transcripts/`, replayed by `agents/replay.ts`. A fake that we write
-// ourselves agrees with the driver by construction; a recording shows what the released CLI really
-// sends. Checks that a thread starts and a turn completes with the recorded answer, and that the
-// driver sends the requests that it sent to the real CLI, in the same order: a driver change that
-// sends a request the CLI never answered, or skips one, fails here before it reaches users.
-//
-// A deliberate driver change records the transcript again: `record-provider-transcript.ts`.
-// `bun run test:provider-transcript-replay`. Writes .openbot-build/provider-transcript-replay-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

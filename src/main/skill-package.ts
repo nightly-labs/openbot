@@ -9,17 +9,13 @@ import { strFromU8, unzipSync, type Zippable, zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 
-/** The YAML frontmatter at the start of a `SKILL.md`; group 1 is the YAML. */
 export const SKILL_FRONTMATTER = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u;
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 200;
-/** The file macOS Finder writes into each folder it opens. A package made from a folder leaves it out. */
 export const FINDER_METADATA_FILE = ".DS_Store";
-/** The mode that an archive entry gets when its file is executable: Unix (`os` 3), a regular file, `rwxr-xr-x`. */
 const EXECUTABLE_ENTRY = { os: 3, attrs: 0o100755 * 0x10000 } as const;
 
-/** Files for `zipSync`. Each name in `executable` keeps its execute bit in the archive (#7746). */
 export function skillZippable(files: Record<string, Uint8Array>, executable: ReadonlySet<string>): Zippable {
   return Object.fromEntries(
     Object.entries(files).map(([name, bytes]) => [name, executable.has(name) ? [bytes, EXECUTABLE_ENTRY] : bytes]),
@@ -64,7 +60,6 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
   return bytes;
 });
 
-/** One `SKILL.md` on its own, as an agent template carries it; publish and install both read it here. */
 export function inspectSkillMarkdown(markdown: string): Omit<SkillPackagePreview, "draftId" | "size"> {
   return inspectArchive(zipSync({ "SKILL.md": new TextEncoder().encode(markdown) }));
 }
@@ -89,7 +84,6 @@ export function normalizedFiles(bytes: Uint8Array): Record<string, Uint8Array> {
   return readSkillArchive(bytes).files;
 }
 
-/** The files of a skill package, and the names of the files that the archive marks executable. */
 export function readSkillArchive(bytes: Uint8Array): {
   files: Record<string, Uint8Array>;
   executable: Set<string>;
@@ -110,7 +104,6 @@ export function readSkillArchive(bytes: Uint8Array): {
   } catch {
     throw new Error(sourceText("error.skill.zipInvalid"));
   }
-  // `unzipSync` read the same headers without an error, so each offset here is in the archive.
   const executableEntries = executableArchiveEntries(bytes);
   const entries = Object.entries(raw).filter(([name]) => !name.endsWith("/"));
   if (!entries.length || entries.length > MAX_FILES) throw new Error(sourceText("error.skill.fileCountInvalid"));
@@ -130,11 +123,6 @@ export function readSkillArchive(bytes: Uint8Array): {
   return { files: result, executable };
 }
 
-/**
- * The entry names that a Unix or macOS archive marks executable, as `agent-archive.ts` reads them.
- * `unzipSync` gives no file modes, so this reads the central directory as fflate does. Other bits,
- * such as setuid, are not kept.
- */
 function executableArchiveEntries(bytes: Uint8Array): Set<string> {
   const u16 = (at: number) => (bytes[at] ?? 0) | ((bytes[at + 1] ?? 0) << 8);
   const u32 = (at: number) => (u16(at) | (u16(at + 2) << 16)) >>> 0;
@@ -158,7 +146,6 @@ function executableArchiveEntries(bytes: Uint8Array): Set<string> {
   return names;
 }
 
-/** A path that escapes its folder, or a file that must not travel: secrets, VCS data, nested archives. */
 export function isUnsafeArchivePath(name: string): boolean {
   const parts = name.split("/");
   const file = parts.at(-1)?.toLowerCase() ?? "";
@@ -182,7 +169,6 @@ function slugify(name: string): string {
     .replace(/^-|-$/gu, "")
     .slice(0, 64);
   if (value) return value;
-  // A name with no Latin letter or digit, such as one in Japanese, gets a slug from its hash.
   const trimmed = name.trim();
   if (!trimmed) throw new Error(sourceText("error.skill.slugInvalid"));
   return `skill-${createHash("sha256").update(trimmed).digest("hex").slice(0, 12)}`;

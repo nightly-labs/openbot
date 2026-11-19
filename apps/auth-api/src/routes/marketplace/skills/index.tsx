@@ -17,7 +17,6 @@ export const Route = createFileRoute("/marketplace/skills/")({
     ]);
     return { ...page, skills, textCatalog: page.locale };
   },
-  // The search and the category filter the list on the page. Neither reads the catalog again.
   shouldReload: false,
   head: ({ match, loaderData }) =>
     marketplaceIndexHead(MARKETPLACE_SKILLS_ROUTE, match.context.siteUrl, loaderData?.text.skills),

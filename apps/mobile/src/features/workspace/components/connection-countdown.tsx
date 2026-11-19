@@ -3,7 +3,6 @@ import { View } from "react-native";
 
 import { AnimatedCounter } from "@/features/workspace/components/connection-counter";
 
-/** Shows and hides with its status. Only the digits that change animate. */
 export function ConnectionCountdown({ seconds }: { seconds: number | null }) {
   if (seconds === null) return null;
   const minutes = Math.floor(seconds / 60);

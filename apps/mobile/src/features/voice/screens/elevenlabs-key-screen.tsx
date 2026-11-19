@@ -12,7 +12,6 @@ import { ElevenLabsError, testElevenLabsKey } from "../model/elevenlabs";
 import { useElevenLabsVoices } from "../model/elevenlabs-voices";
 import { saveElevenLabsKey, saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
 
-/** The longest API key the phone accepts, as desktop does for its ElevenLabs key. */
 const KEY_MAX_LENGTH = 512;
 const KEYS_PAGE = "https://elevenlabs.io/app/developers/api-keys";
 
@@ -25,14 +24,6 @@ const FAILURES = {
   failed: "mobile.settings.voice.elevenLabs.testFailed",
 } as const;
 
-/**
- * The ElevenLabs API key. The page lists the permissions that a restricted key needs, and the phone
- * tests two of them before it saves the key: it lists the voices (Voices: Read) and reads one
- * character (Text to Speech: Access). Speech to Text is tested when the first dictation starts, as
- * a test would cost a recognition session. The key goes to the keychain and never shows again. A new
- * key takes the first voice of the account when none is chosen, and makes ElevenLabs the voice in
- * use, or the recognizer when the page opened from the choice of recognizer.
- */
 export function ElevenLabsKeyScreen() {
   const { t } = useText();
   const { use } = useLocalSearchParams<{ use?: string }>();

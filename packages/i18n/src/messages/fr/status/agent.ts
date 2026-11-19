@@ -111,6 +111,8 @@ export const messages = {
     "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés, {notChanged} non modifiés, car un autre fil les a modifiés avant.",
   "status.agent.mcpToolCall": "Exécuter l’outil {tool} du serveur MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Fermé par un nouveau message",
+  "status.agent.finishCheckContinues":
+    "La demande n’est pas encore terminée. L’agent continue ({current} sur {limit}).",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.planStopped":

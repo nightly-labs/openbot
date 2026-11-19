@@ -7,14 +7,8 @@ import type { CodexLivePort } from "../conversation/stores/codex-live-conversati
 
 const WEB_LIVE_VOICE_STORAGE_KEY = "openbot:web-live-voice";
 
-/** The choice for this page after the browser did not save it. It wins over an older saved value. */
 let unsavedPreference: boolean | undefined;
 
-/**
- * Whether voice conversations in this browser use Codex live voice of the connected host. It is off
- * until the user turns it on, as on the desktop, because the voice then goes to OpenAI. Reading
- * `window.localStorage` throws when the browser blocks storage, so it is read inside the guard.
- */
 function readWebLiveVoice(): boolean {
   if (unsavedPreference !== undefined) return unsavedPreference;
   try {
@@ -32,15 +26,12 @@ function readStorageIntoSignal(event: StorageEvent): void {
 }
 
 if (typeof window !== "undefined") {
-  // One registration per page: addEventListener ignores the same listener twice, and HMR
-  // disposal removes it when this module is replaced.
   window.addEventListener("storage", readStorageIntoSignal);
   import.meta.hot?.dispose(() => {
     window.removeEventListener("storage", readStorageIntoSignal);
   });
 }
 
-/** The shared reactive preference: a Settings change reaches every open chat at once. */
 export function useWebLiveVoice(): () => boolean {
   return webLiveVoice;
 }
@@ -50,17 +41,11 @@ export function setWebLiveVoice(enabled: boolean): void {
     window.localStorage.setItem(WEB_LIVE_VOICE_STORAGE_KEY, String(enabled));
     unsavedPreference = undefined;
   } catch {
-    // Blocked or full storage keeps the choice for this page only.
     unsavedPreference = enabled;
   }
   setWebLiveVoiceSignal(enabled);
 }
 
-/**
- * Codex live voice with `live-voice-v1` of the connected host. The host's Codex answers the WebRTC
- * offer of this page, so the audio goes from this browser to OpenAI and does not pass the host. The
- * transcript and the end come as `live-voice` events of this member's event connection.
- */
 export function webLiveVoicePort(
   request: () => TeamApiRequest,
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,

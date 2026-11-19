@@ -1,10 +1,3 @@
-// Updates a managed provider CLI end to end on the real driver and `ProviderRuntime` while a turn
-// runs on the provider (#2473), with a fake Antigravity CLI for the installed and the new version.
-// Checks that the update waits for the turn instead of failing, holds new turns meanwhile, keeps an
-// idle restart of the app away while it waits, installs when the turn ends without a restart of the
-// app, never runs two installs at once when it is asked for again while it waits, and that a cancel
-// ends the wait with nothing installed.
-// `bun scripts/provider-update-busy-e2e.ts`. Writes .openbot-build/provider-update-busy-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,8 +16,6 @@ const WAIT_MS = 15_000;
 const INSTALLED = "1.5.3";
 const NEWER = "1.5.4";
 
-// An ACP server with one model. It prints its version for `--version`, as the Antigravity CLI does,
-// and writes its pid to `FAKE_AGY_LOG` when it starts.
 const fakeAgy = (version: string) => `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -77,10 +68,8 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
 const log = join(root, "agy.log");
 const report: Report = { passed: false };
 process.env.FAKE_AGY_LOG = log;
-// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
 
-/** Waits for a condition that another fiber or process changes, and fails after `WAIT_MS`. */
 async function waitFor(label: string, check: () => boolean): Promise<void> {
   const deadline = Date.now() + WAIT_MS;
   while (!check()) {
@@ -104,7 +93,6 @@ let running = 0;
 let maxConcurrentInstalls = 0;
 let release: (() => void) | null = null;
 
-/** The install that main hands over: it counts, and the test can hold it open. */
 function install(executable: string, hold = false) {
   return () =>
     Effect.promise(async () => {
@@ -160,8 +148,6 @@ try {
   assert.equal(row()?.state, "available");
   assert.equal(row()?.version, INSTALLED);
 
-  // 1. An update asked for while a turn runs waits for it. It does not fail, installs nothing yet,
-  // and new turns of the provider wait for it.
   busy = true;
   let waited = false;
   const update = runCauseEffect(
@@ -184,7 +170,6 @@ try {
   assert.ok(report.queued.countsAsActiveWork, "an idle restart of the app does not cut the wait");
   assert.equal(row()?.state, "available", "the provider keeps its row while the update waits");
 
-  // 2. The turn ends: the update installs, the provider runs the new version, and turns go on.
   const resumedBefore = resumed;
   busy = false;
   const updated = await update;
@@ -201,8 +186,6 @@ try {
   assert.equal(report.turnEnded.holdsNewTurns, false);
   assert.ok(report.turnEnded.resumed >= 1, "held turns are told to go on");
 
-  // 3. Asked for again while it waits, as a second press of Update or Retry would: the two never
-  // install at the same time.
   installs = 0;
   busy = true;
   let waitedFirst = false;
@@ -234,7 +217,6 @@ try {
   assert.equal(report.askedAgain.holdsNewTurns, false);
   assert.equal(row()?.state, "available");
 
-  // 4. A cancel while it waits ends the update with an abort and installs nothing. Turns go on.
   installs = 0;
   busy = true;
   const controller = new AbortController();
@@ -273,9 +255,7 @@ try {
   for (const pid of pids) {
     try {
       process.kill(pid);
-    } catch {
-      // Already stopped.
-    }
+    } catch {}
   }
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

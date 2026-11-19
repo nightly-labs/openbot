@@ -2,7 +2,6 @@
   display: flex;
 }
 
-/* The list area before the first list answers. It fades in after a delay, so a fast answer does not flash it. */
 .hosted-servers-loading {
   display: grid;
   place-items: center;

@@ -1,15 +1,3 @@
-// The two failure kinds a Team API call produces, and the difference between them.
-//
-// `RemoteRequestError` is the host answering: it understood the request and refused it, so `status`
-// and `code` are the host's own words and the connection is still good. `RemoteProtocolError` is the
-// host and this app disagreeing about the wire itself -- an unreadable body, or a protocol range with
-// no overlap -- which no retry fixes and which pauses the event stream. `server_safe_mode` is a host
-// that stopped its start loop and answers only with the reason (`server-safe-mode-v1`).
-//
-// `remote-server-connection-status.ts` is the only place that turns either into something a user
-// sees. Both are classified by `instanceof`, so this file must stay their single definition: a second
-// copy of a class makes every `instanceof` silently false.
-
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { Schema } from "effect";
 
@@ -17,8 +5,6 @@ export class RemoteRequestError extends Schema.TaggedError<RemoteRequestError>()
   status: Schema.Number,
   code: Schema.NullOr(Schema.String),
   message: Schema.String,
-  // Set only when the failure the user sees is not this status, such as an event socket that a
-  // 403 refused. Otherwise the reference is `http/<status>/<code>`.
   reference: Schema.NullOr(Schema.String),
 }) {
   constructor(status: number, message: string, code: string | null = null, reference: string | null = null) {
