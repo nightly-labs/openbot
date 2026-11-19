@@ -1006,8 +1006,9 @@ export class MailboxStore {
 
   queuedTaskIds(agentId: string): string[] {
     const ids = new Set<string>();
+    const messages = this.#messagesById();
     for (const delivery of this.#queuedFor(agentId)) {
-      const taskId = this.#taskIdOf(delivery);
+      const taskId = this.#taskIdOf(delivery, messages);
       if (taskId) ids.add(taskId);
     }
     return [...ids];
@@ -1087,9 +1088,9 @@ export class MailboxStore {
   }
 
   taskBusy(agentId: string, taskId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId && isActiveDelivery(delivery) && this.#taskIdOf(delivery) === taskId,
+    const messages = this.#messagesById();
+    return this.#deliveriesFor(agentId).some(
+      (delivery) => isActiveDelivery(delivery) && this.#taskIdOf(delivery, messages) === taskId,
     );
   }
 

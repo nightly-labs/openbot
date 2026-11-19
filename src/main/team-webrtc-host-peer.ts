@@ -599,13 +599,12 @@ export class TeamWebRtcHostPeer {
 
   #keepResponse(requestId: string, response: string): void {
     this.#forgetResponse(requestId);
-    if (response.length > MAXIMUM_KEPT_RESPONSE_CHARACTERS) return;
     this.#responses.set(requestId, response);
     this.#responseCharacters += response.length;
     for (const oldest of this.#responses.keys()) {
       if (
-        this.#responses.size <= MAXIMUM_KEPT_RESPONSES &&
-        this.#responseCharacters <= MAXIMUM_KEPT_RESPONSE_CHARACTERS
+        oldest === requestId ||
+        (this.#responses.size <= MAXIMUM_KEPT_RESPONSES && this.#responseCharacters <= MAXIMUM_KEPT_RESPONSE_CHARACTERS)
       )
         return;
       this.#forgetResponse(oldest);
