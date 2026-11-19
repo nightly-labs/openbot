@@ -3,7 +3,9 @@
 // Checks that the update waits for the turn instead of failing, holds new turns meanwhile, keeps an
 // idle restart of the app away while it waits, installs when the turn ends without a restart of the
 // app, never runs two installs at once when it is asked for again while it waits, and that a cancel
-// ends the wait with nothing installed.
+// ends the wait with nothing installed. A restart that waits for a long turn holds new turns only
+// until its hold time ends, and still runs when the turn ends: one long turn of one agent must not
+// stop every agent of the provider (2026-11-19: a Claude restart held all Claude agents 80 minutes).
 // `bun scripts/provider-update-busy-e2e.ts`. Writes .openbot-build/provider-update-busy-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -20,6 +22,7 @@ import { checkProviderAccountReload } from "./provider-account-reload-e2e";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-update-busy-e2e");
 const WAIT_MS = 15_000;
+const HOLD_MS = 1_000;
 const INSTALLED = "1.5.3";
 const NEWER = "1.5.4";
 
@@ -71,6 +74,7 @@ interface Report {
   turnEnded?: { installs: number; version: string | null | undefined; holdsNewTurns: boolean; resumed: number };
   askedAgain?: { installs: number; maxConcurrentInstalls: number; holdsNewTurns: boolean };
   cancelled?: { failure: string | undefined; installs: number; holdsNewTurns: boolean; resumed: number };
+  restartHold?: { heldAtFirst: boolean; pendingAfterHold: boolean; resumed: number; restartRan: boolean };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
@@ -120,39 +124,44 @@ function install(executable: string, hold = false) {
 const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
 const installedExecutable = await installVersion(INSTALLED);
 const newerExecutable = await installVersion(NEWER);
-const providers = new ProviderRuntime({
-  offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "antigravity"),
-  conversation: new ConversationRuntime(
-    store,
-    () => undefined,
-    () => store.list(),
-  ),
-  hooks: {
-    bindClient: () => undefined,
-    onProvidersReady: () => Effect.void,
-    onProviderLost: () => undefined,
-    onClientStopped: () => Effect.void,
-    isStopping: () => false,
-    isProviderBusy: () => busy,
-    isAgentBusy: () => false,
-    isProviderAssigned: () => true,
-    onAgentClientLost: () => Effect.void,
-    sharedRoot: () => join(root, "shared"),
-    onProviderResumed: () => {
-      resumed += 1;
+function createRuntime(providerHoldMs?: number): ProviderRuntime {
+  return new ProviderRuntime({
+    offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "antigravity"),
+    conversation: new ConversationRuntime(
+      store,
+      () => undefined,
+      () => store.list(),
+    ),
+    hooks: {
+      bindClient: () => undefined,
+      onProvidersReady: () => Effect.void,
+      onProviderLost: () => undefined,
+      onClientStopped: () => Effect.void,
+      isStopping: () => false,
+      isProviderBusy: () => busy,
+      isAgentBusy: () => false,
+      isProviderAssigned: () => true,
+      onAgentClientLost: () => Effect.void,
+      sharedRoot: () => join(root, "shared"),
+      onProviderResumed: () => {
+        resumed += 1;
+      },
+      onProviderActivated: () => Effect.void,
+      captureConfigRevision: () => 0,
     },
-    onProviderActivated: () => Effect.void,
-    captureConfigRevision: () => 0,
-  },
-  emit: () => undefined,
-  emitError: () => undefined,
-  requestTimeoutMs: 5_000,
-  preferredProvider: "antigravity",
-  clientFactory: null,
-  bundledExecutables: { antigravity: installedExecutable },
-  credentials: { ...NO_PROVIDER_CREDENTIALS, providerTempDirectory: join(root, "temp") },
-  redactMcp: (text) => text,
-});
+    emit: () => undefined,
+    emitError: () => undefined,
+    requestTimeoutMs: 5_000,
+    preferredProvider: "antigravity",
+    clientFactory: null,
+    bundledExecutables: { antigravity: installedExecutable },
+    credentials: { ...NO_PROVIDER_CREDENTIALS, providerTempDirectory: join(root, "temp") },
+    redactMcp: (text) => text,
+    ...(providerHoldMs === undefined ? {} : { providerHoldMs }),
+  });
+}
+const providers = createRuntime();
+const runtimes = [providers];
 const row = () => providers.status().providers?.find((candidate) => candidate.id === "antigravity");
 
 try {
@@ -265,10 +274,37 @@ try {
   assert.equal(row()?.state, "available");
   busy = false;
 
+  // 5. A restart asked for while a turn runs holds new turns at first. When the hold time ends and the
+  // turn still runs, new turns go on and the restart stays pending; it runs when the turn ends.
+  const short = createRuntime(HOLD_MS);
+  runtimes.push(short);
+  const shortRow = () => short.status().providers?.find((candidate) => candidate.id === "antigravity");
+  await runCauseEffect(short.ensureProvider("antigravity"));
+  busy = true;
+  const resumedBeforeHold = resumed;
+  await runCauseEffect(short.restartProviderWhenIdle("antigravity"));
+  const heldAtFirst = short.isReplacingCli("antigravity");
+  await waitFor("the hold to end while the turn runs", () => !short.isReplacingCli("antigravity"));
+  const pendingAfterHold = shortRow()?.restartPending === true;
+  const resumedByHoldEnd = resumed - resumedBeforeHold;
+  busy = false;
+  await waitFor("the restart to run when the turn ends", () => shortRow()?.restartPending !== true);
+  report.restartHold = {
+    heldAtFirst,
+    pendingAfterHold,
+    resumed: resumedByHoldEnd,
+    restartRan: shortRow()?.restartPending !== true,
+  };
+  assert.ok(heldAtFirst, "new turns wait for the restart at first");
+  assert.ok(pendingAfterHold, "the restart stays pending after the hold ends");
+  assert.ok(resumedByHoldEnd >= 1, "held turns are told to go on when the hold ends");
+  assert.equal(shortRow()?.state, "available");
+
   await checkProviderAccountReload();
   report.passed = true;
 } finally {
-  for (const client of await runCauseEffect(providers.dispose())) await runCauseEffect(client.stop());
+  for (const runtime of runtimes)
+    for (const client of await runCauseEffect(runtime.dispose())) await runCauseEffect(client.stop());
   const pids = (await readFile(log, "utf8").catch(() => "")).split("\n").filter(Boolean).map(Number);
   for (const pid of pids) {
     try {
