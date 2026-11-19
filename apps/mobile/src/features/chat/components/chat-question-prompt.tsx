@@ -139,8 +139,10 @@ export function ChatQuestionPrompt({
 
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
+      {/* A set width: the question text fills the room beside the cross, so a bubble that took
+          the width of its content would leave the text no room at all. */}
       <View
-        className="max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
+        className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
         style={{ borderCurve: "circular" }}
       >
         <View className="flex-row items-center gap-2">
