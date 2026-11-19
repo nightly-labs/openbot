@@ -207,11 +207,14 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const [state, setState] = createStore<{
     account: CentralAuthUser | null;
     loaded: boolean;
+    /** "Try again" on the error screen waits for a check. */
+    retrying: boolean;
     login: CentralAuthState;
     resendAt: number;
   }>({
     account: null,
     loaded: false,
+    retrying: false,
     login: { status: "signed_out" },
     resendAt: 0,
   });
@@ -427,6 +430,10 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     // focus, waits as before.
     const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
     const limit = screenWaits ? new AbortController() : null;
+    if (screenWaits && state.loaded)
+      setState((draft) => {
+        draft.retrying = true;
+      });
     let timedOut = false;
     const timer = limit
       ? window.setTimeout(() => {
@@ -475,6 +482,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       if (!disposed)
         setState((draft) => {
           draft.loaded = true;
+          draft.retrying = false;
           if (returnError !== null && !draft.account && draft.login.status === "signed_out")
             draft.login = { status: "error", issue: companySignInIssue(returnError) };
         });
@@ -754,6 +762,9 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
           {/* The session check has a time limit, but the workspace code it waits for has none. */}
           <Show when={!state.loaded}>
             <WebSlowLoadNotice />
+          </Show>
+          <Show when={state.retrying}>
+            <WebSlowLoadNotice startsWait />
           </Show>
         </div>
       </NotificationObserver>
