@@ -22,6 +22,7 @@ import {
   BrowserTakeoverCard,
   QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
+import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
@@ -77,6 +78,7 @@ import {
 } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { addStartedTask } from "@/features/workspace/model/task-cache";
@@ -91,6 +93,7 @@ import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 const NO_MESSAGES: never[] = [];
 const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
+const NO_OLDER = () => {};
 const AWAIT_TURN_MS = 10_000;
 const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
@@ -246,14 +249,17 @@ function AgentTaskChat({
     () => (dividerAfterId ? { afterId: dividerAfterId, label: sourceTitle } : null),
     [dividerAfterId, sourceTitle],
   );
-  const openBranchSource =
-    link && sourceTitle !== null
-      ? () => {
-          if (link.sourceTaskId === null)
-            router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
-          else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
-        }
-      : undefined;
+  const openBranchSource = useMemo(
+    () =>
+      link && sourceTitle !== null
+        ? () => {
+            if (link.sourceTaskId === null)
+              router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
+            else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
+          }
+        : undefined,
+    [link, sourceTitle, agentId],
+  );
   const [focus, setFocus] = useState(focusMessageId);
   const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
   const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
@@ -535,73 +541,101 @@ function AgentTaskChat({
     }
   }
 
+  const respondToListApproval = useCallback(
+    (approval: PendingApproval, decision: ApprovalDecision) =>
+      respondToApproval(serverId, { requestId: approval.requestId, decision }),
+    [respondToApproval, serverId],
+  );
+  const loadWholeListApproval = useCallback(
+    (approval: PendingApproval) => readWholeApproval(serverId, approval),
+    [readWholeApproval, serverId],
+  );
+  const branchMessage = useMemo(
+    () => (branch ? (message: ChatBubbleMessage) => void branch(message.id) : undefined),
+    [branch],
+  );
+  const setPinned = pins.setPinned;
+  const togglePinMessage = useMemo(
+    () =>
+      pinsEnabled && !isDraft
+        ? (message: ChatBubbleMessage, pinned: boolean) => setPinned(taskId, message.id, pinned)
+        : undefined,
+    [pinsEnabled, isDraft, setPinned, taskId],
+  );
+  const refetchConversation = conversation.refetch;
+  const retryHistory = useCallback(() => void refetchConversation(), [refetchConversation]);
+  const listLimit = list.data?.limit ?? 1;
+  const taskNotes = useMemo(() => {
+    const hold = task ? agentTaskHoldText(task, listLimit, t) : null;
+    return isDraft ? (
+      <Typography.Paragraph type="body-xs" align="center" className="px-6 pb-3 text-text-secondary">
+        {t("mobile.chat.threads.draftNote", { name: target.name })}
+      </Typography.Paragraph>
+    ) : task ? (
+      <View className="gap-3 pb-3">
+        {hold ? (
+          <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
+            {hold}
+          </Typography.Paragraph>
+        ) : null}
+        {task.queuedMessages.length > 0 ? (
+          <View className="gap-2">
+            <Typography.Paragraph type="body-xs" weight="semibold" className="px-1 text-text-secondary">
+              {t("mobile.server.threads.queued")}
+            </Typography.Paragraph>
+            {task.queuedMessages.map((queued) => (
+              <View
+                key={queued.deliveryId}
+                className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
+                style={{ borderCurve: "circular" }}
+              >
+                <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
+                  {queued.text}
+                </Typography.Paragraph>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {task.state === "idle" && task.outcome === "failed" ? (
+          <View accessibilityRole="alert" className="gap-1 px-1">
+            <Typography.Paragraph weight="medium" className="text-danger-text">
+              {t("mobile.server.threads.failedTitle")}
+            </Typography.Paragraph>
+            <Typography.Paragraph type="body-xs" className="text-danger-text">
+              {task.error?.trim()
+                ? errorMessage(task.error, t("mobile.chat.failure.fallback"))
+                : t("mobile.server.threads.failedBody")}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
+      </View>
+    ) : null;
+  }, [isDraft, task, listLimit, t, errorMessage, target.name]);
+
+  const { menu: threadMenuActions, run: runThreadAction } = threadActions;
+  const actionsMenu = useMemo(() => {
+    if (!task) return null;
+    const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
+    return {
+      label: t("mobile.server.threads.actions"),
+      actions: pinsEnabled && !isDraft ? [...threadMenuActions(task), pinsAction] : threadMenuActions(task),
+      onPressAction: (id: string) => {
+        if (id !== PINS_ACTION) {
+          runThreadAction(task, id);
+          return;
+        }
+        void haptics.impact("soft");
+        router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
+      },
+    };
+  }, [task, t, pinsEnabled, isDraft, threadMenuActions, runThreadAction, agentId, serverId, taskId]);
+
   if (!task && !isDraft) {
     if (list.isError)
       return <TaskNote note={t("mobile.server.threads.loadFailed")} retry={() => void list.refetch()} />;
     if (!enabled || list.data)
       return <TaskNote note={t(enabled ? "mobile.server.threads.notFound" : "mobile.server.threads.offline")} />;
   }
-
-  const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
-  const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
-  const actionsMenu = task
-    ? {
-        label: t("mobile.server.threads.actions"),
-        actions: pinsEnabled && !isDraft ? [...threadActions.menu(task), pinsAction] : threadActions.menu(task),
-        onPressAction: (id: string) => {
-          if (id !== PINS_ACTION) {
-            threadActions.run(task, id);
-            return;
-          }
-          void haptics.impact("soft");
-          router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
-        },
-      }
-    : null;
-
-  const taskNotes = isDraft ? (
-    <Typography.Paragraph type="body-xs" align="center" className="px-6 pb-3 text-text-secondary">
-      {t("mobile.chat.threads.draftNote", { name: target.name })}
-    </Typography.Paragraph>
-  ) : task ? (
-    <View className="gap-3 pb-3">
-      {hold ? (
-        <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
-          {hold}
-        </Typography.Paragraph>
-      ) : null}
-      {task.queuedMessages.length > 0 ? (
-        <View className="gap-2">
-          <Typography.Paragraph type="body-xs" weight="semibold" className="px-1 text-text-secondary">
-            {t("mobile.server.threads.queued")}
-          </Typography.Paragraph>
-          {task.queuedMessages.map((queued) => (
-            <View
-              key={queued.deliveryId}
-              className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
-              style={{ borderCurve: "circular" }}
-            >
-              <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
-                {queued.text}
-              </Typography.Paragraph>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {task.state === "idle" && task.outcome === "failed" ? (
-        <View accessibilityRole="alert" className="gap-1 px-1">
-          <Typography.Paragraph weight="medium" className="text-danger-text">
-            {t("mobile.server.threads.failedTitle")}
-          </Typography.Paragraph>
-          <Typography.Paragraph type="body-xs" className="text-danger-text">
-            {task.error?.trim()
-              ? errorMessage(task.error, t("mobile.chat.failure.fallback"))
-              : t("mobile.server.threads.failedBody")}
-          </Typography.Paragraph>
-        </View>
-      ) : null}
-    </View>
-  ) : null;
 
   return (
     <View className="flex-1" style={{ backgroundColor: background }}>
@@ -650,16 +684,14 @@ function AgentTaskChat({
           }
           appActive={appActive}
           activeTurnId={activeTurnId}
-          questionForm={questionForm}
+          questionForm={questionForm.messageId ? questionForm : undefined}
           activityAccessory={taskNotes}
           approvals={approvals}
           browserRequests={taskBrowserRequests}
           serverName={server?.name ?? ""}
-          onRespondApproval={(approval, decision) =>
-            respondToApproval(serverId, { requestId: approval.requestId, decision })
-          }
+          onRespondApproval={respondToListApproval}
           readsWholeApprovals={readsWholeApprovals(serverId)}
-          onLoadWholeApproval={(approval) => readWholeApproval(serverId, approval)}
+          onLoadWholeApproval={loadWholeListApproval}
           foreground={foreground}
           messages={messages}
           turnSummaries={turnSummaries}
@@ -669,13 +701,11 @@ function AgentTaskChat({
           hasOlder={false}
           olderLoading={false}
           olderError={false}
-          onLoadOlder={() => {}}
-          onBranch={branch ? (message) => void branch(message.id) : undefined}
+          onLoadOlder={NO_OLDER}
+          onBranch={branchMessage}
           onDeleteMessage={deleteMessage}
           deletesAnyMessage={messageDelete.deletesAny}
-          onTogglePin={
-            pinsEnabled && !isDraft ? (message, pinned) => pins.setPinned(taskId, message.id, pinned) : undefined
-          }
+          onTogglePin={togglePinMessage}
           pinnedMessageIds={pinnedMessageIds}
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
@@ -687,7 +717,7 @@ function AgentTaskChat({
           muted={muted}
           showStarter={false}
           topInset={insets.top}
-          onRetryHistory={() => void conversation.refetch()}
+          onRetryHistory={retryHistory}
         />
         <Animated.View
           style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
