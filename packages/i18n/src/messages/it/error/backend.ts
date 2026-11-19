@@ -419,7 +419,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Impossibile caricare il popup. Riprova ad accedere dalla pagina originale.",
   "error.backend.browserTabNotFound": "Scheda del browser non trovata.",
   "error.backend.authActive": "L'autenticazione è già attiva.",
-  "error.backend.authHttpsRequired": "L'autenticazione sicura richiede HTTPS.",
+  "error.backend.authWebPageRequired": "L'autenticazione sicura richiede HTTP/HTTPS.",
   "error.backend.authDigitsRange": "I codici di autenticazione richiedono da 4 a 12 cifre.",
   "error.backend.authExpired": "La richiesta di autenticazione è scaduta.",
   "error.backend.authDigitsRequired": "Inserisci il numero di cifre richiesto.",
