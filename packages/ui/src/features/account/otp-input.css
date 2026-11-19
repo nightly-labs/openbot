@@ -6,7 +6,6 @@
 
 .otp-input-fieldset {
   position: relative;
-  /* A code reads left to right in every language; the focus ring moves by slot index from the left. */
   direction: ltr;
   width: max-content;
   max-width: 100%;
@@ -56,8 +55,6 @@
   border-radius: var(--openbot-radius-md);
 }
 
-/* A surface can set the slots with `--otp-slot-border`, `--otp-slot-background`,
-   `--otp-slot-filled-background` and `--otp-slot-shadow`. The error and success states keep their colours. */
 .otp-input-slot {
   position: relative;
   display: grid;
@@ -115,7 +112,6 @@
 .otp-input-caret {
   position: absolute;
   z-index: 2;
-  /* Centred in the slot: 13px down in the default 50px slot. */
   top: calc((var(--otp-slot-height) - 24px) / 2);
   left: 50%;
   width: 1px;
@@ -129,7 +125,6 @@
   margin-left: 7px;
 }
 
-/* The compact code fits the width of its card, so that a long code does not push the card wider. */
 .otp-input[data-size="compact"] {
   container-type: inline-size;
   justify-items: start;
@@ -180,8 +175,7 @@
   stroke-dashoffset: 24;
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* Heavier than the shared glyph scale on purpose: this tick is drawn by animation and
-   * reads as a confirmation, the same exception the badge tick takes. */
+
   stroke-width: 2;
   animation: otp-check-draw 350ms var(--openbot-duration-fast) var(--openbot-ease-out) forwards;
 }

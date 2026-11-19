@@ -25,7 +25,6 @@ export const messages = defineMessages("error.agent", {
     "Call {names} directly. tool_describe does not describe the discovery tools.",
   "error.agent.routineScheduleArgumentsInvalid":
     "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",
@@ -132,7 +131,6 @@ export const messages = defineMessages("error.agent", {
     'A stored agent profile has an unreadable "{field}" value; update the data before starting OpenBot.',
   "error.agent.storedProfileUnreadableId":
     'Stored agent profile {id} has an unreadable "{field}" value; update the data before starting OpenBot.',
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
   "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",

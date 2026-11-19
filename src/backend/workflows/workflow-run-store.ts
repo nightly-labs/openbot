@@ -1,9 +1,3 @@
-/**
- * The run tables of workflows: runs and the steps of each run, and steps that ran alone. Rows are
- * written directly, like the graph tables. Each change of a step is conditional on the status it
- * leaves, so two sweeps, or a sweep and a user action, never both settle one step.
- */
-
 import {
   isWorkflowGraph,
   WORKFLOW_BRANCHES,
@@ -35,7 +29,6 @@ import type { OpenBotDatabase } from "../openbot-database";
 import { webhookReceiptCutoff } from "../webhook-route-store";
 import { workflowTransaction } from "./workflow-transaction";
 
-/** A run as the runtime reads it: the public row and the graph it started from. */
 export interface StoredWorkflowRun extends WorkflowRun {
   graph: WorkflowGraph;
   fromNodeId: string | null;
@@ -43,25 +36,21 @@ export interface StoredWorkflowRun extends WorkflowRun {
   payload: string | null;
 }
 
-/** A step as the runtime reads it: the public row and what the runtime alone needs. */
 export interface StoredWorkflowStep extends WorkflowStep {
   kind: WorkflowNodeKind;
   input: string;
   deliveryId: string | null;
   turnId: string | null;
   createdAt: string;
-  /** The order in which the steps of a run were added: a later step has a larger number. */
   sequence: number;
 }
 
 const OPEN_STEP_STATUSES = ["running", "approval"] as const satisfies readonly WorkflowStepStatus[];
-/** Whether a step has not ended yet. */
 export function isOpenStep(step: Pick<WorkflowStep, "status">): boolean {
   return isOneOf(OPEN_STEP_STATUSES, step.status);
 }
 const OPEN_RUN_STATUSES = ["running", "approval", "stopping"] as const satisfies readonly WorkflowRunStatus[];
 
-/** One delivery that a webhook trigger received: the run it started, or why it started none. */
 export interface WorkflowWebhookReceipt {
   workflowId: string;
   nodeId: string;
@@ -75,10 +64,6 @@ export interface WorkflowWebhookReceipt {
 const OUTPUT_STATUSES = ["pending", "sending", "sent", "failed", "uncertain"] as const;
 export type WorkflowOutputEnd = Exclude<(typeof OUTPUT_STATUSES)[number], "pending" | "sending">;
 
-/**
- * The post of an output step to a messaging place. `sending` is set before the post starts, so a
- * post that a stop or a crash cut off becomes `uncertain`: part of it can be in the place.
- */
 export interface WorkflowOutputDelivery {
   stepId: string;
   connectionId: string;
@@ -130,10 +115,6 @@ export class WorkflowRunStore {
     this.#createId = options.createId ?? (() => crypto.randomUUID());
   }
 
-  /**
-   * Starts a run, or answers the run that the same key already started. `created` writes what belongs
-   * to a new run, such as its version and its first steps, in the same transaction.
-   */
   startRun(
     input: NewWorkflowRun,
     now = new Date(),
@@ -186,7 +167,6 @@ export class WorkflowRunStore {
     });
   }
 
-  /** Whether the trigger received this delivery before, inside the retention window. */
   hasWebhookReceipt(receipt: Pick<WorkflowWebhookReceipt, "workflowId" | "nodeId" | "deliveryId" | "receivedAt">) {
     return (
       databaseRow(
@@ -200,7 +180,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Records one received delivery and drops the receipts past retention. */
   addWebhookReceipt(receipt: WorkflowWebhookReceipt): void {
     this.#transaction(() => {
       const db = this.#database.connection;
@@ -231,11 +210,6 @@ export class WorkflowRunStore {
     return row ? toRun(row) : null;
   }
 
-  /**
-   * How the work of an agent step's handoff began. The handoff names the step's run, or the step itself
-   * when it runs alone, which only the user starts. Null when no workflow run or step has this ID. It
-   * builds a prompt, so a source that this build does not know gives null rather than a failed turn.
-   */
   handoffSource(runId: string): WorkflowRunSource | null {
     const connection = this.#database.connection;
     const run = databaseRow(connection.prepare("SELECT source FROM workflow_runs WHERE run_id = ?").get(runId));
@@ -244,7 +218,6 @@ export class WorkflowRunStore {
     return alone === undefined ? null : "manual";
   }
 
-  /** Runs that can still move: running, waiting for an approval, or stopping. */
   openRuns(): StoredWorkflowRun[] {
     return databaseRows(
       this.#database.connection
@@ -253,7 +226,6 @@ export class WorkflowRunStore {
     ).map(toRun);
   }
 
-  /** Changes an open run's status. Answers whether it changed. */
   setRunStatus(runId: string, status: WorkflowRunStatus, error: string | null, now = new Date()): boolean {
     const at = now.toISOString();
     const ended = isOneOf(OPEN_RUN_STATUSES, status) ? null : at;
@@ -267,7 +239,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Opens an ended run again, for a retried step. */
   reopenRun(runId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -279,7 +250,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Every attempt of the run's steps, oldest first. */
   steps(runId: string): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -293,7 +263,6 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
-  /** Steps that have not ended, of runs and alone. */
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -302,12 +271,6 @@ export class WorkflowRunStore {
     ).map(toStep);
   }
 
-  /**
-   * The newest step of each node that ended with an answer, of runs and alone. A run from a node
-   * reads the steps before that node from here. The copy of an earlier answer that a run from a node
-   * adds is left out: the step that gave the answer has the same one, and the run of that step has
-   * the graph that it was given in.
-   */
   latestDone(workflowId: string): Map<string, StoredWorkflowStep> {
     const rows = databaseRows(
       this.#database.connection
@@ -321,10 +284,6 @@ export class WorkflowRunStore {
     return new Map(rows.map((step) => [step.nodeId, step]));
   }
 
-  /**
-   * Adds a step, or answers the step that the same request already added. The attempt is the
-   * node's next one in its run; a step alone is always the first.
-   */
   addStep(input: NewWorkflowStep, now = new Date()): StoredWorkflowStep {
     return this.#transaction(() => {
       const db = this.#database.connection;
@@ -394,7 +353,6 @@ export class WorkflowRunStore {
       .run(turnId, now.toISOString(), stepId, turnId);
   }
 
-  /** Holds a running step for a person's decision. */
   awaitApproval(stepId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -405,7 +363,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Ends a step that has not ended. Answers whether it ended it. */
   settleStep(stepId: string, end: WorkflowStepEnd, now = new Date()): boolean {
     const at = now.toISOString();
     return (
@@ -429,7 +386,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Keeps the post of an output step before it is sent. A second call for the step keeps the first. */
   addOutput(output: Pick<WorkflowOutputDelivery, "stepId" | "connectionId" | "placeId" | "text">, now = new Date()) {
     const at = now.toISOString();
     this.#database.connection
@@ -448,7 +404,6 @@ export class WorkflowRunStore {
     return row ? toOutput(row) : null;
   }
 
-  /** Marks a waiting post as on its way, before it starts. False when it does not wait now. */
   claimOutput(stepId: string, now = new Date()): boolean {
     return (
       this.#database.connection
@@ -460,7 +415,6 @@ export class WorkflowRunStore {
     );
   }
 
-  /** Ends a post that waits or is on its way. */
   endOutput(stepId: string, status: WorkflowOutputEnd, reason: string | null, now = new Date()): void {
     const at = now.toISOString();
     this.#database.connection
@@ -471,11 +425,6 @@ export class WorkflowRunStore {
       .run(status, reason, status === "sent" ? at : null, at, stepId);
   }
 
-  /**
-   * Runs newest first, after the `before` cursor of the page before when given, and on the first page
-   * the newest steps alone. The cursor is `<started at>|<run id>`, so runs that started in the same
-   * millisecond are not skipped.
-   */
   page(workflowId: string, before: string | undefined, limit: number): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
@@ -515,14 +464,11 @@ export class WorkflowRunStore {
   }
 }
 
-/** The start and the id of the last run of a page. */
 function runCursor(before: string): { startedAt: string; runId: string } {
   const bar = before.lastIndexOf("|");
-  // A time alone has no id: no run id is less than the empty string, so the page starts before that time.
   return bar < 0 ? { startedAt: before, runId: "" } : { startedAt: before.slice(0, bar), runId: before.slice(bar + 1) };
 }
 
-/** The public part of a run, as IPC and the Team API carry it. */
 export function publicRun(run: StoredWorkflowRun): WorkflowRun {
   return {
     id: run.id,
@@ -537,7 +483,6 @@ export function publicRun(run: StoredWorkflowRun): WorkflowRun {
   };
 }
 
-/** The public part of a step, as IPC and the Team API carry it. */
 export function publicStep(step: StoredWorkflowStep): WorkflowStep {
   return {
     id: step.id,

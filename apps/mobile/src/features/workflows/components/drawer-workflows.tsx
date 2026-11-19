@@ -20,25 +20,17 @@ const NO_IDS: readonly string[] = [];
 const PIN_BUTTON = 34;
 
 export interface DrawerWorkflows {
-  /** False on a host without `workflows-v1`: the drawer has no Workflows row then. */
   supported: boolean;
-  /** The runs that wait for the person, else the runs that go on. */
   value: string | null;
   needsYou: boolean;
   pinned: WorkflowSummary[];
 }
 
-/**
- * The value of the Workflows row and the pinned workflows, from the list that the host keeps current.
- * Until the host is online and sends the list, they are the ones of the last start. A failed read
- * shows none, as it did before the phone kept them.
- */
 export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkflows {
   const { t } = useText();
   const { list, online, supported: liveSupported } = useWorkflowList(serverId, open);
   const pinnedIds = useMobileWorkspaceSelector((current) => current.pinnedWorkflowIds[serverId] ?? NO_IDS);
   const cached = useDrawerSnapshot(serverId).workflows;
-  // An online host has sent its capabilities.
   const known = online && (!liveSupported || list.data !== undefined || list.isError);
   const data = list.data;
   const live = useMemo(() => {
@@ -49,7 +41,6 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
       pinned: pinnedIds.flatMap((id) => workflows.find((workflow) => workflow.id === id) ?? []),
     };
   }, [data, pinnedIds]);
-  // With no kept values, the row shows from the capabilities, as before.
   const fromHost = known || cached === undefined;
   const shown = fromHost ? (liveSupported ? live : null) : cached;
   const supported = fromHost ? liveSupported : Boolean(cached);
@@ -66,15 +57,10 @@ export function useDrawerWorkflows(serverId: string, open: boolean): DrawerWorkf
         ? t("mobile.workflow.drawer.running", { count: running })
         : null,
     needsYou: needsYou > 0,
-    // A workflow unpinned since the last start does not show.
     pinned: pinnedIds.flatMap((id) => shown?.pinned.find((workflow) => workflow.id === id) ?? []),
   };
 }
 
-/**
- * A pinned workflow under the Workflows row. The row opens the workflow, or the run that waits for the
- * person; the button runs it, or opens the run that goes on.
- */
 const PinnedWorkflowRow = memo(function PinnedWorkflowRow({
   serverId,
   workflow,
@@ -171,7 +157,6 @@ const PinnedWorkflowRow = memo(function PinnedWorkflowRow({
   );
 });
 
-/** The pinned workflows of the open server, under the Workflows row of the drawer. */
 export function DrawerPinnedWorkflows({
   serverId,
   pinned,

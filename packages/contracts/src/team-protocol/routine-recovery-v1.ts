@@ -1,18 +1,3 @@
-// Frozen optional routine-recovery-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server reads and sets what a routine does with the occurrences that came due while the host was
-// off (`missedPolicy`), and reads a routine's run history with the records of those occurrences. The
-// list and save routes carry the `events-v1` routine with `missedPolicy` added; the host answers them
-// as the `events-v1` routes do, so a client with this capability uses them in place of those two.
-// A run record names its missed occurrences in `missed`, and a run started by a test, a script or a
-// webhook names its `source`. An agent run names the conversation message it posted in `deliveryId`,
-// and a channel run names the channel message it posted in `requestMessageId`.
-// Widening any of it needs a second capability string.
-//
-// A run instruction holds the routine instruction and the event of a webhook or a script, so it can be
-// longer than the routine instruction. A run error is at most `ROUTINE_RECOVERY_RUN_ERROR_LIMIT`
-// long; the host shortens a longer one.
 import {
   type AdminDecoder,
   adminRoute,

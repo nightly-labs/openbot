@@ -7,16 +7,9 @@ import { withoutTax } from "./billing-sales";
 import { BillingUsd, type BillingUsdCurrency } from "./billing-usd";
 import type { StripeEvent } from "./stripe-client";
 
-/**
- * The yearly sales to consumers in other EU countries that start the operator alert, in euro cents. The EU
- * limit is EUR 10,000 (Article 59c of the VAT Directive). Above it, the seller must charge the VAT of the
- * buyer's country, through the One Stop Shop, and no longer Polish VAT. The alert comes first, so that
- * there is time to register.
- */
 const OSS_ALERT_EUR = 900_000;
 const OSS_LIMIT_EUR = 1_000_000;
 const CURRENCIES: readonly BillingUsdCurrency[] = ["eur", "usd", "pln", "brl"];
-/** USD per euro is read with a large amount, so that the rounding to cents changes nothing. */
 const EUR_PROBE = 100_000_000;
 
 const paidInvoiceSchema = Schema.Struct({
@@ -31,12 +24,6 @@ const paidInvoiceSchema = Schema.Struct({
   ),
 });
 
-/**
- * Counts the paid invoices of consumers in EU countries other than Poland, and alerts the operator once in
- * a calendar year when their net total reaches `OSS_ALERT_EUR`. A company with reverse charge does not
- * count, and a buyer in Poland or outside the EU does not count. A refund does not lower the total: the
- * alert can only come early.
- */
 export class BillingOss {
   readonly #database: D1Database;
   readonly #usd: BillingUsd;
@@ -45,7 +32,6 @@ export class BillingOss {
   constructor(options: {
     database: D1Database;
     fetch: (input: string, init: RequestInit) => Promise<Response>;
-    /** Sends the operator text. It must not throw or wait. */
     alert: (text: string) => void;
   }) {
     this.#database = options.database;
@@ -53,11 +39,6 @@ export class BillingOss {
     this.#alert = options.alert;
   }
 
-  /**
-   * Records an `invoice.paid` event; other events change nothing. It is safe to run again for the same
-   * event: the invoice and the alert of a year are each written once. A failure makes Stripe send the
-   * event again.
-   */
   readonly record = Effect.fn("BillingOss.record")(function* (
     this: BillingOss,
     event: StripeEvent,
@@ -82,7 +63,6 @@ export class BillingOss {
             "INSERT OR IGNORE INTO billing_vat_oss_sales(invoice_id, year, country, amount_eur, paid_at) VALUES (?, ?, ?, ?, ?)",
           )
           .bind(id, year, country, amountEur, event.created * 1000),
-        // The limit reads the current and the previous year.
         this.#database.prepare("DELETE FROM billing_vat_oss_sales WHERE year < ?").bind(year - 1),
       ]),
     );

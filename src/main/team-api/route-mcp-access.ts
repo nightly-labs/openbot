@@ -9,12 +9,6 @@ import { requireMcpAccess } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * Which agents get each MCP server of this host, and the level of each role for it. Each person who
- * can use the MCP routes reads the levels that apply to them; an owner or admin also reads and
- * replaces the entries. A replace names the revision that the client read: the host refuses a stale one
- * with 409, so two admins do not write over each other. Frozen by `mcp-access-v1`.
- */
 export async function routeMcpAccess(
   context: TeamApiRequestContext,
   mcpServers: Pick<TeamApiMcpServers, "listMcpServers"> | undefined,

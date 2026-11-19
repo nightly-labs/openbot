@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Sentry here is taken from sentry.io and Sentry's
-// getsentry/toolkit repository. Each page used is in `sources`. Check the sources again,
-// and move `checkedAt`, whenever this file changes.
-
 export const SENTRY_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

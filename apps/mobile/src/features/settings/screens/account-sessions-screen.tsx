@@ -26,7 +26,6 @@ const SESSION_KIND_KEYS = {
   mobile: "mobile.settings.sessions.kindMobile",
 } as const satisfies Record<MobileAccountSession["kind"], MobileTextKey>;
 
-// The same fields as `toLocaleString()` without options.
 const LAST_ACTIVE_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
   month: "numeric",

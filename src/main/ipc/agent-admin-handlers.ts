@@ -1,9 +1,3 @@
-import type { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Access, auto-approve and skills of one agent, and adding an agent from the marketplace or a
-// shared template. On a joined server they belong to the host, so the request goes there, and the
-// host answers only an owner or admin.
-
 import {
   type AddedAgent,
   type AgentAdminSettings,
@@ -85,6 +79,7 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { sourceText } from "@openbot/i18n/source";
+import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
 import type { AgentDefaultsSettingsService } from "../agent-defaults-settings";
@@ -100,6 +95,7 @@ import {
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import { parseInstallAgentTemplate, parsePublishAgentTemplate } from "./agent-template-handlers";
 import {
@@ -270,7 +266,6 @@ export function agentAdminIpcHandlers({
       }),
       listBrowserProxies: scopedQueryHandler({
         local: () => browserProfiles.listProxies(),
-        // Null: the host has no proxy routes, so the settings show no proxy choice.
         remote: (serverId) =>
           remoteServers.supportsCapability(serverId, BROWSER_PROXIES_CAPABILITY)
             ? remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.list, {}, decodeBrowserProxyList)
@@ -289,7 +284,6 @@ export function agentAdminIpcHandlers({
         local: (input) => runCauseEffect(browserProfiles.setProfileProxy(input)),
         remote: (input, serverId) => remoteBrowserProxies(serverId, BROWSER_PROXIES_ROUTES.profile, input, acceptEmpty),
       }),
-      // This computer's own server has no computer proxy of this computer: its pages already use it.
       getBrowserComputerSharing: scopedQueryHandler({
         local: () => null,
         remote: (serverId) => remoteServers.browserComputerSharing(serverId),
@@ -302,7 +296,6 @@ export function agentAdminIpcHandlers({
       }),
       listBrowserTabProfiles: scopedQueryHandler({
         local: () => browserProfiles.tabProfiles(),
-        // A host without the capability shows no label: its tabs are all in its one shared session.
         remote: (serverId) =>
           remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY)
             ? remoteBrowserProfiles(serverId, BROWSER_PROFILES_ROUTES.tabs, {}, decodeHostBrowserTabProfiles)
@@ -350,8 +343,6 @@ export function agentAdminIpcHandlers({
       }),
       addMarketplaceAgent: scopedHandler(parseInstallMarketplaceAgent, {
         local: async (input) => addedAgent(await runCauseEffect(marketplaceAgents.install(input))),
-        // agent-install-v1 only adds a new agent, so an update goes to its own route: dropping the id
-        // would add a copy instead of updating.
         remote: (input, serverId) =>
           input.agentId === undefined
             ? remoteAdd(serverId, AGENT_INSTALL_ROUTES.marketplace, input)
@@ -368,8 +359,6 @@ export function agentAdminIpcHandlers({
       }),
       publishAgentTemplate: scopedHandler(parsePublishAgentTemplate, {
         local: (input) => runCauseEffect(agentTemplates.publish(input)),
-        // The host publishes with its own account. A card too large for the wire is left out, as the
-        // web client does.
         remote: ({ agentId, card }, serverId) =>
           remotePublish(
             serverId,
@@ -411,7 +400,6 @@ export function agentAdminIpcHandlers({
     );
   }
 
-  // A joined server has no browser profile routes yet.
   function remoteBrowserProfiles<A>(serverId: string, path: string, body: unknown, decode: ResponseDecoder<A>) {
     if (!remoteServers.supportsCapability(serverId, BROWSER_PROFILES_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
@@ -444,10 +432,6 @@ export function agentAdminIpcHandlers({
     );
   }
 
-  /**
-   * Reads, or with `update` changes, the fast mode of an agent on a joined server: on `agent-speed-v1`,
-   * or on `agent-fast-mode-v1` from an older host, which has no Ultrafast.
-   */
   async function remoteFastMode(
     serverId: string,
     { agentId }: { agentId: string },

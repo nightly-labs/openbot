@@ -1,20 +1,3 @@
-// Checks Team API protocol 10 (`packages/contracts/src/team-protocol/v10.ts`): capability lists that
-// do not repeat the frozen protocol 9 baseline. A real `TeamApiServer` runs on loopback with the real
-// team, agent, mailbox and sidebar stores on a temporary profile, and a real `TeamWebRtcHostPeer`
-// takes WebRTC frames with no Signal. The checks:
-// - The baseline that the registry makes is the frozen fixture, and the protocol 9 list.
-// - HTTP: a protocol 9 client gets the protocol 9 list, with no `absent`. A protocol 10 client gets
-//   the two lists, and `(baseline - absent) + capabilities` is the same set. `mac-apps-limit-v1` is
-//   in `absent` on a Mac host, and in the set on other hosts.
-// - HTTP: the desktop client (`RemoteServerClient`) negotiates protocol 10 with this host, and
-//   protocol 9 with a host that speaks 1-9 only. It never sends protocol 10 to that host.
-// - WebRTC: the web client compatibility read (`readWebHostCompatibility`) gets the full set from this
-//   host on protocol 10, and stays on protocol 9 with a protocol 9 host. A protocol 9 peer, such as
-//   mobile, gets the protocol 9 list.
-// - HTTP and WebRTC: a protocol 10 client that names a baseline capability in `absent` does not get
-//   it (`reasoning-efforts-v1`). A malformed list fails closed with `protocol_error`. Over HTTP this is
-//   on a route behind the protocol gate: `/v1/compatibility` answers above the gate on purpose.
-// Run: `bun scripts/team-protocol-v10-e2e.ts`. Writes .openbot-build/team-protocol-v10-e2e/report.json.
 import assert from "node:assert/strict";
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -78,8 +61,6 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const MAC_APPS_LIMIT = "mac-apps-limit-v1";
 
-// The main process imports Electron for its windows and IPC. No check here opens a window, so each
-// name is inert, and a call to one shows as a missing feature in the failing step.
 plugin({
   name: "team-api-electron-boundary",
   setup(build) {
@@ -129,11 +110,9 @@ const report: {
   steps: Step[];
 } = { passed: false, host: { appVersion: HOST_VERSION, platform: process.platform, port: null }, steps: [] };
 
-/** Runs one check. `summarize` keeps secrets and live objects out of the report. */
 async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T) => unknown = (value) => value) {
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its answer, and a missing answer must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -150,7 +129,6 @@ async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -176,7 +154,6 @@ function sorted(values: Iterable<string>): string[] {
   return [...values].sort();
 }
 
-/** No check needs the browser: a call to it is a failure. */
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
@@ -203,7 +180,6 @@ interface WireResponse {
   body: unknown;
 }
 
-/** One HTTP request with the headers of `protocol`. `headers` adds or replaces headers. */
 async function http(
   port: number,
   input: { protocol: number; method?: string; path: string; body?: unknown; token?: string },
@@ -225,7 +201,6 @@ async function http(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** The bridge of a WebRTC client: frames go to the host peer directly, with no Signal. */
 class LoopbackBridge extends TeamWebRtcBridge {
   readonly sent: { peerId: string; channel: TeamWebRtcChannel; data: string }[] = [];
   readonly #waiters = new Set<() => void>();
@@ -242,7 +217,6 @@ class LoopbackBridge extends TeamWebRtcBridge {
       for (const wake of this.#waiters) wake();
     });
 
-  /** Waits until `pick` accepts a frame on the RPC channel from index `from`. */
   rpcFrom<T>(from: number, pick: (data: string) => T | null): Promise<T> {
     return new Promise((resolveValue) => {
       const check = () => {
@@ -280,10 +254,6 @@ function rpcResponse(requestId: string) {
   };
 }
 
-/**
- * A host of protocols 1-9, as released: it answers the frozen protocol 9 compatibility fixture and
- * refuses a protocol that it does not speak with 426. It records the protocol of each request.
- */
 function startProtocol9Host(): Promise<{ server: Server; port: number; protocols: string[]; absent: string[] }> {
   const protocols: string[] = [];
   const absent: string[] = [];
@@ -301,7 +271,6 @@ function startProtocol9Host(): Promise<{ server: Server; port: number; protocols
         .writeHead(426)
         .end(JSON.stringify({ error: "Update the host.", code: "host_update_required", host: support }));
     } else {
-      // As a released host does: a peer of an older protocol sees only the names of its protocol.
       const known = new Set<string>(teamCapabilitiesForProtocol(Number(protocol) || TEAM_PROTOCOL_V1));
       const capabilities = support.capabilities.filter((capability) => known.has(capability));
       response.writeHead(200).end(JSON.stringify({ ...support, capabilities }));
@@ -332,7 +301,6 @@ const peers: InstanceType<typeof TeamWebRtcHostPeer>[] = [];
 
 try {
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
@@ -341,8 +309,6 @@ try {
   const source = await runCauseEffect(
     agents.createAgentProfile({ name: "Research", description: "Finds sources.", avatarSeed: "r", avatarHue: null }),
   );
-  // No provider runs here, so the host lists the model that a provider would have listed, and the
-  // agent is on its highest level. Only a client with `reasoning-efforts-v1` gets these levels.
   const wideModel: AgentModelOption = {
     provider: "codex",
     id: "gpt-5.6-sol",
@@ -415,7 +381,6 @@ try {
       assert.ok(!Object.hasOwn(record(response.body, "compatibility"), "absent"), "A protocol 9 answer has `absent`.");
       const support = decodeTeamProtocolSupportV9(response.body);
       assert.deepEqual(support.protocol, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 });
-      // In the baseline order, and with no name after protocol 9.
       const baseline = new Set<string>(TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES);
       assert.deepEqual(
         support.capabilities,
@@ -447,7 +412,6 @@ try {
       );
       const baseline = new Set<string>(TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES);
       assert.ok(support.absent.every((capability) => baseline.has(capability)));
-      // `absent` is the baseline less the protocol 9 list of this host.
       assert.deepEqual(
         sorted(support.absent),
         sorted(TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES.filter((capability) => !protocol9List.includes(capability))),
@@ -455,7 +419,6 @@ try {
       assert.equal(support.absent.includes(MAC_APPS_LIMIT), process.platform === "darwin");
       const expanded = expandTeamCapabilitiesV10(support);
       assert.equal(expanded.includes(MAC_APPS_LIMIT), process.platform !== "darwin");
-      // The same set as protocol 9, and the names after protocol 9.
       const after9 = support.capabilities.filter((capability) => !baseline.has(capability));
       assert.deepEqual(sorted(expanded), sorted([...protocol9List, ...after9]));
       return { expanded, absent: support.absent, capabilities: support.capabilities };
@@ -502,7 +465,6 @@ try {
     return { negotiatedProtocol: compatibility.negotiatedProtocol, protocolsSent: v9Host.protocols };
   });
 
-  // A member that the WebRTC session belongs to, and an HTTP session token.
   const invite = await runCauseEffect(team.createInvite("member"));
   const v1Headers = { [TEAM_CAPABILITIES_HEADER]: TEAM_PROTOCOL_V1_CAPABILITIES.join(",") };
   const joined = await http(
@@ -520,7 +482,6 @@ try {
   assert.equal(login.status, 200);
   const token = text(record(login.body, "login").sessionToken, "session token");
 
-  /** The reasoning levels that a request with these capability headers gets. */
   async function effortsOverHttp(headers: Record<string, string>) {
     const models = await http(port, { protocol: TEAM_PROTOCOL_V10, path: "/v1/agents/models", token }, headers);
     assert.equal(models.status, 200, JSON.stringify(models.body));
@@ -571,7 +532,6 @@ try {
         assert.equal(response.status, 400, JSON.stringify(response.body));
         assert.equal(record(response.body, "400 body").code, "protocol_error");
       }
-      // An unknown name in `absent` is ignored: a later baseline can not contain it.
       const unknown = await http(
         port,
         { protocol: TEAM_PROTOCOL_V10, path: "/v1/agents/models", token },
@@ -585,15 +545,12 @@ try {
     },
   );
 
-  // --- WebRTC ---
-
   const clientKeys = generateKeyPairSync("ed25519", {
     publicKeyEncoding: { type: "spki", format: "pem" },
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
   });
   const fingerprints = { localFingerprint: "host-fingerprint", remoteFingerprint: "client-fingerprint" };
 
-  /** A WebRTC client that Signal connected, after the signed handshake. */
   async function connectWebRtc(peerId: string) {
     const bridge = new LoopbackBridge();
     const ticket = `ticket-${randomUUID()}`;
@@ -674,7 +631,6 @@ try {
       return frame?.type === "auth-confirmed" ? frame : null;
     });
 
-    /** One `http.request` with these capability keys. */
     async function call(path: string, keys: { capabilities: string[]; absent?: string[] }) {
       const requestId = randomUUID();
       const from = bridge.sent.length;
@@ -693,8 +649,6 @@ try {
 
   const web = await connectWebRtc("peer-web");
   await step("WebRTC web client: protocol 10 with this host, and the full set after a second read", async () => {
-    // As `createRemoteTeamPeer` does: the first compatibility read of a connection sends the bootstrap
-    // list, and a later one sends the protocol 10 lists of the protocol that it read.
     let known: number | undefined;
     const sent: { capabilities: number; absent: boolean }[] = [];
     const { support, negotiated } = await readWebHostCompatibility(async () => {

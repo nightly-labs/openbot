@@ -1,7 +1,3 @@
-// Drives issue #3643 on the real modules: the SQLite MCP store and McpGateway, over a database that
-// holds MCP rows this build cannot read. The startup read must not throw, and the user must be able to
-// see, correct and remove the row. No provider or account is used.
-// bun scripts/mcp-server-unreadable-row-e2e.ts. Writes .openbot-build/mcp-server-unreadable-row-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,7 +42,6 @@ const report: { passed: boolean; steps: typeof steps; warnings: string[]; failur
 
 try {
   await runCauseEffect(database.initialize());
-  // Each line the store logs is kept, to check that a row is said once and no value is.
   const store = new McpServerStore(
     database,
     createOpenBotLogger("mcp-server-store", (line) => report.warnings.push(line)),
@@ -69,12 +64,9 @@ try {
        working_directory, url, headers_json, position, created_at, updated_at
      ) VALUES (?, ?, ?, 1, '', '[]', '[]', '[]', ?, ?, ?, ?, '2026-10-28T12:00:00.000Z', '2026-10-28T12:00:00.000Z')`,
   );
-  // The shape the issue reports: headers as an object, not as a list of pairs.
   const objectHeaders = JSON.stringify({ Authorization: `Bearer ${HEADER_SECRET}` });
   insert.run("mcp-object-headers", "object-headers", "http", "", "https://object.example/mcp", objectHeaders, 2);
-  // A column that is not text at all: nothing of this row can be shown.
   insert.run("mcp-blob-folder", "blob-folder", "http", new Uint8Array([0]), "https://blob.example/mcp", "[]", 3);
-  // Rows an earlier build or an import could store past the bounds that the renderer decodes with.
   const insertStdio = database.connection.prepare(
     `INSERT INTO projection_mcp_servers (
        mcp_server_id, name, transport, enabled, command, args_json, env_json, env_passthrough_json,
@@ -86,7 +78,6 @@ try {
   insertStdio.run("mcp-long-command", "long-command", "n".repeat(5_000), "[]", 5);
   insertStdio.run("mcp-long-name", "x".repeat(100), "node", "[]", 6);
 
-  // The startup path of the issue: AgentService.enabledMcpServers() -> McpGateway.enabled().
   const enabled = gateway.enabled().map((config) => config.name);
   assert.deepEqual(enabled, ["alpha", "beta"]);
   steps.push({ step: "startup read", detail: enabled });
@@ -96,7 +87,6 @@ try {
     listed.map((config) => config.name),
     ["alpha", "beta", "object-headers", "many-args", "long-command"],
   );
-  // What the preload does with the list: one config past a bound would fail all of them.
   decodeMcpServerConfigs(listed);
   const tooMany = listed.find((config) => config.name === "many-args");
   assert.ok(tooMany);
@@ -107,7 +97,6 @@ try {
   assert.ok(longCommand);
   assert.equal(longCommand.enabled, false, "a row past a text bound reads as turned off");
   assert.equal(longCommand.command, "");
-  // Turned on as shown, it has no command: the save says what to correct, and the row stays.
   assert.throws(
     () => store.setEnabled("mcp-long-command", true),
     (error: unknown) =>
@@ -140,7 +129,6 @@ try {
   assert.ok(!report.warnings.join("\n").includes(HEADER_SECRET), "a stored value reached the log");
   steps.push({ step: "logged once without values", detail: report.warnings.length });
 
-  // A name the store refuses is refused by the table, so the skipped row keeps its name.
   assert.throws(
     () => store.save(draft("blob-folder", { transport: "http", url: "https://other.example/mcp" })),
     (error: unknown) =>
@@ -149,7 +137,6 @@ try {
   );
   steps.push({ step: "skipped row keeps its name", detail: "name taken" });
 
-  // A header key longer than the read guard allows - what a Hermes import could hand over.
   const longKey = "k".repeat(300);
   assert.throws(
     () =>
@@ -169,12 +156,10 @@ try {
   );
   steps.push({ step: "save refuses a row it cannot read back", detail: "mcpServerInvalid" });
 
-  // The row already reads as off: turning it off keeps its stored values.
   assert.equal(store.setEnabled("mcp-object-headers", false).enabled, false);
   assert.deepEqual({ ...raw() }, { enabled: 0, headers_json: objectHeaders }, "turning off erased the row");
   steps.push({ step: "turn off keeps the row", detail: "enabled 0, headers kept" });
 
-  // Turning the row on stores it as it is shown, so it stays on after the next read.
   const turnedOn = store.setEnabled("mcp-object-headers", true);
   assert.equal(turnedOn.enabled, true);
   assert.deepEqual({ ...raw() }, { enabled: 1, headers_json: "[]" });
@@ -185,7 +170,6 @@ try {
   );
   steps.push({ step: "turn on repairs the row", detail: turnedOn });
 
-  // The user corrects the row in Server settings: a save replaces it with what the form shows.
   const corrected = store.save({ ...turnedOn, headers: [{ key: "Authorization", value: "Bearer new" }] });
   assert.deepEqual(store.get(corrected.id)?.headers, [{ key: "Authorization", value: "Bearer new" }]);
   steps.push({ step: "save corrects the row", detail: corrected.id });

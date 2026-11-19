@@ -1,10 +1,3 @@
-/**
- * One node on the canvas: a routine that starts a run, or an agent that takes input and returns
- * output. An agent card shows the output of its last run inline, so the canvas reads as the result
- * of the run as well as its plan. The card itself does not listen for the pointer: the board moves
- * it and draws connections from its ports, and finds it through the `data-diagram-*` attributes.
- */
-
 import { Button, Check, Clock3, Minus, Play, Spinner, TriangleAlert, Webhook, X } from "@openbot/ui";
 import { For, Match, Show, Switch } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
@@ -16,10 +9,8 @@ import { DIAGRAM_NODE_WIDTH, diagramAgentTask } from "./diagram-graph";
 import type { DiagramNode, DiagramStepRun, DiagramStepStatus } from "./diagram-model";
 import { DIAGRAM_STEP_STATUS_KEY, diagramRoutineTrigger, diagramStepSeconds } from "./diagram-text";
 
-/** How an input port answers a connection in progress. */
 export type DiagramPortTarget = "none" | "valid" | "invalid";
 
-/** A routine whose run reaches an agent, and how the agent's step went in that run. */
 export interface DiagramRoutineChip {
   id: string;
   name: string;
@@ -30,32 +21,22 @@ export interface DiagramRoutineChip {
 export interface DiagramNodeCardProps {
   node: DiagramNode;
   name: string;
-  /** Only the face and the kicker read it, so a sample agent needs no more than these. */
   agent?:
     | (Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarUrl" | "title"> & Partial<Pick<AgentProfile, "model">>)
     | undefined;
-  /** The step an agent runs in when the focused routine fires; absent outside its path. */
   step?: number | undefined;
-  /** True for an agent that no routine reaches, so it never runs. */
   unreachable: boolean;
-  /** True outside the focused routine's path. */
   dimmed: boolean;
-  /** A routine's colour, from `diagramRoutineColor`. */
   routineColor?: number | undefined;
-  /** For an agent: the routines that start it. Empty while the diagram has one routine. */
   routines: DiagramRoutineChip[];
   focusRoutineId: string | null;
   onFocusRoutine: (routineId: string) => void;
   stepRun?: DiagramStepRun | undefined;
   selected: boolean;
-  /** Whether its ports take a new connection. */
   connectable: boolean;
-  /** Whether the user may take it off the canvas. */
   removable: boolean;
-  /** True while this node's output is the source of a connection in progress. */
   connecting: boolean;
   inputTarget: DiagramPortTarget;
-  /** True while the run this routine started is in progress. */
   firing?: boolean;
   onSelect: () => void;
   onRemove: () => void;
@@ -72,7 +53,6 @@ export function DiagramNodeCard(props: DiagramNodeCardProps) {
     if (status() === "running") return "working";
     return status() === "failed" ? "failed" : "idle";
   };
-  /** A routine's kicker says when it fires next, or that it is paused. */
   const routineKicker = (node: Extract<DiagramNode, { kind: "routine" }>) => {
     if (!node.active) return t("diagram.node.paused");
     const next = node.upcomingRuns[0];

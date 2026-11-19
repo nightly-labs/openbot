@@ -1,16 +1,3 @@
-// Frozen optional vault-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a joined
-// server manages the host's Vault from their own computer or browser. They list its items, add, change
-// and delete them, see one saved password, card number or security code when they ask for it, and
-// start again with no items when the host cannot read the file; the host refuses a reset of a Vault
-// that it can read. A member cannot use any route;
-// `requireAdmin` on the host is the only gate. A CSV import is not here: it reads a file on the host.
-//
-// A list item never carries a password, a card number or a security code. Only `reveal` answers with
-// one, and the client asks for it each time the user shows or copies it. `vault-changed` carries no
-// data, as every client with the capability gets it, a member too: an admin client reads the list
-// again. Widening any of it needs a second capability.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -37,14 +24,11 @@ export const VAULT_ROUTES = {
   reset: "/v1/admin/vault/reset",
 } as const;
 
-/** The most items that one list carries. The host sends the first ones. */
 export const VAULT_WIRE_ITEM_LIMIT = 5_000;
-/** The longest agent name in `addedBy`. The host cuts a longer one. */
 export const VAULT_WIRE_NAME_LIMIT = 512;
 
 export type VaultEvent = { type: "vault-changed" };
 
-/** The Vault event in `value`, or null for any other event. */
 export function vaultEvent(value: unknown): VaultEvent | null {
   if (!isDynamicRecord(value) || value.type !== "vault-changed") return null;
   return { type: "vault-changed" };
@@ -100,7 +84,6 @@ const state = fields({
   items: list(item, VAULT_WIRE_ITEM_LIMIT),
 });
 
-/** A new item when `id` is null. A null secret keeps the saved value. */
 const saveInput = variant({
   login: fields({
     kind: oneOf("login"),

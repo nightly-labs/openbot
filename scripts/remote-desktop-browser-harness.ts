@@ -39,7 +39,6 @@ const gateway = new RemoteScreenGateway({
   getDisplays: () => [{ id: "1", label: "Primary display", width: 1920, height: 1080, primary: true }],
   getIceServers: () => Effect.succeed([{ urls: "stun:127.0.0.1:3478" }]),
   audit: (event) => {
-    // Machine-readable: the E2E runner parses OPENBOT_REMOTE_E2E_AUDIT lines.
     process.stdout.write(`OPENBOT_REMOTE_E2E_AUDIT=${JSON.stringify(event)}\n`);
   },
   onDiagnostic: (source, message) => process.stdout.write(`[${source}] ${message}`),
@@ -77,7 +76,6 @@ for (let index = 0; index < clientCount; index += 1) {
     }),
   );
   const viewerUrl = `${session.viewerUrl}#${session.viewerGrant}`;
-  // Machine-readable: the E2E runner parses OPENBOT_REMOTE_E2E_URL lines.
   if (index === 0) process.stdout.write(`OPENBOT_REMOTE_E2E_URL=${viewerUrl}\n`);
   process.stdout.write(`OPENBOT_REMOTE_E2E_URL_${index + 1}=${viewerUrl}\n`);
 }

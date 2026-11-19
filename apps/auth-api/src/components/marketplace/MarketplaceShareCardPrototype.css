@@ -1,7 +1,3 @@
-/* The share card prototype. The card is 1200 × 630 and scales with its frame: every length is in
-   `--px`, one pixel of the 1200-wide card. The card is the container, so the `cqw` in it resolves
-   against the card wherever a child uses it. */
-
 .marketplace-share-card {
   --px: calc(100cqw / 1200);
   position: relative;
@@ -50,7 +46,6 @@
   text-wrap: balance;
 }
 
-/* In the line of the name, after its last word, as the agent page shows it. */
 .marketplace-share-shield {
   display: inline-block;
   width: 0.62em;
@@ -71,7 +66,6 @@
   font-weight: 500;
 }
 
-/* The avatar on the left, without a plate; the mark heads the text column beside it. */
 .marketplace-share-avatar {
   top: 50%;
   left: calc(24 * var(--px));
@@ -98,7 +92,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* The story page. */
 .marketplace-share-page {
   min-height: 100vh;
   background: #000;
@@ -139,7 +132,6 @@
   gap: 12px;
 }
 
-/* The frames, in each app's own dark colours: the frame is theirs, not OpenBot's. */
 .marketplace-share-x,
 .marketplace-share-messages,
 .marketplace-share-slack {

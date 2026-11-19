@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Composio here is taken from docs.composio.dev. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const COMPOSIO_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

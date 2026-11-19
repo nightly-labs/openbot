@@ -5,29 +5,14 @@ import { createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-j
 import { useText } from "../../text";
 import { CodeBlock } from "../conversation/CodeBlock";
 
-/**
- * - making: the app asks the account service for a claim.
- * - waiting: the command shows. No server used the claim yet.
- * - starting: a new server is in the server list, but it is not online yet.
- * - connected: the new server is online.
- * - expired: nobody used the claim before it expired.
- * - failed: the account service did not make a claim.
- */
 export type InstallServerStep = "making" | "waiting" | "starting" | "connected" | "expired" | "failed";
 
 export interface InstallServerDialogProps {
   step: InstallServerStep;
-  /** The claim of the shown command. It stays while the step is `starting`, `connected` or `expired`. */
   claim: ServerClaim | null;
-  /** The new server, from the step `starting`. */
   serverName: string | null;
-  /** The cause of the step `failed`. */
   error: unknown;
   onNewCommand: () => void;
-  /**
-   * Puts an SSH task into the composer of the open chat. The agent gets its own command. Absent: no chat can take it.
-   * Shown while the step is `waiting`.
-   */
   onSetUpWithAgent?: (() => void) | undefined;
   onOpenServer: () => void;
   onClose: () => void;
@@ -38,10 +23,6 @@ const formatRemaining = (ms: number) => {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 };
 
-/**
- * One command that installs OpenBot on a Linux computer or VPS and signs the server in to this account.
- * A person or an AI agent runs it. The dialog then waits until the new server is online.
- */
 export function InstallServerDialog(props: InstallServerDialogProps) {
   const { t, errorMessage } = useText();
   const [now, setNow] = createSignal(Date.now());
@@ -171,7 +152,6 @@ export function InstallServerDialog(props: InstallServerDialogProps) {
   );
 }
 
-/** Copies the command with what an AI agent must know. It sits before Copy, as other code block actions do. */
 function CopyForAgentButton(props: { command: string }) {
   const { t } = useText();
   const [copied, setCopied] = createSignal(false);
@@ -181,7 +161,6 @@ function CopyForAgentButton(props: { command: string }) {
     try {
       await navigator.clipboard.writeText(t("server.install.agentPrompt", { command: props.command }));
     } catch {
-      // The clipboard refused the text, so the button does not say Copied.
       setCopied(false);
       return;
     }

@@ -5,16 +5,13 @@ import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createMemo, Match, Show, Switch } from "solid-js";
 
-/** What the Library does with the selected files. `save` puts them in the Downloads folder. */
 export type LibraryBatchAction = "delete" | "save";
 
-/** The step that the pill shows. Each step has its own face, and the pill springs to its width. */
 export type LibraryPillStep =
   | { kind: "actions" }
   | { kind: "confirm" }
   | { kind: "working"; action: LibraryBatchAction; done: number; total: number };
 
-/** A count that rolls in from below when it changes. */
 function rollIn(element: HTMLElement) {
   if (prefersReducedMotion()) return;
   queueMicrotask(() => contentIn(element, 0, (rest) => `translateY(${60 * rest}%)`));
@@ -23,15 +20,10 @@ function rollIn(element: HTMLElement) {
 export interface LibrarySelectionPillProps {
   open: boolean;
   step: LibraryPillStep;
-  /** The selected files. */
   count: number;
-  /** The selected files that the viewer can download. */
   saveCount: number;
-  /** The selected files that the viewer can delete. */
   deleteCount: number;
-  /** The viewer can delete files. Off for a member of a remote server: the pill has no Delete. */
   canDelete: boolean;
-  /** One more action, such as "Move". It goes between Download and Delete. */
   move?: JSX.Element;
   onSave: () => void;
   onAskDelete: () => void;
@@ -39,13 +31,8 @@ export interface LibrarySelectionPillProps {
   onConfirmDelete: () => void;
 }
 
-/**
- * The pill at the bottom of the Library while files are selected. It shows the count and the actions,
- * asks before a delete, and shows the progress of a delete or download.
- */
 export function LibrarySelectionPill(props: LibrarySelectionPillProps) {
   const { t } = useText();
-  // The pill keeps the last count while it goes down, so it does not show 0 on its way out.
   const count = createMemo<number>((previous) => props.count || previous || 0);
   const face = () => {
     const step = props.step;
@@ -122,7 +109,6 @@ export function LibrarySelectionPill(props: LibrarySelectionPillProps) {
             variant="destructive"
             size="sm"
             class="library-pill-button"
-            // The question replaces the button that asked it, so focus moves to the answer.
             ref={(element) => queueMicrotask(() => element.focus())}
             onClick={() => props.onConfirmDelete()}
           >

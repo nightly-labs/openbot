@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.update", {
-  // Updater state the user reads.
   "error.update.unsupported": "Updates are available in installed desktop builds.",
   "error.update.notReady": "An update is not ready to install.",
   "error.update.restartFailed": "OpenBot could not restart to install the update.",
@@ -30,7 +29,6 @@ export const messages = defineMessages("error.update", {
     "OpenBot cannot install the update because its AppImage file was moved, renamed or replaced. Quit OpenBot, then open the AppImage file again.",
   "error.update.appImageReadOnly":
     "OpenBot cannot install updates in the folder of its AppImage file. Quit OpenBot, move the AppImage file to a folder in your home folder, then open it and install the update again.",
-  // A joined server's admin reads these from the host.
   "error.update.remoteDisabled": "Updates from server admins are turned off on this computer.",
   "error.update.restartStarted": "OpenBot is already restarting to install the update.",
   "error.update.alreadyRestarting": "OpenBot is already restarting.",

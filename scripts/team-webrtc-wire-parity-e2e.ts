@@ -1,13 +1,3 @@
-// Checks that the WebRTC wire of Team protocols 1-10 does not change when code moves between the
-// contracts files (plan 011 item 2, step 2). It runs every WebRTC HTTP codec of protocols 2-10, the
-// protocol 2 request and response frames, and the WebRTC framing (frames, file chunks, the
-// authentication transcript) on one fixed corpus, and records each result or error.
-// - Always: the protocol 4-10 frame of each bodyless request (GET, DELETE, routine test, remote viewer)
-//   is the frame of the v3 WebRTC codec, which those protocols used before.
-// - With `--before=<git ref>`: the same corpus runs on a `git archive` copy of
-//   `packages/contracts/src` at that ref, and each result must be the same, byte for byte.
-// Run: `bun run test:team-webrtc-wire-parity` (CI), or add `-- --before=<ref>` for the comparison.
-// Writes .openbot-build/team-webrtc-wire-parity-e2e/{after,before,report}.json.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -17,7 +7,6 @@ const OUT = join(ROOT, ".openbot-build/team-webrtc-wire-parity-e2e");
 const beforeRef = process.argv.find((argument) => argument.startsWith("--before="))?.slice("--before=".length);
 
 type Outcome = { ok: unknown } | { error: string };
-/** The exports of one contracts module, by name. */
 type ModuleExports = ReadonlyMap<string, unknown>;
 
 const CODEC_MODULES = [
@@ -68,8 +57,6 @@ const NO_BODY_GET_PATHS = [
 ];
 const REQUEST_ROUTES: ReadonlyArray<readonly [string, string]> = [
   ...NO_BODY_GET_PATHS.map((path) => ["GET", path] as const),
-  // GET routes outside the frozen list: the scoped usage and analytics routes, and routes that a newer
-  // codec owns (a bodyless frame refuses them).
   ["GET", "/v1/agents/agent-1/analytics"],
   ["GET", "/v1/analytics?range=7d"],
   ["GET", "/v1/agents/agent-1/usage"],
@@ -88,7 +75,6 @@ const REQUEST_ROUTES: ReadonlyArray<readonly [string, string]> = [
   ["POST", "/v1/remote-screen/sessions/session-1/viewer"],
   ["POST", "/v1/remote-screen/sessions/session-1/authorize"],
   ["POST", "/v1/remote-screen/sessions/session-1/moonlight/pair"],
-  // Routes with a body: their codecs did not move, and they must not change either.
   ["POST", "/v1/agents/agent-1/conversation/unread"],
   ["POST", "/v1/agents/agent-1/duplicate"],
   ["POST", "/v1/agents/agent-1/queue/edit"],
@@ -188,7 +174,6 @@ async function loadModule(source: string, name: string): Promise<ModuleExports> 
   return new Map(Object.entries(await import(join(source, "team-protocol", `${name}.ts`))));
 }
 
-/** A codec function of a module that this script loads by path, so its signature is not known here. */
 function exported(module: ModuleExports, name: string): (...input: unknown[]) => unknown {
   const fn = module.get(name);
   if (typeof fn !== "function") throw new Error(`${name} is not exported.`);
@@ -250,7 +235,6 @@ async function runCorpus(source: string): Promise<Record<string, Outcome>> {
       { status: 200, body: value },
     );
 
-  // The framing is in `v2.ts` before the move and re-exported from it after the move.
   const framing = await loadModule(source, "v2");
   for (const name of [
     "TEAM_PROTOCOL_V2",
@@ -323,7 +307,6 @@ function isBodylessRoute(method: string, path: string): boolean {
   );
 }
 
-/** The protocol 4-10 frame of a bodyless request must be the frame of the v3 WebRTC codec. */
 function bodylessMismatches(results: Record<string, Outcome>): string[] {
   const mismatches: string[] = [];
   let compared = 0;
@@ -334,7 +317,6 @@ function bodylessMismatches(results: Record<string, Outcome>): string[] {
     if (!match) continue;
     const [, version, direction, method, path, rest] = match;
     if (Number(version) < 4 || !method || !path || !isBodylessRoute(method, path)) continue;
-    // The browser display and view session routes have their own empty frame since protocol 4.
     if (path.startsWith("/v1/browser/display") || path.includes("/browser/view")) continue;
     const v3 = results[`v3-webrtc-adapter.${direction}TeamProtocolV3WebRtcHttpRequest ${method} ${path} ${rest}`];
     compared += 1;

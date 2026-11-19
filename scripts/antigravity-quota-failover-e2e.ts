@@ -1,33 +1,3 @@
-// Checks that a spent Gemini quota moves an agent to its backup model, also after the turn started
-// work. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4.
-// A prompt with `QUOTA-NOW` on a `gemini-quota-*` model gets Antigravity's quota text as answer text,
-// in the 1.5 failure form ("\n⚠ <text>"), and the stop reason `end_turn`; with `ACT-FIRST` it runs a
-// tool step before that. `gemini-spent` gets the quota text before any step. `gemini-flash` always
-// answers. A prompt with `RATE-NOW` on `gemini-rate` gets a rate-limit text that only the Gemini
-// rules know, with no Google status name (#11099); with `ACT-FIRST` on `gemini-rate-*` it runs a tool
-// step before that. A prompt with `CREDITS-NOW` on a `gemini-credits-*` model gets the text of a spent
-// AI credits balance (#11332). `NET-NOW` on `gemini-net` gets Go's text of a dropped connection, and
-// `GONE-NOW` on `gemini-gone` gets "Unknown model ID", and on `gemini-gone-b` a model that "is
-// unavailable", which only the Gemini rules know (#12432). Each case has its own primary model: a
-// spent quota holds its model for all agents.
-// Checks:
-//   1. Quota before work, set to switch without asking: the message runs again on the backup.
-//   2. Quota after a tool step, set to switch without asking: the backup continues the work, with
-//      the work steps and no error.
-//   3. Quota after a tool step, set to ask: the backup continues the work too, as after a plan limit.
-//   4. As 3, but the first backup's quota is spent too: the next backup continues the same work.
-//   5. A rate limit before work, set to switch without asking: the message runs again on the backup.
-//   6. A spent AI credits balance before work, set to switch without asking: the message runs again
-//      on the backup.
-//   7. A spent AI credits balance after a tool step, set to ask: the backup continues the work.
-//   8. A rate limit after a tool step, set to switch without asking: the backup continues the work.
-//   9. A dropped connection to Google before work, set to switch without asking: the message runs
-//      again on the backup.
-//  10. A model that the account cannot use now, set to switch without asking: the message runs again
-//      on the backup.
-//  11. Quota on a channel task, set to switch without asking: the task fails, and the agent's next
-//      channel task runs on the backup (#12484).
-// `bun run test:antigravity-quota-failover`. Writes .openbot-build/antigravity-quota-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -46,13 +16,10 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const BACKUP = "gemini-flash";
-// The continuation note that a backup model gets for work that a usage limit stopped.
 const CONTINUATION =
   "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.";
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
-// Bun's `os.homedir()` does not follow HOME. Keep the Gemini home off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
@@ -64,7 +31,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity CLI that keeps each session's model and sends a spent quota as a 1.5 failure. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -185,7 +151,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -229,7 +194,6 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Makes an agent on `model` with the backup models in `order`, and sends `text` after its first turn. */
 async function runCase(
   name: string,
   model: string,
@@ -401,8 +365,6 @@ try {
     credits.passed = true;
   }
 
-  // A channel task is not run again on the backup: its channel shows the failure. The channel's next
-  // task for the agent ran on the spent model again, and failed again (#12484).
   const channelCase: CaseReport = {
     name: "quota on a channel task, switch without asking",
     status: "",

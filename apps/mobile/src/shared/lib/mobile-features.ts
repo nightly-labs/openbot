@@ -12,21 +12,9 @@ import { devFeatureOverride, devLatestAppVersion } from "@/shared/lib/dev-featur
 import { nativeApplicationVersion } from "@/shared/lib/native-application";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
-/**
- * A screen that opens often, or the app when it comes to the front, reads the flags again at most this
- * often. Flags seldom change, and each read is a request to the account service. A screen that must
- * have the current flags, such as the hosted server plans, asks with `force`.
- */
 const FLAGS_TTL_MS = 10 * 60_000;
 const FLAGS_TIMEOUT_MS = 10_000;
 
-/**
- * The feature flags of this app version, from the account server that the phone signed in to. Before the
- * first answer every feature is off, and a failed read keeps the last answer. An account server
- * without the flags endpoint, such as an older or self-hosted one, leaves every feature off. The same
- * answer names the newest store version and the lowest supported one, which an older account server
- * does not send.
- */
 const useMobileFeatures = create<{
   apiUrl: string | null;
   flags: MobileFeatureFlags;
@@ -84,29 +72,21 @@ export async function refreshMobileFeatures(apiUrl: string, force = false): Prom
   }
 }
 
-/**
- * The OpenBot version. In Expo Go the native version is the version of Expo Go, so Expo Go and
- * development builds send the version of the app config; for a development build it is the same.
- * A release build sends its native version.
- */
 export function currentAppVersion(): string | null {
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return Constants.expoConfig?.version ?? null;
   return nativeApplicationVersion();
 }
 
-/** One flag for the account server of this session. It is off for another account server. */
 export function useMobileFeature(apiUrl: string, feature: keyof MobileFeatureFlags): boolean {
   const on = useMobileFeatures((state) => state.apiUrl === apiUrl && state.flags[feature]);
   return devFeatureOverride(feature) ?? on;
 }
 
-/** The newest store version for the account server of this session. Null until it answers. */
 export function useLatestAppVersion(apiUrl: string): string | null {
   const latest = useMobileFeatures((state) => (state.apiUrl === apiUrl ? state.latestVersion : null));
   return devLatestAppVersion() ?? latest;
 }
 
-/** The lowest supported store version. Null until the account server answers, or when it sends none. */
 export function useMinimumAppVersion(apiUrl: string): string | null {
   return useMobileFeatures((state) => (state.apiUrl === apiUrl ? state.minimumVersion : null));
 }

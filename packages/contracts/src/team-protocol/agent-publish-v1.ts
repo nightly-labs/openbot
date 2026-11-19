@@ -1,16 +1,3 @@
-// Frozen optional agent-publish-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can read what the host would publish for one of its agents, publish it as a link-only
-// agent template, update it and unpublish it. The host builds the template, refuses secrets and
-// uploads it with the account signed in on it, as when it is published on the host, so the
-// template belongs to that account. A client never sends instructions, skills or routines: it
-// sends the agent id and, optionally, the share card it drew from the preview. A member cannot use
-// any route; `requireAdmin` on the host is the only gate. Widening any of it needs a second
-// capability string.
-//
-// Bytes travel as base64. The avatar is at most 512 KiB, and so is the card, because a request body
-// of the host is at most 1 MiB; a client publishes without a larger card.
 import {
   adminRoute,
   boolean,
@@ -34,10 +21,8 @@ export const AGENT_PUBLISH_ROUTES = {
   unpublish: "/v1/admin/agents/template-unpublish",
 } as const;
 
-/** The largest avatar or card, in bytes. */
 export const AGENT_PUBLISH_IMAGE_BYTES = 524_288;
 
-/** Base64 of 512 KiB: `ceil(524288 / 3) * 4`. */
 const IMAGE_BASE64_LIMIT = 699_052;
 
 const kind = (name: string) => ({ kind: oneOf(name) });

@@ -16,29 +16,20 @@ interface GitHubRelayAccount {
 
 export interface GitHubRelayOptions {
   account: GitHubRelayAccount;
-  /** The GitHub sign-in of this computer, or null when GitHub is not connected. */
   githubToken(): Effect.Effect<string | null, unknown>;
-  /** Set after construction: the ingress socket asks this relay for its GitHub route ticket. */
   ingress(): SignalIngress;
 }
 
-/**
- * Owns the GitHub hold on the ingress socket and the repositories that it watches. The repositories
- * come from the saved GitHub triggers; the account service confirms them with the GitHub sign-in each
- * time the socket opens, and the event bodies go only to this computer.
- */
 export class GitHubRelay {
   readonly #options: GitHubRelayOptions;
   #repositories: readonly string[] = [];
   #release: (() => void) | null = null;
-  /** The repositories that the last ticket named, by lowercase `owner/name`. */
   #routed = new Map<string, GitHubRouteTicketRepository>();
 
   constructor(options: GitHubRelayOptions) {
     this.#options = options;
   }
 
-  /** Watches `names`, as `owner/name`. An empty list releases the socket. */
   setRepositories(names: readonly string[]): void {
     const next = [...new Set(names.map((name) => name.toLowerCase()))].sort();
     const changed = next.join("\n") !== this.#repositories.join("\n");
@@ -54,12 +45,10 @@ export class GitHubRelay {
     else if (changed) ingress.reconnect();
   }
 
-  /** True only after Signal confirms the GitHub route ticket on the open socket. */
   connected(): boolean {
     return this.#options.ingress().githubReady();
   }
 
-  /** The repository that the last ticket named, or null when the GitHub sign-in cannot see it. */
   routed(fullName: string): GitHubRouteTicketRepository | null {
     return this.#routed.get(fullName.toLowerCase()) ?? null;
   }
@@ -87,10 +76,6 @@ export class GitHubRelay {
   }).bind(this);
 }
 
-/**
- * Gives one relayed GitHub event to the workflows. 202: a trigger saved it; 404: no trigger watches
- * it; 400: the body is not JSON. A fault fails, and the ingress socket answers 503.
- */
 export const receiveGitHubDelivery = Effect.fn("receiveGitHubDelivery")(function* (
   workflows: Pick<WorkflowsHandle, "receiveGitHub">,
   delivery: GitHubIngressDelivery,

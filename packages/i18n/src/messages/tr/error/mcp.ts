@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
-  // MCP oturum açma hataları ve tarayıcıdaki oturum açma sayfası.
   "error.mcp.redirectByName": "Bu adrese adıyla ulaşılamıyor.",
   "error.mcp.redirectNotSignIn": "Bu adres bir oturum açma işleminin parçası değil.",
   "error.mcp.redirectRefused": "Oturum açma reddedildi. OpenBot'a geri dönün ve tekrar deneyin.",

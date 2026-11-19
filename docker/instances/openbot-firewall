@@ -1,11 +1,4 @@
 #!/bin/bash
-# The firewall of the OpenBot instances. See docs/docker.md#several-instances-on-one-host.
-#
-# Agents have full access in their container, so the containers on the `openbot` network
-# (bridge br-openbot) reach only the internet: not the host, not private or local addresses, and not
-# the addresses in /etc/openbot-docker/deny, for example other servers that trust the address of this
-# host. openbot-firewall.service runs it before Docker starts, and Docker requires that unit, so no
-# container starts without it.
 set -euo pipefail
 
 BRIDGE=br-openbot
@@ -19,7 +12,6 @@ BLOCKED=(0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.
   exit 1
 }
 
-# Check the deny file before a rule changes: a bad line must not stop the script halfway.
 DENIED=()
 if [ -f "$DENY" ]; then
   while read -r range _; do
@@ -32,13 +24,10 @@ if [ -f "$DENY" ]; then
   done <"$DENY"
 fi
 
-# Traffic to an address of the host goes through INPUT and not through DOCKER-USER. It comes first.
 iptables --check INPUT --in-interface "$BRIDGE" --jump DROP 2>/dev/null ||
   iptables --insert INPUT 1 --in-interface "$BRIDGE" --jump DROP
-# Docker keeps the rules of DOCKER-USER, and makes the chain only when it does not exist.
 iptables --new-chain DOCKER-USER 2>/dev/null || true
 iptables --new-chain "$CHAIN" 2>/dev/null || true
-# Nothing passes while the chain is empty.
 iptables --insert DOCKER-USER 1 --in-interface "$BRIDGE" --jump DROP
 iptables --flush "$CHAIN"
 for range in "${BLOCKED[@]}" "${DENIED[@]}"; do

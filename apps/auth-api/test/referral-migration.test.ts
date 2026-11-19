@@ -35,7 +35,6 @@ describe("referral migration", () => {
     database.exec(migration("0059_referrals.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker's billing writes still run.
     database.exec(`
       INSERT INTO billing_subscriptions(
         stripe_subscription_id, user_id, stripe_customer_id, server_id, plan, interval, currency, status,
@@ -53,11 +52,9 @@ describe("referral migration", () => {
       INSERT INTO referral_reversals(reversal_id, invoice_id, amount, created_at) VALUES ('re_1', 'in_1', 600, 8);
       UPDATE referral_credits SET reversed_amount = 600 WHERE invoice_id = 'in_1';
     `);
-    // One code for each account, and no account has the code of another.
     expect(() =>
       database.exec("INSERT INTO referral_codes(user_id, code, created_at) VALUES ('friend', 'k7m2p9qx', 9)"),
     ).toThrow();
-    // An account cannot invite itself, and has one referrer.
     expect(() =>
       database.exec(
         "INSERT INTO referrals(referred_user_id, referrer_user_id, created_at) VALUES ('referrer', 'referrer', 9)",
@@ -68,16 +65,13 @@ describe("referral migration", () => {
         "INSERT INTO referrals(referred_user_id, referrer_user_id, created_at) VALUES ('friend', 'referrer', 9)",
       ),
     ).toThrow();
-    // A new invite is not blocked; a friend who paid with a card of the referrer is.
     expect(database.prepare("SELECT blocked_at FROM referrals WHERE referred_user_id = 'friend'").get()).toEqual({
       blocked_at: null,
     });
     database.exec("UPDATE referrals SET blocked_at = 10 WHERE referred_user_id = 'friend'");
-    // A reversal never takes back more than the credit.
     expect(() =>
       database.exec("UPDATE referral_credits SET reversed_amount = 601 WHERE invoice_id = 'in_1'"),
     ).toThrow();
-    // A credit names an account that exists.
     expect(() =>
       database.exec(`
         INSERT INTO referral_credits(
@@ -86,7 +80,6 @@ describe("referral migration", () => {
       `),
     ).toThrow();
 
-    // An account that is deleted takes its invite rows with it.
     database.exec("DELETE FROM users WHERE id = 'friend'");
     expect(database.prepare("SELECT COUNT(*) AS count FROM referrals").get()).toEqual({ count: 0 });
     expect(database.prepare("SELECT COUNT(*) AS count FROM referral_credits").get()).toEqual({ count: 0 });

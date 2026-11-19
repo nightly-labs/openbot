@@ -52,7 +52,6 @@ export const verifyEd25519Pem = Effect.fn("Ed25519.verify")(function* (
   });
 });
 
-/** The `HostKeySignatureCheck` of clients that have no `node:crypto`. */
 export function verifyEd25519Base64Url(signature: string, message: Uint8Array, publicKeyPem: string) {
   return Effect.try({ try: () => base64UrlToBytes(signature), catch: cryptoError }).pipe(
     Effect.flatMap((bytes) => verifyEd25519Pem(bytes, message, publicKeyPem)),

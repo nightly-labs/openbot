@@ -1,11 +1,5 @@
 // @vitest-environment node
 
-// No copy of the database is made before an upgrade, and a database from any shipped release must still
-// upgrade. So each shipped schema is built here from the release tags (`released-schemas/releases.json`),
-// seeded with rows in every table, and upgraded to the latest version. Failure modes: the upgrade loses or
-// changes a row that no migration says it changes; it leaves a broken page, reference or full-text index;
-// it makes a schema that a new install does not have; a second start changes something.
-
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -77,7 +71,6 @@ function expectUpgradeKeepsData(db: DatabaseSync): void {
   expect(query(db, "PRAGMA table_info(schema_migrations)")).toEqual(latest.migrationsTable);
   expect(readAppliedVersions(db)).toEqual([...oldMarkers, ...latest.versions]);
 
-  // A second start after a clean close runs nothing and changes nothing.
   const afterFirst = { rows: readTableRows(db), declarations: readNormalizedDeclarations(db) };
   const appliedAt = query(db, "SELECT version, applied_at FROM schema_migrations ORDER BY version");
   migrateOpenBotDatabase(db, { appliedAt: "2026-12-01T00:00:00.000Z", closedCleanly: true });
@@ -99,8 +92,6 @@ describe("upgrade from the database of each shipped release", () => {
   });
 });
 
-// The same, from each shipped version made by the migrations of this build. `throughVersion` makes these,
-// and the large-database E2E (`scripts/migration-large-db-e2e.ts`) starts from one of them.
 const shippedVersions = [
   ...new Set(releasedCases.map((released) => released.migrations.at(-1) ?? 0).filter((version) => version >= 8)),
 ];

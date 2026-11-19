@@ -1,5 +1,3 @@
-// Invite friends: the invite link, the credit and the friends of the account.
-
 import { parseReferralPageRequest } from "@openbot/contracts/referral";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";

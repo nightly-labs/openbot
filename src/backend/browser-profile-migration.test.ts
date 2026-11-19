@@ -6,15 +6,11 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
-// or its marker; a newer or incomplete history is accepted; a profile has a bad id or a missing value.
-// These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-// Migration 45 adds the profiles and migration 46 the workflow tables, all empty.
 const NEW_TABLES = {
   browser_profiles: [],
   workflow_edges: [],
@@ -57,7 +53,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A Discord connection, from schema 25 on. */
 function seedConnection(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_messaging_connections
     (connection_id, platform, workspace_id, workspace_name, enabled, bot_user_id, app_id, orchestrator_agent_id,
@@ -83,7 +78,6 @@ function seed(db: DatabaseSync, version: number): void {
       VALUES ('connection-1', '400', 'Maintainers', '2026-01-03')`).run();
 }
 
-/** A database that a release before the migration registry made, with its own marker. */
 function releasedDatabase(tag: string, marker: number): DatabaseSync {
   const db = new DatabaseSync(":memory:");
   databases.push(db);
@@ -95,10 +89,6 @@ function releasedDatabase(tag: string, marker: number): DatabaseSync {
   return db;
 }
 
-/**
- * Every row of every table, by table name. Migration 47 replaces the empty task table with the thread
- * table; `agent-thread-migration.test.ts` checks that move.
- */
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
 function contents(db: DatabaseSync): Contents {
@@ -113,7 +103,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each agent memory has no site, as migration 60 adds it. */
 function withNoMemorySite(before: Contents): Contents {
   return {
     ...before,
@@ -140,7 +129,6 @@ describe("browser profile migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v45 must keep.
       if (version < 44) migrateUpTo(db, 44);
       if (version < 25) seedConnection(db);
       const before = contents(db);

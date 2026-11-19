@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/attachment";
 
 export const messages = {
-  // Attachment and file preview errors.
   "error.attachment.notFound": "未找到该附件。",
   "error.attachment.fileTooLarge": "某个文件超过了 100 MB 上限。",
   "error.attachment.namedFileTooLarge": "{name} 超过了 100 MB 上限。",

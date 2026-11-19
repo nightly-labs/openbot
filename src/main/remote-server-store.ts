@@ -1,18 +1,3 @@
-// The user's list of remote servers: what is on disk, which one is active, and every write that
-// changes either. Nothing outside this file may change persisted server state.
-//
-// That is a type, not a convention. `StoredRemoteServerView` is `Readonly`, so a caller that reaches
-// for `server.name = ...` gets a compile error. Until 2026-09 there was no such view: the manager's
-// `#requireServer` handed back a live element of the array this file writes, and six call sites
-// mutated through it. They worked only because whichever `#persist()` happened to run next
-// snapshotted the whole state -- so a mutation with no persist after it changed how the app behaved
-// until some later, unrelated write, and nothing except reading both call sites could see that.
-//
-// Every method here that changes state also writes the file, with one named exception:
-// `setActiveServerId` leaves the write to its caller, because selecting a server has to be able to
-// roll the selection back when the write fails. That is why `persist` is public. Do not add a second
-// exception -- a mutation whose write is somebody else's job is the hazard this module exists to end.
-
 import { readFile } from "node:fs/promises";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
@@ -43,25 +28,17 @@ export interface TokenCipher {
 
 export type StoredRemoteServerView = Readonly<StoredRemoteServer>;
 
-// What an entry this build cannot read still says about a host's identity. Empty strings and nulls
-// mean the entry did not carry that field, not that the host has none.
 export interface PreservedHostIdentity {
   readonly hostId: string;
   readonly publicKey: string | null;
   readonly fingerprint: string;
 }
 
-// Which server is selected -- both halves of it. `unreadableActiveServerId` is the id the file keeps
-// naming while this build runs somewhere else, so a caller putting a failed selection back has to
-// put that back too, and cannot do it by remembering an id.
 export interface ActiveSelection {
   readonly activeServerId: string;
   readonly unreadableActiveServerId: string | null;
 }
 
-// The fields a running app is allowed to change on a server it already has. `id`, `apiUrl`,
-// `fingerprint`, `publicKey` and `transport` are deliberately absent: those identify the host, and
-// changing one silently would repoint a pinned identity at a different machine.
 export interface RemoteServerPatch {
   name?: string;
   username?: string;
@@ -72,8 +49,6 @@ export interface RemoteServerPatch {
   remoteDesktopAvailable?: boolean;
 }
 
-// What a reader needs. Consumers that only look things up take this, not the class, so their tests
-// do not need a disk.
 export interface RemoteServerDirectory {
   readonly activeServerId: string;
   readonly servers: readonly StoredRemoteServerView[];
@@ -95,11 +70,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this.#cipher = options.cipher;
   }
 
-  // A missing file is a first run. So is a file that a power loss left without content: it holds no
-  // server to keep, and it is moved aside. Anything else -- a permission error, a truncated read, a
-  // file that is not JSON, a file this build cannot decode -- reaches the caller, because continuing
-  // would leave an empty list that the next write replaces the user's servers with.
-
   readonly load = Effect.fn("RemoteStore.load")(function* (
     this: RemoteServerStore,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
@@ -114,11 +84,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     }
     if (isEmptyStoredFile(attempt0.success)) return yield* setAsideDamagedFile(this.#path);
     const stored = yield* remoteDecode(() => parseStoredJson(this.#path, attempt0.success, readStoredRemoteServers));
-    // Null means the *file* made no sense -- a `version` from a newer build, or no `servers` array at
-    // all. An unreadable entry is not this: the reader drops it and returns the rest. Keeping the
-    // empty default here would hand a file the newer build still reads to the next `persist()` to
-    // overwrite, which is how a downgrade loses every joined server. The message quotes nothing from
-    // the file; `encryptedToken` is in there.
     if (!stored)
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.serverListUnreadable")) });
     this.#state = stored;
@@ -128,13 +93,10 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return this.#state.activeServerId;
   }
 
-  // Bumped by every selection. A selection that fails to persist only rolls back if no later
-  // selection has happened in the meantime, and this is how the caller tells.
   get activeServerRevision(): number {
     return this.#activeServerRevision;
   }
 
-  // Taken before a selection, restored with `restoreSelection` when its write fails.
   get selection(): ActiveSelection {
     return {
       activeServerId: this.#state.activeServerId,
@@ -142,10 +104,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     };
   }
 
-  // Identity from the entries the reader could not decode. Reconciliation needs these: a pin this
-  // build cannot use is still a pin, and without them a host whose entry is unreadable looks new, so
-  // the account service's advertised key would be accepted for a machine the user already trusts --
-  // exactly what `remote-server-host-directory.ts` exists to prevent.
   get preservedIdentities(): readonly PreservedHostIdentity[] {
     return this.#state.unreadableServers.flatMap((preserved) =>
       isString(preserved.entry.id)
@@ -178,8 +136,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return this.#state.servers.some((candidate) => candidate.id === serverId);
   }
 
-  // A host that an earlier version hid when its owner removed it on this computer. The account
-  // service still lists it, so without this the next directory sync would put it straight back.
   isHiddenHost(hostId: string): boolean {
     return this.#state.hiddenHostIds.includes(hostId);
   }
@@ -192,30 +148,19 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return this.#cipher.encrypt(sessionToken).toString("base64");
   }
 
-  // The one mutation that does not write. See the file header.
   setActiveServerId(serverId: string): number {
-    // The user picking a server is the only thing that supersedes a selection this build could not
-    // read. Until then the file keeps naming it, so a build that can read it finds them still there.
     this.#state.unreadableActiveServerId = null;
     this.#state.activeServerId = serverId;
     this.#activeServerRevision += 1;
     return this.#activeServerRevision;
   }
 
-  // Puts back a selection whose write failed, both halves of it. Bumps the revision like any other
-  // selection, so a rollback that lost a race to a newer one is still detectable.
   restoreSelection(selection: ActiveSelection): number {
     this.#state.activeServerId = selection.activeServerId;
     this.#state.unreadableActiveServerId = selection.unreadableActiveServerId;
     this.#activeServerRevision += 1;
     return this.#activeServerRevision;
   }
-
-  // A join or sign-in that verified the host's identity supersedes an entry this build could not
-  // read, so this is the WebRTC join path's half of what `adopt` does for the HTTPS one -- that path
-  // writes its own entry, this one gets it from `replaceServers` and only has to retire the old.
-  // Reconciliation must not call it: an id recreated from a directory advertisement proves nothing
-  // about the machine holding the pinned key.
 
   readonly retireUnreadable = Effect.fn("RemoteStore.retireUnreadable")(function* (
     this: RemoteServerStore,
@@ -225,13 +170,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this.#forgetUnreadable(serverId);
     yield* this.persist();
   });
-
-  // Adds a server the user just joined or signed in to, replacing any earlier entry with the same
-  // id, and selects it -- the two halves of "the user is now on this server", written once.
-  //
-  // This is also the one path allowed to retire an entry the reader could not decode. Joining or
-  // signing in verified the host's identity, so the new entry supersedes the old; a reconciliation
-  // that happens to mint the same id did not, and `replaceServers` deliberately leaves it alone.
 
   readonly adopt = Effect.fn("RemoteStore.adopt")(function* (
     this: RemoteServerStore,
@@ -243,9 +181,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     yield* this.persist();
   });
 
-  // A local server that started again: a new port and a new session, in the slot it had. Only a new
-  // one is added at the end. It never selects the server: the caller opens it after the start (#11203).
-
   readonly attachLocal = Effect.fn("RemoteStore.attachLocal")(function* (
     this: RemoteServerStore,
     server: StoredRemoteServer,
@@ -256,9 +191,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
       : [...this.#state.servers, server];
     yield* this.persist();
   });
-
-  // Returns the updated server so a caller that needs the new credentials for its next request does
-  // not have to look them up again -- and null when the server is gone, which a live event can race.
 
   readonly update = Effect.fn("RemoteStore.update")(function* (
     this: RemoteServerStore,
@@ -277,11 +209,8 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this: RemoteServerStore,
     serverId: string,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    // The user asked for this server to be gone. That reaches an entry this build could not read as
-    // well -- leaving it would put the server back the next time a build that understands it runs.
     this.#forgetUnreadable(serverId);
     this.#state.servers = this.#state.servers.filter((server) => server.id !== serverId);
-    // A server that the user joins again does not get the connection of this computer back by itself.
     this.#state.browserEgressServerIds = this.#state.browserEgressServerIds.filter((id) => id !== serverId);
     if (this.#state.activeServerId === serverId) this.setActiveServerId(LOCAL_SERVER_ID);
     yield* this.persist();
@@ -302,10 +231,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     this.#state.hiddenHostIds = this.#state.hiddenHostIds.filter((candidate) => candidate !== hostId);
     yield* this.persist();
   });
-
-  // Throws rather than repairing: an order that does not name every server exactly once came from a
-  // renderer working off a stale list, and silently guessing at the rest would reorder the sidebar
-  // under the user. Returns false when the order already matches, so the caller can skip its event.
 
   readonly reorder = Effect.fn("RemoteStore.reorder")(function* (
     this: RemoteServerStore,
@@ -329,10 +254,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return true;
   });
 
-  // The host directory owns the whole WebRTC half of the list, so it replaces it wholesale. If the
-  // active server is not in the new list, selection falls back to the local server -- the same rule
-  // `readStoredRemoteServers` applies to a file that lost an entry.
-
   readonly replaceServers = Effect.fn("RemoteStore.replaceServers")(function* (
     this: RemoteServerStore,
     servers: readonly StoredRemoteServerView[],
@@ -344,8 +265,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     yield* this.persist();
   });
 
-  // A timed mute that has ended reads as unmuted. Its entry stays until the next write for the server
-  // replaces it; nothing needs a timer to clean it up.
   muteState(serverId: string, now = Date.now()): { muted: boolean; mutedUntil: number | null } {
     if (this.#state.mutedServerIds.includes(serverId)) return { muted: true, mutedUntil: null };
     const mutedUntil = this.#state.serverNotifications[serverId]?.mutedUntil;
@@ -362,16 +281,12 @@ export class RemoteServerStore implements RemoteServerDirectory {
     return this.#state.serverNotifications[serverId]?.level ?? "all";
   }
 
-  // The earliest timed mute still running, so the caller can tell the renderer when it ends.
   nextMuteExpiry(now = Date.now()): number | null {
     const ends = Object.values(this.#state.serverNotifications)
       .map((entry) => entry.mutedUntil)
       .filter((mutedUntil): mutedUntil is number => mutedUntil !== undefined && mutedUntil > now);
     return ends.length ? Math.min(...ends) : null;
   }
-
-  // `until` null mutes until the user unmutes; a time mutes until then. Both kinds are cleared first,
-  // so a server never carries a permanent and a timed mute at once.
 
   readonly setMuted = Effect.fn("RemoteStore.setMuted")(function* (
     this: RemoteServerStore,
@@ -412,7 +327,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     });
   });
 
-  /** Whether this computer shares its connection with a joined server. */
   sharesBrowserEgress(serverId: string): boolean {
     return this.#state.browserEgressServerIds.includes(serverId);
   }
@@ -455,8 +369,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
     );
   });
 
-  // Capture server state now, but use the notification preferences committed by preceding writes.
-
   readonly persist = Effect.fn("RemoteStore.persist")(function* (
     this: RemoteServerStore,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
@@ -483,7 +395,6 @@ export class RemoteServerStore implements RemoteServerDirectory {
   });
 }
 
-// An empty entry is removed, so a server back on its defaults leaves nothing in the file.
 function withServerEntry(
   entries: Record<string, StoredServerNotifications>,
   serverId: string,

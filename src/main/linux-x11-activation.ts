@@ -6,12 +6,13 @@ import type * as Koffi from "koffi";
 const logger = createOpenBotLogger("linux-x11-activation");
 const requireModule = createRequire(import.meta.url);
 
-/** `ClientMessage` in `X11/X.h`. */
-const CLIENT_MESSAGE = 33;
-/** `SubstructureNotifyMask | SubstructureRedirectMask`: the mask that EWMH asks for a root window message. */
-const ROOT_MESSAGE_MASK = (1 << 19) | (1 << 20);
-/** EWMH source indication of a pager or other tool. The window manager does not apply its focus rules to it. */
-const SOURCE_TOOL = 2;
+const X11_CLIENT_MESSAGE_EVENT = 33;
+const SUBSTRUCTURE_NOTIFY_MASK = 1 << 19;
+const SUBSTRUCTURE_REDIRECT_MASK = 1 << 20;
+const EWMH_SOURCE_PAGER_OR_TOOL = 2;
+const X11_CURRENT_TIME = 0;
+const NO_REQUESTOR_ACTIVE_WINDOW = 0;
+const X_EVENT_SIZE_IN_LONGS = 24;
 
 interface Xlib {
   koffi: typeof Koffi;
@@ -22,13 +23,11 @@ interface Xlib {
   sendEvent: (display: unknown, window: number, propagate: number, mask: number, event: unknown) => number;
 }
 
-/** Null after a failed load: the FFI or Xlib is missing, and each new try would fail in the same way. */
-let xlib: Xlib | null | undefined;
+let xlibAfterFirstLoad: Xlib | null | undefined;
 
-function loadXlib(): Xlib | null {
-  if (xlib !== undefined) return xlib;
+function loadXlibOnce(): Xlib | null {
+  if (xlibAfterFirstLoad !== undefined) return xlibAfterFirstLoad;
   try {
-    // Loaded on first use, so that only an X11 dock or island loads the FFI.
     const koffi: typeof Koffi = requireModule("koffi");
     const library = koffi.load("libX11.so.6");
     const clientMessage = koffi.struct("OpenBotXClientMessageEvent", {
@@ -41,9 +40,11 @@ function loadXlib(): Xlib | null {
       format: "int",
       data: koffi.array("long", 5),
     });
-    // `XSendEvent` takes the whole `XEvent` union, which is 24 longs.
-    const event = koffi.union("OpenBotXEvent", { xclient: clientMessage, pad: koffi.array("long", 24) });
-    xlib = {
+    const event = koffi.union("OpenBotXEvent", {
+      xclient: clientMessage,
+      pad: koffi.array("long", X_EVENT_SIZE_IN_LONGS),
+    });
+    xlibAfterFirstLoad = {
       koffi,
       openDisplay: library.func("void *XOpenDisplay(const char *name)"),
       closeDisplay: library.func("int XCloseDisplay(void *display)"),
@@ -52,26 +53,15 @@ function loadXlib(): Xlib | null {
       sendEvent: library.func("XSendEvent", "int", ["void *", "unsigned long", "int", "long", koffi.pointer(event)]),
     };
   } catch (error) {
-    xlib = null;
+    xlibAfterFirstLoad = null;
     logger.warn("Unable to load Xlib to focus dock windows:", toLogValue(error));
   }
-  return xlib;
+  return xlibAfterFirstLoad;
 }
 
-/**
- * Asks the X11 window manager to give the key focus to a dock window, as the Plasma panel does
- * (`KX11Extras::forceActiveWindow`).
- *
- * The agent dock and the Dynamic Island are `_NET_WM_WINDOW_TYPE_DOCK` windows. `BrowserWindow.focus()`
- * sends `_NET_ACTIVE_WINDOW` as an application request, and KWin up to Plasma 6.3 gives no focus to a
- * dock window for such a request or for a click on it. Text typed in the dock then goes to another
- * window (#7415). A request from a tool is not refused. Call it only after the user pressed a control
- * of the window that needs keys, such as a text field or a menu with a search field. When Xlib is
- * missing or fails, the window keeps the result of `focus()`.
- */
 export function forceActivateX11Window(window: BrowserWindow): void {
   if (process.platform !== "linux") return;
-  const x = loadXlib();
+  const x = loadXlibOnce();
   if (!x) return;
   try {
     const handle = window.getNativeWindowHandle();
@@ -82,21 +72,19 @@ export function forceActivateX11Window(window: BrowserWindow): void {
       return;
     }
     try {
-      x.sendEvent(display, x.defaultRootWindow(display), 0, ROOT_MESSAGE_MASK, {
+      x.sendEvent(display, x.defaultRootWindow(display), 0, SUBSTRUCTURE_NOTIFY_MASK | SUBSTRUCTURE_REDIRECT_MASK, {
         xclient: {
-          type: CLIENT_MESSAGE,
+          type: X11_CLIENT_MESSAGE_EVENT,
           serial: 0,
           send_event: 1,
           display,
           window: xid,
           message_type: x.internAtom(display, "_NET_ACTIVE_WINDOW", 0),
           format: 32,
-          // Source, timestamp (CurrentTime), the active window of the requestor (none).
-          data: [SOURCE_TOOL, 0, 0, 0, 0],
+          data: [EWMH_SOURCE_PAGER_OR_TOOL, X11_CURRENT_TIME, NO_REQUESTOR_ACTIVE_WINDOW, 0, 0],
         },
       });
     } finally {
-      // Closing the display also sends the request.
       x.closeDisplay(display);
     }
   } catch (error) {

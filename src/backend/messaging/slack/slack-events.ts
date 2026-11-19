@@ -1,25 +1,12 @@
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { InboundAction, InboundFile, InboundMessage } from "../messaging-types";
 
-/** The Block Kit action ids of the buttons the agent posts. */
 export const SLACK_ACTION_IDS = {
   accept: "openbot_accept",
   decline: "openbot_decline",
   stop: "openbot_stop",
 } as const;
 
-/**
- * One Events API payload as a message for OpenBot, or null when it does not address OpenBot.
- *
- * - `app_mention` in a channel starts or continues the thread it is in.
- * - A direct message always addresses OpenBot. OpenBot answers in a thread under it, so each
- *   top-level direct message is its own conversation, and the router picks its agent.
- * - A reply in a thread without a mention counts only in a thread that an agent already answers
- *   (`requiresLink`). In a thread that an agent's post pinged people in, it counts only from them. A reply with a mention also arrives as
- *   `app_mention`, which takes it, so the order of the two events does not decide where it goes.
- *   A reply without a mention that starts with another person's mention is for that person, and is ignored.
- * - Messages of bots, of OpenBot itself, edits, deletions and joins are ignored.
- */
 export function slackInboundMessage(payload: unknown, workspaceId: string, botUserId: string): InboundMessage | null {
   if (!isDynamicRecord(payload) || payload.team_id !== workspaceId) return null;
   const event = payload.event;
@@ -63,8 +50,6 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
   }
   if (!threadTs || threadTs === ts) return null;
   if (isString(event.text) && event.text.includes(`<@${botUserId}>`)) return null;
-  // A reply that starts with another person's mention talks to that person, not to OpenBot: it gets no
-  // reaction, no "Working" post and no turn. A group, @here or a channel link addresses the room.
   const leading = isString(event.text) ? /^\s*<@([A-Z0-9]+)(?:\|[^>]*)?>/.exec(event.text) : null;
   if (leading && leading[1] !== botUserId) return null;
   return {
@@ -76,7 +61,6 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
   };
 }
 
-/** One `block_actions` payload as a button press on an OpenBot message, or null. */
 export function slackInboundAction(payload: unknown, workspaceId: string): InboundAction | null {
   if (!isDynamicRecord(payload) || payload.type !== "block_actions") return null;
   const team = payload.team;
@@ -123,17 +107,11 @@ function inboundFiles(value: unknown): InboundFile[] {
   );
 }
 
-/** The users that Slack markup mentions, without OpenBot. `plainText` writes each as `@<id>`. */
 export function slackMentionIds(text: string, botUserId: string): string[] {
   const ids = [...text.matchAll(/<@([A-Z0-9]+)(?:\|[^>]*)?>/g)].map((match) => match[1] ?? "");
   return [...new Set(ids)].filter((id) => id && id !== botUserId);
 }
 
-/**
- * Slack's markup as plain text: OpenBot's own mention goes, other mentions stay as ids, a
- * channel link keeps its name, a link keeps its label and address, and the three escaped
- * characters come back.
- */
 export function plainText(text: string, botUserId: string): string {
   return text
     .replaceAll(`<@${botUserId}>`, "")

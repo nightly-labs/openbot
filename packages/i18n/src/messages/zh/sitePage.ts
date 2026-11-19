@@ -18,10 +18,8 @@ export const messages = {
   "sitePage.join.browserLink": "在此浏览器中加入",
   "sitePage.join.downloadLink": "下载 OpenBot",
   "sitePage.join.notOpened": "如果此电脑上有 OpenBot，请先启动它，然后再次点击“{open}”。如果没有，请先下载。",
-  // {open} is the label of the button above this note.
   "sitePage.join.mobile": "如果已安装 OpenBot，请点按“{open}”。你也可以把该链接粘贴到应用的“添加服务器”中。",
   "sitePage.join.email": "如果邀请是通过电子邮件发来的，请用该邮箱地址登录 OpenBot。",
-  // {name} is Slack or Discord on all the connect keys.
   "sitePage.connect.title": "返回 OpenBot",
   "sitePage.connect.failedTitle": "连接未完成",
   "sitePage.connect.openApp": "打开 OpenBot",
@@ -41,7 +39,6 @@ export const messages = {
   "sitePage.connect.failure.tabClosed":
     "发起 {name} 连接的 OpenBot 标签页没有响应。请在浏览器中打开 OpenBot，再次连接 {name}。",
   "sitePage.connect.failure.failed": "{name} 未完成连接。请重试。",
-  // {marketplace}, {apps} and {connect} are the names of these screens and that button in the app.
   "sitePage.connect.restartHint":
     "在 OpenBot 中打开“{marketplace}”，再打开“{apps}”，然后打开“{name}”并选择“{connect}”。",
   "sitePage.connect.notOpened": "请启动 OpenBot，然后重试。如果这台电脑上没有 OpenBot，请下载并在应用中连接 {name}。",
@@ -70,7 +67,6 @@ export const messages = {
   "sitePage.report.sending": "正在发送…",
   "sitePage.report.tooMany": "举报过多。请稍后重试。",
   "sitePage.report.sendFailed": "无法发送举报。请重试。",
-  // {email} is the contact address. The page shows it as a link.
   "sitePage.report.writeTo": "你也可以写信到 {email}。",
   "sitePage.report.sentTitle": "举报已发送",
   "sitePage.report.sentBody": "谢谢，我们已收到你的举报。",
@@ -81,7 +77,6 @@ export const messages = {
   "sitePage.pricing.personal.title": "个人使用免费",
   "sitePage.pricing.personal.body": "全部功能，在你自己的电脑上，使用你已付费的 AI 套餐。无需服务器，也无需许可证。",
   "sitePage.pricing.enterprise.title": "企业版",
-  // {count} is the largest number of members that the page sells, such as 25.
   "sitePage.pricing.enterprise.body": "更大的服务器、超过 {count} 名成员，或你需要的其他任何内容，并提供企业级支持。",
   "sitePage.pricing.enterprise.contact": "联系销售",
   "sitePage.pricing.consent.statement": "我声明接受{policy}、{terms}。",

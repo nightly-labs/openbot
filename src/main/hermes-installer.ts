@@ -15,14 +15,6 @@ import { readLimitedBody } from "./provider-runtime-releases";
 
 const logger = createOpenBotLogger("hermes-installer");
 
-/**
- * The official Hermes installer, pinned to the script of one release. Hermes publishes no release
- * archive, and its virtual environment cannot move, so OpenBot runs the installer that Nous Research
- * ships instead of a download of its own. The script checks out this same commit, and `uv.lock`
- * verifies the hash of each Python package. Hermes goes where a terminal install puts it
- * (`~/.hermes`, `~/.local/bin/hermes`), so `hermes update` keeps working and OpenBot finds it as
- * the user's own CLI.
- */
 const HERMES_INSTALLER = {
   version: "0.22.7",
   commit: "b200f5bc60e31588ba2cb60e288029c4a54ba5fa",
@@ -30,11 +22,6 @@ const HERMES_INSTALLER = {
   sha256: "abf338605dae6dd28d101673ac6aed7995c955745db46d47676bc591a7957209",
 } as const;
 
-/**
- * The installer stages that need no person at the computer, in the installer's order, each with its
- * share of the progress bar. `setup` and `gateway` ask for keys and a service in a terminal; the
- * provider row's Connect does the sign-in instead.
- */
 const STAGES = [
   ["prerequisites", 2],
   ["repository", 15],
@@ -47,20 +34,15 @@ const STAGES = [
 type Stage = (typeof STAGES)[number][0];
 
 const DOWNLOAD_TIMEOUT_MS = 60_000;
-/** The Python dependencies and the command build can take minutes on a small server. */
 const STAGE_TIMEOUT_MS = 20 * 60_000;
-/** How much of each output stream a stage keeps: the frame is the last stdout line. */
 const OUTPUT_LIMIT = 64 * 1024;
 const LOGGED_OUTPUT = 2_000;
-/** How long a stage that has exited waits for the end of its output. */
 const EXIT_PIPE_WAIT_MS = 2_000;
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface HermesInstallerOptions {
-  /** Where the pinned script is saved before it runs. */
   downloadRoot: string;
-  /** Checks the Hermes provider again after an install, so its row leaves "not installed". */
   refreshProvider: () => Effect.Effect<unknown, unknown>;
   platform?: NodeJS.Platform;
   fetchImpl?: Fetch;
@@ -77,22 +59,13 @@ function failedStatus(message: string): ProviderRuntimeStatus {
   return { phase: "download-error", progress: null, message, version: null };
 }
 
-/**
- * Installs Hermes Agent for the provider row's Download. A missing Hermes gets the Download only where
- * this computer can run the installer: a Windows computer and an explicit `OPENBOT_HERMES_PATH` keep
- * the install guide. An installed Hermes reads as ready, as a downloaded CLI does, so a server's row
- * offers its Connect. OpenBot does not own what the installer writes: it does not verify, update or
- * remove it.
- */
 export class HermesInstaller extends EventEmitter<{ status: [] }> {
   readonly #downloadRoot: string;
   readonly #refreshProvider: () => Effect.Effect<unknown, unknown>;
   readonly #platform: NodeJS.Platform;
   readonly #fetch: Fetch;
   readonly #scope = Scope.makeUnsafe();
-  /** The Hermes row of the last agent status. */
   #provider: AgentProviderStatus | undefined;
-  /** The running install, or the error of the last one. */
   #run: ProviderRuntimeStatus | null = null;
   #task: Fiber.Fiber<void> | null = null;
   #stopping = false;
@@ -113,23 +86,19 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
     const installable = this.#supported() && !configuredCliPath("hermes");
     if (installable && this.#run) return { ...this.#run };
     const provider = this.#provider;
-    // No agent status yet, or an off provider: the row has no action to take from a status.
     if (!provider || provider.off) return undefined;
     if (provider.state !== "not-installed")
       return { phase: "ready", progress: 100, message: null, version: provider.version ?? null };
     return installable ? { ...NOT_DOWNLOADED } : undefined;
   }
 
-  /** Takes the Hermes row of each agent status. */
   setProvider(provider: AgentProviderStatus | undefined): void {
     const before = JSON.stringify(this.status());
     this.#provider = provider;
-    // A Hermes that the user installed in a terminal ends the error of an earlier install.
     if (this.#run?.phase === "download-error" && provider?.state !== "not-installed") this.#run = null;
     if (JSON.stringify(this.status()) !== before) this.emit("status");
   }
 
-  /** Starts the install and returns when it runs. A second request while it runs changes nothing. */
   install(): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
       if (!this.#supported())
@@ -141,15 +110,12 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
       if (configuredCliPath("hermes"))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
       if (this.#task) return;
-      // An installed Hermes updates with `hermes update`. The pinned installer would move it back.
       if (this.#provider && this.#provider.state !== "not-installed") return;
       this.#set({ phase: "downloading", progress: 0, message: null, version: null });
-      // No await between the guard and the record, so a second request finds this task.
       this.#task = yield* Effect.forkIn(this.#installAndCheck(), this.#scope);
     });
   }
 
-  /** Stops a running install. What the installer wrote stays, and the next install continues it. */
   cancel(): Effect.Effect<void> {
     return Effect.suspend(() => {
       const task = this.#task;
@@ -182,15 +148,12 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
           ),
         ),
       ),
-      // No Hermes command found: the installer ended without the command that OpenBot runs. The
-      // refresh above can do nothing (an off provider, a check that fails), so this looks again.
       Effect.andThen(Effect.exit(resolveHermesCli())),
       Effect.andThen((found) =>
         Effect.sync(() =>
           this.#set(Exit.isSuccess(found) ? null : failedStatus(sourceText("error.provider.hermesInstallFailed"))),
         ),
       ),
-      // The row shows catalog text only: a system error names private paths.
       Effect.catch((error) =>
         Effect.sync(() => {
           const message = error.cause instanceof Error ? error.cause.message : null;
@@ -222,7 +185,6 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
     });
   }
 
-  /** Saves the pinned script after its hash matches. */
   #saveInstaller(): Effect.Effect<string, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<string, ProviderRuntimeFailure> {
       const failed = new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.hermesInstallFailed")) });
@@ -257,7 +219,6 @@ export class HermesInstaller extends EventEmitter<{ status: [] }> {
   }
 }
 
-/** A stage's result, the one JSON line that `--stage <name> --json` prints last. */
 function stageFrame(stdout: string, stage: Stage): { ok: boolean; reason: string | null } | null {
   for (const line of stdout.trim().split("\n").reverse()) {
     let frame: unknown;
@@ -280,10 +241,6 @@ function keepTail(text: string): string {
   return text.length > OUTPUT_LIMIT ? text.slice(-OUTPUT_LIMIT) : text;
 }
 
-/**
- * Runs one installer stage in a process group of its own. An interrupt (Cancel, app stop) ends the
- * whole group: the installer traps SIGTERM, and SIGKILL follows when it does not exit.
- */
 const runStage = Effect.fn("HermesInstaller.runStage")(function* (script: string, stage: Stage) {
   const closed = Deferred.makeUnsafe<number | null>();
   const output = { stdout: "", stderr: "" };
@@ -320,8 +277,6 @@ const runStage = Effect.fn("HermesInstaller.runStage")(function* (script: string
         Deferred.doneUnsafe(closed, Effect.succeed(null));
       });
       child.once("close", (exitCode) => Deferred.doneUnsafe(closed, Effect.succeed(exitCode)));
-      // A process that the stage started outside its group can keep the pipes open, so "close"
-      // never comes. The exit of the stage itself then ends the wait.
       child.once("exit", (exitCode) => {
         setTimeout(() => Deferred.doneUnsafe(closed, Effect.succeed(exitCode)), EXIT_PIPE_WAIT_MS).unref();
       });
@@ -338,9 +293,7 @@ const runStage = Effect.fn("HermesInstaller.runStage")(function* (script: string
           Effect.sync(() => {
             try {
               if (child.pid) process.kill(-child.pid, value);
-            } catch {
-              /* The group has already exited. */
-            }
+            } catch {}
           });
         yield* signal("SIGTERM");
         yield* Deferred.await(closed).pipe(
