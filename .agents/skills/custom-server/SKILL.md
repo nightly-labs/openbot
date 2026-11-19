@@ -30,19 +30,18 @@ they do. This skill adds the rules for an agent.
    the server name that the customer sees (6 to 32 characters). Ask for each one that is missing.
    When the developer does not know the VPS ID, run `leaseweb-pool.ts free`: it lists each VPS with no
    reference on the five accounts.
-2. Write the operator keys to `.openbot-build/custom/operator-keys`, as the docs say.
-3. Run the command without `--apply`. Show the plan: the reference, the hostname and the server
+2. Run the command without `--apply`. Show the plan: the reference, the hostname and the server
    name. Do not show the email in a message that other people can read.
-4. After approval, run it with `--apply`, and write the output to
+3. After approval, run it with `--apply`, and write the output to
    `.openbot-build/custom/run-<VPS ID>.log`.
-5. When it stops, read the error and run the same command again. It continues from the step where it
+4. When it stops, read the error and run the same command again. It continues from the step where it
    stopped. Known causes, both temporary:
    - A Leaseweb API call times out.
    - The bootstrap check "SSH offers keys only" fails with `exit 255`, because the server closed one
      SSH connection before the greeting.
 
    Stop and tell the developer when the command says that another account is signed in.
-6. Report the reference, the OpenBot version, and the result of the online check and of the D1
+5. Report the reference, the OpenBot version, and the result of the online check and of the D1
    owner check. The owner signs in to the app with that email, sees the server, and invites the
    other members.
 
