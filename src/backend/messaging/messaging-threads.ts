@@ -121,7 +121,7 @@ export type MessagingPostFailure = "gone" | "not-running" | "refused" | "unknown
  * Who a post reaches by name: the people that a Slack post pinged, or the person of a WhatsApp direct
  * chat, with the redacted text. A direct chat gives its own place and conversation key.
  */
-export interface MessagingPostPing {
+interface MessagingPostPing {
   userIds: string[];
   text: string;
   platformChannelId?: string;
