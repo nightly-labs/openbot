@@ -181,6 +181,8 @@ export const messages = {
   "error.remote.relayUnavailable": "لم يرسل Signal أي خوادم ترحيل لهذا الاتصال. أعد المحاولة لاحقًا.",
   "error.remote.iceFailed": "تعذّر إنشاء اتصال مباشر بالمضيف. قد يحظره جدار حماية أو VPN أو وكيل.",
   "error.remote.iceDisconnected": "فُقد الاتصال المباشر بالمضيف.",
+  "error.remote.webrtcBlocked":
+    "هذا الجهاز يحظر الاتصال الذي يحتاجه OpenBot. إذا كان نمط المنع قيد التشغيل، فأوقفه لـ OpenBot في الإعدادات > الخصوصية والأمن > نمط المنع.",
   "error.remote.directoryUnreachable": "تعذّر على OpenBot الوصول إلى خدمة OpenBot. تحقق من اتصالك.",
   "error.remote.directoryTimeout": "لم ترد خدمة OpenBot في الوقت المحدد. أعد المحاولة.",
   "error.remote.inviteAlreadyUsed": "استُخدمت هذه الدعوة بالفعل. اطلب دعوة جديدة.",

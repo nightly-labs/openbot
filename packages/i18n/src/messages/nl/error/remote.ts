@@ -193,6 +193,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Er kon geen directe verbinding met de host worden gemaakt. Een firewall, VPN of proxy kan deze blokkeren.",
   "error.remote.iceDisconnected": "De directe verbinding met de host is verbroken.",
+  "error.remote.webrtcBlocked":
+    "Dit apparaat blokkeert de verbinding die OpenBot nodig heeft. Als de isolatiemodus aan staat, zet die dan uit voor OpenBot via Instellingen > Privacy en beveiliging > Isolatiemodus.",
   "error.remote.directoryUnreachable": "OpenBot kan de OpenBot-service niet bereiken. Controleer je verbinding.",
   "error.remote.directoryTimeout": "De OpenBot-service reageerde niet op tijd. Probeer het opnieuw.",
   "error.remote.inviteAlreadyUsed": "Deze uitnodiging is al gebruikt. Vraag om een nieuwe uitnodiging.",

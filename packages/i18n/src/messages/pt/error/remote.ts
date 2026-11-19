@@ -197,6 +197,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Não foi possível estabelecer uma conexão direta com o computador anfitrião. Um firewall, VPN ou proxy pode bloqueá-la.",
   "error.remote.iceDisconnected": "A conexão direta com o computador anfitrião foi perdida.",
+  "error.remote.webrtcBlocked":
+    "Este dispositivo bloqueia a conexão de que o OpenBot precisa. Se o Modo de Isolamento estiver ativado, desative-o para o OpenBot em Ajustes > Privacidade e Segurança > Modo de Isolamento.",
   "error.remote.directoryUnreachable": "O OpenBot não conseguiu acessar o serviço do OpenBot. Verifique sua conexão.",
   "error.remote.directoryTimeout": "O serviço do OpenBot não respondeu a tempo. Tente novamente.",
   "error.remote.inviteAlreadyUsed": "Este convite já foi usado. Peça um novo convite.",
