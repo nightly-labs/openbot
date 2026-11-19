@@ -69,6 +69,7 @@ export interface AgentProviderDescriptor {
   readonly authKind: AgentAuthState["kind"];
   readonly pickerOrder: number;
   readonly localCodeSignIn: "device" | "paste" | null;
+  readonly windowsCodeSignIn?: "paste";
   readonly accountSignIn?: "key";
   readonly accountCodeSignIn?: "device" | "paste";
   readonly signInPageEnd: "callback" | "page";
@@ -192,6 +193,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "antigravity",
     pickerOrder: 4,
     localCodeSignIn: null,
+    windowsCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".gemini/skills", ".agents/skills"],
     homeSkills: "instructions",
