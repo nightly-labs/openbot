@@ -1641,7 +1641,7 @@ export function createConversationViewScope(props: ConversationProps) {
           resources.importTargetAgents.set(event.requestId, target);
           clearConversationError(target);
           importSounds.started(event.requestId);
-          // A set over the attachment limits names no files. Main refuses it whole, with a banner.
+          // A set over the attachment limits names no files. Main refuses it, and the composer says why.
           if (event.files.length > 0) attachmentUploads.start(event.requestId, target, event.files);
         }
         syncAttachmentImports();
@@ -1651,7 +1651,8 @@ export function createConversationViewScope(props: ConversationProps) {
           importSounds.cancel(event.requestId);
           // A side thread has no upload chip, so no Retry: the files are not kept for one.
           conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
-          actionToast.error(event.message);
+          const { t, errorMessage } = currentText();
+          actionToast.error(errorMessage(event.message, t("composer.upload.failed")));
         } else {
           // A cancelled import completes with no attachments.
           if (event.attachments.length > 0) importSounds.finished(event.requestId, "success");
@@ -1664,16 +1665,13 @@ export function createConversationViewScope(props: ConversationProps) {
         syncAttachmentImports();
         if (target) {
           importSounds.finished(event.requestId, "error");
-          // The chip of the file shows the failure, with Retry. An import with no chip has the banner.
-          // Electron puts the IPC channel in front of the sentence; the chip shows only the sentence.
-          if (attachmentUploads.get(event.requestId)) {
-            const { t, errorMessage } = currentText();
-            attachmentUploads.fail(event.requestId, errorMessage(event.message, t("composer.upload.failed")));
-          } else
-            setConversationErrors((current) => ({
-              ...current,
-              [composerDraftKey(target)]: event.message,
-            }));
+          // The chip of the file shows the failure, with Retry. An import with no chip, a set over a
+          // limit, has the composer error: the files of the same pick that came in do not clear it.
+          // Electron puts the IPC channel in front of the sentence; both show only the sentence.
+          const { t, errorMessage } = currentText();
+          const message = errorMessage(event.message, t("composer.upload.failed"));
+          if (attachmentUploads.get(event.requestId)) attachmentUploads.fail(event.requestId, message);
+          else setScopedComposerError(message, target);
         } else importSounds.cancel(event.requestId);
         // Only a chip offers Retry, so the files of an import with none are not kept for one.
         if (!attachmentUploads.get(event.requestId))

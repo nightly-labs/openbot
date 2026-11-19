@@ -239,7 +239,7 @@ export function createWebConversationRuntime(
   // it saw at its start, so a later pick cannot hide the earlier one from Cancel.
   let cancelGeneration = 0;
   // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
-  // files: it has no chips, and the banner says why it failed.
+  // files: it has no chips, and the composer says why it failed.
   const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
     emit({
       type: "started",
@@ -249,20 +249,22 @@ export function createWebConversationRuntime(
     });
   /**
    * Each file is its own import, as on desktop, so a failed file does not drop the others. They go
-   * one after another, because the web client uploads one file at a time.
+   * one after another, because the web client uploads one file at a time. Over the count limit, the
+   * first files still come in, and the whole set is refused with the limit (#11573).
    */
   async function importPick(files: readonly File[]) {
     // The pick belongs to the host on screen now. After a host change, its other files go nowhere.
     const serverId = hostId();
-    if (files.length > INPUT_LIMITS.attachments) {
+    const generation = cancelGeneration;
+    const imports = files
+      .slice(0, INPUT_LIMITS.attachments)
+      .map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
+    for (const item of imports) announceImport(item.requestId, serverId, item.files, true);
+    if (files.length > imports.length) {
       const requestId = crypto.randomUUID();
       announceImport(requestId, serverId, files, false);
       await runImportFiles(requestId, serverId, files, false);
-      return;
     }
-    const generation = cancelGeneration;
-    const imports = files.map((file) => ({ requestId: crypto.randomUUID(), files: [file] }));
-    for (const item of imports) announceImport(item.requestId, serverId, item.files, true);
     for (const item of imports) {
       if (generation !== cancelGeneration || hostId() !== serverId)
         emit({ type: "completed", serverId, requestId: item.requestId, attachments: [] });

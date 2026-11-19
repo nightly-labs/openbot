@@ -529,27 +529,29 @@ listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
 });
 
 /**
- * Each file is its own import, so a failed file does not drop the others and can be sent again. A
- * set over the count or size limit stays one import, so main refuses it whole, as before.
+ * Each file is its own import, so a failed file does not drop the others and can be sent again. Over
+ * the count limit, the first files still come in (#11573). The whole set then goes to main as one
+ * import, which main refuses with the limit in words the composer shows. A set whose first files are
+ * over the size limit stays one import, so main refuses it whole, as before.
  */
 async function importFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const serverId = selectedServerId;
-  const overLimit =
-    files.length > INPUT_LIMITS.attachments ||
-    files.reduce((sum, file) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   // A pasted image has no name. It gets one here, so the chip and the server show the same name.
   const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
-  if (overLimit) {
+  const kept = named.slice(0, INPUT_LIMITS.attachments);
+  if (kept.reduce((sum, { file }) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes) {
     await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  const imports = kept.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true));
+  if (named.length > kept.length) imports.push(runAttachmentImport(crypto.randomUUID(), serverId, named, false));
+  await Promise.all(imports);
 }
 
 /**
  * `retryable` imports name their files, so the composer shows a chip for each, and keep them for a
- * retry. A set over a limit names none: a retry cannot pass, and the banner says why.
+ * retry. A set over a limit names none: a retry cannot pass, and the composer says why.
  */
 async function runAttachmentImport(
   requestId: string,
