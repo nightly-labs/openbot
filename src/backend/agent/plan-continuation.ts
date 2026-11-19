@@ -1,6 +1,7 @@
 import type { ConversationPlan, ConversationPlanStep } from "@openbot/contracts/ipc";
 import {
   compactionContinuationPrompt,
+  finishCheckContinuationPrompt,
   nextStepContinuationPrompt,
   planContinuationPrompt,
   providerExitContinuationPrompt,
@@ -12,17 +13,36 @@ export interface PlanContinuationOptions {
 }
 
 /**
- * Why a turn continues: open steps in its plan, a next step that it named but did not do, a
- * compaction that lost the connection and stopped the turn, or a provider process that exited
- * during the agent's answer.
+ * Why a turn continues: open steps in its plan, a next step that it named but did not do, a finish
+ * check that found a part of the request not done, a compaction that lost the connection and stopped
+ * the turn, or a provider process that exited during the agent's answer.
  */
-type ContinuationKind = "plan" | "nextStep" | "compaction" | "providerExit";
+type ContinuationKind = "plan" | "nextStep" | "finishCheck" | "compaction" | "providerExit";
+
+/**
+ * Whether a finish check may decide a turn that no other rule continues: `no`, `allowed`, or `only`
+ * for a turn whose last line waits for the user, which only the check can continue.
+ */
+export type FinishCheckMode = "no" | "allowed" | "only";
+
+/**
+ * No rule continues the turn, but a finish check may. The chain waits for `afterFinishCheck`; a
+ * `cancel` ends it when the check does not continue the request. `continuations` counts the
+ * automatic continuations of the request so far.
+ */
+export interface FinishCheckPending {
+  kind: "check";
+  continuations: number;
+}
 
 /**
  * A chain that ended with open steps in the plan: at the limit, or after a continuation turn that
  * changed no open step. Nothing runs after it, so the chat says that the agent stopped (#8263).
  */
 const STOPPED = { kind: "stopped" } as const;
+
+/** The most finish-check continuations of one request. Each one costs a call to the model. */
+const FINISH_CHECK_LIMIT = 3;
 
 /** The most next-step continuations of one request. Each one has no plan to measure progress. */
 const NEXT_STEP_LIMIT = 2;
@@ -227,6 +247,10 @@ interface Chain {
   shown: ContinuationCount;
   /** The next-step continuations of the chain. */
   nextSteps: number;
+  /** The finish-check continuations of the chain. */
+  checks: number;
+  /** The work that the last finish check found not done, or null while its check runs. */
+  gap: string | null;
   /** Whether a failed compaction or a provider exit continued the chain already. A second one ends it. */
   failureContinued: boolean;
   /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
@@ -254,7 +278,9 @@ function openSteps(plan: ConversationPlan, earlierSteps: ReadonlySet<string>): C
  * done, the limit is reached, or a turn makes no progress. A step that was open, with the same text
  * and status, in the plan from before the request is left from earlier work and does not count.
  * A turn with no open step also continues, at most `NEXT_STEP_LIMIT` times, when its answer only asks
- * whether to continue, or is short and ends on a next step that it did not do. A restart forgets every
+ * whether to continue, or is short and ends on a next step that it did not do. When no rule continues
+ * a turn, a finish check can: `consider` answers `check`, the caller asks the model, and
+ * `afterFinishCheck` continues at most `FINISH_CHECK_LIMIT` times with the work it found. A restart forgets every
  * chain, and the drain then settles the waiting deliveries. It never imports the mailbox or the
  * service facade.
  */
@@ -285,7 +311,9 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     /** The answer of that turn. */
     answer: string | undefined;
-  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | null {
+    /** Whether a finish check may decide the turn when no other rule continues it. */
+    finishCheck?: FinishCheckMode;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
     this.#chains.delete(key);
@@ -304,14 +332,38 @@ export class PlanContinuation {
     const open = plan ? openSteps(plan, earlierSteps) : [];
     if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
+    const checks = chained ? previous.checks : 0;
+    const mode = input.finishCheck ?? "no";
     let kind: ContinuationKind;
-    if (open.length > 0) {
+    if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
       // A continuation after a failed compaction keeps the plan of the turn before it.
-      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return STOPPED;
+      // A next-step or finish-check turn worked on other work, so an unchanged plan is not a stall.
+      if (
+        chained &&
+        previous.kind !== "nextStep" &&
+        previous.kind !== "finishCheck" &&
+        previous.openSteps === signature
+      )
+        return STOPPED;
       kind = "plan";
-    } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
-    else return null;
+    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: { current: checks, limit: FINISH_CHECK_LIMIT },
+        nextSteps,
+        checks,
+        gap: null,
+        failureContinued: chained ? previous.failureContinued : false,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count };
+    } else return null;
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -322,12 +374,48 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
+      checks,
+      gap: null,
       failureContinued: chained ? previous.failureContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
     });
     return { kind, ...shown };
+  }
+
+  /**
+   * Continues the request after a finish check found work not done (`gap`). Only the lane whose last
+   * `consider` answered `check` continues, within the limits of its chain. Returns null when it does
+   * not continue; null also ends the chain.
+   */
+  afterFinishCheck(
+    agentId: string,
+    taskId: string | null,
+    gap: string,
+  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    const key = laneKey(agentId, taskId);
+    const chain = this.#chains.get(key);
+    // `consider` gives no check at the limit, so a chain that waits for a check is below it.
+    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
+      this.#chains.delete(key);
+      return null;
+    }
+    const shown = {
+      current: chain.checks + 1,
+      limit: chain.checks + Math.min(FINISH_CHECK_LIMIT - chain.checks, this.#limit - chain.count),
+    };
+    this.#chains.set(key, { ...chain, count: chain.count + 1, checks: chain.checks + 1, gap, shown });
+    return { kind: "finishCheck", ...shown };
+  }
+
+  /**
+   * Whether the lane still waits for the finish check that its last `consider` started. A Stop, a new
+   * chat or a new message ends the chain (`cancel`), and then the check has no use.
+   */
+  waitsForCheck(agentId: string, taskId: string | null): boolean {
+    const chain = this.#chains.get(laneKey(agentId, taskId));
+    return chain?.kind === "finishCheck" && chain.gap === null;
   }
 
   /**
@@ -390,6 +478,8 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: chained ? previous.nextSteps : 0,
+      checks: chained ? previous.checks : 0,
+      gap: null,
       failureContinued: true,
       plan,
       openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
@@ -412,6 +502,8 @@ export class PlanContinuation {
     }
     if (chain.kind === "compaction") return compactionContinuationPrompt();
     if (chain.kind === "providerExit") return providerExitContinuationPrompt();
+    if (chain.kind === "finishCheck" && chain.gap !== null)
+      return finishCheckContinuationPrompt(chain.gap, chain.shown.current, chain.shown.limit);
     return chain.kind === "plan" && chain.plan
       ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);

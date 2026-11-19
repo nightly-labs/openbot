@@ -641,6 +641,19 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
   ].join("\n");
 }
 
+/**
+ * The note for a turn after a finish check found a part of the request not done. `gap` is the check's
+ * own words, so the note says that the check can be wrong.
+ */
+export function finishCheckContinuationPrompt(gap: string, count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
+    gap,
+    "Do this work now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
+}
+
 /** The note for a turn that a failed compaction stopped: the connection failed or stopped during it. */
 export function compactionContinuationPrompt(): string {
   return [
