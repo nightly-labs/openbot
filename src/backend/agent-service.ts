@@ -6331,13 +6331,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     const provider = providerForAgent(agent);
-    const providerState = () => this.#providers.status().providers?.find((status) => status.id === provider)?.state;
-    const signedInBeforeSend = providerState() === "available";
     yield* this.#providers.ensureProvider(provider).pipe(
       Effect.catchIf(
-        () =>
-          providerState() === "sign-in-required" &&
-          (signedInBeforeSend || this.#mailbox.nextQueued(agent.id, input.taskId ?? null) !== null),
+        (failure) =>
+          this.#providers.signInRecheckPending(provider) &&
+          this.#providers.signInRequired(provider) &&
+          failure.cause instanceof Error &&
+          failure.cause.message ===
+            this.#providers.status().providers?.find((status) => status.id === provider)?.message,
         () => Effect.void,
       ),
       Effect.mapError(
