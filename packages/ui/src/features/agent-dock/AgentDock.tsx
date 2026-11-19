@@ -57,7 +57,7 @@ import {
   type AgentDockPendingMessage,
   pendingMessageDelivered,
 } from "./AgentDockChat";
-import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
+import { AgentDockShelf, type AgentDockShelfItem, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
   addCenterY,
   DOCK_LEFT,
@@ -221,8 +221,59 @@ interface DockState {
 
 let pendingKey = 0;
 
+interface ShelfCard extends AgentDockShelfItem {
+  height: number;
+  y: Spring;
+  placed: boolean;
+}
+
+interface ShelfBlock {
+  top: number;
+  height: number;
+  members: { index: number; offset: number }[];
+}
+
+function spreadShelf(wants: readonly number[], heights: readonly number[]): number[] {
+  const want = (index: number) => wants[index] ?? 0;
+  const height = (index: number) => heights[index] ?? 0;
+  const settle = (block: ShelfBlock) => {
+    const sum = block.members.reduce(
+      (total, member) => total + want(member.index) - height(member.index) / 2 - member.offset,
+      0,
+    );
+    block.top = Math.min(Math.max(0, sum / block.members.length), PANEL_HEIGHT - block.height);
+    return block;
+  };
+  const blocks: ShelfBlock[] = [];
+  const order = wants.map((_, index) => index).sort((a, b) => want(a) - want(b) || a - b);
+  for (const index of order) {
+    let block = settle({ top: 0, height: height(index), members: [{ index, offset: 0 }] });
+    let previous = blocks.at(-1);
+    while (previous && previous.top + previous.height + SHELF_ITEM_GAP > block.top) {
+      blocks.pop();
+      const shift = previous.height + SHELF_ITEM_GAP;
+      block = settle({
+        top: 0,
+        height: shift + block.height,
+        members: [
+          ...previous.members,
+          ...block.members.map((member) => ({ ...member, offset: member.offset + shift })),
+        ],
+      });
+      previous = blocks.at(-1);
+    }
+    blocks.push(block);
+  }
+  const centers = wants.map(() => 0);
+  for (const block of blocks) {
+    for (const member of block.members) centers[member.index] = block.top + member.offset + height(member.index) / 2;
+  }
+  return centers;
+}
+
 const SEAT_LAG = 0.3;
 const SHELF_GAP = 12;
+const SHELF_ITEM_GAP = 8;
 const SEAT_FADE = 24;
 const ADD_SEARCH_MIN = 9;
 const ADD_MORPH_MS = 200;
@@ -273,10 +324,9 @@ export function AgentDock(props: AgentDockProps) {
   let handleHit!: SVGPathElement;
   let shelf: HTMLUListElement | undefined;
   let shelfShown = false;
-  let shelfAgent: string | null = null;
-  let shelfHeight = 0;
-  let shelfCard = 0;
+  let shelfCards: ShelfCard[] = [];
   let shelfSeats: readonly string[] = initialSeats;
+  let shelfResize: ResizeObserver | undefined;
   let seatScroll!: HTMLDivElement;
   let seatList!: HTMLDivElement;
   const seatElements = new Map<string, HTMLElement>();
@@ -294,7 +344,6 @@ export function AgentDock(props: AgentDockProps) {
   const initialCount = initialSeats.length;
   const dockH = motion.spring(dockHeight(initialCount), WOBBLY);
   const addY = motion.spring(addCenterY(initialCount), WOBBLY);
-  const shelfOffset = motion.spring(0, WOBBLY);
   const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   const panelOpen = motion.spring(0, LIQUID_OPEN);
   const closing = motion.spring(0, SOFT);
@@ -339,35 +388,78 @@ export function AgentDock(props: AgentDockProps) {
     return Math.min(last, Math.max(first, seatCenterY(seats.indexOf(id), count) - scroll));
   }
 
-  function shelfTarget(seats: readonly string[] = shelfSeats) {
-    const id = shelfAgent === null ? null : agentDockSeatKey({ kind: "agent", id: shelfAgent });
-    if (id === null || !seats.includes(id) || leaving.has(id)) return 0;
-    const line = Math.min(PANEL_HEIGHT, Math.max(shelfHeight, seatY(id, seats) + shelfCard / 2));
-    return line - (addCenterY(seats.length) - SEAT / 2);
+  function shelfCenters(seats: readonly string[]) {
+    const anchor = addCenterY(seats.length) - SEAT / 2;
+    const wants = shelfCards.map((card) => {
+      const id = card.agentId === null ? null : agentDockSeatKey({ kind: "agent", id: card.agentId });
+      return id !== null && seats.includes(id) && !leaving.has(id) ? seatY(id, seats) : anchor - card.height / 2;
+    });
+    const tops = shelfCards.flatMap((card, index) =>
+      card.agentId === null ? [] : [(wants[index] ?? anchor) - card.height / 2],
+    );
+    if (tops.length > 0) {
+      const top = Math.min(...tops);
+      shelfCards.forEach((card, index) => {
+        if (card.agentId === null) wants[index] = top - SHELF_ITEM_GAP - card.height / 2;
+      });
+    }
+    return spreadShelf(
+      wants,
+      shelfCards.map((card) => card.height),
+    );
   }
 
-  function placeShelf() {
-    const target = shelfTarget();
-    if (!shelfShown) {
-      shelfOffset.jump(target);
-      return;
-    }
-    if (shelfOffset.target === target) return;
-    shelfOffset.to(target);
-    motion.kick();
+  function placeShelf(instant = false) {
+    if (!shelfShown || shelfCards.length === 0) return;
+    const centers = shelfCenters(shelfSeats);
+    let moved = false;
+    shelfCards.forEach((card, index) => {
+      const center = centers[index] ?? card.y.target;
+      if (instant || !card.placed) {
+        card.y.jump(center);
+        card.placed = card.height > 0;
+      } else if (card.y.target !== center) {
+        card.y.to(center);
+        moved = true;
+      }
+    });
+    drawShelf();
+    if (moved) motion.kick();
   }
 
   function drawShelf() {
-    if (!shelf) return;
-    const line = addY.value - SEAT / 2 + shelfOffset.value - stretch.value * SEAT_LAG;
-    shelf.style.bottom = `${PANEL_HEIGHT - line}px`;
+    const lag = stretch.value * SEAT_LAG;
+    for (const card of shelfCards) card.element.style.top = `${card.y.value - card.height / 2 - lag}px`;
   }
 
   function measureShelf() {
-    if (!shelf) return;
-    shelfHeight = shelf.offsetHeight;
-    const card = shelf.lastElementChild;
-    shelfCard = card instanceof HTMLElement ? card.offsetHeight : 0;
+    for (const card of shelfCards) {
+      const height = card.element.offsetHeight;
+      if (height > 0) card.height = height;
+    }
+  }
+
+  function updateShelf(items: readonly AgentDockShelfItem[], shown: boolean) {
+    const appeared = shown && !shelfShown;
+    shelfShown = shown;
+    const previous = new Map(shelfCards.map((card) => [card.key, card]));
+    shelfCards = items.map((item) => {
+      const known = previous.get(item.key);
+      previous.delete(item.key);
+      if (known?.element === item.element) return known;
+      if (known) forgetShelfCard(known);
+      shelfResize?.observe(item.element);
+      return { ...item, height: 0, y: motion.spring(0, WOBBLY), placed: false };
+    });
+    for (const card of previous.values()) forgetShelfCard(card);
+    measureShelf();
+    placeShelf(appeared);
+    reportShape();
+  }
+
+  function forgetShelfCard(card: ShelfCard) {
+    shelfResize?.unobserve(card.element);
+    motion.drop(card.y);
   }
 
   function revealScroll(index: number) {
@@ -470,7 +562,7 @@ export function AgentDock(props: AgentDockProps) {
     if (moving) return report(null);
     const parts: Element[] = [dockEdge, ...(props.onDrag ? [handleHit] : [])];
     if (panelOpen.value > 0.001) parts.push(panelEdge);
-    if (shelf && !shelf.hidden) parts.push(shelf);
+    if (shelf && !shelf.hidden) parts.push(...shelfCards.map((card) => card.element));
     report(
       parts
         .map((element) => element.getBoundingClientRect())
@@ -623,7 +715,7 @@ export function AgentDock(props: AgentDockProps) {
     move(dockH, dockHeight(count));
     move(addY, addCenterY(count));
     shelfSeats = seats;
-    move(shelfOffset, shelfTarget(seats));
+    placeShelf(instant);
     const listHeight = SEAT_VIEW_INSET + seatsHeight(count);
     if (listHeight > listH.value) listH.jump(listHeight);
     else move(listH, listHeight);
@@ -1048,10 +1140,12 @@ export function AgentDock(props: AgentDockProps) {
       placeShelf();
       reportShape();
     });
-    if (shelf) resized.observe(shelf);
+    shelfResize = resized;
+    for (const card of shelfCards) resized.observe(card.element);
     window.addEventListener("resize", reportShape);
     return () => {
       motion.stop();
+      shelfResize = undefined;
       resized.disconnect();
       window.removeEventListener("resize", reportShape);
     };
@@ -1351,19 +1445,8 @@ export function AgentDock(props: AgentDockProps) {
           hidden={state.open !== null}
           stage={() => stage}
           onOpen={(agentId) => openChat(agentDockSeatKey({ kind: "agent", id: agentId }))}
-          onShownChange={(shown) => {
-            shelfShown = shown;
-            if (shown) {
-              measureShelf();
-              shelfOffset.jump(shelfTarget());
-              drawShelf();
-            }
-            props.onShelfChange?.(shown);
-          }}
-          onAgentChange={(agentId) => {
-            shelfAgent = agentId;
-            placeShelf();
-          }}
+          onShownChange={(shown) => props.onShelfChange?.(shown)}
+          onItemsChange={updateShelf}
           ref={(element) => {
             shelf = element;
             element.style.right = `${STAGE_WIDTH - DOCK_LEFT + SHELF_GAP}px`;

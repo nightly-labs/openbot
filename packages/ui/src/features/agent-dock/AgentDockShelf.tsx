@@ -18,6 +18,13 @@ const LEAVE = 300;
 const LOOK_GRACE = 600;
 const CLOCK_STEP = 100;
 const LOOK_TARGETS = ".agent-dock-seats, .agent-dock-hit, .agent-dock-shelf";
+const MORE_KEY = "more";
+
+export interface AgentDockShelfItem {
+  key: string;
+  agentId: string | null;
+  element: HTMLLIElement;
+}
 
 export interface AgentDockShelfProps {
   results: readonly AgentDockShelfResult[];
@@ -26,7 +33,7 @@ export interface AgentDockShelfProps {
   stage: () => HTMLElement | undefined;
   onOpen: (agentId: string) => void;
   onShownChange?: ((shown: boolean) => void) | undefined;
-  onAgentChange?: ((agentId: string | null) => void) | undefined;
+  onItemsChange?: ((items: readonly AgentDockShelfItem[], shown: boolean) => void) | undefined;
   ref: (element: HTMLUListElement) => void;
 }
 
@@ -77,15 +84,20 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
     },
   );
 
-  const soleAgent = createMemo((previous: string | null | undefined): string | null => {
-    const agents = new Set(live().map((result) => result.agentId));
-    if (agents.size === 0) return previous ?? null;
-    return agents.size === 1 ? (agents.values().next().value ?? null) : null;
-  });
-
-  createEffect(soleAgent, (agentId) => {
-    untrack(() => props.onAgentChange?.(agentId));
-  });
+  const elements = new Map<string, HTMLLIElement>();
+  createEffect(
+    () => [visible(), folded() > 0, ...shown().map((result) => result.id)].join("\n"),
+    () => {
+      const keys = untrack(() => [...(folded() > 0 ? [MORE_KEY] : []), ...shown().map((result) => result.id)]);
+      for (const key of elements.keys()) if (!keys.includes(key)) elements.delete(key);
+      const agents = new Map(untrack(shown).map((result) => [result.id, result.agentId]));
+      const items = keys.flatMap((key) => {
+        const element = elements.get(key);
+        return element ? [{ key, agentId: agents.get(key) ?? null, element }] : [];
+      });
+      untrack(() => props.onItemsChange?.(items, visible()));
+    },
+  );
 
   createEffect(visible, (value) => {
     untrack(() => props.onShownChange?.(value));
@@ -126,7 +138,7 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       hidden={visible() ? undefined : true}
     >
       <Show when={folded() > 0}>
-        <li class="agent-dock-shelf-item">
+        <li class="agent-dock-shelf-item" ref={(element) => elements.set(MORE_KEY, element)}>
           <Button type="button" variant="ghost" class="agent-dock-shelf-more" onClick={() => setExpanded(true)}>
             {t("agent.dock.finished.more", { count: folded() })}
           </Button>
@@ -134,7 +146,11 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       </Show>
       <For each={shown()} keyed={(result) => result.id}>
         {(result) => (
-          <li class="agent-dock-shelf-item" data-leaving={age(result().id) >= LIFE ? "" : undefined}>
+          <li
+            class="agent-dock-shelf-item"
+            data-leaving={age(result().id) >= LIFE ? "" : undefined}
+            ref={(element) => elements.set(untrack(result).id, element)}
+          >
             <Show when={props.agent(result().agentId)}>
               {(agent) => (
                 <Button
