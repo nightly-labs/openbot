@@ -20,6 +20,8 @@ export const messages = {
     "{provider} のプランの利用上限に達しました。別のモデルを選ぶか、{provider} のプランをアップグレードしてください。",
   "error.provider.acpMcpNotLoaded":
     "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} が OpenBot のツールなしでこのメッセージを実行したため、エージェントはチームメイトへの連絡、ブラウザの使用、ファイルの添付ができませんでした。もう一度お試しください。",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} が MCP サーバー {name} を起動できなかったため、応答が止まりました。このサーバーは OpenBot ではなく、ご自身の {provider} の設定にあります。そこでサーバーを削除するか修復してから、新しいチャットを始めてください。",
   "error.provider.endpointsReadOnly":

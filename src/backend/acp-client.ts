@@ -220,6 +220,12 @@ const ACP_REPEATED_TOOL_FAILURES = 5;
  */
 const ACP_STEER_ANSWER_MS = 3_000;
 
+/**
+ * Added to `AcpFlavor.mcpListLimit`. The agent starts its wait after the request leaves, so a list
+ * a little after the limit can still have been in time. Such a turn is not failed.
+ */
+const ACP_MCP_LIST_MARGIN_MS = 1_000;
+
 /** How often OpenBot asks `session/list` whether a session with a background task has changed. */
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
@@ -404,6 +410,11 @@ interface AcpThread {
   configOptions: SessionConfigOption[];
   currentModelId: string | null;
   mcp: LocalMcpSession;
+  /**
+   * The agent listed the tools of OpenBot's servers in time for this session or a prompt of it
+   * (`AcpFlavor.mcpListLimit`). The agent keeps a server that it loaded.
+   */
+  mcpListed: boolean;
   /** Ends the session's stdio relays (`relayStdioMcpServers`) and their servers. */
   relays: Effect.Effect<void>;
   activeTurn: AcpTurn | null;
@@ -1924,6 +1935,25 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  /**
+   * Whether the agent had OpenBot's tools for a session or prompt request sent at `sentAt`: it listed
+   * them within `AcpFlavor.mcpListLimit`. True when the flavor or the CLI version has no such limit,
+   * or when the session got no OpenBot server.
+   */
+  #listedInTime(mcp: LocalMcpSession, sentAt: number): boolean {
+    const limit = this.#flavor.mcpListLimit;
+    const version = this.#initialization?.agentInfo?.version;
+    if (
+      !limit ||
+      mcp.servers.length === 0 ||
+      typeof version !== "string" ||
+      !isVersion(version) ||
+      compareReleases(version, limit.since) < 0
+    )
+      return true;
+    return mcp.listedWithin(sentAt, limit.ms + ACP_MCP_LIST_MARGIN_MS);
+  }
+
   /** Whether the agent can resume without replaying its transcript, and OpenBot uses that resume. */
   get #supportsSessionResume(): boolean {
     if (this.#flavor.loadInsteadOfResume) return false;
@@ -2194,6 +2224,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions,
               currentModelId,
               mcp,
+              mcpListed: this.#listedInTime(mcp, sentAt),
               relays: closeRelays ?? Effect.void,
               activeTurn: null,
               needsResume: false,
@@ -2941,7 +2972,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     try {
-      const send = () => this.#sendPrompt(thread, turn, prompt, params);
+      // The last send of the turn's prompt, from which the agent loads a server that it does not have.
+      let sentAt = 0;
+      // A steer or a wake prompt can load the servers again, so such a turn is not judged.
+      let promptedAgain = false;
+      const send = () =>
+        Effect.suspend(() => {
+          sentAt = Date.now();
+          return this.#sendPrompt(thread, turn, prompt, params);
+        });
       let sent = yield* send();
       // A prompt that the agent took and then lost is not sent again: it can have run.
       if (
@@ -2990,6 +3029,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         // steer's prompt. The turn ends with the reply to the last one. A reply that ends the same run
         // as the next one carries the same usage (`AcpFlavor.promptRun`), so only the last one reports it.
         for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
+          promptedAgain = true;
           const run = this.#flavor.promptRun?.(response);
           if (run === undefined) this.#reportPromptUsage(thread, turn, response);
           const reply = yield* Deferred.await(steer);
@@ -3018,6 +3058,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (thread.activeTurn !== turn || turn.completing) return;
         turn.lastActivityAt = Date.now();
         staleWake = this.#backgroundCommands(turn) === running;
+        promptedAgain = true;
       }
       this.#reportPromptUsage(thread, turn, response);
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
@@ -3097,6 +3138,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
+      }
+      // The agent ran the prompt without OpenBot's tools, with no error (`AcpFlavor.mcpListLimit`). The
+      // answer stays, and the turn fails, so the user and a routine run see that the work was not done
+      // (#12298). The cause starts no backup model: the next prompt loads the servers again.
+      if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, sentAt);
+      if (
+        !thread.mcpListed &&
+        !promptedAgain &&
+        !turn.providerError &&
+        !turn.stopped &&
+        response.stopReason === "end_turn"
+      ) {
+        turn.failureCause = "unknown";
+        turn.providerError = sourceText("error.provider.acpToolsNotLoaded", { provider: this.#label });
       }
       const status =
         turn.stopped || response.stopReason === "cancelled"

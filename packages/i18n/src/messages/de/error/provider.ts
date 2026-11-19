@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
     "{provider} hat die OpenBot-Tools nicht geladen, daher kann dieser Agent sie nicht nutzen und seine Teammitglieder nicht erreichen. Eine Team-Richtlinie von {provider} kann lokale MCP-Server blockieren. Bitte deinen Team-Admin, sie zu erlauben, und versuche es dann erneut.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} hat diese Nachricht ohne die OpenBot-Tools ausgeführt. Der Agent konnte daher seine Teammitglieder nicht erreichen, den Browser nicht nutzen und keine Dateien anhängen. Versuche es erneut.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} konnte den MCP-Server {name} nicht starten, daher wurde die Antwort beendet. Dieser Server ist in deinen eigenen {provider}-Einstellungen, nicht in OpenBot. Entferne oder repariere ihn dort und starte dann einen neuen Chat.",
   "error.provider.endpointsReadOnly":

@@ -131,6 +131,7 @@ describe("mcpSecretValues", () => {
         setThreadId: () => {},
         reached: () => false,
         dropped: () => false,
+        listedWithin: () => false,
         renew: () => [],
         close: () => {},
       };

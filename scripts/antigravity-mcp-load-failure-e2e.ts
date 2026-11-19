@@ -25,6 +25,9 @@
 // From #11746: Google refuses `items` on a field that is not an array. Its server is left out the same way.
 // From #12358: the CLI sends a number `enum`, such as Aave's `limit: [10, 50]`, as empty values. Its
 // server is left out the same way.
+// From #12298: the CLI 1.5.11 runs a prompt without a server that did not list its tools within 5 s,
+// with no error. A turn without OpenBot's own tools fails with a plain message and keeps its answer; a
+// prompt that lists them in time completes, and an older CLI is not judged.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -32,10 +35,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { isCauseCode } from "@openbot/telemetry";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
+import { FAILOVER_CAUSES } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
-import { getString } from "../src/backend/protocol";
+import { getRecord, getString } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
@@ -485,6 +492,87 @@ try {
     "Only the server whose enum holds numbers is left out.",
   );
   assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
+
+  // 12. From #12298: the CLI 1.5.11 runs a prompt without a server that did not list its tools within
+  // 5 s, with no error. The fake lists the tools of OpenBot's own servers over the real bridge.
+  const listCauses = new Map<string, string | null>();
+  const listAgent = async (name: string, env: Record<string, string>) => {
+    const executable = join(root, `agy-list-${name}`, "bin", "antigravity");
+    const workspace = join(root, `list-${name}`);
+    await mkdir(workspace, { recursive: true });
+    await installFakeAgent(executable, "antigravity-mcp-list", { FAKE_LOG: join(root, `list-${name}.jsonl`), ...env });
+    const listClient = requireProviderDriver("antigravity").createClient(
+      { executable, version: env.FAKE_VERSION ?? "1.5.12", source: "managed" },
+      20_000,
+      { apiKey: () => null, customProviders: () => [], mcpServers: () => [] },
+    );
+    clients.push(listClient);
+    listClient.on("notification", (notification: { method: string; params?: unknown }) => {
+      if (notification.method !== "error") return;
+      const threadId = getString(notification.params, "threadId");
+      if (threadId) listCauses.set(threadId, getString(notification.params, "causeCode") ?? null);
+    });
+    listClient.start();
+    // As the agent service starts a thread: with OpenBot's own tools, which the bridge serves.
+    const response = await runCauseEffect(
+      listClient.request(
+        "thread/start",
+        { cwd: workspace, dynamicTools: visibleDynamicTools("antigravity") },
+        (value) => value,
+      ),
+    );
+    const threadId = getString(getRecord(response, "thread"), "id");
+    assert.ok(threadId, "The thread opens.");
+    return { listClient, threadId, log: join(root, `list-${name}.jsonl`) };
+  };
+  const plain = { text: "Reply with OK only.", timeoutMs: 30_000 };
+
+  // 12a. The session lists the tools at once: each turn completes.
+  const onTime = await listAgent("now", { FAKE_OPEN_LIST: "now" });
+  const onTimeTurn = await runTurn(onTime.listClient, onTime.threadId, plain);
+  report.turns.toolsListedOnTime = onTimeTurn;
+  assert.equal(onTimeTurn.status, "completed", "A turn with OpenBot's tools completes.");
+  assert.equal(onTimeTurn.error, null, "A turn with OpenBot's tools has no error.");
+  // The model list opens a session of its own, with no OpenBot server.
+  const onTimeLog = await readJsonl<{ method: string; listed: number | null }>(onTime.log);
+  assert.ok(
+    onTimeLog.some((entry) => entry.method === "session/new" && (entry.listed ?? 0) > 0),
+    "The fake listed OpenBot's tools over the bridge.",
+  );
+
+  // 12b. The session never lists them: the turn fails with a plain message, and its answer stays. A
+  // prompt that lists them in time completes, and the session keeps them for the next prompt.
+  const never = await listAgent("never", { FAKE_OPEN_LIST: "never" });
+  const missed = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsNotListed = missed;
+  assert.equal(missed.status, "failed", "A turn without OpenBot's tools fails.");
+  assert.match(missed.error ?? "", /without OpenBot's tools/u, "The error says that the tools were missing.");
+  assert.doesNotMatch(missed.error ?? "", /MCP|policy|admin/u, "The error has no protocol words.");
+  assert.equal(missed.reply, "OK", "The answer of the turn stays.");
+  const missedCause = listCauses.get(never.threadId) ?? null;
+  assert.equal(missedCause, "unknown", "The cause is one that does not start a backup model.");
+  assert.ok(
+    missedCause !== null && isCauseCode(missedCause) && !FAILOVER_CAUSES.has(missedCause),
+    "No backup model runs the prompt again.",
+  );
+  const listedTurn = await runTurn(never.listClient, never.threadId, { ...plain, text: "list the tools" });
+  report.turns.toolsListedAtPrompt = listedTurn;
+  assert.equal(listedTurn.status, "completed", "A prompt that lists the tools in time completes.");
+  const keptTurn = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsKept = keptTurn;
+  assert.equal(keptTurn.status, "completed", "The session keeps the tools for the next prompt.");
+
+  // 12c. The session lists them after the limit: the turn fails as in 12b.
+  const lateList = await listAgent("late", { FAKE_OPEN_LIST: "late", FAKE_LATE_MS: "6500" });
+  const lateListTurn = await runTurn(lateList.listClient, lateList.threadId, plain);
+  report.turns.toolsListedLate = lateListTurn;
+  assert.equal(lateListTurn.status, "failed", "A turn whose tools came after the limit fails.");
+
+  // 12d. A CLI before 1.5.11 is not judged: its limit is not known.
+  const older = await listAgent("older", { FAKE_OPEN_LIST: "never", FAKE_VERSION: "1.5.10" });
+  const olderTurn = await runTurn(older.listClient, older.threadId, plain);
+  report.turns.toolsOlderCli = olderTurn;
+  assert.equal(olderTurn.status, "completed", "An older CLI's turn completes as before.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

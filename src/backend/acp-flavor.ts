@@ -392,6 +392,12 @@ export interface AcpFlavor {
    */
   mcpConnectLimitMs?: number;
   /**
+   * How long the agent waits for an MCP server of a session to list its tools, from the CLI version
+   * `since`. A server that did not list them in time is not in the prompt's tools, with no error, and
+   * the agent tries it again at the next prompt. A turn that ran without OpenBot's servers fails.
+   */
+  mcpListLimit?: { ms: number; since: string };
+  /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
    * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
    * (`startStdioMcpRelay`), sends it as http, and stops it when the session closes.

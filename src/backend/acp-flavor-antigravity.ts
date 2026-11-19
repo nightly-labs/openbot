@@ -535,6 +535,11 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // also with progress every 20 s, and also with `timeoutSeconds` in the session server entry. Only
   // the CLI's own `mcp_config.json` changes it, which is the user's file (#9689).
   mcpToolCallLimitMs: 180_000,
+  // A probe of 1.5.11 and 1.5.12: a session server that does not list its tools within 5 s is left
+  // out of the session, and of each prompt whose new try is late too. The model then said that its
+  // OpenBot tools were missing, or used the CLI's own `send_message`, and the turn ended as a
+  // success (#12298).
+  mcpListLimit: { ms: 5_000, since: "1.5.11" },
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own

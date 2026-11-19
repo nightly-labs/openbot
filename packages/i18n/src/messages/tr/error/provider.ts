@@ -20,6 +20,8 @@ export const messages = {
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
     "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} bu mesajı OpenBot araçları olmadan çalıştırdı; bu yüzden ajan takım arkadaşlarına ulaşamadı, tarayıcıyı kullanamadı ve dosya ekleyemedi. Yeniden deneyin.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider}, {name} MCP sunucusunu başlatamadı, bu yüzden yanıt durdu. Bu sunucu OpenBot'ta değil, kendi {provider} ayarlarınızda. Sunucuyu orada kaldırın veya onarın, ardından yeni bir sohbet başlatın.",
   "error.provider.endpointsReadOnly":

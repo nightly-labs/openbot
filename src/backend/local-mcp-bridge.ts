@@ -50,6 +50,11 @@ export interface LocalMcpSession {
    */
   dropped(sentAt: number, limitMs: number): boolean;
   /**
+   * Whether the client listed the tools of a server of this session, with its current token, within
+   * `limitMs` after `from`.
+   */
+  listedWithin(from: number, limitMs: number): boolean;
+  /**
    * Gives each marked server a new token, which all sessions of its directory share. `servers` then
    * has the new tokens, and is returned.
    */
@@ -83,6 +88,9 @@ const OPENCODE_SESSION_META = "ai.opencode/sessionID";
  * gave up the server. The client starts its attempt after the request leaves, so it ends a little later.
  */
 const DROP_JUDGE_MARGIN_MS = 2_000;
+
+/** The list times that a route keeps. A client lists the tools when a session opens and at prompts. */
+const LISTED_TIMES_KEPT = 16;
 
 /**
  * How long the bridge keeps an idle connection. Go's HTTP client, which Antigravity uses, keeps one for
@@ -164,6 +172,8 @@ interface BridgeRoute {
   sentBy: BridgeMember;
   /** When the client first listed the tools with the current token, or null. */
   listedAt: number | null;
+  /** When the client listed the tools with the current token, the last `LISTED_TIMES_KEPT` times. */
+  listedTimes: number[];
   /** The client gave up the current token: OpenCode 2.3.0 does not connect again to the same settings. */
   dropped: boolean;
 }
@@ -225,6 +235,7 @@ export class LocalMcpBridge {
         tokens: [token],
         sentBy: member,
         listedAt: null,
+        listedTimes: [],
         dropped: false,
       };
       this.#routes.set(token, route);
@@ -261,6 +272,8 @@ export class LocalMcpBridge {
         }
         return dropped;
       },
+      listedWithin: (from, limitMs) =>
+        routes.some((route) => route.listedTimes.some((at) => at >= from && at - from <= limitMs)),
       renew: () => {
         for (const route of routes) if (route.dropped) this.#renewToken(route, member);
         current.splice(0, current.length, ...servers());
@@ -284,6 +297,7 @@ export class LocalMcpBridge {
     route.tokens.push(token);
     route.sentBy = member;
     route.listedAt = null;
+    route.listedTimes = [];
     route.dropped = false;
     this.#routes.set(token, route);
     if (route.shareKey !== null) this.#shared.set(route.shareKey, token);
@@ -395,7 +409,11 @@ export class LocalMcpBridge {
     );
     // The client lists one set for all sessions of a shared token; a call is checked against its own session.
     mcp.setRequestHandler(ListToolsRequestSchema, async () => {
-      if (token === route.tokens.at(-1)) route.listedAt ??= Date.now();
+      if (token === route.tokens.at(-1)) {
+        const now = Date.now();
+        route.listedAt ??= now;
+        route.listedTimes = [...route.listedTimes, now].slice(-LISTED_TIMES_KEPT);
+      }
       return {
         tools: listedTools(route).map((tool) => ({
           name: tool.name,
