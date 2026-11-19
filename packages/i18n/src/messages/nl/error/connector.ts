@@ -31,6 +31,8 @@ export const messages = {
     "1Password heeft te veel verzoeken ontvangen. Wacht een paar minuten en probeer het opnieuw.",
   "error.connector.onePasswordNoVault":
     "Het serviceaccount kan geen kluis lezen. Geef het toegang tot een kluis en probeer het opnieuw.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot kan je logins in 1Password niet lezen. Verbreek de verbinding met 1Password en maak daarna opnieuw verbinding.",
   "error.connector.onePasswordFileUnreadable": "Het verbindingsbestand van 1Password is onleesbaar.",
   "error.connector.onePasswordFileTooLarge": "Het verbindingsbestand van 1Password is te groot.",
   "error.connector.bitwardenFailed":
