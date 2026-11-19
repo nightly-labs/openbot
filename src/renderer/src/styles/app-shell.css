@@ -1221,7 +1221,8 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.sidebar-compact .dev-worktree-label {
+.sidebar-compact .dev-worktree-label,
+.app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .dev-worktree-label {
   display: none;
 }
 

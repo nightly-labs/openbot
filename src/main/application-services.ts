@@ -2248,6 +2248,12 @@ export async function createApplicationServices({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.modelFailed"),
           })),
         ),
+      chooseTextModel: (request) =>
+        service.chooseWorkflowModel(request).pipe(
+          Effect.mapError((failure) => ({
+            message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.modelFailed"),
+          })),
+        ),
       generateMedia: (request) =>
         service.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({

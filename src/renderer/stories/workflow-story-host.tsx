@@ -145,6 +145,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
     agentFilesSupported: () => true,
+    stepSettingsSupported: () => true,
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,

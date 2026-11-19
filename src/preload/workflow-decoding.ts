@@ -12,6 +12,7 @@ import {
   isWorkflowRunPage,
   isWorkflowSaveResult,
   isWorkflowStep,
+  isWorkflowStepSettings,
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
@@ -27,6 +28,7 @@ export const decodeWorkflowVersions = guardedListDecoder(isWorkflowVersion, "wor
 export const decodeWorkflowRunDetail = guardedDecoder(isWorkflowRunDetail, "workflow run response");
 export const decodeWorkflowRunPage = guardedDecoder(isWorkflowRunPage, "workflow runs response");
 export const decodeWorkflowStep = guardedDecoder(isWorkflowStep, "workflow step response");
+export const decodeWorkflowStepSettings = guardedDecoder(isWorkflowStepSettings, "workflow step settings response");
 export const decodeWorkflowWebhookSecret = guardedDecoder(isWorkflowWebhookSecret, "workflow webhook secret response");
 export const decodeWorkflowGitHubCatalog = guardedDecoder(isWorkflowGitHubCatalog, "workflow GitHub catalog response");
 export const decodeWorkflowGitHubOptions = guardedDecoder(
