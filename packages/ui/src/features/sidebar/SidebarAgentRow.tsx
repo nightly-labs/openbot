@@ -161,6 +161,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     </ContextMenu.Root>
   );
   return (
+    /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
     <div
       class={[
         "sidebar-agent-item",
