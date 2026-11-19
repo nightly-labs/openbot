@@ -7183,10 +7183,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ),
         );
     // A turn that waits on a question in this chat reads no message until that question is answered,
-    // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
+    // so the person who wrote instead would wait for it. A stopped turn clears its own questions. A
+    // detached question of the chat closes also with no running turn, but not for the hidden welcome or
+    // setup message, which the person did not write (#12449).
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
-      if (targetThreadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      if (!targetThreadId) return;
+      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
     // Claude's steer puts the message in the CLI's input at once, so the question closes after it.

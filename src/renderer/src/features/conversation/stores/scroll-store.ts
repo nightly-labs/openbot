@@ -209,11 +209,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
    * A message that the user sends while a question card is open shows when the question's row has
    * its outcome, under that row. The card is drawn under all rows, so until the host closed it, the
    * message showed above the question; and the host closes the card a moment before the row says
-   * "cancelled", so the message then stood where the card was. Only a question of the running turn
-   * closes for a message (`releaseForUserMessage`), so a card that stays, such as a detached question,
-   * holds nothing; one that stays all the same, such as an MCP sign-in, lets the message show after
-   * `PROMPT_SEND_HOLD_MS`. Each time is when this view first had the row while a question waited, so a
-   * message from before the question is not held, and the host's clock does not count.
+   * "cancelled", so the message then stood where the card was. A question of the running turn closes
+   * for a message (`releaseForUserMessage`). A detached question closes too, but holds nothing: its
+   * row is older than the message, and a subagent's question, which has the same mark, stays. One
+   * that stays all the same, such as an MCP sign-in, lets the message show after `PROMPT_SEND_HOLD_MS`.
+   * Each time is when this view first had the row while a question waited, so a message from before
+   * the question is not held, and the host's clock does not count.
    */
   const userRowSeenAt = new Map<string, number>();
   let waitingQuestion:
