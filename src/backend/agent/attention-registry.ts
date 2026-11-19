@@ -142,7 +142,8 @@ interface PendingPrompt {
   detach?: { target: LateAnswerTarget; timer: ReturnType<typeof setTimeout> };
   /**
    * The call was answered with `detachedPromptResult`, so no provider waits for this question. The card
-   * stays until the user answers it, and the answer reaches the agent as a new message in this chat.
+   * stays until the user answers it, and the answer reaches the agent as a new message in this chat. A
+   * message that the user writes in this chat, or a new question of the agent there, closes it (#12449).
    */
   detached?: LateAnswerTarget;
   /**
@@ -1995,6 +1996,7 @@ export class AttentionRegistry {
       return;
     }
 
+    this.#expireDetachedInChat(agentId, publicThreadId);
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     const pending: PendingPrompt = {
       client,
@@ -2078,6 +2080,7 @@ export class AttentionRegistry {
       return;
     }
 
+    this.#expireDetachedInChat(agentId, publicThreadId);
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
@@ -2295,15 +2298,19 @@ export class AttentionRegistry {
    * each would wait for the other. The questions and blocks of the turn close as skipped, with a note
    * to follow the message. A form whose key or item is being saved finishes on its own. Approvals,
    * MCP elicitations and browser takeovers stay: a message must not refuse an action or end a sign-in.
+   *
+   * A detached question of the chat closes too, of any turn and also with no running turn (`turnId`
+   * null): the user moved on, and the card would still ask for an answer that the message can hold
+   * (#12449). Its call has its answer already, so the agent reads only the message.
    */
-  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string | null): void {
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
-      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
-        continue;
-      // A detached question holds no call, so the turn reads the message, and the card stays.
-      if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
-      this.#routines.markRunningForTurn(turnId);
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (!pending.detached && pending.turnId !== turnId) continue;
+      if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
+      // A detached question gave its turn back when it detached.
+      if (!pending.detached) this.#routines.markRunningForTurn(pending.turnId);
       // The card closes as the user's own skip does, and says why: the user did not press Skip (#7678).
       const uiBlockState = pending.uiBlock
         ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
@@ -2316,6 +2323,21 @@ export class AttentionRegistry {
         { status: "cancelled" },
         uiBlockState,
       );
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * The agent asks again in a chat where a detached question waits. A chat shows one question, so the
+   * old card would come back when the new one closes, and ask for an answer that the user maybe gave
+   * already (#12449). The old card expires, and the new question replaces it.
+   */
+  #expireDetachedInChat(agentId: string, publicThreadId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!pending.detached || pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      this.#expirePrompt(requestId, pending);
       changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
