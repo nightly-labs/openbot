@@ -54,7 +54,7 @@ function ThreadRowItem(props: {
       }
     >
       <ContextMenu.Root modal={false} onOpenChange={menuChange}>
-        <ContextMenu.Trigger as="li" class={props.class} style={style()}>
+        <ContextMenu.Trigger as="li" class={props.class ?? ""} style={style() ?? {}}>
           {props.children}
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
