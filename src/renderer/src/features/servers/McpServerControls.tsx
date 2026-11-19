@@ -29,35 +29,26 @@ import {
 } from "./mcp-servers";
 
 interface ControlsState {
-  /** The key of the one action in flight. A test or a sign-in does not hold it. */
   busy: string | null;
   error: string;
-  /** The last test or sign-in, with the config it measured: an edit makes it stale. */
   test: { test: McpTestState; config: McpServerConfig } | null;
 }
 
-/**
- * The connection card of a custom MCP server's Marketplace page: turn it on or off, test it, and
- * sign in to it. The form edits the settings; this card only acts on what is stored.
- */
 export function McpServerControls(props: { tools: McpServerTools; id: string }) {
   const { t, errorMessage } = useText();
   const runs = useMcpRuns(() => props.tools);
   const [state, setState] = createStore<ControlsState>({ busy: null, error: "", test: null });
-  // Counts the tests and sign-ins: a Test during a sign-in replaces it, and only the newest answers.
   let run = 0;
   let testButton: HTMLButtonElement | undefined;
 
   const config = createMemo(() => props.tools.servers().find((candidate) => candidate.id === props.id));
   const signedIn = () => Boolean(props.tools.signIns()[props.id]?.signedIn);
 
-  /** The test while it still describes the stored row; the switch is not compared. */
   const test = createMemo((): McpTestState | undefined => {
     const current = config();
     if (!current) return undefined;
     const entry = state.test;
     if (entry && !mcpConfigChanged({ ...current, enabled: entry.config.enabled }, entry.config)) return entry.test;
-    // The server refused the saved sign-in: the page asks for a new one as a failed test would.
     if (runs.canSignIn(current) && props.tools.signIns()[props.id]?.needsSignIn)
       return { status: "failed", error: t("error.backend.mcpSignInRequired"), kind: "sign-in" };
     return undefined;
@@ -104,7 +95,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
   const testServer = () => measure("testing", runs.runTest);
   const signIn = () => measure("signing-in", runs.runSignIn);
 
-  /** Not behind the latch: nothing may leave the user unable to stop a browser wait. */
   function cancelSignIn(url: string): void {
     props.tools
       .signIn()
@@ -128,7 +118,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     });
   }
 
-  // A sign-in the user asked for on an agent's card starts once, when the page shows the row.
   createEffect(
     () => {
       const current = config();
@@ -159,7 +148,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                     <Badge variant="outline">{t("mcp.status.signedIn")}</Badge>
                   </Show>
                 </div>
-                {/* Testing shows on the button, and a passed test on the badge. */}
                 <Show when={test()?.status === "failed" || test()?.status === "signing-in" ? test() : undefined}>
                   {(answer) => (
                     <ItemDescription class="server-mcp-row-text" role="status">
@@ -167,7 +155,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                     </ItemDescription>
                   )}
                 </Show>
-                {/* Only when no failure or wait is shown: the answer the user asked for comes first. */}
                 <Show
                   when={
                     test()?.status !== "failed" && test()?.status !== "signing-in"
@@ -225,7 +212,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   type="button"
                   size="sm"
                   variant="outline"
-                  // A Test would replace the sign-in that waits, and with it Cancel.
                   disabled={Boolean(waiting())}
                   loading={test()?.status === "testing"}
                   loadingLabel={t("common.connecting")}

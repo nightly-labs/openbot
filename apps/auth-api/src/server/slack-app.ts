@@ -1,22 +1,15 @@
-import type { RemoteFailure } from "./remote-control-plane";
-// The OpenBot Slack app's OAuth install. One app serves every workspace: a workspace member installs
-// it once, and the workspace is linked to one OpenBot host, which answers all of its messages. The
-// Worker exchanges the code because the client secret lives here, records only which host answers
-// the workspace, and seals the bot token to the host's key. It keeps no token. The sealed grant goes
-// back to the desktop in the URL fragment of `/slack/connect`.
-
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { SLACK_BOT_SCOPES } from "@openbot/contracts/slack-app";
 import { isRawP256PublicKey, sealSlackWorkspaceGrant } from "@openbot/contracts/slack-workspace-grant";
 import { Effect, Schema } from "effect";
 import { decodeBase64Url, encodeBase64Url, hmacSha256, importHmacSha256Key } from "./crypto";
+import type { RemoteFailure } from "./remote-control-plane";
 import { authEventStatement } from "./remote-control-plane";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const STATE_TTL_MS = 10 * 60_000;
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const SLACK_ID_PATTERN = /^[A-Z0-9]{1,32}$/u;
-/** Development only: the dev app's listener on the same computer as the browser. */
 const DEVELOPMENT_RETURN_PATTERN = /^http:\/\/127\.0\.0\.1:[0-9]{2,5}\/slack-workspace$/u;
 
 export class SlackAppError extends Schema.TaggedError<SlackAppError>()("SlackAppError", {
@@ -72,7 +65,6 @@ export class SlackAppService {
       WorkerBindings,
       "DB" | "SLACK_CLIENT_ID" | "SLACK_CLIENT_SECRET" | "SLACK_STATE_SECRET" | "SLACK_DEV_PUBLIC_ORIGIN"
     >,
-    // Sends the queued Signal events. The Worker passes its delivery; the cron sends them otherwise.
     options: { fetch?: Fetch; now?: () => number; flushAuthEvents?: () => Effect.Effect<void, RemoteFailure> } = {},
   ) {
     const clientId = bindings.SLACK_CLIENT_ID?.trim();
@@ -91,15 +83,9 @@ export class SlackAppService {
     this.#flushAuthEvents = options.flushAuthEvents ?? (() => Effect.void);
   }
 
-  /**
-   * Where Slack sends the browser back. A local development API is plain HTTP, which Slack refuses,
-   * so `bun run dev:slack` gives it a public HTTPS tunnel origin.
-   */
   redirectUri(requestUrl: string): string {
     return new URL("/v2/slack/callback", this.#developmentOrigin ?? requestUrl).toString();
   }
-
-  /** The Slack install URL for one connect of one host that the account owns. */
 
   readonly authorizeUrl = Effect.fn("SlackAppService.authorizeUrl")(function* (
     this: SlackAppService,
@@ -109,7 +95,6 @@ export class SlackAppService {
     if (!NONCE_PATTERN.test(input.hostNonce) || !isRawP256PublicKey(input.hostPublicKey)) {
       return yield* new SlackAppError(400, "invalid_slack_request", "The Slack sign-in request is invalid.");
     }
-    // Only a development API takes a return address, and only one on this computer's loopback.
     if (
       input.returnUrl !== undefined &&
       (!this.#developmentOrigin || !DEVELOPMENT_RETURN_PATTERN.test(input.returnUrl))
@@ -140,14 +125,6 @@ export class SlackAppService {
     url.searchParams.set("state", state);
     return url.toString();
   }).bind(this);
-
-  /**
-   * Exchanges the code, links the workspace to the host in `state`, and seals the bot token to the
-   * host key. Returns what the desktop needs: the nonce, to find its connect, and the sealed grant.
-   *
-   * A workspace answers to one host. The account that connected it can move it to another of its
-   * hosts; another account gets `slack_workspace_taken` until the first host disconnects.
-   */
 
   readonly complete = Effect.fn("SlackAppService.complete")(function* (
     this: SlackAppService,
@@ -187,9 +164,6 @@ export class SlackAppService {
     const team = grant.team;
     if (!SLACK_ID_PATTERN.test(team.id))
       return yield* new SlackAppError(502, "slack_exchange_failed", "Slack did not accept the install.");
-    // One statement, so two connects at once cannot both win. Another account's row stays as it is.
-    // When the link is made, Signal drops any older route of the workspace: a host that the workspace
-    // moved away from cannot keep it with the ticket it holds.
     const now = this.#now();
     const [linked] = yield* slackCall(() =>
       this.#database.batch([

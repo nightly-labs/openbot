@@ -54,12 +54,6 @@ export function createTeamProtocolV2Event(
   });
 }
 
-/**
- * Outbound. The result goes on the wire, so it ends in the frozen vocabulary -- `botId`, not `agentId`.
- * This is the half that used to share an implementation with {@link decodeTeamProtocolV2CurrentHttpRequest};
- * once the two vocabularies stopped being the same words, one function could no longer serve both
- * directions, because whichever end it was written for silently broke the other.
- */
 export function encodeTeamProtocolV2CurrentHttpRequest(
   method: string,
   path: string,
@@ -71,7 +65,6 @@ export function encodeTeamProtocolV2CurrentHttpRequest(
   return wireJson(JSON.parse(encodeTeamProtocolV1CurrentHttpRequest(method, path, normalized.value, options)));
 }
 
-/** Inbound. The result reaches a handler, so it ends in the current vocabulary the handler reads. */
 export function decodeTeamProtocolV2CurrentHttpRequest(
   method: string,
   path: string,
@@ -83,13 +76,10 @@ export function decodeTeamProtocolV2CurrentHttpRequest(
   if (options.preserveSemanticTags) {
     return wireJson(decodeTeamProtocolV1CurrentHttpRequest(method, path, normalized.value));
   }
-  // The encode call is only here to expand semantic tags, and it leaves the object in wire vocabulary.
-  // Decoding its output is what brings the keys back to the current spelling the handlers read.
   const expanded = JSON.parse(encodeTeamProtocolV1CurrentHttpRequest(method, path, normalized.value));
   return wireJson(decodeTeamProtocolV1CurrentHttpRequest(method, path, expanded));
 }
 
-/** The route handling both directions share: the two bodies that never reach the v1 codec at all. */
 function normalizeV2HttpRequest(
   method: string,
   path: string,

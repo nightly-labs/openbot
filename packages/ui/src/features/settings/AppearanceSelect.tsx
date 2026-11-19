@@ -5,12 +5,10 @@ import type { JSX } from "@solidjs/web";
 import { createMemo } from "solid-js";
 import { useText } from "../../text";
 
-/** A light, dark or system choice, or `palette:<id>` for a theme palette file. */
 export type AppearanceSelectValue = AppAppearance | `palette:${string}`;
 
 const PALETTE_PREFIX = "palette:";
 
-/** The select value of a saved preference: the palette while one is selected, else the appearance. */
 export function appearanceSelectValue(preference: {
   appearance: AppAppearance;
   palette: string | null;
@@ -18,15 +16,10 @@ export function appearanceSelectValue(preference: {
   return preference.palette === null ? preference.appearance : `${PALETTE_PREFIX}${preference.palette}`;
 }
 
-/** The palette id of a select value, or null for a light, dark or system choice. */
 function paletteOfSelectValue(value: AppearanceSelectValue): string | null {
   return isAppAppearance(value) ? null : value.slice(PALETTE_PREFIX.length);
 }
 
-/**
- * The preference change that a select value makes. A palette choice changes only the palette, so
- * the light, dark or system choice comes back when the palette is cleared; the others clear it.
- */
 export function appearanceChangeOfSelectValue(
   value: AppearanceSelectValue,
 ): { appearance: AppAppearance; palette: null } | { palette: string } {
@@ -47,24 +40,18 @@ function sameValues(before: readonly AppearanceSelectValue[], after: readonly Ap
 
 export interface AppearanceSelectPalette {
   id: string;
-  /** The name that the palette file gives. It is data, so it shows as written. */
   name: string;
 }
 
 export interface AppearanceSelectProps {
   value: AppearanceSelectValue;
   onChange: (value: AppearanceSelectValue) => void;
-  /** Theme palette files, listed after the light, dark and system choices. */
   palettes?: readonly AppearanceSelectPalette[] | undefined;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/** The theme row control: follow the system, always light or dark, or a theme palette file. */
 export function AppearanceSelect(props: AppearanceSelectProps): JSX.Element {
   const { t } = useText();
-  // Kobalte takes a mutable array, and a new array makes it choose again, so the list changes only
-  // when its values change.
   const options = createMemo(
     (): AppearanceSelectValue[] => [
       ...APP_APPEARANCES,
@@ -84,7 +71,6 @@ export function AppearanceSelect(props: AppearanceSelectProps): JSX.Element {
       class="settings-modal-select"
       options={options()}
       value={props.value}
-      // Kobalte reports the selected value again when the options change. Only a new choice is sent.
       onChange={(value) => value && value !== props.value && props.onChange(value)}
       placement="bottom-end"
       itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{label(itemProps.item.rawValue)}</SelectItem>}

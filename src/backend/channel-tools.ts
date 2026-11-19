@@ -70,7 +70,6 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   },
   {
     name: "channel_remember",
-    // The advertised schema has no maxLength, so the limit is in the description.
     description: `Save one durable fact for every channel member to keep, up to ${INPUT_LIMITS.agentMemoryText} characters. Save the same text again to correct it. This writes immediately.`,
     shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
   },
@@ -78,8 +77,6 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     name: "channel_forget_memory",
     description:
       "Delete one saved channel memory when the user asks the channel to forget it. Give the memoryId from its line.",
-    // One optional property keeps the advertised schema in its byte budget. A model can give a memory
-    // text, or the whole `[memoryId] text` line, here too: the service then matches the text.
     shape: { memoryId: z.string().max(INPUT_LIMITS.agentMemoryText).optional() },
   },
   {

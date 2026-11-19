@@ -10,7 +10,6 @@ import {
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useText } from "@/shared/lib/text";
 
-/** The channel picture route of Channel info. Each choice saves at once, so the screen has no save action. */
 export function ChannelPictureScreen() {
   const { t } = useText();
   const params = useLocalSearchParams<{ serverId?: string; channelId?: string }>();

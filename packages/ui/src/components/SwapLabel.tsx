@@ -3,7 +3,6 @@ import { createEffect, untrack } from "solid-js";
 
 const COUNT_LABEL = /^(\d+)(\D.*)$/;
 
-/** No motion when the user asks for less, or where the page cannot animate an element (jsdom). */
 function motionAllowed(element: HTMLElement): boolean {
   return "animate" in element && !prefersReducedMotion();
 }
@@ -21,7 +20,6 @@ function fillLabel(target: HTMLElement, text: string): HTMLElement | undefined {
   return digits;
 }
 
-/** How far the text slides, how much it blurs, and for how long, in px and ms. */
 export interface SwapMotion {
   distance: number;
   blur: number;
@@ -36,17 +34,11 @@ const DEFAULT_SWAP: SwapMotion = {
   leave: { duration: 140, easing: "cubic-bezier(0.4, 0, 1, 1)" },
 };
 
-/**
- * A label that animates a change of its text. The box eases to the new width. A count rolls its
- * digits up or down; any other change slides the old text out and the new text in, with a blur.
- * `from` is the text that a new label animates from, when it replaces an old one.
- */
 export function SwapLabel(props: {
   text: string;
   from?: string | undefined;
   class?: string;
   motion?: SwapMotion;
-  /** `auto` for a name the user wrote, so it keeps its own direction in a mirrored layout. */
   dir?: "auto";
 }) {
   let box: HTMLSpanElement | undefined;
@@ -69,7 +61,6 @@ export function SwapLabel(props: {
       });
       const leaving = document.createElement("span");
       leaving.className = "ui-swap-leaving";
-      // The old text is only a picture of the change; assistive technology reads the new text once.
       leaving.setAttribute("aria-hidden", "true");
       box.append(leaving);
       if (fromCount && toCount && digits && fromCount[2] === toCount[2]) {

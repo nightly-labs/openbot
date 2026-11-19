@@ -14,7 +14,6 @@ import { isActiveRun } from "@/features/workflows/model/workflow-steps";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The open run on the item of an event that waits for it, from the runs that the page has read. */
 function waitsFor(delivery: WorkflowGitHubDelivery, history: WorkflowGitHubHistory, runs: readonly WorkflowRun[]) {
   const item = delivery.item;
   if (!item) return undefined;
@@ -25,7 +24,6 @@ function waitsFor(delivery: WorkflowGitHubDelivery, history: WorkflowGitHubHisto
   return undefined;
 }
 
-/** What the host did with an event, as the desktop Events menu says it. */
 function outcomeText(
   delivery: WorkflowGitHubDelivery,
   history: WorkflowGitHubHistory,
@@ -57,10 +55,6 @@ function outcomeText(
   }
 }
 
-/**
- * One event that GitHub sent to a trigger: its item, its event and what it did. A run opens its page;
- * a skipped event opens its issue or pull request on GitHub.
- */
 export function WorkflowGitHubEventRow({
   delivery,
   history,

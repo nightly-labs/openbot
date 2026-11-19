@@ -1,7 +1,3 @@
-// The `cursor-agent acp` of `cursor-stream-closed-e2e.ts`. Cursor 2026.10.22-27dcf5f sends a closed
-// stream error as one answer chunk after a turn that succeeded, and then ends the turn (#3334). This
-// fake answers each prompt in that way. A prompt with "quote-case" gets an answer that only quotes
-// the error.
 import { serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "auto";

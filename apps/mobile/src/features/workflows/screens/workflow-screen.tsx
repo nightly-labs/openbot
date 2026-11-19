@@ -34,16 +34,9 @@ import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const NO_IDS: readonly string[] = [];
-/** The workflow page shows the newest runs; the Runs page shows them all. */
 const LATEST_RUNS = 3;
-/** The workflow page shows the newest GitHub events; the GitHub events page shows them all. */
 const LATEST_EVENTS = 3;
 
-/**
- * Drawer > Workflows > one workflow: run it, edit it, pin it to the drawer, and read its steps,
- * its trigger and its newest runs. The header has Run and a menu with Edit, Pin and the layout of the
- * steps: a flow from top to bottom, or a list.
- */
 export function WorkflowScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId: string }>();
@@ -74,10 +67,8 @@ export function WorkflowScreen() {
   const events = githubTrigger && githubHistory ? triggerDeliveries(githubHistory.deliveries, githubTrigger.id) : [];
   const stepActions = useWorkflowStepActions(serverId, workflowId);
   const byId = new Map(workflow?.graph.nodes.map((node) => [node.id, node]) ?? []);
-  // The newest step of each node that ran alone, outside a run, in the order of the host.
   const soloSteps = [...latestSteps(runs.data?.soloSteps ?? []).values()].filter((step) => byId.has(step.nodeId));
 
-  /** Starts a run and opens it; `start` answers the run id, or null when the host refused it. */
   const startAndOpen = async (start: () => Promise<string | null>) => {
     setStarting(true);
     const runId = await start();
@@ -86,7 +77,6 @@ export function WorkflowScreen() {
   };
   const runNow = () => startAndOpen(() => commands.run(workflowId));
   const stepMenu: WorkflowStepMenu = {
-    // A trigger starts the whole workflow with Run now; a note does not run.
     actions: (node: WorkflowNode) =>
       node.kind === "trigger" || !isWorkflowStepKind(node.kind) || workflow?.needsNewerApp
         ? []
@@ -192,7 +182,6 @@ export function WorkflowScreen() {
         title={title}
         caption={workflow ? t("mobile.workflow.detail.steps", { count: workflow.summary.steps }) : undefined}
         contentContainerClassName="gap-7 px-4 pt-3"
-        // Run and the "…" menu.
         barButtonsRight={2}
       >
         {!workflow ? (
@@ -277,7 +266,6 @@ export function WorkflowScreen() {
                 {githubTrigger && !workflow.needsNewerApp ? (
                   <SettingsRow
                     disclosure={false}
-                    // As on desktop, the trigger needs a repository to find its newest item.
                     disabled={starting || !githubTriggerSettings(githubTrigger).repository}
                     supportingText={t("mobile.workflow.github.runLastEventHint")}
                     onPress={() => void startAndOpen(() => commands.runLastEvent(workflowId, githubTrigger.id))}

@@ -5,28 +5,16 @@ import { useText } from "../../text";
 
 export interface SidebarMachineCardProps {
   serverName: string;
-  /** The metric that is furthest above its level. */
   metric: MachineMetric;
-  /** Its use and its alert level, in whole percent. */
   percent: number;
   level: number;
-  /** What is still free on the disk or in memory. Unused for CPU. */
   freeBytes: number | null;
-  /** The owner or admin who gets the alert, when the sidebar knows the name. */
   recipientName: string | null;
-  /** Far above the level: the card is red and has no close button. */
   critical: boolean;
-  /** Opens Server settings › Storage. */
   onOpenDetails: () => void;
-  /** Hides the card until another alert. */
   onDismiss: () => void;
 }
 
-/**
- * A machine metric of the selected server passed its alert level, at the bottom of the sidebar. It
- * uses the card of the storage warning: the ring shows the use, and the button opens Server settings
- * › Storage, where the machine part and its alert levels are.
- */
 export function SidebarMachineCard(props: SidebarMachineCardProps) {
   const { t, format } = useText();
   const percent = () => format.percent(props.percent / 100);

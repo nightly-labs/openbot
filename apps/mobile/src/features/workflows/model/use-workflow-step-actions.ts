@@ -14,17 +14,12 @@ type WorkflowStepFailure =
   | "mobile.workflow.run.stopFailed"
   | "mobile.workflow.run.stopStepFailed";
 
-/** Shows an error of an action on a step, in the language of the reader. */
 function showStepFailure(error: unknown, title: WorkflowStepFailure) {
   void haptics.notification("error");
   const text = currentText();
   Alert.alert(text.t(title), text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")));
 }
 
-/**
- * The actions on the steps of a workflow's runs and on the steps that ran alone: decide, retry and
- * stop. One action goes at a time, and each one reads the workflow again.
- */
 export function useWorkflowStepActions(serverId: string, workflowId: string) {
   const queryClient = useQueryClient();
   const queryScope = useQueryScope();

@@ -23,7 +23,6 @@ export const Route = createFileRoute("/v1/auth/email/verify")({
                 code: body.code,
                 sourceIp: requestSourceIp(request),
                 surface: "desktop",
-                // A code that is not valid does not stop the sign-in: the account gets no invite.
                 referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
               }),
             );

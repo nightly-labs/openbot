@@ -14,25 +14,13 @@ const STEPS = [
   { label: "server.settings.restartStepStart", detail: "server.settings.restartStepStartDetail" },
 ] as const;
 
-/**
- * The end of a restart that no client waits for, such as a server that the web client did not open. The
- * client that waits sets a hosted issue much sooner. A hosted machine restored its disk in 18 minutes.
- */
 const RESTART_LIMIT_SECONDS = 30 * 60;
 
-/**
- * Asks before the owner or an admin restarts a hosted server, then shows the restart until the server
- * is online again or does not start. A failed request stays in the dialog. The user can hide the dialog
- * while the server restarts; a toast then reports the result.
- */
 export function RestartServerDialog(props: {
-  /** The server to restart. Null closes the dialog. */
   server: RestartServer | null;
-  /** The current servers. A hidden restart follows its server here after `server` is null. */
   servers: readonly RestartServer[];
   onClose: () => void;
   onRestart: () => Promise<void>;
-  /** The element that opened the dialog. A menu item is gone when the dialog closes. */
   restoreFocusTarget?: HTMLElement | null | undefined;
 }) {
   const { t, errorMessage } = useText();
@@ -40,7 +28,6 @@ export function RestartServerDialog(props: {
   const [error, setError] = createSignal<string | null>(null);
   const [elapsed, setElapsed] = createSignal(0);
   const [restartId, setRestartId] = createSignal<string | null>(null);
-  /** The current restart. A result of an earlier restart that the dialog no longer follows is ignored. */
   let run = 0;
   let requestDone = false;
   let wentDown = false;
@@ -68,9 +55,6 @@ export function RestartServerDialog(props: {
     setElapsed(0);
   }
 
-  // A new request opens the confirmation. A request for the server that restarts shows its progress.
-  // The effect also runs when a new summary of the same server arrives; that is not a new request, and
-  // must not reset a finished restart to the confirmation.
   createEffect(
     () => props.server?.id ?? null,
     (id, previous) => {
@@ -78,12 +62,9 @@ export function RestartServerDialog(props: {
       untrack(() => {
         if (!restarting()) return reset();
         if (id === restartId()) {
-          // The dialog shows the restart again, so the toast from Hide closes.
           toast.dismiss(toastId());
           return;
         }
-        // The dialog follows one restart. The hidden restart of the other server keeps a toast
-        // that does not wait for the result.
         toast.info(t("server.settings.restartedTitle", { name: restartServer()?.name ?? "" }), {
           id: toastId(),
           description: t("server.settings.restartHiddenDescription"),
@@ -100,7 +81,6 @@ export function RestartServerDialog(props: {
       queueMicrotask(() => primaryButton?.focus({ preventScroll: true }));
       return;
     }
-    // The dialog is hidden, so the toast that it opened reports the result.
     const title =
       result === "online"
         ? t("server.settings.restartDoneTitle", { name: name() })
@@ -110,14 +90,8 @@ export function RestartServerDialog(props: {
     reset();
   }
 
-  /**
-   * The server goes offline when it stops, and comes back online when it starts again. The client that
-   * waits for the start sets a hosted issue when the start fails or takes too long. A server on this
-   * computer goes offline and comes back before its request returns.
-   */
   function follow(server: Pick<RestartServer, "state" | "hostedIssue"> | null): void {
     if (!restarting() || !server) return;
-    // An incompatible server runs; only its version differs from this app.
     const down = server.state !== "online" && server.state !== "incompatible";
     if (down) wentDown = true;
     if (!requestDone) return;
@@ -174,8 +148,6 @@ export function RestartServerDialog(props: {
     }
     if (current !== run || !restarting()) return;
     requestDone = true;
-    // An issue from before the restart is not its result. A new issue, or the same issue after it
-    // cleared, is.
     lastIssue = restartServer()?.hostedIssue ?? null;
     follow(restartServer());
   }
@@ -238,7 +210,6 @@ export function RestartServerDialog(props: {
     return t("server.settings.restartTitle");
   };
 
-  // One list for all phases, so that the body does not render it again on each read.
   const steps = (
     <ol class="restart-server-steps" aria-label={t("server.settings.restartSteps")}>
       <For each={STEPS}>

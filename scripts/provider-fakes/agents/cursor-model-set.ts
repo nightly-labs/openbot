@@ -1,10 +1,3 @@
-// The `cursor-agent acp` of `cursor-model-set-e2e.ts`. As Cursor 2026.10.22-27dcf5f does, the model
-// belongs to the process: a model set moves every session to it, and the agent sends no update for
-// the other sessions. Each set is logged to `FAKE_LOG`. While the file named in `FAKE_FAIL_NEXT_SET`
-// exists, the next model set fails as Cursor's does when its model list request fails (#3800), and
-// the file is removed. While the file named in `FAKE_REORDER_SETS` exists, a set applies when it
-// arrives, and the first of two overlapping sets answers last: Cursor answers each set after a server
-// request of its own, so answers can come in another order than the sets applied.
 import { existsSync, rmSync } from "node:fs";
 import { type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 

@@ -12,7 +12,6 @@ import {
   requestUser,
 } from "../../../server/request-auth";
 
-/** Invite friends: the invite link, the credit, the friend counts and one page of friends. */
 export const Route = createFileRoute("/v1/me/referrals")({
   server: {
     handlers: {

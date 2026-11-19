@@ -1,12 +1,3 @@
-import { Effect, Semaphore } from "effect";
-import { type ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
-// The user's own model endpoints: list, add, edit, remove. The local IPC handlers and the Team API
-// host routes share one instance, so a change from a joined admin and a change from this window
-// wait for each other.
-//
-// This module owns the order of the two writes, so the backend never has to know that a store
-// exists: it is given a getter, and reads it again at every provider spawn.
-
 import {
   type CustomProviderHarness,
   type CustomProviderRestart,
@@ -16,13 +7,13 @@ import {
   type SaveCustomProviderInput,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { Effect, Semaphore } from "effect";
 import { AgentLifecycleFailed, type AgentService } from "../backend/agent-service";
 import type { CustomProviderStore } from "./custom-provider-store";
+import { type ProviderRuntimeFailure, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 import type { ProviderRuntimeManager } from "./provider-runtime-manager";
 
 export interface CustomProviderChangeDependencies {
-  // Only the endpoint-change methods, so the order of writes can be checked without a running
-  // backend.
   service: Pick<
     AgentService,
     | "saveCustomProvider"
@@ -33,28 +24,14 @@ export interface CustomProviderChangeDependencies {
   >;
   customProviders: Pick<CustomProviderStore, "list" | "save" | "checkUpdate" | "update" | "remove">;
   providerRuntimes: Pick<ProviderRuntimeManager, "startCustomProviderHarness">;
-  /**
-   * Asks the endpoints which models cannot reason, before the restart that reads the answer
-   * (#8381). True: the answer changed. Absent: nothing is asked.
-   */
   refreshModelReasoning?: () => Effect.Effect<boolean>;
 }
 
 export interface CustomProviderChanges {
-  /** The endpoints without their keys or header values. */
   list(): CustomProviderSummary[];
   save(input: SaveCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
-  /** This computer: every field of the edit applies, the model settings and the harness too. */
   update(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
-  /**
-   * A joined admin's edit (`custom-provider-edit-v1`). The wire carries no harness and no model
-   * settings, so the endpoint keeps its harness and each kept model id keeps its saved settings.
-   */
   peerUpdate(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
-  /**
-   * A joined admin's edit that names the harness (`custom-provider-harness-choice-v1`): as
-   * `peerUpdate`, and the endpoint moves to that harness, with the agents on each kept model.
-   */
   peerHarnessUpdate(
     input: UpdateCustomProviderInput,
     harness: CustomProviderHarness,
@@ -68,23 +45,8 @@ export function createCustomProviderChanges({
   providerRuntimes,
   refreshModelReasoning,
 }: CustomProviderChangeDependencies): CustomProviderChanges {
-  /**
-   * One endpoint change at a time, from the first read to the last write.
-   *
-   * A delete reads the live catalogue to pick a fallback, then writes the file, then records the
-   * exclusion. Two deletes that overlap both pick before either records, so each moves its agents
-   * onto the endpoint the other is removing, and both agents end on a model no longer served. The
-   * store's own chain cannot prevent this: the reassignment happens before the store is called. A
-   * failed change does not stop the next one, so the chain swallows the rejection it re-throws to
-   * its own caller.
-   */
   const gate = Semaphore.makeUnsafe(1);
   const harnessOf = (id: string) => customProviders.list().find((provider) => provider.id === id)?.harness;
-  /**
-   * Restarts the harness that runs the endpoint now, and the one that ran it before when it moved.
-   * The answer is the current harness's, except that a restart a turn holds back on either one wins:
-   * until it runs, the endpoint is in neither catalogue.
-   */
   const restart = Effect.fn("CustomProviderChanges.restart")(function* (
     current: CustomProviderHarness | undefined,
     previous: CustomProviderHarness | undefined,
@@ -93,15 +55,9 @@ export function createCustomProviderChanges({
     const outcome: CustomProviderRestart = yield* service.reloadCustomProviderConfig(now);
     if (previous === undefined || previous === now) return outcome;
     const before = yield* service.reloadCustomProviderConfig(previous);
-    // The agents on the endpoint move to `now` when it activates, and a harness that is not running
-    // does not activate by itself.
     if (outcome === "not-running") yield* service.startHarnessForMovedAgents(now);
     return before === "skipped-busy" ? before : outcome;
   });
-  /**
-   * `restart` for a saved endpoint, and a download of the provider that runs it when this computer
-   * has none. Without that download the endpoint is in no model list.
-   */
   const serve = Effect.fn("CustomProviderChanges.serve")(function* (
     id: string,
     previous: CustomProviderHarness | undefined,
@@ -109,8 +65,6 @@ export function createCustomProviderChanges({
     const current = harnessOf(id);
     const reasoningChanged = refreshModelReasoning ? yield* refreshModelReasoning() : false;
     const outcome = yield* restart(current, previous);
-    // Only OpenCode reads that answer. When this change did not restart it, the answer of another
-    // endpoint can still be new, for example after its server started.
     if (reasoningChanged && (current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) !== "opencode" && previous !== "opencode")
       yield* service.reloadCustomProviderConfig("opencode");
     yield* providerRuntimes.startCustomProviderHarness(current ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
@@ -120,10 +74,6 @@ export function createCustomProviderChanges({
     return gate.withPermit(Effect.suspend(run));
   }
 
-  /**
-   * Like `save`, and the agents on a model that the edit takes out move first. The store checks
-   * the edit before that, so an edit it refuses moves no agent.
-   */
   const update = (input: UpdateCustomProviderInput) =>
     Effect.fn("CustomProviderChanges.update")(function* () {
       yield* runtimeSync(() => customProviders.checkUpdate(input));
@@ -166,19 +116,9 @@ export function createCustomProviderChanges({
 
   return {
     list: () => customProviders.list(),
-    /**
-     * Persist first, then restart. The save resolves on the durable write plus the restart outcome,
-     * and deliberately not on model discovery, which can take the full request timeout: the models
-     * arrive through the ready `status` event, like every other provider's.
-     */
     save: (input) =>
       serialize(() =>
         Effect.fn("CustomProviderChanges.save")(function* () {
-          // The backend owns this order as well: it excludes the id being saved, then runs the write.
-          // The id is served again only once a new process has read the file, which the backend hears
-          // from the provider runtime. A restart that is skipped or that fails leaves the CLI
-          // answering on the endpoints as they were, so the id stays out -- whether it was removed
-          // before this write or already named models in that process's catalogue.
           const previous = harnessOf(input.id);
           const providers = yield* service
             .saveCustomProvider(input.id, input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, () =>
@@ -198,20 +138,11 @@ export function createCustomProviderChanges({
         })().pipe(Effect.uninterruptible),
       ),
     update: (input) => serialize(() => update(input)),
-    // The saved settings are read inside the permit, so a change that waits for this one cannot
-    // replace them between the read and the write.
     peerUpdate: (input) => serialize(() => update(withSavedModelSettings(input))),
     peerHarnessUpdate: (input, harness) => serialize(() => update({ ...withSavedModelSettings(input), harness })),
-    /**
-     * Agents move off the endpoint's models *before* it is removed, so no agent is left naming a
-     * model the restarted CLI does not list.
-     */
     remove: (id) =>
       serialize(() =>
         Effect.fn("CustomProviderChanges.remove")(function* () {
-          // The backend owns this order: it excludes the endpoint, moves the agents off it, and runs
-          // the write as one change no agent update can interleave with. A write that throws gives the
-          // exclusion back, because the endpoint is then still saved and still served.
           const previous = harnessOf(id);
           const providers = yield* service
             .removeCustomProvider(id, () =>
@@ -233,10 +164,6 @@ export function createCustomProviderChanges({
   };
 }
 
-/**
- * What a joined admin may change through the Team API. An edit keeps the model settings, and keeps
- * the harness unless it names one.
- */
 export type PeerCustomProviderChanges = Pick<
   CustomProviderChanges,
   "list" | "save" | "peerUpdate" | "peerHarnessUpdate" | "remove"

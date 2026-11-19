@@ -23,31 +23,25 @@ import { CoveringMenuView } from "@/shared/components/covering-menu-view";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { type MobileText, useText } from "@/shared/lib/text";
 
-/** The plan start times of the menu, as on desktop. */
 const PLAN_START_PRESETS: readonly number[] = [10_000, 30_000, 60_000, 300_000];
-/** The local script limits of the menu, as on desktop. */
 const LIMIT_PRESETS: readonly number[] = [30, 60, 120, 300, 1_000];
 
-/** "wait" waits for Start; another value is the time in ms. */
 type PlanStartChoice = "wait" | `${number}`;
 
 function planStartChoice(ms: number | null): PlanStartChoice {
   return ms === null ? "wait" : `${ms}`;
 }
 
-/** A saved time that is not a preset, such as one set on desktop, is a choice of its own. */
 function planStartChoices(ms: number | null): PlanStartChoice[] {
   const custom = ms !== null && !PLAN_START_PRESETS.includes(ms) ? [ms] : [];
   return ["wait", ...[...PLAN_START_PRESETS, ...custom].map((value) => `${value}` as const)];
 }
 
-/** A saved limit that is not a preset is a choice of its own. */
 function limitChoices(limit: number): number[] {
   return LIMIT_PRESETS.includes(limit) ? [...LIMIT_PRESETS] : [...LIMIT_PRESETS, limit].sort((a, b) => a - b);
 }
 
 function delayText({ t, format }: MobileText, ms: number): string {
-  // Round to whole seconds first, so 119.6 s shows as 2 min and not as 1 min 60 s.
   const total = Math.round(ms / 1_000);
   const minutes = Math.floor(total / 60);
   const seconds = total % 60;
@@ -59,7 +53,6 @@ function delayText({ t, format }: MobileText, ms: number): string {
   });
 }
 
-/** The choice that all agents have, or undefined when they differ. */
 function commonChoice(
   agents: readonly AgentDefaultsRow[],
   setting: AgentDefaultSetting,
@@ -68,10 +61,6 @@ function commonChoice(
   return first !== undefined && rest.every((choice) => choice === first) ? first : undefined;
 }
 
-/**
- * Settings > Agents > a setting of one server: its default, and the choice of each agent with Set
- * all. An agent on Default follows the default. Each change saves at once.
- */
 export function AgentDefaultSettingScreen() {
   const text = useText();
   const { t, format } = text;
@@ -240,7 +229,6 @@ export function AgentDefaultSettingScreen() {
               })}
             </SettingsSection>
           ) : null}
-          {/* Not under Default: no agent can change the limit for itself. */}
           {key === "allowAutomation" ? limit(overview) : null}
         </>
       ) : null}

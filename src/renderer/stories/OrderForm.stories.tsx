@@ -6,7 +6,6 @@ import type { Accessor } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { MOCK_HOSTED_SERVER_CATALOG } from "../src/preview/mock-hosted-servers";
 
-/** The shared order form of the pricing page and of Billing. */
 function OrderFormStory(props: {
   withServers: boolean;
   currency?: BillingCurrency;
@@ -61,25 +60,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A server and a Team license, in euro, for a visitor in the EU. */
 export const ServerAndLicense: Story = { args: { withServers: true, currency: "eur", inEu: true } };
 
-/** No server catalog: the form sells only the license. */
 export const LicenseOnly: Story = { args: { withServers: false, currency: "eur" } };
 
-/** The account pays for a server already, so each license has the bundle price. */
 export const OwnedServer: Story = { args: { withServers: true, currency: "eur", ownedServer: true } };
 
-/** 3 people use the account's servers: Starter is not available, and Team starts at 5 members. */
 export const ThreeMembers: Story = { args: { withServers: true, currency: "eur", used: 3 } };
 
-/** An account that pays in złoty cannot change the currency. */
 export const Pln: Story = { args: { withServers: true, currency: "pln", currencyLocked: true } };
 
-/** Reais: the plans offer BRL only when their Stripe Prices have it, as the sandbox catalog does. */
 export const Brl: Story = { args: { withServers: true, currency: "brl" } };
 
-/** A promotion: a license bought now is free until 1 December. */
 export const LicenseTrial: Story = {
   args: { withServers: true, currency: "eur", inEu: true, licenseTrialEnd: Date.UTC(2026, 11, 1) },
 };

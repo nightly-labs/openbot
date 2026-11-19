@@ -1,15 +1,3 @@
-// Runs the real agent dock on a Linux X11 desktop (#5935) and drives it with the real pointer and keyboard:
-// 1. The dock is a DOCK window at the right edge of the screen, above other windows and on all workspaces.
-// 2. A click outside the shape of the dock goes to the window under it.
-// 3. The pointer on a seat hovers it, and a click on the seat opens the chat.
-// 4. Text typed in the chat composer is sent with Return.
-// 5. A drag of the handle moves the dock.
-// 6. A switch to another workspace keeps the dock on the screen.
-// 7. An idle dock uses almost no CPU and does not send a new input region.
-//
-// Build the app first (`bun run build`), then run on Linux: bun scripts/linux-agent-dock-e2e.ts
-// `scripts/linux-above-apps-e2e.ts` starts the desktop and records the video (see there).
-// It writes .openbot-build/linux-agent-dock-e2e/<desktop>/report.json, screenshots and video.mp4.
 import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -45,7 +33,6 @@ import {
 } from "./linux-above-apps-e2e";
 
 const IDLE_SECONDS = 10;
-/** One percent of one core. The idle dock must stay under it. */
 const IDLE_CPU_LIMIT_PERCENT = 1;
 
 const DockInfoSchema = Schema.Struct({
@@ -97,15 +84,12 @@ try {
   await until(async () => (await app.stats()).regions.length > 0, "the first input region");
   await settle(app);
 
-  // 1. Placement.
   const properties = await windowManagerProperties(session, dock.xid);
   assert.equal(dock.bounds.x + dock.bounds.width, SCREEN.width / SCALE, "the dock touches the right edge");
   assert.equal(dock.visible, true);
   steps.push({ step: "placement", detail: { bounds: dock.bounds, properties: properties.trim().split("\n") } });
   screenshot(session, "01-placement");
 
-  // 2. Click-through: a point of the dock window outside its shape. A first click away from the dock
-  // shows that the pointer of the test reaches the window under it.
   await firstClick(desktop, fromPixels(300, 600), () => app.eval("main", "clicks.length", decodeNumber));
   const region = latestRegion(await app.stats());
   const outside = pointOutside(dock.bounds, region);
@@ -122,7 +106,6 @@ try {
   );
   steps.push({ step: "click-through", detail: { point: outside, region } });
 
-  // 3. Hover and click a seat.
   const seat = await screenPoint(app, ".agent-dock-seat-button");
   desktop.move(seat.x, seat.y);
   await until(
@@ -145,7 +128,6 @@ try {
   screenshot(session, "03-chat");
   steps.push({ step: "click opens the chat" });
 
-  // 4. Typing.
   const composer = ".agent-dock-panel [contenteditable='true'], .agent-dock-panel textarea";
   const field = await screenPoint(app, composer);
   desktop.move(field.x, field.y);
@@ -173,8 +155,6 @@ try {
     "the closed chat",
   );
 
-  // 5. Drag the handle 150 DIP to the side with more room. The dock stays on the screen: it moves as far
-  // as the room lets it. A dock as tall as the screen (a small screen in DIP) has no room.
   const startY = dock.bounds.y;
   const roomAbove = startY;
   const roomBelow = SCREEN.height / SCALE - (startY + dock.bounds.height);
@@ -201,11 +181,9 @@ try {
     steps.push({ step: "drag moves the dock", detail: { from: startY, to: dock.bounds.y } });
   }
 
-  // 6. Another workspace.
   await checkOtherWorkspace(session, desktop, dock.xid, "06-workspace-2");
   steps.push({ step: "all workspaces" });
 
-  // 7. Idle CPU, with the pointer away from the dock.
   const away = fromPixels(200, 500);
   desktop.move(away.x, away.y);
   await sleep(2_000);
@@ -225,13 +203,10 @@ try {
   assert.equal(stats.aboveAppsWindows, 1, "the app has one dock window: one display");
   await app.quit();
 
-  // 8. A self-hosted or hosted server, and native Wayland windows on a Wayland desktop: the same app, with
-  // the same presentation, opens no dock window.
   for (const mode of NO_WINDOW_MODES) {
     const other = dockApp(startHarness<Command>(session, bundle, mode));
     started = other;
     await other.ready;
-    // A window can open after the start. The app above has its window in much less time.
     await sleep(NO_WINDOW_WAIT_MS);
     const { aboveAppsWindows, x11 } = await other.stats();
     assert.equal(x11, mode !== "wayland", `${mode}: the app uses the expected windows`);
@@ -268,7 +243,6 @@ interface App {
   ready: Promise<void>;
   dock: () => Promise<DockInfo>;
   stats: () => Promise<Stats>;
-  /** Runs `js` in a window of the app and decodes its result. */
   eval: <A>(target: "dock" | "main", js: string, decode: (value: unknown) => A) => Promise<A>;
   quit: () => Promise<void>;
 }
@@ -285,14 +259,12 @@ function dockApp(harness: Harness<Command>): App {
   };
 }
 
-/** The renderer applies the last change, its motion ends, and it draws a frame. */
 async function settle(app: App): Promise<void> {
   await app.eval("dock", TWO_FRAMES, () => undefined);
   await until(async () => await app.eval("dock", MOTION_DONE, decodeBoolean), "the end of the dock motion");
   await app.eval("dock", TWO_FRAMES, () => undefined);
 }
 
-/** The screen centre of the first element that matches `selector` in the dock window. */
 async function screenPoint(app: App, selector: string): Promise<{ x: number; y: number }> {
   const current = await app.dock();
   const box = await app.eval(

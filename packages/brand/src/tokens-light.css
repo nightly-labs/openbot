@@ -1,24 +1,3 @@
-/*
- * The light palette of the desktop app and the web client. tokens.css declares every
- * token, dark; this file changes only the colors that must change, when the root element
- * has data-openbot-color-scheme="light". Each desktop window and the web client set that
- * attribute from the saved choice, and resolve System from prefers-color-scheme. The public
- * site never sets it, so it stays dark.
- *
- * The rules of the dark palette stay true here, turned over: a raised surface is lighter
- * than the canvas, and a hover or a border is a translucent ink. In the dark palette that
- * ink is white; here it is the primary text color, #141414.
- *
- * Not here, on purpose:
- * - The native-only tokens (bg-native-canvas, chrome-*): mobile has its own light theme in
- *   tokens-native.css. The desktop uses the native sidebar, sheet and grouped tokens, so they are here.
- * - The landing-page materials (price-*, hero-grid, download-card-*): the public site is dark only.
- * - The paper-* tokens: they stay on paper that is always light, such as a QR code.
- * - Illustration and brand colors (logo-*, onboarding-*, sound-*, provider logos): a drawing
- *   keeps its colors in both themes.
- * - The Dynamic Island: it imitates the camera housing, so its window never sets the attribute.
- */
-
 :root[data-openbot-color-scheme="light"] {
   color-scheme: light;
 
@@ -56,8 +35,6 @@
   --openbot-image-outline: rgba(20, 20, 20, 0.1);
   --openbot-hover: rgba(20, 20, 20, 0.05);
 
-  /* Contrast on the canvas: primary 17:1, secondary 10:1, muted 4.9:1. Dim is for
-     marks and disabled text, as in the dark palette. */
   --openbot-text-primary: #141414;
   --openbot-text-secondary: #3a3a3c;
   --openbot-text-muted: #6b6b70;
@@ -66,23 +43,17 @@
   --openbot-text-readable: rgba(20, 20, 20, 0.6);
   --openbot-settings-text-muted: rgba(20, 20, 20, 0.6);
 
-  /* The on-light family is the high-contrast inverted element: the default button, a checked
-     switch, the user's bubble, the light tooltip. On a light canvas it turns dark. */
   --openbot-surface-light: #1c1c1e;
   --openbot-text-on-light: #ffffff;
   --openbot-text-muted-on-light: rgba(255, 255, 255, 0.64);
   --openbot-text-dim-on-light: rgba(255, 255, 255, 0.4);
   --openbot-border-on-light: rgba(255, 255, 255, 0.16);
 
-  /* The same hue 210 as the dark accent. The fill keeps its value, so a button looks the same
-     in both themes; text and hover go darker for contrast (accent-text 5.3:1 on the canvas). */
   --openbot-accent-hover: #006ad4;
   --openbot-accent-text: #0064c8;
   --openbot-accent-soft: rgba(0, 124, 247, 0.12);
   --openbot-accent-strong: rgba(0, 124, 247, 0.26);
 
-  /* Chart series: darker steps of the dark-palette hues, so each series reads on white.
-     Not yet checked with the dataviz palette validator in light mode. */
   --openbot-chart-series-codex: #8e4fc0;
   --openbot-chart-series-grok: #16849b;
   --openbot-chart-storage-workspaces: #2f74c9;
@@ -91,7 +62,6 @@
   --openbot-chart-storage-downloads: #6f62d6;
   --openbot-chart-storage-runtimes: #a86f00;
 
-  /* Status fills keep their hue. Status text is darker, for AA on white. */
   --openbot-success: #1fa85a;
   --openbot-success-text: #187a41;
   --openbot-success-soft: rgba(31, 168, 90, 0.12);
@@ -119,7 +89,6 @@
   --openbot-badge-new: #e0004a;
   --openbot-badge-new-soft: rgba(224, 0, 74, 0.12);
 
-  /* File references: the hues of the dark palette, darker so the name reads on white. */
   --openbot-file-blue: #1a66c4;
   --openbot-file-blue-soft: rgba(31, 111, 209, 0.12);
   --openbot-file-yellow: #9c5200;
@@ -143,8 +112,6 @@
   --openbot-data-table-outer-border: rgba(20, 20, 20, 0);
   --openbot-data-table-ring: rgba(20, 20, 20, 0.1);
 
-  /* No drop shadows: on the dark canvas they do not show, but on white they read as a halo.
-     A raised surface keeps its 1px ring. */
   --openbot-shadow-popover-ambient: transparent;
   --openbot-shadow-dialog: transparent;
   --openbot-shadow-menu: transparent;

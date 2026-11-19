@@ -3,10 +3,6 @@ import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { receiveMermaidResult, useMermaidJobs } from "../model/mermaid-diagrams";
 import MermaidRenderer from "./mermaid-renderer.dom";
 
-/**
- * Starts the Mermaid web view when the first diagram needs it and keeps it for the session, so
- * an account with no diagrams never loads Mermaid. The web view is hidden and takes no touches.
- */
 export function MermaidRendererHost() {
   const jobs = useMermaidJobs();
   const [started, setStarted] = useState(false);

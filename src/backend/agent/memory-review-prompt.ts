@@ -12,21 +12,11 @@ import type { MemoryReviewBase } from "./agent-memories";
 import { chatTranscript, promptJson } from "./side-question";
 import { workSteps } from "./skill-suggestion";
 
-/** The most changes that one review may make. */
 const REVIEW_OPERATION_LIMIT = 20;
-/**
- * The most characters of searchable memory text in one review. Every essential memory is shown: their
- * budget holds them small. Of the searchable ones, those that share the most words with the chat come
- * first, then the newest, so a review stays the same size at any memory limit.
- */
 const MEMORY_REVIEW_SEARCHABLE_CHARACTERS = 12_000;
 
 const MemoryText = Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(INPUT_LIMITS.agentMemoryText));
 const MemoryId = Schema.NonEmptyString.check(Schema.isMaxLength(INPUT_LIMITS.identifier));
-/**
- * A host or a URL, as `openbot.remember` takes it. The apply step drops one that is not a host. A model
- * can write null for "no site", next to the null of "skill".
- */
 const MemorySite = Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(2048))));
 
 const MemoryReviewOperationSchema = Schema.Union([
@@ -40,25 +30,16 @@ const MemoryReviewOperationSchema = Schema.Union([
   Schema.Struct({ type: Schema.Literal("forget"), memoryId: MemoryId }),
 ]);
 
-/** The answer of a review model. An empty list is the usual answer. */
 export const MemoryReviewResult = Schema.Struct({
   operations: Schema.Array(MemoryReviewOperationSchema).check(Schema.isMaxLength(REVIEW_OPERATION_LIMIT)),
 });
 
 export type MemoryReviewOperation = typeof MemoryReviewOperationSchema.Type;
 
-/** The most characters of the question that a review asks the user about a skill. */
 const SKILL_SUGGESTION_CHARACTERS = 600;
 const SKILL_NAME_CHARACTERS = 80;
-/** The earlier skill questions that a review sees, so it does not ask the same again. */
 const EARLIER_SUGGESTION_LIMIT = 5;
 
-/**
- * The skill part of a review answer. It is decoded apart from the memory changes: a bad suggestion
- * is dropped, and the memory changes still apply. A suggestion names the signal of the skill rules
- * that it comes from; one without a signal is dropped, so a message that only says to skip never
- * becomes a question to the user.
- */
 export const SkillReviewResult = Schema.Struct({
   skill: Schema.optional(
     Schema.NullOr(
@@ -73,21 +54,14 @@ export const SkillReviewResult = Schema.Struct({
   ),
 });
 
-/** A suggestion that passed the review. The signal is checked at decoding; a chat line does not keep it. */
 export type SkillReviewSuggestion = Omit<NonNullable<typeof SkillReviewResult.Type.skill>, "signal">;
 
-/** A skill that the agent has: its own, installed, or in its workspace. */
 export interface ReviewSkill {
   skillId: string;
   name: string;
   description?: string | undefined;
 }
 
-/**
- * The suggestion when it fits the skills: an update names a skill of the local library that the agent
- * has, and a new skill does not take the name of one the agent has. An update takes the name of its
- * skill, so the card shows the name that the skill list shows.
- */
 export function acceptedSuggestion(
   suggestion: SkillReviewSuggestion | null | undefined,
   skills: readonly ReviewSkill[],
@@ -103,23 +77,12 @@ export function acceptedSuggestion(
   return skills.some((skill) => skill.name.trim().toLocaleLowerCase() === name) ? null : suggestion;
 }
 
-/**
- * What a review needs to suggest a skill. Absent, the review does not suggest one. Every text is
- * redacted by the caller.
- */
 export interface SkillReviewInput {
   skills: readonly ReviewSkill[];
-  /** The texts of the latest skill questions and lessons in the chat, oldest first. */
   earlierSuggestions: readonly string[];
-  /** The review saves the skill itself (`automatic`), or asks the user first. */
   automatic: boolean;
 }
 
-/**
- * The prompt of a background memory review: the agent's profile, its memories with their room, and
- * the part of its chat since the last review. The generation has no tools: it answers one JSON object
- * of changes, which the memory tools' checks then apply. Every text is redacted by the caller.
- */
 export function memoryReviewPrompt(
   agent: Pick<AgentSummary, "name" | "title" | "description">,
   base: MemoryReviewBase,
@@ -212,12 +175,6 @@ export function memoryReviewPrompt(
   ].join("\n");
 }
 
-/**
- * The skill rules, after the skill review of Hermes Agent (MIT). Hermes saves the skill itself, as
- * the automatic mode does: then the message states the lesson, and a writer adds it to the skill. In
- * the other mode each suggestion is a question to the user. Both suggest a skill only when a signal
- * clearly fired.
- */
 function skillRules(automatic: boolean): string[] {
   return [
     `First decide whether ${automatic ? "to save a skill" : "to ask the user to save a skill"}. A skill is the instructions for one class of task, done the most efficient and correct way for this user: the procedure, the tools and commands that work, their order, how the user wants the result, and the pitfalls that cost time. A later chat follows it and gets the result right the first time.`,
@@ -239,7 +196,6 @@ function skillRules(automatic: boolean): string[] {
 
 type ReviewMemory = MemoryReviewBase["memories"][number];
 
-/** Every essential memory, and the searchable ones that fit the budget, most related to the chat first. */
 function reviewedMemories(memories: readonly ReviewMemory[], messages: readonly ConversationMessage[]) {
   const chat = words(messages.map((message) => message.text).join("\n"));
   const searchable = memories
@@ -259,14 +215,12 @@ function reviewedMemories(memories: readonly ReviewMemory[], messages: readonly 
   return memories.filter((entry) => entry.inclusion === "essential" || included.has(entry));
 }
 
-/** The distinct words of a text, as the memory search splits them, without the shortest ones. */
 function words(text: string): Set<string> {
   return new Set(
     Array.from(text.toLowerCase().matchAll(/[\p{L}\p{N}\p{M}]+/gu), ([word]) => word).filter((word) => word.length > 2),
   );
 }
 
-/** One browsing step as the review model reads it: the time in UTC minutes, the place, and what happened. */
 function browsingLine(step: UserBrowsingStep): Record<string, string> {
   return {
     at: new Date(step.at).toISOString().slice(0, 16),

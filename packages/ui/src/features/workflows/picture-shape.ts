@@ -1,20 +1,12 @@
-/** Whether a picture on the canvas has clear pixels, so its card can let the canvas show through. */
-
 import { createEffect, createSignal } from "solid-js";
 
-/** The longest side, in pixels, of the copy of a picture that the alpha check reads. */
 const ALPHA_SAMPLE = 96;
 
-/** A picture with clear pixels, and its width over its height. */
 interface PictureShape {
   clear: boolean;
   ratio: number;
 }
 
-/**
- * Reads a small copy of the picture and finds clear pixels. A JPEG has none. A picture that the
- * canvas cannot read, as one from an origin without CORS, counts as opaque, so it keeps its card.
- */
 async function pictureShape(url: string): Promise<PictureShape | undefined> {
   const response = await fetch(url);
   if (!response.ok) return undefined;
@@ -42,10 +34,6 @@ async function pictureShape(url: string): Promise<PictureShape | undefined> {
   }
 }
 
-/**
- * The shape of the picture at the URL, once it is known; on a failure, none. While the next picture
- * loads, the last shape stays, so the card does not flash between two clear results.
- */
 export function usePictureShape(url: () => string | undefined) {
   const [shape, setShape] = createSignal<PictureShape>();
   createEffect(url, (current) => {

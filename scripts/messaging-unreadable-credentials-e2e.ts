@@ -1,9 +1,3 @@
-// Checks a messaging token file that this computer cannot decrypt, such as after a change of the
-// system keyring (#9167). A disconnect removes only the entry of its connection, keeps the other
-// entries as they are, and the next start reads the kept entries when the keyring is back. A file
-// that is not an envelope stays as it is. Runs the real credential store on a temporary profile, and
-// loads it again to check that the result stays: `bun scripts/messaging-unreadable-credentials-e2e.ts`.
-// Writes .openbot-build/messaging-unreadable-credentials-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -17,12 +11,10 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/messaging-unreadable
 const root = await mkdtemp(join(tmpdir(), "openbot-messaging-unreadable-"));
 const path = join(root, "openbot-messaging-credentials-v1.json");
 
-/** The keyring that saved the file: it reverses the bytes, so the file never holds the plain text. */
 const savedKeyring = {
   encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
   decrypt: (value: Buffer) => Buffer.from(value).reverse().toString("utf8"),
 };
-/** The keyring after a change: it reads what it saved itself, not what the earlier one saved. */
 const CHANGED = Buffer.from("new:");
 const changedKeyring = {
   encrypt: (value: string) => Buffer.concat([CHANGED, savedKeyring.encrypt(value)]),
@@ -45,7 +37,6 @@ const envelopeSchema = z.object({ connections: z.record(z.string(), z.string()) 
 const entries = () => envelopeSchema.parse(JSON.parse(readFileSync(path, "utf8"))).connections;
 
 try {
-  // Two connections, saved with the keyring that the computer had before.
   const before = new MessagingCredentialStore(path, savedKeyring);
   await Effect.runPromise(before.load());
   await Effect.runPromise(before.set("whatsapp-number", { storeId: "link-1", whatsappStoreKey: "a2V5LTE=" }));

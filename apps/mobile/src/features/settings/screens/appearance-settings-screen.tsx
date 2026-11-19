@@ -62,10 +62,6 @@ const PRESET_LABELS = {
 
 type AppearanceTab = "theme" | "colors" | "backdrop" | "chat";
 
-/**
- * Settings › Appearance in the Studio layout: a live preview of a chat, then four short tabs that
- * change it. Each tab holds the sections of one topic, so the page is never long.
- */
 export function AppearanceSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -112,7 +108,6 @@ export function AppearanceSettingsScreen() {
   );
 }
 
-/** Light, Dark or System. */
 function ThemeSection() {
   const { t } = useText();
   const { value, ready } = useAppearance();
@@ -125,7 +120,6 @@ function ThemeSection() {
       <SettingsPictureChoice<Appearance>
         label={t("mobile.settings.appearance.theme")}
         value={value}
-        // saveAppearance ignores a choice while a save runs. Disabling here would dim the pictures at each tap.
         disabled={!ready}
         options={(
           [
@@ -150,12 +144,10 @@ function ThemeSection() {
   );
 }
 
-/** The color of the reader's own bubbles, and how a colored bubble takes it. */
 function MessageColorSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const messageColor = useMessageColor();
   const [messageColorError, setMessageColorError] = useState<string | null>(null);
-  // The picture choice plays its own selection haptic.
   const changeMessageColor = (change: Partial<MessageColorValue>, { haptic = true } = {}) => {
     setMessageColorError(null);
     if (haptic) void haptics.selection();
@@ -254,15 +246,10 @@ function MessageColorSection({ dark }: { dark: boolean }) {
   );
 }
 
-/**
- * The chat background of the theme that the app shows now: the theme's own background, a preset or
- * any color. The other theme keeps its color, as on the desktop.
- */
 function ChatBackgroundSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const scheme = dark ? "dark" : "light";
   const saved = useChatBackground((state) => state[scheme]);
-  // A backdrop replaces the chat background, as on the desktop, so the color waits until it is off.
   const backdropShown = useChatBackdrop((state) => state.ready && state.choice !== "none");
   const ready = useChatBackground((state) => state.ready) && !backdropShown;
   const themeBackground = String(useThemeColor("background"));
@@ -340,7 +327,6 @@ function ChatBackgroundSection({ dark }: { dark: boolean }) {
   );
 }
 
-/** Whether the rows of consecutive routine markers in a chat start closed. */
 function RoutineCollapseSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const preference = useRoutineCollapsePreference();
@@ -366,7 +352,6 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
   );
 }
 
-/** The details of a reply that a chat shows: the agent's thinking, its subagents and its saved memories. */
 function ChatDetailsSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const [error, setError] = useState<string | null>(null);
@@ -413,7 +398,6 @@ function ChatDetailsSection({ dark }: { dark: boolean }) {
   );
 }
 
-/** Whether a visual reply in a chat grows to the full height of its page. */
 function FullVisualSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const preference = useFullVisualPreference();
@@ -439,10 +423,6 @@ function FullVisualSection({ dark }: { dark: boolean }) {
   );
 }
 
-/**
- * The text size, in the steps of the desktop interface size. The slider moves through the steps;
- * the size applies when the finger lifts, so the screen does not change its layout during a drag.
- */
 function TextSizeSection() {
   const { t, format } = useText();
   const ready = useTextSize((state) => state.ready);
@@ -450,7 +430,6 @@ function TextSizeSection() {
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<AppInterfaceSize | null>(null);
   const shown = dragged ?? saved;
-  // The slider can report more than one value before the next render: a step plays one tick.
   const lastStep = useRef(shown);
   const step = (index: number) =>
     APP_INTERFACE_SIZES[Math.min(APP_INTERFACE_SIZES.length - 1, Math.max(0, Math.round(index)))] ?? saved;

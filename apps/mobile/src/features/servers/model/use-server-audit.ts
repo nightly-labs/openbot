@@ -45,18 +45,12 @@ type Piece =
   | { kind: "key"; text: string; level?: AgentAccessLevel }
   | { kind: "to"; text: string };
 
-/**
- * One piece of a change line: the words between keywords, a keyword, or the word between two values.
- * `id` is its place in the line, which does not change, so a row can key its pieces by it.
- */
 export type AuditPart = Piece & { id: number };
 
 type Key = Extract<Piece, { kind: "key" }>;
 
-// Marks a placeholder in a translated line, so the line can be split around its keywords.
 const MARK = "\u0000";
 
-/** The line of a change in the interface language, as the desktop audit log writes it. */
 export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPart[] {
   const values: Piece[][] = [];
   const show = (...parts: Piece[]) => `${MARK}${values.push(parts) - 1}${MARK}`;
@@ -75,7 +69,6 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
           role: show(memberRole(change.role)),
         });
       case "member-removed":
-        // A member who removed themself left.
         return entry.actor?.id === change.member.id
           ? t("mobile.server.audit.memberLeft", { member: show(name(change.member)) })
           : t("mobile.server.audit.memberRemoved", { member: show(name(change.member)) });
@@ -113,20 +106,14 @@ export function auditLine(entry: ServerAuditEntry, t: MobileText["t"]): AuditPar
     .map((piece, id) => ({ ...piece, id }));
 }
 
-/** The line as plain text, for the search. */
 export function auditLineText(parts: readonly AuditPart[]): string {
   return parts.map((part) => (part.kind === "to" ? ` ${part.text} ` : part.text)).join("");
 }
 
-/** Who made the change. A join from an invitation has no other actor. */
 export function auditActor(entry: ServerAuditEntry, t: MobileText["t"]): string {
   return entry.actor?.name ?? (entry.change.kind === "member-joined" ? "" : t("mobile.server.audit.unknownActor"));
 }
 
-/**
- * The audit log of one server (`server-audit-v1`), for its owners and admins. It is read again each
- * time the page opens, so the changes made since then appear.
- */
 export function useServerAudit(serverId: string) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canReadServerAudit(serverId));
   const { loadServerAuditLog } = useMobileWorkspaceActions();

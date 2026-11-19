@@ -67,15 +67,9 @@ const STATUS_BADGE = {
 
 export interface ReferralPanelProps {
   store: ReferralStore;
-  /** False when this surface has no invite calls. */
   available: boolean;
 }
 
-/**
- * The Invite friends content of the desktop Settings tab and the web dialog: the split of each payment,
- * the invite link, the credit, and the friends who joined, 20 on each page. It shows no plan or amount
- * of a friend: only the status and the total credit of the reader.
- */
 export function ReferralPanel(props: ReferralPanelProps): JSX.Element {
   const { t } = useText();
   const referral = () => props.store.state.referral;
@@ -112,10 +106,6 @@ export function ReferralPanel(props: ReferralPanelProps): JSX.Element {
   );
 }
 
-/**
- * The split, on the right of the page title and "Your link": the plush, a fork, and one chip on each row.
- * It plays once when the panel opens.
- */
 function ReferralSplit(): JSX.Element {
   const { t, format } = useText();
   const percent = () => format.percent(REFERRAL_SHARE_PERCENT / 100);
@@ -152,7 +142,6 @@ function LinkAndCredit(props: { state: ReferralState }): JSX.Element {
   const credit = () => props.state.credit.filter((item) => item.amountMinor > 0);
   const earned = () => props.state.earned.filter((item) => item.amountMinor > 0);
   const pending = () => props.state.pending.filter((item) => item.amountMinor > 0);
-  /** The waiting credit and the part of it that collects to the minimum, for each currency. */
   const waiting = () => {
     const rows = new Map<ReferralMoney["currency"], { total: number; ready: number }>();
     for (const item of pending()) rows.set(item.currency, { total: item.amountMinor, ready: 0 });
@@ -291,7 +280,6 @@ function FriendRow(props: { friend: ReferralFriend }): JSX.Element {
   );
 }
 
-/** The credit from one friend: what went to the account, and what waits for the friend's next payment. */
 function FriendCredit(props: { friend: ReferralFriend }): JSX.Element {
   const { t, format } = useText();
   const earned = () => props.friend.earned.filter((item) => item.amountMinor > 0);
@@ -312,11 +300,6 @@ function FriendCredit(props: { friend: ReferralFriend }): JSX.Element {
   );
 }
 
-/**
- * Previous and next page, and which friends the page shows. Only when the list has more than one page.
- * The buttons stay active during a load: a window-focus reload must not lock them, and the store drops the
- * result of a page that the reader left.
- */
 function PageControls(props: {
   page: number;
   total: number;
@@ -359,19 +342,13 @@ function PageControls(props: {
   );
 }
 
-/**
- * One list of friends, newest first. A filter above it shows all friends or one status. The account
- * server sends one page of 20; a new filter starts again at the first page.
- */
 function FriendList(props: { state: ReferralState; store: ReferralStore }): JSX.Element {
   const { t } = useText();
   const request = () => props.store.state.request;
-  // The rows of the chosen filter and page. While they load, the list shows a spinner, not the rows of another filter.
   const loaded = (filter: ReferralFilter) =>
     props.state.filter === filter && props.state.page === request().page && request().filter === filter;
   const turnPage = (page: number, from: HTMLElement) => {
     props.store.turnPage(page);
-    // The new page starts at the top of the list, with the filter in view, not where the old page ended.
     from.closest(".ui-settings-section")?.scrollIntoView({ block: "start" });
   };
 
