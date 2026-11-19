@@ -3789,7 +3789,10 @@ export class ProviderRuntime implements ProviderPort {
       server: server ?? config?.id ?? null,
       message,
     });
-    if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID) this.#reportGitHubToolsFailure(client.provider);
+    const githubKey =
+      client.provider === "codex" ? `openbot_${providerMcpServerName(config?.name ?? "")}` : config?.name;
+    if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID && key === githubKey)
+      this.#reportGitHubToolsFailure(client.provider);
     if (!server) return;
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
