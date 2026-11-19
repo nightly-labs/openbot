@@ -443,13 +443,17 @@ export function MobileChatView({
   const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(agent.serverId).view);
   const browserShown = browserAllowed && showsOnline(server) && browserView;
   const threadsShown = threadMenu !== undefined;
+  const sideQuestionShown = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(agent.serverId));
   const swipeForward = useMemo(() => {
     const params = { agentId: agent.id, serverId: agent.serverId };
     if (swipeAction === "off") return null;
-    if (swipeAction === "threads")
+    if (swipeAction === "question" && sideQuestionShown)
+      return () => router.push({ pathname: "/side-question/[agentId]", params });
+    // A host without side questions keeps the swipe of the earlier default, the thread list.
+    if (swipeAction === "threads" || swipeAction === "question")
       return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
     return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;
-  }, [swipeAction, threadsShown, browserShown, agent.id, agent.serverId]);
+  }, [swipeAction, sideQuestionShown, threadsShown, browserShown, agent.id, agent.serverId]);
   // A pull past the latest message opens the agent's info sheet on top of this chat, unless Settings
   // turns the pull off.
   const pullOn = useChatPullPreference((state) => state.enabled);

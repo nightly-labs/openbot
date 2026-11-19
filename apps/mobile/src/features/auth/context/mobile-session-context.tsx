@@ -28,6 +28,7 @@ import {
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 import { deleteComposerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteSideQuestions } from "@/features/chat/model/side-questions";
 import { deleteAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
@@ -80,6 +81,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       queryClient.removeQueries({ queryKey: queryKeys.billing() });
       // Unsent text belongs to one account. This also drops text that a closing chat wrote after sign-out.
       deleteComposerDrafts();
+      deleteSideQuestions();
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
     if (sessionRef.current && !session) deletePhoneCopy();
