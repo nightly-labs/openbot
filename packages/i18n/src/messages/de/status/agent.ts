@@ -81,6 +81,9 @@ export const messages = {
   "status.agent.skillReading": "Fähigkeit wird gelesen…",
   "status.agent.toolStepFailed":
     "Ein Tool-Schritt ist fehlgeschlagen; das Ergebnis wird geprüft und entschieden, was als Nächstes versucht wird…",
+  "status.agent.toolStepDeclined": "Dieser Schritt wurde nicht ausgeführt, weil er nicht erlaubt war.",
+  "status.agent.toolStepExitCode": "Der Befehl wurde mit dem Fehlercode {code} beendet.",
+  "status.agent.toolStepNoReason": "Das Tool hat nicht angegeben, warum dieser Schritt fehlgeschlagen ist.",
   "status.agent.toolResultReviewing": "Das letzte Tool-Ergebnis wird geprüft…",
   "status.agent.sourcesSearching": "Nach aktuellen Informationen wird gesucht…",
   "status.agent.sourcesReviewing": "Die gefundenen Quellen und Informationen werden geprüft…",

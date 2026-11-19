@@ -633,21 +633,31 @@ function isShellCommand(item: ThreadItem): boolean {
 /**
  * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs before
  * the cut, because a cut through a secret leaves a part that no rule recognizes. A command keeps the
- * end of its output, where the error is; other tools keep the start.
+ * end of its output, where the error is; other tools keep the start. A step that `toolFailed` marks
+ * always has a text, so its red row can tell why (#12130).
  */
 export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
-  if (getString(item, "status") !== "failed") return null;
+  if (!toolFailed(item)) return null;
   const raw = resultText(item);
-  if (!raw) return null;
+  if (!raw) return toolFailureReason(item);
   const tail = isShellCommand(item);
   const window = raw.length <= FAILURE_WINDOW ? raw : tail ? raw.slice(-FAILURE_WINDOW) : raw.slice(0, FAILURE_WINDOW);
   const text = redact(window).trim();
   const limit = CONVERSATION_TRACE_TEXT_LIMIT;
-  if (text.length <= limit) return text || null;
+  if (text.length <= limit) return text || toolFailureReason(item);
   // A cut between the two halves of a surrogate pair leaves half a character, which goes.
   return tail
     ? `…${text.slice(1 - limit).replace(/^[\uDC00-\uDFFF]/u, "")}`
     : `${text.slice(0, limit - 1).replace(/[\uD800-\uDBFF]$/u, "")}…`;
+}
+
+/** The reason of a failed tool step that sent no text: a declined step, or a command's exit code. */
+function toolFailureReason(item: ThreadItem): string {
+  if (getString(item, "status") === "declined") return sourceText("status.agent.toolStepDeclined");
+  const exitCode = item.exitCode;
+  if (typeof exitCode === "number" && exitCode !== 0)
+    return sourceText("status.agent.toolStepExitCode", { code: String(exitCode) });
+  return sourceText("status.agent.toolStepNoReason");
 }
 
 /** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */
@@ -657,7 +667,8 @@ export function isToolItem(item: ThreadItem): boolean {
 
 export function toolProgressText(item: ThreadItem, completed: boolean): string | null {
   if (!isToolItem(item)) return null;
-  if (completed && getString(item, "status") === "failed") {
+  // The same check as the trace and its failed count, so the step list does not show a red trace row as done.
+  if (completed && toolFailed(item)) {
     return sourceText("status.agent.toolStepFailed");
   }
 

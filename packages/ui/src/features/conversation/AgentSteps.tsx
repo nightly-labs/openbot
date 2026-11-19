@@ -15,7 +15,8 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
  * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
  * turn committed. `memory-summary` is the count that a host without the changes sends instead.
  * The text of `progress` and `memory-summary` is the host's English source text. The `error` of a
- * `progress` step is the output of a failed tool step, which the line can open.
+ * `progress` step is the output of a failed tool step, which the line can open, or the host's English
+ * source text of its reason when the step sent no output.
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }
@@ -143,7 +144,7 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
 
 /** The line of a failed tool step, with a closed toggle that shows its error. */
 function FailedStep(props: { text: string; error: string | undefined; newest: boolean }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const outputId = createUniqueId();
   const [open, setOpen] = createSignal(false);
   const expanded = () => (open() ? "true" : "false");
@@ -170,7 +171,8 @@ function FailedStep(props: { text: string; error: string | undefined; newest: bo
       </Button>
       <Show when={open()}>
         <pre id={outputId} class="agent-step-error" dir="auto">
-          {props.error}
+          {/* The host's reason of a step with no output is English source text; provider output stays as it is. */}
+          {props.error && sourceText(props.error)}
         </pre>
       </Show>
     </div>

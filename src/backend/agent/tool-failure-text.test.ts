@@ -26,6 +26,14 @@ describe("toolFailureText", () => {
     expect(text).toBe("401 for key •••");
   });
 
+  it("masks a secret in the output of a declined step", () => {
+    const text = toolFailureText(
+      item({ type: "commandExecution", status: "declined", aggregatedOutput: `denied: ${secret}` }),
+      redact,
+    );
+    expect(text).toBe("denied: •••");
+  });
+
   it("masks a secret that the cut would divide", () => {
     const filler = "x".repeat(CONVERSATION_TRACE_TEXT_LIMIT - 8);
     const text = toolFailureText(

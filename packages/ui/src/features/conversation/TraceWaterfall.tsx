@@ -359,7 +359,8 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     const kept = new Set<string>();
     const parents = parentOf();
     for (const span of view().spans) {
-      const haystack = `${span.name} ${span.detail ?? ""} ${span.error ?? ""}`.toLocaleLowerCase();
+      // The error as the row shows it, so a search for the shown reason finds the row.
+      const haystack = `${span.name} ${span.detail ?? ""} ${text.sourceText(span.error ?? "")}`.toLocaleLowerCase();
       if (!haystack.includes(query)) continue;
       for (let id: string | undefined = span.id; id !== undefined && !kept.has(id); id = parents.get(id)) kept.add(id);
     }
@@ -1197,6 +1198,7 @@ function TraceRowView(props: {
 
 /** The error of a failed tool row, under the row. It tells its height, which moves the handoff lines. */
 function TraceSpanError(props: { id: string; error: string; depth: number; onHeight: (height: number) => void }) {
+  const text = useText();
   const observer = new ResizeObserver((entries) => {
     for (const entry of entries) if (entry.target instanceof HTMLElement) props.onHeight(entry.target.offsetHeight);
   });
@@ -1205,7 +1207,7 @@ function TraceSpanError(props: { id: string; error: string; depth: number; onHei
   return (
     <div class="trace-span-error-row" style={rowStyle()} ref={(element) => observer.observe(element)}>
       <pre id={props.id} class="trace-span-error" dir="auto">
-        {props.error}
+        {text.sourceText(props.error)}
       </pre>
     </div>
   );

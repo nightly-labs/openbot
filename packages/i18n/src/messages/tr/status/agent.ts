@@ -79,6 +79,9 @@ export const messages = {
   "status.agent.skillReading": "Bir beceri okuyor…",
   "status.agent.toolStepFailed":
     "Bir araç adımı başarısız oldu; sonucu inceliyor ve sırada neyi deneyeceğine karar veriyor…",
+  "status.agent.toolStepDeclined": "Bu adıma izin verilmediği için çalıştırılmadı.",
+  "status.agent.toolStepExitCode": "Komut {code} hata koduyla durdu.",
+  "status.agent.toolStepNoReason": "Araç bu adımın neden başarısız olduğunu belirtmedi.",
   "status.agent.toolResultReviewing": "En son araç sonucu inceleniyor…",
   "status.agent.sourcesSearching": "Güncel bilgiler aranıyor…",
   "status.agent.sourcesReviewing": "Bulunan kaynaklar ve bilgiler inceleniyor…",

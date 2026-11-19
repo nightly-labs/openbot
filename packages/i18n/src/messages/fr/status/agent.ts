@@ -80,6 +80,9 @@ export const messages = {
   "status.agent.skillReading": "Lecture d’une compétence…",
   "status.agent.toolStepFailed":
     "Une étape d’outil a échoué ; analyse du résultat et recherche de la prochaine tentative…",
+  "status.agent.toolStepDeclined": "Cette étape n’a pas été exécutée, car elle n’était pas autorisée.",
+  "status.agent.toolStepExitCode": "La commande s’est arrêtée avec le code d’erreur {code}.",
+  "status.agent.toolStepNoReason": "L’outil n’a pas indiqué pourquoi cette étape a échoué.",
   "status.agent.toolResultReviewing": "Analyse du dernier résultat d’outil…",
   "status.agent.sourcesSearching": "Recherche d’informations récentes…",
   "status.agent.sourcesReviewing": "Analyse des sources et des informations trouvées…",
