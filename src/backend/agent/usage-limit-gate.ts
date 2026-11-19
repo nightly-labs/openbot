@@ -155,7 +155,7 @@ export class UsageLimitGate {
     const accountId = accountOf(agent);
     const turnModel = model ?? agent.model;
     const key = limitKey(provider, accountId, turnModel);
-    this.#forgetReturnHold(key);
+    const dropped = this.#forgetReturnHold(key);
     if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
@@ -169,6 +169,7 @@ export class UsageLimitGate {
       spent: spent || previous?.spent === true,
       timer: this.#armFailure(key, endsAt),
     });
+    if (dropped) this.#wakeReturning(key);
     this.#hooks.emitRuntimeSnapshot();
   }
 
@@ -218,7 +219,7 @@ export class UsageLimitGate {
     const turnModel = model ?? agent.model;
     const accountId = accountOf(agent);
     const key = limitKey(provider, accountId, turnModel);
-    this.#forgetReturnHold(key);
+    const dropped = this.#forgetReturnHold(key);
     const limit = this.#limits.get(key) ?? {
       provider,
       accountId,
@@ -238,6 +239,7 @@ export class UsageLimitGate {
     else if (limit.resetsAt === null) limit.readBlind = false;
     this.#limits.set(key, limit);
     this.#arm(key, limit);
+    if (dropped) this.#wakeReturning(key);
     yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
     this.#hooks.emitRuntimeSnapshot();
     if (limit.resetsAt !== null) {
@@ -435,6 +437,14 @@ export class UsageLimitGate {
     if (hold.timer) clearTimeout(hold.timer);
     this.#returnHolds.delete(key);
     return true;
+  }
+
+  #wakeReturning(key: string): void {
+    for (const agent of this.#store.list()) {
+      const returnTo = agent.usageLimitReturn;
+      if (returnTo && limitKey(returnTo.provider, accountOf(returnTo), returnTo.model) === key)
+        this.#hooks.scheduleDrain(agent.id);
+    }
   }
 
   #heldAgents(limit: UsageLimit) {
