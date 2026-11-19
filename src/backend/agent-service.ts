@@ -3540,12 +3540,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
     agentId: string,
   ) {
-    for (const snapshot of this.#conversation.workingTaskSnapshots(agentId)) {
-      const { activeTurnId: turnId, threadId } = snapshot;
-      if (!turnId || !threadId) continue;
-      if (this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId)) continue;
-      if (this.#mailbox.findDeliveriesByTurn(agentId, turnId).length > 0) continue;
-      if (this.#mailbox.startingDeliveriesForAgent(agentId, this.#tasks.taskForThread(threadId)).length > 0) continue;
+    const stale = yield* lifecycleStep("find stale task turns", () =>
+      this.#conversation.workingTaskSnapshots(agentId).flatMap(({ activeTurnId: turnId, threadId }) => {
+        if (!turnId || !threadId) return [];
+        if (this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId)) return [];
+        if (this.#mailbox.findDeliveriesByTurn(agentId, turnId).length > 0) return [];
+        // A thread can stay a task thread in memory after its task record is gone. Then a message
+        // that starts in any lane of the agent keeps the turn.
+        const taskId = this.#tasks.taskForThread(threadId) ?? undefined;
+        if (this.#mailbox.startingDeliveriesForAgent(agentId, taskId).length > 0) return [];
+        return [{ turnId, threadId }];
+      }),
+    );
+    for (const { turnId, threadId } of stale) {
       logger.warn("A task turn that no provider runs held the agent. It ends as interrupted.", { agentId, turnId });
       yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
     }
