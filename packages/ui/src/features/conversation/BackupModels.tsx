@@ -84,12 +84,16 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   };
 }
 
-/** Every model of every provider and account the host has, except the ones in `exclude`. */
+/**
+ * Every model of every provider and account the host has, except the ones in `exclude` and the ones
+ * that an admin turned off (`kept`: another agent still uses it, #12582).
+ */
 export function backupModelOptions(
   source: BackupModelSource,
   exclude: readonly AgentModelChoice[],
 ): BackupModelOption[] {
   return source.modelOptions.flatMap((model) => {
+    if (model.listing === "kept") return [];
     // A provider that this build does not know cannot be a backup: its model cannot be chosen here.
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
