@@ -65,8 +65,6 @@ const MAX_STALL_PROFILES_BYTES = 256 * 1024;
 // A profile starts in a minute that follows a stall, so only stalls that come again are profiled.
 const PROFILE_START_INTERVAL_MS = 30 * 60_000;
 const PROFILE_KEEP_INTERVAL_MS = 6 * 60 * 60_000;
-// A stall this many times longer than the one of the last kept profile can start a profile before
-// the keep interval ends, so that a short stall does not hide a long freeze for hours.
 const PROFILE_LONGER_STALL_FACTOR = 10;
 const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
@@ -129,7 +127,6 @@ interface ResourceSample {
   /** The app window renderers together. Null when one of them did not answer. */
   windowMemory: WindowMemory | null;
   mainLoopMs: { p99: number; max: number; phase: LoopPhase } | null;
-  /** The V8 heap of the main process and its limit. A heap near the limit makes the loop stall in garbage collection. */
   mainHeapMb: { used: number; limit: number };
   database: { statements: number; maxMs: number };
   activeTurns: number;
@@ -152,6 +149,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #profiler = new MainLoopProfiler();
   #profileStartedAt: number | null = null;
   #profileKeptAt: number | null = null;
+  #profileStartStallMs = 0;
   #profileKeptStallMs = 0;
   #lastStallProfile: (MainLoopStallProfile & { at: string }) | null = null;
   #onStallProfile: (profile: MainLoopStallProfile) => void = () => {};
@@ -451,7 +449,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       const profile = yield* this.#profiler.stop();
       if (!profile || !stalled) return;
       this.#profileKeptAt = now;
-      this.#profileKeptStallMs = mainLoopMs.max;
+      this.#profileKeptStallMs = Math.max(this.#profileStartStallMs, mainLoopMs.max);
       const summary: MainLoopStallProfile = {
         stallMs: Math.round(mainLoopMs.max),
         phase: mainLoopMs.phase,
@@ -472,6 +470,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const longerStall = mainLoopMs.max >= this.#profileKeptStallMs * PROFILE_LONGER_STALL_FACTOR;
     if (this.#profileKeptAt !== null && now - this.#profileKeptAt < PROFILE_KEEP_INTERVAL_MS && !longerStall) return;
     this.#profileStartedAt = now;
+    this.#profileStartStallMs = mainLoopMs.max;
     yield* this.#profiler.start();
     // The rest check ran before this start. The next sample needs the histogram to judge the profile.
     this.#measureLoop();
