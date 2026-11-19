@@ -8,7 +8,9 @@ export const EXTERNAL_LINK_APP_PATH_LIMIT = 1024;
 
 /**
  * - `default`: the browser that the operating system opens web pages with.
- * - `openbot`: links in chats open in the built-in browser. Other pages open as for `default`.
+ * - `openbot`: links in the chats of the main window open in the built-in browser. The agent dock, a
+ *   separate chat window and a joined server's chat have no built-in browser on this computer, so
+ *   their links, and all other pages, open as for `default`.
  * - `app`: one program. On macOS it is an application bundle, opened with `open -a`. On Linux and
  *   Windows it is a program path or a command name. It gets the address as its only argument, with
  *   no shell.

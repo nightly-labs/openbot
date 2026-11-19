@@ -105,7 +105,8 @@ export const messages = {
   "settings.quitGuard.always": "始终",
   "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
-  "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
+  "settings.externalLinks.description":
+    "聊天、登录页面和账单页面中的链接在这里打开。选择 OpenBot 时，只有主窗口聊天中的链接在 OpenBot 中打开。其他链接在默认浏览器中打开。",
   // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "默认浏览器",
   "settings.externalLinks.openbot": "OpenBot",

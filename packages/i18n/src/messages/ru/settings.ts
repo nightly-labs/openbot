@@ -109,7 +109,8 @@ export const messages = {
   "settings.quitGuard.always": "Всегда",
   "settings.quitGuard.never": "Никогда",
   "settings.externalLinks.title": "Открывать внешние ссылки в",
-  "settings.externalLinks.description": "Здесь открываются ссылки из чатов, страниц входа и оплаты.",
+  "settings.externalLinks.description":
+    "Здесь открываются ссылки из чатов, страниц входа и оплаты. При выборе OpenBot в OpenBot открываются только ссылки из чатов главного окна. Остальные ссылки открываются в основном браузере.",
   "settings.externalLinks.defaultBrowser": "Основной браузер",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Основной браузер ({name})",
