@@ -273,6 +273,10 @@ export const messages = {
     "このモデルは利用できません。このエージェントに別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。設定でカスタムプロバイダーを開き、このエンドポイントの編集をクリックして、このモデルの最大出力を大きくしてください。または、推論の強さを下げるか別のモデルを選んでください。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeModelNotServed":
