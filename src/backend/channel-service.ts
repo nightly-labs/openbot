@@ -2663,7 +2663,7 @@ export class ChannelService {
           revision: nextState === "queued" ? task.revision + 1 : task.revision,
           error:
             state === "failed"
-              ? (deliveryError ?? "The agent could not complete this task.")
+              ? (deliveryError ?? sourceText("error.backend.channelTaskFailed"))
               : state === "interrupted"
                 ? sourceText("error.backend.channelTaskStopped")
                 : // The owner of a routine's request reported that the run failed (`routine_report_failure`).

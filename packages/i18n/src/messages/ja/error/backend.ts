@@ -105,6 +105,7 @@ export const messages = {
     "この依頼はルーティングのコンテキスト上限を超えています。メンバーを選択するか、短い依頼を送信してください。",
   "error.backend.channelTaskMemberRequired": "このタスクのメンバーを選択してください。",
   "error.backend.channelTaskStopped": "停止しました。このタスクを続行するか、再割り当てしてください。",
+  "error.backend.channelTaskFailed": "エージェントはこのタスクを完了できませんでした。",
   "error.backend.channelRoutingUnreadable":
     "リーダーがこのメッセージを振り分けられませんでした。メンバーに再割り当てしてください。",
   "error.backend.channelRoutingFailed": "ルーティングに失敗しました。メンバーを選択するか、もう一度お試しください。",

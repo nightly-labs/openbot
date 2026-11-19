@@ -20,6 +20,7 @@ import type {
   Routine,
 } from "@openbot/contracts/ipc";
 import { channelRoutingConversationEventItemType } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { strToU8, zipSync } from "fflate";
 import { z } from "zod";
@@ -1340,7 +1341,7 @@ async function seedLaunchRoom(
       requestMessageId: requestRollback,
       instruction: rollbackText,
       state: "failed",
-      error: "The agent could not complete this task.",
+      error: sourceText("error.backend.channelTaskFailed"),
     }),
   ];
   store.update(created, { messages, tasks }, "dev-seed:channel-launch-room:transcript");

@@ -99,6 +99,7 @@ export const messages = defineMessages("error.backend", {
     "This request exceeds the routing context limit. Select a member or send a shorter request.",
   "error.backend.channelTaskMemberRequired": "Choose a member for this task.",
   "error.backend.channelTaskStopped": "Stopped. Continue or reassign this task.",
+  "error.backend.channelTaskFailed": "The agent could not complete this task.",
   "error.backend.channelRoutingUnreadable": "The lead could not route this message. Reassign it to a member.",
   "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
   "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",

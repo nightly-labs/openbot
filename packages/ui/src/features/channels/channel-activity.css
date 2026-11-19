@@ -102,7 +102,19 @@
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
 }
-.channel-paused-task-actions .ui-button:hover {
+/* The panel fills with the accent, so its buttons keep the inverted on-light pair on hover too.
+   The primitive hover rule paints the text with `--openbot-text-primary`, which matches the
+   panel fill here and disappears. */
+@media (hover: hover) and (pointer: fine) {
+  .channel-paused-task-actions .ui-button:hover:not(:disabled):not([data-disabled]) {
+    background: var(--openbot-surface-light);
+    color: var(--openbot-text-on-light);
+    box-shadow: 0 0 0 1px var(--openbot-text-dim-on-light);
+  }
+}
+/* Reassign opens a menu and keeps aria-expanded, which the primitives also paint with the panel fill. */
+.channel-paused-task-actions .ui-button[aria-expanded="true"] {
   background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
   box-shadow: 0 0 0 1px var(--openbot-text-dim-on-light);
 }
