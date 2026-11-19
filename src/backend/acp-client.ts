@@ -5009,7 +5009,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: CreateElicitationRequest,
   ): Effect.fn.Return<CreateElicitationResponse, ProviderClientOperationError> {
     const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
-    const questions = elicitationFieldQuestions(params, "ACP");
+    // Claude's ACP adapter sends each AskUserQuestion question as a choice field `<id>` and an optional
+    // text field `<id>_custom` ("Other"). The card already takes a typed answer for the choice, and a
+    // second step made a closed card or a chat message drop the option that the user chose (#12164).
+    const fields = elicitationFieldQuestions(params, "ACP");
+    const choices = new Set(fields.filter(({ options }) => options?.length).map(({ id }) => id));
+    const questions = fields.filter(
+      ({ id }) => !(id.endsWith("_custom") && choices.has(id.slice(0, -"_custom".length))),
+    );
     if (questions.length === 0) {
       questions.push({
         id: "response",
