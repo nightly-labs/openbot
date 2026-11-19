@@ -45,7 +45,11 @@
 3. **Automatic restore.** When the owner renews, a free pool machine restores the archive by itself.
    The Worker keeps the archive key, wrapped with a Worker secret, in D1. Cloudflare holds the key but
    not the data; B2 holds the data but not the key.
-4. **Archive in the region of the machine.** B2 EU Central for `AMS-01`, B2 US East for `WDC-02`.
+4. **One B2 bucket.** All archives go to `openbot-pool-archive-eu` (B2 EU Central), also from
+   `WDC-02` machines (developer, 2026-11-19; replaces "archive in the region of the machine"). The
+   `region` column stays, so a second bucket can come later.
+6. **Encryption.** `age` on the machine, with a new X25519 key for each archive (developer,
+   2026-11-19).
 5. **Restore target.** A ready pool machine with the product of the plan, in the locations of the
    currency (`poolLocations`), as for a new payment. When no machine is ready, the server restores into
    a new boat sandbox, and an operator moves it to a VPS later with the existing move
@@ -75,8 +79,11 @@ subscription. So an archive never races a late payment of the same subscription.
   SHA-256 match what the machine sent, and D1 has the row with the wrapped key. Any failure keeps the
   data on the machine, and the next run tries again. The 14-day delete of today stays as the last
   fallback.
-- The machine never gets a B2 key. The machine encrypts the archive and streams it over SSH to
-  `sync`, and `sync` uploads it with the operator key. A restore downloads with a presigned URL for one
+- The machine never gets a B2 key. `sync` makes the `age` key, starts a multipart upload with the
+  operator key, and gives the machine only the recipient and a presigned URL for each part. The
+  machine encrypts the archive and uploads it straight to B2, so the data never goes through the
+  operator's computer (a 5 GB server would be 10 GB on that connection). `sync` checks the MD5 of each
+  part, completes the upload and checks the size. A restore downloads with a presigned URL for one
   object that expires in 1 hour, signed by the Worker with its read-only key. (A key for each job needs
   the B2 master key. The account also holds another project's bucket, so a new master key is not an
   option: it would replace that project's key.)
@@ -93,7 +100,7 @@ subscription. So an archive never races a late payment of the same subscription.
 | Region | Bucket | Endpoint | Keys in `apps/auth-api/.env.production` |
 | --- | --- | --- | --- |
 | EU Central (`AMS-01`) | `openbot-pool-archive-eu`, private, SSE-B2, lifecycle: hide after 15 days, delete 1 day later (was 31; changed 2026-11-19 for the new Terms) | `s3.eu-central-003.backblazeb2.com` | `B2_KEY_ID_EU`, `B2_APPLICATION_KEY_EU` (operator: read, write, delete); `B2_WORKER_KEY_ID_EU`, `B2_WORKER_APPLICATION_KEY_EU` (Worker: read, share) |
-| US East (`WDC-02`) | Not made. A B2 account has one region, so this needs a second B2 account. | — | — |
+| US East | Not made: the developer decided on 2026-11-19 to use the EU bucket for `WDC-02` too. | — | — |
 
 Both keys reach only this bucket (checked with `b2_authorize_account`). The Worker keys are not yet
 Worker secrets; item 2 adds them.
@@ -114,6 +121,10 @@ Worker secrets; item 2 adds them.
   (file sha256, type, mode, owner, link, crontab) with none missing or added, OpenBot runs after the
   import. Archive 116 MB; export 56 s, upload and import 39 s, reinstall and prepare 202 s. Report:
   `.openbot-build/pool-archive-e2e.json`.
+- **Timing (2026-11-19, `--extra-gb=5`)**: 5.75 GB server, 5.80 GB archive in 56 parts, 9 of 9 checks
+  pass (54,094 facts). Export, encrypt and upload 661 s (8.8 MB/s, one part at a time); download and
+  decrypt 269 s; import 349 s, of which `tar --extract` is 347 s; reinstall and prepare 312 s. The
+  same extract alone took 47 to 67 s, so the disk speed of the VPS changes, not the import.
 - **Item 1b (open)**: sandbox mode of `import` for the boat restore (decision 5), and an E2E that
   imports the same archive into a test boat sandbox.
 - **STOP** when a pool machine has data that neither list covers.
@@ -132,9 +143,11 @@ Worker secrets; item 2 adds them.
 - **Evidence**: `sync` already stops OpenBot after a plan ends and reinstalls a machine after a delete
   (`docs/hosted-servers.md` "Reuse a pool machine").
 - **Change**: for a stopped row with an ended plan (fresh Stripe read) and no verified archive: run
-  `export - | encrypt` on the machine over SSH, upload the stream to B2 with the operator key
-  (multipart), verify, store the row, then reinstall the machine and set `operator_host = NULL`. The
-  server row stays with `desired_state = 'stopped'`.
+  `export - | age -r <recipient> | split --filter=<upload part>` on the machine over SSH, with
+  presigned part URLs (see the rules), verify, store the row, then reinstall the machine and set
+  `operator_host = NULL`. The server row stays with `desired_state = 'stopped'`.
+  `scripts/hosting/pool-archive-e2e.ts` has the tested shell and SigV4 code. `leaseweb-bootstrap.sh`
+  installs `age`; a machine prepared before that needs `apt-get install age` first.
 - **Timing**: archive a `canceled` end at once and an `unpaid` end 3 days after `plan_ended_at`
   (decision 2). The operator runs `sync` once a day, so "at once" means "at the next `sync`". The
   developer decided on 2026-11-19 that the daily `sync` is enough: no timer.
@@ -176,6 +189,4 @@ web client or Team API change.
 
 - That `export` works on a pool machine with small changes: only the script header and its checks were
   read.
-- B2 upload speed from a Leaseweb VPS, and the archive size of a real server.
-- The multipart upload of a stream of unknown size with the operator key, and a presigned GET of an
-  object over 5 GB. Read the B2 S3 documentation in item 3.
+- The archive size of a real server.
