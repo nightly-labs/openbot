@@ -53,6 +53,10 @@ interface UsageLimit extends UsageLimitKey {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
+interface ReturnHold {
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
 export class UsageLimitGate {
   readonly #store: AgentStore;
   readonly #hooks: UsageLimitHooks;
@@ -62,6 +66,8 @@ export class UsageLimitGate {
   readonly #failures = new Map<string, ProviderFailure>();
   readonly #tries = new Map<string, string>();
   readonly #readReleased = new Map<string, number>();
+  readonly #seen = new Set<string>();
+  readonly #returnHolds = new Map<string, ReturnHold>();
 
   constructor(options: UsageLimitGateOptions) {
     this.#store = options.store;
@@ -107,7 +113,19 @@ export class UsageLimitGate {
   }
 
   isLimited(limit: UsageLimitKey): boolean {
-    return this.#limits.has(limitKey(limit.provider, limit.accountId, limit.model));
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
+    return this.#limits.has(key) || this.#returnHolds.has(key);
+  }
+
+  returnConfirmed(limit: UsageLimitKey): boolean {
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
+    if (this.#seen.has(key)) return true;
+    if (!this.#returnHolds.has(key)) {
+      const hold: ReturnHold = { timer: null };
+      this.#returnHolds.set(key, hold);
+      this.#readReturn(key, limit, hold);
+    }
+    return false;
   }
 
   failureKey(agentId: string, model: string | null = null): string | null {
@@ -130,6 +148,7 @@ export class UsageLimitGate {
     const accountId = accountOf(agent);
     const turnModel = model ?? agent.model;
     const key = limitKey(provider, accountId, turnModel);
+    this.#forgetReturnHold(key);
     if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
@@ -192,6 +211,7 @@ export class UsageLimitGate {
     const turnModel = model ?? agent.model;
     const accountId = accountOf(agent);
     const key = limitKey(provider, accountId, turnModel);
+    this.#forgetReturnHold(key);
     const limit = this.#limits.get(key) ?? {
       provider,
       accountId,
@@ -237,6 +257,8 @@ export class UsageLimitGate {
     const provider = providerForAgent(agent);
     const key = limitKey(provider, accountOf(agent), model ?? agent.model);
     this.#readReleased.delete(key);
+    if (this.#forgetReturnHold(key))
+      yield* this.#hooks.released({ provider, accountId: accountOf(agent), model: model ?? agent.model });
     if (this.#limits.has(key)) yield* this.#release(key);
     if (this.#failures.has(key)) yield* this.#releaseFailure(key);
     if (![...this.#limits.values()].some((limit) => limit.provider === provider)) this.#announced.delete(provider);
@@ -249,6 +271,9 @@ export class UsageLimitGate {
   ) {
     const account = limitKey(provider, accountId, "");
     for (const key of [...this.#readReleased.keys()]) if (key.startsWith(account)) this.#readReleased.delete(key);
+    for (const key of [...this.#returnHolds.keys()])
+      if (key.startsWith(account) && this.#forgetReturnHold(key))
+        yield* this.#hooks.released({ provider, accountId, model: key.slice(account.length) });
     for (const [key, limit] of [...this.#limits])
       if (limit.provider === provider && limit.accountId === accountId) yield* this.#release(key, true);
   }).bind(this);
@@ -260,6 +285,9 @@ export class UsageLimitGate {
     this.#failures.clear();
     this.#tries.clear();
     this.#readReleased.clear();
+    for (const hold of this.#returnHolds.values()) if (hold.timer) clearTimeout(hold.timer);
+    this.#returnHolds.clear();
+    this.#seen.clear();
     this.#announced.clear();
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -362,6 +390,43 @@ export class UsageLimitGate {
     this.#hooks.emitRuntimeSnapshot();
     yield* this.#hooks.released({ provider: failure.provider, accountId: failure.accountId, model: failure.model });
   });
+
+  #readReturn(key: string, limit: UsageLimitKey, hold: ReturnHold): void {
+    Effect.runFork(this.#confirmReturn(key, limit, hold).pipe(Effect.forkIn(this.#scope)));
+  }
+
+  readonly #confirmReturn = Effect.fn("UsageLimitGate.confirmReturn")(function* (
+    this: UsageLimitGate,
+    key: string,
+    limit: UsageLimitKey,
+    hold: ReturnHold,
+  ) {
+    hold.timer = null;
+    const usage = yield* this.#hooks
+      .readUsage(limit.provider, limit.model, limit.accountId)
+      .pipe(Effect.catch(() => Effect.succeed(null)));
+    if (this.#returnHolds.get(key) !== hold) return;
+    const resetsAt = usage ? spentWindowReset(usage) : null;
+    if (resetsAt !== null) {
+      const untilReset = resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
+      hold.timer = setTimeout(
+        () => this.#readReturn(key, limit, hold),
+        Math.max(0, Math.min(untilReset, USAGE_LIMIT_RECHECK_MS)),
+      );
+      return;
+    }
+    this.#forgetReturnHold(key);
+    yield* this.#hooks.released({ provider: limit.provider, accountId: limit.accountId, model: limit.model });
+  });
+
+  #forgetReturnHold(key: string): boolean {
+    this.#seen.add(key);
+    const hold = this.#returnHolds.get(key);
+    if (!hold) return false;
+    if (hold.timer) clearTimeout(hold.timer);
+    this.#returnHolds.delete(key);
+    return true;
+  }
 
   #heldAgents(limit: UsageLimit) {
     return this.#store

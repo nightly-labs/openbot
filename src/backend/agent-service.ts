@@ -3879,7 +3879,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (agent.usageLimitReturn && this.#usageLimitReady(agent.usageLimitReturn))
+    if (
+      agent.usageLimitReturn &&
+      this.#usageLimitReady(agent.usageLimitReturn) &&
+      this.#usageLimits.returnConfirmed(usageLimitOf(agent.usageLimitReturn))
+    )
       return {
         input: {
           ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
