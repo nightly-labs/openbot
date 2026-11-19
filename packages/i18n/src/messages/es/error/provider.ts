@@ -401,7 +401,7 @@ export const messages = {
   "error.provider.codexRequestRefused":
     "{provider} rechazó la solicitud de este chat y no indicó la causa. Esto puede ocurrir en un chat largo con muchas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.codexAudioRefused":
-    "El modelo no aceptó el audio de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Inténtalo de nuevo.",
+    "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":
