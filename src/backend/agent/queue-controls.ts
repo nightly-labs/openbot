@@ -279,6 +279,7 @@ export class QueueControls {
       this.#mailboxSync.emitQueue(agent.id);
       return yield* new QueueOperationFailed({ cause: new SteerUnsupportedError() });
     }
+    const liveSnapshot = () => this.#conversation.ensureSnapshot(agent.id, publicThreadId);
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
@@ -319,7 +320,7 @@ export class QueueControls {
             toQueueOperationFailed,
             Effect.andThen(
               queueStep(() => {
-                this.#mailboxSync.syncMailboxMessages(snapshot);
+                this.#mailboxSync.syncMailboxMessages(liveSnapshot());
                 this.#mailboxSync.emitQueue(agent.id);
                 this.#drain.scheduleDrain(agent.id);
               }),
@@ -329,16 +330,17 @@ export class QueueControls {
       );
     yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
+      const current = liveSnapshot();
       if (
-        this.#conversation.isExecutionThread(snapshot.threadId) &&
-        !snapshot.messages.some((message) => message.id === input.deliveryId)
+        this.#conversation.isExecutionThread(current.threadId) &&
+        !current.messages.some((message) => message.id === input.deliveryId)
       ) {
-        snapshot.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
-        this.#mailboxSync.syncDeliveryMessage(snapshot, input.deliveryId);
+        current.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
+        this.#mailboxSync.syncDeliveryMessage(current, input.deliveryId);
       }
-      this.#mailboxSync.syncMailboxMessages(snapshot);
+      this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
+      this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
     });
   }, Effect.uninterruptible);
 }
