@@ -60,7 +60,15 @@ export const EuCountryWrongVatId: Story = {
   render: () => <PricingStory details={{ country: "FR", vatId: "DE123456789" }} />,
 };
 
-/** A buyer outside the EU: no VAT ID field. */
+/**
+ * A consumer in the United Kingdom: no VAT ID field. A consumer there also has a 14-day right of withdrawal, so a
+ * server order asks for the early start, as in the EU. Turkey is the same.
+ */
+export const UnitedKingdom: Story = {
+  render: () => <PricingStory details={{ country: "GB", vatId: "" }} />,
+};
+
+/** A buyer outside the EU, the United Kingdom and Turkey: no VAT ID field and no early start box. */
 export const OutsideEu: Story = {
   render: () => <PricingStory details={{ country: "US", vatId: "" }} />,
 };
