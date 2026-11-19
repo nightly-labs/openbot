@@ -74,6 +74,7 @@ export const messages = {
   "status.agent.browserActing": "Gebruikt de webpagina…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
+  "status.agent.chatsSearching": "Doorzoekt eerdere chats…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",
     other: "Herinneringen doorzocht: {count} gevonden",

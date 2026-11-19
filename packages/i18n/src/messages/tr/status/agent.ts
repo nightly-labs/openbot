@@ -70,6 +70,7 @@ export const messages = {
   "status.agent.browserActing": "Web sayfası kullanılıyor…",
   "status.agent.browserReviewing": "Web sayfası inceleniyor…",
   "status.agent.memoriesSearching": "Belleklerinde arıyor…",
+  "status.agent.chatsSearching": "Önceki sohbetlerinde arıyor…",
   "status.agent.memoriesSearched": {
     one: "Belleklerinde aradı: {count} bulundu",
     other: "Belleklerinde aradı: {count} bulundu",

@@ -73,6 +73,7 @@ export const messages = {
   "status.agent.browserActing": "Webseite wird bedient…",
   "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
+  "status.agent.chatsSearching": "Frühere Chats werden durchsucht…",
   "status.agent.memoriesSearched": {
     one: "Erinnerungen durchsucht: {count} gefunden",
     other: "Erinnerungen durchsucht: {count} gefunden",
