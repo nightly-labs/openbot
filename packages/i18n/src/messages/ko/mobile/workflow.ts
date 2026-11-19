@@ -37,6 +37,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "실행 {number}이(가) 기다리고 있어요. 검토",
   "mobile.workflow.detail.trigger": "트리거",
   "mobile.workflow.detail.nextRun": "다음 실행: {time}",
+  "mobile.workflow.detail.nextRunAfter": "다음 실행: 실행 {number} 종료 후",
   "mobile.workflow.detail.copyWebhook": "웹훅 주소 복사",
   "mobile.workflow.detail.runs": "실행",
   "mobile.workflow.detail.allRuns": "모든 실행 보기",

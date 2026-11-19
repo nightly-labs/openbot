@@ -38,6 +38,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "A execução {number} espera por você. Revisar",
   "mobile.workflow.detail.trigger": "Gatilho",
   "mobile.workflow.detail.nextRun": "Próxima execução: {time}",
+  "mobile.workflow.detail.nextRunAfter": "Próxima execução: quando a execução {number} terminar",
   "mobile.workflow.detail.copyWebhook": "Copiar endereço do webhook",
   "mobile.workflow.detail.runs": "Execuções",
   "mobile.workflow.detail.allRuns": "Ver todas as execuções",

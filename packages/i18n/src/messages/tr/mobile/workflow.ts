@@ -38,6 +38,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "{number}. çalıştırma sizi bekliyor. İncele",
   "mobile.workflow.detail.trigger": "Tetikleyici",
   "mobile.workflow.detail.nextRun": "Sonraki çalıştırma: {time}",
+  "mobile.workflow.detail.nextRunAfter": "Sonraki çalıştırma: {number}. çalıştırma bitince",
   "mobile.workflow.detail.copyWebhook": "Webhook adresini kopyala",
   "mobile.workflow.detail.runs": "Çalıştırmalar",
   "mobile.workflow.detail.allRuns": "Tüm çalıştırmaları gör",

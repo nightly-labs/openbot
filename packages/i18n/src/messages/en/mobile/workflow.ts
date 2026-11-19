@@ -36,6 +36,7 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.detail.waits": "Run {number} waits for you. Review",
   "mobile.workflow.detail.trigger": "Trigger",
   "mobile.workflow.detail.nextRun": "Next run: {time}",
+  "mobile.workflow.detail.nextRunAfter": "Next run: after run {number} ends",
   "mobile.workflow.detail.copyWebhook": "Copy webhook address",
   "mobile.workflow.detail.runs": "Runs",
   "mobile.workflow.detail.allRuns": "See all runs",

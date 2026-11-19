@@ -195,6 +195,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "Uitvoeren met laatste event",
   "workflow.trigger.webhook.address": "Adres",
   "workflow.trigger.nextRunName": "Volgende run",
+  "workflow.trigger.nextRunAfter": "Na het einde van run {number}",
   "workflow.condition.title": "Voorwaarde",
   "workflow.condition.name": "voorwaarde",
   "workflow.condition.rule": "Regel",

@@ -200,6 +200,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "הרצה עם האירוע האחרון",
   "workflow.trigger.webhook.address": "כתובת",
   "workflow.trigger.nextRunName": "ההרצה הבאה",
+  "workflow.trigger.nextRunAfter": "אחרי שהרצה {number} תסתיים",
   "workflow.condition.title": "תנאי",
   "workflow.condition.name": "תנאי",
   "workflow.condition.rule": "כלל",

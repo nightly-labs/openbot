@@ -204,6 +204,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "Son olayla çalıştır",
   "workflow.trigger.webhook.address": "Adres",
   "workflow.trigger.nextRunName": "Sonraki çalıştırma",
+  "workflow.trigger.nextRunAfter": "{number}. çalıştırma bitince",
 
   "workflow.condition.title": "Koşul",
   "workflow.condition.name": "koşul",

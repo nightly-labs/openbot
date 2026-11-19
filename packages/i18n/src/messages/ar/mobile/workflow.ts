@@ -58,6 +58,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "التشغيل {number} في انتظارك. مراجعة",
   "mobile.workflow.detail.trigger": "المشغّل",
   "mobile.workflow.detail.nextRun": "التشغيل التالي: {time}",
+  "mobile.workflow.detail.nextRunAfter": "التشغيل التالي: بعد انتهاء التشغيل {number}",
   "mobile.workflow.detail.copyWebhook": "نسخ عنوان الـ webhook",
   "mobile.workflow.detail.runs": "عمليات التشغيل",
   "mobile.workflow.detail.allRuns": "عرض كل عمليات التشغيل",

@@ -37,6 +37,7 @@ export const messages = {
   "mobile.workflow.detail.waits": "הרצה {number} ממתינה לך. בדיקה",
   "mobile.workflow.detail.trigger": "טריגר",
   "mobile.workflow.detail.nextRun": "ההרצה הבאה: {time}",
+  "mobile.workflow.detail.nextRunAfter": "ההרצה הבאה: אחרי שהרצה {number} תסתיים",
   "mobile.workflow.detail.copyWebhook": "העתקת כתובת ה-webhook",
   "mobile.workflow.detail.runs": "הרצות",
   "mobile.workflow.detail.allRuns": "הצגת כל ההרצות",

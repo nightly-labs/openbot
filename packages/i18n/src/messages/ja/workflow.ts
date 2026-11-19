@@ -201,6 +201,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "最後のイベントで実行",
   "workflow.trigger.webhook.address": "アドレス",
   "workflow.trigger.nextRunName": "次回の実行",
+  "workflow.trigger.nextRunAfter": "実行 {number} の終了後",
 
   "workflow.condition.title": "条件",
   "workflow.condition.name": "条件",

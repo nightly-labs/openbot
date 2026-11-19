@@ -204,6 +204,7 @@ export const messages = {
   "workflow.trigger.runLastEvent": "Ejecutar con el último evento",
   "workflow.trigger.webhook.address": "Dirección",
   "workflow.trigger.nextRunName": "Próxima ejecución",
+  "workflow.trigger.nextRunAfter": "Cuando termine la ejecución {number}",
 
   "workflow.condition.title": "Condición",
   "workflow.condition.name": "condición",

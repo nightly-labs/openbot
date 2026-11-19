@@ -203,6 +203,7 @@ export const messages = defineMessages("workflow", {
   "workflow.trigger.runLastEvent": "Run with last event",
   "workflow.trigger.webhook.address": "Address",
   "workflow.trigger.nextRunName": "Next run",
+  "workflow.trigger.nextRunAfter": "After run {number} ends",
 
   "workflow.condition.title": "Condition",
   "workflow.condition.name": "condition",
