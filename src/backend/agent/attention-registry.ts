@@ -912,7 +912,7 @@ export class AttentionRegistry {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
       if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {

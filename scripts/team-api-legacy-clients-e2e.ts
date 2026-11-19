@@ -1619,6 +1619,7 @@ try {
       sourceText("error.backend.authRequestInactive"),
       `The answer did not reach the agent service: ${JSON.stringify(frame)}.`,
     );
+    assert.equal(error?.status, 409, `A closed secure authentication request was not a 409: ${JSON.stringify(frame)}.`);
     return { status: error?.status };
   });
 

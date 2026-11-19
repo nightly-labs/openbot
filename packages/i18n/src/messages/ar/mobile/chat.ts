@@ -463,6 +463,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "لا يمكن تشغيل هذا الملف الصوتي.",
   "mobile.chat.browserSecret.password": "كلمة المرور",
   "mobile.chat.browserSecret.authenticatorCode": "رمز المصادقة",
+  "mobile.chat.browserSecret.ended": "انتهى طلب تسجيل الدخول هذا. اطلب من الوكيل المحاولة مرة أخرى.",
   "mobile.chat.browserSecret.oneTimeCode": "رمز لمرة واحدة",
   "mobile.chat.browserSecret.takeoverTitle": "تولي التحكم في المتصفح",
   "mobile.chat.browserSecret.takeoverBody": "أكمل هذه الخطوة في المتصفح على الحاسوب الذي يشغّل OpenBot.",

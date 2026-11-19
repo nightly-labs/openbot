@@ -386,6 +386,8 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Diese Audiodatei kann nicht abgespielt werden.",
   "mobile.chat.browserSecret.password": "Passwort",
   "mobile.chat.browserSecret.authenticatorCode": "Authentifizierungscode",
+  "mobile.chat.browserSecret.ended":
+    "Diese Anmeldeanfrage ist beendet. Bitte den Agenten, es noch einmal zu versuchen.",
   "mobile.chat.browserSecret.oneTimeCode": "Einmalcode",
   "mobile.chat.browserSecret.takeoverTitle": "Browserübernahme",
   "mobile.chat.browserSecret.takeoverBody":

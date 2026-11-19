@@ -95,6 +95,7 @@ export const messages = {
   "browser.secret.takeOver": "Übernehmen",
   "browser.secret.failed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "browser.secret.ended": "Diese Anmeldeanfrage ist beendet. Bitte den Agenten, es noch einmal zu versuchen.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
   "browser.secret.vaultSkip.fieldKind":

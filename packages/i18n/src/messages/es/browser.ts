@@ -92,6 +92,7 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Intervenir",
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
+  "browser.secret.ended": "Esta solicitud de inicio de sesión terminó. Pide al agente que lo intente de nuevo.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
   "browser.secret.vaultSkip.fieldKind":

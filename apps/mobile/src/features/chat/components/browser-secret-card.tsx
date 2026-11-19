@@ -6,6 +6,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -187,10 +188,10 @@ export function BrowserSecretComposer({
   request: BrowserTakeoverRequest;
   respond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
-  const { t } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<MobileTextKey | null>(null);
   const password = request.secret?.method === "password";
   const digits = request.secret?.digits ?? 6;
   const title = password
@@ -207,7 +208,7 @@ export function BrowserSecretComposer({
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
     setPending(true);
-    setError(false);
+    setError(null);
     const identity = { agentId: request.agentId, requestId: request.requestId };
     const input: RespondToBrowserSecretInput =
       decision === "submit" ? { ...identity, decision, secret: value } : { ...identity, decision };
@@ -215,9 +216,11 @@ export function BrowserSecretComposer({
     try {
       await respond(input);
       void haptics.notification("success");
-    } catch {
+    } catch (cause) {
       void haptics.notification("error");
-      setError(true);
+      const failed = t("mobile.chat.browserSecret.submitFailed");
+      const ended = errorMessage(cause, failed) === sourceText(englishSourceText("error.backend.authRequestInactive"));
+      setError(ended ? "mobile.chat.browserSecret.ended" : "mobile.chat.browserSecret.submitFailed");
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);
@@ -248,7 +251,7 @@ export function BrowserSecretComposer({
         </Button>
         {error ? (
           <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
-            {t("mobile.chat.browserSecret.submitFailed")}
+            {t(error)}
           </Typography.Paragraph>
         ) : null}
       </BrowserRequestCard>

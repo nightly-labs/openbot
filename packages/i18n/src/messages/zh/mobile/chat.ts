@@ -363,6 +363,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "无法播放该音频文件。",
   "mobile.chat.browserSecret.password": "密码",
   "mobile.chat.browserSecret.authenticatorCode": "验证器验证码",
+  "mobile.chat.browserSecret.ended": "此登录请求已结束。请让助手再试一次。",
   "mobile.chat.browserSecret.oneTimeCode": "一次性验证码",
   "mobile.chat.browserSecret.takeoverTitle": "接管浏览器",
   "mobile.chat.browserSecret.takeoverBody": "请在运行 OpenBot 的电脑上的浏览器中完成该步骤。",

@@ -347,6 +347,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Kan dit audiobestand niet afspelen.",
   "mobile.chat.browserSecret.password": "Wachtwoord",
   "mobile.chat.browserSecret.authenticatorCode": "Authenticatiecode",
+  "mobile.chat.browserSecret.ended": "Dit aanmeldverzoek is beëindigd. Vraag de agent het nog eens te proberen.",
   "mobile.chat.browserSecret.oneTimeCode": "Eenmalige code",
   "mobile.chat.browserSecret.takeoverTitle": "Browser overnemen",
   "mobile.chat.browserSecret.takeoverBody": "Voltooi deze stap in de browser op de computer waarop OpenBot draait.",

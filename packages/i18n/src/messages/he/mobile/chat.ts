@@ -378,6 +378,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "לא ניתן להשמיע את קובץ השמע הזה.",
   "mobile.chat.browserSecret.password": "סיסמה",
   "mobile.chat.browserSecret.authenticatorCode": "קוד אימות",
+  "mobile.chat.browserSecret.ended": "בקשת ההתחברות הזו הסתיימה. צריך לבקש מהסוכן לנסות שוב.",
   "mobile.chat.browserSecret.oneTimeCode": "קוד חד-פעמי",
   "mobile.chat.browserSecret.takeoverTitle": "השתלטות על הדפדפן",
   "mobile.chat.browserSecret.takeoverBody": "יש להשלים את השלב הזה בדפדפן במחשב שמריץ את OpenBot.",

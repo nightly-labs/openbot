@@ -373,6 +373,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "이 오디오 파일을 재생할 수 없어요.",
   "mobile.chat.browserSecret.password": "비밀번호",
   "mobile.chat.browserSecret.authenticatorCode": "인증 앱 코드",
+  "mobile.chat.browserSecret.ended": "이 로그인 요청은 종료되었어요. 에이전트에게 다시 시도해 달라고 요청해 주세요.",
   "mobile.chat.browserSecret.oneTimeCode": "일회용 코드",
   "mobile.chat.browserSecret.takeoverTitle": "브라우저 직접 제어",
   "mobile.chat.browserSecret.takeoverBody": "OpenBot을 실행하는 컴퓨터의 브라우저에서 이 단계를 완료해 주세요.",

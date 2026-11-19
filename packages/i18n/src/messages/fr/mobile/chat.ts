@@ -386,6 +386,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Impossible de lire ce fichier audio.",
   "mobile.chat.browserSecret.password": "Mot de passe",
   "mobile.chat.browserSecret.authenticatorCode": "Code d’authentification",
+  "mobile.chat.browserSecret.ended": "Cette demande de connexion est terminée. Demandez à l’agent de réessayer.",
   "mobile.chat.browserSecret.oneTimeCode": "Code à usage unique",
   "mobile.chat.browserSecret.takeoverTitle": "Prise de contrôle du navigateur",
   "mobile.chat.browserSecret.takeoverBody":
