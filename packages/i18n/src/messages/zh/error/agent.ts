@@ -159,7 +159,9 @@ export const messages = {
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
   "error.agent.mcpServerHeadersNeedHttp":
-    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请用户在市场、应用、{name} 中输入其密钥。",
+    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请让用户在“市场 → 应用 → {name}”中输入它的密钥。",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "只有此 OpenBot 的用户可以在与你的聊天中提供 MCP 服务器 {name} 的密钥。请让用户在“市场 → 应用 → {name}”中输入密钥。",
   "error.agent.mcpServerBuiltIn":
     "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",

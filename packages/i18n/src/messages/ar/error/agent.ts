@@ -173,6 +173,8 @@ export const messages = {
     "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في المتجر، التطبيقات، {name}.",
   "error.agent.mcpServerHeadersNeedHttp":
     "يشغّل خادم MCP {name} أمرًا محليًا، لذا لا يقبل ترويسات. اطلب من المستخدم إدخال مفاتيحه في المتجر، التطبيقات، {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "يمكن لمستخدم OpenBot هذا فقط، في محادثة معك، أن يعطي مفاتيح خادم MCP {name}. اطلب من المستخدم إدخالها في المتجر، التطبيقات، {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} جزء من OpenBot، لذلك لا يمكن لأدوات MCP اختباره أو تشغيله أو إيقافه أو إزالته. يتحكم فيه المستخدم على الحاسوب الذي يشغّل OpenBot: اتصال GitHub في المتجر، التطبيقات، GitHub، والتحكم في الحاسوب في الإعدادات، التحكم في الحاسوب.",
   "error.agent.mcpServerUnknown": "لا يوجد خادم MCP باسم {name}. استدعِ list_mcp_servers لمعرفة الأسماء.",

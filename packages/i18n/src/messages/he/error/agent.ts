@@ -172,6 +172,8 @@ export const messages = {
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerHeadersNeedHttp":
     "שרת ה-MCP {name} מריץ פקודה מקומית, ולכן אינו מקבל כותרות. בקש מהמשתמש להזין את המפתחות שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "רק המשתמש של OpenBot זה, בצ'אט איתך, יכול לתת את המפתחות של שרת ה-MCP {name}. בקש מהמשתמש להזין אותם בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",

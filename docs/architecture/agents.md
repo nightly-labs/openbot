@@ -881,8 +881,11 @@ the tools. Full access answers it, as for other built-in tool approvals. `save_m
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
 server that needs an OAuth sign-in or a key is saved. `save_mcp_server` takes the headers of an http
 server that the user gave in the conversation, such as `Authorization: Bearer <token>`: each one sets or
-replaces the header of that name, an empty value removes it, and OpenBot registers each value as a
-secret before the approval, so logs and results mask it. The tools never take an environment value and
+replaces the header of that name, and an empty value removes it. OpenBot registers the value of each
+header with a secret name before it parses the call, so logs mask it, and a failure masks every new
+value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
+key that the local user wrote in the request of the task, and elsewhere only a person's message. The
+approval names the headers that change. The tools never take an environment value and
 never return a header or environment value, and show an address without its query. The user can also
 enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
 and environment, and an edit that would send them to another transport, origin, command, arguments or

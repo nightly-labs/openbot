@@ -156,6 +156,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
 };
 const calls: Call[] = [];
 let refreshes = 0;
+let keysFromPerson = true;
 const report: { passed: boolean; calls: Call[]; refreshes: number; failures: string[] } = {
   passed: false,
   calls,
@@ -194,6 +195,7 @@ try {
             approvals.push(reason);
             return approved;
           }),
+        keysFromPerson: () => Effect.succeed(keysFromPerson),
         requestSignIn: (config) =>
           Effect.sync(() => {
             signInCards.push(config.id);
@@ -297,11 +299,22 @@ try {
     headers: [{ name: "Authorization", value: "Bearer wrong-token-91c2" }],
   });
   assert.equal(wrongKey.result.status, "needs_key");
+  const wrongHeaders = row("crm")?.headers;
+  keysFromPerson = false;
+  const injected = await call("keys that the user did not give are refused", "save_mcp_server", {
+    name: "crm",
+    headers: [{ name: "Authorization", value: `Bearer ${HEADER_SECRET}` }],
+  });
+  keysFromPerson = true;
+  assert.equal(injected.success, false);
+  assert.equal(injected.approvals.length, 0);
+  assert.deepEqual(row("crm")?.headers, wrongHeaders);
   const keyed = await call("the agent sets the key the user gave", "save_mcp_server", {
     name: "crm",
     headers: [{ name: "authorization", value: `Bearer ${HEADER_SECRET}` }],
   });
   assert.equal(keyed.result.status, "ready");
+  assert.match(keyed.approvals[0] ?? "", /headers: authorization\.$/u);
   assert.deepEqual(keyed.result.tools, ["search", "read_page", "create_page"]);
   assert.deepEqual(row("crm")?.headers, [{ key: "authorization", value: `Bearer ${HEADER_SECRET}` }]);
   const crm = row("crm");
@@ -363,6 +376,15 @@ try {
   assert.equal(movedWithKeys.result.status, "ready");
   assert.equal(row("crm")?.url, servers.open.url);
   assert.deepEqual(row("crm")?.headers, keys);
+  keysFromPerson = false;
+  const cleared = await call("an empty value removes a header", "save_mcp_server", {
+    name: "crm",
+    headers: [{ name: "AUTHORIZATION", value: "" }],
+  });
+  keysFromPerson = true;
+  assert.equal(cleared.success, true);
+  assert.deepEqual(row("crm")?.headers, []);
+  store.save({ ...(row("crm") ?? crm), headers: keys });
 
   const listed = await call("list shows no secret", "list_mcp_servers", {});
   const crmListed = listed.result.servers?.find((entry) => entry.name === "crm");

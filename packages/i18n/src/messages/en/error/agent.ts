@@ -183,6 +183,8 @@ export const messages = defineMessages("error.agent", {
     "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Marketplace, Apps, {name}.",
   "error.agent.mcpServerHeadersNeedHttp":
     "The MCP server {name} runs a local command, so it takes no headers. Ask the user to enter its keys in Marketplace, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Only the user of this OpenBot, in a chat with you, can give the keys of the MCP server {name}. Ask the user to enter them in Marketplace, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is part of OpenBot, so the MCP tools cannot test, turn on or off, or remove it. The user controls it on the computer that runs OpenBot: the GitHub connection in Marketplace, Apps, GitHub, and Computer Use in Settings, Computer Use.",
   "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",

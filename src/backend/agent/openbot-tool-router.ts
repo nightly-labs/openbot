@@ -2724,8 +2724,29 @@ export class OpenBotToolRouter {
             Effect.map((decision) => decision === "accept"),
             toToolOperationFailed,
           ),
+      keysFromPerson: (values) => this.#keysFromPerson(agentId, params.turnId, threadId, values),
       requestSignIn: (config) => toolStep(() => this.#postMcpSignInCard(agentId, threadId, params.turnId, config)),
     });
+  });
+
+  readonly #keysFromPerson = Effect.fn("OpenBotToolRouter.keysFromPerson")(function* (
+    this: OpenBotToolRouter,
+    agentId: string,
+    turnId: string,
+    threadId: string,
+    values: readonly string[],
+  ) {
+    if (this.#messaging.store.linkForThread(threadId)) return false;
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId) return this.#requestedByPerson(agentId, turnId, threadId);
+    for (const value of values) {
+      const token = value.trim().split(/\s+/u).at(-1) ?? value;
+      const holds = yield* this.#channels
+        .localRequestHolds(channelId, agentId, turnId, token)
+        .pipe(Effect.catch(() => Effect.succeed(false)));
+      if (!holds) return false;
+    }
+    return true;
   });
 
   readonly #searchSignIns = Effect.fn("OpenBotToolRouter.searchSignIns")(function* (

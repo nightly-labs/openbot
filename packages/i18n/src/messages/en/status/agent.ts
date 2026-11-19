@@ -118,6 +118,7 @@ export const messages = defineMessages("status.agent", {
     "Add the MCP server {name}: {target}. Every agent on this server gets its tools. OpenBot connects to it to test it.",
   "status.agent.mcpServerChange":
     "Change the MCP server {name} to {target}. Every agent on this server gets its tools. OpenBot connects to it to test it.",
+  "status.agent.mcpServerHeaders": "It also changes these headers: {names}.",
   "status.agent.mcpServerEnable": "Turn on the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerDisable": "Turn off the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerRemove": "Remove the MCP server {name} and its sign-in from every agent on this server.",
