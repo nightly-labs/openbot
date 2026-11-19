@@ -344,7 +344,7 @@ import { createWebAgentImportCalls } from "./web-agent-import";
 import { createWebAgentThreads } from "./web-agent-threads";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { openWebLink } from "./web-attachments";
-import { createWebBillingCalls, createWebLicenseCalls, type WebAppStart } from "./web-billing";
+import { createWebBillingCalls, createWebLicenseCalls, createWebReferralCalls, type WebAppStart } from "./web-billing";
 import { webBitwardenConnectorPort } from "./web-bitwarden-connector";
 import { createWebChannelsPort } from "./web-channels-runtime";
 import { createWebChatHistory, type WebChatHistoryEntry } from "./web-chat-history";
@@ -1503,6 +1503,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const billing = createBillingStore(() => billingCalls, billingOpen);
   const licenseCalls = createWebLicenseCalls(props.accountFetch);
   const license = createLicenseStore(() => licenseCalls, billingOpen, trackLicenseEvent);
+  // Invite friends is a tab of the account settings: its store loads while that tab shows.
+  const referralCalls = createWebReferralCalls(props.accountFetch);
   // The web client has no Hosted servers settings, so a server whose plan ended is renewed or deleted in Billing.
   const billingHostedServers = createSettingsHostedServersStore(
     {
@@ -3606,6 +3608,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         appearance={props.appearance}
                         onChangeAppearance={props.onChangeAppearance}
                         onOpenBilling={() => setBillingOpen(true)}
+                        referral={referralCalls}
                         onSignOut={signOut}
                         notifications={notificationSettings}
                         notificationFocusRequest={notificationFocusRequest()}

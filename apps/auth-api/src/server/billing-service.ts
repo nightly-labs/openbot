@@ -42,6 +42,7 @@ import {
   ORDER_METADATA,
   parseLicenseOrder,
 } from "@openbot/contracts/license";
+import type { ReferralMoney } from "@openbot/contracts/referral";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer } from "effect";
@@ -63,6 +64,7 @@ import {
 } from "./billing-errors";
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
+import { BillingReferral } from "./billing-referral";
 import {
   type BillingSales,
   type BillingSalesSynced,
@@ -79,6 +81,7 @@ import {
   type LicenseSync,
   ordersLicense,
 } from "./license-service";
+import { Referrals } from "./referrals";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { StripeTransportError } from "./stripe-client";
 import {
@@ -292,6 +295,7 @@ export class BillingService {
   readonly #vies: ViesClient;
   readonly #onVatMismatch: ((text: string) => void) | null;
   readonly #oss: BillingOss | null;
+  readonly #referral: BillingReferral;
   readonly #countryRequired: boolean;
   /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
@@ -318,6 +322,13 @@ export class BillingService {
       onSubscriptionSynced,
       analytics: this.#analytics,
     });
+    this.#referral = new BillingReferral({
+      database,
+      stripe,
+      referrals: new Referrals({ database, now }),
+      now,
+      ensureCustomer: (user) => this.ensureCustomer(user),
+    });
     this.license = new LicenseService({
       database,
       stripe,
@@ -326,6 +337,7 @@ export class BillingService {
       countryRequired: this.#countryRequired,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
+      referralCoupon: (userId) => this.#referral.couponFor(userId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
@@ -379,6 +391,10 @@ export class BillingService {
    * The Stripe customer of the account. The service makes it before the first Checkout, so two open
    * Checkouts use one customer and the webhook always knows the account.
    */
+
+  /** The invite credit that Stripe takes off the next invoice of the account, for each currency. */
+  readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
+    this.#referral.credit(userId);
 
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (
@@ -479,6 +495,7 @@ export class BillingService {
       yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
       const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const referralCouponId = yield* this.#referral.couponFor(request.user.id);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
       // During a promotion the license is free until its trial end, so the order pays for the server only.
@@ -519,6 +536,7 @@ export class BillingService {
               }
             : {}),
           ...(request.promotionCode ? { promotionCode: request.promotionCode } : {}),
+          ...(referralCouponId ? { referralCouponId } : {}),
           // Stripe puts the session ID in the URL. The desktop return page sends it with the first
           // website visit of the browser, so that the saved checkout names the account.
           successUrl:
@@ -1079,6 +1097,7 @@ export class BillingService {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
       if (this.#oss) yield* this.#oss.record(event);
+      yield* this.#referral.record(event, payment, sold?.userId ?? null);
       // The event is recorded only after it is applied, so a failed event is applied again on retry.
       yield* billingCall(() =>
         dependencies.database.batch([

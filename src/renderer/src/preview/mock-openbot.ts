@@ -248,6 +248,7 @@ import { createMockMessaging } from "./mock-messaging";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
+import { createMockReferral } from "./mock-referral";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
 import { mockRoutineFlows } from "./mock-routine-flows";
@@ -1785,6 +1786,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     passwordManagers: createMockPasswordManagers(),
     vault: createMockVault(),
     billing: createMockBilling(billingPlans),
+    referral: createMockReferral(),
     license: createMockLicense(),
     routineFeed: createMockRoutineFeed(),
     hostedServers: createMockHostedServers(billingPlans),

@@ -406,6 +406,8 @@ export function decodeTestCompanySignInResult(value: unknown): TestCompanySignIn
 export interface VerifyEmailCodeInput {
   challengeId: string;
   code: string;
+  /** The invite code that the person typed at sign-in. The account server uses it only for a new account. */
+  referralCode?: string;
 }
 
 export type MacPermissionId = "screen-recording" | "accessibility";

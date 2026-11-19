@@ -8,10 +8,12 @@ import {
   parsePricingOrder,
 } from "@openbot/contracts/license";
 import { readPromotionCode } from "@openbot/contracts/promotion-code";
+import { parseReferralState } from "@openbot/contracts/referral";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
 import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
+import type { ReferralCalls } from "@openbot/ui/features/referral/referral-store";
 import { currentText } from "@openbot/ui/text";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -82,6 +84,19 @@ export function createWebLicenseCalls(
     setUsers: (users) => state("v1/me/license/users", JSON.stringify(users)),
     changePlan: (plan) => state("v1/me/license/plan", JSON.stringify(plan)),
     setRenewal: (renewal) => state("v1/me/license/renewal", JSON.stringify(renewal)),
+  };
+}
+
+/** The Invite friends calls for a signed-in browser, through the `/api/browser/v1/me/referrals` operations. */
+export function createWebReferralCalls(accountFetch: typeof fetch): ReferralCalls {
+  const request = browserRequest(accountFetch);
+  return {
+    async getState(page) {
+      const query = new URLSearchParams({ filter: page.filter, page: String(page.page) });
+      const state = await request(`v1/me/referrals?${query.toString()}`, parseReferralState);
+      if (!state) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return state;
+    },
   };
 }
 

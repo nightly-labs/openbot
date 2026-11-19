@@ -72,13 +72,9 @@
   margin-top: 1px;
 }
 
-/* Under the box, the lock line and the Terms notice form the footer of the form. */
-.web-consent-row + .account-login-footer {
-  margin-top: var(--openbot-space-3);
-}
-
-.account-login-footer .first-run-consent-notice {
-  width: 100%;
+/* The Terms notice sits under the lock line in the page footer of the sign-in screen. */
+.account-login-legal .first-run-consent-notice {
+  width: auto;
   margin: 0;
 }
 

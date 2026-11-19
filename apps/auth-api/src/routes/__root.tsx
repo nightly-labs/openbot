@@ -4,6 +4,7 @@ import { createRootRoute, type ErrorComponentProps, HeadContent, Outlet, Scripts
 import { createSignal, onSettled, Show } from "solid-js";
 import "@openbot/brand/logo.css";
 import { rememberPromotionCode } from "@openbot/contracts/promotion-code";
+import { rememberReferralCode } from "@openbot/contracts/referral";
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import "../styles.css";
 import { NotFoundPage } from "../components/landing/NotFoundPage";
@@ -51,6 +52,8 @@ function RootComponent() {
   onSettled(() => installPointerFocusGuard());
   // A discount link (`?promo=CODE`) on any page: the web client sends the code with the next Checkout.
   onSettled(() => rememberPromotionCode(() => window.localStorage, window.location.href, Date.now()));
+  // An invite link (`?ref=CODE`) on any page: the web client sends the code when a new account signs up.
+  onSettled(() => rememberReferralCode(() => window.localStorage, window.location.href, Date.now()));
   return <Outlet />;
 }
 

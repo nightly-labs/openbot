@@ -38,6 +38,7 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.email.description": "Enter your email address. We will send you a one-time code.",
   "mobile.auth.email.label": "Email",
   "mobile.auth.email.placeholder": "you@example.com",
+  "mobile.auth.email.inviteCode": "Invite link or code (optional)",
   "mobile.auth.email.send": "Send code",
   "mobile.auth.email.sending": "Sending code…",
   "mobile.auth.email.tryAgainIn": "Try again in {time}",
@@ -60,6 +61,7 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.email.companyWaiting": "Waiting for your company sign-in…",
   "mobile.auth.email.developmentCode": "Development code: {code}",
   "mobile.auth.email.error.invalidEmail": "Enter a valid email address.",
+  "mobile.auth.email.error.inviteCode": "Enter an invite link or an 8-character invite code.",
   "mobile.auth.email.error.wait": "Wait before you request another code.",
   "mobile.auth.email.error.deliveryUnconfirmed":
     "OpenBot could not confirm that the code was sent. Check delivery before you send another code.",
