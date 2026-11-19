@@ -3282,6 +3282,7 @@ export async function createApplicationServices({
       }),
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
+    remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
