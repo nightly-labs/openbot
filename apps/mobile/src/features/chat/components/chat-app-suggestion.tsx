@@ -6,6 +6,7 @@ import Check from "lucide-react-native/icons/check";
 import { type ReactNode, useMemo } from "react";
 import { View } from "react-native";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { dismissAppSuggestion, useAppSuggestionDismissals } from "@/features/chat/model/app-suggestion-dismissals";
 import { ListingIcon } from "@/features/marketplace/components/marketplace-parts";
 import { appListings, CONNECTOR_TAGLINES } from "@/features/marketplace/model/marketplace-listings";
@@ -160,6 +161,7 @@ function SuggestionCard({
   onConnect: () => void;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const dismissed = useAppSuggestionDismissals((store) => store.ids.includes(messageId));
   const frame = "w-full max-w-[92%] self-start";
@@ -191,10 +193,7 @@ function SuggestionCard({
         ? t("mobile.chat.appSuggestion.unavailable", { name })
         : tagline;
   return (
-    <View
-      className={`${frame} flex-row items-center gap-3 rounded-[20px] bg-control/60 p-3`}
-      style={{ borderCurve: "circular" }}
-    >
+    <View className={`${frame} flex-row items-center gap-3 rounded-[20px] ${card.fillClass} p-3`} style={card.style}>
       {icon}
       <View className="min-w-0 flex-1 gap-0.5">
         <Typography weight="medium" numberOfLines={1}>

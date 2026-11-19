@@ -234,6 +234,8 @@ export const messages = {
     '엔드포인트 "{provider}"이(가) 요청을 거부했어요. API 키 또는 헤더가 잘못되었거나, 계정이 이 모델을 사용할 수 없을 수 있어요. 서버 설정 → 제공자에서 확인하거나 다른 모델을 선택한 다음 다시 시도해 주세요.',
   "error.provider.customEndpointKeyMissing":
     '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
+  "error.provider.customEndpointEffortRefused":
+    '엔드포인트 "{provider}"가 이 모델의 추론 강도를 거부했어요. 서버 설정 → 제공자에서 "{provider}"를 편집해 주세요. 추론 강도에서 이 모델이 받는 강도만 남기거나, 추론 안 함을 선택해 주세요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeKeyRefused":
@@ -262,6 +264,10 @@ export const messages = {
     "이 모델은 사용할 수 없어요. 이 에이전트에 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 설정에서 사용자 지정 제공자를 열고 이 엔드포인트의 편집을 클릭한 다음 이 모델의 최대 출력을 더 크게 설정하세요. 또는 더 낮은 강도나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":
@@ -286,6 +292,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider}이(가) 몇 가지 단계를 실행한 뒤 답변 없이 턴을 끝냈어요. 같은 요청을 다시 보내기 전에 에이전트에게 무엇을 했는지 물어보세요.",
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",
+  "error.provider.channelNoAnswer":
+    "{provider}이(가) 답변 없이 턴을 끝냈어요. 채널에서 '계속'을 눌러 작업을 다시 실행하거나, '다시 배정'을 눌러 다른 멤버에게 넘겨 주세요.",
   "error.provider.chatgptPageFailed": "OpenBot이 ChatGPT 연결 페이지를 열 수 없었어요.",
   "error.provider.noneReady": "준비된 에이전트 제공자가 없어요.",
   "error.provider.claudeTurnActive": "컨텍스트를 새로 고치기 전에 진행 중인 Claude 턴이 끝날 때까지 기다려 주세요.",

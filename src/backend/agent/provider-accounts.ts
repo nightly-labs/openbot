@@ -779,7 +779,7 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization })) {
+          if (afterSignIn && email && this.#loginTaken(provider, account.id, { email, organization })) {
             this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
