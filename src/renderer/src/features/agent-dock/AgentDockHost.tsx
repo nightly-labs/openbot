@@ -395,9 +395,12 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   });
   const agentMessages = (agentId: string): AgentMessage[] => {
     const running = workingTurns()[agentId];
+    /* A turn that waits for an answer shows its last note above the question, as the main chat does:
+       the question is often about it, such as a draft to approve (#12544). */
+    const asking = promptOf({ kind: "agent", id: agentId })?.turnId;
     return withStepAnswers(
       (conversations[agentId]?.messages ?? []).map(asOwn),
-      new Set(running ? [running] : []),
+      new Set(running && running !== asking ? [running] : []),
       () => agentList().find((agent) => agent.id === agentId)?.provider,
     );
   };

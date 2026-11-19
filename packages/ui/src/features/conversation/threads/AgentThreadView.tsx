@@ -665,11 +665,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   }
   /**
    * The action row of a message. The compact row has Reply, and More with the items of the right-click
-   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn.
+   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn. The text
+   * above a waiting question is a step of the turn, so it has no actions, as in the agent's chat.
    */
   function messageActions(message: AgentMessage): JSX.Element | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return (
       <Show
         when={props.compactMessageActions !== false}
@@ -709,7 +710,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   /** The right-click menu of a message, with the items of its More button. */
   function messageMenu(message: AgentMessage): (() => JSX.Element) | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return () => <MessageMenu {...menuItems(message, onCopy)} authorName={author(message).name} />;
   }
   /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */

@@ -29,6 +29,7 @@ import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatC
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
+import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
 import { useTurnTrace } from "./turn-trace";
 
@@ -105,6 +106,8 @@ export function ConversationThread() {
     [],
     { key: "id" },
   );
+  /** The rows, with the agent's text above the question that waits, as in the agent's chat (#12544). */
+  const shownMessages = createMemo(() => withQuestionContext(messages, messages, props.prompt?.turnId));
   // The thread gets only the latest progress line of a running turn, so its steps are the thoughts,
   // and after the turn the tool steps of its stored trace.
   const turnSteps = createTurnSteps({
@@ -289,7 +292,7 @@ export function ConversationThread() {
             limit={current().threads.limit}
             agent={current().agent}
             agents={props.agents}
-            messages={messages}
+            messages={shownMessages()}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
