@@ -366,7 +366,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
-  "error.backend.apiKeyNotAllowed": "Ввести ключ API может только владелец или админ сервера.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
   "error.backend.authRequestInactive": "Этот запрос безопасной аутентификации больше не активен.",
   "error.backend.secureAuthUnavailable": "Безопасная аутентификация недоступна.",

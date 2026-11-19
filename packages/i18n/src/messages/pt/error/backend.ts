@@ -381,8 +381,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
-  "error.backend.apiKeyNotAllowed":
-    "Somente o proprietário do servidor ou um administrador pode inserir uma chave de API.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
   "error.backend.authRequestInactive": "Esta solicitação de autenticação segura não está mais ativa.",
   "error.backend.secureAuthUnavailable": "A autenticação segura está indisponível.",

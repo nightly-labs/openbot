@@ -758,8 +758,6 @@ export class AttentionRegistry {
       const answered = values?.[API_KEY_FIELD_ID];
       const value = typeof answered === "string" ? answered.trim() : "";
       if (value === "") return null;
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
       const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;
       if (toVault && !this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
@@ -815,8 +813,6 @@ export class AttentionRegistry {
       const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
       const item = response?.values ? enteredVaultItem(vault.kind, response.values) : null;
       if (!item) return null;
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.vaultItemNotAllowed"));
       if (!this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
       pending.saving = true;
       return { pending, vaultItems: this.#vaultItems, item };

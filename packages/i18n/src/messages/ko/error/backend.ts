@@ -354,7 +354,6 @@ export const messages = {
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
-  "error.backend.apiKeyNotAllowed": "서버 소유자 또는 관리자만 API 키를 입력할 수 있어요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
   "error.backend.authRequestInactive": "이 보안 인증 요청은 더 이상 활성 상태가 아니에요.",
   "error.backend.secureAuthUnavailable": "보안 인증을 사용할 수 없어요.",

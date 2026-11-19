@@ -10693,18 +10693,26 @@ try {
       json: answer,
       capabilities: [BROWSER_SECRET_VAULT_CAPABILITY],
     });
+    check(
+      "a save without either capability gets 400 and does not reach the agent",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(noHandoff, 400, sourceText("error.team.secureAuthUnsupported")) &&
+        callsOf("respondToBrowserSecret").length === before,
+      [summary(unsupported), summary(noHandoff)],
+    );
     const member = await call("POST", BROWSER_SECRET_VAULT_ROUTES.respond, {
       token: bobToken,
       json: answer,
       capabilities,
     });
     check(
-      "a save without either capability gets 400, and a member gets 403; none reaches the agent",
-      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
-        errorIs(noHandoff, 400, sourceText("error.team.secureAuthUnsupported")) &&
-        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
-        callsOf("respondToBrowserSecret").length === before,
-      [summary(unsupported), summary(noHandoff), summary(member)],
+      "a member submits the password with a save; the answer does not carry it",
+      member.status === 200 &&
+        !member.text.includes(VAULT_PASSWORD) &&
+        isDeepStrictEqual(callsOf("respondToBrowserSecret").at(-1), [
+          { requestId: "auth-1", agentId: "agent-ada", decision: "submit", secret: VAULT_PASSWORD, saveToVault: true },
+        ]),
+      summary(member),
     );
     const saved = await call("POST", BROWSER_SECRET_VAULT_ROUTES.respond, {
       token: adaToken,

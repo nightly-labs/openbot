@@ -356,7 +356,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Bu tarayıcı devralması artık etkin değil.",
   "error.backend.authSubmitting": "Kimlik doğrulama gönderimi zaten devam ediyor.",
   "error.backend.apiKeySaveFailed": "OpenBot API anahtarını kaydedemedi. Yeniden deneyin.",
-  "error.backend.apiKeyNotAllowed": "API anahtarını yalnızca sunucu sahibi veya bir yönetici girebilir.",
   "error.backend.apiKeySaving": "API anahtarı zaten kaydediliyor.",
   "error.backend.authRequestInactive": "Bu güvenli kimlik doğrulama isteği artık etkin değil.",
   "error.backend.secureAuthUnavailable": "Güvenli kimlik doğrulaması kullanılamıyor.",
