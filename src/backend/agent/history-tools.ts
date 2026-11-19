@@ -192,13 +192,13 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_search",
     description:
-      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId, also before a new chat; such results have beforeNewChat. after: 24h, 7d or a date. history_read gives more.',
+      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId. after: 24h, 7d or a date. history_read gives more.',
     shape: searchShape,
   },
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, also before a new chat: beforeNewChat marks messages that are not in your context. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];

@@ -499,7 +499,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "start_new_chat",
     description:
-      "Start a new chat for yourself when this chat is long and its earlier messages no longer matter, or when a routine asks for it. Each message then sends less context. Before you call it, keep what you need: use remember, or write notes to a file in your workspace. The user still sees the earlier messages; you do not, but history_search and history_read still find them. The new chat starts when this turn ends and your queue is empty or holds only routine runs. When another queued message runs first, the request ends; call it again. It works only in your own chat, and only when the user allows it in your settings.",
+      "Start a new chat for yourself when this chat is long and its earlier messages no longer matter, or when a routine asks for it. Each message then sends less context. Before you call it, keep what you need: use remember, or write notes to a file in your workspace. The user still sees the earlier messages; you find them with history_search. The new chat starts when this turn ends and your queue is empty or holds only routine runs. When another queued message runs first, the request ends; call it again. It works only in your own chat, and only when the user allows it in your settings.",
     shape: {},
   },
   {
