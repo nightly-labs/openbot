@@ -87,7 +87,7 @@ export const messages = {
     "Esto también termina las conexiones remotas activas de la cuenta. El dispositivo puede volver a iniciar sesión.",
   "mobile.settings.sessions.disconnect": "Desconectar",
   "mobile.settings.dictation.footer":
-    "El idioma que hablas al reconocimiento del teléfono, en una conversación de voz y al dictar. «Automático» usa el primer idioma de los ajustes del teléfono que admite.",
+    "El idioma que hablas al reconocimiento del teléfono, en una conversación de voz y al dictar. «Automático» usa el idioma del teclado con el que escribes y, si no, el primer idioma de los ajustes del teléfono que admite.",
   "mobile.settings.dictation.automatic": "Automático",
   "mobile.settings.appearance.title": "Apariencia",
   "mobile.settings.appearance.footer": "«Sistema» sigue la apariencia de tu dispositivo.",

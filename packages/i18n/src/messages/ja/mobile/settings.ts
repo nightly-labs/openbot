@@ -84,7 +84,7 @@ export const messages = {
     "アカウントの有効なリモート接続も終了します。デバイスは再度サインインできます。",
   "mobile.settings.sessions.disconnect": "切断",
   "mobile.settings.dictation.footer":
-    "音声会話や音声入力で、端末の音声認識に話す言語です。「自動」は、スマートフォンの設定の言語のうち、対応している最初の言語を使います。",
+    "音声会話や音声入力で、端末の音声認識に話す言語です。「自動」は、入力に使っているキーボードの言語を使い、なければスマートフォンの設定の言語のうち、対応している最初の言語を使います。",
   "mobile.settings.dictation.automatic": "自動",
   "mobile.settings.appearance.title": "外観",
   "mobile.settings.appearance.footer": "「システム」はデバイスの外観に従います。",

@@ -84,7 +84,7 @@ export const messages = {
     "Cela met aussi fin aux connexions distantes actives du compte. L’appareil pourra se reconnecter.",
   "mobile.settings.sessions.disconnect": "Déconnecter",
   "mobile.settings.dictation.footer":
-    "La langue que vous parlez à la reconnaissance du téléphone, dans une conversation vocale et en dictée. « Automatique » utilise la première langue des réglages de votre téléphone qu’elle prend en charge.",
+    "La langue que vous parlez à la reconnaissance du téléphone, dans une conversation vocale et en dictée. « Automatique » utilise la langue du clavier avec lequel vous écrivez, sinon la première langue des réglages de votre téléphone qu’elle prend en charge.",
   "mobile.settings.dictation.automatic": "Automatique",
   "mobile.settings.appearance.title": "Apparence",
   "mobile.settings.appearance.footer": "« Système » suit l’apparence de votre appareil.",

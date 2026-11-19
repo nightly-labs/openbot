@@ -11,6 +11,7 @@ import android.media.AudioTrack
 import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Build
+import android.view.inputmethod.InputMethodManager
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
@@ -183,6 +184,18 @@ class SpeechModule : Module() {
     /** Closes the microphone and drops the speech that was not sent. */
     Function("cancelCapture") {
       captureExecutor.execute { capture.cancel() }
+    }
+
+    /**
+     * The language of the keyboard that is set now, such as `pt-BR`, or null when the keyboard names
+     * none. The phone recognizer listens in one language, and the keyboard tells which one the user
+     * writes in when the phone settings are in another. Some keyboards set only the older locale.
+     */
+    Function("keyboardLanguage") {
+      val keyboard = appContext.reactContext?.getSystemService(InputMethodManager::class.java)
+      val subtype = keyboard?.currentInputMethodSubtype ?: return@Function null
+      @Suppress("DEPRECATION")
+      subtype.languageTag.ifEmpty { subtype.locale.replace('_', '-') }.ifEmpty { null }
     }
 
     /**

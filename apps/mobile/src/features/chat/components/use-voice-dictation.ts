@@ -98,10 +98,11 @@ function supportedLocales(module: Recognizer): Promise<SupportedLocales> {
 
 async function recognitionOptions(module: Recognizer, supported: Promise<SupportedLocales>) {
   const chosen = useDictationLanguage.getState().value;
+  const keyboard = speechNative?.keyboardLanguage?.();
   const preferred =
     chosen !== AUTOMATIC_DICTATION_LANGUAGE
       ? [chosen]
-      : [...phoneLanguages(), Intl.DateTimeFormat().resolvedOptions().locale];
+      : [...(keyboard ? [keyboard] : []), ...phoneLanguages(), Intl.DateTimeFormat().resolvedOptions().locale];
   const locales = await supported;
   const lang = pickRecognitionLocale(preferred, locales.locales);
   const requiresOnDeviceRecognition =

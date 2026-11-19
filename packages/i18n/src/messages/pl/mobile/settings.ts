@@ -93,7 +93,7 @@ export const messages = {
     "To kończy także aktywne zdalne połączenia konta. Urządzenie może zalogować się ponownie.",
   "mobile.settings.sessions.disconnect": "Rozłącz",
   "mobile.settings.dictation.footer":
-    "Język, w którym mówisz do rozpoznawania telefonu, w rozmowie głosowej i podczas dyktowania. Automatyczny używa pierwszego obsługiwanego języka z ustawień telefonu.",
+    "Język, w którym mówisz do rozpoznawania telefonu, w rozmowie głosowej i podczas dyktowania. Automatyczny używa języka klawiatury, na której piszesz, a potem pierwszego obsługiwanego języka z ustawień telefonu.",
   "mobile.settings.dictation.automatic": "Automatyczny",
   "mobile.settings.appearance.title": "Wygląd",
   "mobile.settings.appearance.footer": "Systemowy wygląd jest zgodny z ustawieniem urządzenia.",
