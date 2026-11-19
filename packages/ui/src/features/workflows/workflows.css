@@ -1357,7 +1357,7 @@
 }
 
 .wfn-none-line {
-  height: 6px;
+  height: var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-pill);
   background: var(--wfn-ring-strong);
 }
@@ -1472,6 +1472,7 @@
   }
 }
 
+.wfn-none[data-still],
 .wfn-none[data-still] :is(.wfn-none-world, .wfn-none-node, .wfn-none-edge, .wfn-none-hand, .wfn-card) {
   animation: none;
   transition: none;
@@ -1556,6 +1557,11 @@
 .wfn-canvas[data-frame="window"][data-hud-hidden] .wfn-hud-top .wfn-hud {
   visibility: visible;
   opacity: 1;
+}
+
+.wfn-canvas[data-deleted][data-frame="window"][data-hud-hidden] .wfn-hud-top,
+.wfn-canvas[data-deleted][data-frame="window"][data-hud-hidden] .wfn-hud-top .wfn-hud {
+  visibility: hidden;
 }
 
 .wfs-menu.ui-action-menu {

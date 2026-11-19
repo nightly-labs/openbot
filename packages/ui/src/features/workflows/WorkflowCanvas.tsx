@@ -839,6 +839,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
   onCleanup(() => closeDelete?.());
+  createEffect(deleted, (hidden) => {
+    for (const layer of Array.from(root?.children ?? [])) {
+      if (!layer.classList.contains("wfn-none")) layer.toggleAttribute("inert", hidden);
+    }
+  });
   const [ui, setUi] = createStore<{
     tool: Tool;
     draw: DrawMode;
