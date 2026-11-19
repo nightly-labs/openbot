@@ -735,7 +735,7 @@ export class AttentionRegistry {
         } else {
           const resolution = promptResolution(pending.questions, answers);
           this.#resolvePersistedPrompt(pending, resolution);
-          this.#showWelcomeAnswer(pending, resolution, responder?.sender);
+          this.#showWelcomeAnswer(pending, resolution, responder);
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
@@ -2426,23 +2426,24 @@ export class AttentionRegistry {
   #showWelcomeAnswer(
     pending: PendingPrompt,
     resolution: AgentPromptResolution,
-    sender: ConversationMessageSender | undefined,
+    responder: PromptResponder | undefined,
   ): void {
-    if (pending.detached || pending.subagent) return;
+    if (pending.detached || pending.subagent || pending.responseKind === "mcp-elicitation" || responder?.automatic)
+      return;
     const text = welcomeAnswerText(pending.questions, resolution);
     if (!text) return;
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
-    const welcomeTurn = snapshot.messages.some(
-      (message) => message.itemType === AGENT_WELCOME_ITEM_TYPE && message.turnId === pending.turnId,
-    );
+    const inTurn = snapshot.messages.filter((message) => message.turnId === pending.turnId);
+    const welcomeTurn = inTurn.some((message) => message.itemType === AGENT_WELCOME_ITEM_TYPE);
+    const firstQuestion = inTurn.find((message) => message.questionPrompt)?.id === pending.messageId;
     const id = `welcome-answer:${pending.turnId}:${String(pending.id)}`;
-    if (!welcomeTurn || snapshot.messages.some((message) => message.id === id)) return;
+    if (!welcomeTurn || !firstQuestion || inTurn.some((message) => message.id === id)) return;
     snapshot.messages.push({
       id,
       turnId: pending.turnId,
       author: "user",
       source: "user",
-      ...(sender ? { senderMember: structuredClone(sender) } : {}),
+      ...(responder?.sender ? { senderMember: structuredClone(responder.sender) } : {}),
       text,
       createdAt: new Date().toISOString(),
       status: "completed",
@@ -2452,15 +2453,10 @@ export class AttentionRegistry {
 }
 
 function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
-  if (resolution.status !== "answered") return "";
-  return questions
-    .flatMap((question) => {
-      const response = resolution.responses[question.id];
-      if (question.isSecret || response?.status !== "answered" || !response.answers) return [];
-      const answer = response.answers.join(", ").trim();
-      return answer ? [answer] : [];
-    })
-    .join("\n");
+  const [question] = questions;
+  if (questions.length !== 1 || !question || question.isSecret || resolution.status !== "answered") return "";
+  const response = resolution.responses[question.id];
+  return response?.status === "answered" && response.answers ? response.answers.join(", ").trim() : "";
 }
 
 function uiBlockAnswer(
