@@ -849,6 +849,14 @@ export class DrainScheduler {
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
         ),
       );
+      const stillWorking = new Set(
+        [...requestIds].flatMap((requestId) => this.#mailbox.stillWorkingRecipients(agent.id, requestId)),
+      );
+      const unanswered = new Set(
+        [...requestIds]
+          .flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId))
+          .filter((recipientId) => !stillWorking.has(recipientId)),
+      );
       const promptInput = (executionText: string | undefined) => {
         const continued = new Set<string>();
         const input = combinedPromptInput(
@@ -874,9 +882,9 @@ export class DrainScheduler {
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),
-          [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
+          [...unanswered],
           agentNames,
-          [...requestIds].flatMap((requestId) => this.#mailbox.stillWorkingRecipients(agent.id, requestId)),
+          [...stillWorking],
         );
         return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
       };

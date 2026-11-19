@@ -1838,7 +1838,7 @@ export class MailboxStore {
         (candidate) =>
           candidate.messageId === request.id &&
           candidate.recipientAgentId !== answeredBy &&
-          (candidate.status === "queued" || candidate.status === "starting" || candidate.status === "running"),
+          isActiveDelivery(candidate),
       ) && !this.#laterTurnEnded(delivery, messages)
     );
   }
@@ -1849,6 +1849,7 @@ export class MailboxStore {
       (candidate) =>
         candidate.recipientAgentId === held.recipientAgentId &&
         candidate.turnId !== null &&
+        candidate.steeredAt === undefined &&
         !isActiveDelivery(candidate) &&
         candidate.createdAt > held.createdAt &&
         this.#laneOf(candidate, messages) === lane,
