@@ -444,6 +444,8 @@ export function MessageBody(props: {
           .map((reference) => reference.attachment.id),
       ),
   );
+  /** The images of a client that gets no `previewUrl`: the small copies when the chat shows them. */
+  const imageSource = createMemo(() => props.imageCopies?.mediaSource ?? props.mediaSource);
   /* The web client gets no `previewUrl`. An image that the host sent shows full size, as on desktop.
      Each loaded image keeps one object, so a load elsewhere does not draw it again. */
   const mediaImages = new Map<string, AttachmentSummary>();
@@ -453,7 +455,7 @@ export function MessageBody(props: {
   const shownAttachments = createMemo<AttachmentSummary[]>((previous = []) =>
     (props.message.attachments ?? []).map((attachment, index) => {
       if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
-      const url = props.mediaSource?.url(attachment.id);
+      const url = imageSource()?.url(attachment.id);
       if (!url) {
         const sent = sentImages.get(attachment.id);
         if (sent) return sent;
@@ -543,7 +545,7 @@ export function MessageBody(props: {
   const loadLimit = (attachment: AttachmentSummary) =>
     props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
-    const source = props.mediaSource;
+    const source = imageSource();
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
@@ -569,7 +571,7 @@ export function MessageBody(props: {
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
-      const source = props.mediaSource;
+      const source = imageSource();
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -956,7 +958,7 @@ export function MessageBody(props: {
         <div class="message-attachments-group">
           <AttachmentCards
             attachments={standaloneFileAttachments()}
-            mediaSource={props.mediaSource}
+            mediaSource={imageSource()}
             downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}

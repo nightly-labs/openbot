@@ -506,8 +506,9 @@ export function createWebConversationRuntime(
     attachmentMedia,
     // A tile shows the small copy that `attachmentMedia` loaded; the viewer loads the whole file.
     imageCopies: {
+      mediaSource: attachmentMedia.withCopies,
       copyUrl: (image) => attachmentMedia.copyUrl(image.id),
-      fullUrl: (image) => attachmentMedia.fullUrl(image.id),
+      fullUrl: (image) => attachmentMedia.url(image.id),
       loadFull: (image) => attachmentMedia.load(image, "generated"),
     },
     visualPage: files.visualPage,

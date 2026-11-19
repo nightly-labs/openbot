@@ -60,8 +60,11 @@ export interface WebAttachmentMedia extends AttachmentMediaSource {
   keep(attachment: AttachmentSummary, bytes: Uint8Array<ArrayBuffer>): void;
   /** The loaded small copy of an image (`attachment-preview-v1`). Reactive. */
   copyUrl(attachmentId: string): string | undefined;
-  /** The loaded whole file of an attachment. Reactive. */
-  fullUrl(attachmentId: string): string | undefined;
+  /**
+   * The same files for a chat that shows small copies: an image that a card or a tile shows loads as
+   * its copy, and `url` gives the whole file or else the copy. This source gives whole files only.
+   */
+  readonly withCopies: AttachmentMediaSource;
   /** Revokes every object URL. */
   dispose(): void;
 }
@@ -79,8 +82,9 @@ interface Entry {
  * Object URLs for the images, audio and video of host attachments. The browser client gets no
  * `previewUrl`, so each file is read through the host connection when the chat shows it.
  *
- * With `copies`, an image that a card or a tile shows loads as the host's small copy, and the viewer
- * loads the whole file (#12562). `file` gives only whole files, so an open or a save never gets a copy.
+ * With `copies`, `withCopies` loads an image that a card or a tile shows as the host's small copy, and
+ * the viewer loads the whole file (#12562). `url` and `file` give only whole files, so another viewer,
+ * an open or a save never gets a copy.
  */
 export function createWebAttachmentMedia(
   remote: Pick<WebWorkspaceRuntime, "download"> & Partial<Pick<WebWorkspaceRuntime, "downloadPreview">>,
@@ -195,28 +199,42 @@ export function createWebAttachmentMedia(
   const copyKey = (host: string, attachmentId: string) => `${host}:copy:${attachmentId}`;
   const shownUrl = (key: string) => (disposed ? undefined : shown().get(key));
 
-  return {
+  const fullUrl = (id: string) => shownUrl(`${hostId()}:${id}`);
+  const load = (attachment: AttachmentSummary, size: "thumbnail" | "generated" = "thumbnail", copied = false) => {
+    const host = currentHost();
+    const key = `${host}:${attachment.id}`;
+    const type = mediaType(attachment);
+    if (!type) return Promise.resolve(false);
+    const limit = limitFor(type, size);
+    if (attachment.size > limit) return Promise.resolve(false);
+    const whole = () => loadOnce(key, () => download(attachment, type, limit, key));
+    // A held whole file shows as it is. A host without copies, or one without a copy of this
+    // image (a large GIF or WebP file), sends the whole file, as before.
+    if (!copied || size !== "thumbnail" || !remote.downloadPreview || copies?.() !== true) return whole();
+    if (entries.has(key) || playableMediaKind(type) || type === SVG_TYPE) return whole();
+    const copy = copyKey(host, attachment.id);
+    const started = generation;
+    return loadOnce(copy, () => download(attachment, type, limit, copy, true)).then(
+      // A host switch or a dispose during the copy ends the load: its file is not of this host.
+      (shown) => shown || (generation === started && !disposed && whole()),
+    );
+  };
+  const limits = {
     thumbnailLimit: WEB_THUMBNAIL_BYTES,
     generatedImageLimit: WEB_GENERATED_IMAGE_BYTES,
     mediaLimit: WEB_MEDIA_BYTES,
-    url: (id) => shownUrl(`${hostId()}:${id}`) ?? shownUrl(copyKey(hostId(), id)),
+  };
+
+  return {
+    ...limits,
+    url: fullUrl,
     copyUrl: (id) => shownUrl(copyKey(hostId(), id)),
-    fullUrl: (id) => shownUrl(`${hostId()}:${id}`),
-    load(attachment, size = "thumbnail") {
-      const host = currentHost();
-      const key = `${host}:${attachment.id}`;
-      const type = mediaType(attachment);
-      if (!type) return Promise.resolve(false);
-      const limit = limitFor(type, size);
-      if (attachment.size > limit) return Promise.resolve(false);
-      const whole = () => loadOnce(key, () => download(attachment, type, limit, key));
-      // A held whole file shows as it is. A host without copies, or one without a copy of this
-      // image (a large GIF or WebP file), sends the whole file, as before.
-      const copied = size === "thumbnail" && Boolean(remote.downloadPreview) && copies?.() === true;
-      if (!copied || entries.has(key) || playableMediaKind(type) || type === SVG_TYPE) return whole();
-      const copy = copyKey(host, attachment.id);
-      return loadOnce(copy, () => download(attachment, type, limit, copy, true)).then((shown) => shown || whole());
+    withCopies: {
+      ...limits,
+      url: (id) => fullUrl(id) ?? shownUrl(copyKey(hostId(), id)),
+      load: (attachment, size) => load(attachment, size, true),
     },
+    load: (attachment, size) => load(attachment, size),
     async file(attachmentId) {
       if (disposed) return null;
       const key = `${currentHost()}:${attachmentId}`;

@@ -13,6 +13,7 @@ import {
   untrack,
 } from "solid-js";
 import { useText } from "../../text";
+import type { AttachmentMediaSource } from "./AttachmentCards";
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon } from "./ConversationIcons";
 import { justifiedGalleryLayout } from "./image-gallery-layout";
 import {
@@ -38,6 +39,8 @@ import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, 
  * and the full image when that has loaded.
  */
 export interface ImageCopies {
+  /** The images of a client that gets no `previewUrl`, loaded as small copies. Absent, the chat's own source. */
+  mediaSource?: AttachmentMediaSource | undefined;
   /** The small copy of an image. Undefined when it has none: the image then shows its `previewUrl`. Reactive. */
   copyUrl(image: AttachmentSummary): string | undefined;
   /** The full image. Undefined until `loadFull` gets it. Reactive. */
@@ -383,7 +386,17 @@ export function ImageLightbox(props: {
     const copy = copies()?.copyUrl(entry);
     return copy && copy !== copies()?.fullUrl(entry) ? copy : undefined;
   };
-  const showsCopy = (entry: AttachmentSummary) => fullReady[entry.id] !== true && copyOf(entry) !== undefined;
+  // A full image that left the client's cache shows its copy again, and loads again.
+  const showsCopy = (entry: AttachmentSummary) =>
+    copyOf(entry) !== undefined && !(fullReady[entry.id] === true && copies()?.fullUrl(entry));
+  // A copy that does not load waits for its full image; the image fails only when both fail.
+  const [copyFailed, setCopyFailed] = createStore<Record<string, boolean>>({});
+  const failImage = (entry: AttachmentSummary) => {
+    if (entry.id === current()?.id) opened = true;
+    setFailed((state) => {
+      state[entry.id] = true;
+    });
+  };
   const sourceOf = (entry: AttachmentSummary) =>
     (showsCopy(entry) ? copyOf(entry) : copies()?.fullUrl(entry)) ?? entry.previewUrl;
   const images = () => props.opening.images;
@@ -638,18 +651,21 @@ export function ImageLightbox(props: {
       if (!entry) return;
       const source = untrack(copies);
       let done = false;
+      let decoded = false;
       const full = new Image();
       // The copy stays when the full image does not load. It shows the image, and the download works.
       const fail = () => {
-        if (!done)
-          setFullFailed((state) => {
-            state[entry.id] = true;
-          });
+        if (done) return;
+        setFullFailed((state) => {
+          state[entry.id] = true;
+        });
+        if (untrack(() => copyFailed[entry.id])) failImage(entry);
       };
       const show = (url: string) => {
         full.src = url;
         void full.decode().then(() => {
           if (done) return;
+          decoded = true;
           const element = imageElements.get(entry.id);
           if (element) fitScreenPixels(element, entry.mimeType, full.naturalWidth, full.naturalHeight);
           setFullReady((state) => {
@@ -668,7 +684,8 @@ export function ImageLightbox(props: {
         }, fail);
       return () => {
         done = true;
-        full.src = "";
+        // A decoded image stays, so the shown image takes it without a new read.
+        if (!decoded) full.src = "";
       };
     },
   );
@@ -955,10 +972,11 @@ export function ImageLightbox(props: {
                               else if (entry.id === current()?.id) move(camera);
                             }}
                             onError={() => {
-                              if (entry.id === current()?.id) opened = true;
-                              setFailed((state) => {
-                                state[entry.id] = true;
-                              });
+                              if (showsCopy(entry) && fullFailed[entry.id] !== true)
+                                setCopyFailed((state) => {
+                                  state[entry.id] = true;
+                                });
+                              else failImage(entry);
                             }}
                           />
                         </Show>
