@@ -1651,7 +1651,8 @@ export function createConversationViewScope(props: ConversationProps) {
           importSounds.cancel(event.requestId);
           // A side thread has no upload chip, so no Retry: the files are not kept for one.
           conversationRuntime(props).agent.discardAttachmentImport?.(event.requestId);
-          actionToast.error(event.message);
+          const { t, errorMessage } = currentText();
+          actionToast.error(errorMessage(event.message, t("composer.upload.failed")));
         } else {
           // A cancelled import completes with no attachments.
           if (event.attachments.length > 0) importSounds.finished(event.requestId, "success");
