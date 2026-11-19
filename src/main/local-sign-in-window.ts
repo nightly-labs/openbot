@@ -1,4 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  BROWSER_SIGN_IN_STORAGE_ENTRY_LIMIT,
+  BROWSER_SIGN_IN_STORAGE_TEXT_LIMIT,
+  type BrowserSignInStorage,
+  isBrowserSignInOrigin,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -22,45 +29,28 @@ import {
 } from "../backend/browser-policy";
 import { isBrowserSignInAddress, isBrowserSignInSite } from "./browser-sign-in-page";
 
-/**
- * A window on this computer where a person signs in to a site for a tab of a remote server's browser.
- * Some sites refuse a sign-in from a server address, but accept the session that this computer makes.
- *
- * Each sign-in has its own session in memory, so the page cannot read the app's cookies or storage,
- * and nothing stays on disk. The page has the sandbox of the embedded browser. It cannot download a
- * file, ask for a permission other than a clipboard write, or leave http(s). A site can open a popup,
- * for example a sign-in with another account; the popup has the same session and the same rules.
- *
- * The window sees when the sign-in is complete: the site showed a sign-in step, then set a cookie
- * that the page cannot read, then left the sign-in steps. This is a guess, so the caller sends the
- * session and checks the server tab before it closes the window.
- */
-
-/** The bounds of the `browser-sign-in` wire. */
 const COOKIE_LIMIT = 150;
 const COOKIE_TEXT_LIMIT = 4096;
 const COOKIE_DOMAIN_LIMIT = 253;
 const COOKIE_PATH_LIMIT = 1024;
-/** Cloudflare ties these cookies to the address that passed its check, so the server cannot use them. */
 const ADDRESS_BOUND_COOKIE = /^(?:__cf|cf_)/u;
 const WINDOW_WIDTH = 520;
 const WINDOW_HEIGHT = 760;
-/** A site changes the page and its cookies in several steps. The check runs when they stop. */
 const CHECK_DELAY_MS = 1_000;
 const SCRIPT_WORLD = 1_018;
 const PASSWORD_FIELD_SCRIPT = `Array.from(document.querySelectorAll("input[type=password]")).some((field) => field.getClientRects().length > 0)`;
+const STORAGE_SCRIPT = `({ origin: location.origin, entries: Object.keys(localStorage).map((name) => ({ name, value: localStorage.getItem(name) ?? "" })) })`;
+const STORAGE_READ_TIMEOUT_MS = 2_000;
 
 export class LocalSignInFailed extends Schema.TaggedError<LocalSignInFailed>()("LocalSignInFailed", {
   cause: Schema.Defect(),
 }) {}
 
-/** The tab that a sign-in is for. The server is the one that was active when the window opened. */
 export interface LocalSignInTarget {
   serverId: string;
   tabId: string;
 }
 
-/** How the wait for a window ends: the person closed it, or the site looks signed in. */
 export type LocalSignInEnd = "closed" | "signed-in";
 
 interface PendingSignIn extends LocalSignInTarget {
@@ -71,10 +61,29 @@ interface PendingSignIn extends LocalSignInTarget {
   signInSeen: boolean;
   cookieAfterSignIn: boolean;
   check: ReturnType<typeof setTimeout> | null;
+  storage: BrowserSignInStorage | null;
+  storageReads: number;
+  storageRead: number;
 }
 
 function isWebUrl(value: string): boolean {
   return /^https?:\/\//iu.test(value);
+}
+
+function signInStorage(value: unknown): BrowserSignInStorage | null {
+  if (!isDynamicRecord(value) || !isString(value.origin) || !isBrowserSignInOrigin(value.origin)) return null;
+  if (!Array.isArray(value.entries)) return null;
+  const entries: BrowserSignInStorage["entries"] = [];
+  let text = 0;
+  for (const item of value.entries) {
+    if (!isDynamicRecord(item) || !isString(item.name) || !isString(item.value)) continue;
+    const size = Buffer.byteLength(JSON.stringify(item.name) + JSON.stringify(item.value));
+    if (entries.length >= BROWSER_SIGN_IN_STORAGE_ENTRY_LIMIT || text + size > BROWSER_SIGN_IN_STORAGE_TEXT_LIMIT)
+      continue;
+    text += size;
+    entries.push({ name: item.name, value: item.value });
+  }
+  return { origin: value.origin, entries };
 }
 
 function signInCookie(cookie: Cookie): BrowserSignInCookie | null {
@@ -87,7 +96,6 @@ function signInCookie(cookie: Cookie): BrowserSignInCookie | null {
   return {
     name: cookie.name,
     value: cookie.value,
-    // The wire marks a cookie for one host by a domain with no leading dot.
     domain: cookie.hostOnly ? bare : `.${bare}`,
     path,
     secure: cookie.secure === true,
@@ -101,28 +109,20 @@ function signInCookie(cookie: Cookie): BrowserSignInCookie | null {
 export class LocalSignInWindows {
   #pending: PendingSignIn | null = null;
 
-  /** The tab of the open sign-in and the host of its site, or null. */
   target(): (LocalSignInTarget & { host: string }) | null {
     const pending = this.#pending;
     return pending ? { serverId: pending.serverId, tabId: pending.tabId, host: pending.host } : null;
   }
 
-  /** The address of the page in the sign-in window, or null when no window is open. */
   page(): string | null {
     const contents = this.#pending?.window?.webContents;
     return contents && !contents.isDestroyed() ? contents.getURL() : null;
   }
 
-  /** True when the window of the open sign-in showed a sign-in step. */
   signInSeen(): boolean {
     return this.#pending?.signInSeen === true;
   }
 
-  /**
-   * Opens the address in a sign-in window, or shows the window that is open for the same tab. The
-   * effect ends when the window closes or the site looks signed in. The session stays until
-   * `discard`, so a person can close the window and then select Done.
-   */
   readonly open = Effect.fn("LocalSignInWindows.open")(function* (
     this: LocalSignInWindows,
     target: LocalSignInTarget,
@@ -148,7 +148,6 @@ export class LocalSignInWindows {
     return yield* Deferred.await(current.ended);
   });
 
-  /** The cookies of the tab's site in the sign-in session. The values never go to a log. */
   readonly collect = Effect.fn("LocalSignInWindows.collect")(function* (
     this: LocalSignInWindows,
   ): Effect.fn.Return<BrowserSignInCookie[], LocalSignInFailed> {
@@ -164,13 +163,17 @@ export class LocalSignInWindows {
       .slice(0, COOKIE_LIMIT);
   });
 
-  /** Closes the window and removes everything that the sign-in kept. */
+  readonly collectStorage = Effect.fn("LocalSignInWindows.collectStorage")(function* (this: LocalSignInWindows) {
+    const pending = this.#pending;
+    if (!pending) return null;
+    return yield* Effect.promise(() => this.#readStorage(pending));
+  });
+
   readonly discard = Effect.fn("LocalSignInWindows.discard")(function* (this: LocalSignInWindows) {
     const pending = this.#pending;
     if (!pending) return;
     this.#pending = null;
     if (pending.check) clearTimeout(pending.check);
-    // The popups that the site opened have the same session.
     for (const window of BrowserWindow.getAllWindows())
       if (!window.isDestroyed() && window.webContents.session === pending.session) window.destroy();
     yield* Deferred.done(pending.ended, Exit.succeed("closed"));
@@ -197,8 +200,10 @@ export class LocalSignInWindows {
       signInSeen: false,
       cookieAfterSignIn: false,
       check: null,
+      storage: null,
+      storageReads: 0,
+      storageRead: 0,
     };
-    // Sites keep the session in a cookie that the page cannot read.
     session.cookies.on("changed", (_event, cookie, _cause, removed) => {
       if (removed || !cookie.httpOnly || !pending.signInSeen) return;
       if (!browserSignInCookieFitsHost(cookie.domain ?? "", host)) return;
@@ -221,8 +226,8 @@ export class LocalSignInWindows {
     const contents = pending.window?.webContents;
     if (this.#pending !== pending || !contents || contents.isDestroyed()) return;
     const url = contents.getURL();
-    // A sign-in with another account opens on that site, in a popup or in this window.
     if (!isBrowserSignInSite(url, pending.host)) return;
+    void this.#readStorage(pending);
     const passwordField = await contents
       .executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: PASSWORD_FIELD_SCRIPT }])
       .then((result: unknown) => result === true)
@@ -233,9 +238,30 @@ export class LocalSignInWindows {
       return;
     }
     if (!pending.signInSeen || !pending.cookieAfterSignIn) return;
-    // A new cookie must come before the next end, so a page that the server refused does not end the wait again.
     pending.cookieAfterSignIn = false;
     Deferred.doneUnsafe(pending.ended, Exit.succeed("signed-in"));
+  }
+
+  async #readStorage(pending: PendingSignIn): Promise<BrowserSignInStorage | null> {
+    const contents = pending.window?.webContents;
+    if (!contents || contents.isDestroyed() || !URL.canParse(contents.getURL())) return pending.storage;
+    if (new URL(contents.getURL()).hostname !== pending.host) return pending.storage;
+    pending.storageReads += 1;
+    const read = pending.storageReads;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const result = await Promise.race([
+      contents.executeJavaScriptInIsolatedWorld(SCRIPT_WORLD, [{ code: STORAGE_SCRIPT }]).catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), STORAGE_READ_TIMEOUT_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+    const storage = signInStorage(result);
+    if (storage && this.#pending === pending && read > pending.storageRead) {
+      pending.storage = storage;
+      pending.storageRead = read;
+    }
+    return pending.storage;
   }
 
   #openWindow(pending: PendingSignIn, url: string): void {

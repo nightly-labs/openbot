@@ -19,14 +19,10 @@ export interface RoundupPageProps {
   roundup: RoundupComparison;
 }
 
-/** OpenBot's entry draws its own logo, which `SideMark` draws when no mark is given. */
 function appMark(app: RoundupApp) {
   return app.mark === "openbot" ? undefined : app.mark;
 }
 
-// Many apps in one list. OpenBot is first, and the page says that we make it. Each
-// other entry links to the comparisons that include it, where its sources are. The
-// summary table is a real table, for the same reason as on a comparison.
 export function RoundupPage(props: RoundupPageProps) {
   return (
     <DataArticleFrame collection={props.collection} article={props.article}>

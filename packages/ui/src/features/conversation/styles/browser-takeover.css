@@ -1,4 +1,3 @@
-/* The frame is a UiBlockCard (ui-blocks.css); the page preview is its body. */
 .browser-takeover-card {
   width: min(540px, 100%);
   margin: var(--openbot-space-3) 0 var(--openbot-space-6);
@@ -21,7 +20,6 @@
   align-items: center;
   gap: var(--openbot-space-1-5);
   border-bottom: 1px solid var(--openbot-border);
-  /* Raised over the card, as the details of an approval. */
   background: var(--openbot-bg-surface-raised);
   padding: 0 var(--openbot-space-3);
   color: var(--openbot-text-secondary);
@@ -62,8 +60,6 @@
   background: var(--openbot-bg-control);
 }
 
-/* The viewport is the button that opens the page, so it keeps the frame it has as a plain
-   figure: no button padding, no radius of its own, and the preview stacked under the label. */
 .browser-takeover-preview-open.ui-button {
   display: grid;
   width: 100%;
@@ -73,7 +69,6 @@
   padding: 0;
 }
 
-/* The preview and the Open label share one cell, so the label floats over the page image. */
 .browser-takeover-preview-open > * {
   grid-area: 1 / 1;
 }
@@ -182,7 +177,6 @@
   font-weight: var(--openbot-weight-regular);
 }
 
-/* The details of a request, as the draft of a confirm block (ui-blocks.css): raised over the bubble. */
 .approval-command-block,
 .approval-detail-row,
 .approval-permissions {
@@ -223,6 +217,13 @@
 .approval-detail-label {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+}
+
+.approval-cut-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
 }
 
 .approval-detail-row strong {

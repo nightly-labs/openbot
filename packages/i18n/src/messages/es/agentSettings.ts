@@ -148,8 +148,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Acceso del agente",
   "agentSettings.runtime.busyMessage": "Durante el trabajo",
   "agentSettings.runtime.busyMessageLabel": "Mensajes mientras el agente trabaja",
-  "agentSettings.runtime.taskLimit": "Hilos en paralelo",
-  "agentSettings.runtime.taskLimitLabel": "Hilos que se ejecutan a la vez",
   "agentSettings.runtime.workingDirectory": "Directorio de trabajo",
   "agentSettings.runtime.notAvailable": "Todavía no disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -168,9 +166,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Orientar",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} no puede orientar un turno en curso. Los mensajes enviados mientras trabaja esperan en la cola.",
-  "agentSettings.taskLimit.default": "Predeterminado ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} ejecuta un turno a la vez. Los hilos de este agente se esperan entre sí.",
   "agentSettings.notificationLevel.title": "Avisarme",
   "agentSettings.notificationLevel.server": "Predeterminado del servidor ({level})",
   "agentSettings.notificationLevel.note":
@@ -201,6 +196,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Permitir acceso completo",
   "agentSettings.fullAccess.askConfirm": "Usar Preguntar antes",
   "agentSettings.links.usage": "Uso",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Todos los agentes",
   "agentSettings.links.memories": "Recuerdos",
   "agentSettings.links.memoriesCount": {
     one: "{count} guardado",

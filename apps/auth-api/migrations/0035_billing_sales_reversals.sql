@@ -1,5 +1,3 @@
--- Refund and dispute facts. SQLite cannot change a CHECK constraint, so the table is copied with
--- the same columns. The Worker that runs before this deploy writes only the earlier fact types.
 CREATE TABLE billing_sales_facts_next (
   source_key TEXT PRIMARY KEY,
   fact_type TEXT NOT NULL CHECK(
@@ -68,8 +66,6 @@ CREATE INDEX billing_sales_facts_user
   ON billing_sales_facts(user_id, fact_type, event_timestamp)
   WHERE user_id IS NOT NULL;
 
--- The paid invoice id is the idempotency boundary. Stripe can deliver the same invoice with more
--- than one event id, so this index is required in addition to source_key.
 CREATE UNIQUE INDEX billing_sales_paid_invoice
   ON billing_sales_facts(invoice_id)
   WHERE fact_type = 'payment_succeeded' AND invoice_id IS NOT NULL;

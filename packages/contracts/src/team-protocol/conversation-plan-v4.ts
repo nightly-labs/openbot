@@ -2,15 +2,6 @@ import { isConversationPlan } from "../ipc-conversation-plan";
 import { isDynamicRecord, isString } from "../runtime-values";
 import type { TeamProtocolV4BaseJsonObject, TeamProtocolV4BaseJsonValue } from "./v4-base";
 
-/**
- * `plan` rides beside the frozen conversation projection, in the way `expectsReply` does: the
- * shipped key lists drop it, so a client on protocol 1-3, or an older v4 client, reads the plan
- * from its checklist text as before. Only the current protocol carries which step runs.
- *
- * A present plan must decode. The projection removes the key, so an unchecked value would reach
- * the client as a message with a plan that the stored bounds never allowed. Fail closed instead;
- * an absent plan still means an older host, and the checklist text.
- */
 export function withConversationPlans(
   projected: TeamProtocolV4BaseJsonValue,
   source: unknown,
@@ -41,7 +32,6 @@ export function withConversationPlans(
   return result;
 }
 
-/** The conversation inside a `conversation` or `conversation-page` event, where plans ride. */
 export function eventConversationKey(type: unknown): "snapshot" | "page" | null {
   return type === "conversation" ? "snapshot" : type === "conversation-page" ? "page" : null;
 }

@@ -14,24 +14,18 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 
 interface QueuePanelProps {
   deliveries: QueueDelivery[];
-  /** Why the queue is waiting, when the cause is not a turn this conversation can show. */
   hold?: QueueHold | null | undefined;
   agents?: ComposerAgent[];
   skills?: ComposerSkill[] | undefined;
   editingDeliveryId?: string | null | undefined;
   canSteer: boolean;
-  /** Steers a queued message into the running turn, or with `sendsNow`, stops the turn and sends it next. */
   onSteer?: ((deliveryId: string) => void) | undefined;
-  /** The agent's provider cannot steer, so the row action is Send now. */
   sendsNow?: boolean | undefined;
-  /** A routine run holds this chat's turn. A message cannot steer it, so its row names the routine. */
   routineRuns?: boolean | undefined;
-  /** Starts a separate task with a queued message. Absent where the host keeps no tasks. */
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
   onEdit: (delivery: QueueDelivery) => void;
   onReorder: (deliveryIds: string[]) => void;
-  /** `floating` is the glass queue over a browser page, with quiet glass row actions. */
   variant?: "docked" | "floating";
 }
 
@@ -78,10 +72,8 @@ export function QueuePanel(props: QueuePanelProps) {
   );
   let knownSourceIds = new Set(initialSourceDeliveries.map((delivery) => delivery.id));
 
-  // A message another editor holds keeps its place, so it stays out of the order this panel sends.
   const editedElsewhere = (delivery: QueueDelivery) =>
     Boolean(delivery.editing) && delivery.id !== props.editingDeliveryId;
-  /** The queue starts nothing while its first message is edited, so Send now would only stop the turn. */
   const headEdited = createMemo(
     () =>
       Boolean(props.sendsNow) && Boolean(props.deliveries.find((delivery) => delivery.status === "queued")?.editing),
@@ -524,7 +516,13 @@ export function QueuePanel(props: QueuePanelProps) {
                       <Show when={props.onSteer}>
                         {(steer) => (
                           <LabelTooltip
-                            content={t(props.sendsNow ? "queue.item.sendNowTooltip" : "queue.item.steerTooltip")}
+                            content={t(
+                              props.sendsNow
+                                ? "queue.item.sendNowTooltip"
+                                : props.routineRuns && !props.canSteer
+                                  ? "queue.item.steerFallback.routineRun"
+                                  : "queue.item.steerTooltip",
+                            )}
                           >
                             <LabelTooltipTrigger
                               as={Button}

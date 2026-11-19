@@ -1,13 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that answers as after a stop that it cancelled. boat runs the pre-stop hook, which stops OpenBot and
-// makes the flag in /run, and then it can cancel the stop, for example when it cannot pause a Docker
-// container that restarts. The sandbox then runs with OpenBot stopped. A client or a connector that
-// cannot reach such a server must make the Worker run the command that starts OpenBot for an old flag.
-// A server that boat still stops must not get the command, and a failed command must not fail the wake.
-// The command runs after the reply.
-//
-// Run: bun run test:hosted-failed-stop
-// It writes .openbot-build/hosted-failed-stop-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -33,7 +23,6 @@ const OWNER = {
 };
 const FLAG = "/run/openbot-pre-stop";
 
-/** The state that boat reports for the sandbox. `idle` after a cancelled stop, `archiving` during a stop. */
 type SandboxAnswer = "idle" | "archiving";
 type CommandAnswer = "started" | "nothing" | "unavailable" | "failed";
 type Caller = "client" | "connector";
@@ -66,7 +55,6 @@ async function reachWith(options: {
     .run(SERVER_ID, OWNER.id, SANDBOX_ID, options.desired, now - 10 * 60_000);
 
   const calls: { method: string; path: string; body: unknown }[] = [];
-  // The command waits until the caller has its reply, as a slow boat command would.
   let release = () => {};
   const replied = new Promise<void>((resolve) => {
     release = resolve;
@@ -98,7 +86,6 @@ async function reachWith(options: {
     { DB: sqliteD1(database), HOSTED_SERVERS_ENABLED: "true", BOAT_API_KEY: "boat-key" },
     { fetch: boatFetch, now: () => now, schedule: (work) => scheduled.push(Effect.runPromise(work)) },
   );
-  // A call that waits for the command never gets its reply; the time limit ends that wait.
   const reach = Effect.runPromise(
     options.caller === "connector" ? service.startForRoute(SERVER_ID) : service.wake(OWNER, SERVER_ID),
   ).then(() => true);
@@ -118,7 +105,6 @@ async function reachWith(options: {
   };
 }
 
-/** The command starts OpenBot only for a flag older than 5 minutes, and touches nothing else. */
 function commandStartsOnlyForAnOldFlag(commands: { path: string; body: unknown }[]) {
   const body = commands[0]?.body;
   if (!isDynamicRecord(body)) return false;

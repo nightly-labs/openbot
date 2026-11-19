@@ -1,7 +1,3 @@
-// OpenBot's Signal repository for Baileys: pairwise sessions, sender keys and LID mapping, stored in
-// the Baileys key store. Session and sender key records use OpenBot's own binary format under the key
-// types `session` and `sender-key`; remote identity keys (33 bytes) go under `identity-key`.
-
 import {
   isHostedLidUser,
   isHostedPnUser,
@@ -46,7 +42,6 @@ import {
   serializeSessionRecord,
 } from "./signal/session-record";
 
-/** The Baileys logger interface, which its package index does not export by name. */
 type ILogger = SocketConfig["logger"];
 
 export function makeOpenBotSignalRepository(
@@ -82,7 +77,6 @@ export function makeOpenBotSignalRepository(
     await keys.set({ "sender-key": { [name]: serializeSenderKeyRecord(record) } });
   };
 
-  /** Session address of `jid`. A phone-number JID uses its LID address when the mapping is stored. */
   const sessionAddress = async (jid: string): Promise<string> => {
     if (isPnUser(jid) || isHostedPnUser(jid)) {
       const decoded = jidDecode(jid);
@@ -123,12 +117,10 @@ export function makeOpenBotSignalRepository(
         const storedIdentity = await loadIdentity(address);
         const identityChanged = storedIdentity !== undefined && !bytesEqual(storedIdentity, message.identityKey);
         if (identityChanged) logger.info({ address }, "identity key changed, starting a new session record");
-        // Trust on first use, as WhatsApp Web does: a new identity replaces the old record.
         const record = (identityChanged ? undefined : await loadSession(address)) ?? { states: [] };
         const { plaintext, createdState } = await decryptPreKeySignalMessage(record, local(), message, async () => {
           const signedPreKey = auth.creds.signedPreKey;
           if (signedPreKey.keyId !== message.signedPreKeyId) {
-            // Baileys keeps only the current signed prekey; an older ID fails the MAC check.
             logger.warn(
               { address, wanted: message.signedPreKeyId, current: signedPreKey.keyId },
               "pkmsg names a signed prekey that is not current",
@@ -231,7 +223,6 @@ export function makeOpenBotSignalRepository(
         const value = Number(device);
         if (Number.isInteger(value) && value >= 0) devices.add(value);
       }
-      // A hosted device (99) has its own servers, as in Baileys' `lid-mapping.ts`.
       const pairs = [...devices].map((device) => ({
         pn: addressToString(jidToAddress(jidEncode(from.user, device === 99 ? "hosted" : from.server, device))),
         lid: addressToString(jidToAddress(jidEncode(to.user, device === 99 ? "hosted.lid" : to.server, device))),
@@ -297,7 +288,6 @@ export function makeOpenBotSignalRepository(
       const name = senderKeyName(group, jidToAddress(meId));
       return keys.transaction(async () => {
         const record = await ownSenderKey(name);
-        // The distribution message states the iteration of this message, so receivers can decrypt it.
         const senderKeyDistributionMessage = createDistributionMessage(record);
         const ciphertext = encryptGroupMessage(record, data);
         await saveSenderKey(name, record);
@@ -321,7 +311,6 @@ export function makeOpenBotSignalRepository(
   };
 }
 
-/** Baileys gives a store with transactions at runtime; a plain store runs each transaction directly. */
 function withTransactions(store: SignalKeyStore | SignalKeyStoreWithTransaction): SignalKeyStoreWithTransaction {
   if ("transaction" in store) return store;
   return {

@@ -1,5 +1,6 @@
 import {
   BROWSER_DOCK_LIMITS,
+  BROWSER_DOCK_OVERLAY_WIDTH,
   type BrowserDockAction,
   type BrowserDockFrame,
   type BrowserDockGlass,
@@ -11,18 +12,11 @@ import { clamp } from "@openbot/ui/utils";
 import { createSignal, onSettled, Show } from "solid-js";
 import { browserDockPort } from "./browser-dock-port";
 
-/** The space above the dock for its shadow, in CSS pixels. */
 const SHADOW_ROOM = 24;
 const BLUR_PATTERN = /blur\(([\d.]+)px\)/;
 
-/**
- * The browser dock in the overlay view above a local page. The main renderer owns the conversation: this
- * view shows what it publishes, sends each action back, and reports the space and the glass of the dock,
- * so main can size the overlay and blur the page under each glass shape.
- */
 export function BrowserDockSurface() {
   const [presentation, setPresentation] = createSignal<BrowserDockPresentation | null>(null);
-  /** The field keeps its own text while the user types. A new draft revision replaces it. */
   const [text, setText] = createSignal("");
   let revision = -1;
   let received = false;
@@ -40,15 +34,10 @@ export function BrowserDockSurface() {
     setPresentation(next);
   }
 
-  // Main decodes each action, so a failure here is a value that it refused; the dock stays as it was.
   function perform(action: BrowserDockAction) {
     void send(action);
   }
 
-  /**
-   * Resolves true when main has the action. The main renderer answers the agent; when that fails, it
-   * publishes the card again with a new attempt.
-   */
   function send(action: BrowserDockAction): Promise<boolean> {
     return browserDockPort()
       .browserDock.performAction(action)
@@ -58,7 +47,6 @@ export function BrowserDockSurface() {
       );
   }
 
-  /** The portals of the menus and popovers of the dock. They are children of the body, outside the root. */
   function portals(): HTMLElement[] {
     return [...document.body.children].filter(
       (child): child is HTMLElement =>
@@ -79,22 +67,18 @@ export function BrowserDockSurface() {
         if (shape) glass.push(shape);
       }
     }
-    // A menu needs room above the dock, so the overlay takes the whole page while one is open.
-    // The dock is in a bottom corner, so the overlay needs only the space from that side: of the box, or of
-    // its tab when the user hid the box. A menu needs the whole page.
     const tab = dock.hasAttribute("data-tucked") ? dock.querySelector(".browser-dock-tab") : null;
     const box = (tab ?? dock).getBoundingClientRect();
     const limit = BROWSER_DOCK_LIMITS.frameSize;
     const needed = open.length > 0 ? limit : viewport - box.top;
     const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, limit);
-    const side = getComputedStyle(dock).direction === "rtl" ? "left" : "right";
-    const reach = side === "left" ? box.right : window.innerWidth - box.left;
-    const width = open.length > 0 ? limit : clamp(Math.ceil(reach + SHADOW_ROOM), 0, limit);
-    // Main places the glass in an overlay of the new width before this view has that width. The dock stays
-    // at the right edge, so a glass shape keeps its distance from that edge.
-    const shift = side === "right" ? width - window.innerWidth : 0;
+    const centre = window.innerWidth / 2;
+    const reach = Math.max(centre - box.left, box.right - centre);
+    const width =
+      open.length > 0 ? limit : tab ? clamp(2 * Math.ceil(reach + SHADOW_ROOM), 0, limit) : BROWSER_DOCK_OVERLAY_WIDTH;
+    const shift = (width - window.innerWidth) / 2;
     for (const shape of glass) shape.left = clamp(shape.left + shift, -limit, limit);
-    return { height, glass, anchor: { side, width } };
+    return { height, glass, anchor: { width } };
   }
 
   function report() {
@@ -108,8 +92,6 @@ export function BrowserDockSurface() {
         .browserDock.setFrame({ seq, ...frame })
         .catch(() => undefined);
     }
-    // A spring moves the glass on each frame, so the blur follows it until the animations end. A spinner
-    // that never ends does not move the glass.
     const moving = document
       .getAnimations()
       .some((animation) => animation.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY);
@@ -125,7 +107,6 @@ export function BrowserDockSurface() {
     void browserDockPort()
       .browserDock.getPresentation()
       .then((current) => {
-        // A presentation that arrived first is newer than this answer.
         if (!received) apply(current);
       })
       .catch(() => undefined);
@@ -177,7 +158,6 @@ export function BrowserDockSurface() {
             onReorder={(deliveryIds) => perform({ type: "reorder", deliveryIds })}
             onHandoff={dock().canHandoff ? () => perform({ type: "handoff" }) : undefined}
             vault={{ server: null }}
-            // The code goes to main from here and never through the main renderer.
             onRespondSecret={(input) => browserDockPort().agent.respondToBrowserSecret(input, LOCAL_SERVER_ID)}
             onAnswerPrompt={(requestId, answers) => send({ type: "answer-prompt", requestId, answers })}
             onRespondApproval={(requestId, decision) => send({ type: "respond-approval", requestId, decision })}
@@ -192,7 +172,6 @@ export function BrowserDockSurface() {
   );
 }
 
-/** The glass shape of `element`, measured from the left and the bottom of the overlay, or undefined. */
 function glassOf(element: HTMLElement, viewport: number): BrowserDockGlass | undefined {
   const style = getComputedStyle(element);
   const blur = BLUR_PATTERN.exec(style.backdropFilter);

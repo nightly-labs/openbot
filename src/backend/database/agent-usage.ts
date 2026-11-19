@@ -33,48 +33,32 @@ export interface UsageSample {
   baseline: boolean;
   reportedCost?: number | null;
   occurredAt?: string;
-  /** The prompt of the last request in this update, when the provider reports it. */
   lastRequestInputTokens?: number | null;
-  /** The smallest prompt of all the requests in this update, when the provider reports each request. */
   smallestRequestInputTokens?: number | null;
-  /**
-   * The provider's totals before this update. A counter with no checkpoint starts from them, so its
-   * first update records only the new requests.
-   */
   previousTokens?: UsageTokens | null;
-  /**
-   * The counter whose checkpoint keeps `reportedCost`, when the provider reports tokens per prompt but
-   * cost for the whole session. Without one, the cost is kept with the tokens.
-   */
   costCounterId?: string;
-  /** A turn that adds 0 to `reportedCost` used a model with no rates, so it stays unpriced. */
   zeroCostUnpriced?: boolean;
 }
 const TOKEN_KEYS = ["uncachedInput", "cachedInput", "cacheCreation", "output"] as const;
 
-/** One skill an agent loaded, from the finished tool step that loaded it. */
 export interface SkillLoadSample {
   agentId: string;
   sessionId: string;
   turnId: string;
-  /** The provider's id of the tool step. With the skill, it makes a step that comes again count once. */
   itemId: string;
   provider: string;
   model: string;
   skill: string;
-  /** The estimated tokens of its SKILL.md, or null when the file was not found. */
   tokens: number | null;
   occurredAt: string;
 }
 
-/** The tokens one model used in a turn. */
 export interface TurnModelUsage {
   provider: string;
   model: string;
   tokens: UsageTokens;
 }
 
-/** Owns numeric analytics and cumulative checkpoints. Conversation deletion does not erase usage. */
 export class AgentUsage {
   readonly #core: DatabaseCore;
   constructor(core: DatabaseCore) {
@@ -144,7 +128,6 @@ export class AgentUsage {
         for (const key of TOKEN_KEYS) {
           const current = tokens[key];
           const prior = before?.[key];
-          // Counter resets need an explicit new counter id, never a negative delta treated as fresh usage.
           delta[key] =
             current === null || (before && prior === null)
               ? null
@@ -160,8 +143,6 @@ export class AgentUsage {
           sample.counterId,
           JSON.stringify(sample.costCounterId ? tokens : { ...tokens, reportedCost }),
         );
-        // A session that has records but no cost checkpoint ran before its costs were kept. Its
-        // first cost report also counts that earlier use, so the report is only the start.
         const costStartUnknown =
           sample.costCounterId && sample.reportedCost != null && typeof previousCost !== "number"
             ? databaseRow(
@@ -175,8 +156,6 @@ export class AgentUsage {
             "INSERT INTO agent_usage_checkpoints VALUES (?, ?, ?) ON CONFLICT(agent_id, counter_id) DO UPDATE SET tokens_json = excluded.tokens_json",
           ).run(sample.agentId, sample.costCounterId, JSON.stringify({ reportedCost }));
         if ((!before && sample.baseline) || sample.turnId === "baseline") return null;
-        // A resumed Claude process reports its cost from 0, so the cost of its first turn is unknown.
-        // That turn, and a Claude report with no cost, are priced from list rates instead.
         const reportedDelta =
           sample.reportedCost === undefined ||
           sample.reportedCost === null ||
@@ -223,10 +202,6 @@ export class AgentUsage {
     );
   }
 
-  /**
-   * Keeps one skill load. Its tokens are priced as uncached input of the turn's model, which is
-   * what the skill adds when it enters the context; later requests read it from the cache.
-   */
   recordSkillLoad(sample: SkillLoadSample): void {
     const cost =
       sample.tokens === null
@@ -261,11 +236,6 @@ export class AgentUsage {
       .run(agentId, `turn:${sessionId}:${turnId}`, sessionId, turnId, provider, model, new Date().toISOString());
   }
 
-  /**
-   * The token counts of one turn by provider and model, summed over its records. An empty list
-   * means the provider reported none. A count is `null` when one record lacks it, so a partial sum
-   * never reads as complete. `since` bounds the read to the agent's recent rows on `agent_usage_date`.
-   */
   readTurn(agentId: string, turnId: string, since: string): TurnModelUsage[] {
     const rows = databaseRows(
       this.#core.connection
@@ -294,11 +264,6 @@ export class AgentUsage {
     return [...models.values()];
   }
 
-  /**
-   * All the tokens of one turn and its cost, summed over its records, or `null` when the provider
-   * reported none. The tokens add the known counts, as the analytics total does. The cost is `null`
-   * when one record has no cost, so a partial sum never reads as complete.
-   */
   readTurnTotals(agentId: string, turnId: string, since: string): { tokens: number; costUsd: number | null } | null {
     const rows = databaseRows(
       this.#core.connection
@@ -320,8 +285,6 @@ export class AgentUsage {
   }
 
   read(raw: AgentAnalyticsInput): AgentAnalytics {
-    // A spread does not trigger excess-property checking, so the host-only arrays of a
-    // single-agent report are dropped by name rather than left for a decoder to strip.
     const {
       agents: _agents,
       providerDaily: _providerDaily,
@@ -333,11 +296,6 @@ export class AgentUsage {
 
   readHost(raw: HostAnalyticsInput): HostAnalytics {
     const input = parseHostAnalyticsInput(raw);
-    // One statement per shape rather than one with `(? IS NULL OR agent_id = ?)`. That
-    // predicate cannot be answered from an index in either case, so both reads scanned all
-    // retained history: a seven-day report cost as much as the whole table, and a report
-    // left open repeated it after every turn. Each shape now seeks - the host-wide read on
-    // the date-leading index, the agent read on the leading `agent_id` of its own.
     const rangeStart = new Date(Date.parse(input.startDate) - 86400000).toISOString();
     const rangeEnd = new Date(Date.parse(input.endDate) + 2 * 86400000).toISOString();
     const readRange = (table: string): DynamicRecord[] =>
@@ -362,8 +320,6 @@ export class AgentUsage {
       days.set(date.toISOString().slice(0, 10), bucket());
     const models = new Map<string, { provider: string; model: string; bucket: Bucket }>();
     const agents = new Map<string, Bucket>();
-    // The chart reads two measures per [date, provider], and a Bucket would allocate three
-    // Sets per cell - about 3,300 at the 367-day cap - for fields this row never carries.
     const providerDays = new Map<string, AnalyticsProviderDay>();
     let updatedAt: string | null = null;
     const targets = (row: DynamicRecord): { targets: Bucket[]; cell: AnalyticsProviderDay | null } => {
@@ -381,8 +337,6 @@ export class AgentUsage {
         entry = { provider, model, bucket: bucket() };
         models.set(key, entry);
       }
-      // The bucket is created past the day guard, so an agent whose rows all fall outside
-      // the range stays out of the table instead of arriving as a row of zeroes.
       const agentId = requiredStringColumn(row, "agent_id");
       let agentEntry = agents.get(agentId);
       if (!agentEntry) {
@@ -415,8 +369,6 @@ export class AgentUsage {
           target.values.estimatedCostUsd = (target.values.estimatedCostUsd ?? 0) + row.estimated_cost_usd;
         else target.values.unpricedRecords++;
       }
-      // Only this loop feeds the cell: tokens and cost live on agent_usage_records, and the
-      // activity rows below carry turn and message counts the cell does not hold.
       const cell = scope.cell;
       if (cell) {
         for (const key of TOKEN_KEYS) if (tokens[key] !== null) cell.processedTokens += tokens[key];
@@ -477,11 +429,7 @@ export class AgentUsage {
           ...finish(item),
           share: summary.processedTokens ? item.values.processedTokens / summary.processedTokens : 0,
         }))
-        // Agent ids are unique, so the tiebreak makes the order of two equal rows a
-        // decision rather than a consequence of the unordered SELECT above.
         .sort((a, b) => b.processedTokens - a.processedTokens || a.agentId.localeCompare(b.agentId)),
-      // daily leans on the insertion order of a map seeded date by date; this map is built
-      // lazily from an ORDER BY-less SELECT, so the order is sorted rather than inherited.
       providerDaily: [...providerDays.values()].sort(
         (a, b) => a.date.localeCompare(b.date) || a.provider.localeCompare(b.provider),
       ),
@@ -513,7 +461,6 @@ function finish(item: Bucket): AnalyticsTotals {
   };
 }
 
-/** Called inside the conversation writer's transaction; only message identity and counts survive. */
 export function recordUsageMessage(
   db: DatabaseSync,
   agentId: string,

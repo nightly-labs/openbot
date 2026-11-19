@@ -4,7 +4,6 @@ import { runApiResponse } from "../../../../../server/effect-runtime";
 import { marketplaceCardResponse } from "../../../../../server/marketplace-cards";
 import { marketplaceErrorResponse, requestAgentMarketplace } from "../../../../../server/request-auth";
 
-/** The share card a link preview of the agent's page shows. It is public, like the page. */
 export const Route = createFileRoute("/v1/marketplace/agents/$agentId/card")({
   server: {
     handlers: {

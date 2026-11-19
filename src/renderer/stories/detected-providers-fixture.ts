@@ -6,7 +6,6 @@ import type {
 } from "@openbot/ui/features/custom-providers/detected-providers";
 import { createSignal, onCleanup } from "solid-js";
 
-/** What a scan could find on a developer's computer. The paths, versions and models are examples only. */
 export const STORY_DETECTED_PROVIDERS: readonly DetectedProvider[] = [
   {
     key: "models:http://127.0.0.1:11434/v1",
@@ -44,9 +43,7 @@ const FOUND_EVERY_MS = 450;
 const REPLY_MS = 500;
 
 interface StoryDetectionOptions {
-  /** Detection keys that the user hid in an earlier run. */
   hidden?: readonly string[] | undefined;
-  /** Without it there is no Scan again, as on the first-run step. */
   rescan?: boolean | undefined;
   onSaved?: ((value: DetectedProviderValue) => void) | undefined;
 }
@@ -57,11 +54,6 @@ interface StoryDetectionState {
   hidden: ReadonlySet<string>;
 }
 
-/**
- * A fake host: each provider appears after the one before it, as a host that probes one address or
- * command at a time would report them. Save marks the row as added, and Hide and Show hidden change
- * only this story's list.
- */
 export function createStoryDetection(initial: ProviderDetection, options: StoryDetectionOptions = {}) {
   const [state, setState] = createSignal<StoryDetectionState>({
     scanning: initial.scanning,
@@ -132,7 +124,6 @@ export function createStoryDetection(initial: ProviderDetection, options: StoryD
     hide: (provider) => setState((current) => ({ ...current, hidden: new Set([...current.hidden, provider.key]) })),
     showHidden: () => setState((current) => ({ ...current, hidden: new Set() })),
     scan: options.rescan ? scan : undefined,
-    // The fake server lists what the scan found at the same address.
     discoverModels: (endpoint) =>
       reply(() => {
         const server = STORY_DETECTED_PROVIDERS.find(

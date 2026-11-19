@@ -15,16 +15,10 @@ export interface DataArticleFrameProps {
   children: JSX.Element;
 }
 
-/**
- * What every page drawn from data, a comparison or a provider page, has around its
- * content: the header, the analytics, the reading progress and the footer.
- */
 export function DataArticleFrame(props: DataArticleFrameProps) {
   let articleBody: HTMLElement | undefined;
   const tracked = (): ArticleReference => ({ collection: props.collection.id, slug: props.article.slug });
 
-  // Tracked for the same reason as on the article page: a link between two
-  // pages of a collection keeps this route and only changes the parameter.
   createTrackedEffect(() => {
     const article = tracked();
     return landingAnalytics.start(

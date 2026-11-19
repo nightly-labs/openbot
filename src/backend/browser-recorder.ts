@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { type FileHandle, mkdir, open, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { BrowserRecordingArtifact } from "@openbot/contracts/ipc";
+import type { BrowserEnvironment, BrowserRecordingArtifact } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import { BrowserWindow, type WebContents } from "electron";
 import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
+import { isRecorderTabCapture, RECORDER_ORIGIN } from "./browser-recorder-permission";
 import { runCauseEffect } from "./effect-boundary";
 
 const MAX_RECORDING_MS = 5 * 60 * 1_000;
@@ -23,6 +24,14 @@ const recorderStartErrorSchema = Schema.Struct({
   name: Schema.String,
   message: Schema.String,
 });
+
+export type RecordingFrameSize = { width: number; height: number } | null;
+
+export function recordingFrameSize(environment: BrowserEnvironment): RecordingFrameSize {
+  const { mode, width, height, deviceScaleFactor } = environment.viewport;
+  if (mode !== "custom") return null;
+  return { width: Math.round(width * deviceScaleFactor), height: Math.round(height * deviceScaleFactor) };
+}
 
 interface RecorderSession {
   tabId: string;
@@ -44,6 +53,7 @@ export class BrowserRecorder {
   readonly #artifacts = new Map<string, BrowserRecordingArtifact>();
   readonly #errors = new Map<string, Error>();
   readonly #starting = new Set<string>();
+  readonly #capturing = new Set<number>();
   readonly #onStateChanged: (tabId: string, recording: boolean) => void;
   readonly #maxRecordingMs: number;
   readonly #maxConcurrentRecordings: number;
@@ -69,10 +79,21 @@ export class BrowserRecorder {
     return this.#sessions.get(tabId)?.stoppedReason === null;
   }
 
+  allowsTabCapture(
+    contents: WebContents,
+    permission: string,
+    request: Parameters<typeof isRecorderTabCapture>[1],
+  ): boolean {
+    if (!isRecorderTabCapture(permission, request, this.#capturing.has(contents.id))) return false;
+    this.#capturing.delete(contents.id);
+    return true;
+  }
+
   readonly start = Effect.fn("BrowserRecorder.start")(function* (
     this: BrowserRecorder,
     tabId: string,
     contents: WebContents,
+    frameSize: RecordingFrameSize,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const existing = this.#sessions.get(tabId);
     if (existing) {
@@ -189,11 +210,16 @@ export class BrowserRecorder {
                   },
                 });
               });
-              yield* browserCall(() => recorderWindow.loadURL("https://recorder.openbot.invalid/"));
+              yield* browserCall(() => recorderWindow.loadURL(`${RECORDER_ORIGIN}/`));
               const sourceId = contents.getMediaSourceId(recorderWindow.webContents);
+              const captured = contents.id;
+              if (frameSize) this.#capturing.add(captured);
               const startResult = yield* browserCall(() =>
-                recorderWindow.webContents.executeJavaScript(startScript(sourceId, this.#maxRecordingMs), true),
-              );
+                recorderWindow.webContents.executeJavaScript(
+                  startScript(sourceId, this.#maxRecordingMs, frameSize),
+                  true,
+                ),
+              ).pipe(Effect.ensuring(Effect.sync(() => this.#capturing.delete(captured))));
               const started = Schema.decodeUnknownResult(recorderStartErrorSchema)(startResult);
               if (Result.isSuccess(started))
                 return yield* browserFailure(new Error(`${started.success.name}: ${started.success.message}`));
@@ -391,23 +417,41 @@ export class BrowserRecorder {
   });
 }
 
-function startScript(sourceId: string, maxRecordingMs: number): string {
+function startScript(sourceId: string, maxRecordingMs: number, frameSize: RecordingFrameSize): string {
+  const tabVideo = frameSize
+    ? {
+        mandatory: {
+          chromeMediaSource: "tab",
+          chromeMediaSourceId: sourceId,
+          minWidth: frameSize.width,
+          maxWidth: frameSize.width,
+          minHeight: frameSize.height,
+          maxHeight: frameSize.height,
+        },
+      }
+    : null;
+  const displayVideo = frameSize
+    ? {
+        width: { ideal: frameSize.width, max: frameSize.width },
+        height: { ideal: frameSize.height, max: frameSize.height },
+      }
+    : true;
   return `(async () => {
     let stage = 'initialization';
     try {
     const STOP_BYTES = ${RECORDING_STOP_BYTES};
     const MAX_MS = ${maxRecordingMs};
-    const sourceId = ${JSON.stringify(sourceId)};
-    stage = 'getUserMedia';
+    const tabVideo = ${JSON.stringify(tabVideo)};
     let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId } },
-      });
-    } catch {
+    if (tabVideo) {
+      stage = 'getUserMedia';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: tabVideo });
+      } catch {}
+    }
+    if (!stream) {
       stage = 'getDisplayMedia';
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: ${JSON.stringify(displayVideo)}, audio: false });
     }
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'

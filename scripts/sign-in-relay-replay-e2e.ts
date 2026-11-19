@@ -1,9 +1,3 @@
-// Runs the real `SignInRelayHost` replay against a fake loopback sign-in that acts as `codex login`
-// does (#3864): its callback saves the sign-in and redirects to its own `/success` page, and the
-// process ends only when that page loads. The replay must load it, so a second Codex account on a
-// joined server finishes. A success page that fails does not undo the callback, and a redirect to a
-// different address must not be followed.
-// `bun run test:sign-in-relay-replay`. Writes .openbot-build/sign-in-relay-replay-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
@@ -19,12 +13,10 @@ const STATE = "relay-state";
 interface FakeLogin {
   port: number;
   paths: string[];
-  /** True when the success page loaded, as when `codex login` exits. */
   exited: () => boolean;
   close: () => Promise<void>;
 }
 
-/** A loopback sign-in whose callback redirects to `successAt(port)`, and that ends on `/success`. */
 async function fakeLogin(successAt: (port: number) => string): Promise<FakeLogin> {
   const paths: string[] = [];
   let exited = false;
@@ -62,14 +54,12 @@ interface CaseResult {
   result: McpTestResult | null;
 }
 
-/** One relayed sign-in: the host replays the client's callback to `login`. */
 async function runCase(name: string, successAt: (port: number, otherPort: number) => string): Promise<CaseResult> {
   const other = await fakeLogin(() => "/");
   const login = await fakeLogin((port) => successAt(port, other.port));
   try {
     const redirectUri = `http://127.0.0.1:${login.port}/auth/callback`;
     const pageUrl = `https://auth.example/oauth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&state=${STATE}`;
-    // A replay flow uses none of these: the sign-in that it relays to is the one in `startReplay`.
     const unused = () => Effect.die(new Error("A replay does not start a sign-in."));
     const noPage = () => ({ pageUrl: null, result: null });
     const host = new SignInRelayHost({
@@ -77,11 +67,11 @@ async function runCase(name: string, successAt: (port: number, otherPort: number
       providers: { startRelay: unused, relayStatus: noPage, cancel: unused },
       accounts: { startRelay: unused, relayStatus: noPage, cancelSignIn: unused },
       receiveMcpGrant: () => false,
+      receiveMcpRefusal: () => false,
       printedLink: () => false,
     });
     const { flowId } = host.startReplay(MEMBER, {
       key: "account\ncodex",
-      // The account sign-in ends when its `codex login` exits.
       status: () => ({
         pageUrl: login.exited() ? null : pageUrl,
         result: login.exited() ? { toolCount: 0, error: null } : null,
@@ -113,7 +103,6 @@ try {
   assert.equal(codex.loginExited, true, "The sign-in ends after the replay.");
   assert.deepEqual(codex.result, { toolCount: 0, error: null }, "The host's result arrives.");
 
-  // A success page that fails does not make `complete` fail: `runCase` would throw.
   const missing = await runCase("success page that fails", (port) => `http://127.0.0.1:${port}/missing`);
   report.cases.push(missing);
   assert.deepEqual(missing.loginPaths, ["/auth/callback", "/missing"], "The replay loads the redirect once.");

@@ -1,31 +1,14 @@
-// The user's own OpenAI-compatible voice server, as the desktop and the phone read it: the model
-// list of `GET /models`, the voice list, and the WAV audio of `POST /audio/speech`. The requests
-// themselves stay in each app, because each has its own network and key storage.
 import type { SpeechAudio, VoiceServerModels, VoiceServerRoutes } from "./ipc";
 import { VOICE_SERVER_LIMITS } from "./ipc";
 import { isDynamicRecord, isString } from "./runtime-values";
 
-/**
- * The voices of the OpenAI speech API. A server that lists no voices gets these, because a server
- * that copies the OpenAI API usually accepts its voice names.
- */
 export const OPENAI_VOICES = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"];
 
-/**
- * The voice lists to try, in order. There is no standard route: Kokoro-FastAPI answers
- * `/audio/voices` and Speaches `/audio/speech/voices`.
- */
 export const VOICE_SERVER_VOICE_PATHS = ["audio/voices", "audio/speech/voices"] as const;
 
-/** Model names that are speech recognition or speech synthesis, for a server that does not say. */
 const TRANSCRIPTION_MODEL = /whisper|transcri|stt|asr|parakeet|scribe|canary|sensevoice|speech-to-text/i;
 const SPEECH_MODEL = /tts|kokoro|piper|orpheus|xtts|kitten|chatterbox|melo|zonos|supertonic|text-to-speech/i;
 
-/**
- * The models of a `GET /models` answer, sorted by route, or null when the answer is not a model list.
- * A model says its route in `task` on Speaches; for a server that does not, the name decides. A
- * model of neither kind, such as a chat model, is left out.
- */
 export function voiceServerModelLists(body: unknown): { transcription: string[]; speech: string[] } | null {
   if (!isDynamicRecord(body) || !Array.isArray(body.data)) return null;
   const transcription: string[] = [];
@@ -50,7 +33,6 @@ export function voiceServerModelLists(body: unknown): { transcription: string[];
   return { transcription, speech };
 }
 
-/** `["af_heart"]`, `{ voices: [...] }` or `{ data: [...] }`, with names or `{ id }`, `{ voice_id }`, `{ name }`. */
 export function voiceServerVoiceNames(body: unknown): string[] {
   const list = Array.isArray(body)
     ? body
@@ -74,10 +56,6 @@ export function voiceServerVoiceNames(body: unknown): string[] {
   return names;
 }
 
-/**
- * The routes that agree with what a test found. A route that the server does not have turns off; a
- * route that had no model yet turns on, so a new server is in use when its setup is done.
- */
 export function fitVoiceServerRoutes(routes: VoiceServerRoutes, models: VoiceServerModels): VoiceServerRoutes {
   const known = (list: readonly string[], value: string | null) => (value && list.includes(value) ? value : null);
   const transcriptionModel = known(models.transcription, routes.transcriptionModel) ?? models.transcription[0] ?? null;
@@ -89,13 +67,11 @@ export function fitVoiceServerRoutes(routes: VoiceServerRoutes, models: VoiceSer
   return { dictation, speech, transcriptionModel, speechModel, voice };
 }
 
-/** The last part of a model ID, which is the part that a person reads. */
 export function shortVoiceServerModel(model: string | null): string {
   if (!model) return "";
   return model.split("/").pop() || model;
 }
 
-/** `studio.local:8000` for `http://studio.local:8000/v1`, the part of an address that a message may name. */
 export function voiceServerHost(address: string): string {
   try {
     return new URL(address).host;
@@ -104,10 +80,6 @@ export function voiceServerHost(address: string): string {
   }
 }
 
-/**
- * The samples of a WAV file as 16-bit mono PCM. It takes 16-bit or 32-bit float samples, mixes
- * channels down, and reads a streamed file whose data size is unknown to its end.
- */
 export function decodeVoiceServerWav(wav: Uint8Array): SpeechAudio | null {
   const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
   const tag = (offset: number) => String.fromCharCode(...wav.subarray(offset, offset + 4));
@@ -121,7 +93,6 @@ export function decodeVoiceServerWav(wav: Uint8Array): SpeechAudio | null {
     if (id === "fmt " && declared >= 16 && start + 16 <= wav.byteLength) {
       const code = view.getUint16(start, true);
       format = {
-        // WAVE_FORMAT_EXTENSIBLE names the real format in its sub-format GUID.
         code:
           code === 0xfffe && declared >= 26 && start + 26 <= wav.byteLength ? view.getUint16(start + 24, true) : code,
         channels: view.getUint16(start + 2, true),
@@ -164,7 +135,6 @@ function toMonoPcm16(
   return { pcm: output, sampleRate };
 }
 
-/** A WAV file of little-endian 16-bit mono PCM, for `POST /audio/transcriptions`. */
 export function encodeVoiceServerWav(pcm: Uint8Array, sampleRate: number): Uint8Array {
   const wav = new Uint8Array(44 + pcm.byteLength);
   const view = new DataView(wav.buffer);

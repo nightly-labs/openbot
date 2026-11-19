@@ -35,62 +35,39 @@ import { Kbd } from "../../surface";
 import { type TextValue, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 
-/** What a span of the trace did. A failed span keeps its kind and sets `failed`. */
 export type TraceSpanKind = "model" | "tool" | "waiting" | "handoff";
 
-/** What a span did, more exactly than its kind. It selects the icon of the row. */
 export type TraceSpanIcon = "agent" | "thinking" | "text" | "search" | "read" | "edit" | "command" | "web" | "tool";
 
-/**
- * One timed piece of an agent run: a model call, a tool call, a wait or a handoff to another agent.
- * Spans nest through `parentId`, such as an agent, its subagents and their calls.
- */
 export interface TraceSpan {
   id: string;
-  /** The span that holds this one. A span with no parent in the list is a top-level row. */
   parentId: string | null;
-  /** The text that the provider or the host sent, shown as it is. */
   name: string;
-  /** The model or the tool source, such as "Sonnet 5.5" or "GitHub". */
   detail?: string;
   kind: TraceSpanKind;
-  /** The icon of the row. Without one, the row shows the icon of its kind. */
   icon?: TraceSpanIcon;
   failed?: boolean;
-  /** The output of a failed tool step, redacted by the host. A click on the row shows it under the row. */
   error?: string | undefined;
-  /** Epoch milliseconds. */
   start: number;
-  /** Epoch milliseconds, or null while the span runs: its bar then grows to `now`. */
   end: number | null;
-  /** The tokens of this span's own work, without its children. */
   tokens?: number;
-  /** The cost of this span's own work, without its children. A parent row shows its total. */
   costUsd?: number;
 }
 
-/** The keyboard that the shortcut hint names. */
 export type TraceKeyboard = "mac" | "pc";
 
 export interface TraceWaterfallProps {
   spans: readonly TraceSpan[];
-  /** The steps of the turn that the host did not keep, because the turn had too many. The spans and totals leave them out. */
   omittedSteps?: number | undefined;
-  /** The time now, in epoch milliseconds. The caller moves it while a span runs. */
   now: number;
   keyboard: TraceKeyboard;
-  /** The search text when the trace opens. */
   defaultQuery?: string | undefined;
-  /** Controls at the end of the header, such as the close button of a dialog. */
   actions?: JSX.Element;
-  /** The rows that the user can pick, such as the steps that the chat can show. */
   canSelectSpan?: ((id: string) => boolean) | undefined;
-  /** Called when the user picks a row that `canSelectSpan` accepts. */
   onSelectSpan?: ((id: string) => void) | undefined;
   class?: string;
 }
 
-/** About this many ticks cover the axis. */
 const TICK_COUNT = 5;
 const TICK_STEPS = [1, 2, 5] as const;
 
@@ -103,14 +80,9 @@ const KIND_LABEL = {
 
 const LEGEND = ["model", "tool", "waiting"] as const satisfies readonly TraceSpanKind[];
 
-/** How much faster than the real run a replay plays. Kobalte takes a mutable option array. */
 type SpeedLevel = "1" | "2" | "5" | "10";
 const SPEED_LEVELS: SpeedLevel[] = ["1", "2", "5", "10"];
 
-/**
- * Each subagent gets the next colour of this many, and its calls share it. The top agent has no
- * colour, so its own calls stay grey. The colours are in `trace-waterfall.css`.
- */
 const HUE_COUNT = 5;
 
 const KIND_ICON = {
@@ -135,12 +107,9 @@ const SPAN_ICON = {
 const SHORTCUT = { mac: "⌘F", pc: "Ctrl F" } as const satisfies Record<TraceKeyboard, string>;
 
 interface TraceViewState {
-  /** The parent rows that the user folded. */
   collapsed: Record<string, boolean>;
-  /** The failed rows whose error the user opened. */
   errors: Record<string, boolean>;
   query: string;
-  /** The time into the run that a replay shows, in ms. Null when the trace shows the whole run. */
   replay: number | null;
   playing: boolean;
   speed: SpeedLevel;
@@ -150,21 +119,15 @@ interface TraceRow {
   span: TraceSpan;
   depth: number;
   parent: boolean;
-  /** The colour of the agent that did this span, from 1 to `HUE_COUNT`. Null for the top agent. */
   hue: number | null;
 }
 
-/**
- * A row and the rows under it. A parent row stays at the top while its rows scroll under it. A folded
- * row keeps its rows, so they can slide closed and open.
- */
 interface TraceBranch {
   row: TraceRow;
   open: boolean;
   children: TraceBranch[];
 }
 
-/** A piece of a parent's lane: one direct child of the parent, from 0 to 1 on the timeline. */
 interface TraceSegment {
   id: string;
   kind: TraceSpanKind;
@@ -174,34 +137,22 @@ interface TraceSegment {
   end: number;
 }
 
-/**
- * The line from a parent row down to the last of the subagents that it starts at one time. Rows
- * count from the first row. Each subagent's row draws the branch into its bar.
- */
 interface TraceHandoff {
   id: string;
   at: number;
   from: number;
   to: number;
-  /** The height in px of the open errors above the `from` row and above the `to` row. */
   fromShift: number;
   toShift: number;
-  /** The colour of the agent that hands off. */
   hue: number | null;
 }
 
-/** A piece of a handoff line that one row draws. */
 interface TraceLine {
   at: number;
   hue: number | null;
 }
 
-/**
- * The handoff lines that a row draws itself: the branch into its own bar, and the lines that pass a
- * parent row, whose background covers the overlay.
- */
 interface TraceRowLines {
-  /** `last` is true on the last subagent of a line, where the line turns and stops. */
   branch: (TraceLine & { last: boolean }) | null;
   passes: TraceLine[];
 }
@@ -210,7 +161,6 @@ function hueValue(hue: number | null): string | undefined {
   return hue === null ? undefined : String(hue);
 }
 
-/** The spans under each span id, in start order. Null holds the top-level spans. */
 function childrenOf(spans: readonly TraceSpan[]): Map<string | null, TraceSpan[]> {
   const ids = new Set(spans.map((span) => span.id));
   const children = new Map<string | null, TraceSpan[]>();
@@ -228,13 +178,11 @@ function spanEnd(span: TraceSpan, now: number): number {
   return span.end ?? now;
 }
 
-/** A span as it was before it ended: it has no result, tokens or cost yet. */
 function unfinished(span: TraceSpan): TraceSpan {
   const { failed: _failed, tokens: _tokens, costUsd: _costUsd, ...open } = span;
   return { ...open, end: null };
 }
 
-/** "11ms", "1.4s", "17s", "2m 5s". A short tool call is not "0s". */
 function formatDuration(ms: number, format: TextValue["format"]): string {
   const seconds = Math.max(0, ms) / 1_000;
   if (ms > 0 && ms < 100) {
@@ -259,7 +207,6 @@ function formatDuration(ms: number, format: TextValue["format"]): string {
   return `${minutes} ${rest}`;
 }
 
-/** "$0.27", and three digits under a cent: "$0.004". */
 function formatCost(value: number, format: TextValue["format"]): string {
   return format.currencyUsd(value, {
     minimumFractionDigits: 2,
@@ -267,7 +214,6 @@ function formatCost(value: number, format: TextValue["format"]): string {
   });
 }
 
-/** The smallest 1, 2 or 5 × 10ⁿ ms step that cuts `range` into at most `count` parts. */
 function tickStep(range: number, count: number): number {
   const raw = range / count;
   const power = 10 ** Math.floor(Math.log10(raw));
@@ -275,10 +221,6 @@ function tickStep(range: number, count: number): number {
   return 10 * power;
 }
 
-/**
- * A live trace of an agent run: each span is a bar on one timeline, under a strip of totals. The tree
- * folds, the search keeps the matches and their parents, and a replay plays the run again.
- */
 export function TraceWaterfall(props: TraceWaterfallProps) {
   const text = useText();
   const { t, format } = text;
@@ -292,8 +234,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   });
   let searchInput: HTMLInputElement | undefined;
   let root: HTMLElement | undefined;
-  /* A menu belongs to the trace dialog when the trace is in it: outside it, the modal dialog blocks the
-     pointer and hides the menu from assistive technology. Without a dialog, the menu goes to the body. */
   const [menuMount, setMenuMount] = createSignal<HTMLElement | undefined>();
   const onMenuOpen = (open: boolean) => {
     if (open) setMenuMount(root?.closest<HTMLElement>(".trace-dialog") ?? undefined);
@@ -310,10 +250,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return { origin, duration: Math.max(0, end - origin) };
   });
 
-  /**
-   * The spans as the trace shows them. A replay shows the run as it was at `replay`: later spans are
-   * not there yet, and a span that ends later still runs. The axis keeps the range of the whole run.
-   */
   const view = createMemo(() => {
     if (state.replay === null) return { spans: props.spans, now: props.now };
     const now = range().origin + state.replay;
@@ -325,10 +261,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
 
   const tree = createMemo(() => childrenOf(view().spans));
 
-  /**
-   * The colour of each span. It comes from the whole run, not the replay, so an agent keeps its colour
-   * while the replay plays.
-   */
   const hues = createMemo(() => {
     const children = childrenOf(props.spans);
     const result = new Map<string, number | null>();
@@ -354,7 +286,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return parents;
   });
 
-  /** The matches and every span above one. Null when there is no search. */
   const matches = createMemo(() => {
     const query = state.query.trim().toLocaleLowerCase();
     if (!query) return null;
@@ -368,13 +299,11 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return kept;
   });
 
-  /** The rows as a tree for the list, and in order for the handoff lines. */
   const layout = createMemo(() => {
     const children = tree();
     const kept = matches();
     const colours = hues();
     const rows: TraceRow[] = [];
-    /** `shown` is false under a folded row: those rows are in the tree, but not in the row order. */
     const visit = (parentId: string | null, depth: number, shown: boolean): TraceBranch[] => {
       const branches: TraceBranch[] = [];
       for (const span of children.get(parentId) ?? []) {
@@ -382,7 +311,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
         const parent = children.has(span.id);
         const row: TraceRow = { span, depth, parent, hue: colours.get(span.id) ?? null };
         if (shown) rows.push(row);
-        // A search shows each match, also one under a folded row.
         const open = kept !== null || !state.collapsed[span.id];
         branches.push({ row, open, children: parent ? visit(span.id, depth + 1, shown && open) : [] });
       }
@@ -394,28 +322,24 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
 
   const rows = () => layout().rows;
 
-  /** The error of a row that can show one. A parent row folds on a click, so it shows no error. */
   const errorOf = (row: TraceRow) => (row.parent || !row.span.failed ? undefined : row.span.error);
   const errorOpen = (row: TraceRow) => errorOf(row) !== undefined && state.errors[row.span.id] === true;
   const toggleError = (id: string) =>
     setState((draft) => {
       draft.errors[id] = !draft.errors[id];
     });
-  /** The height in px of each open error. An error moves the rows under it, so the handoff lines move too. */
   const [errorHeights, setErrorHeights] = createStore<Record<string, number>>({});
   const setErrorHeight = (id: string, height: number) =>
     setErrorHeights((draft) => {
       draft[id] = height;
     });
 
-  /** The row under the pointer, or the row of the lane piece under it. The two light up together. */
   const [hovered, setHovered] = createSignal<string | null>(null);
   const onPointerOver = (event: PointerEvent) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-span-id]") : null;
     setHovered(target?.dataset.spanId ?? null);
   };
 
-  /** The row that the Tab key goes to. The arrow keys move it; it is the first row until then. */
   const [active, setActive] = createSignal<string | null>(null);
   const activeId = createMemo(() => {
     const id = active();
@@ -428,7 +352,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   };
   const rowOpen = (id: string) => matches() !== null || !state.collapsed[id];
 
-  /** Up and Down move between rows. Right unfolds a row, then goes to its first row; Left goes back. */
   const onRowKeyDown = (event: KeyboardEvent, row: TraceRow) => {
     const shown = rows();
     const at = shown.findIndex((item) => item.span.id === row.span.id);
@@ -443,7 +366,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
       if (open) target = shown[at + 1]?.span.id;
       else toggle(row.span.id);
     } else if (event.key === "ArrowLeft") {
-      // A search shows the rows under each match, so it does not fold.
       if (row.parent && open && matches() === null) toggle(row.span.id);
       else target = parentOf().get(row.span.id);
     } else return;
@@ -453,7 +375,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
 
   const canSelect = (id: string) => props.onSelectSpan !== undefined && (props.canSelectSpan?.(id) ?? true);
 
-  /** Where a time is on the timeline, from 0 to 1. */
   const position = (time: number) => {
     const { origin, duration } = range();
     return duration === 0 ? 0 : Math.min(1, Math.max(0, (time - origin) / duration));
@@ -479,16 +400,13 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
       if (span.costUsd !== undefined) cost = (cost ?? 0) + span.costUsd;
       if (span.tokens !== undefined) tokens = (tokens ?? 0) + span.tokens;
       if (span.failed) errors += 1;
-      // An agent row holds calls; it is not one.
       if (children.has(span.id)) continue;
       if (span.kind === "model") modelCalls += 1;
-      // A handoff is the tool call that sends a message or starts a subagent.
       else if (span.kind === "tool" || span.kind === "handoff") toolCalls += 1;
     }
     return { cost, tokens, modelCalls, toolCalls, errors };
   });
 
-  /** The cost of each span with all the spans under it. */
   const subtreeCost = createMemo(() => {
     const children = tree();
     const costs = new Map<string, number | null>();
@@ -505,7 +423,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return costs;
   });
 
-  /** The finished model or tool call that took longest. A wait is not work, and one call has no slowest. */
   const slowestId = createMemo(() => {
     const children = tree();
     const finished = view().spans.filter(
@@ -516,7 +433,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return finished.reduce((slowest, span) => (took(span) > took(slowest) ? span : slowest)).id;
   });
 
-  /** The direct children of a parent row, as pieces of its lane. A subagent is a wait for the parent. */
   const segments = (id: string): TraceSegment[] => {
     const children = tree();
     return (children.get(id) ?? []).map((child) => ({
@@ -529,10 +445,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     }));
   };
 
-  /**
-   * The row that a handoff line starts from: the parent's last handoff step that ends by the time the
-   * subagents start, or else the parent row. A line from the parent row would cross that step's bar.
-   */
   const handoffRow = (shown: TraceRow[], parentId: string, from: number, to: number, start: number) => {
     for (let at = to - 1; at > from; at--) {
       const span = shown[at]?.span;
@@ -542,14 +454,9 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     return from;
   };
 
-  /**
-   * The handoff lines. Subagents that one parent starts at one time share one line, so that their
-   * lines do not lie on top of each other, and each subagent gets a branch from it.
-   */
   const handoffs = createMemo(() => {
     const shown = rows();
     const index = new Map(shown.map((row, at) => [row.span.id, at]));
-    /** `shifts[at]` is the height of the open errors above the row at `at`. */
     const shifts = [0];
     for (const row of shown)
       shifts.push((shifts.at(-1) ?? 0) + (errorOpen(row) ? (errorHeights[row.span.id] ?? 0) : 0));
@@ -607,7 +514,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
       draft.collapsed[id] = !draft.collapsed[id];
     });
 
-  // The replay moves on each animation frame. It keeps its own clock, so a slow frame does not slow it.
   let frame = 0;
   let lastFrame = 0;
   let replayAt = 0;
@@ -618,10 +524,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   };
   onCleanup(stopFrames);
 
-  /*
-   * The list fades at an edge where it has more rows. The axis row and the parent rows stay at the
-   * top as the list scrolls, so the top fade starts under the last of them, not at the top edge.
-   */
   const fades = createScrollFades();
   const [stack, setStack] = createSignal(0);
   let body: HTMLElement | undefined;
@@ -632,7 +534,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     for (const row of body.querySelectorAll<HTMLElement>(".trace-axis-row, .trace-row[data-parent]")) {
       if (row.closest("[inert]")) continue;
       const rect = row.getBoundingClientRect();
-      // A row is at the top when it is at or above the place where it stops.
       const stuck = rect.top - top <= Number.parseFloat(getComputedStyle(row).top) + 1;
       if (stuck && rect.bottom > top) bottom = Math.max(bottom, rect.bottom - top);
     }
@@ -678,7 +579,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     });
   };
 
-  /** Starts a replay from the start of the run, or pauses or resumes the replay that shows. */
   const togglePlay = () => {
     if (state.replay === null) replayAt = 0;
     const playing = !state.playing;
@@ -690,7 +590,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     else stopFrames();
   };
 
-  /** Plays the replay again from the start of the run. */
   const restartReplay = () => {
     replayAt = 0;
     setState((draft) => {
@@ -714,7 +613,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     searchInput?.select();
   };
 
-  // Named functions, not ternaries in props: see `AgentActivity.tsx`.
   const nowStyle = () => ({ "--trace-at": String(position(view().now)) });
   const speedLabel = (level: SpeedLevel) => t("chat.trace.speedLevel", { speed: format.number(Number(level)) });
   const handoffStyle = (handoff: TraceHandoff) => ({
@@ -728,7 +626,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   const formatShownDuration = (ms: number) => formatDuration(ms, format);
   const formatShownCost = (usd: number) => formatCost(usd, format);
 
-  /** One row of the list, with the values that it reads from the whole trace, and its open error. */
   const rowView = (row: () => TraceRow) => {
     const errorId = createUniqueId();
     const shownError = () => (errorOpen(row()) ? errorOf(row()) : undefined);
@@ -956,10 +853,6 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
   );
 }
 
-/**
- * A total. When it changes, the digits that change roll in: from below when the total grows, from
- * above when it shrinks, as a replay restarts. Assistive technology reads the plain text.
- */
 function TraceTotal(props: { label: string; value: number; format: (value: number) => string }) {
   const roll = createDigitRoll(() => props.value, { animate: () => !prefersReducedMotion() });
   const shown = createMemo<{ value: number; text: string; previous: string }>((last) => {
@@ -971,7 +864,6 @@ function TraceTotal(props: { label: string; value: number; format: (value: numbe
     value: shown().value,
     up: last === undefined || shown().value >= last.value,
   }));
-  // The texts line up at their ends, so "9.9s" to "10s" rolls the digits, not the unit.
   const changed = (character: string, index: number) => {
     const { text, previous } = shown();
     return /\d/u.test(character) && previous[previous.length - text.length + index] !== character;
@@ -999,10 +891,7 @@ function TraceTotal(props: { label: string; value: number; format: (value: numbe
   );
 }
 
-/** The rows of a tree level. Each parent row and its rows sit in one item, so the parent row stays at the
- * top only while its own rows scroll under it. */
 function TraceBranches(props: { branches: TraceBranch[]; row: (row: () => TraceRow) => JSX.Element }) {
-  /** The rows under a folded row stay in the page while they slide closed; no one can reach them. */
   const folded = (branch: TraceBranch) => (branch.open ? undefined : true);
   return (
     <ol class="trace-rows">
@@ -1029,23 +918,17 @@ function TraceRowView(props: {
   open: boolean;
   slowest: boolean;
   label: string;
-  /** Where the bar starts and ends on the timeline, from 0 to 1. */
   start: number;
   end: number;
-  /** The pieces of a parent row's lane. A parent row shows these and no bar of its own. */
   segments: TraceSegment[];
-  /** The handoff lines that this row draws over its own background. */
   lines: TraceRowLines | undefined;
-  /** The span under the pointer: this row, or a piece of this row's lane. */
   hovered: string | null;
-  /** True on the one row that the Tab key goes to. */
   focusable: boolean;
   selectable: boolean;
   onToggle: () => void;
   onFocus: () => void;
   onKeyDown: (event: KeyboardEvent) => void;
   onSelect: () => void;
-  /** The error of a failed tool row. A click on the row shows it under the row, before a select. */
   error: string | undefined;
   errorOpen: boolean;
   errorId: string;
@@ -1070,7 +953,6 @@ function TraceRowView(props: {
     if (props.error !== undefined) props.onToggleError();
     else if (props.selectable) props.onSelect();
   };
-  /** A parent row tells if its rows show; a failed row tells if its error shows. */
   const nameExpanded = () => {
     if (props.row.parent) return expanded();
     if (props.error === undefined) return undefined;
@@ -1109,7 +991,6 @@ function TraceRowView(props: {
             <ChevronDown class="trace-toggle-icon" aria-hidden="true" />
           </Button>
         </Show>
-        {/* The keyboard stop of the row. Left and Right fold the row, so the chevron needs no stop. */}
         <Button
           type="button"
           variant="ghost"
@@ -1171,7 +1052,6 @@ function TraceRowView(props: {
             </span>
           }
         >
-          {/* The track is the parent's own time, so a wait before its first child still shows. */}
           <span class="trace-bar trace-track" data-kind={span().kind} style={barStyle()} aria-hidden="true" />
           <For each={props.segments} keyed={(segment) => segment.id}>
             {(segment) => (
@@ -1200,7 +1080,6 @@ function TraceRowView(props: {
   );
 }
 
-/** The error of a failed tool row, under the row. It tells its height, which moves the handoff lines. */
 function TraceSpanError(props: { id: string; error: string; depth: number; onHeight: (height: number) => void }) {
   const observer = new ResizeObserver((entries) => {
     for (const entry of entries) if (entry.target instanceof HTMLElement) props.onHeight(entry.target.offsetHeight);
@@ -1216,7 +1095,6 @@ function TraceSpanError(props: { id: string; error: string; depth: number; onHei
   );
 }
 
-/** The icon of a row on a small tile. An agent's icon has the agent's colour. */
 function TraceGlyph(props: { span: TraceSpan }) {
   const icon = () => (props.span.icon === undefined ? KIND_ICON[props.span.kind] : SPAN_ICON[props.span.icon]);
   return (
@@ -1236,10 +1114,8 @@ export interface TraceWaterfallDialogProps extends Omit<TraceWaterfallProps, "ac
   onOpenChange: (open: boolean) => void;
 }
 
-/** The trace of a turn in a dialog, as the steps row of the turn opens it. */
 export function TraceWaterfallDialog(props: TraceWaterfallDialogProps) {
   const { t } = useText();
-  // A controlled dialog has no Kobalte trigger, so it keeps the element that opened it itself.
   let opener: HTMLElement | undefined;
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>

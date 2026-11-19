@@ -10,30 +10,19 @@ import { SkillMark } from "./MarketplaceParts";
 import type { MarketplaceAgent, MarketplaceModel, MarketplaceSkillRef } from "./marketplace-model";
 import { agentsWith, matches, useSkillWords } from "./marketplace-skill-state";
 
-/** The skill that the dialog acts on. A skill made on this computer has no mark. */
 export type DialogSkill = MarketplaceSkillRef & { iconUrl?: string | null | undefined };
 
-/** A drag over the rows of a check box list, as in a file list. */
 interface DragCheck {
-  /** The rows from the first row of the drag to the row under the pointer. */
   from: number;
   to: number;
-  /** The state the first row changes to. Each row in the range gets it. */
   on: boolean;
-  /** The state of each row before the drag, so a row that leaves the range gets it back. */
   before: ReadonlyMap<string, boolean>;
   pointerId: number;
   y: number;
 }
 
-/** Near this distance from the top or the bottom edge, a drag scrolls the list. */
 const DRAG_EDGE = 32;
 
-/**
- * Press on a row and drag: each row from that row to the pointer gets the new state of the first
- * one. Shift+click sets the rows from the last click to this one. Near the top or the bottom edge,
- * the list scrolls. Touch keeps its scroll; the keyboard keeps one check box at a time.
- */
 function createDragCheck(props: {
   shown: () => readonly MarketplaceAgent[];
   checked: (agentId: string) => boolean;
@@ -90,7 +79,6 @@ function createDragCheck(props: {
     setDragging(false);
     cancelAnimationFrame(frame);
     frame = 0;
-    // The click of this press comes after pointerup, in the same task.
     setTimeout(() => {
       swallowClick = false;
     });
@@ -100,7 +88,6 @@ function createDragCheck(props: {
     dragging,
     attach: (element: HTMLUListElement) => {
       list = element;
-      // The press already set the row. The click of the label must not change it back.
       element.addEventListener(
         "click",
         (event) => {
@@ -142,7 +129,6 @@ function createDragCheck(props: {
   };
 }
 
-/** One agent in a picker row: avatar, name, title as in the sidebar, and a short note at the end. */
 function PickerAgent(props: { agent: MarketplaceAgent; note: string | undefined }) {
   return (
     <>
@@ -170,15 +156,10 @@ function PickerAgent(props: { agent: MarketplaceAgent; note: string | undefined 
   );
 }
 
-/**
- * The agents with a search field and a check box each: a long list must not be a long menu. "All"
- * checks each agent that the search shows. A row that cannot change has its check box off.
- */
 export function AgentSearchList(props: {
   agents: readonly MarketplaceAgent[];
   label: string;
   checked: (agentId: string) => boolean;
-  /** Changes the rows. An agent that cannot change is not in the list. */
   set: (agents: readonly MarketplaceAgent[], on: boolean) => void;
   blocked: (agent: MarketplaceAgent) => boolean;
   note: (agent: MarketplaceAgent) => string | undefined;
@@ -275,26 +256,19 @@ export function AgentSearchList(props: {
   );
 }
 
-/**
- * Chooses the agents of one skill in a dialog, with a search. Changes wait for the button, which
- * says what it does: "Add to 12 agents", "Remove from Chief", "Save: add 3, remove 1".
- */
 export function AgentsDialog(props: { model: MarketplaceModel; skill: DialogSkill; onClose: () => void }) {
   const { t } = useText();
   const words = useSkillWords(() => props.model);
   const skillId = untrack(() => props.skill.id);
-  /* Only the user's choices. An agent with no choice follows its read, which can load after the dialog opens. */
   const [draft, setDraft] = createStore<{ on: Record<string, boolean> }>({ on: {} });
   const agents = () => props.model.agents();
   const installed = (agentId: string) => props.model.installedSkill(agentId, skillId);
   const has = (agentId: string) => installed(agentId) !== undefined;
   const checked = (agentId: string) => draft.on[agentId] ?? has(agentId);
-  /** The agent has its most skills. Without the list of each agent's skills, no agent counts as full. */
   const full = (agentId: string) => {
     const skills = props.model.installedSkills?.(agentId);
     return skills !== undefined && assignedSkillCount(skills) >= INPUT_LIMITS.agentSkills;
   };
-  /* An agent whose list did not load may have the skill already, changed by the user: leave it alone. */
   const known = (agentId: string) => props.model.skillRead(agentId) === "loaded";
   const blocked = (agent: MarketplaceAgent) => !has(agent.id) && (!known(agent.id) || full(agent.id));
   const note = (agent: MarketplaceAgent) => {
@@ -324,7 +298,6 @@ export function AgentsDialog(props: { model: MarketplaceModel; skill: DialogSkil
     );
     props.onClose();
   };
-  // The answers can be older than the dialog, so it reads each agent that has no fresh answer.
   onSettled(() => props.model.readSkills());
   let content: HTMLElement | undefined;
   return (
@@ -343,7 +316,6 @@ export function AgentsDialog(props: { model: MarketplaceModel; skill: DialogSkil
           ref={(element) => {
             content = element;
           }}
-          // The dialog opens on the agent search, not on Close.
           onOpenAutoFocus={(event) => {
             const search = content?.querySelector<HTMLElement>("input[type=search]");
             if (!search) return;
@@ -396,7 +368,6 @@ export function AgentsDialog(props: { model: MarketplaceModel; skill: DialogSkil
   );
 }
 
-/** A button that opens the agents dialog of one skill. No button for a user with no agents. */
 function DialogButton(props: {
   model: MarketplaceModel;
   skill: DialogSkill;
@@ -425,8 +396,7 @@ function DialogButton(props: {
   );
 }
 
-/** Small avatars of the first agents, one over the next. The text beside it gives the count. */
-function AgentStack(props: { agents: readonly MarketplaceAgent[] }) {
+export function AgentStack(props: { agents: readonly MarketplaceAgent[] }) {
   return (
     <span class="marketplace-skill-stack" aria-hidden="true">
       <For each={props.agents.slice(0, 3)} keyed={(agent) => agent.id}>
@@ -440,7 +410,6 @@ function AgentStack(props: { agents: readonly MarketplaceAgent[] }) {
   );
 }
 
-/** "Add to agents" on a skill page. */
 export function AddToAgents(props: { model: MarketplaceModel; skill: DialogSkill }) {
   const { t } = useText();
   return (
@@ -456,7 +425,6 @@ export function AddToAgents(props: { model: MarketplaceModel; skill: DialogSkill
   );
 }
 
-/** The agents that have the skill, "On 12 of 50", or "Add" when no agent has it. Each opens the dialog. */
 export function DialogAgents(props: { model: MarketplaceModel; skill: DialogSkill }) {
   const { t } = useText();
   const words = useSkillWords(() => props.model);

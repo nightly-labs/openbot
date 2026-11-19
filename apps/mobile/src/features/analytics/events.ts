@@ -59,7 +59,6 @@ export const MOBILE_EVENTS = {
   conversation_action: { ...outcome, action: ["pin", "unpin", "hide", "unhide"] },
   usage_viewed: { scope: ["agent", "server"] },
   account_sign_out: outcome,
-  // The desktop sends the same two sign-in events. `code_sent` is the result of a sent code.
   account_sign_in_started: { ...outcome, result: ["code_sent", "company_sign_in", "failed"], method: ["email"] },
   account_sign_in_completed: { ...outcome, method: ["email", "company"] },
   hosted_server_plans_action: {
@@ -87,7 +86,6 @@ export const MOBILE_EVENTS = {
   voice_conversation_action: { ...outcome, ...voice, action: ["start", "end"], turn_count: count },
   voice_turn: { ...outcome, ...voice, audio_duration_seconds: seconds },
   agent_template_action: { ...outcome, action: ["installed"], entry_point: ["deep_link"] },
-  // The desktop event, without `listing_slug`: the phone sends no listing name.
   marketplace_action: { ...outcome, entity: ["agent", "skill", "plugin"], action: ["install", "update"] },
   analytics_preference_changed: { enabled: isBoolean },
 } as const;

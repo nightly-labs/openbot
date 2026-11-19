@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/marketplace";
 
 export const messages = {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "编程",
   "marketplace.category.design": "设计",
   "marketplace.category.dataAnalytics": "数据与分析",
@@ -19,7 +18,6 @@ export const messages = {
   "marketplace.loadMore": "加载更多",
   "marketplace.version": "版本 {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "市场",
   "marketplace.kinds": "市场内容类型",
   "marketplace.tab.agents": "助手",
@@ -28,10 +26,8 @@ export const messages = {
   "marketplace.description.agents": "带有自身指令和技能的现成助手。",
   "marketplace.description.skills": "教助手完成某项任务或使用某个工具的指令。",
 
-  // A plugin link.
   "marketplace.plugins.missing": "OpenBot 目录中没有该插件。",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "正在加载助手详情…",
   "marketplace.agents.skills": "技能",
   "marketplace.agents.routines": "自动化任务",
@@ -48,7 +44,6 @@ export const messages = {
   "marketplace.agents.trust.pendingBeforeAdd": "创建者在 OpenBot 审核前分享了它。添加后，它可以代表你执行操作。",
   "marketplace.agents.source.pending": "尚未审核",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "正在加载技能",
   "marketplace.try.readFailed": "OpenBot 无法读取该助手的技能，请重试。",
   "marketplace.try.enable": "请在助手设置中启用该技能后再试用。",
@@ -56,7 +51,6 @@ export const messages = {
   "marketplace.try.update": "请更新该技能后再试用该版本。",
   "marketplace.try.composerUnavailable": "助手输入框不可用。",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "打开 {name}",
   "marketplace.tab.apps": "应用",
   "marketplace.crumbs.label": "位置",
@@ -78,7 +72,6 @@ export const messages = {
   "marketplace.properties.updated": "更新时间",
   "marketplace.properties.installs": "安装量",
 
-  // Agents.
   "marketplace.agent.add": "添加",
   "marketplace.agent.addNamed": "添加 {name}",
   "marketplace.agent.addAgent": "添加助手",
@@ -87,7 +80,6 @@ export const messages = {
   "marketplace.agent.update": "更新",
   "marketplace.agent.openChat": "打开对话",
 
-  // Apps.
   "marketplace.app.connect": "连接",
   "marketplace.app.reconnect": "重新连接",
   "marketplace.app.connectNamed": "连接 {name}",
@@ -97,6 +89,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
   "marketplace.app.notConnected": "未连接",
+  "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",
   "marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",
@@ -106,7 +99,6 @@ export const messages = {
   "marketplace.app.whatsappTagline": "WhatsApp 中你自己的聊天和你允许的人",
   "marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
   "marketplace.app.protonPassTagline": "用共享保管库中的登录信息登录网站",
-  // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "登录与凭据管理",
   "marketplace.app.yourApps": "你的应用",
   "marketplace.app.addCustom": "添加自定义项",
@@ -121,6 +113,10 @@ export const messages = {
   "marketplace.app.remove.action": "移除",
   "marketplace.app.remove.confirmTitle": "移除 {name}？",
   "marketplace.app.remove.keep": "保留",
+  "marketplace.app.replace.title": "替换 {server}?",
+  "marketplace.app.replace.description":
+    "你已有一个名为 {server} 的服务器,但它不是 {name}。要用 {name} 替换它吗?它的地址和已保存的密钥将被删除。",
+  "marketplace.app.replace.action": "替换",
   "marketplace.app.connection": "连接",
   "marketplace.app.access.use": "可使用",
   "marketplace.app.access.noAgents": "无助手",
@@ -138,6 +134,7 @@ export const messages = {
     "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
   "marketplace.app.blocked.member":
     "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
+  "marketplace.app.blocked.mac": "{name} 仅在运行 OpenBot 的 Mac 上可用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -157,9 +154,6 @@ export const messages = {
   "marketplace.app.signInTitle": "请重新登录 {name}",
   "marketplace.app.signInDescription": "{name} 拒绝了已保存的登录。重新登录之前，你的助手无法使用它。",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave 数据与交易",
   "marketplace.plugin.aave.description":
     "Aave 让用户浏览实时的 Aave V3 和 V4 市场、查看钱包持仓与 DAO 治理、模拟借贷操作，并准备非托管交易。所有交易都以未签名形式返回：插件只读取市场并生成调用，钱包始终掌握在用户手中。",
@@ -235,6 +229,13 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "我还有多少 Higgsfield 积分？",
   "marketplace.plugin.higgsfield.prompt.productShot": "用 Higgsfield 生成一张陶瓷马克杯放在木桌上的产品照。",
   "marketplace.plugin.higgsfield.prompt.clip": "用 Higgsfield 生成一段 5 秒的日落海浪视频。",
+  "marketplace.plugin.sunra.tagline": "AI 图片、视频、音频和 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra 让助手使用 GPT Image、Nano Banana、Seedream、FLUX、Seedance、Kling 和 Veo 等模型生成图片、视频、音频和 3D 模型，查看积分余额，并获取结果。结果保存到用户 Sunra 账户中的一个项目里。每个用户在浏览器中登录自己的 Sunra 账户。Sunra 会先报出每次生成的费用，确认后才消耗该账户的积分。",
+  "marketplace.plugin.sunra.app": "通过 Sunra 的 MCP 服务器生成图片、视频、音频和 3D，查看积分和结果，在浏览器中登录。",
+  "marketplace.plugin.sunra.prompt.balance": "我还有多少 Sunra 积分？",
+  "marketplace.plugin.sunra.prompt.poster": "用 Sunra 生成一张雨中夜市的竖版海报。",
+  "marketplace.plugin.sunra.prompt.clip": "用 Sunra 生成一段 5 秒的纸船在河上漂流的视频。先告诉我费用。",
   "marketplace.plugin.elevenlabs.tagline": "语音、声音和语音智能体",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs 让智能体把文本转成语音、使用各种声音，并创建、测试和查看 ElevenLabs 语音智能体及其对话。生成的音频以短时有效的下载链接返回。每位用户在浏览器中登录自己的 ElevenLabs 账号，每次生成都会使用该账号的额度。",
@@ -346,8 +347,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "我的笔记里关于这个项目的决定是怎么写的？",
   "marketplace.plugin.obsidian.prompt.save": "把这个决定作为新笔记保存到我的仓库。",
   "marketplace.plugin.obsidian.prompt.log": "把今天工作的总结添加到我的“工作日志”笔记中。",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    '在 Obsidian 中打开 Settings > Local REST API。复制 API 密钥并开启 "Enable non-encrypted (HTTP) server"。',
+  "marketplace.plugin.obsidian.hint.apiKey": "在 Obsidian 中打开 Settings > Local REST API，然后复制 API 密钥。",
   "marketplace.plugin.resend.tagline": "事务性邮件",
   "marketplace.plugin.resend.description":
     "Resend 让助手通过一个 API 发送事务性邮件并检查投递情况。把 Resend 控制台中的 API 密钥作为一个环境变量传给本地服务器即可。",
@@ -357,13 +357,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
   "marketplace.plugin.omnisend.tagline": "邮件和短信营销",
   "marketplace.plugin.omnisend.description":
-    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每个用户在浏览器中登录自己的 Omnisend 账户，并在授权页面选择访问级别。拥有写入权限时，智能体还可以发送活动和删除数据。如果智能体只需要报告，请选择只读权限。",
+    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每位用户使用自己 Omnisend 账号中的 API 密钥连接。智能体可以执行该密钥允许的操作，可能包括发送活动和删除数据。",
   "marketplace.plugin.omnisend.app":
-    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并在浏览器中登录。",
+    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并使用 API 密钥。",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
   "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.omnisend.hint.apiKey": "在 Omnisend 中打开 Store settings > API keys，然后创建一个密钥。",
   "marketplace.plugin.postiz.description":
     "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
   "marketplace.plugin.postiz.app":
@@ -371,6 +372,13 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
   "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
   "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.tagline": "社交媒体排程",
+  "marketplace.plugin.trypost.description":
+    "TryPost 让智能体列出你已连接的频道，并在 X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest 等平台起草、排程、加入队列和发布帖子。智能体还可以查看分析数据、管理想法和审批，并设置发布时间。在浏览器中登录你的 TryPost 账户并选择一个工作区。智能体可以立即发布帖子，因此请在批准前检查每篇帖子。",
+  "marketplace.plugin.trypost.app": "通过 TryPost 的 MCP 服务器和浏览器登录，管理频道、帖子、队列、想法和分析。",
+  "marketplace.plugin.trypost.prompt.week": "本周排程了哪些帖子？",
+  "marketplace.plugin.trypost.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.prompt.analytics": "上个月我的哪些帖子互动最多？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",
@@ -379,7 +387,6 @@ export const messages = {
   "marketplace.plugin.composio.prompt.handoff": "把这个拉取请求的摘要发到我们的团队频道。",
   "marketplace.plugin.composio.prompt.apps": "通过 Composio 你能使用哪些应用和操作？",
 
-  // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
   "marketplace.plugin.composio.hint.apiKey": "可在你的 Composio 账号的 Settings > Sessions & API Key 中找到。",
   "marketplace.plugin.neon.tagline": "Postgres 项目、分支与迁移",
   "marketplace.plugin.neon.description":
@@ -476,7 +483,6 @@ export const messages = {
   "marketplace.auth.apiKey": "API 密钥",
   "marketplace.auth.personalApiKey": "个人 API 密钥",
   "marketplace.auth.createKey": "创建密钥",
-  // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "在 {name} 中试用",
   "marketplace.skills.yours": "你的技能",
@@ -509,6 +515,13 @@ export const messages = {
   "marketplace.skills.origin.local": "在这台电脑上创建",
   "marketplace.skills.origin.workspace": "位于该助手的文件夹中",
   "marketplace.skills.origin.marketplace": "来自市场 · 版本 {version}",
+  "marketplace.skills.origin.github": "来自 GitHub · {repository}",
+  "marketplace.skills.github.search": "搜索，或粘贴 GitHub 链接",
+  "marketplace.skills.github.reading": "正在仓库中查找技能",
+  "marketplace.skills.github.trust": "OpenBot 未审核来自 GitHub 的技能。添加前请先阅读技能内容。",
+  "marketplace.skills.github.source": "GitHub · {repository}，提交 {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "在 GitHub 上打开 {repository}",
   "marketplace.skills.status.notAdded": "未添加",
   "marketplace.skills.status.on": "已开启：{agents}",
   "marketplace.skills.agentCount": { other: "{count} 个助手" },
@@ -540,7 +553,6 @@ export const messages = {
   "marketplace.skills.dialog.unread": "未读取技能",
   "marketplace.skills.local.gone": "现在没有助手拥有该技能。",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "已添加 {name}。",
   "marketplace.notice.agentUpdated": "已更新 {name}。",
   "marketplace.notice.appConnected": "{name} 已连接。",
@@ -556,7 +568,6 @@ export const messages = {
   },
   "marketplace.error.skillPartial": "{name} 在这些助手上没有变化：{agents}。{reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "无法打开链接。",
   "marketplace.error.copyLink": "无法复制链接。",
   "marketplace.error.connectNoServer": "请选择一台本地服务器来连接该应用。",

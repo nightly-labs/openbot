@@ -15,17 +15,9 @@ import { redactText } from "@openbot/logging";
 interface RunningTrace {
   startedAt: string;
   steps: Map<string, ConversationTraceStep>;
-  /** The ids of the items that came after the step limit. Only their number is kept. */
   omitted: Set<string>;
 }
 
-/**
- * Owns the steps of each running turn, by provider item id, until the turn ends. The providers send
- * no times, so each time is when the host got the event. A turn ends with `take`, which removes it;
- * only a turn that `begin` started records steps, so a compaction turn keeps nothing here. After
- * `CONVERSATION_TRACE_STEP_LIMIT` steps it keeps no new step, but it counts them, so the trace can
- * say that it is partial.
- */
 export class TurnTraces {
   readonly #turns = new Map<string, RunningTrace>();
 
@@ -33,13 +25,6 @@ export class TurnTraces {
     this.#turns.set(turnId, { startedAt, steps: new Map(), omitted: new Set() });
   }
 
-  /**
-   * Records an item event. The first event of an item starts its step; a completion ends it. A later
-   * event can change the kind between thinking and message, because Claude marks its thinking late.
-   * `text` is the progress text of a tool step; the text of the first event stays. The command and the
-   * recipients of a tool step come with its start, but a provider can send them later, so the first
-   * event that has them sets them.
-   */
   observe(
     turnId: string,
     itemId: string,
@@ -50,12 +35,10 @@ export class TurnTraces {
       text?: string | null;
       command?: string | null;
       recipientAgentIds?: string[] | null;
-      /** The redacted and cut error text of a failed step (`toolFailureText`). */
       error?: string | null;
     },
   ): void {
     const trace = this.#turns.get(turnId);
-    // A step id must pass the message guard, or the message that holds the trace would not decode.
     if (!trace || !itemId || itemId.length > INPUT_LIMITS.identifier) return;
     const now = new Date().toISOString();
     let step = trace.steps.get(itemId);
@@ -70,7 +53,6 @@ export class TurnTraces {
     if (step.kind !== "tool") step.kind = kind;
     if (kind === "tool" && step.text === undefined && event.text)
       step.text = event.text.slice(0, CONVERSATION_TRACE_TEXT_LIMIT);
-    // The trace stays on this computer, but a command can hold a token, as a log line can.
     const command = event.command?.trim();
     if (kind === "tool" && step.command === undefined && command)
       step.command = redactText(command).slice(0, CONVERSATION_TRACE_TEXT_LIMIT);
@@ -81,7 +63,6 @@ export class TurnTraces {
     if (event.completed && event.failed) step.failed = true;
   }
 
-  /** The trace of a turn that ends now, without its usage. It removes the turn. */
   take(turnId: string, endedAt: string): ConversationTurnTrace | null {
     const trace = this.#turns.get(turnId);
     this.#turns.delete(turnId);
@@ -100,10 +81,6 @@ export class TurnTraces {
   }
 }
 
-/**
- * The message of a turn that holds its trace: its last answer with text, or its last thinking when
- * it has no answer. A question prompt, a plan, the subagents and the memory changes do not hold it.
- */
 export function traceMessage(
   messages: readonly ConversationMessage[],
   turnId: string,

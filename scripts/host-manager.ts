@@ -24,7 +24,6 @@ async function main(): Promise<void> {
     return;
   }
   if (process.argv[2] === "--runtime-check") {
-    // Exercise JavaScriptCore's hot loop in the hardened standalone executable without host access.
     let sum = 0;
     for (let index = 0; index < 1_000_000; index++) sum += index;
     if (sum !== 499_999_500_000) throw new Error("Runtime check failed.");
@@ -54,7 +53,6 @@ async function main(): Promise<void> {
     await ensureHostDirectory(join(directory, "tenants"), 0o755);
     for (const uid of config.tenants) {
       const path = join(directory, "tenants", String(uid));
-      // Never repair or follow an existing tenant-controlled path as root.
       await mkdir(path, { mode: 0o700 });
       await chown(path, uid, 0);
       const info = await lstat(path);
@@ -72,7 +70,6 @@ async function main(): Promise<void> {
     await runCauseEffect(writeProtocolJson(join(directory, "config.json"), config));
     return;
   }
-  // launchd owns daemon lifetime and serialization. Do not allow a second interactive coordinator.
   if (process.ppid !== 1 || process.argv.length !== 2)
     throw new Error("Start Host Manager through its system LaunchDaemon.");
   await verifyHostPath(directory);

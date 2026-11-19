@@ -85,12 +85,6 @@ interface Options {
   outputPath: string;
 }
 
-/**
- * Runs the bounded history check against the real SQLite staging store and conversation cache.
- *
- * The default total is intentionally above the 256 MiB transport guard. Each page is only 50
- * 32 KiB items, so the benchmark never builds the complete transcript in a JavaScript array.
- */
 export async function runProviderHistoryReport(options: Options): Promise<Report> {
   const databaseRoot = await mkdtemp(join(tmpdir(), "openbot-provider-history-report-"));
   const homeRoot = await mkdtemp(join(tmpdir(), "openbot-provider-history-report-home-"));
@@ -182,7 +176,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         database,
         readHistory,
         sessionId,
-        provider: "codex",
+        provider: "grok",
         externalSessionId: "provider-history-report-external-session",
         agentId,
         publicThreadId: threadId,
@@ -205,7 +199,7 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         database,
         readHistory: retryReadHistory,
         sessionId,
-        provider: "codex",
+        provider: "grok",
         externalSessionId: "provider-history-report-external-session",
         agentId,
         publicThreadId: threadId,

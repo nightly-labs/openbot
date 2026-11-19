@@ -1,10 +1,11 @@
+import type { UseQueryResult } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { View } from "react-native";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, type MobileConnectorId } from "@/features/servers/model/connectors";
+import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** The logo, name, status and description at the top of a connector page. */
 export function ConnectorHeader({
   id,
   status,
@@ -39,11 +40,23 @@ export function ConnectorHeader({
   );
 }
 
-/** The reason that the last change or read failed, under the header. */
 export function ConnectorError({ message }: { message: string | null }) {
   return message ? (
     <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="-mt-4 px-4 text-danger-text">
       {message}
     </Typography.Paragraph>
   ) : null;
+}
+
+export function ConnectorLoading({ query }: { query: Pick<UseQueryResult, "isError" | "error"> }) {
+  const { t, errorMessage } = useText();
+  return (
+    <SettingsContent>
+      <SettingsNote>
+        {query.isError
+          ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
+          : t("mobile.server.connectors.loading")}
+      </SettingsNote>
+    </SettingsContent>
+  );
 }

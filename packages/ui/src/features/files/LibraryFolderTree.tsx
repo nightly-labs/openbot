@@ -3,70 +3,100 @@ import {
   Archive,
   Button,
   buttonVariants,
+  ChevronDown,
   ChevronRight,
+  Clock3,
   DropdownMenu,
   Ellipsis,
   Folder,
+  FolderOpen,
   FolderPlus,
   GalleryVerticalEnd,
+  Inbox,
   Input,
   Pencil,
   Plus,
   Search,
+  Star,
+  StarOff,
   Trash2,
+  UsersRound,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { AgentPicker } from "../agents/AgentPicker";
 import type { LibraryDropMark } from "./library-folder-drag";
 import {
+  AGENTS_SECTION,
   ALL_FILES,
   agentKey,
   branchId,
   canHoldFolder,
+  FAVORITES_SECTION,
   type LibraryLocation,
+  RECENT_FILES,
   REMOVED_AGENTS,
   sameLocation,
+  UNSORTED_FILES,
 } from "./library-folders-view";
+
+export interface LibraryCounts {
+  all: number;
+  recent: number;
+  unsorted: number;
+  removed: number;
+  agent: ReadonlyMap<string, number>;
+  folder: ReadonlyMap<string, number>;
+}
+
+export type LibraryFavorite =
+  | { kind: "folder"; key: string; folder: LibraryFolder }
+  | { kind: "agent"; key: string; agent: AgentProfile };
+
+const AGENTS_SHOWN = 6;
 
 interface LibraryFolderTreeProps {
   agents: readonly AgentProfile[];
+  activeAgents: readonly AgentProfile[];
   folders: readonly LibraryFolder[];
-  /** The place that the page shows. Its row is the current one. */
+  counts: LibraryCounts;
+  favorites: readonly LibraryFavorite[];
   place: LibraryLocation;
   search: string;
-  /** The search looks in the current place, so its field names that place. */
   searchLabel: string;
-  /** The folder whose row shows the name field. */
   renaming: string | null;
-  /** The folder list under an agent (`agentKey`) or a folder (its id) does not show. */
   isCollapsed: (key: string) => boolean;
-  /** How the row of an agent (`folderId` null) or of a folder shows a drop. */
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
-  /** `""` for the folder that the pointer drags. */
   draggedFolder: (folderId: string) => "" | undefined;
-  /** The server can hold one more folder. Without it, no row offers a new folder. */
+  dropOff: (agentId: string | undefined, folderId?: string) => "" | undefined;
+  landed: (agentId: string, folderId: string | null) => "" | undefined;
+  outMark: () => "into" | undefined;
+  outOff: () => "" | undefined;
+  landedOut: () => "" | undefined;
+  dragAgent: string | null;
   canCreate: boolean;
-  /** The viewer can change the folders of the agent. Without it, its rows offer no change. */
   canOrganize: (agentId: string) => boolean;
-  /** Files of deleted agents exist. They get a row after the agents. */
   removedFiles: boolean;
   onSearch: (search: string) => void;
   onGo: (place: LibraryLocation) => void;
   onOpenChange: (key: string, open: boolean) => void;
-  /** Makes a folder at the top level of the agent, or in the folder `parentId`. */
   onNewFolder: (agentId: string, parentId?: string) => void;
   onRename: (folderId: string) => void;
   onCommitName: (folderId: string, name: string) => void;
   onCancelName: (folderId: string) => void;
   onDelete: (folder: LibraryFolder) => void;
+  onToggleFavorite: (key: string) => void;
 }
 
-/** The parts of the tree that each row uses. */
 interface TreeRows {
   props: LibraryFolderTreeProps;
   children: (agentId: string, parentId: string | undefined) => readonly LibraryFolder[];
+  isFavorite: (key: string) => boolean;
+  current: (place: LibraryLocation) => boolean;
+  go: (place: LibraryLocation, branch?: string) => void;
 }
 
 const NO_FOLDERS: readonly LibraryFolder[] = [];
@@ -79,8 +109,16 @@ function folderPlace(folder: LibraryFolder) {
   return { kind: "folder", agentId: folder.agentId, folderId: folder.id } satisfies LibraryLocation;
 }
 
-/** The name field of a folder row. Enter or a click outside saves the name; Escape keeps the name before. */
-function FolderNameField(props: { name: string; onCommit: (name: string) => void; onCancel: () => void }) {
+function agentPlace(agentId: string) {
+  return { kind: "agent", agentId } satisfies LibraryLocation;
+}
+
+export function FolderNameField(props: {
+  name: string;
+  class: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+}) {
   const { t } = useText();
   const [name, setName] = createSignal(untrack(() => props.name));
   let done = false;
@@ -93,12 +131,11 @@ function FolderNameField(props: { name: string; onCommit: (name: string) => void
   return (
     <Input
       size="sm"
-      class="library-row-input"
+      class={props.class}
       aria-label={t("files.folder.name")}
       maxlength={LIBRARY_FOLDER_LIMITS.name}
       value={name()}
       onValueChange={setName}
-      // The menu that started the rename gives the focus back to its button first.
       ref={(element) =>
         requestAnimationFrame(() => {
           element.focus();
@@ -118,28 +155,203 @@ function FolderNameField(props: { name: string; onCommit: (name: string) => void
   );
 }
 
-/** The button that shows and hides the folders of a row. */
-function BranchToggle(props: { rows: TreeRows; branch: string; name: string }) {
+function SideRow(props: {
+  depth?: number;
+  icon: JSX.Element;
+  label: string;
+  count?: number | undefined;
+  current: boolean;
+  branch?: string | undefined;
+  onGo: () => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
+  collapsed?: boolean;
+  actions?: JSX.Element | undefined;
+  agentId?: string | undefined;
+  folderId?: string | undefined;
+  drop?: LibraryDropMark | undefined;
+  dropKind?: "into" | undefined;
+  dragging?: "" | undefined;
+  off?: "" | undefined;
+  landed?: "" | undefined;
+  out?: boolean | undefined;
+  editing?: JSX.Element | undefined;
+}) {
   const { t } = useText();
-  const collapsed = () => props.rows.props.isCollapsed(props.branch);
-  const expanded = () => (collapsed() ? "false" : "true");
+  const branched = () => props.branch !== undefined;
+  const expanded = () => (props.collapsed ? "false" : "true");
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      class="library-row-toggle"
-      aria-label={t("files.folder.listOf", { name: props.name })}
-      aria-expanded={expanded()}
-      aria-controls={branchId(props.branch)}
-      onClick={() => props.rows.props.onOpenChange(props.branch, collapsed())}
+    <div
+      class="library-row"
+      style={{ "--library-depth": String(props.depth ?? 0) }}
+      data-library-agent={props.agentId}
+      data-library-folder={props.folderId}
+      data-library-drop={props.dropKind}
+      data-drop={props.drop}
+      data-dragging={props.dragging}
+      data-drop-off={props.off}
+      data-landed={props.landed}
+      data-library-out={props.out ? "" : undefined}
+      data-count={props.count ? "" : undefined}
+      data-actions={props.actions ? "" : undefined}
     >
-      <ChevronRight aria-hidden="true" />
-    </Button>
+      <Show
+        when={!props.editing}
+        fallback={
+          <div class="library-row-edit">
+            <span class="library-row-icon">{props.icon}</span>
+            {props.editing}
+          </div>
+        }
+      >
+        <Button
+          type="button"
+          variant="ghost"
+          class="library-row-main"
+          aria-current={props.current ? "page" : undefined}
+          onClick={() => props.onGo()}
+          onKeyDown={(event) => {
+            if (!branched() || (event.key !== "ArrowRight" && event.key !== "ArrowLeft")) return;
+            event.preventDefault();
+            props.onOpenChange?.(event.key === "ArrowRight");
+          }}
+        >
+          <span class="library-row-icon">{props.icon}</span>
+          <span class="library-truncate" dir="auto">
+            {props.label}
+          </span>
+        </Button>
+        <Show when={props.branch}>
+          {(branch) => (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              class="library-row-toggle"
+              aria-label={t("files.folder.listOf", { name: props.label })}
+              aria-expanded={expanded()}
+              aria-controls={branchId(branch())}
+              onClick={() => props.onOpenChange?.(props.collapsed === true)}
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          )}
+        </Show>
+        <Show when={props.count}>
+          {(count) => (
+            <span class="library-row-count" aria-hidden="true">
+              {count()}
+            </span>
+          )}
+        </Show>
+        <Show when={props.actions}>
+          <span class="library-row-actions">{props.actions}</span>
+        </Show>
+      </Show>
+    </div>
   );
 }
 
-/** The folders of one parent, and below each folder the folders that are in it. */
+function SideSection(props: {
+  rows: TreeRows;
+  key: string;
+  title: string;
+  action?: JSX.Element | undefined;
+  children: JSX.Element;
+}) {
+  const collapsed = () => props.rows.props.isCollapsed(props.key);
+  return (
+    <section class="library-section" aria-label={props.title}>
+      <header class="library-section-head" data-library-spring={props.key}>
+        <Button
+          type="button"
+          variant="ghost"
+          class="library-section-toggle"
+          aria-expanded={collapsed() ? "false" : "true"}
+          aria-controls={branchId(props.key)}
+          onClick={() => props.rows.props.onOpenChange(props.key, collapsed())}
+        >
+          {props.title}
+          <ChevronDown class="library-section-chevron" aria-hidden="true" />
+        </Button>
+        {props.action}
+      </header>
+      <div
+        class="library-collapse"
+        id={branchId(props.key)}
+        data-collapsed={collapsed() ? "" : undefined}
+        inert={collapsed()}
+      >
+        <div class="library-collapse-body">{props.children}</div>
+      </div>
+    </section>
+  );
+}
+
+function NewFolderButton(props: { rows: TreeRows; agentId: string; parentId?: string | undefined; label: string }) {
+  const tree = () => props.rows.props;
+  return (
+    <Show when={tree().canCreate && canHoldFolder(tree().folders, props.parentId)}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        class="library-row-action"
+        aria-label={props.label}
+        title={props.label}
+        onClick={() => tree().onNewFolder(props.agentId, props.parentId)}
+      >
+        <Plus aria-hidden="true" />
+      </Button>
+    </Show>
+  );
+}
+
+export function FavoriteMenuItem(props: { favorite: boolean; onSelect: () => void }) {
+  const { t } = useText();
+  return (
+    <DropdownMenu.Item onSelect={() => props.onSelect()}>
+      <Show when={props.favorite} fallback={<Star aria-hidden="true" />}>
+        <StarOff aria-hidden="true" />
+      </Show>
+      {props.favorite ? t("files.folder.removeFavorite") : t("files.folder.addFavorite")}
+    </DropdownMenu.Item>
+  );
+}
+
+function FolderMenu(props: { rows: TreeRows; folder: LibraryFolder }) {
+  const { t } = useText();
+  const tree = () => props.rows.props;
+  return (
+    <DropdownMenu.Root placement="bottom-end" gutter={4}>
+      <DropdownMenu.Trigger
+        class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} library-row-action`}
+        aria-label={t("files.action.moreActions", { name: props.folder.name })}
+      >
+        <Ellipsis aria-hidden="true" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content>
+          <FavoriteMenuItem
+            favorite={props.rows.isFavorite(props.folder.id)}
+            onSelect={() => tree().onToggleFavorite(props.folder.id)}
+          />
+          <Show when={tree().canOrganize(props.folder.agentId)}>
+            <DropdownMenu.Item onSelect={() => tree().onRename(props.folder.id)}>
+              <Pencil aria-hidden="true" />
+              {t("common.rename")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => tree().onDelete(props.folder)}>
+              <Trash2 aria-hidden="true" />
+              {t("files.folder.delete")}
+            </DropdownMenu.Item>
+          </Show>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
 function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: string | undefined; depth: number }) {
   const { t } = useText();
   const tree = () => props.rows.props;
@@ -147,106 +359,73 @@ function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: st
   const folders = () => props.rows.children(props.agent.id, props.parentId);
   const owner = () => tree().folders.find((folder) => folder.id === props.parentId)?.name ?? props.agent.name;
   const collapsed = () => tree().isCollapsed(key());
-  const hidden = () => (collapsed() ? "" : undefined);
-  const ariaHidden = () => (collapsed() ? "true" : undefined);
-  const current = (folder: LibraryFolder) => (sameLocation(tree().place, folderPlace(folder)) ? "page" : undefined);
-
-  /** ArrowRight shows the folders of a row and ArrowLeft hides them, as in a file tree. */
-  function onRowKey(event: KeyboardEvent, branch: string): void {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-    event.preventDefault();
-    tree().onOpenChange(branch, event.key === "ArrowRight");
-  }
 
   return (
     <Show when={folders().length > 0}>
       <div
-        class="library-branch"
+        class="library-collapse"
         id={branchId(key())}
-        data-collapsed={hidden()}
-        aria-hidden={ariaHidden()}
+        data-collapsed={collapsed() ? "" : undefined}
+        aria-hidden={collapsed() ? "true" : undefined}
         inert={collapsed()}
       >
-        <ul class="library-tree-folders" aria-label={t("files.folder.listOf", { name: owner() })}>
+        <ul
+          class="library-branch"
+          style={{ "--library-depth": String(props.depth) }}
+          aria-label={t("files.folder.listOf", { name: owner() })}
+        >
           <For each={folders()} keyed={(folder) => folder.id}>
-            {(folder) => (
-              <li>
-                <div
-                  class="library-row"
-                  style={{ "--library-depth": String(props.depth) }}
-                  data-library-agent={folder().agentId}
-                  data-library-folder={folder().id}
-                  data-drop={tree().dropMark(folder().agentId, folder().id)}
-                  data-dragging={tree().draggedFolder(folder().id)}
-                >
-                  <Show
-                    when={tree().renaming === folder().id}
-                    fallback={
+            {(folder) => {
+              const place = () => folderPlace(folder());
+              const nested = () => props.rows.children(folder().agentId, folder().id).length > 0;
+              const current = () => props.rows.current(place());
+              const open = () => current() || tree().dropMark(folder().agentId, folder().id) === "into";
+              return (
+                <li>
+                  <SideRow
+                    depth={props.depth}
+                    agentId={folder().agentId}
+                    folderId={folder().id}
+                    drop={tree().dropMark(folder().agentId, folder().id)}
+                    dragging={tree().draggedFolder(folder().id)}
+                    off={tree().dropOff(folder().agentId, folder().id)}
+                    landed={tree().landed(folder().agentId, folder().id)}
+                    icon={open() ? <FolderOpen aria-hidden="true" /> : <Folder aria-hidden="true" />}
+                    label={folder().name}
+                    count={tree().counts.folder.get(folder().id)}
+                    current={current()}
+                    branch={nested() ? folder().id : undefined}
+                    collapsed={tree().isCollapsed(folder().id)}
+                    onOpenChange={(open) => tree().onOpenChange(folder().id, open)}
+                    onGo={() => props.rows.go(place(), nested() ? folder().id : undefined)}
+                    editing={
+                      tree().renaming === folder().id ? (
+                        <FolderNameField
+                          class="library-row-input"
+                          name={folder().name}
+                          onCommit={(name) => tree().onCommitName(folder().id, name)}
+                          onCancel={() => tree().onCancelName(folder().id)}
+                        />
+                      ) : undefined
+                    }
+                    actions={
                       <>
-                        <Show when={props.rows.children(folder().agentId, folder().id).length > 0}>
-                          <BranchToggle rows={props.rows} branch={folder().id} name={folder().name} />
-                        </Show>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          class="library-row-main"
-                          aria-current={current(folder())}
-                          onClick={() => tree().onGo(folderPlace(folder()))}
-                          onKeyDown={(event) => onRowKey(event, folder().id)}
-                        >
-                          <Folder aria-hidden="true" />
-                          <span class="library-truncate" dir="auto">
-                            {folder().name}
-                          </span>
-                        </Button>
+                        <FolderMenu rows={props.rows} folder={folder()} />
                         <Show when={tree().canOrganize(folder().agentId)}>
-                          <DropdownMenu.Root placement="bottom-end" gutter={4}>
-                            <DropdownMenu.Trigger
-                              class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} library-row-action`}
-                              aria-label={t("files.action.moreActions", { name: folder().name })}
-                            >
-                              <Ellipsis aria-hidden="true" />
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Portal>
-                              <DropdownMenu.Content>
-                                <Show when={tree().canCreate && canHoldFolder(tree().folders, folder().id)}>
-                                  <DropdownMenu.Item onSelect={() => tree().onNewFolder(folder().agentId, folder().id)}>
-                                    <FolderPlus aria-hidden="true" />
-                                    {t("files.folder.new")}
-                                  </DropdownMenu.Item>
-                                </Show>
-                                <DropdownMenu.Item onSelect={() => tree().onRename(folder().id)}>
-                                  <Pencil aria-hidden="true" />
-                                  {t("common.rename")}
-                                </DropdownMenu.Item>
-                                <DropdownMenu.Separator />
-                                <DropdownMenu.Item
-                                  class="ui-action-menu-danger"
-                                  onSelect={() => tree().onDelete(folder())}
-                                >
-                                  <Trash2 aria-hidden="true" />
-                                  {t("files.folder.delete")}
-                                </DropdownMenu.Item>
-                              </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                          </DropdownMenu.Root>
+                          <NewFolderButton
+                            rows={props.rows}
+                            agentId={folder().agentId}
+                            parentId={folder().id}
+                            label={t("files.folder.newInside", { name: folder().name })}
+                          />
                         </Show>
                       </>
                     }
-                  >
-                    <div class="library-row-edit">
-                      <Folder aria-hidden="true" />
-                      <FolderNameField
-                        name={folder().name}
-                        onCommit={(name) => tree().onCommitName(folder().id, name)}
-                        onCancel={() => tree().onCancelName(folder().id)}
-                      />
-                    </div>
-                  </Show>
-                </div>
-                <FolderBranch rows={props.rows} agent={props.agent} parentId={folder().id} depth={props.depth + 1} />
-              </li>
-            )}
+                  />
+                  <FolderBranch rows={props.rows} agent={props.agent} parentId={folder().id} depth={props.depth + 1} />
+                </li>
+              );
+            }}
           </For>
         </ul>
       </div>
@@ -254,11 +433,108 @@ function FolderBranch(props: { rows: TreeRows; agent: AgentProfile; parentId: st
   );
 }
 
-/**
- * The side panel of the Library: a search field, "All files", each agent with its folders, and the
- * files of deleted agents when there are some. A row shows the files of its place. An agent row makes
- * a folder; a folder row has a menu. Both need the viewer to be able to change the folders of the agent.
- */
+function AgentBranch(props: { rows: TreeRows; agent: AgentProfile }) {
+  const { t } = useText();
+  const tree = () => props.rows.props;
+  const key = () => agentKey(props.agent.id);
+  const hasFolders = () => props.rows.children(props.agent.id, undefined).length > 0;
+  const favorite = () => props.rows.isFavorite(key());
+  return (
+    <li>
+      <SideRow
+        agentId={props.agent.id}
+        drop={tree().dropMark(props.agent.id, null)}
+        off={tree().dropOff(props.agent.id)}
+        landed={tree().landed(props.agent.id, null)}
+        icon={<AgentAvatar agent={props.agent} class="library-row-avatar" />}
+        label={props.agent.name}
+        count={tree().counts.agent.get(props.agent.id)}
+        current={props.rows.current(agentPlace(props.agent.id))}
+        branch={hasFolders() ? key() : undefined}
+        collapsed={tree().isCollapsed(key())}
+        onOpenChange={(open) => tree().onOpenChange(key(), open)}
+        onGo={() => props.rows.go(agentPlace(props.agent.id), hasFolders() ? key() : undefined)}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              class="library-row-action"
+              aria-label={t("files.library.favorite", { name: props.agent.name })}
+              aria-pressed={favorite() ? "true" : "false"}
+              onClick={() => tree().onToggleFavorite(key())}
+            >
+              <Star aria-hidden="true" />
+            </Button>
+            <Show when={tree().canOrganize(props.agent.id)}>
+              <NewFolderButton
+                rows={props.rows}
+                agentId={props.agent.id}
+                label={t("files.folder.newIn", { name: props.agent.name })}
+              />
+            </Show>
+          </>
+        }
+      />
+      <FolderBranch rows={props.rows} agent={props.agent} parentId={undefined} depth={1} />
+    </li>
+  );
+}
+
+function FavoriteRow(props: { rows: TreeRows; favorite: LibraryFavorite }) {
+  const tree = () => props.rows.props;
+  return (
+    <li>
+      <Show
+        when={props.favorite.kind === "folder" ? props.favorite.folder : undefined}
+        fallback={
+          <Show when={props.favorite.kind === "agent" ? props.favorite.agent : undefined}>
+            {(agent) => (
+              <SideRow
+                agentId={agent().id}
+                dropKind="into"
+                drop={tree().dropMark(agent().id, null) === "into" ? "into" : undefined}
+                off={tree().dropOff(agent().id)}
+                landed={tree().landed(agent().id, null)}
+                icon={<AgentAvatar agent={agent()} class="library-row-avatar" />}
+                label={agent().name}
+                count={tree().counts.agent.get(agent().id)}
+                current={props.rows.current(agentPlace(agent().id))}
+                onGo={() => tree().onGo(agentPlace(agent().id))}
+              />
+            )}
+          </Show>
+        }
+      >
+        {(folder) => {
+          const owner = () => tree().agents.find((agent) => agent.id === folder().agentId);
+          return (
+            <SideRow
+              agentId={folder().agentId}
+              folderId={folder().id}
+              dropKind="into"
+              drop={tree().dropMark(folder().agentId, folder().id) === "into" ? "into" : undefined}
+              off={tree().dropOff(folder().agentId, folder().id)}
+              landed={tree().landed(folder().agentId, folder().id)}
+              icon={<Star aria-hidden="true" class="library-row-star" />}
+              label={folder().name}
+              count={tree().counts.folder.get(folder().id)}
+              current={props.rows.current(folderPlace(folder()))}
+              onGo={() => tree().onGo(folderPlace(folder()))}
+              actions={
+                <Show when={owner()}>
+                  {(agent) => <AgentAvatar agent={agent()} class="library-row-avatar library-row-owner" />}
+                </Show>
+              }
+            />
+          );
+        }}
+      </Show>
+    </li>
+  );
+}
+
 export function LibraryFolderTree(props: LibraryFolderTreeProps) {
   const { t } = useText();
   const byParent = createMemo(() => {
@@ -271,17 +547,38 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
     }
     return map;
   });
+  const favoriteKeys = createMemo(() => new Set(props.favorites.map((favorite) => favorite.key)));
+  const current = (place: LibraryLocation) => sameLocation(props.place, place);
   const rows: TreeRows = {
     props,
     children: (agentId, parentId) => byParent().get(childrenKey(agentId, parentId)) ?? NO_FOLDERS,
+    isFavorite: (key) => favoriteKeys().has(key),
+    current,
+    go: (place, branch) => {
+      if (branch !== undefined && current(place)) props.onOpenChange(branch, props.isCollapsed(branch));
+      else props.onGo(place);
+    },
   };
-  const current = (place: LibraryLocation) => (sameLocation(props.place, place) ? "page" : undefined);
 
-  function onAgentKey(event: KeyboardEvent, agentId: string): void {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-    event.preventDefault();
-    props.onOpenChange(agentKey(agentId), event.key === "ArrowRight");
-  }
+  const [picked, setPicked] = createSignal<readonly string[]>([]);
+  const many = () => props.agents.length > AGENTS_SHOWN;
+  const shownAgents = createMemo((): readonly AgentProfile[] => {
+    if (!many()) return props.agents;
+    const ids = new Set(props.activeAgents.slice(0, AGENTS_SHOWN).map((agent) => agent.id));
+    for (const id of picked()) ids.add(id);
+    if (props.place.kind === "agent" || props.place.kind === "folder") ids.add(props.place.agentId);
+    const renamed = props.renaming && props.folders.find((folder) => folder.id === props.renaming);
+    if (renamed) ids.add(renamed.agentId);
+    if (props.dragAgent) ids.add(props.dragAgent);
+    return props.agents.filter((agent) => ids.has(agent.id));
+  });
+  const pickerAgents = createMemo(() => {
+    const active = new Set(props.activeAgents.map((agent) => agent.id));
+    return [...props.activeAgents, ...props.agents.filter((agent) => !active.has(agent.id))];
+  });
+  const organizable = createMemo(() => pickerAgents().filter((agent) => props.canOrganize(agent.id)));
+  const agentCount = (agentId: string) => props.counts.agent.get(agentId) ?? 0;
+  const keep = (agentId: string) => setPicked((list) => (list.includes(agentId) ? list : [...list, agentId]));
 
   return (
     <nav class="library-side" aria-label={t("files.library.title")}>
@@ -297,72 +594,112 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
           />
         </label>
       </div>
-      <ul class="library-tree">
-        <li class="library-row">
-          <Button
-            type="button"
-            variant="ghost"
-            class="library-row-main"
-            aria-current={current(ALL_FILES)}
-            onClick={() => props.onGo(ALL_FILES)}
-          >
-            <GalleryVerticalEnd aria-hidden="true" />
-            <span class="library-truncate">{t("files.library.allFiles")}</span>
-          </Button>
-        </li>
-        <For each={props.agents} keyed={(agent) => agent.id}>
-          {(agent) => (
-            <li>
-              <div class="library-row" data-library-agent={agent().id} data-drop={props.dropMark(agent().id, null)}>
-                <Show when={rows.children(agent().id, undefined).length > 0}>
-                  <BranchToggle rows={rows} branch={agentKey(agent().id)} name={agent().name} />
-                </Show>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  class="library-row-main"
-                  aria-current={current({ kind: "agent", agentId: agent().id })}
-                  onClick={() => props.onGo({ kind: "agent", agentId: agent().id })}
-                  onKeyDown={(event) => onAgentKey(event, agent().id)}
-                >
-                  <AgentAvatar agent={agent()} class="library-row-avatar" />
-                  <span class="library-truncate" dir="auto">
-                    {agent().name}
-                  </span>
-                </Button>
-                <Show when={props.canCreate && props.canOrganize(agent().id)}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    class="library-row-action"
-                    aria-label={t("files.folder.newIn", { name: agent().name })}
-                    title={t("files.folder.new")}
-                    onClick={() => props.onNewFolder(agent().id)}
-                  >
-                    <Plus aria-hidden="true" />
-                  </Button>
-                </Show>
-              </div>
-              <FolderBranch rows={rows} agent={agent()} parentId={undefined} depth={1} />
-            </li>
-          )}
-        </For>
-        <Show when={props.removedFiles}>
-          <li class="library-row">
-            <Button
-              type="button"
-              variant="ghost"
-              class="library-row-main"
-              aria-current={current(REMOVED_AGENTS)}
-              onClick={() => props.onGo(REMOVED_AGENTS)}
-            >
-              <Archive aria-hidden="true" />
-              <span class="library-truncate">{t("files.library.removedAgents")}</span>
-            </Button>
+      <div class="library-side-scroll" data-library-autoscroll="">
+        <ul class="library-side-list">
+          <li>
+            <SideRow
+              icon={<GalleryVerticalEnd aria-hidden="true" />}
+              label={t("files.library.allFiles")}
+              count={props.counts.all}
+              off={props.dropOff(undefined)}
+              current={current(ALL_FILES)}
+              onGo={() => props.onGo(ALL_FILES)}
+            />
           </li>
+          <li>
+            <SideRow
+              icon={<Clock3 aria-hidden="true" />}
+              label={t("files.library.recent")}
+              count={props.counts.recent}
+              off={props.dropOff(undefined)}
+              current={current(RECENT_FILES)}
+              onGo={() => props.onGo(RECENT_FILES)}
+            />
+          </li>
+          <li>
+            <SideRow
+              icon={<Inbox aria-hidden="true" />}
+              label={t("files.library.unsorted")}
+              count={props.counts.unsorted}
+              out={true}
+              drop={props.outMark()}
+              off={props.outOff()}
+              landed={props.landedOut()}
+              current={current(UNSORTED_FILES)}
+              onGo={() => props.onGo(UNSORTED_FILES)}
+            />
+          </li>
+        </ul>
+        <Show when={props.favorites.length > 0}>
+          <SideSection rows={rows} key={FAVORITES_SECTION} title={t("files.library.favorites")}>
+            <ul class="library-side-list">
+              <For each={props.favorites} keyed={(favorite) => favorite.key}>
+                {(favorite) => <FavoriteRow rows={rows} favorite={favorite()} />}
+              </For>
+            </ul>
+          </SideSection>
         </Show>
-      </ul>
+        <Show when={props.agents.length > 0}>
+          <SideSection
+            rows={rows}
+            key={AGENTS_SECTION}
+            title={t("files.library.agents")}
+            action={
+              <Show when={props.canCreate && organizable().length > 0}>
+                <AgentPicker
+                  agents={organizable()}
+                  label={t("files.folder.newForAgent")}
+                  triggerClass={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} library-section-action`}
+                  triggerLabel={t("files.folder.newForAgent")}
+                  onChange={(agentId) => {
+                    keep(agentId);
+                    props.onNewFolder(agentId);
+                  }}
+                >
+                  <FolderPlus aria-hidden="true" />
+                </AgentPicker>
+              </Show>
+            }
+          >
+            <ul class="library-side-list">
+              <For each={shownAgents()} keyed={(agent) => agent.id}>
+                {(agent) => <AgentBranch rows={rows} agent={agent()} />}
+              </For>
+            </ul>
+            <Show when={many()}>
+              <AgentPicker
+                agents={pickerAgents()}
+                value={props.place.kind === "agent" || props.place.kind === "folder" ? props.place.agentId : null}
+                count={agentCount}
+                label={t("files.library.agents")}
+                triggerClass={`${buttonVariants({ variant: "ghost" })} library-side-more`}
+                triggerLabel={t("files.library.allAgents", { count: props.agents.length })}
+                onChange={(agentId) => {
+                  keep(agentId);
+                  props.onGo(agentPlace(agentId));
+                }}
+              >
+                <UsersRound aria-hidden="true" />
+                <span class="library-truncate">{t("files.library.allAgents", { count: props.agents.length })}</span>
+              </AgentPicker>
+            </Show>
+          </SideSection>
+        </Show>
+        <Show when={props.removedFiles}>
+          <ul class="library-side-list">
+            <li>
+              <SideRow
+                icon={<Archive aria-hidden="true" />}
+                label={t("files.library.removedAgents")}
+                count={props.counts.removed}
+                off={props.dropOff(undefined)}
+                current={current(REMOVED_AGENTS)}
+                onGo={() => props.onGo(REMOVED_AGENTS)}
+              />
+            </li>
+          </ul>
+        </Show>
+      </div>
     </nav>
   );
 }

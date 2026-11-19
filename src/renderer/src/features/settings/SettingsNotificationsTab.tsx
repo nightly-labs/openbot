@@ -27,17 +27,11 @@ interface SettingsNotificationsTabProps {
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
-  /** Shows one desktop notification now. Absent where there is no operating system to show it. */
   onTestNotification?: (() => void | Promise<void>) | undefined;
-  /** Opens the operating system notification settings. Absent where the system has no such page. */
   onOpenNotificationSettings?: (() => void | Promise<void>) | undefined;
-  /** The agents and levels of each server. */
   levels: NotificationLevelsStore;
-  /** Writes the level of a server for all devices of the user, or for this computer on an older host. */
   onSetServerLevel: (serverId: string, level: ServerNotificationLevel) => Promise<void>;
-  /** Mutes a server on this computer. No duration mutes until the user unmutes. */
   onSetServerMuted: (serverId: string, muted: boolean, durationMs?: number) => Promise<void>;
-  /** Moves the tab to one server. Each nonce moves once. */
   focusRequest?: { serverId: string; nonce: number } | null | undefined;
   menuMount?: HTMLElement | undefined;
 }

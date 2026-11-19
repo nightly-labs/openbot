@@ -1,6 +1,3 @@
-// Run: bun scripts/transfer-upload-cleanup-e2e.ts
-// Report: .openbot-build/transfer-upload-cleanup-e2e.json
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -30,7 +27,6 @@ const manifest = {
 };
 const bytes = zipSync({ [INSTANCE_TRANSFER_MANIFEST]: strToU8(JSON.stringify(manifest)) });
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-// Empty exports omit settings and cannot be imported. Check their wire manifest too.
 const decodeArchiveManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
@@ -75,7 +71,6 @@ async function seed(directory: string): Promise<string[]> {
   await run(previous.stageUpload(async () => bytes, "previous-owner"));
   await run(previous.exportForMember(exportInput, "export-member"));
   await writeFile(join(directory, "interrupted.zip.part"), bytes);
-  // An upload in parts that the previous process did not finish, and one that it finished.
   const upload = await run(previous.chunks.beginUpload({ size: bytes.length, sha256 }, "parts-owner"));
   await run(
     previous.chunks.writePart({ uploadId: upload.uploadId, index: 0, sha256 }, async () => bytes, "parts-owner"),
@@ -175,7 +170,6 @@ async function checkLocal(root: string): Promise<void> {
   assert.deepEqual(await readFile(path), Buffer.from(bytes));
 }
 
-/** Parts of an upload and an export are files of the same folder: a restart removes them too. */
 async function checkChunks(root: string): Promise<void> {
   const directory = join(root, "chunks", "instance-transfer-uploads");
   const orphans = await restart(directory);

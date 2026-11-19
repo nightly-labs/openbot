@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { VaultService } from "./vault-service";
 import { VaultStore } from "./vault-store";
 
-/** Reverses the bytes, so the file never holds the plain text and a test can still read it back. */
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
   decrypt: (value: Buffer) => Buffer.from(value).reverse().toString("utf8"),
@@ -87,8 +86,6 @@ describe("Vault secret redaction", () => {
   });
 
   it("redacts the secrets of a file that a new process loads", async () => {
-    // Written without the service, so only the load can register these values. It has no `apiKeys`,
-    // as a build before API keys wrote it.
     const record = {
       logins: [{ id: "l1", website: "example.com", username: "ada", password: "vault-login-secret-2", notes: "" }],
       cards: [{ ...CARD, id: "c1", number: "5555555555554444", billingContactId: null }],
@@ -105,7 +102,6 @@ describe("Vault secret redaction", () => {
     const redacted = redactText("vault-login-secret-2 5555 5555 5555 4444");
     expect(redacted).not.toContain("vault-login-secret-2");
     expect(redacted).not.toContain("5555 5555 5555 4444");
-    // The first API key keeps every item of the older file.
     await Effect.runPromise(reader.save(API_KEY));
     const upgraded = service();
     await Effect.runPromise(upgraded.load());

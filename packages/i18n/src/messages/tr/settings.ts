@@ -19,9 +19,17 @@ export const messages = {
   "settings.interfaceFont.title": "Arayüz yazı tipi",
   "settings.interfaceFont.description": "Menülerin, sohbetlerin ve ayarların yazı tipi.",
   "settings.interfaceFont.default": "Varsayılan (Inter)",
+  "settings.interfaceFont.defaultSystem": "Sistem yazı tipi",
   "settings.codeFont.title": "Kod yazı tipi",
   "settings.codeFont.description": "Kodun, terminallerin ve dosya yollarının yazı tipi.",
   "settings.codeFont.default": "Varsayılan",
+  "settings.motion.title": "Hareket",
+  "settings.backgroundBlur.title": "Arka plan bulanıklığı",
+  "settings.backgroundBlur.description":
+    "Menülerin ve iletişim kutularının arkasındaki bulanıklık. GPU’su olmayan bir bilgisayarda başta kapalıdır.",
+  "settings.movingFaces.title": "Hareketli ajan yüzleri",
+  "settings.movingFaces.description":
+    "Ajan yüzleri göz kırpar ve hareket eder. GPU’su olmayan bir bilgisayarda başta durağandır.",
   "settings.logoColor.title": "Logo rengi",
   "settings.logoColor.description": "Dock'ta, görev çubuğunda ve Dynamic Island'da gösterilir.",
   "settings.logoColor.buildNote": "Bu derleme kendi logo rengini korur. Seçim, yayımlanan uygulamaya uygulanır.",
@@ -41,6 +49,19 @@ export const messages = {
   "settings.chatBackground.light": "Açık temada sohbet arka planı",
   "settings.chatBackground.dark": "Koyu temada sohbet arka planı",
   "settings.chatBackground.default": "Varsayılan",
+  "settings.chatBackdrop.title": "Pencere arka planı",
+  "settings.chatBackdrop.description":
+    "Bu cihazda tüm pencerenin arkasında bir sahne, resim veya GIF. Bir ajandan sahne isteyin, sonra yanıtında “Arka plan olarak kullan” seçeneğini seçin.",
+  "settings.chatBackdrop.none": "Yok",
+  "settings.chatBackdrop.pond": "Koi göleti",
+  "settings.chatBackdrop.jellyfish": "Denizanaları",
+  "settings.chatBackdrop.sunset": "Retro gün batımı",
+  "settings.chatBackdrop.snowfall": "Kar yağışı",
+  "settings.chatBackdrop.fireflies": "Ateş böcekleri",
+  "settings.chatBackdrop.upload": "Resim yükle…",
+  "settings.chatBackdrop.uploadRefused": "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi kullanın.",
+  "settings.chatBackdrop.saveFailed": "Arka plan kaydedilmedi.",
+  "settings.chatBackdrop.removeFailed": "Arka plan kaldırılmadı.",
   "settings.chatColor.title": "Sohbet rengi",
   "settings.chatColor.description": "Mesaj balonlarınızı renklendirir. Sunucularınızdaki kişiler de görür.",
   "settings.chatColor.yours": "Sohbet renginiz",
@@ -60,6 +81,12 @@ export const messages = {
   "settings.chatColor.red": "Kırmızı",
   "settings.chatColor.green": "Yeşil",
   "settings.chatColor.blue": "Mavi",
+  "settings.bubbleStyle.title": "Balonlarınız",
+  "settings.bubbleStyle.description":
+    "Bir ajanla sohbette balonlarınız ajanın rengini alır. Bunu yalnızca siz görürsünüz.",
+  "settings.bubbleStyle.solid": "Dolu",
+  "settings.bubbleStyle.tint": "Ton",
+  "settings.bubbleStyle.classic": "Klasik",
   "settings.appBehavior.title": "Uygulama davranışı",
   "settings.conversations.title": "Konuşmalar",
   "settings.launchAtLogin.title": "Oturum açıldığında OpenBot'u başlat",
@@ -97,7 +124,7 @@ export const messages = {
   "settings.sendShortcut.title": "Gönderme kısayolu",
   "settings.sendShortcut.description": "Bu cihazda ve tarayıcıda mesaj gönderen tuşları seçin.",
   "settings.chatOrder.description":
-    "Kenar çubuğunun okunmamış sohbetleri bu cihazda nerede göstereceğini seçin. Elle, Okunmamış grubunu kapatır.",
+    "Kenar çubuğunun sohbetleri bu cihazda nasıl sıralayacağını seçin. Elle ve Son etkinlik, Okunmamış grubunu kapatır.",
   "settings.sendShortcut.enter": "Göndermek için Enter",
   "settings.sendShortcut.modEnterMac": "Göndermek için ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Göndermek için Ctrl+Enter",
@@ -147,6 +174,7 @@ export const messages = {
   "settings.planStart.set": "Ayarla",
   "settings.automationLimit.sectionTitle": "Sınır",
   "settings.automationLimit.sectionDescription": "Bu bilgisayardaki tüm ajanlar için geçerlidir.",
+  "settings.automationLimit.sectionDescriptionServer": "Bu sunucudaki tüm ajanlar için geçerlidir.",
   "settings.automationLimit.title": "Saatlik istek",
   "settings.automationLimit.option": "Saatte {limit}",
   "settings.automationLimit.note":
@@ -268,6 +296,9 @@ export const messages = {
     "Yuvanın gizlendiği yerde ince bir şerit kalır. Yuvayı göstermek için işaretçiyi yaklaştırın. Bir ajan size bir şey sorduğunda şeritten bir renk dalgası geçer.",
   "settings.agentDock.results.title": "Biten işleri göster",
   "settings.agentDock.results.description": "Ajanların bitirdiği sonuçlar kısa bir süre yuvanın yanında görünür.",
+  "settings.agentDock.activeSeats.title": "Yenilikleri olan ajanları göster",
+  "settings.agentDock.activeSeats.description":
+    "Yuvada olmayan bir ajan veya kanal, yeni bir mesajı olduğu ya da seni beklediği sürece yuvada görünür.",
   "settings.agentDock.agents.title": "Yuvadaki ajanlar",
   "settings.agentDock.agents.description": "{server} sunucusunun ajanları. Her sunucunun kendi yuvası vardır.",
   "settings.agentDock.agents.empty": "Bu sunucuda henüz ajan yok.",
@@ -277,7 +308,7 @@ export const messages = {
   "settings.analytics.webDescription":
     "Açık: kullanım ve güvenilirlik meta verileri hesap kimliğiniz ve e-postanızla birlikte OpenBot'un kendi barındırdığı analizlerine gönderilir. Kapalı: aynı meta veriler yalnızca rastgele bir kurulum kimliğiyle gönderilir. Sohbetler, dosyalar ve istemler asla gönderilmez. Bu ayar bu tarayıcı için geçerlidir.",
   "settings.tab.general.title": "Genel",
-  "settings.tab.general.description": "OpenBot'un bu bilgisayarda nasıl davranacağını kontrol edin.",
+  "settings.tab.general.description": "Sohbetlerin nasıl çalışacağını ve OpenBot'un neyi paylaşacağını seçin.",
   "settings.tab.agents.title": "Ajanlar",
   "settings.tab.agents.description":
     "Bir ajan için ayarlamadığınızda bu bilgisayardaki ajanların neler yapabileceğini seçin.",
@@ -303,6 +334,14 @@ export const messages = {
   "settings.tab.billing.description": "Lisans, sunucu planları, ödeme yöntemi ve faturalar.",
   "settings.tab.hostedServers.title": "Barındırılan sunucular",
   "settings.tab.hostedServers.description": "Bu bilgisayar kapalıyken çalışan OpenBot sunucuları oluşturun.",
+  "settings.tab.appearance.description": "Temayı, renkleri, dili ve yazı tiplerini seçin.",
+  "settings.tab.appBehavior.description": "OpenBot'un bu bilgisayarda nasıl başlayıp çalışacağını seçin.",
+  "settings.appearance.colorsTitle": "Renkler",
+  "settings.appearance.textTitle": "Dil ve metin",
+  "settings.appBehavior.startTitle": "Başlatma ve çıkış",
+  "settings.appBehavior.backgroundTitle": "Arka plan",
+  "settings.sections.group.account": "Hesap",
+  "settings.sections.group.thisComputer": "Bu bilgisayar",
   "settings.sections.label": "Ayar bölümleri",
   "settings.panel.resize": "Sağ paneli yeniden boyutlandır",
   "settings.preferences.loadFailed": "Ayarlarınız yüklenemedi.",
@@ -431,7 +470,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Görüntü kopyalanamadı.",
   "settings.profile.share.createFailed": "Görüntü oluşturulamadı.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot ile son altı ayım",
   "settings.profile.activity.title": "Bu bilgisayardaki etkinlik",
   "settings.profile.activity.activeDays": {
@@ -441,7 +479,6 @@ export const messages = {
   "settings.profile.activity.empty": "Henüz etkinlik yok",
   "settings.profile.activity.loading": "Etkinlik yükleniyor…",
   "settings.profile.activity.loadFailed": "Etkinliğiniz yüklenemedi.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Son bir yılda {count} etkin günde {tokens} token",
     other: "Son bir yılda {count} etkin günde {tokens} token",
@@ -523,7 +560,6 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot yeniden başlar ve indirilen güncellemeyi yükler. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
-  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
   "settings.updates.idleRestart.title": "OpenBot'u yeniden başlat",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
@@ -620,7 +656,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.parakeetUnified.description":
@@ -649,6 +684,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.automatic": "Otomatik",
+  "settings.voice.pause.title": "Göndermeden önce duraklama",
+  "settings.voice.pause.description":
+    "Sesli konuşmada, bu kadar süre konuşmadığınızda OpenBot sözlerinizi gönderir. Yavaş konuşuyorsanız veya düşünmek için duruyorsanız daha uzun bir duraklama seçin. Codex canlı ses sonu kendisi bulur.",
+  "settings.voice.pause.seconds": "{seconds} sn",
   "settings.voice.loadFailed": "Ses modelleri okunamadı.",
   "settings.voice.saveFailed": "Ses ayarı kaydedilemedi. Tekrar deneyin.",
   "settings.voice.downloadFailed": "İndirme başlatılamadı. Tekrar deneyin.",
@@ -704,12 +743,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sunucu ayarı yok",
   "settings.transfer.includeAgent": "Dahil et: {name}",
   "settings.transfer.export.title": "Bu sunucuyu dışa aktar",
-  "settings.transfer.export.files": "Çalışma alanı dosyalarını dahil et",
-  "settings.transfer.export.filesDescription":
-    "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör. Küçük bir dosya için kapatın.",
-  "settings.transfer.export.settings": "Sunucu ayarlarını dahil et",
+  "settings.transfer.preset.label": "Dosyaya neler girer",
+  "settings.transfer.preset.templates": "Şablonlar",
+  "settings.transfer.preset.everything": "Tümü",
+  "settings.transfer.meter.files": "/ {total} (çalışma alanı dosyaları)",
+  "settings.transfer.part.agents": "Ajanlar ve kurulumları",
+  "settings.transfer.part.agentsDescription": "{contents}. Her zaman dosyada.",
+  "settings.transfer.part.settings": "Sunucu ayarları",
+  "settings.transfer.part.chats": "Sohbet geçmişi",
+  "settings.transfer.part.chatsDescription":
+    "Sohbetler ve yan ileti dizileri ile dosyaları, ayrıca rutinlerin çalıştırma geçmişi. Ajanlar bu sohbetlere bağlamlarıyla devam eder.",
+  "settings.transfer.part.channels": "Kanal mesajları",
+  "settings.transfer.part.channelsDescription":
+    "Dışa aktarılan ajanların bulunduğu kanalların mesajları, dosyaları ve kanal rutinlerinin çalıştırma geçmişiyle birlikte.",
+  "settings.transfer.part.files": "Çalışma alanı dosyaları",
+  "settings.transfer.part.filesDescription": "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör.",
+  "settings.transfer.part.preferences": "Sunucu tercihleri",
+  "settings.transfer.part.preferencesDescription":
+    "Ad, logo, saat dilimi, kişilik, ajan varsayılanları, model seçimleri, bellek ve beceri ayarları ile her kişinin bildirim düzeyleri ve sabitlemeleri.",
   "settings.transfer.export.settingsDescription":
-    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri ve rutin akışları.",
+    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri, rutin akışları ve paylaşılan beceriler.",
   "settings.transfer.export.chooseAgents": "Ajanları seç ({selected}/{total})",
   "settings.transfer.export.hideAgents": "Ajanları gizle",
   "settings.transfer.export.agentsLabel": "Dışa aktarılacak ajanlar",
@@ -728,6 +781,13 @@ export const messages = {
   "settings.transfer.import.lede": "Diğer sunucudan dışa aktardığınız dosyayı seçin. Dosya adı .zip ile biter.",
   "settings.transfer.import.choose": "Dosya seç…",
   "settings.transfer.import.reading": "Dosya okunuyor…",
+  "settings.transfer.upload.label": "Sunucuya yükleme",
+  "settings.transfer.upload.sending": "Dosya gönderiliyor…",
+  "settings.transfer.upload.sent": "{total} içinden {sent} gönderildi",
+  "settings.transfer.upload.serverReading": "Sunucu dosyayı okuyor…",
+  "settings.transfer.upload.etaSoon": "Bir dakikadan az kaldı",
+  "settings.transfer.upload.etaMinutes": "Yaklaşık {minutes} dk kaldı",
+  "settings.transfer.upload.etaHours": "Yaklaşık {hours} sa {minutes} dk kaldı",
   "settings.transfer.import.openFailed": "Dosya açılamadı",
   "settings.transfer.import.contains": "Bu dosyanın içeriği",
   "settings.transfer.import.source": "OpenBot {version} · {date} tarihinde dışa aktarıldı",
@@ -736,8 +796,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Dosyadaki ajanlar",
   "settings.transfer.import.nameExists": "Ad zaten kullanılıyor",
   "settings.transfer.import.settings": "Sunucu ayarlarını içe aktar",
-  "settings.transfer.import.settingsDescription":
-    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını ve kenar çubuğu bölümlerini ekler.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını, kenar çubuğu bölümlerini ve paylaşılan becerileri ekler.",
+  "settings.transfer.import.preferences": "Sunucu tercihlerini içe aktar",
+  "settings.transfer.import.preferencesDescription":
+    "Bu sunucunun adını, logosunu ve tercihlerini, ayrıca her kişinin bildirim düzeylerini ve sabitlenmiş öğelerini dosyadakilerle değiştirir.",
   "settings.transfer.import.submit": {
     one: "{count} ajanı içe aktar",
     other: "{count} ajanı içe aktar",
@@ -756,4 +819,30 @@ export const messages = {
   "settings.transfer.result.signInButton": "{provider} sağlayıcısında oturum aç",
   "settings.transfer.result.notImported": "İçe aktarılmadı",
   "settings.transfer.result.warnings": "Bunları kontrol edin",
+  "settings.transfer.copy.tileTitle": "Başka bir sunucuya kopyala",
+  "settings.transfer.copy.tileText": "Ajanları sunucularınızdan birine gönderin.",
+  "settings.transfer.copy.title": "Ajanları başka bir sunucuya kopyala",
+  "settings.transfer.copy.from": "Kaynak",
+  "settings.transfer.copy.to": "Hedef",
+  "settings.transfer.copy.chooseServer": "Bir sunucu seçin",
+  "settings.transfer.copy.search": "Ajan ara",
+  "settings.transfer.copy.agentsOn": "{server} üzerindeki ajanlar",
+  "settings.transfer.copy.all": { one: "Tüm ajanlar ({count})", other: "Tüm ajanlar ({count})" },
+  "settings.transfer.copy.noAgents": "Bu sunucuda ajan yok.",
+  "settings.transfer.copy.new": "Yeni",
+  "settings.transfer.copy.notCopied":
+    "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+  "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.duplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
+  "settings.transfer.copy.copying": "Kopyalanıyor…",
+  "settings.transfer.copy.done": {
+    one: "{count} ajan {server} sunucusuna kopyalandı.",
+    other: "{count} ajan {server} sunucusuna kopyalandı.",
+  },
+  "settings.transfer.copy.open": "{server} sunucusunu aç",
+  "settings.transfer.copy.loadFailed": "Ajanlar okunamadı",
+  "settings.transfer.copy.failed": "Kopyalama tamamlanmadı",
 } as const satisfies PartialTranslation<typeof source>;

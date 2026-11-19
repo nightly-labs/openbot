@@ -1,17 +1,3 @@
-// Drives the thread tabs of an agent's chat in this worktree's running dev app, through the real UI,
-// preload bridge, agent service and provider. It changes the data of the profile, so start the app
-// with `bun run dev` (never `--shared`), and pass the id of an agent whose provider is signed in and
-// runs turns at the same time (not a custom ACP agent):
-// `bun scripts/agent-threads-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// It starts a thread from "New thread", renames it, closes and opens its tab, archives it and restores
-// it from the Archived list, archives it on "another device" (the bridge) and back, refuses a delete
-// while a turn runs, keeps the tabs after a reload, and deletes the thread with Undo and then for good.
-// Text typed in a new thread and not sent stays when a turn of the agent's own chat ends, and after a
-// reload. A second thread checks that a reload during the Undo time does not lose its delete.
-// Each turn is a real provider turn, so the prompts are short. A thread that it started and did not
-// delete is deleted at the end.
-// Writes .openbot-build/agent-threads-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -58,7 +44,6 @@ let deleted = false;
 
 const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const tabs = () => page.getByRole("tablist", { name: english("conversation.threads.open") });
-// A tab's name ends with the state of its thread while a turn runs or waits.
 const tab = (title: string) => tabs().getByRole("tab", { name: new RegExp(`^${literal(title)}`) });
 const tabMenu = () => page.getByRole("menu", { name: english("conversation.threads.actions") });
 const menuItem = (menu: Locator, name: string) => menu.getByRole("menuitem", { name, exact: true });
@@ -72,7 +57,6 @@ function listQueue(): Promise<QueueSnapshot> {
   return page.evaluate((id) => window.openbot.agent.listQueue(id), agentId);
 }
 
-/** Whether a message of the agent's own chat waits or runs. */
 function ownChatRuns(snapshot: QueueSnapshot): boolean {
   return snapshot.deliveries.some(
     (delivery) => delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running",
@@ -112,7 +96,6 @@ async function openAgent(name: string): Promise<void> {
     .getByRole("button", { name: new RegExp(`^${literal(name)}[,.]`) })
     .first()
     .click();
-  // With no other tab open, the header shows the agent's name and "New thread", and no tab list.
   await button(english("conversation.threads.new")).first().waitFor({ timeout: UI_WAIT_MS });
 }
 
@@ -135,7 +118,6 @@ try {
   await openAgent(agent.name);
   const before = new Set((await listTasks()).tasks.map((task) => task.id));
 
-  // 1. "New thread" opens a draft tab; its first message starts the thread, whose tab stays open.
   await button(english("conversation.threads.new")).first().click();
   const draftComposer = page.getByRole("textbox", {
     name: english("conversation.threads.view.newPlaceholder", { name: agent.name }),
@@ -155,7 +137,6 @@ try {
   await waitForTask("the first turn ends", (current) => current?.state === "idle");
   await shot("1-created");
 
-  // 2. A double click renames the thread on the host.
   await tab(task.title).dblclick();
   const field = page.getByRole("textbox", { name: english("conversation.threads.name") });
   await field.waitFor({ timeout: UI_WAIT_MS });
@@ -165,7 +146,6 @@ try {
   await tab(title).waitFor({ timeout: UI_WAIT_MS });
   report.renamed = { title, tab: true };
 
-  // 3. Closing the tab keeps the thread; the thread list opens it again.
   await menuItem(await openTabMenu(title), english("conversation.threads.closeTab")).click();
   await tab(title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   await button(english("conversation.threads.all")).click();
@@ -177,35 +157,30 @@ try {
   report.closedTab = { inMenu: true, state: afterClose?.state ?? "missing", reopened: await selected(title) };
   assert.notEqual(report.closedTab.state, "closed");
 
-  // 4. Archive closes the tab and moves the thread to the Archived list.
   await menuItem(await openTabMenu(title), english("conversation.threads.archive")).click();
   await tab(title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   const archived = await waitForTask("the archive", (current) => current?.state === "closed");
   await button(english("conversation.threads.all")).click();
   await page.getByRole("menuitem", { name: english("conversation.threads.archived") }).click();
   const archivedItem = page
-    // Kobalte names the submenu after its trigger.
     .getByRole("menu", { name: english("conversation.threads.archived"), exact: true })
     .getByRole("menuitem", { name: new RegExp(literal(title)) });
   await archivedItem.waitFor({ timeout: UI_WAIT_MS });
   report.archived = { state: archived?.state ?? "missing", inArchivedList: true };
   await shot("4-archived-list");
 
-  // 5. Opening an archived thread restores it.
   await archivedItem.click();
   const restored = await waitForTask("the restore", (current) => current?.state === "idle");
   await tab(title).waitFor({ timeout: UI_WAIT_MS });
   report.restored = { state: restored?.state ?? "missing", tabSelected: await selected(title) };
   assert.ok(report.restored.tabSelected);
 
-  // 6. An archive on another device hides the open tab; a restore there shows it again.
   await page.evaluate(({ agent, task }) => window.openbot.agent.closeTask({ agentId: agent, taskId: task }), {
     agent: agentId,
     task: task.id,
   });
   await tab(title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   const threadView = page.getByRole("region", { name: english("conversation.threads.view.label", { title }) });
-  // The agent's own chat takes the place of the thread view.
   await threadView.waitFor({ state: "detached", timeout: UI_WAIT_MS });
   await page.evaluate(({ agent, task }) => window.openbot.agent.reopenTask({ agentId: agent, taskId: task }), {
     agent: agentId,
@@ -214,10 +189,9 @@ try {
   await tab(title).waitFor({ timeout: UI_WAIT_MS });
   report.archivedElsewhere = { tabHidden: true, threadViewClosed: true, tabBack: true };
 
-  // 7. A running turn blocks a delete, in the menu and on the host.
   await tab(title).click();
   const composer = page.getByRole("textbox", {
-    name: english("conversation.threads.view.placeholder", { name: agent.name, title }),
+    name: english("conversation.threads.view.placeholder", { name: agent.name }),
   });
   await composer.fill(LONG_PROMPT);
   await composer.press("Enter");
@@ -244,12 +218,10 @@ try {
   });
   await waitForTask("the turn stops", (current) => current?.state === "idle");
 
-  // 8. A reload keeps the open tabs of this device.
   await page.reload();
   await tab(title).waitFor({ timeout: UI_WAIT_MS * 2 });
   report.reload = { tabKept: true, tabSelected: await selected(title) };
 
-  // 9. Delete archives the thread at once and hides it; Undo restores it, and the host keeps it.
   await menuItem(await openTabMenu(title), english("common.delete")).click();
   await tab(title).waitFor({ state: "detached", timeout: UI_WAIT_MS });
   const toastText = page.getByText(english("conversation.threads.deleteUndo.title", { title }), { exact: true });
@@ -263,7 +235,6 @@ try {
   report.undo = { toast: true, archivedDuringUndo, tabBack: true, state: afterUndo?.state ?? "missing" };
   assert.ok(archivedDuringUndo, "The delete archives the thread during its Undo time.");
 
-  // 10. Without Undo, the host deletes the thread when the toast ends.
   await menuItem(await openTabMenu(title), english("common.delete")).click();
   await toastText.waitFor({ timeout: UI_WAIT_MS });
   await waitForTask("the delete", (current) => current === undefined);
@@ -271,8 +242,6 @@ try {
   report.deleted = { gone: true };
   await shot("10-deleted");
 
-  // 11. Text typed in a new thread and not sent stays when a turn of the agent's own chat ends, after
-  // the agent's own chat opens and the thread opens again, and after a reload (#3448).
   const unsent = `Unsent ${crypto.randomUUID().slice(0, 4)}`;
   await page.evaluate((input) => window.openbot.agent.sendMessage({ ...input, clientMessageId: crypto.randomUUID() }), {
     agentId,
@@ -294,19 +263,16 @@ try {
   await tab(english("conversation.threads.new")).click();
   const afterSwitch = (await unsentComposer.innerText()).trim();
   await page.reload();
-  // A new thread tab is not kept after a restart, but its text is.
   await button(english("conversation.threads.new"))
     .first()
     .click({ timeout: UI_WAIT_MS * 2 });
   const afterReload = (await unsentComposer.innerText()).trim();
   report.unsentDraft = { typedDuringTurn, afterTurn, afterSwitch, afterReload };
-  // The text is stored in the profile, so it is removed before the checks can stop the script.
   await unsentComposer.fill("");
   assert.equal(afterTurn, unsent, "The text stays when the own chat's turn ends.");
   assert.equal(afterSwitch, unsent, "The text stays after the agent's own chat opens.");
   assert.equal(afterReload, unsent, "The text stays after a reload.");
 
-  // 12. A reload during the Undo time does not lose the delete: the next start finishes it.
   const second = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId, text: SHORT_PROMPT },

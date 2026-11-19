@@ -6,7 +6,6 @@ import {
   sidebarFolderTreeOrder,
 } from "@openbot/contracts/ipc";
 
-/** As the store does: each action, then the folders back in tree order. */
 export function applySidebarLayoutAction(
   layout: SidebarLayoutSnapshot,
   action: SidebarLayoutAction,

@@ -1,14 +1,11 @@
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
-/** What a member can do with one agent. Each level includes the levels before it. */
 export const AGENT_ACCESS_LEVELS = ["none", "view", "chat", "manage"] as const;
 export type AgentAccessLevel = (typeof AGENT_ACCESS_LEVELS)[number];
 
-/** Levels by agent id. */
 export type AgentAccessLevels = Record<string, AgentAccessLevel>;
 
-/** A role of a server: a name, a level for each agent that it lists, and its members. */
 export interface AgentAccessRole {
   id: string;
   name: string;
@@ -16,10 +13,6 @@ export interface AgentAccessRole {
   memberIds: string[];
 }
 
-/**
- * The roles of one server (`agent-access-v1`). `mine` holds the levels that apply to the caller. An
- * owner or admin also gets `everyone` and `roles`; a member does not.
- */
 export interface AgentAccessSnapshot {
   revision: number;
   mine: AgentAccessLevels;
@@ -27,14 +20,12 @@ export interface AgentAccessSnapshot {
   roles?: AgentAccessRole[];
 }
 
-/** A full replace. `revision` is the one the client read; the host refuses a stale one. */
 export interface AgentAccessChange {
   revision: number;
   everyone: AgentAccessLevels;
   roles: AgentAccessRole[];
 }
 
-// The same bounds as agent-access-v1.
 export const AGENT_ACCESS_ROLE_LIMIT = 100;
 export const AGENT_ACCESS_ROLE_NAME_LIMIT = 100;
 const AGENT_LIMIT = 1000;
@@ -83,7 +74,6 @@ function copyRole(role: AgentAccessRole): AgentAccessRole {
   return { id: role.id, name: role.name.trim(), agents: { ...role.agents }, memberIds: [...new Set(role.memberIds)] };
 }
 
-/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
 export function decodeAgentAccessSnapshot(value: unknown): AgentAccessSnapshot {
   if (
     !isDynamicRecord(value) ||

@@ -48,7 +48,6 @@ export function AppLockSettingsScreen() {
     };
   }, []);
 
-  /** Every change asks the owner to unlock first, so a person who finds the phone open cannot turn the lock off. */
   async function change(action: () => Promise<string | null | undefined>) {
     setError(null);
     setSaving(true);

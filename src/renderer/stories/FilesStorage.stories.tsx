@@ -34,8 +34,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Settings > Storage -------------------------------------------------------
-
 type OverviewArgs = Parameters<typeof StorageOverview>[0];
 
 const overviewArgs = (): OverviewArgs => ({
@@ -76,7 +74,6 @@ export const StorageReady: Story = {
   render: () => <OverviewStage args={overviewArgs()} />,
 };
 
-// A member of a remote server reads the same page, without Clean up and without Delete.
 export const StorageMember: Story = {
   name: "Storage: Member",
   render: () => <OverviewStage args={{ ...overviewArgs(), hostName: "Studio server", canManage: false }} />,
@@ -188,8 +185,6 @@ export const StorageInRemoteServerSettings: Story = {
   ),
 };
 
-// Agent settings > Files ---------------------------------------------------
-
 const agentPanelArgs = {
   agent: STORY_AGENT,
   runtimeSettings: storyRuntimeSettings(STORY_AGENT),
@@ -265,8 +260,6 @@ export const AgentFilesLoading: Story = {
   render: () => <AgentFilesStory initiallyOpen loading />,
 };
 
-// Chat > Files ------------------------------------------------------------
-
 function ConversationStage(props: Partial<Parameters<typeof ConversationFilesPanel>[0]>) {
   return (
     <main class="agent-memories-story-stage files-story-chat">
@@ -311,8 +304,6 @@ export const ConversationLongNames: Story = {
   name: "Chat files: Long names",
   render: () => <ConversationStage files={FILES_LONG_NAME_ROWS} width={300} />,
 };
-
-// The shared list ----------------------------------------------------------
 
 function ListStage(props: Partial<Parameters<typeof FileList>[0]>) {
   return (
