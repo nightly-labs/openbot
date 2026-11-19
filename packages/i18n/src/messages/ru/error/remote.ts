@@ -190,6 +190,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Не удалось установить прямое подключение к хосту. Его может блокировать брандмауэр, VPN или прокси.",
   "error.remote.iceDisconnected": "Прямое подключение к хосту потеряно.",
+  "error.remote.webrtcBlocked":
+    "Это устройство блокирует подключение, которое нужно OpenBot. Если включен режим блокировки, выключите его для OpenBot в Настройки > Конфиденциальность и безопасность > Режим блокировки.",
   "error.remote.directoryUnreachable": "OpenBot не смог связаться со службой OpenBot. Проверьте подключение.",
   "error.remote.directoryTimeout": "Служба OpenBot не ответила вовремя. Повторите попытку.",
   "error.remote.inviteAlreadyUsed": "Это приглашение уже использовано. Попросите новое приглашение.",

@@ -192,6 +192,8 @@ export const messages = {
   "error.remote.iceFailed":
     "No se pudo establecer una conexión directa con el host. Un cortafuegos, una VPN o un proxy pueden bloquearla.",
   "error.remote.iceDisconnected": "Se perdió la conexión directa con el host.",
+  "error.remote.webrtcBlocked":
+    "Este dispositivo bloquea la conexión que necesita OpenBot. Si el modo de aislamiento está activado, desactívalo para OpenBot en Ajustes > Privacidad y seguridad > Modo de aislamiento.",
   "error.remote.directoryUnreachable": "OpenBot no pudo acceder al servicio de OpenBot. Comprueba tu conexión.",
   "error.remote.directoryTimeout": "El servicio de OpenBot no respondió a tiempo. Inténtalo de nuevo.",
   "error.remote.inviteAlreadyUsed": "Esta invitación ya se usó. Pide una nueva invitación.",
