@@ -2556,7 +2556,7 @@ export async function createApplicationServices({
     read: () => machineAlertMetrics.read(),
     display: () => machineMetrics.read(),
     store: machineAlertStore,
-    members: () => teamStore.listMembers(),
+    members: () => (teamStore.configured ? teamStore.listMembers() : []),
     onError: (message, error) => logger.warn(message, toLogValue(error)),
   });
   teardown.push(TEARDOWN_ORDER.machineAlerts, "the machine alert check", () => machineAlerts.close());
