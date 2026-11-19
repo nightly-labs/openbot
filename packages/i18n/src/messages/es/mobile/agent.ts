@@ -419,10 +419,11 @@ export const messages = {
     "Este servidor no puede guardar tu propio nivel de notificaciones para un agente. Actualiza OpenBot en el equipo que lo ejecuta.",
   "mobile.agent.newChat.title": "Nuevo chat",
   "mobile.agent.newChat.starting": "Iniciando nuevo chat…",
-  "mobile.agent.newChat.footer": "El agente olvida este chat. Se conserva su configuración.",
+  "mobile.agent.newChat.footer":
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Se conserva su configuración.",
   "mobile.agent.newChat.confirmTitle": "¿Iniciar un nuevo chat con {name}?",
   "mobile.agent.newChat.confirmBody":
-    "El agente olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "mobile.agent.newChat.confirm": "Iniciar nuevo chat",
   "mobile.agent.newChat.failed": "No se pudo iniciar un nuevo chat",
   "mobile.agent.newChat.failedBody": "El host no pudo iniciar un nuevo chat.",

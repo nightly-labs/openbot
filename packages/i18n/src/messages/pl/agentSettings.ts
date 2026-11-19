@@ -192,11 +192,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Ten wybór dotyczy tylko ciebie, na wszystkich twoich urządzeniach. Gdy serwer jest wyciszony lub ustawiony na „Nic”, ten agent też milczy.",
   "agentSettings.newChat.title": "Nowy czat",
-  "agentSettings.newChat.description": "Agent zapomni ten czat. Jego konfiguracja zostanie.",
+  "agentSettings.newChat.description":
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Jego konfiguracja zostanie.",
   "agentSettings.newChat.button": "Rozpocznij",
   "agentSettings.newChat.confirmTitle": "Rozpocząć nowy czat z agentem {name}?",
   "agentSettings.newChat.confirmDescription":
-    "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
   "agentSettings.deleteHistory.title": "Usuń historię",

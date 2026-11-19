@@ -4,10 +4,14 @@ import {
   isRoutineSchedule,
   isWorkflowGraph,
   WORKFLOW_BRANCHES,
+  WORKFLOW_DISCORD_EVENTS,
+  WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_MAX_COORDINATE,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
+  WORKFLOW_SLACK_EVENTS,
+  WORKFLOW_TELEGRAM_EVENTS,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
@@ -19,6 +23,7 @@ import {
   workflowListField,
 } from "@openbot/contracts/ipc";
 
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -135,6 +140,7 @@ const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
   image: "prompt",
 };
 const LABEL_CHARS = 40;
+const STEP_MODEL_FIELDS = ["provider", "model", "effort"] as const;
 
 const CARD_SIZE: Record<WorkflowNodeKind, { width: number; height: number }> = {
   trigger: { width: 320, height: 210 },
@@ -313,6 +319,37 @@ function withRepositoryList(
   return { ...fields, ...workflowGitHubTriggerRepositoryFields(repositories) };
 }
 
+const TRIGGER_EVENTS = new Map<string, readonly string[]>([
+  ["github", WORKFLOW_GITHUB_EVENTS],
+  ["discord", WORKFLOW_DISCORD_EVENTS],
+  ["telegram", WORKFLOW_TELEGRAM_EVENTS],
+  ["slack", WORKFLOW_SLACK_EVENTS],
+]);
+
+function changesTriggerEvent(patch: WorkflowOp["fields"]): boolean {
+  return patch?.trigger !== undefined || patch?.event !== undefined;
+}
+
+function checkTriggerEvent(node: WorkflowNode, op: number): void {
+  const { trigger, event } = node.fields;
+  const events = node.kind === "trigger" && typeof trigger === "string" ? TRIGGER_EVENTS.get(trigger) : undefined;
+  if (!events || isOneOf(events, event)) return;
+  const given = event === undefined ? "has no event" : `has event "${String(event)}", which is unknown`;
+  refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
+}
+
+function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
+  if (kind !== "agent") return;
+  const given = STEP_MODEL_FIELDS.filter((name) => {
+    const value = patch?.[name];
+    return value !== undefined && value !== null && value !== "";
+  });
+  if (given.length > 0)
+    refuse(
+      `Op ${op}: an agent step runs on its agent's model, so it has no ${given.join(", ")}. For another model, add an llm step.`,
+    );
+}
+
 function checkedSchedule(value: WorkflowOp["schedule"]) {
   if (value === undefined) return undefined;
   if (!isRoutineSchedule(value)) refuse("The schedule is not a valid routine schedule.");
@@ -363,6 +400,7 @@ function applyWorkflowOps(
   };
   const placed: { id: string; withFrom: boolean }[] = [];
   const pinned = new Set<string>();
+  const eventChanges = new Map<string, number>();
 
   ops.forEach((op, index) => {
     const n = index + 1;
@@ -370,12 +408,14 @@ function applyWorkflowOps(
       case "add": {
         if (!op.kind) refuse(`Op ${n}: add needs kind.`);
         if (op.ref !== undefined && ids[op.ref] !== undefined) refuse(`Op ${n}: ref ${op.ref} is already used.`);
+        checkAgentStepModel(op.kind, op.fields, n);
         const id = `${op.kind}-${crypto.randomUUID()}`;
         const fields = withRepositoryList(op.kind, mergeFields(newNodeFields(op.kind), op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
+        if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -389,11 +429,13 @@ function applyWorkflowOps(
       }
       case "update": {
         const node = resolve(op.node, n);
+        checkAgentStepModel(node.kind, op.fields, n);
         const fields = withRepositoryList(node.kind, mergeFields(node.fields, op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         replace(withSchedule({ ...node, fields }, scheduled));
+        if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
         return;
       }
       case "move": {
@@ -428,6 +470,10 @@ function applyWorkflowOps(
       }
     }
   });
+  for (const node of nodes) {
+    const op = eventChanges.get(node.id);
+    if (op !== undefined) checkTriggerEvent(node, op);
+  }
   const empty = graph.nodes.every((node) => ANNOTATION_KINDS.has(node.kind));
   if (tidy || empty) {
     const fixed = (node: WorkflowNode) =>

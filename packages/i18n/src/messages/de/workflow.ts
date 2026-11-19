@@ -535,6 +535,12 @@ export const messages = {
   "workflow.canvas.version.run": "Vor einem Lauf",
   "workflow.canvas.deleteUndo.title": "{name} gelöscht",
   "workflow.canvas.deleteUndo.action": "Rückgängig",
+  "workflow.canvas.none.lead": "Richte die Schritte einmal ein.",
+  "workflow.canvas.none.title": "Lass ihn {run}.",
+  "workflow.canvas.none.run": "laufen",
+  "workflow.canvas.none.trigger": "Ein Auslöser startet den Workflow.",
+  "workflow.canvas.none.handoff": "Jeder Schritt gibt sein Ergebnis an den nächsten weiter.",
+  "workflow.canvas.none.open": "{name} öffnen",
   "workflow.page.failed": "OpenBot konnte das nicht ausführen. Versuche es erneut.",
   "workflow.page.needsNewerApp":
     "Dieser Workflow hat Schritte aus einer neueren OpenBot-Version. Aktualisiere OpenBot, um ihn zu ändern.",

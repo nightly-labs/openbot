@@ -27,6 +27,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Przechwyć główny ekran i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureChannel":
     "Obraz pojawi się na kanale {channel} i każdy członek tego serwera, który czyta kanał, może go zobaczyć.",
+  "status.agent.screenCapturePermissionNext":
+    "Potem macOS może poprosić cię o zezwolenie OpenBot na nagrywanie ekranu.",
   "status.agent.screenCaptureDisplay": "Przechwyć wyświetlacz {name} i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureWindow": "Przechwyć okno {name} i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureRegion":
@@ -70,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Korzystanie ze strony internetowej…",
   "status.agent.browserReviewing": "Sprawdzanie strony internetowej…",
   "status.agent.memoriesSearching": "Przeszukiwanie wspomnień…",
+  "status.agent.chatsSearching": "Przeszukiwanie wcześniejszych czatów…",
   "status.agent.memoriesSearched": {
     one: "Przeszukano wspomnienia, znalezione: {count}",
     few: "Przeszukano wspomnienia, znalezione: {count}",

@@ -414,10 +414,10 @@ export const messages = {
     "이 서버는 에이전트별 내 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "mobile.agent.newChat.title": "새 채팅",
   "mobile.agent.newChat.starting": "새 채팅 시작 중…",
-  "mobile.agent.newChat.footer": "에이전트가 이 채팅을 잊어요. 설정은 유지돼요.",
+  "mobile.agent.newChat.footer": "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 설정은 유지돼요.",
   "mobile.agent.newChat.confirmTitle": "{name}과(와) 새 채팅을 시작할까요?",
   "mobile.agent.newChat.confirmBody":
-    "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "mobile.agent.newChat.confirm": "새 채팅 시작",
   "mobile.agent.newChat.failed": "새 채팅을 시작할 수 없어요",
   "mobile.agent.newChat.failedBody": "호스트가 새 채팅을 시작하지 못했어요.",

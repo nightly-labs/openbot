@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.11",
+  "version": "1.4.12",
   "expo": {
     "install": {
       "exclude": [
@@ -11,7 +11,9 @@
     "autolinking": {
       "android": {
         "buildFromSource": [
-          "expo-splash-screen"
+          "expo-splash-screen",
+          "expo-ui",
+          "expo-image"
         ]
       }
     }

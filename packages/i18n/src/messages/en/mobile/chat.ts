@@ -581,6 +581,8 @@ export const messages = defineMessages("mobile.chat", {
     other: "{name}, threads. {count} threads need you",
   },
   "mobile.chat.threads.main": "Main chat",
+  "mobile.chat.threads.count": { one: "{count} thread", other: "{count} threads" },
+  "mobile.chat.threads.unreadCount": { one: "{count} unread thread", other: "{count} unread threads" },
   "mobile.chat.threads.branchedFrom": "Branched from {title}",
   "mobile.chat.threads.branchedFromDeleted": "Branched from a deleted thread",
   "mobile.chat.threads.new": "New thread",

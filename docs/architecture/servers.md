@@ -491,6 +491,13 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-agent-files-v1` says that the host gives an Agent step the files of the steps that connect
+to it. The host attaches each image and file input to the message for the agent, and the message
+tells the agent to use them together, as given, and not to invent a substitute. The capability adds
+no route. A client shows the connected pictures on the Agent card only on a host that advertises it,
+because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
+them without the note and does not advertise the capability, so its Agent card shows no pictures.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -997,6 +1004,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
+| `vault-member-save-v1` | No route or field of its own. The host takes a password save on `browser-secret-vault-v1` and a `request_vault_item` or API key card answer from any member, not only from an owner or admin. The item goes to all agents of the host | `agent` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the

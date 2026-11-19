@@ -26,6 +26,7 @@ import { teamCapabilitiesForProtocol, teamCapabilityHeaders } from "@openbot/con
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -110,6 +111,8 @@ const LIVE_MODEL: WorkflowMediaCatalogModel = {
 const LIVE_PRICE = 22.5;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
+const handoffs: { agentId: string; text: string; sourcePaths: readonly string[] }[] = [];
+const MISSING_FILE = "e2e-missing-file";
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -305,12 +308,15 @@ async function startHost(): Promise<Host> {
           : { status: "completed", turnId: `turn-${deliveryId}`, error: null };
       },
       turnAnswer: () => LONG_ANSWER,
-      sendHandoff: ({ agentId, idempotencyKey }) =>
+      sendHandoff: ({ agentId, idempotencyKey, text, sourcePaths }) =>
         Effect.sync(() => {
+          handoffs.push({ agentId, text, sourcePaths });
           const deliveryId = `delivery-${idempotencyKey}`;
           deliveries.set(deliveryId, agentId);
           return deliveryId;
         }),
+      filePath: (attachmentId) =>
+        Effect.succeed(attachmentId === MISSING_FILE ? null : join(userData, "e2e-files", attachmentId)),
       stopDelivery: () => Effect.void,
       generateText: () => Effect.fail({ message: "No model step runs in this check." }),
       keepPicture: (draftId, types) =>
@@ -1842,6 +1848,79 @@ try {
         serviceAccounts = [];
         higgsfieldSignedIn = false;
       }
+    },
+  );
+
+  await step(
+    "agent files: the host advertises workflows-agent-files-v1 to a protocol 10 peer; an agent step gets each connected picture and a note to use them together; a missing file fails the step",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
+      const run = async (fileIds: readonly string[]) => {
+        const title = ["Agent files", fileIds.length, ...fileIds].join(" ");
+        const workflow = await hostWorkflow(title, {
+          nodes: [
+            promptNode,
+            ...fileIds.map((fileId, index) => ({
+              id: `asset-${index}`,
+              kind: "asset" as const,
+              at: { x: 0, y: 200 * (index + 1) },
+              fields: { fileId },
+            })),
+            {
+              id: "agent",
+              kind: "agent",
+              at: at(300),
+              fields: { agentId: open, task: "Put the person on the beach." },
+            },
+          ],
+          edges: [
+            { id: "edge", from: "prompt", to: "agent", type: "text" },
+            ...fileIds.map((_, index) => ({
+              id: `edge-${index}`,
+              from: `asset-${index}`,
+              to: "agent",
+              type: "image" as const,
+            })),
+          ],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "agent");
+        return { done, handoff: handoffs.find((handoff) => handoff.text.includes(`"${title}"`)) };
+      };
+      const pair = await run(["e2e-person", "e2e-beach"]);
+      assert.equal(pair.done.status, "done", JSON.stringify(pair.done.error));
+      assert.ok(pair.handoff, "the agent step reached the agent");
+      assert.deepEqual(pair.handoff.sourcePaths, [
+        join(userData, "e2e-files", "e2e-person"),
+        join(userData, "e2e-files", "e2e-beach"),
+      ]);
+      assert.ok(pair.handoff.text.includes("Put the person on the beach."));
+      const note =
+        "The 2 attached files come from the steps before this one. Use them together as given: keep what they show, and do not invent a substitute.";
+      assert.ok(pair.handoff.text.includes(note), pair.handoff.text);
+      assert.ok(pair.handoff.text.indexOf(note) < pair.handoff.text.indexOf("--- input ---"), pair.handoff.text);
+      const one = await run(["e2e-person"]);
+      assert.ok(one.handoff?.text.includes("The attached file comes from a step before this one."), one.handoff?.text);
+      const none = await run([]);
+      assert.ok(none.handoff && !none.handoff.text.includes("attached file"), none.handoff?.text);
+      const missing = await run(["e2e-person", MISSING_FILE]);
+      assert.equal(missing.done.status, "failed");
+      assert.equal(missing.handoff, undefined);
+      return {
+        capability: WORKFLOWS_AGENT_FILES_CAPABILITY,
+        files: pair.handoff.sourcePaths.length,
+        missing: missing.done.status,
+      };
     },
   );
 

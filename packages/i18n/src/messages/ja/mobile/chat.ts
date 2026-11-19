@@ -582,6 +582,8 @@ export const messages = {
   "mobile.chat.threads.menu": "{name}、スレッド",
   "mobile.chat.threads.menuAttention": { other: "{name}、スレッド。{count} 件が対応待ち" },
   "mobile.chat.threads.main": "メインチャット",
+  "mobile.chat.threads.count": { other: "{count} 件のスレッド" },
+  "mobile.chat.threads.unreadCount": { other: "未読スレッド {count} 件" },
   "mobile.chat.threads.branchedFrom": "{title} から分岐",
   "mobile.chat.threads.branchedFromDeleted": "削除されたスレッドから分岐",
   "mobile.chat.threads.new": "新しいスレッド",

@@ -266,6 +266,10 @@ export const messages = {
     "Bu model sizin için kullanılamıyor. Bu ajan için başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Daha düşük bir efor veya başka bir model seçin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Ayarlar'da Özel sağlayıcı'yı açın, bu uç noktada Düzenle'ye tıklayın ve bu model için daha büyük bir En fazla çıktı değeri girin. Ya da daha düşük bir efor veya başka bir model seçin.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeModelNotServed":

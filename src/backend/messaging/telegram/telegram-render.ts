@@ -99,17 +99,42 @@ function inlineHtml(line: string, mentionName: ((userId: string) => string) | un
             return `\uE002${links.length - 1}\uE002`;
           })
         : inertMentions(text);
-      return escapeHtml(mentioned)
-        .replace(
-          /\*\*(.+?)\*\*|__(.+?)__/gu,
-          (_match, a: string | undefined, b: string | undefined) => `<b>${a ?? b}</b>`,
-        )
-        .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/gu, "<i>$1</i>")
-        .replace(/(?<![\p{L}\p{N}\p{M}_])_(?!\s)(.+?)(?<!\s)_(?![\p{L}\p{N}\p{M}_])/gu, "<i>$1</i>")
-        .replace(/~~(.+?)~~/gu, "<s>$1</s>")
-        .replace(/(\d+)/gu, (_match, index: string) => links[Number(index)] ?? "");
+      return nestedStyleTags(
+        escapeHtml(mentioned)
+          .replace(
+            /\*\*(.+?)\*\*|__(.+?)__/gu,
+            (_match, a: string | undefined, b: string | undefined) => `<b>${a ?? b}</b>`,
+          )
+          .replace(/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/gu, "<i>$1</i>")
+          .replace(/(?<![\p{L}\p{N}\p{M}_])_(?!\s)(.+?)(?<!\s)_(?![\p{L}\p{N}\p{M}_])/gu, "<i>$1</i>")
+          .replace(/~~(.+?)~~/gu, "<s>$1</s>"),
+      ).replace(/(\d+)/gu, (_match, index: string) => links[Number(index)] ?? "");
     })
     .join("");
+}
+
+const EMPTY_STYLE_TAG = /<([bis])><\/\1>/gu;
+
+function nestedStyleTags(html: string): string {
+  const open: string[] = [];
+  let nested = html.replace(/<(\/?)([bis])>/gu, (tag, closing: string, name: string) => {
+    if (!closing) {
+      open.push(name);
+      return tag;
+    }
+    const index = open.lastIndexOf(name);
+    if (index === -1) return tag;
+    const inner = open.splice(index).slice(1);
+    open.push(...inner);
+    const closeInner = inner.toReversed().map((innerName) => `</${innerName}>`);
+    const reopenInner = inner.map((innerName) => `<${innerName}>`);
+    return `${closeInner.join("")}${tag}${reopenInner.join("")}`;
+  });
+  for (let previous = ""; previous !== nested; ) {
+    previous = nested;
+    nested = nested.replace(EMPTY_STYLE_TAG, "");
+  }
+  return nested;
 }
 
 const TELEGRAM_MENTION = /(?<![\w@])@(?:[0-9]{5,20}\b|[A-Za-z][A-Za-z0-9_]{4,31}\b)/u;

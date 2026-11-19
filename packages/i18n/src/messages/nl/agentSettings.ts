@@ -172,11 +172,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",
   "agentSettings.newChat.title": "Nieuwe chat",
-  "agentSettings.newChat.description": "De agent vergeet deze chat. De instellingen blijven.",
+  "agentSettings.newChat.description":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De instellingen blijven.",
   "agentSettings.newChat.button": "Starten",
   "agentSettings.newChat.confirmTitle": "Nieuwe chat met {name} starten?",
   "agentSettings.newChat.confirmDescription":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",

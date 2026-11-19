@@ -431,10 +431,11 @@ export const messages = {
     "Bu sunucu bir ajan için kendi bildirim düzeyini saklayamıyor. OpenBot’u onu çalıştıran bilgisayarda güncelle.",
   "mobile.agent.newChat.title": "Yeni sohbet",
   "mobile.agent.newChat.starting": "Yeni sohbet başlatılıyor…",
-  "mobile.agent.newChat.footer": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
+  "mobile.agent.newChat.footer":
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Yapılandırması kalır.",
   "mobile.agent.newChat.confirmTitle": "{name} ile yeni bir sohbet başlatılsın mı?",
   "mobile.agent.newChat.confirmBody":
-    "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "mobile.agent.newChat.confirm": "Yeni sohbet başlat",
   "mobile.agent.newChat.failed": "Yeni bir sohbet başlatılamadı",
   "mobile.agent.newChat.failedBody": "Ana makine yeni bir sohbet başlatamadı.",

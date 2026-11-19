@@ -739,6 +739,13 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
   "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.talk.section": "Sprachgespräch",
+  "settings.voice.talkKey.title": "Push-to-Talk-Taste",
+  "settings.voice.talkKey.description": "Halte diese Tasten gedrückt, um in einem Sprachgespräch zu sprechen.",
+  "settings.voice.talkKey.change": "Push-to-Talk-Taste ändern",
+  "settings.voice.talkKey.recording": "Drücke die Tasten",
+  "settings.voice.talkKey.refused": "Füge noch eine Taste hinzu",
+  "settings.voice.talkKey.reset": "Zurücksetzen",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":

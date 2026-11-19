@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { REMOTE_TICKET_AUDIENCE, type RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 import { createOpenBotLogger } from "@openbot/logging";
 import { ANALYTICS_GENERATIONS } from "@openbot/telemetry";
 import { HostAnalytics, type HostOpenPanelClient } from "../src/main/analytics";
@@ -21,6 +22,13 @@ const PHASE_PROPERTIES = [
   "compatibility_ms",
   "first_request_ms",
 ];
+
+function ticket(claims: Pick<RemoteTicketClaims, "signal">): string {
+  const payload = Buffer.from(JSON.stringify({ aud: REMOTE_TICKET_AUDIENCE, ...claims })).toString("base64url");
+  return `${Buffer.from('{"alg":"EdDSA"}').toString("base64url")}.${payload}.signature`;
+}
+const US_TICKET = ticket({ signal: "us" });
+const ENTRY_TICKET = ticket({});
 
 type Sent = { name: string; properties: NonNullable<Parameters<HostOpenPanelClient["track"]>[1]> };
 const sent: Sent[] = [];
@@ -70,12 +78,14 @@ async function run() {
     firstRequest: "ok" | "error",
     hostedWaitMs?: number,
     afterBegin = () => {},
+    signalTicket = US_TICKET,
   ) => {
     trace.begin(hostId);
     afterBegin();
     for (const phase of REMOTE_CONNECT_PHASES) {
       if (phase === "compatibility" && hostedWaitMs !== undefined) trace.hostedStart(hostId, hostedWaitMs);
       trace.mark(hostId, phase, phase === "session" ? session : phase === "first-request" ? firstRequest : "ok");
+      if (phase === "ticket") trace.signalHome(hostId, signalTicket);
     }
   };
   const remoteEvents = () => sent.filter((event) => event.name === "system_remote_connect");
@@ -84,13 +94,14 @@ async function run() {
   await sentCount(1);
   const first = remoteEvents()[0]?.properties ?? {};
   check(
-    "a first connection sends its outcome, session and every phase time",
+    "a first connection sends its outcome, session, Signal home and every phase time",
     first.outcome === "connected" &&
       first.connection === "first" &&
       first.session_kind === "new" &&
       first.last_phase === "first-request" &&
       first.first_request === "ok" &&
       first.failed_attempts === 0 &&
+      first.signal_home === "us" &&
       PHASE_PROPERTIES.every((key) => Number.isInteger(first[key])) &&
       Number.isInteger(first.total_ms) &&
       first.wait_ms === first.total_ms,
@@ -112,6 +123,7 @@ async function run() {
       Number.isInteger(failed.session_ms) &&
       !("ticket_ms" in failed) &&
       !("first_request" in failed) &&
+      !("signal_home" in failed) &&
       !("hosted_start_wait_ms" in failed),
     failed,
   );
@@ -119,37 +131,55 @@ async function run() {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     trace.fail(HOST, trace.begin(HOST), "error");
   }
-  connect(HOST, "reused", "error");
+  connect(HOST, "reused", "error", undefined, undefined, ENTRY_TICKET);
   await sentCount(3);
   const retried = remoteEvents()[2]?.properties ?? {};
   check(
-    "later failures send nothing, and the next connection counts them",
+    "later failures send nothing, and the next connection counts them and names the entry",
     retried.outcome === "connected" &&
       retried.connection === "reconnect" &&
       retried.session_kind === "reused" &&
       retried.first_request === "error" &&
       retried.failed_attempts === 3 &&
+      retried.signal_home === "entry" &&
       Number(retried.wait_ms) >= Number(retried.total_ms),
     retried,
   );
 
   trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "cancelled");
-  trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "error");
+  const afterTicket = trace.begin(OTHER_HOST);
+  trace.mark(OTHER_HOST, "session");
+  trace.mark(OTHER_HOST, "ticket");
+  trace.signalHome(OTHER_HOST, ticket({ signal: "b" }));
+  trace.fail(OTHER_HOST, afterTicket, "error");
   await sentCount(4);
   const afterCancel = remoteEvents()[3]?.properties ?? {};
   check(
-    "a cancel sends nothing, and the next failure is sent",
-    afterCancel.outcome === "failed" && afterCancel.connection === "first" && afterCancel.last_phase === "start",
+    "a cancel sends nothing, and the next failure after the ticket names its Signal home",
+    afterCancel.outcome === "failed" &&
+      afterCancel.connection === "first" &&
+      afterCancel.last_phase === "ticket" &&
+      afterCancel.signal_home === "b",
     afterCancel,
   );
 
   const old = trace.begin(LAST_HOST);
-  connect(LAST_HOST, "ok", "ok", undefined, () => trace.fail(LAST_HOST, old, "cancelled"));
+  connect(
+    LAST_HOST,
+    "ok",
+    "ok",
+    undefined,
+    () => trace.fail(LAST_HOST, old, "cancelled"),
+    ticket({ signal: "Not A Home!" }),
+  );
   await sentCount(5);
   const last = remoteEvents()[4]?.properties ?? {};
   check(
-    "an old attempt that ends late does not stop the newer one",
-    last.outcome === "connected" && last.connection === "first" && last.last_phase === "first-request",
+    "an old attempt that ends late does not stop the newer one, and a home claim that is not a name is other",
+    last.outcome === "connected" &&
+      last.connection === "first" &&
+      last.last_phase === "first-request" &&
+      last.signal_home === "other",
     last,
   );
   check(
@@ -158,7 +188,10 @@ async function run() {
     sent.map((event) => event.name),
   );
   const body = JSON.stringify({ globals, sent });
-  check("no event names a host", ![HOST, OTHER_HOST, LAST_HOST].some((host) => body.includes(host)));
+  check(
+    "no event names a host or has a ticket",
+    ![HOST, OTHER_HOST, LAST_HOST, US_TICKET, ENTRY_TICKET, "Not A Home"].some((text) => body.includes(text)),
+  );
   check(
     "the events go on the host surface with its current generation",
     globals.surface === "desktop_host" && globals.event_schema_version === ANALYTICS_GENERATIONS.desktop_host,

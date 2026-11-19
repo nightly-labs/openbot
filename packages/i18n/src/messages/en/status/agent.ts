@@ -30,6 +30,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.screenCaptureScreen": "Capture the main screen and send the image to the agent's model.",
   "status.agent.screenCaptureChannel":
     "The image shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.screenCapturePermissionNext": "macOS can then ask you to allow Screen Recording for OpenBot.",
   "status.agent.screenCaptureDisplay": "Capture the display {name} and send the image to the agent's model.",
   "status.agent.screenCaptureWindow": "Capture the window {name} and send the image to the agent's model.",
   "status.agent.screenCaptureRegion":
@@ -76,6 +77,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserActing": "Using the web page…",
   "status.agent.browserReviewing": "Reviewing the web page…",
   "status.agent.memoriesSearching": "Searching its memories…",
+  "status.agent.chatsSearching": "Searching its past chats…",
   "status.agent.memoriesSearched": {
     one: "Searched its memories: {count} found",
     other: "Searched its memories: {count} found",

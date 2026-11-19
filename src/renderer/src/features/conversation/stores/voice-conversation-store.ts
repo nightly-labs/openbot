@@ -6,7 +6,7 @@ import {
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
 } from "@openbot/contracts/ipc";
-import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
+import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
@@ -34,6 +34,7 @@ const HOLD_WORDS_MS = 2_000;
 const WORD = /[\p{L}\p{N}]/u;
 const SILENT_RECORDING_MS = 4_000;
 const RESTART_QUIET_MS = 600;
+const PUSH_TO_TALK_MIN_MS = 300;
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_200;
 const DIGITAL_SILENCE_DB = -90;
 const NOISE_RISE_DB = 0.1;
@@ -62,6 +63,7 @@ type VoiceConversationStep = "starting" | "listening" | "transcribing" | "waitin
 interface VoiceConversationState {
   phase: VoiceConversationStep;
   muted: boolean;
+  talking: boolean;
   offline: boolean;
   heard: string;
   error: string | null;
@@ -103,6 +105,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   const [state, setState] = createStore<VoiceConversationState>({
     phase: "starting",
     muted: false,
+    talking: false,
     offline: false,
     heard: "",
     error: null,
@@ -112,6 +115,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let disposed = false;
   let turn: Turn | undefined;
   let ready = false;
+  let loading = false;
+  let pushToTalk = false;
+  let talking = false;
+  let talkingAt = 0;
+  let releaseWhenListening = false;
   let livePreview = false;
   let streamed = false;
   let cloud = false;
@@ -137,6 +145,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   function setStep(next: VoiceConversationStep): void {
     step = next;
+    if (next === "listening" && releaseWhenListening) {
+      releaseWhenListening = false;
+      queueMicrotask(() => {
+        if (!talking && pushToTalk && !disposed) releaseTalk();
+      });
+    }
     setState((draft) => {
       draft.phase = next;
     });
@@ -146,6 +160,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     muted = next;
     setState((draft) => {
       draft.muted = next;
+    });
+  }
+
+  function setTalking(next: boolean): void {
+    talking = next;
+    setState((draft) => {
+      draft.talking = next;
     });
   }
 
@@ -182,6 +203,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const own = generation;
     const analytics = desktopAnalytics.scope();
     const startingAt = performance.now();
+    loading = true;
     try {
       const speech = speechPort().voice;
       const [server, turnPauseMs] = await Promise.all([
@@ -247,6 +269,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       setState((draft) => {
         draft.error = currentText().errorMessage(error, currentText().t("conversation.voice.error"));
       });
+    } finally {
+      loading = false;
     }
   }
 
@@ -373,7 +397,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       setInterval(() => {
         if (turn !== current || performance.now() - current.startedAt < (VOICE_AUDIO_LIMITS.maximumSeconds - 2) * 1_000)
           return;
-        if (current.spoke) endTurn(current);
+        if (current.spoke || (pushToTalk && talking)) endTurn(current);
         else restartRecording(current);
       }, 1_000),
     );
@@ -449,6 +473,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         silentFor = loudness >= SPEECH_LOUDNESS ? 0 : silentFor + LEVEL_INTERVAL_MS;
         if (
           !current.spoke &&
+          !(pushToTalk && talking) &&
           silentFor >= RESTART_QUIET_MS &&
           performance.now() - current.startedAt >= SILENT_RECORDING_MS
         )
@@ -467,9 +492,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         } else {
           loudFor = 0;
           quietFor += LEVEL_INTERVAL_MS;
-          if (current.spoke && quietFor >= turnEndSilenceMs) endTurn(current);
+          if (current.spoke && quietFor >= turnEndSilenceMs && !pushToTalk) endTurn(current);
         }
-        if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
+        if (held && !pushToTalk && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);
       }, LEVEL_INTERVAL_MS),
     );
@@ -678,17 +703,83 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   function toggleMute(): void {
-    setMuted(!muted);
     desktopAnalytics.track("voice_conversation_action", {
-      action: muted ? "mute" : "unmute",
+      action: muted ? "unmute" : "mute",
       server_kind: serverKind,
       result: "succeeded",
     });
+    applyMute(!muted);
+  }
+
+  function setTalkMode(mode: VoiceTalkMode): void {
+    const push = mode === "push";
+    if (push === pushToTalk) return;
+    pushToTalk = push;
+    releaseWhenListening = false;
+    setTalking(false);
+    if (push !== muted) applyMute(push);
+  }
+
+  function startTalking(): void {
+    if (!pushToTalk || talking) return;
+    setTalking(true);
+    talkingAt = performance.now();
+    releaseWhenListening = false;
+    if (step === "waiting" && sending === 0) holdReply();
+    if (muted) applyMute(false);
+  }
+
+  function stopTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    if (muted) {
+      if (held && step === "listening") void resumeReply();
+      return;
+    }
+    const current = turn;
+    const long = performance.now() - talkingAt >= PUSH_TO_TALK_MIN_MS;
+    if (long && current?.spoke && (step === "transcribing" || step === "waiting")) {
+      releaseWhenListening = true;
+      return;
+    }
+    releaseTalk(long);
+  }
+
+  function releaseTalk(long = true): void {
+    const current = turn;
+    if (long && current && step === "listening" && current.recorder.state === "recording") {
+      endTurn(current);
+      setMuted(true);
+      releaseTurn();
+      return;
+    }
+    if (held) {
+      desktopAnalytics.track("voice_conversation_action", {
+        action: "interrupt",
+        server_kind: serverKind,
+        result: "succeeded",
+        trigger: "button",
+      });
+      dropReply();
+    }
+    applyMute(true);
+  }
+
+  function cancelTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    releaseWhenListening = false;
+    if (!muted) applyMute(true);
+    else if (held && step === "listening") void resumeReply();
+  }
+
+  function applyMute(next: boolean): void {
+    setMuted(next);
     if (!muted)
       setState((draft) => {
         draft.error = null;
       });
-    if (!muted && !ready) {
+    if (!muted && !ready && !loading) {
       setStep("starting");
       void start();
       return;
@@ -759,9 +850,14 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   return {
     phase,
     muted: () => state.muted,
+    talking: () => state.talking,
     error: () => state.error,
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
+    setTalkMode,
+    startTalking,
+    stopTalking,
+    cancelTalking,
     interrupt,
   };
 }

@@ -27,6 +27,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
+  "status.agent.screenCapturePermissionNext": "macOS kan je daarna vragen om schermopname toe te staan voor OpenBot.",
   "status.agent.screenCaptureDisplay":
     "Het beeldscherm {name} vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureWindow":
@@ -73,6 +74,7 @@ export const messages = {
   "status.agent.browserActing": "Gebruikt de webpagina…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
+  "status.agent.chatsSearching": "Doorzoekt eerdere chats…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",
     other: "Herinneringen doorzocht: {count} gevonden",

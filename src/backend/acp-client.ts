@@ -77,6 +77,7 @@ import {
 } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
+import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import { IdleThreadPool } from "./idle-thread-pool";
 import { type DynamicToolNamespace, LocalMcpBridge, type LocalMcpSession } from "./local-mcp-bridge";
 import {
@@ -375,6 +376,7 @@ export interface AcpProviderOptions {
   discoveryCwd?: () => string;
   additionalModels?: () => Effect.Effect<AcpModel[]>;
   modelName?: (id: string, name: string) => string;
+  encodesModelIds?: boolean;
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null;
   savedKey?: (modelId: string | null) => boolean;
   providerKeyStored?: (provider: string) => boolean;
@@ -1028,7 +1030,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         {
           const readRateLimits = this.options.readRateLimits;
           const response = readRateLimits
-            ? yield* readRateLimits(this.#requireConnection(), getString(params, "model")).pipe(
+            ? yield* readRateLimits(this.#requireConnection(), this.#requestedModel(params)).pipe(
                 Effect.timeoutOrElse({
                   duration: timeoutMs ?? this.#requestTimeoutMs,
                   orElse: () =>
@@ -1063,7 +1065,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           decoder({
             ...(this.#steerExtension || this.#steersByPrompt ? { steersTurns: true } : {}),
             data: this.#models.map((model) => ({
-              model: model.id,
+              model: this.options.encodesModelIds ? encodedModelId("", model.id) : model.id,
               displayName: model.name,
               description: model.description,
               defaultReasoningEffort: model.defaultReasoningEffort,
@@ -1506,7 +1508,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       held.agentId ??= mcpAgentParam(params);
       yield* this.#configuration.applyConfig(
         held,
-        getString(params, "model"),
+        this.#requestedModel(params),
         getString(params, "effort"),
         this.#models,
       );
@@ -1646,12 +1648,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             } else {
+              const created = providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta }));
               const response = providerResult(
-                yield* Effect.result(
-                  afterSignInRead(
-                    providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
-                  ),
-                ),
+                yield* Effect.result(afterSignInRead(sessionTransport ? created : this.#whileProcessWrites(created))),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -1709,7 +1708,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               yield* Effect.result(
                 this.#configuration.applyConfig(
                   thread,
-                  getString(params, "model"),
+                  this.#requestedModel(params),
                   getString(params, "effort"),
                   this.#models,
                 ),
@@ -2225,7 +2224,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     yield* this.#configuration.applyConfig(
       thread,
-      getString(params, "model"),
+      this.#requestedModel(params),
       getString(params, "effort"),
       this.#models,
       requireModel,
@@ -2333,6 +2332,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       },
     });
     return turn;
+  }
+
+  #requestedModel(params: unknown): string | null {
+    const model = getString(params, "model");
+    return model !== null && this.options.encodesModelIds ? providerModelValue(model) : model;
   }
 
   #requireServedModel(thread: AcpThread): void {
@@ -2827,7 +2831,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const kind = mcpProviderFailureKind(reason);
-    if (kind === "failed") {
+    if (kind !== "sign_in" && kind !== "timeout") {
       this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
       return;
     }

@@ -1,3 +1,4 @@
+import { ticketSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { quantize } from "./resource-summary";
 import type { TraceSpan } from "./trace-file";
 
@@ -14,6 +15,18 @@ export const REMOTE_CONNECT_PHASES = [
 ] as const;
 export type RemoteConnectPhase = (typeof REMOTE_CONNECT_PHASES)[number];
 
+const SIGNAL_HOME_NAME = /^[a-z][a-z0-9-]{0,15}$/u;
+
+export function isSignalHomeName(value: unknown): value is string {
+  return typeof value === "string" && SIGNAL_HOME_NAME.test(value);
+}
+
+function signalHomeOf(ticket: string): string {
+  const home = ticketSignalHome(ticket);
+  if (home === null) return "entry";
+  return isSignalHomeName(home) && home !== "entry" ? home : "other";
+}
+
 export interface RemoteConnectSummary {
   readonly outcome: "connected" | "failed";
   readonly connection: "first" | "reconnect";
@@ -24,6 +37,7 @@ export interface RemoteConnectSummary {
   readonly failedAttempts: number;
   readonly waitMs: number;
   readonly hostedStartWaitMs?: number;
+  readonly signalHome?: string;
   readonly firstRequest?: "ok" | "error";
 }
 
@@ -34,6 +48,7 @@ interface Attempt {
   lastPhase: RemoteConnectPhase | "start";
   session?: "new" | "stored" | "reused";
   hostedStartWaitMs?: number;
+  signalHome?: string;
 }
 
 interface Streak {
@@ -88,6 +103,11 @@ export class RemoteConnectTrace {
     if (attempt) attempt.hostedStartWaitMs = waitedMs;
   }
 
+  signalHome(hostId: string, ticket: string): void {
+    const attempt = this.#attempts.get(hostId);
+    if (attempt) attempt.signalHome = signalHomeOf(ticket);
+  }
+
   fail(hostId: string, attemptId: number, outcome: "error" | "cancelled"): void {
     const attempt = this.#attempts.get(hostId);
     if (attempt?.id !== attemptId) return;
@@ -131,6 +151,7 @@ export class RemoteConnectTrace {
       failedAttempts,
       waitMs: quantize(now - (failedAttempts > 0 && streak ? streak.startedAt : attempt.startedAt)),
       ...(attempt.hostedStartWaitMs === undefined ? {} : { hostedStartWaitMs: quantize(attempt.hostedStartWaitMs) }),
+      ...(attempt.signalHome === undefined ? {} : { signalHome: attempt.signalHome }),
       ...(firstRequest ? { firstRequest } : {}),
     });
   }

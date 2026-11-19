@@ -219,7 +219,8 @@ that vendor's app. A key the user types, or the grant of a browser sign-in, goes
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
 counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
-Mobile never sends scanned QR values, install-referrer URLs or route identifiers. It does not
+Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
+install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
@@ -350,8 +351,8 @@ when there is no install ID.
   connection took, rounded, and how long each fixed step of it took; whether it was the first
   connection to that server since the app started; whether the session was new or saved; how many
   attempts failed before it; and, for a hosted server, how long the server took to start. The first
-  attempt that fails after a connection also sends the last step that finished. The server ID,
-  address, session, ticket and keys are not sent.
+  attempt that fails after a connection also sends the last step that finished. It also sends the short
+  name of the OpenBot Signal machine that the connection used, as the connection ticket names it. The server ID, address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
@@ -1045,8 +1046,9 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
   and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
-  joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
-  to that server's Vault, not to the Vault of the computer where it was typed. The
+  joined server, the box starts checked, any member can save, and the password goes to that server's
+  Vault, not to the Vault of the computer where it was typed. All agents of that server can then sign
+  in with it. Only an owner or admin can show it in the server's Vault. The
   first card fill on a site waits for the server owner's approval; team members and messaging
   services cannot give it. The card then keeps that site and the origins of its card frames, and
   later fills there need no approval; the user can remove a site in the card. The
@@ -1150,6 +1152,10 @@ on desktop. The phone does not store the viewer's files, the screen, or the conn
 sheet shows; Copy in that sheet puts them on the phone's clipboard only when the user taps it. It asks for Face ID, Touch ID
 or the phone unlock before a session, ends the session when the app leaves the foreground, and on
 Android does not allow screenshots or screen recording of the screen while it is open.
+
+On Android, the phone app turns off Content Capture for its window. The system's content capture
+service, such as Android System Intelligence, does not get the text of the app's screens, such as chat
+messages. Accessibility services and autofill do not change.
 
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
