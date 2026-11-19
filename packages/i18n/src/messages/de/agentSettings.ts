@@ -172,11 +172,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Diese Wahl gilt nur für dich, auf allen deinen Geräten. Ist der Server stummgeschaltet oder auf „Nichts“ gesetzt, bleibt auch dieser Agent still.",
   "agentSettings.newChat.title": "Neuer Chat",
-  "agentSettings.newChat.description": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",
+  "agentSettings.newChat.description":
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Seine Einrichtung bleibt erhalten.",
   "agentSettings.newChat.button": "Starten",
   "agentSettings.newChat.confirmTitle": "Neuen Chat mit {name} starten?",
   "agentSettings.newChat.confirmDescription":
-    "Der Agent vergisst diesen Chat. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
   "agentSettings.deleteHistory.title": "Verlauf löschen",

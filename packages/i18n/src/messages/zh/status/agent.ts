@@ -67,6 +67,7 @@ export const messages = {
   "status.agent.browserActing": "正在使用网页…",
   "status.agent.browserReviewing": "正在查看网页…",
   "status.agent.memoriesSearching": "正在搜索记忆…",
+  "status.agent.chatsSearching": "正在搜索以往的对话…",
   "status.agent.memoriesSearched": { other: "已搜索记忆：找到 {count} 条" },
   "status.agent.memoriesUpdating": "正在更新记忆…",
   "status.agent.skillUsing": "正在使用技能 {name}…",

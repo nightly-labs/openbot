@@ -71,6 +71,7 @@ export const messages = {
   "status.agent.browserActing": "Usando a página da web…",
   "status.agent.browserReviewing": "Analisando a página da web…",
   "status.agent.memoriesSearching": "Pesquisando suas memórias…",
+  "status.agent.chatsSearching": "Pesquisando seus chats anteriores…",
   "status.agent.memoriesSearched": {
     one: "Pesquisou suas memórias: {count} encontrada",
     other: "Pesquisou suas memórias: {count} encontradas",

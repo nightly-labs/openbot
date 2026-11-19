@@ -398,10 +398,10 @@ export const messages = {
     "此服务器无法为助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "mobile.agent.newChat.title": "新对话",
   "mobile.agent.newChat.starting": "正在开始新对话…",
-  "mobile.agent.newChat.footer": "助手会忘记这段对话，其配置保持不变。",
+  "mobile.agent.newChat.footer": "助手会重新开始，需要时仍可查找这段对话，其配置保持不变。",
   "mobile.agent.newChat.confirmTitle": "与 {name} 开始新对话？",
   "mobile.agent.newChat.confirmBody":
-    "助手会忘记这段对话，消息仍会显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
+    "助手会重新开始，需要时仍可查找这段对话。消息仍会显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "mobile.agent.newChat.confirm": "开始新对话",
   "mobile.agent.newChat.failed": "无法开始新对话",
   "mobile.agent.newChat.failedBody": "主机无法开始新对话。",
