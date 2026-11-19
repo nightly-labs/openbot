@@ -22,6 +22,7 @@ import type { CustomEndpoints } from "./custom-endpoints";
 import { agentNamesById, deliveryPromptInput, type TagReferenceSource } from "./delivery-content";
 import { steerNote } from "./developer-instructions";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
+import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
@@ -31,6 +32,7 @@ export interface QueueControlsHooks {
   channelAssignment(deliveryId: string): ChannelAssignment | null;
   taskThreadId(deliveryId: string): string | null;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
+  liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
 }
 
 export interface QueueControlsOptions {
@@ -303,6 +305,7 @@ export class QueueControls {
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
+              liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
             }),
           ],

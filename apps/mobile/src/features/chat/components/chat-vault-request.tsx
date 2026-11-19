@@ -10,6 +10,7 @@ import KeyRound from "lucide-react-native/icons/key-round";
 import UserRound from "lucide-react-native/icons/user-round";
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { setVaultRequestHandoff, vaultRequestAnswers, vaultRequestPrefill } from "@/features/chat/model/vault-request";
 import { haptics } from "@/shared/lib/haptics";
@@ -41,6 +42,7 @@ export function ChatVaultRequest({
   onActivate?: (() => void) | undefined;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const resolution =
     prompt.resolution ?? controller?.resolution ?? (controller || onActivate ? null : { status: "expired" as const });
@@ -78,8 +80,8 @@ export function ChatVaultRequest({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-3 rounded-[20px] bg-control/60 px-4 py-3"
-      style={{ borderCurve: "circular" }}
+      className={`w-full max-w-[92%] self-start gap-3 rounded-[20px] ${card.fillClass} px-4 py-3`}
+      style={card.style}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-3">

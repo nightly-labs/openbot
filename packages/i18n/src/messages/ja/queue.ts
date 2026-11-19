@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "添付ファイル",
   "queue.hold.named": "待機中 - {name} は {channel} で作業しています",
   "queue.hold.unnamed": "待機中 - このエージェントは {channel} で作業しています",
+  "queue.hold.providerRestart": "待機中 - {provider} は実行中のタスクが終わると再起動します",
   "queue.item.label": "キューのメッセージ {position}: {preview}",
   "queue.item.labelEditing": "キューのメッセージ {position}、編集中: {preview}",
   "queue.item.editing": "編集中",

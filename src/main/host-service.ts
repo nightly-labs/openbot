@@ -187,6 +187,7 @@ interface HostServiceOptions {
   getRemoteDesktopRuntimeCredentials?: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
   getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
+  remoteDesktopScreenLocked?: () => boolean;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   writeRemoteDesktopClipboard?: (text: string) => void;
   remoteControlPolicy?: RemoteControlPolicyStore;
@@ -317,6 +318,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       sessionDisconnected: windowsSessionDisconnected,
+      screenLocked: options.remoteDesktopScreenLocked,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),

@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "첨부 파일",
   "queue.hold.named": "대기 중 - {name}이(가) {channel}에서 작업 중이에요",
   "queue.hold.unnamed": "대기 중 - 이 에이전트가 {channel}에서 작업 중이에요",
+  "queue.hold.providerRestart": "대기 중 - 실행 중인 작업이 끝나면 {provider}이(가) 다시 시작돼요",
   "queue.item.label": "대기 중인 메시지 {position}: {preview}",
   "queue.item.labelEditing": "대기 중인 메시지 {position}, 편집 중: {preview}",
   "queue.item.editing": "편집 중",

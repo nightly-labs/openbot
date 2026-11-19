@@ -44,7 +44,7 @@ import {
   isCustomProviderHarness,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
-  isCustomProviderReasoningEfforts,
+  isCustomProviderModelEfforts,
   isServerNotificationLevel,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
@@ -324,6 +324,7 @@ export class InstanceTransferService {
         return this.#prepareUploadDirectory(directory).pipe(Effect.as(directory));
       },
       stage: (path, owner) => this.#stageFile(path, owner, true, ARCHIVE),
+      staged: (token) => this.#staged.has(token),
       exportTo: (path, input, exporter) => this.exportTo(path, input, ARCHIVE, exporter),
     });
   }
@@ -1306,7 +1307,7 @@ export class InstanceTransferService {
             name,
             ...(isCustomProviderContextWindow(contextWindow) ? { contextWindow } : {}),
             ...(isCustomProviderMaxOutput(maxOutput) ? { maxOutput } : {}),
-            ...(isCustomProviderReasoningEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
+            ...(isCustomProviderModelEfforts(reasoningEfforts) ? { reasoningEfforts: [...reasoningEfforts] } : {}),
             ...(isCustomProviderInputs(inputs) ? { inputs: [...inputs] } : {}),
           })),
           headers: [],
