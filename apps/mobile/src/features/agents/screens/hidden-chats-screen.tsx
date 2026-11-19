@@ -52,7 +52,6 @@ export function HiddenChatsScreen() {
           animateIdle={false}
         />
       ),
-      // A member cannot show an agent that the host hid; the host refuses the request.
       show: canUnhideAgent(agent.id)
         ? () => {
             unhideAgent(agent.id);
@@ -61,7 +60,6 @@ export function HiddenChatsScreen() {
           }
         : null,
     }));
-  // The phone hides a channel only for itself.
   const items = [
     ...agentItems,
     ...hiddenChannels.map((channel) => ({

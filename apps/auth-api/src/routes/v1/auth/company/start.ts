@@ -6,8 +6,6 @@ import { readJsonObject } from "../../../../server/json-body";
 import { apiError, companySignInErrorResponse, json, requestCompanySignIn } from "../../../../server/request-auth";
 import { requestSourceIp } from "../../../../server/source-ip";
 
-// The app asks for the company provider's sign-in page after the email start answers
-// `company_sign_in_required`. The app opens the answer in the browser.
 export const Route = createFileRoute("/v1/auth/company/start")({
   server: {
     handlers: {

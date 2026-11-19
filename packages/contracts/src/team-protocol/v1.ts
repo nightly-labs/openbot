@@ -275,7 +275,6 @@ function isTeamProtocolV1EventType(value: string): value is keyof typeof TEAM_PR
   return TEAM_PROTOCOL_V1_EVENT_TYPE_SET.has(value);
 }
 
-// This is the frozen v1 wire validator. Do not replace its nested checks with current IPC validators.
 function isTeamProtocolV1KnownEvent(value: DynamicRecord): value is TeamProtocolV1Event {
   switch (value.type) {
     case "status":
@@ -1045,7 +1044,6 @@ interface TeamProtocolV1HttpContract {
   response: TeamProtocolV1HttpPayloadKind;
 }
 
-// This registry is the frozen v1 HTTP surface. A new route or a changed payload must use a new protocol.
 const TEAM_PROTOCOL_V1_HTTP_CONTRACTS = {
   "GET compatibility": { request: "none", response: "object" },
   "GET identity": { request: "none", response: "nullable-object" },
@@ -1899,9 +1897,6 @@ function projectV1RoutineSchedule(value: DynamicRecord): TeamProtocolV1JsonObjec
   }
 }
 
-// The host encodes every JSON response through this adapter, so a path `TEAM_API_ROUTES` builds that this
-// frozen list cannot name is a route no client can be answered on. Classification only: it reads the
-// list below and decides nothing, so exporting it leaves every released response meaning what it did.
 export function teamProtocolV1HttpRoute(method: string, path: string): TeamProtocolV1HttpRoute | null {
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   const exact: Record<string, TeamProtocolV1HttpRoute> = {

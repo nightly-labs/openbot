@@ -9,14 +9,12 @@ const PEAKS = [
   0.15, 0.05, 0.2, 0.55, 0.7, 0.95, 0.6, 0.4, 0.25, 0.5, 0.7, 0.45, 0.3, 0.15, 0.1, 0.05, 0.03, 0.02,
 ];
 
-/** A spoken reply has a speed button; the user's own voice message does not. */
 const REPLY = { kind: "reply", speed: 1, onCycleSpeed: fn() } as const;
 
 const meta = {
   title: "Conversation/VoicePlayer",
   component: VoicePlayer,
   args: { kind: "message", state: "idle", peaks: PEAKS, duration: 6, onToggle: fn(), onSeek: fn() },
-  // Play state, position and speed are local here; in the app the speech playback holds them.
   render: (args) => {
     const [state, setState] = createSignal(untrack(() => args.state));
     const [elapsed, setElapsed] = createSignal(untrack(() => args.elapsed ?? 0));
@@ -70,7 +68,6 @@ export const SpokenReplyPlaying: Story = {
   },
 };
 
-/** A reply that was read to its end once keeps its audio: it shows its waveform and length. */
 export const SpokenReplyRead: Story = { args: { ...REPLY, duration: 23 } };
 
 export const SpokenReplyReplaying: Story = { args: { ...REPLY, state: "playing", duration: 23, elapsed: 9 } };

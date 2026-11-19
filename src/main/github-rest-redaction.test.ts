@@ -8,7 +8,6 @@ import { createGitHubRest } from "./github-rest";
 
 const BOT_TOKEN = `ghs_${randomBytes(18).toString("hex")}`;
 const USER_TOKEN = `ghu_${randomBytes(18).toString("hex")}`;
-// A secret with no known token shape, as a pasted password in a comment can be.
 const REGISTERED = `pass-${randomBytes(18).toString("hex")}`;
 
 const COMMENT: WorkflowGitHubChange = {
@@ -23,7 +22,6 @@ const COMMENT: WorkflowGitHubChange = {
   files: null,
 };
 
-/** The failure of one comment change, over `fetch`. */
 function failureOf(fetch: GitHubFetch) {
   const api = createGitHubRest({
     fetch,

@@ -3,12 +3,10 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, onSettled, Show } from "solid-js";
 
 interface SplashPlaygroundProps {
-  /** How long the simulated app takes to load. */
   readyAfterMs: number;
   children: (ready: () => boolean, onExited: () => void) => JSX.Element;
 }
 
-/** Mounts a splash, marks the app ready after a delay, and replays the run on request. */
 export function SplashPlayground(props: SplashPlaygroundProps) {
   const [run, setRun] = createSignal(0);
   const [ready, setReady] = createSignal(false);

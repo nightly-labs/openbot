@@ -7,11 +7,6 @@ import type { BrowserDiagnostics } from "./browser-diagnostics";
 import type { BrowserOperationError } from "./browser-effects";
 import { type BrowserTabSession, isPersistableBrowserUrl } from "./browser-state";
 
-/**
- * One tab as `BrowserHost` holds it. The host owns every tab and its lifecycle; the tab operations in
- * `browser-tab-operations.ts` only read and advance its queue, revision and secret state.
- */
-/** The page a preview frame shows: its URL, its main-frame document, and the tab's capture generation. */
 export interface BrowserPreviewPage {
   url: string;
   document: number;
@@ -21,137 +16,57 @@ export interface BrowserPreviewPage {
 export interface BrowserHostTab {
   id: string;
   view: WebContentsView;
-  /** WebContentsView clears its property after native destruction. Keep the handle for cleanup. */
   contents: WebContents;
   requestedUrl: string;
   openerTabId?: string;
-  /** Retained document references can outlive popup closure and navigation. */
   hasSharedBrowsingContext?: boolean;
-  /**
-   * The current document received a secret and was kept, with its filled fields empty and no
-   * readable copy of the value, so a
-   * single-page sign-in can show its next step. Page code can still hold the value, so evaluation
-   * and recording stay blocked in its opener group until a main-frame navigation replaces it.
-   */
   secretDocument?: boolean;
-  /**
-   * The kept document of `secretDocument` can still show the secret: its fields did not empty, or the
-   * page copied the value. Images of the tab stay blocked, as for `filledCard`, until it navigates.
-   */
   secretShown?: boolean;
-  /**
-   * `fill_card` typed a saved card into the current document. Its fields show the number and the
-   * security code, and page code can read them, so screenshots, previews, evaluation and recording
-   * stay blocked until a main-frame navigation replaces the document.
-   */
   filledCard?: boolean;
-  /**
-   * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
-   * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
-   * the session fills. A main-frame navigation or an idle unload ends the document and clears this.
-   */
   scriptedOrigins?: Set<string>;
-  /**
-   * The origins whose service worker could have served code from a script to the current document:
-   * it was open while agent code ran on the origin in its session. Only this document waits for a
-   * navigation; it does not block the other pages of the origin.
-   */
   workerExposedOrigins?: Set<string>;
-  /**
-   * A session of this tab and its popups only, kept in memory: a sign-in page that the host opened
-   * for someone else. Such a tab is not saved, and its cookies go when it closes.
-   */
   privateSession?: Session;
-  /**
-   * The persistent session this tab and its popups use: the agent's own session or a named profile.
-   * Absent: the shared session. Fixed for the life of the tab.
-   */
   tabSession?: BrowserTabSession;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
   closing?: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
-  /** Other threads of the owner agent that can use the tab: a person tagged it in their message. */
   sharedThreadIds?: Set<string>;
   revision: number;
-  /** The number of the queued operation that runs now or ran last. */
   operations?: number;
-  /** The last full-page image that the agent got, and the operation that last passed it on. */
   image?: { operation: number; url: string; taken: number };
   queue: Deferred.Deferred<void>;
   scope: Scope.Closeable;
-  /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
-  /** How often the page renderer crashed. A `run_script` stops when this changes. */
+  opening?: boolean;
   crashes?: number;
-  /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
   documents: number;
-  /** How long reads of one document waited for its bot check. All reads of a document share one wait. */
   challengeWait?: { document: number; waitedMs: number };
-  /**
-   * The document whose bot check offered its checkbox for one click. The next read waits once for
-   * the check to pass; later reads of that document offer no click.
-   */
   challengeClick?: { document: number; waited: boolean };
-  /** The origin of the page whose last read found a bot check. */
   checkOrigin?: string;
-  /**
-   * The origin of a bot check that was on the page when a person took over the tab and selected Done.
-   * While a read of that origin still finds a check, the check refuses this browser: another takeover
-   * does not pass it.
-   */
   checkAfterTakeover?: string;
-  /** The page host whose memories a snapshot gave the agent, and the turn. The next turn shows them again. */
   siteRecall?: { turnId: string; host: string };
-  /**
-   * The last preview frame, with the page, document and capture generation it shows. A preview waits
-   * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.
-   */
   preview?: (BrowserPreviewPage & { frame: BrowserPreview }) | undefined;
-  /** The preview capture on `queue`, so preview requests for the same page share one capture. */
   previewCapture?:
     | (BrowserPreviewPage & { frame: Deferred.Deferred<BrowserPreview, BrowserOperationError> })
     | undefined;
-  /**
-   * The first load of a tab restored from disk, held back until the tab is shown or used. Each loaded
-   * tab is a renderer process, and a restart would otherwise start one for every saved tab at once.
-   */
   pendingRestore?: (() => Effect.Effect<void, BrowserOperationError>) | undefined;
-  /**
-   * An idle agent tab whose page and renderer process were closed to free memory. The title and the last
-   * preview frame stand in for the page until `pendingRestore` loads it again.
-   */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
-  /**
-   * Set when the idle unload closes the page: the threads that a tool result has told so since. The tab
-   * keeps its address and title, so without this note an agent cannot tell that its scripts and page
-   * state are gone. Each thread that can use the tab, its owner and a thread it was shared with, reads it once.
-   */
   idleUnloadNoted?: Set<string>;
-  /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
-  /** The next document keeps the focus that it takes when it commits: a person opened the tab or entered its address. */
   focusOnCommit?: boolean | undefined;
-  /** Whether the tab had focus when its page closed itself, so its opener can take focus over. */
   focusedAtPageClose?: boolean | undefined;
   environment: BrowserEnvironment;
   engine: BrowserCdpEngine;
   diagnostics: BrowserDiagnostics;
   recording: boolean;
   captureGeneration: number;
-  /** Counts the addresses loaded after the tab opened. A later load that aborts the first load does not close the tab. */
   loadGeneration: number;
   viewInvalidations: Set<() => void>;
-  /**
-   * The live view that made the last right-click, until the menu of that click opens. The menu then
-   * goes to that view, and does not open on this screen.
-   */
   viewContextMenu: { deliver: (menu: BrowserViewContextMenu) => void; until: number } | null;
-  /** The host of the last page reported as a site visit, so a navigation inside one site is not reported again. */
   visitedHost?: string | undefined;
-  // Pending consent permits human takeover; submission blocks captures until document replacement.
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
 }
 
@@ -167,7 +82,6 @@ export function restoreWebContentsFocus(previous: WebContents | null, controlled
   }
 }
 
-/** Whether history has a page with an address at `offset` from the current one, as back and forward need. */
 export function hasHistoryEntry(contents: WebContents, offset: -1 | 1): boolean {
   const history = contents.navigationHistory;
   return history.canGoToOffset(offset) && Boolean(history.getEntryAtIndex(history.getActiveIndex() + offset)?.url);
@@ -187,8 +101,6 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    // A page can put a typed card value or password in its title. The address stays as it is: the
-    // app loads it again and looks up saved logins with it.
     title: tab.secret
       ? "Secure authentication"
       : restoredTabTitle(tab) || tab.engine.scrubText(tab.contents.getTitle()) || "New tab",
@@ -206,10 +118,6 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
   };
 }
 
-/**
- * A restored or sleeping tab that has not loaded yet shows a blank page; its last title, or else its
- * host name, stands in for its title.
- */
 function restoredTabTitle(tab: BrowserHostTab): string | null {
   if (!tab.pendingRestore) return null;
   if (tab.sleeping?.title) return tab.sleeping.title;

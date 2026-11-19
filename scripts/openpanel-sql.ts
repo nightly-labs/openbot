@@ -9,13 +9,6 @@ import { Schema } from "effect";
 import { loadSharedDevelopmentEnvironment } from "./development-environment";
 import { readScriptArguments } from "./script-arguments";
 
-// Read-only SQL on the OpenPanel ClickHouse, for the openpanel skill. The user openbot_readonly can only
-// SELECT from the view openbot_readonly.events (openpanel.events of project openbot). The server sets
-// readonly=1 and the time, memory, thread and result limits. ClickHouse has no public port: the script
-// opens an SSH tunnel to the container, or uses OPENPANEL_CLICKHOUSE_URL when a tunnel is already open.
-// The credentials are OPENPANEL_CLICKHOUSE_USER and OPENPANEL_CLICKHOUSE_PASSWORD in
-// apps/auth-api/.env.dev and .env.production. They are decrypted for each run and never written out.
-
 const USAGE = `Usage:
   bun scripts/openpanel-sql.ts query '<sql>' [options]   SELECT from \`events\` (no FORMAT clause)
   bun scripts/openpanel-sql.ts query - [options]         read the SQL from stdin
@@ -66,7 +59,6 @@ interface Preset {
   readonly event: string;
   readonly metrics: readonly string[];
   readonly by: readonly string[];
-  /** Keeps the successful events. --all-results removes it. */
   readonly success?: string;
 }
 
@@ -113,7 +105,6 @@ const PROPERTY_KEY = /^[a-z][a-z0-9_]*$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const EMAIL = /[^\s@"'<>,;]+@[^\s@"'<>,;]+\.[a-z]{2,}/giu;
 const IDENTIFIER_COLUMN = /profile_id|device_id|session_id|email/iu;
-// uniqExact(profile_id) and other counts of identifiers are numbers, not identifiers.
 const NUMERIC_TYPE = /^(Nullable\()?(U?Int|Float|Decimal)/u;
 
 const decodeResult = Schema.decodeUnknownSync(
@@ -162,7 +153,6 @@ function canConnect(port: number): Promise<boolean> {
 }
 
 async function openTunnel(): Promise<Connection> {
-  // The container IP changes when Docker recreates the container, so read it for each tunnel.
   const { stdout } = await execFileAsync(
     "ssh",
     [
@@ -214,7 +204,6 @@ async function openTunnel(): Promise<Connection> {
   return { url: `http://127.0.0.1:${port}/`, close };
 }
 
-/** Uses OPENPANEL_CLICKHOUSE_URL when a tunnel is already open, for example in CI. */
 export async function connectClickHouse(): Promise<Connection> {
   const existing = process.env.OPENPANEL_CLICKHOUSE_URL;
   return existing ? { url: existing, close: () => {} } : openTunnel();
@@ -227,8 +216,6 @@ export interface QueryRequest {
   readonly showIdentifiers: boolean;
 }
 
-// A limit can stop a query after ClickHouse sent part of the rows, with HTTP 500 or, after the
-// headers, HTTP 200. Show only the exception, because those rows are not redacted.
 function clickHouseError(status: number, body: string): Error {
   const exception = /Code: \d+\. DB::Exception: (?:[^\n"\\]|\\.)*/u.exec(body)?.[0];
   const detail = exception ? redactText(exception.replace(EMAIL, "<email>")) : "The output is not valid JSON.";
@@ -236,7 +223,6 @@ function clickHouseError(status: number, body: string): Error {
 }
 
 export async function runQuery(connection: Connection, request: QueryRequest): Promise<QueryResult> {
-  // readonly=1 blocks every setting, also default_format, so the format goes in the query.
   const response = await fetch(connection.url, {
     method: "POST",
     headers: { "X-ClickHouse-User": request.user, "X-ClickHouse-Key": request.password },
@@ -246,12 +232,10 @@ export async function runQuery(connection: Connection, request: QueryRequest): P
   if (!response.ok) throw clickHouseError(response.status, text);
   let result: QueryResult;
   try {
-    // The email pattern stops at a quote, so it cannot change the JSON structure.
     result = decodeResult(request.showIdentifiers ? text : text.replace(EMAIL, "<email>"));
   } catch {
     throw clickHouseError(response.status, text);
   }
-  // JSON output quotes 64-bit integers.
   const integers = result.meta.filter((column) => /^(Nullable\()?U?Int64/u.test(column.type)).map((c) => c.name);
   const identifiers = request.showIdentifiers
     ? []

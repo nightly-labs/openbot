@@ -1,9 +1,3 @@
-/**
- * The People section. It takes its id as a prop rather than importing the constant because the
- * section list is what decides where People sits in the order, and `data-section-id` has to carry
- * the same id the layout used - see `SIDEBAR_DRAG_SELECTORS`.
- */
-
 import { Button } from "@openbot/ui";
 import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -19,11 +13,12 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const {
     directThreadByMember,
     dragOffset,
-    orderedPeople,
+    listFiltered,
     movePersonByKeyboard,
     props,
     sectionDragClasses,
     sectionIsCollapsed,
+    shownPeople,
     sidebarClickIsSuppressed,
     startPersonDragging,
     stopSidebarDragging,
@@ -32,7 +27,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
   const presence = (online: boolean) => (online ? t("sidebar.people.online") : t("sidebar.people.offline"));
   const sectionId = () => sectionProps.sectionId;
   return (
-    <Show when={props.showPeople !== false && orderedPeople().length > 0}>
+    <Show when={props.showPeople !== false && shownPeople().length > 0}>
       <section
         class={["sidebar-chat-group sidebar-section", sectionDragClasses(sectionId())]}
         style={`--sidebar-drag-y: ${dragOffset(sectionId()).y}px;`}
@@ -49,7 +44,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
           inert={sectionIsCollapsed(sectionId()) ? true : undefined}
         >
           <div id={`sidebar-section-body-${sectionId()}`} class="sidebar-section-body">
-            <For each={orderedPeople()}>
+            <For each={shownPeople()}>
               {(member) => {
                 const thread = () => directThreadByMember().get(member.id);
                 const unreadBadge = createMemo(() => sidebarUnreadBadge(thread()?.unreadCount ?? 0));
@@ -59,7 +54,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                     class={["sidebar-person-item", { "sidebar-drag-shifting": dragOffset(member.id).y !== 0 }]}
                     style={`--sidebar-drag-y: ${dragOffset(member.id).y}px;`}
                     data-person-id={member.id}
-                    draggable={props.compact ? "false" : "true"}
+                    draggable={props.compact || listFiltered() ? "false" : "true"}
                     onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) =>
                       startPersonDragging(event, member)
                     }
@@ -87,7 +82,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                           props.onSelectPerson(member.id);
                         }}
                         onKeyDown={(event: KeyboardEvent) => {
-                          if (!event.altKey) return;
+                          if (!event.altKey || listFiltered()) return;
                           if (event.key === "ArrowUp") {
                             event.preventDefault();
                             movePersonByKeyboard(member.id, -1);

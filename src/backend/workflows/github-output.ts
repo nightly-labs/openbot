@@ -1,9 +1,3 @@
-/**
- * The rules of a GitHub output step: which repository and item it changes, the change its fields and its
- * input give, the question that lets a model choose labels or a person, and the keys that the loop guard
- * keeps for the change.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isGitHubRepositoryName,
@@ -29,10 +23,8 @@ import {
 } from "./workflow-github-api";
 import { fieldText, inputText } from "./workflow-walk";
 
-/** GitHub refuses a longer issue title. */
 const TITLE_LIMIT = 256;
 
-/** What a model chooses for the output, when its fields say "Agent chooses". */
 export interface GitHubOutputChoice {
   labels: boolean;
   person: boolean;
@@ -40,15 +32,9 @@ export interface GitHubOutputChoice {
 
 export type GitHubOutputPlan =
   | { kind: "change"; change: WorkflowGitHubChange; choose: GitHubOutputChoice }
-  /** Nothing to say: a comment with no text makes no change, as a quiet routine run posts nothing. */
   | { kind: "quiet" }
   | { kind: "failed"; error: string };
 
-/**
- * The change of an output step. `graph` and `runItem` are those of its run: the trigger's repository and
- * the item of the event that started it. `files` are the files of the run's trigger, which a new issue
- * or a comment links.
- */
 export function githubOutputPlan(
   node: WorkflowNode,
   input: string,
@@ -72,7 +58,6 @@ export function githubOutputPlan(
     number = item.number;
   }
 
-  // The event of a trigger is data for an agent. GitHub does not get it as a comment, a review or an issue.
   const text = withoutEvents(input);
   const onlyEvent = text !== input && !text.trim();
   const body = text.trim().slice(0, GITHUB_BODY_LIMIT);
@@ -102,7 +87,6 @@ export function githubOutputPlan(
       change.files = files;
       break;
     case "review.changes":
-      // GitHub asks for the changes in the review text.
       if (!body) return { kind: "failed", error: textMissing };
       break;
     case "label.add":
@@ -128,10 +112,6 @@ export function githubOutputPlan(
   return { kind: "change", change, choose };
 }
 
-/**
- * The input of a GitHub output step: the text of the steps before it as one text, then the events of
- * triggers as framed data. The change leaves the events out; "Agent chooses" still reads them.
- */
 export function githubOutputInput(inputs: readonly string[]): string {
   const events = inputs.map((input) => input.trim()).filter((input) => input.startsWith(EXTERNAL_EVENT_START));
   const text = inputText(inputs.filter((input) => !input.trim().startsWith(EXTERNAL_EVENT_START)));
@@ -140,18 +120,12 @@ export function githubOutputInput(inputs: readonly string[]): string {
 
 const FRAME_END = `\n${EXTERNAL_EVENT_END}`;
 
-/** The name that `inputText` puts before each input it joins, with no text after it. */
 const EMPTY_INPUT_NAME = /(?<=^|\n)Input \d+:\s*(?=Input \d+:\n|$)/gu;
 const INPUT_NAME = /(?<=^|\n)Input \d+:\n\n/gu;
 
-/**
- * The input without the framed events of triggers. A loop joins the event into the input of a later
- * pass, so the names of the joined inputs go with their events, and one text that stays keeps no name.
- */
 export function withoutEvents(input: string): string {
   let text = input;
   for (let start = text.indexOf(EXTERNAL_EVENT_START); start >= 0; start = text.indexOf(EXTERNAL_EVENT_START)) {
-    // The event is one line of JSON, which keeps no line break, so a marker in a comment does not end it.
     const end = text.indexOf(FRAME_END, start);
     text = text.slice(0, start) + (end < 0 ? "" : text.slice(end + FRAME_END.length));
   }
@@ -163,7 +137,6 @@ export function withoutEvents(input: string): string {
   return name && rest.startsWith(name) ? rest.slice(name.length) : text;
 }
 
-/** The question that lets a model choose from the repository's own labels and people. */
 export function githubChoicePrompt(
   input: string,
   options: WorkflowGitHubRepositoryOptions,
@@ -181,10 +154,6 @@ export function githubChoicePrompt(
   return lines.filter(Boolean).join("\n\n");
 }
 
-/**
- * The labels and the person that a model chose, as the repository writes them. A value that the
- * repository does not have is dropped. Null when the model chose nothing that the change needs.
- */
 export function githubChoices(
   answer: string,
   options: WorkflowGitHubRepositoryOptions,
@@ -213,7 +182,6 @@ export function githubChoices(
   return { labels, people: person ? [person] : [] };
 }
 
-/** The keys of what the change sets, known before GitHub answers. */
 export function githubChangeKeys(change: WorkflowGitHubChange): string[] {
   switch (change.action) {
     case "label.add":
@@ -232,7 +200,6 @@ export function githubChangeKeys(change: WorkflowGitHubChange): string[] {
   }
 }
 
-/** Every key of the change, with the comment, review or issue that GitHub made. */
 export function githubResultKeys(change: WorkflowGitHubChange, result: WorkflowGitHubChangeResult): string[] {
   const created = result.created;
   if (!created) return githubChangeKeys(change);
@@ -244,17 +211,12 @@ export function githubResultKeys(change: WorkflowGitHubChange, result: WorkflowG
   ];
 }
 
-/** The text that a done GitHub output step keeps: the page of what changed. */
 export function githubOutputText(change: WorkflowGitHubChange, result: WorkflowGitHubChangeResult | null): string {
   if (result?.url) return result.url;
   const number = result?.created?.kind === "issue" ? result.created.number : change.number;
   return number === null ? change.repository : `${change.repository}#${number}`;
 }
 
-/**
- * The output's repository. "trigger", or none, names the repository of the event that started the run,
- * when it is one of the trigger's; otherwise the trigger's first repository.
- */
 function outputRepository(
   node: WorkflowNode,
   graph: WorkflowGraph | null,
@@ -269,10 +231,6 @@ function outputRepository(
   return repositories.find((name) => name.toLowerCase() === eventRepository) ?? repositories[0] ?? null;
 }
 
-/**
- * The item that the output changes: the item of the event that started the run, or the number in its
- * input (`#12`, or a link to the issue or the pull request). `pullRequest` is null when only GitHub knows.
- */
 function outputItem(
   node: WorkflowNode,
   input: string,

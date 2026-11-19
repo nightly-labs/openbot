@@ -1,11 +1,3 @@
-// Chooses each other voice in Settings → Voice → Spoken replies of a running dev app, and checks
-// that the closed select names that voice, that the saved setting is that voice, and that the select
-// still names it after Settings opens again. The select kept the voice it showed first (#2602).
-// Restores the saved voice at the end. Needs an English window and `--allow-mutations`, because it
-// changes the voice setting.
-//
-// Run: bun scripts/speech-voice-select-e2e.ts --allow-mutations
-// It writes .openbot-build/speech-voice-select-e2e/report.json and a screenshot, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -16,7 +8,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -62,7 +53,6 @@ function voiceRow(page: Page) {
   return page.locator('[data-settings-row="settings.voice.speech.voice.title"]');
 }
 
-/** Opens Settings on the Voice tab and returns the closed Voice select. */
 async function openVoiceSelect(page: Page) {
   const title = settingsTitle(page);
   if (!(await title.isVisible()))
@@ -78,7 +68,6 @@ async function openVoiceSelect(page: Page) {
 }
 
 async function closeSettings(page: Page) {
-  // A focused settings tab keeps Escape for itself, so Escape goes from the title.
   await settingsTitle(page).focus();
   await page.keyboard.press("Escape");
   await settingsTitle(page).waitFor({ state: "hidden" });
@@ -92,7 +81,6 @@ async function chooseVoice(page: Page, voice: SpeechVoice) {
   await (await openVoiceSelect(page)).click();
   await page.getByRole("option", { name: voiceName(voice), exact: true }).click();
   await page.getByRole("listbox").waitFor({ state: "hidden" });
-  // The select saves without an event, so read the setting until main has it.
   const deadline = Date.now() + 15_000;
   while ((await savedVoice(page)) !== voice && Date.now() < deadline);
 }

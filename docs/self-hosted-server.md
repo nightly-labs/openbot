@@ -155,6 +155,12 @@ about 10 seconds. In Docker, the container must have a restart policy, such as `
 unless-stopped`; without one, the container stays stopped. When the server does not answer, use
 `sudo openbot restart`.
 
+When the start of OpenBot fails again and again, the service stops, and systemd does not start it again
+(see [Start loop](hosted-servers.md#start-loop)). `openbot status` then says so. Read the reason with
+`openbot logs`. Install a newer release with `sudo openbot update`, or try again with
+`sudo openbot restart`. The update timer also starts the service again about each hour, with a
+newer release when one is staged.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 

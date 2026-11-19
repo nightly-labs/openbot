@@ -1,8 +1,3 @@
-// Checks that the loss of a provider process ends only the work of that process (plan 006). Runs the
-// real agent service on a temporary profile with a fake Codex app-server that exits during a
-// compaction. The compaction of the lost process ends as "failed", its queued message reaches a final
-// state, and the service does not clear the browser controls of every agent.
-// `bun scripts/provider-loss-scope-e2e.ts`. Writes .openbot-build/provider-loss-scope-e2e/report.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,7 +16,6 @@ const controlPath = join(root, "control.json");
 const exitedPath = join(root, "exited");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -48,7 +42,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** threadId -> { turnId, finish } of the compaction turn that runs. */
 const compacting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -72,7 +65,6 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      // Codex 0.160.1 \`start_or_steer_turn\`: an active compaction turn cannot take input.
       if (compacting.has(params.threadId)) {
         log({ refused: params.threadId });
         return write({ id: message.id, error: { code: -32603, message: "failed to submit turn input: ActiveTurnNotSteerable { turn_kind: Compact }" } });
@@ -93,7 +85,6 @@ const answer = (message) => {
       const turnId = "compact-turn-" + (++turns);
       const item = { type: "contextCompaction", id: "compact-item-" + turnId };
       write({ id: message.id, result: {} });
-      // The first process exits during its compaction. The restarted one finds the marker and runs normally.
       if (exitDuringCompaction && !fs.existsSync(process.env.OPENBOT_FAKE_CODEX_EXITED)) {
         write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
         write({ method: "item/started", params: { threadId: params.threadId, turnId, item } });
@@ -175,7 +166,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** The messages that OpenBot sent to the fake Codex. */
 function protocol(): { method: string | null; threadId: string | null }[] {
   try {
     return readFileSync(logPath, "utf8")
@@ -193,7 +183,6 @@ function protocolEntry(value: unknown) {
   return { method: getString(entry, "method"), threadId: getString(params, "threadId") };
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -204,7 +193,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** Waits for a state, and records a failed check instead of a stop when it does not come. */
 async function settle<T>(label: string, read: () => T | null | undefined | false, timeoutMs?: number) {
   return waitFor(label, read, timeoutMs).catch(() => null);
 }
@@ -237,7 +225,6 @@ try {
       initialMessage: "First message.",
     }),
   );
-  // The first turn reports 90% of the context window, so the next message starts a compaction.
   const threadId = await waitFor("the first turn to end", () => {
     const session = store.activeProviderSession(agent.id)?.externalSessionId;
     const started = protocol().some((line) => line.method === "turn/start" && line.threadId === session);
@@ -266,9 +253,6 @@ try {
     const status = mailbox.getDelivery(deliveryId)?.delivery.status;
     return status === "completed" || status === "failed" || status === "interrupted" ? status : null;
   });
-  // The message ends as "interrupted" before and after this change: boot recovery orphans every unresolved
-  // delivery of the provider. The check proves only that the queue does not wait for a compaction that
-  // cannot end.
   check("the queued message reaches a final state after the loss", finalStatus !== null, {
     finalStatus,
     error: mailbox.getDelivery(deliveryId)?.delivery.error ?? null,

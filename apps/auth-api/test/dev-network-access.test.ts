@@ -43,7 +43,6 @@ describe("development Auth API LAN access", () => {
       expect(developmentNetworkRequestAllowed("192.168.1.20", path)).toBe(true);
     }
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/auth/logout")).toBe(false);
-    // A development code follows from the challenge ID, so email sign-in stays on loopback.
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/auth/email/start")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/email/verify")).toBe(false);
     expect(developmentNetworkRequestAllowed("192.168.1.20", "/v1/mobile-auth/ticket")).toBe(false);

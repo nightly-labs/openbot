@@ -3,31 +3,21 @@ import { useText } from "@openbot/ui/text";
 import { Match, Show, Switch } from "solid-js";
 import { StopIcon } from "./ConversationIcons";
 
-/** What Send does while the message box has nothing to send: start or end a voice conversation. */
 export type ComposerSendVoice = "start" | "end";
 
 export interface ComposerSendControlProps {
-  /** Show Stop in place of Send: the agent works and the message box has nothing to send. */
   stop: boolean;
   onStop: () => void;
-  /**
-   * Show the voice conversation control in place of Send: the message box has nothing to send.
-   * Stop has priority. Without it, Send shows.
-   */
   voice?: ComposerSendVoice | undefined;
   onVoice?: (() => void) | undefined;
-  /** The accessible name of Send. */
   label: string;
   keyShortcuts?: string | undefined;
   title?: string | undefined;
   disabled: boolean;
-  /** A spinner replaces the arrow while the message goes. */
   busy: boolean;
-  /** Without it, Send submits its form. */
   onSend?: (() => void) | undefined;
 }
 
-/** The Send button of a message box, Stop while the agent works, or voice while the box is empty. */
 export function ComposerSendControl(props: ComposerSendControlProps) {
   const { t } = useText();
   const sendType = () => (props.onSend ? "button" : "submit");

@@ -17,4 +17,5 @@ export const messages = {
   "error.kind.permission": "Vous n’avez pas l’autorisation d’effectuer cette action. Demandez l’accès au propriétaire.",
   "error.kind.rateLimit": "Trop de requêtes. Patientez un instant, puis réessayez.",
   "error.kind.service": "Le service est indisponible. Patientez un instant, puis réessayez.",
+  "error.kind.interrupted": "La connexion s’est fermée avant la fin de la réponse. Renvoyez votre message.",
 } as const satisfies PartialTranslation<typeof source>;

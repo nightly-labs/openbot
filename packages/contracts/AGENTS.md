@@ -1,33 +1,45 @@
 # `packages/contracts`
 
-The IPC channel list, the IPC payload types, and the frozen Team API wire protocol. Everything here
-is a contract someone else already implements — a shipped desktop build, a remote host, a renderer
-mock — so the cost of a change is paid by code you cannot edit.
+The IPC channel list, the IPC payload types, and the Team API wire protocol. Everything here is a
+contract someone else already implements — a shipped desktop build, a remote host, a renderer mock —
+so the cost of a change is paid by code you cannot edit, for as long as the support window (root
+`AGENTS.md`) covers that build.
 
 ## Team API protocol compatibility
 
 - Never use the application SemVer as a wire protocol version; application versions are diagnostic
   metadata only.
-- Keep a frozen codec, adapter, and client and host fixtures for each released protocol under
-  `src/team-protocol`, and one registered adapter per supported protocol. The fixtures are the record
+- Keep a frozen codec, adapter, and client and host fixtures for each protocol that a release in the
+  support window speaks, under `src/team-protocol`, and one registered adapter per supported protocol. The fixtures are the record
   of each released wire format; no unit test reads them, so compare a codec change against them by
   hand. Do not serialize current IPC types across the boundary.
 - Use capabilities for additive, optional behaviour; a missing capability disables only its own
   feature. `TEAM_PROTOCOL_CAPABILITY_LIMITS` (`src/team-protocol/capability-limits.ts`) holds the
   most capabilities that each protocol reads. Protocol 6 and older read 64, and the bootstrap list
-  goes to them too. Protocols 7 and 8 read 128, and their lists are full: a new one goes in
-  `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`. `bun run test:team-legacy-clients` fails when a list is over
-  its limit.
+  goes to them too. Protocols 7 and 8 read 128, and protocol 9 reads 256. All three lists are full.
+  `bun run test:team-legacy-clients` fails when a list is over its limit.
+- `TEAM_CAPABILITY_REGISTRY` (`src/team-protocol/current.ts`) is the one table of capabilities. Each
+  entry has a placement (`since`, `bootstrap`), and every capability list comes from it. Add a new
+  capability at the end with `V10`. Do not change the placement of a released capability, and do not
+  remove one with `since` 9 or lower: the lists of protocol 9 and older are released wire contracts.
+- Protocol 10 (`src/team-protocol/v10.ts`) does not send the protocol 9 list again. The frozen
+  protocol 9 list is the baseline (`fixtures/v10/baseline-capabilities.json`). A protocol 10 peer
+  sends `capabilities` (the names after protocol 9, and the markers) and `absent` (the baseline names
+  that it does not serve). Its full set is `(baseline - absent) + capabilities`
+  (`expandTeamCapabilitiesV10`). Check a capability with `supportsTeamCapability` on the full set, not
+  on one list. `bun run test:team-protocol-v10` checks both directions.
 - A required field, a removed field, or a semantic change needs a new protocol version. Never change
-  the meaning of a released one.
+  the meaning of a protocol that a release in the support window speaks.
 - A new value in an open field is not a protocol change. From protocol 8, provider ids and auth
   kinds are open (`OPEN_PROVIDER_ID`): a new provider needs no new version. Peers below 8 keep their
   frozen lists, and the host hides each provider outside them (`FROZEN_PROVIDERS` in
   `src/main/team-api/provider-visibility.ts`). A client keeps an agent of a provider it does not know.
-- Age, release count and SemVer distance are not reasons to remove an adapter. Removal needs a
-  separate architecture decision — a security issue, data-loss risk, semantics that cannot be kept,
-  or cost an adapter cannot contain — plus a changelog entry, update instructions, an E2E check of
-  both update directions, and clear UI text.
+- When no release in the support window speaks a protocol, raise the minimum protocol and delete its
+  codec, adapter, fixtures and capabilities in the same change. A peer below the minimum gets
+  `client_update_required` or `host_update_required` with clear UI text, never a silent failure. The
+  change needs a changelog entry and an E2E check of both directions.
+- A capability that every protocol in the window implies is not sent again. A new protocol version
+  can make all earlier capabilities implied; when it is the minimum, delete them from the lists.
 - Malformed known payloads fail closed as `protocol_error`. Unknown optional events are ignored.
 
 ## One channel list, two mirrors

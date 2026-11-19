@@ -1,13 +1,3 @@
-// Frozen optional agent-backup-models-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can read and change the backup models of each agent (`backupModels`): the models, at most
-// eight, that the agent moves to when a usage limit holds its message, and whether it moves at once
-// (`automatic`) or asks first. Null means the agent asks in the chat, with no saved order. Each answer
-// also names the model that the agent left for a usage limit (`usageLimitReturn`, read only), or null.
-// A provider id is open (`OPEN_PROVIDER_ID`); the host refuses one it does not know. An account id names one of
-// the host's own provider accounts. A member cannot use either route; `requireAdmin` on the host is
-// the only gate.
 import { isString } from "../runtime-values";
 import {
   type AdminDecoder,

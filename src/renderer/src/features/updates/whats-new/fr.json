@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Une fois cette version installée, vous ne pouvez plus revenir à une version plus ancienne d’OpenBot sur cet ordinateur ou ce serveur. Cette version réduit la taille de la base de données, et une version plus ancienne ne peut pas l’ouvrir.",
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les tailles d’image personnalisées, les modèles et les prix de Sunra et de Higgsfield, et le chargement plus rapide de nombreux agents ne fonctionnent que si le serveur a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Affichez les fils secondaires de chaque agent dans la barre latérale. Sélectionnez la flèche à la fin d’une ligne d’agent, ou placez le pointeur sur la ligne pour voir tous ses fils.",
+          "Filtrez la barre latérale avec le bouton de filtre à la fin du champ de recherche. Affichez uniquement les agents ou les canaux, uniquement les discussions non lues ou les agents au travail, ou uniquement les discussions des dossiers que vous sélectionnez.",
+          "Donnez à une étape Image du canevas de workflow une taille personnalisée en pixels, ou utilisez les proportions 4:5 ou 5:4.",
+          "Le canevas de workflow affiche tous les modèles d’image et de vidéo de Sunra et de Higgsfield, et le bouton Lancer affiche le prix en crédits.",
+          "Désactivez le Flou d’arrière-plan et les Visages d’agents animés dans Réglages > Apparence > Mouvement pour rendre OpenBot plus rapide sur un ordinateur lent."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Plusieurs personnes peuvent modifier un même workflow en même temps. Le canevas ajoute les modifications des autres personnes au fur et à mesure qu’elles enregistrent.",
+          "OpenBot utilise beaucoup moins de CPU pendant que de nombreux agents travaillent, et vous pouvez taper sans délai.",
+          "Les agents terminent un paiement lorsque la banque demande un code 3-D Secure. Lorsque le code se trouve dans un e-mail ou un SMS que l’agent peut lire, l’agent le saisit.",
+          "Réglages du serveur > Transfert > Copier vers un autre serveur copie désormais aussi les workflows et les flux de routine des agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La base de données d’OpenBot prend beaucoup moins de place. Après la mise à jour, OpenBot supprime les anciennes copies des messages de discussion par petites étapes.",
+          "Sous Windows, une mise à jour affiche de nouveau sa progression.",
+          "Un serveur rejoint avec de nombreux agents, et un grand canal, s’ouvrent plus vite.",
+          "Les discussions Gemini avec de nombreuses images ou un long historique ne s’arrêtent plus, et Gemini ne vous demande plus de vous connecter lorsqu’une nouvelle discussion commence.",
+          "L’application de bureau se reconnecte à un serveur sous OpenBot v0.34.1 ou une version plus ancienne."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

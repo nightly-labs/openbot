@@ -1,8 +1,3 @@
-// What main answers for the embedded browser, its live view, and its picture-in-picture window.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import type {
   BrowserBounds,
   BrowserControlAction,
@@ -97,7 +92,6 @@ export function decodeBrowserLocalSignInEnd(value: unknown): BrowserLocalSignInE
   return { signedIn: requiredBoolean(end, "signedIn") };
 }
 
-/** Null when the person cancelled the sign-in. */
 export function decodeBrowserLocalSignInResult(value: unknown): BrowserLocalSignInResult | null {
   if (value === null) return null;
   const result = decodeRecord(value, "browser sign-in result");
@@ -142,7 +136,6 @@ export function decodeBrowserPictureInPictureEvent(value: unknown): BrowserPictu
   }
 }
 
-/** The steps that a person showed. A text that is not a string is left out. */
 export function decodeBrowserTeachSteps(value: unknown): BrowserTeachStep[] {
   return decodeList(value, "browser teach steps", (entry) => {
     const step = decodeRecord(entry, "browser teach step");
@@ -189,7 +182,6 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     ...(diagnosticErrorCount === undefined ? {} : { diagnosticErrorCount }),
     ...(openerTabId === undefined ? {} : { openerTabId }),
     ...(popupFailure === undefined ? {} : { popupFailure: popupFailureOf(popupFailure) }),
-    // Only an exact `true` marks the tab: any other value does not make an agent wait.
     ...(userControl === true ? { userControl } : {}),
     ...(canGoBack === undefined ? {} : { canGoBack }),
     ...(canGoForward === undefined ? {} : { canGoForward }),
@@ -245,12 +237,6 @@ function controlSession(session: DynamicRecord): BrowserControlSession {
   };
 }
 
-// A `FromMain` decoder has a same-shaped `FromHost` twin in `src/main/remote-host-decoding.ts` and
-// its four wire-area siblings, and is deliberately not the same function: this side is checking what
-// the main process sent the renderer, which is a trusted sender, while that side is checking a remote
-// team server, which is not. The suffix is there so a later reader does not merge them onto whichever
-// is looser. `src/main/ipc-channel-coverage.test.ts` checks the two sets name for name, so dropping a
-// suffix or deleting one half is a red test rather than a comment nobody read.
 export function decodeBrowserPreviewFromMain(value: unknown): BrowserPreview {
   const preview = decodeRecord(value, "browser preview");
   const dataUrl = requiredString(preview, "dataUrl");

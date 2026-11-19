@@ -8,7 +8,6 @@ export const messages = {
   "provider.custom.description": "自分のモデルエンドポイント",
   "provider.custom.addLabel": "カスタムプロバイダーを追加",
   "provider.custom.installLabel": "カスタムプロバイダーをインストール",
-  // 日本語に単数複数の区別はないので、どの個数でも同じ形です。
   "provider.endpointCount": { other: "エンドポイント {count} 件" },
   "provider.customAgentCount": { other: "カスタムエージェント {count} 件" },
   "provider.manageEndpoints": { other: "エンドポイント {count} 件を管理" },
@@ -271,6 +270,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · OpenBot がダウンロード",
+  "provider.settings.installedVersionIncomplete":
+    "一部のモデルには、このバージョンにない部品が必要です。使うには OpenBot のバージョンをダウンロードしてください。",
   "provider.settings.useInstalledVersion": "インストール版を使う",
   "provider.settings.useDownloadedVersion": "OpenBot 版を使う",
   "provider.settings.cache": "キャッシュ",

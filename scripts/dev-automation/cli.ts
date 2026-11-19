@@ -1,6 +1,3 @@
-// AI-facing bridge to the live dev app. Read-only by default; anything that
-// changes app state needs --allow-mutations. This tool never seeds, resets or
-// copies openbot.db: it drives the instance you already have open.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
@@ -39,10 +36,6 @@ import {
   waitForRole,
 } from "./tools";
 
-// Diagnostics go to stderr so stdout carries only the final JSON document,
-// which stays parseable for the calling agent.
-// `debug` so the renderer console and page errors this tool subscribes to are
-// visible; the default `info` threshold would drop them.
 const logger = createOpenBotLogger("dev-automation", (line) => process.stderr.write(`${line}\n`), "debug");
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -52,12 +45,7 @@ const MEMORY_ROOT = join(SCREENSHOT_ROOT, "memory");
 const DEFAULT_CPU_DURATION_MS = 60_000;
 const MAX_CPU_DURATION_MS = 600_000;
 const DEFAULT_CPU_INTERVAL_MS = 5_000;
-// A sampler that runs every few hundred milliseconds becomes the load it is
-// there to measure, and the counters it reads are cumulative, so nothing is
-// lost by asking rarely.
 const MIN_CPU_INTERVAL_MS = 1_000;
-// GitHub refuses PR video attachments over 10 MB on the free plan. The app
-// window records at about 0.8 Mbit/s, so 90 s stays under that limit.
 const DEFAULT_RECORD_DURATION_MS = 60_000;
 const MAX_RECORD_DURATION_MS = 90_000;
 
@@ -99,8 +87,6 @@ type StringFlag = {
   [Name in keyof typeof OPTIONS]: (typeof OPTIONS)[Name]["type"] extends "string" ? Name : never;
 }[keyof typeof OPTIONS];
 
-// `null` means the flag is absent, `""` means it was passed empty. The two
-// differ for `--text=`, which legitimately clears a field.
 function flagValue(flags: Flags, name: StringFlag): string | null {
   return flags[name] ?? null;
 }
@@ -127,9 +113,6 @@ function readTimeout(flags: Flags): number {
   return timeout;
 }
 
-// Dev is meant to be fully testable, so any window can be driven - but the
-// aim has to be deliberate. An empty selector would match every target and
-// land wherever the list happens to start.
 function readPageSelector(flags: Flags): string | null {
   const raw = flagValue(flags, "page");
   if (raw === null) return null;
@@ -137,9 +120,6 @@ function readPageSelector(flags: Flags): string | null {
   return raw;
 }
 
-// Honoured by every command: before the capture for `snapshot` and
-// `screenshot`, after the action for `click` and `type`, which is where the
-// race actually is.
 function readWaitTarget(flags: Flags): WaitTarget | null {
   const raw = flagValue(flags, "wait-for");
   if (raw === null) return null;
@@ -167,17 +147,11 @@ function readService(flags: Flags): DevInstanceService {
 interface AutomationTarget {
   port: number;
   expectedRendererPort: number | null;
-  // The dev supervisor process the registry published, and the anchor for the
-  // `ps` walk in `cpu`. Null when no record owns this port.
   pid: number | null;
   instanceNamed: boolean;
   description: string;
 }
 
-// Resolution order, and why: an explicit port or instance is an instruction
-// and wins. Otherwise the registry decides, and the record of the worktree
-// this command runs in is the one an agent almost always means - the default
-// port is a last resort, kept read-only by `instanceNamed: false`.
 function resolveTarget(flags: Flags, records: DevInstanceRecord[], service: DevInstanceService): AutomationTarget {
   const explicitPort = resolveAutomationPort(
     flagValue(flags, "port") ?? undefined,
@@ -189,11 +163,6 @@ function resolveTarget(flags: Flags, records: DevInstanceRecord[], service: DevI
   }
   if (explicitPort.explicit && requestedInstance === null) {
     const published = records.find((record) => record.remoteDebuggingPort === explicitPort.port);
-    // An explicit port is an instruction and stays authoritative - this is dev,
-    // and driving another worktree's app on purpose is legitimate. But a
-    // mistyped digit resolves silently to a different developer's profile,
-    // where a click or a keystroke lands in real conversations, so say whose
-    // app this is rather than refuse it.
     if (published && resolve(published.projectRoot) !== resolve(process.cwd())) {
       logger.warn(
         `--port=${explicitPort.port} belongs to another worktree (${published.projectRoot}), not this one. ` +
@@ -240,8 +209,6 @@ function resolveTarget(flags: Flags, records: DevInstanceRecord[], service: DevI
     port: selection.record.remoteDebuggingPort,
     expectedRendererPort: selection.record.rendererPort,
     pid: selection.record.pid,
-    // A foreign instance is the dev app of another worktree. Readable, so an
-    // agent can still take a snapshot, but not something to click blind.
     instanceNamed: selection.match !== "foreign",
     description: `${describeDevInstance(selection.record)} [${selection.match}]`,
   };
@@ -271,10 +238,6 @@ async function measureCpu(flags: Flags, target: AutomationTarget): Promise<void>
   const label = flagValue(flags, "label") ?? "run";
   const comparePath = flagValue(flags, "compare");
   const baseline = comparePath === null || comparePath === "" ? null : readComparisonReport(comparePath);
-  // Resolved before the run, not after it: a rejected `--out` should cost the
-  // developer nothing, and finding out at the end throws a minute of sampling
-  // away. `--compare` stays relative to the working directory, because it only
-  // reads and the usual call passes the path an earlier run printed.
   const out = flagValue(flags, "out");
   const outPath = out === null || out === "" ? null : resolveWritablePath(CPU_ROOT, out, ".json", "CPU reports");
   const browser = await openDevBrowser(target.port, logger, { ownerPid: target.pid });
@@ -330,10 +293,6 @@ async function measureMemory(flags: Flags, target: AutomationTarget): Promise<vo
   process.stdout.write(`${JSON.stringify(document, null, 2)}\n`);
 }
 
-// Resolves on the deadline or on the first SIGINT/SIGTERM, so an agent that
-// recorded in the background can stop when its demo ends. The handlers stay
-// installed: a second signal while the encoder flushes must not kill the
-// process and truncate the file.
 function waitForStop(durationMs: number): Promise<void> {
   return new Promise((resolveStop) => {
     const finish = (): void => {
@@ -346,8 +305,6 @@ function waitForStop(durationMs: number): Promise<void> {
   });
 }
 
-// Read-only: a CDP screencast of one page. The clicks of the demo come from
-// other `click` and `type` runs, so this command changes nothing in the app.
 async function recordVideo(flags: Flags, target: AutomationTarget): Promise<void> {
   const durationMs = readMilliseconds(flags, "duration", DEFAULT_RECORD_DURATION_MS, 1_000, MAX_RECORD_DURATION_MS);
   const outPath = resolveWritablePath(
@@ -366,7 +323,6 @@ async function recordVideo(flags: Flags, target: AutomationTarget): Promise<void
   let startedAt = 0;
   try {
     if (waitTarget) await waitForRole(session.page, waitTarget, readTimeout(flags), logger, flags.exact ?? false);
-    // The VP8 encoder needs even dimensions. CSS pixels keep the file small.
     const size = await session.page.evaluate(() => ({
       width: Math.floor(window.innerWidth / 2) * 2,
       height: Math.floor(window.innerHeight / 2) * 2,
@@ -391,11 +347,6 @@ async function main(): Promise<void> {
   const flags = parsed.values;
   const [command] = parsed.positionals;
   if (command === "instances") {
-    // Every diagnostic on stderr goes through the logger, which redacts. This
-    // is the one place a registry field reaches stdout raw, and `projectRoot`
-    // is a filesystem path the developer chose - a checkout under a directory
-    // named after an email, or one holding a token, would otherwise be copied
-    // into the transcript verbatim. Selection keeps using the raw records.
     const instances = readDevInstanceRecords().map((record) => ({
       ...record,
       profile: redactText(record.profile),
@@ -428,9 +379,6 @@ async function main(): Promise<void> {
     }
     return;
   }
-  // Read-only: `cpu` and `memory` attach CDP counters and run `ps`, and change nothing in
-  // the app. So it stays out of the mutation gate below and works against an
-  // instance nobody named.
   if (command === "cpu") {
     await measureCpu(flags, target);
     return;
@@ -454,9 +402,6 @@ async function main(): Promise<void> {
   const role = command === "click" || command === "type" ? parseAutomationRole(requireFlagValue(flags, "role")) : null;
   const name = command === "click" || command === "type" ? requireFlagValue(flags, "name") : null;
   const text = command === "type" ? requireTextFlag(flags) : null;
-  // Substring matching is the default because control names carry context --
-  // "Sign in to OpenCode" reads better than an exact label. `--exact` is for
-  // the names that nest: a "Settings" gear beside "View agent settings".
   const exact = flags.exact ?? false;
   const timeoutMs = readTimeout(flags);
   const waitTarget = readWaitTarget(flags);

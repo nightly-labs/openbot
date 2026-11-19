@@ -147,7 +147,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "La licencia finaliza al terminar el periodo pagado. Tus servidores no se ven afectados.",
   "billing.license.cancel.keep": "Conservar licencia",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Periodo de facturación",
   "billing.order.currency": "Moneda",
   "billing.order.monthly": "Mensual",

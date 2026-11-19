@@ -1,10 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Omnisend here is taken from api-docs.omnisend.com and
-// support.omnisend.com, except the API key on the MCP server: Omnisend documents the key only
-// for its REST API, and the MCP server's own 401 answer asks for it (#9372). Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const OMNISEND_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

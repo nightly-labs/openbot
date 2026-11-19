@@ -123,10 +123,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Açıklık",
   "mobile.settings.appearance.messageColorFooter":
     "Ajan rengi ile bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Özel renk ile tüm sohbetlerdeki mesajlarınız seçtiğiniz rengi kullanır. Metin rengi okunaklı kalması için değişir.",
+  "mobile.settings.appearance.bubbleStyle": "Balon stili",
+  "mobile.settings.appearance.bubbleStyleSolid": "Dolu",
+  "mobile.settings.appearance.bubbleStyleTint": "Ton",
+  "mobile.settings.appearance.seeThroughBubbles": "Saydam balonlar",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Ajan balonlarının ve renksiz balonların arkasından arka plan görünür. Arka plan yoksa balonlar her zaman opaktır.",
+  "mobile.settings.appearance.tab.colors": "Renkler",
+  "mobile.settings.appearance.tab.chat": "Sohbet",
+  "mobile.settings.appearance.preview.routines": "3 rutin çalıştırması",
+  "mobile.settings.appearance.preview.thinking": "4 saniye düşündü",
+  "mobile.settings.appearance.preview.memory": "1 anı kaydedildi",
+  "mobile.settings.appearance.backdrop.title": "Arka plan",
+  "mobile.settings.appearance.backdrop.footer":
+    "Bu telefonda Ana ekranın ve sohbetlerinizin arkasında görünür. Bir ajan sizin için ayarlayabilir; sohbetteki Geri al eskisini geri getirir.",
+  "mobile.settings.appearance.backdrop.none": "Yok",
+  "mobile.settings.appearance.backdrop.pond": "Koi göleti",
+  "mobile.settings.appearance.backdrop.jellyfish": "Denizanaları",
+  "mobile.settings.appearance.backdrop.sunset": "Retro gün batımı",
+  "mobile.settings.appearance.backdrop.snowfall": "Kar yağışı",
+  "mobile.settings.appearance.backdrop.fireflies": "Ateş böcekleri",
+  "mobile.settings.appearance.backdrop.agentPage": "Ajan sayfası",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Bir ajan ayarladı",
+  "mobile.settings.appearance.backdrop.photo": "Fotoğraf",
+  "mobile.settings.appearance.backdrop.photoChoose": "Fotoğraflarınızdan seçin",
+  "mobile.settings.appearance.backdrop.photoChange": "Başka bir fotoğraf seçmek için yeniden dokunun",
+  "mobile.settings.appearance.backdrop.strength": "Arka plan yoğunluğu",
+  "mobile.settings.appearance.backdrop.calm": "Sakin",
+  "mobile.settings.appearance.backdrop.vivid": "Canlı",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Sakin bir arka plan uzun yanıtları kolay okunur tutar. En çok Ana ekranın üst kısmında görünür.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Sürüm notunu yazabilir misin?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "İşte bir taslak: Bir ajanın ayarladığı arka plan artık telefonunuzda da görünüyor.",
   "mobile.settings.appearance.chatBackground": "Sohbet arka planı",
   "mobile.settings.appearance.chatBackgroundDefault": "Varsayılan",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Her tema kendi rengini korur. Metnin okunmasını zorlaştıran bir renk koyulaşır veya açılır.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Arka plan, sohbet arka planının yerini alır. Bir renk kullanmak için arka plan olarak Yok seçin.",
   "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",
@@ -249,6 +284,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Fotoğraflar ve dosyalar",
   "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
+  "mobile.settings.conversations.swipeQuestion": "Yan soru",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
   "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
   "mobile.settings.conversations.swipeOff": "Kapalı",
@@ -535,7 +571,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Ajan seç",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot kilitli",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot’u aç",
-  "mobile.settings.shortcuts.footer": "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz.",
+  "mobile.settings.shortcuts.footer":
+    "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz. Open Agent bu ajanın sohbetini açar.",
   "mobile.settings.shortcuts.send.sent": "Gönderildi",
   "mobile.settings.shortcuts.send.failed": "OpenBot bunu gönderemedi.",
   "mobile.settings.shortcuts.send.unconfirmed": "Sunucudan yanıt yok. Mesaj sohbette olabilir.",

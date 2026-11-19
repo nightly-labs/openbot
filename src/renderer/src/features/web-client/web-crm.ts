@@ -1,6 +1,3 @@
-// The CRM page of the joined server in the browser client. The host serves it through `crm-v1`, to an
-// owner or admin only.
-
 import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { CRM_ROUTES, crmEvent } from "@openbot/contracts/team-protocol/crm-v1";
 import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -17,11 +14,9 @@ import type { CrmHost } from "../crm/crm-port";
 
 export interface WebCrmHostOptions {
   request: () => TeamApiRequest;
-  /** Every event of the connected host. Returns the unsubscribe function. */
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
 }
 
-/** The CRM of the connected host. */
 export function webCrmHost(options: WebCrmHostOptions): CrmHost {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown): Promise<T> =>
     options.request()("POST", path, decode, decodeTeamProtocolV2Json(body));
@@ -39,7 +34,6 @@ export function webCrmHost(options: WebCrmHostOptions): CrmHost {
     openUrl: (url) => void window.open(url, "_blank", "noopener,noreferrer"),
     onChanged: (listener) =>
       options.onHostEvent((event) => {
-        // A snapshot comes after a reconnect: the CRM can change while the host is away.
         if (event.type === "runtime-snapshot" || crmEvent(event)) listener();
       }),
   };

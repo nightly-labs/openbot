@@ -10,7 +10,6 @@ export const messages = {
   "error.backend.webhookRouteUnavailable": "公共 Webhook 路由尚未就绪。请检查主机连接后重试。",
   "error.backend.webhookTestUnavailable": "主机现在无法接收测试事件。请确认它已登录，然后重试。",
   "error.backend.webhookTestFailed": "测试事件没有送达该自动化任务，请重试。",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "浏览器实时视图仅适用于远程主机。",
   "error.backend.browserViewUnsupported": "该远程主机不支持浏览器实时视图。",
   "error.backend.browserViewLimit": "这台主机上打开的浏览器视图过多。",
@@ -111,6 +110,7 @@ export const messages = {
   "error.backend.memoryGone": "该记忆已不存在。",
   "error.backend.routineGone": "该自动化任务已不存在。",
   "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
+  "error.backend.routineRunFailedNoReason": "运行因错误而停止，但没有收到原因。打开这次运行，查看智能体做了什么。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
@@ -231,6 +231,8 @@ export const messages = {
     "此智能体只能使用有限数量的 MCP 服务器。要使用此服务器，请关闭智能体不需要的 MCP 服务器。",
   "error.backend.mcpRegistrationRefused":
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
+  "error.backend.mcpRegistrationUnavailable":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -241,6 +243,7 @@ export const messages = {
   "error.backend.mcpSignInNeedsHttps": "该服务器要求登录，而 OpenBot 仅通过 https 登录。请把地址改为 {url}。",
   "error.backend.mcpSignInCancelled": "登录已取消。",
   "error.backend.mcpSignInTimedOut": "未在浏览器中完成登录。",
+  "error.backend.mcpSignInRefused": "登录页面拒绝了访问。请重新登录。",
   "error.backend.mcpSignInResponseTimedOut": "登录响应未及时返回。",
   "error.backend.mcpSignInMetadataUnreadable": "OpenBot 无法读取该服务器的登录信息。请检查服务器地址后重试。",
   "error.backend.mcpSignInAnswerUnreadable":
@@ -249,6 +252,7 @@ export const messages = {
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
+  "error.backend.mcpServerStoppedDuringCall": "MCP 服务器在响应此次调用前停止了。",
   "error.backend.mcpToolSchemaRefused":
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
@@ -379,7 +383,6 @@ export const messages = {
     "该 MCP 服务器的登录服务器已变更，因此 OpenBot 没有把登录应用发送给它。若该变更正确，请移除登录应用后重新添加。",
   "error.backend.mcpSignInAppNoServer": "请先把该 MCP 服务器保存为 URL 服务器，再添加登录应用。",
   "error.backend.mcpSignInAppUnavailable": "该电脑无法保存登录应用。",
-  // Tasks: conversations of one agent that run beside its own chat.
   "error.backend.taskMoveRefused": "只有你单独发给该助手的消息才能作为任务运行。",
   "error.backend.taskNotFound": "该任务不可用。",
   "error.backend.taskClosed": "该任务已关闭，请重新打开后再发送消息。",

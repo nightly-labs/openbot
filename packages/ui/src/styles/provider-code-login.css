@@ -1,14 +1,3 @@
-/*
- * The code sign-in dialog. It opens from the provider rows, which appear inside the settings modal
- * as well as on their own, so it sits one layer above the shared dialog layer for the same reason
- * `opencode-key-dialog.css` does: both portals are children of `body`, and insertion order alone
- * would decide it wrongly the first time a caller mounts it from elsewhere.
- *
- * The code itself is the largest thing on screen. It is about to be typed on another device from
- * this screen alone, so it is set in the mono face at display size with the characters spaced
- * apart: a code read wrong costs the whole round trip.
- */
-
 .provider-code-login-backdrop {
   z-index: calc(var(--openbot-layer-dialog) + 1);
 }
@@ -26,7 +15,6 @@
   animation: provider-code-login-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
-/* The host's sign-in page needs the width of a browser window. */
 .provider-code-login-dialog[data-page] {
   width: min(720px, 100%);
 }
@@ -35,7 +23,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-1);
-  /* The close button sits in the corner the title would otherwise run into. */
   padding-inline-end: var(--openbot-space-8);
 }
 
@@ -61,8 +48,6 @@
   margin-top: var(--openbot-space-6);
 }
 
-/* The two waits, which look the same because they are the same to the user: OpenBot is busy and
-   there is nothing to do. */
 .provider-code-login-pending {
   display: flex;
   align-items: center;
@@ -92,8 +77,6 @@
   align-self: stretch;
 }
 
-/* The link is a button, so it needs the baseline of the sentence it sits in rather than a line of
-   its own. */
 .provider-code-login-url {
   display: inline-flex;
   height: auto;
@@ -120,8 +103,6 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* The copy icon belongs to the label beside it, not to the code: the default icon size would make
-   it the second largest thing in the row. */
 .provider-code-login-copy > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -137,7 +118,6 @@
   letter-spacing: var(--openbot-tracking-wide);
 }
 
-/* The pasted code and its button, full width under the steps. */
 .provider-code-login-paste {
   display: flex;
   flex-direction: column;
@@ -150,7 +130,6 @@
   text-align: center;
 }
 
-/* The app hand-off has no phase to show: only its two actions, in the order of a dialog footer. */
 .provider-use-app-actions {
   flex-direction: row;
   justify-content: flex-end;

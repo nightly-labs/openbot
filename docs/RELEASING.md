@@ -686,9 +686,11 @@ AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships
 runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
-for later offline use. The optional Whisper large-v3 turbo int8 model, which takes a fixed dictation
-language, is downloaded the same way only when the user selects Download in Settings > Voice. Its
-three pinned files go in `runtimes/whisper-turbo-int8`. The Underdog Bark 3.0 Plus int8 model,
+for later offline use. The Whisper large-v3 turbo model (an int8 encoder and a full-precision
+decoder), which takes a fixed dictation language, is downloaded the same way when the user selects
+Download in Settings > Voice or dictates with it. Its three pinned files go in
+`runtimes/whisper-turbo-int8`. The int8 decoder of earlier versions in that directory is deleted
+after the three files are verified. The Underdog Bark 3.0 Plus int8 model,
 which recognizes English only, is no longer offered: Settings > Voice shows it only while it is in
 use or downloaded, and a saved choice of it still works. Its four pinned files go in
 `runtimes/bark-3.0-plus-int8`. They come from an
@@ -825,6 +827,39 @@ all servers get a new release in about 6 hours, and a pause does not stop them.
   percentage again with `release-rollout.yml`.
 - `gh release upload --clobber` deletes each manifest and then uploads it again. A check in that
   short time gets no manifest. Settings > Updates can then show a check error until the next check.
+
+## Minimum app version
+
+Each surface has a minimum app version: the desktop app, the server, iOS and Android. A version below
+it shows **Update required**. The web client has no minimum: the Worker serves it, so it is always
+current. The values are in `APP_MINIMUM_VERSIONS` (`apps/auth-api/src/server/app-minimum-version.ts`).
+They are `null` (nothing blocked) until we raise one.
+
+To raise a minimum:
+
+1. Raise it only in a PR that deletes old code or needs the newer client. The support window is 2
+   months (see [Team API support window](../AGENTS.md#non-negotiable)).
+2. Set the value to a released version that is 60 days old or older: the date in `CHANGELOG.md` for
+   `desktop` and `host`, the store date in `apps/mobile/CHANGELOG.md` for `ios` and `android`.
+   Over-the-air versions do not count.
+3. `bun run check:app-minimum-version` (in the CI `Check` job) fails for a newer or unknown version.
+4. The value is live when the account service Worker deploys.
+
+How the apps use it:
+
+- `GET /v1/app/minimum-version?surface=desktop|host|ios|android` answers `{ minimumVersion }`
+  (`null` for none or an unknown surface). `GET /v1/mobile/features` has the same field for the phone
+  platform.
+- A packaged desktop app or server asks 15 seconds after start and every 6 hours
+  (`src/main/required-update.ts`). Below the minimum, the desktop app shows **Update required** in
+  place of the workspace. The update downloads and installs when the agents are idle
+  (`RequestedUpdate`: agent turns, routines, browser control and transfers), or at once with the
+  button. A server does the same without the screen. A tenant whose Host Manager manages updates, a
+  development build and a local server child do not ask.
+- A signed-in phone below the minimum shows **Update required** with the store link.
+- A failed check never blocks. A failed request (offline, timeout, error status) keeps the last
+  confirmed state. An answer with no readable minimum removes the block.
+- An install that cannot update itself (a Linux package, Nix) shows only the download page.
 
 ## Release health after publishing
 

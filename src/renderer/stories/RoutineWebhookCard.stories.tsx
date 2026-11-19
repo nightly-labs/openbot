@@ -4,15 +4,8 @@ import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/*
- * The chat record of a webhook routine an agent created or changed. The agent never gets the signing
- * secret, so the person makes one on the card, and can change which events start the routine. In the
- * app, `RoutineWebhookChatCard` asks the host for the secret and saves the events.
- */
-
 const STORY_SECRET = "whsec_storybook-example-not-a-real-secret";
 
-/** Holds the secret and the events, so Regenerate and an edit show the way the app does. */
 function CardStage(props: RoutineWebhookCardProps) {
   const [secret, setSecret] = createSignal<string | null>(null);
   const [eventType, setEventType] = createSignal(() => props.eventType);

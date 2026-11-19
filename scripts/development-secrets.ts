@@ -16,23 +16,12 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Every value the local Auth API needs is derivable on the machine that runs it, so local defaults
-// live in private state instead of a committed file. Nothing here is shared with production:
-// `.env.production` stays encrypted and its key stays in `.env.keys`. This is what lets a fork run
-// `bun run dev` without the maintainer's dotenvx keys.
-//
-// `prepare-dev-environment.ts` calls this before `bun install`, so it uses node builtins only —
-// `@openbot/logging` is not resolvable yet on a fresh clone, which is why this writes to stdout.
-
-// `wrangler.jsonc` pins the active ticket key ID in its top-level `vars`, and `parseJwks` rejects a
-// JWKS that does not carry that `kid`, so the generated pair has to claim the same one.
 const TICKET_KEY_ID = "openbot-remote-1";
 const DEVELOPMENT_STATE_VERSION = 1 as const;
 const DEVELOPMENT_STATE_DIRECTORY = ".openbot";
 const DEVELOPMENT_STATE_FILE = "dev-state.json";
 const DEVELOPMENT_STATE_LOCK = "dev-state.json.lock";
 
-/** The persisted local values used by development services. */
 export interface DevelopmentState {
   version: typeof DEVELOPMENT_STATE_VERSION;
   defaults: Record<string, string>;
@@ -56,9 +45,6 @@ export function createDevelopmentTicketKeyPair(keyId: string = TICKET_KEY_ID): D
   };
 }
 
-// `strongSecret` in `remote/api/src/config.ts` rejects anything under 32 bytes, and the same
-// `REMOTE_AUTH_WEBHOOK_SECRET` is read from this file by both the Worker and the Signal service, so
-// one generated value pairs the two halves of local development.
 function developmentSecret(): string {
   return randomBytes(32).toString("hex");
 }
@@ -67,7 +53,6 @@ export function createDevelopmentDefaults(): Record<string, string> {
   const tickets = createDevelopmentTicketKeyPair();
   return {
     AUTH_EXPOSE_DEVELOPMENT_CODE: "true",
-    // Empty SMTP settings disable delivery, including values set in Wrangler's vars.
     EMAIL_SMTP_HOST: "",
     EMAIL_SMTP_PORT: "",
     EMAIL_SMTP_USERNAME: "",
@@ -94,7 +79,6 @@ export function ensureDevelopmentState(projectRoot: string): DevelopmentStateOut
   return existed ? "kept" : "created";
 }
 
-/** Reads or creates local state before dependency installation, using Node built-ins only. */
 export function readDevelopmentState(projectRoot: string): DevelopmentState {
   const paths = developmentStatePaths(projectRoot);
   ensurePrivateDirectory(paths.directory);
@@ -115,11 +99,6 @@ export function readDevelopmentState(projectRoot: string): DevelopmentState {
   }
 }
 
-/**
- * Applies explicit local development overrides and publishes them as one atomic state update.
- * `undefined` and `null` remove an override. The writer takes an exclusive lock and therefore
- * fails safely if another process is updating the state instead of losing that process's update.
- */
 export function setDevelopmentOverrides(
   projectRoot: string,
   updates: Record<string, string | null | undefined>,
@@ -144,7 +123,6 @@ export function setDevelopmentOverrides(
   }
 }
 
-/** Secrets added after a state was made. An older state gets a generated value on its next read. */
 const ADDED_SECRET_NAMES = ["COMPANY_SIGN_IN_SECRET"] as const;
 
 function addMissingSecrets(paths: DevelopmentStatePaths, state: DevelopmentState): DevelopmentState {
@@ -229,8 +207,6 @@ function publishInitialState(path: string, state: DevelopmentState): void {
   if (existsSync(path)) return;
   const temporary = writeTemporary(path, state);
   try {
-    // Hard-link publication is exclusive: a concurrent first run cannot replace a state that won
-    // the race and thereby rotate the ticket identity.
     try {
       linkSync(temporary, path);
     } catch (error) {
@@ -306,10 +282,7 @@ function assertRegularPrivateFileIfPresent(path: string, label: string): void {
 function unlinkIfPresent(path: string): void {
   try {
     rmSync(path, { force: true });
-  } catch {
-    // The state has already been published. A leftover private temporary can be removed on the
-    // next run, but must not hide the successful operation.
-  }
+  } catch {}
 }
 
 function isAlreadyExistsError(error: unknown): boolean {

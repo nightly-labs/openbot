@@ -3,22 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 
-// The trusted preview publisher (.github/workflows/cloudflare-preview.yml) uploads a Worker that a
-// pull request built. The pull request also wrote the generated wrangler.json, so its Worker name,
-// bindings, routes and `build.command` are untrusted. This compares that file with the one that
-// `main` builds and allows only the keys below to differ: the code entry and the runtime version.
-// Anything else, such as a binding to the production database, stops the upload.
-//
-// Usage: bun scripts/check-preview-worker-config.ts <trusted wrangler.json> <untrusted wrangler.json>
-
-const MAY_DIFFER = new Set([
-  "main",
-  "compatibility_date",
-  "compatibility_flags",
-  // Where the build found its source config. Wrangler reads no code from these paths.
-  "configPath",
-  "userConfigPath",
-]);
+const MAY_DIFFER = new Set(["main", "compatibility_date", "compatibility_flags", "configPath", "userConfigPath"]);
 
 const logger = createOpenBotLogger("check-preview-worker-config");
 const [trustedPath, untrustedPath] = process.argv.slice(2);

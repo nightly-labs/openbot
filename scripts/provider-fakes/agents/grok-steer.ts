@@ -1,13 +1,7 @@
-// The Grok agent of `grok-steer-e2e.ts`. A `work` prompt opens one tool call and stays open until
-// `_x.ai/interject` arrives. The agent then answers with the interjection's text and ends the turn,
-// as Grok reads an interjection at its next safe point (`xai-grok-shell/src/extensions/interject.rs`).
-// `FAKE_NO_INTERJECT=1` refuses the method as a Grok without it does, and ends the open turn.
-// Each other prompt answers at once.
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = [{ modelId: "grok-fake", name: "Grok Fake" }];
 const interjects = process.env.FAKE_NO_INTERJECT !== "1";
-/** The `work` prompt that waits for an interjection, by session. */
 const open = new Map<string, AcpRequest>();
 let count = 0;
 
@@ -77,7 +71,6 @@ serveFakeAcpAgent(
         finish(peer, sessionId, "done without steering");
         return;
       }
-      // The reply of the real Grok 1.0.70.
       peer.reply(request, { result: { status: "queued" } });
       finish(peer, sessionId, `steered: ${params.text ?? ""}`);
     },

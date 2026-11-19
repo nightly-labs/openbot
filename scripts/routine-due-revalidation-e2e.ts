@@ -1,8 +1,3 @@
-// Runs the real scheduler, SQLite stores and mailbox. The enqueue gate replaces only scheduling
-// time at the mailbox boundary. No provider, account, network or model is started.
-//
-// Run: bun scripts/routine-due-revalidation-e2e.ts
-// It writes .openbot-build/routine-due-revalidation-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -112,7 +107,6 @@ async function openFixture(root: string): Promise<Fixture> {
       () => store.list(),
     );
     const runtime = conversation;
-    // The scheduler has no running host here. Each pass gets an explicit clock, so no timer races it.
     const timer = new RoutineTimer(
       () => [],
       () => false,
@@ -137,7 +131,6 @@ async function openFixture(root: string): Promise<Fixture> {
         scheduleDrain: () => {},
         interrupt: () => Effect.void,
         awaitDrain: () => undefined,
-        // Provider draining and snapshot delivery are outside this scheduler proof.
         syncMailboxMessages: () => {},
         listAgents: () => store.list(),
         excludedAgents: () => new Set(),
@@ -197,7 +190,6 @@ function seed(fixture: Fixture, kind: ScheduleKind, mutation: Mutation): Seed {
     changed: create("Changed", new Date(base + 60_000), kind, mutation === "wait" ? "skip" : "wait"),
     last: create("Last", new Date(base + 120_000), "once"),
     now: new Date(base + 180_000),
-    // A daily cron stores the clock time only. Use a later time, not the same time tomorrow.
     future: new Date(base + 10 * 60_000),
   };
 }
@@ -229,7 +221,6 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
     return yield* original.call(fixture.mailbox, input);
   });
   const pass = runCauseEffect(fixture.scheduler.processDue(saved.now));
-  // Observe an early pass failure even if it fails before reaching the gate.
   void pass.catch(() => {});
   try {
     await within(
@@ -335,7 +326,6 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
     await runCauseEffect(fixture.scheduler.processDue(saved.now));
     const current = fixture.runs.get(fixture.agentId, saved.changed.id);
     assert.ok(current);
-    // A recurring resume before its due time retains a valid future occurrence. A one-time edit is later.
     if (mutation === "reschedule" || kind === "once")
       assert.equal(
         deliveryCount(fixture, saved.changed),
@@ -366,7 +356,6 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
 async function crashChild(root: string, kind: ScheduleKind): Promise<never> {
   const fixture = await openFixture(root);
   const saved = seed(fixture, kind, "unchanged");
-  // Keep only the selected run. The process must stop after the durable run/trigger writes.
   await runCauseEffect(
     fixture.scheduler.delete(
       { agentId: fixture.agentId, routineId: saved.first.id },

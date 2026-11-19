@@ -81,42 +81,19 @@ export interface ChannelHooks {
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
   busy(agentId: string): boolean;
-  /**
-   * Whether a spent provider plan holds this agent, so a routing turn on its model would be refused.
-   * An agent that may try one turn, after `retry`, is not held.
-   */
   usageLimited?(agentId: string): boolean;
-  /** A person wrote to this agent while a spent plan may hold it, so it may start one turn. */
   retry?(agentId: string): void;
-  /**
-   * Whether a task that a spent plan holds is dropped, because its routine has no use for a late
-   * result. It settles the routine run before the task is cancelled.
-   */
   skipAtLimit?(task: ChannelTask): boolean;
-  /** Whether nobody waits for the answer of the routine run that posted this request, as in a Test run. */
   quietRoutineRequest?(requestMessageId: string): boolean;
-  /** Whether this agent switches without asking and has a backup model that is ready now. */
   usageLimitBackup?(agentId: string): boolean;
+  failedOver?(agentId: string): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
-  /** Whether a background generation may start and still leave one for the user's own. */
   spareGeneration?(): boolean;
-  /**
-   * Whether the agent's provider reports each compaction, its own automatic ones too. Only then can a
-   * packet leave out the messages that the session read: a compaction resets what it read.
-   */
   reportsCompactions?(agentId: string): boolean;
-  /** Whether the agent's provider streams text as the answer before it knows that it is not a step. */
   provisionalAnswers?(agentId: string): boolean;
-  /**
-   * Whether the running turn owns a channel routine's request and has nothing to report
-   * (`routine_no_update`). Its answers show as steps, as they do after the turn as quiet answers.
-   */
   quietTurn?(turnId: string): boolean;
-  /** The thread's snapshot when main has it in memory, which a streaming turn always has. */
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
-  /** Removes live provider state for an execution thread before its durable rows are deleted. */
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
-  /** Whether a person's message to this agent joins its running turn: its busy-message mode is `steer` and its provider steers. */
   steersWhenBusy?(agentId: string): boolean;
   steer?(
     agentId: string,
@@ -125,26 +102,14 @@ export interface ChannelHooks {
     messageId: string,
     text: string,
   ): Effect.Effect<"accepted" | "rejected" | "uncertain", ChannelOperationError>;
-  changed(channelId: string, revision: number): void;
-  /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
+  releaseQuestions?(agentId: string, threadId: string, turnId: string): void;
+  changed(channelId: string, revision: number, messagesOnly?: boolean): void;
   queueHoldChanged?(): void;
-  /** A memory is not part of the channel revision, so a tool write needs its own notification. */
   memoriesChanged?(channelId: string): void;
-  /**
-   * The access level of the person who asked a member to change the channel, for an agent that the
-   * change adds or removes, as the Team API gives it for their own save. Omitted, `manage`: only
-   * this computer's user reaches the channel.
-   */
   personAgentLevel?(personId: string, agentId: string): AgentAccessLevel;
-  /** Whether the person who asked uses a remote client, which has only the released routine schedules. */
   remotePerson?(personId: string): boolean;
-  /** The schedule routines of the channels, for the routine tools. Omitted, those tools fail. */
   routines?: ChannelRoutineToolPort;
   error(error: unknown): void;
-  /**
-   * A routing turn failed. The channel text names no cause, so this gets each failure, also one that
-   * the channel shows as catalog text, for the log. A question of the lead is not a failure.
-   */
   routingFailed?(failure: { channelId: string; taskId: string; lead: AgentSummary | undefined; error: unknown }): void;
 }
 
@@ -156,23 +121,12 @@ class ChannelRoutingError extends Schema.TaggedError<ChannelRoutingError>()("Cha
   }
 }
 
-/**
- * The routing prompt budget. A router needs the subject of the work and the shape of the last
- * exchange, not the transcript: the persisted channel summary already carries everything older, and
- * it costs nothing extra because member turns maintain it.
- */
 const TASK_EXPECTED_RESULT = "Complete the requested work and report the result.";
 const ROUTING_RECENT_MESSAGES = 5;
 const ROUTING_TEXT_CHARACTERS = 600;
-/**
- * In UTF-8 bytes. A request can hold 100k characters; its start is enough to choose members. Grok CLI
- * 1.0.70 moves a prompt above 100,000 bytes to a file and shows the model only an excerpt, so a
- * router that got the whole request saw part of it and stopped at a tool permission.
- */
 const ROUTING_REQUEST_BYTES = 20_000;
 const ROUTING_PROMPT_CHARACTERS = 120_000;
 
-/** One outcome only; reject extra fields when decoding the model response. */
 const RoutingOutcomes = [
   Schema.Struct({
     agentIds: Schema.NonEmptyArray(Schema.NonEmptyString).check(Schema.isMaxLength(INPUT_LIMITS.agents)),
@@ -182,12 +136,6 @@ const RoutingOutcomes = [
 ] as const;
 const routingDocument = Schema.toJsonSchemaDocument(Schema.Union(RoutingOutcomes));
 const routingDescription = JSON.stringify({ ...routingDocument.schema, $defs: routingDocument.definitions });
-/**
- * The prompt asked for one `agentId` before; a model that still answers that way picks one member.
- * Routing could also return a `question` before, and the coordinator posted it and paused the task.
- * The model used it to answer the person itself (#4401), so a `question` now goes to the lead, which
- * can ask in its own reply with the conversation.
- */
 const RoutingDecision = Schema.Union([
   ...RoutingOutcomes,
   Schema.Struct({ agentId: Schema.NonEmptyString }),
@@ -195,32 +143,22 @@ const RoutingDecision = Schema.Union([
 ]);
 const decodeRoutingDecision = Schema.decodeUnknownResult(RoutingDecision, { onExcessProperty: "error" });
 
-/**
- * A request that an agent posts into a channel from another conversation (`send_to_channel`). It is
- * not a client command: no IPC or Team API decoder accepts it, so a client cannot post as an agent.
- * Like a routine request, it always starts new root tasks.
- */
 interface ChannelHandoffCommand {
   type: "handoff";
   operationId: string;
   channelId: string;
   text: string;
   recipientAgentIds: string[];
-  /** Local files that the agent gives with the request. */
   sourcePaths: string[];
   senderAgentId: string;
 }
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
 
-/** The author id of a handoff request. Like `routine:`, it tells the message from a person's. */
 function channelHandoffAuthorId(agentId: string): string {
   return `agent:${agentId}`;
 }
 
-/**
- * Owns channel commands and assignment scheduling. It never starts provider turns itself.
- */
 export class ChannelService {
   readonly store: ChannelStore;
   readonly memories: ChannelMemoryStore;
@@ -231,58 +169,23 @@ export class ChannelService {
   readonly #commandFibers = new Set<Fiber.Fiber<Channel | void, ChannelOperationError | MessageDeleteRefused>>();
   readonly #interrupts = new Set<Fiber.Fiber<void>>();
   readonly #events = new Set<Fiber.Fiber<void>>();
-  /**
-   * The summary that runs after a turn of each channel ends. Not awaited by `stop`: closing the
-   * scope interrupts it, and the next packet summarizes what it did not save.
-   */
   readonly #summaries = new Map<string, Fiber.Fiber<void>>();
   #stopped = false;
   readonly #wakeAgain = new Set<string>();
-  /**
-   * The place of each queued task that resources held back, oldest first. Kept in memory: after a
-   * restart the tasks take new places in the order the next pass meets them.
-   */
   readonly #queuePlaces = new Map<string, number>();
   #nextQueuePlace = 0;
-  /** The channels that each older waiting task held back, so they wake when it can no longer start. */
   readonly #heldBehind = new Map<string, Set<string>>();
-  /**
-   * Channels whose pump left a queued task because its owner or normal work was busy. Only a turn
-   * that completes wakes every channel, so a delivery that ends without one - a start that fails, a
-   * cancel, a requeue - would leave such a task queued until the next command or a restart. Every
-   * one of those changes the mailbox, so the next queue change wakes these channels again.
-   */
   readonly #waitingForAgents = new Set<string>();
-  /** Turns that the provider started with no delivery. Their rows are no task's reply. */
   readonly #providerTurns = new Set<string>();
-  /**
-   * Provider turns that continue the member's last task, by assignment id: the answer to a
-   * background job that the task's turn started. The channel shows their rows under that task.
-   */
   readonly #lateTurns = new Map<string, string>();
   readonly #deletedChannels = new Set<string>();
-  /**
-   * Tasks from a person's message whose owner has not had its one try at a usage limit. The try
-   * goes to the owner once, also to a member that routing picks later: a held task that wakes again
-   * gets no new try.
-   */
   readonly #tryTasks = new Set<string>();
   readonly #assignmentTerminalWaiters = new Map<string, Set<() => void>>();
-  /** The active assignments last seen per channel, so turn traffic reports no new hold. */
   readonly #activeAssignments = new Map<string, string>();
-  /** By delivery: the packet with only unread messages, and the provider session that read the rest. */
   readonly #deltas = new Map<string, { sessionId: string; text: string }>();
-  /**
-   * The cursors that this process accepted, by channel, agent and session, with the channel facts
-   * and memories that the session got. A cursor from an earlier run is not used: an earlier version
-   * did not reset it at a compaction.
-   */
   readonly #acceptedContexts = new Map<string, DeliveredChannelText>();
-  /** By delivery: the count of in-place message changes when its packet was built. */
   readonly #preparedChanges = new Map<string, number>();
-  /** By delivery: the channel facts and memories in its packet. */
   readonly #preparedFacts = new Map<string, DeliveredChannelText>();
-  /** The prepared deliveries that continue their request after sub-tasks (#8812). */
   readonly #resumedDeliveries = new Set<string>();
 
   constructor(
@@ -296,20 +199,10 @@ export class ChannelService {
     this.#history = new ChannelHistory(this.store, hooks.generate, this.memories);
   }
 
-  /**
-   * Whether a command of this actor has already committed. The owner of a routine run writes its
-   * run row before it issues the command, so it needs this to tell a request that has not arrived
-   * in the channel yet from one that every task has dropped.
-   */
   committed(actorId: string, operationId: string): boolean {
     return this.store.database.commandResult(`channels:${actorId}:${operationId}`) !== undefined;
   }
 
-  /**
-   * `beforeApply` changes the command when its turn in the queue comes, immediately before it is
-   * applied, or returns null to drop it. A caller that completes a command from the stored channel must do it there: the
-   * channel it reads before the call can be older than the commands that still wait in the queue.
-   */
   readonly command = Effect.fn("ChannelService.command")(
     (
       command: ChannelCommand,
@@ -326,7 +219,6 @@ export class ChannelService {
     },
   );
 
-  /** The open channels, or with `archivedOnly` the archived ones, for an agent that chooses a channel (`list_channels`). */
   handoffTargets(archivedOnly = false): Array<{
     id: string;
     name: string;
@@ -351,10 +243,6 @@ export class ChannelService {
       }));
   }
 
-  /**
-   * Posts an agent's request from another conversation into a channel (`send_to_channel`). The
-   * named members get it; with none, the lead routes it, so a channel with no lead needs recipients.
-   */
   readonly handoff = Effect.fn("ChannelService.handoff")(function* (
     this: ChannelService,
     input: {
@@ -382,11 +270,6 @@ export class ChannelService {
     );
   });
 
-  /**
-   * Posts a note into a channel, such as the result of a workflow. No task starts and no member
-   * answers it; the members read it later as channel history. A second post with the same operation
-   * id changes nothing, so a restart does not post it twice.
-   */
   readonly postNote = Effect.fn("ChannelService.postNote")(function* (
     this: ChannelService,
     input: { operationId: string; channelId: string; author: { id: string; name: string }; text: string },
@@ -441,13 +324,6 @@ export class ChannelService {
       ),
   );
 
-  /**
-   * Sets or removes the uploaded image of a channel. It is not a channel command: the image is a
-   * file on this computer. The Team API sets it only through the `channel-picture-v1` image route.
-   * The old file goes after the commit, so a failed commit leaves the stored URL on a file that
-   * still exists. A shutdown does not stop the
-   * work between the file and the commit, so no file is left that the channel does not name.
-   */
   readonly setImage = Effect.fn("ChannelService.setImage")((channelId: string, image: AvatarImageInput | null) =>
     this.#serialize(
       channelId,
@@ -466,16 +342,6 @@ export class ChannelService {
     ),
   );
 
-  /**
-   * "New conversation": the members forget the earlier messages of the channel. A marker message
-   * starts the history that a model reads, and the summary starts again after it. The messages stay
-   * for the reader, and the members, instructions, memories and routines do not change. It waits
-   * for the commands queued before it, and work that still runs or waits refuses it, because that
-   * work belongs to the old conversation. `members.busy` refuses it while a member session still
-   * runs a turn or compacts, and `members.end` ends the provider session of each member's execution
-   * thread before the next command of the channel runs, so no turn starts on an old session. A second
-   * request after the marker only repairs a summary that a failed first request left.
-   */
   readonly clearContext = Effect.fn("ChannelService.clearContext")(function* (
     this: ChannelService,
     channelId: string,
@@ -498,7 +364,6 @@ export class ChannelService {
         const last = (yield* channelSync(() => this.store.messages(channelId, undefined, 1)))[0];
         if (!last) return;
         if (isContextResetMarker(last.message)) {
-          // The marker and the summary are two writes. A request after a failure between them repairs the summary.
           yield* channelSync(() => {
             const summary = this.store.summary(channelId);
             if (summary.throughSequence < last.sequence)
@@ -540,13 +405,6 @@ export class ChannelService {
     this.publish(channelId);
   });
 
-  /**
-   * "Delete history": every message of the channel leaves the view and the stored history, with its
-   * files, and the members forget the channel as after "New conversation". The members,
-   * instructions, memories, routines and tasks stay. Work that still runs or waits refuses it, and
-   * `members.busy` works as for `clearContext`. `members.forget` deletes the messages of each
-   * member's channel thread and ends its session; a failure leaves the rest for a second request.
-   */
   readonly deleteHistory = Effect.fn("ChannelService.deleteHistory")(function* (
     this: ChannelService,
     channelId: string,
@@ -569,7 +427,6 @@ export class ChannelService {
         if (members.busy(contexts))
           return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeDeleteHistory")));
         yield* channelSync(() => this.store.deleteHistory(channel));
-        // A failure here leaves copies that no message shows; a second request removes them.
         yield* this.mailbox.deleteChannelMessageCopies(channelId, "all").pipe(Effect.mapError(channelFailure));
         yield* members.forget(contexts);
       }).pipe(Effect.uninterruptible),
@@ -577,10 +434,6 @@ export class ChannelService {
     this.publish(channelId);
   });
 
-  /**
-   * The member sessions that "Compact now" compacts: the execution thread of each member with an
-   * active provider session. Work that still runs or waits refuses it, as for a new conversation.
-   */
   readonly compactTargets = Effect.fn("ChannelService.compactTargets")(function* (
     this: ChannelService,
     channelId: string,
@@ -591,7 +444,6 @@ export class ChannelService {
     return yield* channelSync(() => this.store.contexts(channelId));
   });
 
-  /** Refuses while a task of the channel is queued, running, or waits for other work. */
   #requireIdle(
     channelId: string,
     key:
@@ -608,13 +460,6 @@ export class ChannelService {
     );
   }
 
-  /**
-   * A channel that an agent creates or changes from its own chat (`create_channel`, `update_channel`).
-   * `draftOf` gets the channel as it is stored when this save's turn in the command queue comes, or
-   * null when it does not exist, so it never undoes a command that waited before it. It throws to
-   * refuse the change, and a change of a channel that is gone. A retried call finds its receipt and
-   * changes nothing again.
-   */
   readonly agentSave = Effect.fn("ChannelService.agentSave")(
     (
       input: { channelId: string; operationId: string; agentId: string; create: boolean },
@@ -627,8 +472,6 @@ export class ChannelService {
             ? yield* channelSync(() => this.store.get(input.channelId))
             : null;
           const actor = this.agentActor(input.agentId);
-          // A retried call that already committed gets its channel back. The draft is not checked
-          // again: an agent that the user hid after the first attempt must not turn it into a failure.
           const done =
             (yield* channelSync(() =>
               this.store.database.commandResult(`channels:${actor.id}:${input.operationId}`),
@@ -648,7 +491,6 @@ export class ChannelService {
       ),
   );
 
-  /** The actor of a command that an agent sends from its own chat, as `send_to_channel` writes it. */
   agentActor(agentId: string): { id: string; name: string } {
     return { id: channelHandoffAuthorId(agentId), name: this.memberName(agentId) };
   }
@@ -661,7 +503,6 @@ export class ChannelService {
         const channel = yield* channelSync(() => this.store.get(channelId));
         const pump = this.#pumps.get(channelId);
         this.#deletedChannels.add(channelId);
-        // A summary that runs after a turn would write to the deleted rows.
         const summary = this.#summaries.get(channelId);
         if (summary) yield* Fiber.interrupt(summary);
         yield* Effect.gen({ self: this }, function* () {
@@ -677,7 +518,6 @@ export class ChannelService {
               .filter(activeAssignment)
               .map((assignment) => assignment.agentId),
           );
-          // A pump can queue a drain before the provider reports its turn ID. Await that drain before removing its rows.
           yield* Effect.forEach(
             agentIds,
             (agentId) => (this.hooks.awaitDrain?.(agentId) ?? Effect.void).pipe(Effect.catch(() => Effect.void)),
@@ -707,10 +547,6 @@ export class ChannelService {
     ),
   );
 
-  /**
-   * Deletes one message from the channel view and history. Members that already read it can still
-   * remember it. A message that an open task still uses, or that still streams, is `busy`.
-   */
   readonly deleteMessage = Effect.fn("ChannelService.deleteMessage")(
     (input: DeleteChannelMessageInput, access: MessageDeleteAccess) =>
       this.#serialize(
@@ -725,7 +561,6 @@ export class ChannelService {
           const tasks = yield* channelSync(() => this.store.tasks(input.channelId));
           if (
             message.message.status === "streaming" ||
-            // A message of a running task, such as its plan or result, can still change.
             tasks.some(
               (task) =>
                 !terminal(task) &&
@@ -749,7 +584,6 @@ export class ChannelService {
     this: ChannelService,
     command: ChannelServiceCommand,
     actor: { id: string; name: string },
-    /** Messages a save writes with the change, in the same commit. */
     notes: ChannelMessage[] = [],
   ): Effect.fn.Return<Channel, ChannelOperationError> {
     const operationId = `${actor.id}:${command.operationId}`;
@@ -760,16 +594,8 @@ export class ChannelService {
       const existing = (yield* channelSync(() => this.store.exists(command.channelId)))
         ? yield* channelSync(() => this.store.get(command.channelId))
         : null;
-      // Agent deletion removes the agent from each channel, but a database from an older version can
-      // still hold a deleted member, and the settings panel offers to remove it. Only a member the draft adds has to be available: rejecting the ones already stored would
-      // hold every later save of the channel, so the reader could not remove the first of two
-      // deleted members, or edit any other field.
-      // A save that edits an open channel must never bring a deleted one back. Settings save on
-      // every field, so a save can still be queued behind the deletion of its own channel, and it
-      // carries the whole draft: it would restore the name, the instructions and the members.
       if (!existing && command.update)
         return yield* channelFailure(new Error(sourceText("error.backend.channelNotFound")));
-      // Stored instructions over the limit stay, so the other fields still save; new text must fit.
       if (
         command.draft.instructions.length > INPUT_LIMITS.agentDescription &&
         command.draft.instructions !== existing?.instructions
@@ -790,10 +616,6 @@ export class ChannelService {
         assigned.flatMap((task) => descendants(this.store.tasks(channel.id), task.id)).map((task) => task.id),
       );
       const tasks = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => removed.has(task.id));
-      // A request that stopped only because the channel had no lead goes to the lead the save sets,
-      // as a limited lead's request waits and starts by itself. Without this it stayed
-      // stopped until the reader pressed Continue, which a reader who had just picked a lead missed.
-      // An archived channel keeps its work stopped: unarchiving starts nothing.
       const lead = command.draft.leadAgentId;
       const waitingForLead =
         lead && lead !== existing?.leadAgentId && !existing?.archived
@@ -847,15 +669,9 @@ export class ChannelService {
     }
     if (command.type === "archive" || command.type === "restore") {
       const open = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => !terminal(task));
-      // A turn ends only when its provider stops it, so an archive with a running task left the agent
-      // working in a deleted channel, and its other chats named that channel as the cause (#10472).
-      // The clients turn the action off while `activeTasks` counts a running task; this refuses
-      // agents, older clients and a task that started after the menu opened.
       if (command.type === "archive" && open.some((task) => task.state === "running"))
         return yield* channelFailure(new Error(sourceText("error.backend.channelArchiveRunning")));
       const tasks = command.type === "archive" ? open : [];
-      // The archive paused its work with no reason, so the restored channel would show no way to
-      // continue it. The restore gives each of those tasks the reason that a stop gives.
       const restored =
         command.type === "restore"
           ? open
@@ -883,14 +699,6 @@ export class ChannelService {
       const recipientAgentId = command.recipientAgentId;
       if (recipientAgentId) yield* channelSync(() => this.requireMember(channel, recipientAgentId));
       const id = randomUUID();
-      // The files are committed here, not at the dispatch: a channel dispatches when a member is
-      // free, which can be after a restart, and a restart clears every draft with its files. The
-      // request would then hold ids that resolve to nothing, and no retry could bring the upload
-      // back. Committed, the request carries durable references that every dispatch re-sends.
-      //
-      // It happens before anything is read, because `archive` and `stop` do not queue behind the
-      // other commands of a channel: a state read before this copy could be stale by the time it
-      // is written back, and would restore an archived channel and start the work it stopped.
       const committed = command.attachmentDraftIds.length
         ? yield* this.mailbox
             .commitChannelAttachments({
@@ -904,7 +712,6 @@ export class ChannelService {
             })
             .pipe(Effect.mapError(channelFailure))
         : null;
-      // Once the drafts are consumed, every refusal below must give them back.
       const stored = yield* Effect.gen({ self: this }, function* () {
         const current = committed ? yield* channelSync(() => this.store.get(channel.id)) : channel;
         if (current.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
@@ -919,12 +726,6 @@ export class ChannelService {
         const open = allTasks.filter((task) => !terminal(task));
         const eligible = this.eligibleMembers(current);
         const recipients = this.#recipients(eligible, text, command.recipientAgentId);
-        // A person's message to the member of the one task that runs joins that task, in any language,
-        // when the same person asked for it and the member takes messages into its running turn, as in
-        // its own chat. A message with no address goes to that member only when no other member could
-        // get it: the member is the lead, or the only member. A message with files, a reply, a message
-        // to another member, or another person's task (also a routine's or a handoff's) starts new work
-        // as before (#11037).
         const runningRequest = open.length === 1 && open[0]?.state === "running" ? open[0].requestMessageId : null;
         const ownRequest = messages.some(
           (message) =>
@@ -945,20 +746,9 @@ export class ChannelService {
           /^(?:also|instead|actually|please change|change that|correction|continue|resume|go on|keep going|yes|no|use that|make it)\b/iu.test(
             text.trim(),
           );
-        // Each recipient answers separately, so a request to several members starts new work; it
-        // does not continue the one task that a reply names. When the open work is the tasks that
-        // several members own for one request, a follow-up continues each one that the user stopped,
-        // or each of them when none is stopped. A member that still works is left as it is.
         const roots = open.filter((task) => task.parentTaskId === null);
         const pausedRoots = roots.filter((task) => task.state === "paused");
         const openRoots = pausedRoots.length ? pausedRoots : roots;
-        // "continue" names no task, and the user says it about the work that was stopped last. Other
-        // open work, such as a task that failed days ago, does not make it ambiguous: the request of
-        // the newest stopped task chooses, and every stopped task of that request continues. A task
-        // that the user stopped comes before one that failed, and a member named as the recipient
-        // continues its own stopped task before it takes over the task of another member. A restart
-        // or a failed turn can stop a subtask while its parent waits for it, and that subtask is the
-        // stopped work of the request (#6010).
         const failedRoots = roots.filter((task) => task.state === "failed");
         const heldSubtasks = open.filter(
           (task) =>
@@ -999,25 +789,17 @@ export class ChannelService {
                       ? openRoots
                       : [];
         const previous = continued[0];
-        // A reply to a member is addressed to that member. The arm above only catches a reply that
-        // carries a task; a plain progress note and the lead's own dispatch carry none, and those
-        // used to fall through to a full routing turn to rediscover the author the reply names.
         const repliedMember =
           !previous && referenced && !referenced.taskId && referenced.author.kind === "agent"
             ? eligible.find((agentId) => agentId === referenced.author.id)
             : undefined;
-        // A held reply task still answers the member that waits for it, as the Continue control
-        // keeps it: it keeps its reply message and its reply rules.
         const heldReply = (item: ChannelTask) =>
           !referenced && isReplyTask(item) && heldSubtasks.some((task) => task.id === item.id);
         const resumed = continued.map(
           (item, index): ChannelTask => ({
             ...item,
-            // The task keeps the request it was made for. The new message is its request now, and the
-            // dispatch and the packet give it as a follow-up: "continue" alone is no assignment.
             dependencies: [],
             requestMessageId: heldReply(item) ? item.requestMessageId : id,
-            // A resumed reply task answers the person now, not the member that replied.
             expectedResult: isReplyTask(item) && !heldReply(item) ? TASK_EXPECTED_RESULT : item.expectedResult,
             sourceMessageIds: [...item.sourceMessageIds.slice(-30), id],
             revision: item.revision + 1,
@@ -1074,13 +856,28 @@ export class ChannelService {
         ),
       );
       const { current, continued, affected, resumed, message, result, tasks } = stored;
-      // A person wrote, so the agents that the message reaches may start one turn while a spent plan
-      // holds them, as in their own chat: the person can have bought more usage, and no reading shows
-      // that before the reset. The lead routes a task with no owner, and each owner gets its try when
-      // the task reaches it.
       for (const item of tasks) this.#tryTasks.add(item.id);
       if (current.leadAgentId && tasks.some((item) => !item.ownerAgentId)) this.hooks.retry?.(current.leadAgentId);
       this.publish(current.id);
+      const queuedFor = new Set(
+        tasks.flatMap((item) =>
+          item.ownerAgentId && !continued.some((entry) => entry.id === item.id) ? [item.ownerAgentId] : [],
+        ),
+      );
+      const releaseQuestions = this.hooks.releaseQuestions;
+      if (queuedFor.size && releaseQuestions)
+        yield* Effect.gen({ self: this }, function* () {
+          const blocked = (yield* channelSync(() => this.store.assignments(current.id))).filter(
+            (item) => item.state === "running" && queuedFor.has(item.agentId),
+          );
+          for (const { agentId, turnId, requestMessageId } of blocked) {
+            if (!turnId || !requestMessageId) continue;
+            const request = yield* channelSync(() => this.store.message(current.id, requestMessageId));
+            if (request?.author.kind !== "member" || request.author.id !== actor.id) continue;
+            const { threadId } = yield* channelSync(() => this.store.context(current.id, agentId));
+            yield* channelSync(() => releaseQuestions(agentId, threadId, turnId));
+          }
+        }).pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))));
       yield* this.interruptTasks(
         current.id,
         affected.filter((item) => !continued.some((entry) => entry.id === item.id)),
@@ -1091,9 +888,6 @@ export class ChannelService {
           Effect.gen({ self: this }, function* () {
             const before = continued[index];
             if (!before) return;
-            // A failed steer starts the task again from a new delivery, and the other steers go on.
-            // A stopped task is not steered: its turn can still be ending, and a correction that
-            // turn accepted ended with it, which stopped the resumed task again.
             const stopped = before.state === "paused" || before.state === "failed";
             const steered = stopped
               ? false
@@ -1105,7 +899,6 @@ export class ChannelService {
                     }),
                   ),
                 );
-            // A pump can start the resumed task before this runs, so only the older turn stops.
             if (!steered) yield* this.interruptTasks(current.id, [item], { staleOnly: true });
           }),
         { concurrency: "unbounded", discard: true },
@@ -1116,10 +909,6 @@ export class ChannelService {
     if (command.type === "request") {
       const recipientAgentId = command.recipientAgentId;
       if (recipientAgentId) yield* channelSync(() => this.requireMember(channel, recipientAgentId));
-      // Always new root tasks, one for each member that the text addresses. A routine must never
-      // take `send`'s continuation branch above: that heuristic would let a schedule hijack and
-      // supersede a human's in-flight task, because the text of a routine is fixed and can start
-      // with "Also" or "Continue" by accident.
       const recipients = this.#recipients(this.eligibleMembers(channel), command.text, recipientAgentId);
       const [owner = null, ...rest] = recipients;
       const task = this.newTask(channel.id, command.requestMessageId, command.text, owner);
@@ -1142,10 +931,7 @@ export class ChannelService {
     const selected = tasks.find((task) => task.id === command.taskId);
     if (!selected) return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotFound")));
     if (terminal(selected)) return yield* channelFailure(new Error(sourceText("error.backend.channelTaskComplete")));
-    // `cancel` ends the whole run of the task, from its root: a parent waits for each task it
-    // delegated, so a parent of a cancelled child would wait for ever. The messages stay.
     if (command.type === "cancel") {
-      // Cancel is the way out of a stopped run; Stop is the one for active work.
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
       return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
@@ -1156,10 +942,6 @@ export class ChannelService {
       const recipientAgentId = command.recipientAgentId;
       yield* channelSync(() => this.requireMember(channel, recipientAgentId));
     }
-    // `stop` and `resume` hold the whole run below the selected task. `reassign` gives one task
-    // another owner, but it must start the rest of the stopped run with it: a parent waits for each
-    // task it delegated, so a root that started alone would wait for a stopped child for ever. A
-    // task that still runs keeps its turn; only a stopped one starts again.
     const branch = descendants(tasks, selected.id);
     const affected =
       command.type === "reassign"
@@ -1169,7 +951,6 @@ export class ChannelService {
       (task): ChannelTask => ({
         ...task,
         state: command.type === "stop" ? "paused" : "queued",
-        // The reason is what offers Continue and Reassign; a task that an archive paused has none.
         error: command.type === "stop" ? sourceText("error.backend.channelTaskStopped") : null,
         revision: task.revision + 1,
         assignmentCount: command.type !== "stop" ? 0 : task.assignmentCount,
@@ -1184,10 +965,6 @@ export class ChannelService {
     return result;
   }).bind(this);
 
-  /**
-   * One new root task for each recipient, as for a routine request. With no recipient, the lead
-   * routes it. The files become channel attachments before the request is stored, as for `send`.
-   */
   readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
     this: ChannelService,
     channel: Channel,
@@ -1196,8 +973,6 @@ export class ChannelService {
     operationId: string,
   ) {
     for (const agentId of command.recipientAgentIds) yield* channelSync(() => this.requireMember(channel, agentId));
-    // Checked in the queue: a save that removes the lead can run first. The agent then gets the
-    // refusal, not a "posted" result for a task that no member can take.
     if (
       !command.recipientAgentIds.length &&
       !channel.leadAgentId &&
@@ -1271,7 +1046,6 @@ export class ChannelService {
     };
   }
 
-  /** Every task by id and every active assignment, across all channels. */
   #scheduling(): { tasks: ReadonlyMap<string, ChannelTask>; assignments: ChannelAssignment[] } {
     const ids = this.store.ids();
     return {
@@ -1280,11 +1054,6 @@ export class ChannelService {
     };
   }
 
-  /**
-   * Whether the task waits for other work before its resources matter: a stopped run, a running
-   * turn of its owner or of the task, a full channel, or a dependency that is not complete (a
-   * failed member reply counts as complete: `settled`).
-   */
   #waitsForWork(
     task: ChannelTask,
     tasks: ReadonlyMap<string, ChannelTask>,
@@ -1292,9 +1061,6 @@ export class ChannelService {
   ): boolean {
     const root = tasks.get(task.rootTaskId);
     if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) return true;
-    // A task keeps one owner at a time. A transfer replaces the owner and the resources of the
-    // task record while the previous owner still runs its turn, so the identity of the owner
-    // alone does not show that the task is free: the assignment of the previous owner does.
     return (
       assignments.some((assignment) => assignment.agentId === task.ownerAgentId || assignment.taskId === task.id) ||
       assignments.filter((assignment) => assignment.channelId === task.channelId).length >= CHANNEL_PARALLEL_LIMIT ||
@@ -1305,15 +1071,10 @@ export class ChannelService {
     );
   }
 
-  /** Gives a task that resources hold back its place in the queue, once. */
   #holdPlace(taskId: string): void {
     if (!this.#queuePlaces.has(taskId)) this.#queuePlaces.set(taskId, this.#nextQueuePlace++);
   }
 
-  /**
-   * Whether the pump of its channel would start this waiting task once its resources are free. A
-   * task that its own pump skips must not hold back another task, or both wait for ever.
-   */
   #waiterReady(
     waiter: ChannelTask,
     tasks: ReadonlyMap<string, ChannelTask>,
@@ -1331,10 +1092,6 @@ export class ChannelService {
     );
   }
 
-  /**
-   * The oldest waiting task that is ready and whose resources conflict with these. A place is
-   * dropped once its task is no longer queued.
-   */
   #olderWaiter(
     task: ChannelTask,
     tasks: ReadonlyMap<string, ChannelTask>,
@@ -1354,11 +1111,6 @@ export class ChannelService {
     return undefined;
   }
 
-  /**
-   * A waiting task that held channels back can stop being ready with no assignment that ends: it
-   * starts, it is stopped, or its owner leaves. Nothing else would pump those channels again, so
-   * every pump that ends wakes them.
-   */
   #wakeHeldBehind(): Effect.Effect<void, ChannelOperationError> {
     return Effect.gen({ self: this }, function* () {
       if (!this.#heldBehind.size) return;
@@ -1372,12 +1124,6 @@ export class ChannelService {
     });
   }
 
-  /**
-   * An active assignment holds the next channel turn of its own agent, and on a provider that runs
-   * one turn at a time also its normal requests (`mayDrain`). Ending that assignment lifts the hold, but the held agent has no trigger of its own left: `wake()` schedules
-   * channel tasks only. Every path that ends an assignment therefore schedules the agents of the
-   * assignments that ended.
-   */
   #releaseHeldAgents(agentIds: Iterable<string>): Effect.Effect<void, ChannelOperationError> {
     return Effect.gen({ self: this }, function* () {
       yield* this.wake();
@@ -1442,17 +1188,6 @@ export class ChannelService {
     });
   }
 
-  /**
-   * The members a task could actually be given to: a member row alone is not enough, because an
-   * agent can be deleted or unavailable while its membership stays. This is the same
-   * intersection the routing prompt sends as `agents`.
-   */
-  /**
-   * The members a message is addressed to. "@A @B what do you think?" asks each of them, and
-   * "@everyone" asks every member. The text carries the address, so a client that sends only the
-   * first mention in `recipientAgentId` still reaches all of them. A mention of an agent that cannot
-   * take work here is only a reference.
-   */
   #recipients(eligible: readonly string[], text: string, recipientAgentId: string | null | undefined): string[] {
     const address = leadingAddress(text);
     const mentions = address.mentions.map((mention) => mention.id).filter((agentId) => eligible.includes(agentId));
@@ -1465,12 +1200,6 @@ export class ChannelService {
     ];
   }
 
-  /**
-   * Names typed after "@" without the mention picker: "@Chief push the branch" or "@Ana @Ben, ideas?".
-   * They have no tag, so the lead had to route them, and a routing answer that could not be read left
-   * the task with no member. Only an exact name of one eligible member is an address; the longest name
-   * wins, so "@Code Reviewer" is not "@Code". Spaces, commas and "and" may separate the names.
-   */
   #typedAddress(eligible: readonly string[], text: string): string[] {
     const members = this.hooks.agents().filter((agent) => eligible.includes(agent.id) && agent.name.trim());
     const found: string[] = [];
@@ -1498,7 +1227,6 @@ export class ChannelService {
       .filter((agentId) => live.some((agent) => agent.id === agentId));
   }
 
-  /** The other members that answer the same request in tasks of their own, by name. */
   #peers(tasks: readonly ChannelTask[], task: ChannelTask): string[] {
     if (task.parentTaskId !== null) return [];
     const owners = tasks
@@ -1514,17 +1242,6 @@ export class ChannelService {
     return this.hooks.agents().find((agent) => agent.id === agentId)?.name ?? agentId;
   }
 
-  /**
-   * The lead's routing receipt: activity the channel shows its reader, not a message a member sent.
-   *
-   * The item type makes it one of the activity markers the renderer already draws for a sent
-   * message or a created routine, so the row carries no bubble, no message actions and no unread
-   * count, and it stays out of the history a member reads. The text stays a readable sentence, so
-   * a client that does not know this item type still shows the user which member was chosen.
-   * It is authored by the lead agent itself, not by the anonymous `coordinator` identity the
-   * failure notice uses. Only a real model decision writes one: a deterministic assignment has
-   * nothing to audit and stays silent.
-   */
   private dispatch(
     channelId: string,
     taskId: string,
@@ -1544,18 +1261,7 @@ export class ChannelService {
     );
   }
 
-  /**
-   * The order in which the pump tries the tasks of a channel: a person's queued message first, then
-   * the rest in the order they were made. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at once, so a
-   * question to a lead that waited for its subtasks waited behind every queued subtask, and the
-   * person saw no answer (#8761). The request of a routine or an agent keeps its place. While a
-   * person's message already runs here, the order stays as made, so delegated work still gets a
-   * place when people keep writing.
-   */
   #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
-    // A task that answers a person's message: a root task of that message (one for each member it
-    // names), the task it continues, or the task that routing gave it. A subtask only inherits the id
-    // of the message.
     const answersPerson = (task: ChannelTask) => {
       const request = this.store.message(channelId, task.requestMessageId);
       return (task.parentTaskId === null || request?.taskId === task.id) && requestPerson(request) !== null;
@@ -1582,8 +1288,6 @@ export class ChannelService {
     const listed = yield* channelSync(() => this.store.tasks(channelId));
     for (const candidate of yield* channelSync(() => this.#dispatchOrder(channelId, listed))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
-      // One row each, not every task of the channel again: a long channel holds thousands of
-      // finished tasks, and the whole list for each of them blocked the main process for minutes.
       const candidateTask = yield* channelSync(() => this.store.task(channelId, candidate.id));
       if (candidateTask?.state !== "queued") continue;
       let channel = yield* channelSync(() => this.store.get(channelId));
@@ -1593,9 +1297,6 @@ export class ChannelService {
       const root = yield* channelSync(() => this.store.task(channelId, rootId));
       if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) continue;
       if (!task.ownerAgentId) {
-        // One eligible member is not a decision. Routing costs a full turn of the lead's own model,
-        // so it runs only when there is a choice to make. This is silent on purpose: a dispatch
-        // message exists to make a model's choice auditable, and no model was asked here.
         const [onlyMember, ...otherMembers] = this.eligibleMembers(channel);
         if (onlyMember && otherMembers.length === 0) {
           task = { ...task, ownerAgentId: onlyMember };
@@ -1606,26 +1307,19 @@ export class ChannelService {
       if (!task.ownerAgentId) {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
-        // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
-        if (lead && this.hooks.usageLimited?.(lead.id)) {
+        if (lead && (this.hooks.usageLimited?.(lead.id) || this.hooks.failedOver?.(lead.id))) {
           yield* channelSync(() => this.#heldByLimit(channelId, task, lead.id));
           continue;
         }
         try {
           if (!lead) throw new ChannelRoutingError(sourceText("error.backend.channelLeadRequired"));
-          // The channel summary that member turns already maintain stands in for the transcript.
-          // Only the messages it does not yet cover are sent whole, and only the last few of those.
           const summary = channelResult(yield* Effect.result(channelSync(() => this.store.summary(channelId))));
-          // After "New conversation", routing reads only the messages after its marker, as the members do.
           const reset = channelResult(
             yield* Effect.result(channelSync(() => this.store.contextResetSequence(channelId))),
           );
           const agents = this.hooks
             .agents()
             .filter((agent) => channel.members.some((member) => member.agentId === agent.id));
-          // The prompt names each agent by a short key, not by its long id: a model that miscopied one
-          // character of an id named no member, and the request stopped (#10158). An answer that gives
-          // a full id still counts. A key is never the id of a member, so it names one agent only.
           const memberIds = new Set([...channel.members.map((member) => member.agentId), lead.id]);
           const memberKeys = new Map<string, string>();
           const agentOfKey = new Map<string, string>();
@@ -1684,9 +1378,6 @@ export class ChannelService {
                 tasks,
               }),
             ].join("\n");
-          // Member descriptions get the room that the rest of the prompt leaves, shared evenly, so a
-          // channel of many members with long descriptions still routes. JSON escapes make a
-          // description longer than its raw length, so the share gets smaller until the prompt fits.
           let prompt = routingPrompt();
           if (prompt.length > ROUTING_PROMPT_CHARACTERS && agents.length > 0) {
             const base = routingPrompt(0).length;
@@ -1730,9 +1421,6 @@ export class ChannelService {
             decision = decoded.success;
           } catch (error) {
             if (!(error instanceof StructuredOutputError)) throw error;
-            // An unreadable answer is an unclear routing, which the prompt gives to the lead. Before, it
-            // paused the task for the person to reassign and showed a provider error (#6277). The answer
-            // can quote the request, so the log gives only its size and the fields it had.
             logger.warn("A routing answer was unreadable, so the lead takes the request.", {
               channelId,
               provider: lead.provider,
@@ -1777,7 +1465,6 @@ export class ChannelService {
                         ),
                       { ...task, state: "cancelled" },
                       {
-                        // The task keeps its instruction; the packet adds the new message as a follow-up.
                         ...existing,
                         requestMessageId: task.requestMessageId,
                         attachmentDraftIds: task.attachmentDraftIds,
@@ -1801,12 +1488,6 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
-          // Idle is silent for the request of a routine or an agent: the lead judged that nothing needs
-          // doing, so there is no dispatch. A message that names a member is never idle: "Thanks @Ana"
-          // or "hi @Ana" gets Ana's answer, as a person who is named in a group chat answers. An agent
-          // writes a name as text, not as a tag, so a typed "@Name" anywhere counts too; idle completed
-          // such a request with no answer (#5964).
-          // An "@" in a link or in a tag, such as a quote, names no one.
           const eligible = this.eligibleMembers(channel);
           const tags = chatTagReferences(task.instruction);
           const named = [
@@ -1820,9 +1501,6 @@ export class ChannelService {
                 .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
             ]),
           ];
-          // A person's request is never idle: the lead takes it, as an unclear request, and can ask
-          // what they mean. Idle completed it with no owner and no reply, so the person saw only
-          // silence (#7908).
           const unnamedIdle = "idle" in decision && !named.length;
           if (
             unnamedIdle &&
@@ -1849,9 +1527,6 @@ export class ChannelService {
                       : decision.agentIds.map(agentOf),
             ),
           ];
-          // A member the model named that cannot take work is left out. With none left, the lead takes
-          // the request, as it takes an unreadable answer: the person gets an answer, not a stopped
-          // request (#10158). When the lead cannot take work either, the first one gives the reason.
           const chosen = picked.filter((agentId) => eligible.includes(agentId));
           if (!chosen.length && eligible.includes(lead.id)) {
             logger.warn("A routing answer named no member who can take work, so the lead takes the request.", {
@@ -1869,10 +1544,6 @@ export class ChannelService {
             throw new ChannelRoutingError(sourceText("error.backend.channelTaskMemberRequired"));
           }
           task = { ...task, ownerAgentId: owner };
-          // Each other member gets its own task for the same request, so each one answers in its own
-          // reply, and a stop, a failure or a resume of one leaves the others as they are. A task that
-          // an earlier version queued with open drafts has no files on the request until its owner
-          // commits them, so it stays with its owner only.
           const others = task.attachmentDraftIds.length ? [] : rest;
           const siblings = others.map(
             (agentId): ChannelTask => ({
@@ -1885,7 +1556,6 @@ export class ChannelService {
               channelSync(() =>
                 this.store.update(channel, {
                   tasks: [task, ...siblings],
-                  // The lead that answers alone needs no receipt: its reply already shows who answers.
                   messages:
                     owner === lead.id && !siblings.length
                       ? []
@@ -1896,12 +1566,8 @@ export class ChannelService {
               ),
             ),
           );
-          // Each member that a person's message reaches gets its one try at a usage limit.
           if (this.#tryTasks.has(task.id)) for (const sibling of siblings) this.#tryTasks.add(sibling.id);
-          // The owner used to be stamped without a publish, because nothing the renderer shows had
-          // changed. The dispatch message has, so the channel has to be republished here.
           this.publish(channelId);
-          // This pass read the task list before the siblings existed; the next pass starts them.
           if (siblings.length) this.#wakeAgain.add(channelId);
           channel = channelResult(yield* Effect.result(channelSync(() => this.store.get(channelId))));
         } catch (error) {
@@ -1909,15 +1575,15 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
-          // A spent plan refused the routing turn and now holds the lead. The task is not paused for
-          // a human: it stays queued, and the reset wakes the channel again.
-          if (lead && this.hooks.usageLimited?.(lead.id)) {
+          if (
+            lead &&
+            (this.hooks.usageLimited?.(lead.id) ||
+              (!(error instanceof ChannelRoutingError) && this.hooks.failedOver?.(lead.id)))
+          ) {
             yield* channelSync(() => this.#heldByLimit(channelId, task, lead.id));
             continue;
           }
           channel = yield* channelSync(() => this.store.get(channelId));
-          // A cause without channel text goes to the redacted error path; without it no one could
-          // see why routing failed.
           const shown = error instanceof ChannelRoutingError ? error.message : routingFailureText(error);
           this.hooks.routingFailed?.({ channelId, taskId: task.id, lead, error });
           if (shown === null) this.hooks.error(error);
@@ -1965,16 +1631,10 @@ export class ChannelService {
       }
       const { tasks: allTasks, assignments: allAssignments } = yield* channelSync(() => this.#scheduling());
       if (this.#waitsForWork(task, allTasks, allAssignments)) continue;
-      // Read the reservation from the assignment, not from its task: a transfer can lower the
-      // resources of a task that still runs, and the record of the task would then report a
-      // reservation that the running turn has not released.
       if (allAssignments.some((assignment) => resourcesConflict(task.resources, assignment.resources))) {
         this.#holdPlace(task.id);
         continue;
       }
-      // Channels are pumped one after the other, so without an order the first channel to see a free
-      // resource takes it, and a task that has waited longer in another channel never gets it. An older
-      // waiting task whose resources conflict holds this one back until that task starts.
       const olderWaiter = yield* channelSync(() => this.#olderWaiter(task, allTasks, allAssignments));
       if (olderWaiter) {
         this.#holdPlace(task.id);
@@ -2001,11 +1661,6 @@ export class ChannelService {
         pendingOutcome: null,
       };
       yield* channelSync(() => this.store.update(channel, { assignments: [assignment] }));
-      // The request message belongs to the task that the request created, not to a child task that
-      // only inherits the id. A send commits its uploads before it is accepted, so `committing`
-      // now only serves a task an earlier version queued with its drafts still open: it turns
-      // those drafts into attachments and rewrites the stored request. Every other dispatch -
-      // a resume, or a hand-off to another task - re-sends the committed copies instead.
       const request = yield* channelSync(() => this.store.message(channelId, task.requestMessageId));
       const originId = task.sourceMessageIds[0];
       const origin =
@@ -2014,8 +1669,6 @@ export class ChannelService {
           : yield* channelSync(() => this.store.message(channelId, originId));
       const ownsRequest = request?.taskId === task.id;
       const committing = ownsRequest && task.attachmentDraftIds.length > 0;
-      // A request to several members gives each one a task of its own. The message names only the
-      // first, but every one of them answers the request, so every one gets its files.
       const answersRequest = ownsRequest || (request !== null && task.parentTaskId === null);
       try {
         const sourcePaths =
@@ -2041,9 +1694,6 @@ export class ChannelService {
         const delivery = receipt.deliveries[0];
         if (!delivery) throw new Error(sourceText("error.backend.channelDeliveryNotCreated"));
         assignment.deliveryId = delivery.id;
-        // The assignment reserved the host before attachment copying. Keep its delivery ahead
-        // of normal messages that arrived during that await, or the reservation would leave the
-        // queue's normal head blocked behind this channel delivery forever.
         const queuedDeliveryIds = this.mailbox.queuedDeliveryIds(assignment.agentId);
         if (queuedDeliveryIds[0] !== delivery.id)
           channelResult(
@@ -2071,9 +1721,6 @@ export class ChannelService {
               this.mailbox.cancel(assignment.agentId, delivery.id).pipe(Effect.mapError(channelFailure)),
             ),
           );
-          // The enqueue consumed the drafts even though the task moved on. Keep their saved copies
-          // on the request, as the success path does, or a later dispatch would ask for drafts
-          // that are gone.
           const context = this.mailbox.getDelivery(delivery.id);
           channelResult(
             yield* Effect.result(
@@ -2099,8 +1746,6 @@ export class ChannelService {
             ),
           );
           this.#wakeAgain.add(channelId);
-          // The cancelled assignment held its agent from the moment it was made, so the normal
-          // messages that arrived during the copy are waiting behind a hold that is gone.
           yield* this.#releaseHeldAgents([assignment.agentId]);
           continue;
         }
@@ -2131,26 +1776,17 @@ export class ChannelService {
         this.publish(channelId);
         this.hooks.schedule(assignment.agentId);
       } catch {
-        // The enqueue may have succeeded before a later step failed: a failed assignment must not
-        // leave its delivery in the queue.
         const deliveryId = assignment.deliveryId;
         if (deliveryId && this.mailbox.getDelivery(deliveryId)?.delivery.status === "queued") {
           const cancelled = yield* Effect.result(
             channelSync(() => this.mailbox.cancelNow(assignment.agentId, deliveryId)),
           );
-          // The delivery then stays queued, possibly behind normal messages, so keeping its
-          // reservation could hold that queue forever. The assignment fails below as usual, and
-          // `prepare` refuses the delivery when it comes up, because its task is no longer queued
-          // at this revision: it ends without a turn.
           if (Result.isFailure(cancelled)) this.hooks.error(cancelled.failure.cause);
         }
         yield* channelSync(() => {
-          // A stop or reassign that landed during the awaits above is newer: keep it.
           const tasks = this.store.tasks(channelId);
           const latest = tasks.find((item) => item.id === task.id);
           const current = latest?.revision === task.revision && latest.state === "queued";
-          // A delivery means the enqueue consumed the drafts. Keep their saved copies on the
-          // request, as the success path does, or Resume would ask for drafts that are gone.
           const context = deliveryId ? this.mailbox.getDelivery(deliveryId) : null;
           const consumed = context ? { attachmentDraftIds: [] } : {};
           return this.store.update(this.store.get(channelId), {
@@ -2189,13 +1825,6 @@ export class ChannelService {
     }
   }).bind(this);
 
-  /**
-   * The files of a request outlive its first dispatch as committed attachments, not as drafts:
-   * enqueue consumes every draft and the dispatch clears the ids. A second delivery of the same
-   * request therefore attaches the stored copies again, so a resume after a failure sends the same
-   * files as the first try. A file that the user has moved or changed resolves to null and is left
-   * out, which is what `verifyDeliveryAttachments` reports for a missing delivery file.
-   */
   readonly #requestAttachmentPaths = Effect.fn("ChannelService.requestAttachmentPaths")(function* (
     this: ChannelService,
     request: ChannelMessage | undefined,
@@ -2207,21 +1836,10 @@ export class ChannelService {
     return resolved.flatMap((item) => (item ? [item.path] : []));
   });
 
-  /**
-   * Whether the agent's own chat lane may start its next delivery on a provider that runs one turn
-   * of the agent at a time: an active assignment of its own holds its other requests until the
-   * assignment ends. The work of other agents does not hold it, and on other providers the channel
-   * turn runs in its own lane, beside the chat.
-   */
   mayDrain(agentId: string): boolean {
     return !this.store.hasAgentAssignmentInState(agentId, ACTIVE_ASSIGNMENT_STATES);
   }
 
-  /**
-   * Whether any channel has work in progress: an assignment still starting, running or queued, or
-   * a task queued or running. An update waits for it. Paused, waiting and failed tasks do not count;
-   * they resume from durable rows after a restart.
-   */
   hasActiveWork(): boolean {
     if (this.store.hasAssignmentInState(ACTIVE_ASSIGNMENT_STATES)) return true;
     return this.store
@@ -2231,13 +1849,6 @@ export class ChannelService {
       );
   }
 
-  /**
-   * The channel work of `agentId` that its queue waits behind, or null when the agent has none.
-   *
-   * The channel turn runs on another thread, so an agent held here has no turn of its own chat to
-   * show, and this is the only way the chat can say why a message the user just sent has not
-   * started.
-   */
   queueHold(agentId: string): QueueHold | null {
     const reserving = this.store.agentAssignment(agentId, ACTIVE_ASSIGNMENT_STATES);
     if (!reserving) return null;
@@ -2249,10 +1860,6 @@ export class ChannelService {
     };
   }
 
-  /**
-   * A page for this computer's reader, with the reason that each queued task waits. An older page adds
-   * only messages: the view keeps the tasks of the first page.
-   */
   page(channelId: string, before?: number): ChannelPage {
     const stored = this.store.page(channelId, before);
     if (before !== undefined) return stored;
@@ -2261,17 +1868,9 @@ export class ChannelService {
     return waits.length ? { ...page, waits } : page;
   }
 
-  /**
-   * Why each queued task of `tasks` that has an owner does not start. The pump skips such a task and
-   * keeps no reason, so the channel showed a request that did not start and nothing more (#6067).
-   * Work of the owner in this channel is not a reason here: the channel shows it. A task that waits
-   * for its dependencies or for a usage limit has no reason here either: the pump would not start it
-   * when the busy work ends, and the channel shows a usage limit itself.
-   */
   taskWaits(channelId: string, tasks: readonly ChannelTask[]): ChannelTaskWait[] {
     const assignments = this.store.assignments(channelId).filter(activeAssignment);
     const byId = new Map(tasks.map((task) => [task.id, task]));
-    // A remote page can leave a dependency out, so the stored tasks are read once when one is missing.
     let stored: Map<string, ChannelTask> | undefined;
     const dependencySettled = (id: string): boolean => {
       let dependency = byId.get(id);
@@ -2327,13 +1926,6 @@ export class ChannelService {
     });
   }
 
-  /**
-   * A spent provider plan holds the agent of this delivery. The task goes back to the queue with a
-   * new revision and the assignment ends, so nothing holds the agent's resources while it waits: the
-   * pump assigns the task again once the agent takes turns. False when there is no active assignment
-   * to give back, or when a transfer is pending on it. A task whose routine drops late work is
-   * cancelled instead. `continueWork` keeps the assignment for a ready backup to continue now.
-   */
   readonly requeueForLimit = Effect.fn("ChannelService.requeueForLimit")(function* (
     this: ChannelService,
     deliveryId: string,
@@ -2346,7 +1938,6 @@ export class ChannelService {
     const skipped = task && current && this.hooks.skipAtLimit?.(task) ? this.#skippedTasks(task) : null;
     if (continueWork) {
       if (!task || !current || skipped) return false;
-      // The ready backup keeps this assignment and its delivery, including the interrupted work.
       this.#keepAssignment(assignment, task);
       return true;
     }
@@ -2357,17 +1948,10 @@ export class ChannelService {
     });
     this.resolveAssignmentTerminal(assignment.id);
     this.publish(assignment.channelId);
-    // The drain that calls this must not wait for the release.
     yield* this.#forkEvent(this.#releaseHeldAgents([assignment.agentId]));
     return true;
   });
 
-  /**
-   * Keeps the active assignment of this delivery for its turn to run again on the same model, as
-   * `requeueForLimit` keeps it for a backup. No limit holds the agent, so a routine set to skip at a
-   * limit keeps its run (#11425). False when there is no active assignment, when a transfer is pending
-   * on it, or when its task moved on.
-   */
   keepForRetry(deliveryId: string): Effect.Effect<boolean> {
     return Effect.sync(() => {
       const assignment = this.store.assignmentForDelivery(deliveryId);
@@ -2380,7 +1964,6 @@ export class ChannelService {
     });
   }
 
-  /** The assignment and its task wait for the same delivery to start again. */
   #keepAssignment(assignment: ChannelAssignment, task: ChannelTask): void {
     this.store.update(this.store.get(assignment.channelId), {
       assignments: [{ ...assignment, state: "queued", turnId: null }],
@@ -2389,18 +1972,10 @@ export class ChannelService {
     this.publish(assignment.channelId);
   }
 
-  /**
-   * Whether a queued task waits for this agent: one that it owns and that has no assignment, or one
-   * with no owner in a channel that it leads. A move to a backup model is made for this work too.
-   */
   ownsWaitingWork(agentId: string): boolean {
     return this.#waitingWork(agentId).length > 0;
   }
 
-  /**
-   * A note in each channel whose queued work waits for this agent, that the agent left its model for
-   * a usage limit or went back to it. It is the note of the agent's own chat, with the agent as author.
-   */
   noteModelSwitch(agentId: string, text: string, itemType: string): void {
     const author = { kind: "agent" as const, id: agentId, name: this.memberName(agentId) };
     for (const task of this.#waitingWork(agentId)) {
@@ -2412,7 +1987,6 @@ export class ChannelService {
     }
   }
 
-  /** The first task of each channel that `ownsWaitingWork` counts. */
   #waitingWork(agentId: string): ChannelTask[] {
     const archived = this.store.archivedIds();
     return this.store.ids().flatMap((channelId) => {
@@ -2430,28 +2004,17 @@ export class ChannelService {
     });
   }
 
-  /**
-   * A queued task that a spent plan holds. When the agent has a backup model that is ready, the task
-   * waits and the agent is scheduled, so that it moves to that model; the move wakes the channels.
-   * Otherwise the task waits for the reset, and a routine that drops late work cancels it.
-   */
   #heldByLimit(channelId: string, task: ChannelTask, agentId: string): void {
     if (this.hooks.usageLimitBackup?.(agentId)) this.hooks.schedule(agentId);
     else this.#dropForLimit(channelId, task);
   }
 
-  /** A queued task that a spent plan holds, and whose routine drops late work, is cancelled. */
   #dropForLimit(channelId: string, task: ChannelTask): void {
     if (!this.hooks.skipAtLimit?.(task)) return;
     this.store.update(this.store.get(channelId), { tasks: this.#skippedTasks(task) });
     this.publish(channelId);
   }
 
-  /**
-   * The task a skipped routine run drops, and every other task of the same request that still
-   * waits with no assignment: a delegated task shares the request, and the settled run would no
-   * longer claim it. A task that already runs keeps its turn.
-   */
   #skippedTasks(task: ChannelTask): ChannelTask[] {
     const assigned = new Set(
       this.store
@@ -2483,13 +2046,6 @@ export class ChannelService {
       }
   }
 
-  /**
-   * Takes every agent without a record out of each channel's members. Agent deletion calls this, and
-   * so does startup, for members that older versions and an interrupted deletion left behind.
-   *
-   * The lead moves the way the settings panel moves it: to the first member that stays. A task the
-   * deleted agent owned needs nothing here, because the pump pauses a task whose owner is gone.
-   */
   removeDeletedMembers(agentIds: ReadonlySet<string>): void {
     for (const channelId of this.store.ids()) {
       const channel = this.store.get(channelId);
@@ -2541,9 +2097,6 @@ export class ChannelService {
           assignment = { ...assignment, deliveryId: context.delivery.id };
           yield* channelSync(() => this.store.update(this.store.get(channelId), { assignments: [assignment] }));
         }
-        // The boot recovery settles each orphaned delivery before this runs, so one that still starts
-        // or runs is a live turn of this run: on another provider, or on an agent's own process that
-        // outlived a restart of the shared one.
         if (context?.delivery.status === "starting" || context?.delivery.status === "running") continue;
         if (
           context?.delivery.status === "queued" &&
@@ -2585,8 +2138,6 @@ export class ChannelService {
           );
         }
       }
-      // A stop in older versions gave no reason, so the task showed no way to continue it. An archive
-      // also pauses with no reason, so only a channel that is not archived gets the stop reason.
       if (!archived.has(channelId)) {
         const stopped = (yield* channelSync(() => this.store.tasks(channelId)))
           .filter((task) => task.state === "paused" && !task.error)
@@ -2598,21 +2149,10 @@ export class ChannelService {
     yield* this.wake();
   }).bind(this);
 
-  /**
-   * Whether this channel delivery continues its request after the sub-tasks that it waited for ended.
-   * `prepare` decides it once, so the chat row and the packet agree.
-   */
   resumesAfterSubtasks(deliveryId: string): boolean {
     return this.#resumedDeliveries.has(deliveryId);
   }
 
-  /**
-   * An earlier assignment of the same request to the same member waited for fewer tasks, so this one
-   * continues that request with the results of the new ones. Its delivery repeats the request, but the
-   * person did not send it again (#8812). A run again after a usage limit continues too when an earlier
-   * one waited for fewer tasks. A member that takes the task from another one, with a transfer or a
-   * reassign, gets the request for the first time.
-   */
   #resumesAfterSubtasks(assignment: ChannelAssignment): boolean {
     if (assignment.awaitedTaskIds.length === 0) return false;
     return this.store
@@ -2685,10 +2225,6 @@ export class ChannelService {
     return { threadId: context.threadId, text: history.text };
   }).bind(this);
 
-  /**
-   * What the member's active provider session already read of the channel, or null when the next
-   * packet must be complete: the session is new, another one, or compacted since (cursor zero).
-   */
   #deliveredContext(
     channelId: string,
     context: ChannelContext,
@@ -2725,22 +2261,16 @@ export class ChannelService {
     this.#acceptedContexts.set(JSON.stringify([channelId, agentId, sessionId]), delivered);
   }
 
-  /** The packet of a delivery with only the unread messages, and the session that read the others. */
   delta(deliveryId: string): { sessionId: string; text: string } | undefined {
     return this.#deltas.get(deliveryId);
   }
 
-  /**
-   * Whether the turn on this provider session gets the delta. Another session, as when the provider
-   * cannot resume the old one, has not read the channel and gets the complete packet.
-   */
   sendsDelta(deliveryId: string, sessionId: string): boolean {
     if (this.#deltas.get(deliveryId)?.sessionId === sessionId) return true;
     this.#deltas.delete(deliveryId);
     return false;
   }
 
-  /** The provider compacted this session; the next packet of each channel in it is complete. */
   contextCompacted(sessionId: string): void {
     try {
       this.store.resetContextsForSession(sessionId);
@@ -2757,11 +2287,7 @@ export class ChannelService {
         (item) => item.id === assignment.taskId,
       );
       if (!task) return;
-      // The drain and the turn start both report the same turn. Only the first report saves the
-      // cursor: a changed message or a compaction can reset it before the second report.
       const repeated = assignment.state === "running" && assignment.turnId === turnId;
-      // A message that the packet showed changed after it was built, so the packet shows it as it was.
-      // The cursor goes to zero, and the next packet is complete.
       const prepared = this.#preparedChanges.get(deliveryId);
       this.#preparedChanges.delete(deliveryId);
       const facts = this.#preparedFacts.get(deliveryId);
@@ -2771,8 +2297,6 @@ export class ChannelService {
         prepared === undefined || prepared === this.store.completedMessageChanges(assignment.channelId)
           ? { throughSequence: assignment.throughSequence, summaryVersion: assignment.summaryVersion }
           : { throughSequence: 0, summaryVersion: 0 };
-      // The delta went to another session, so this session did not read the earlier messages. The
-      // cursor stays on the other session, and the next packet is complete.
       const delta = this.#deltas.get(deliveryId);
       this.#deltas.delete(deliveryId);
       if (!repeated && (delta === undefined || delta.sessionId === sessionId)) {
@@ -2783,7 +2307,6 @@ export class ChannelService {
             sessionId,
             cursor.throughSequence,
             cursor.summaryVersion,
-            // Unknown text never matches, so the next delta gives the facts and memories again.
             facts ?? { channelFacts: null, channelMemories: null },
           ),
         );
@@ -2822,7 +2345,6 @@ export class ChannelService {
         loaded?.agentId === event.agentId
           ? loaded
           : this.store.database.readConversation(event.agentId, event.threadId);
-      // Only the streaming turn changed. Each other message was captured by its own event.
       this.capture(snapshot, event.turnId);
       return true;
     }
@@ -2841,14 +2363,8 @@ export class ChannelService {
     if (event.type === "turn-started") {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
-      // No delivery was starting, as when Claude or OpenCode starts a turn after a background job
-      // ends. That turn is not the member's next assignment: taking it ran the provider's answer as
-      // that task, and the task's own start then failed.
       if (event.origin === "unknown") {
         this.#providerTurns.add(event.turnId);
-        // The member ended its task's turn while a background job ran, and this turn answers that
-        // job. Its progress and result belong to that task. Before, the channel showed nothing, and
-        // the member looked stuck (#9070).
         const late = this.#lateAssignment(channelId, event.agentId);
         if (late) this.#lateTurns.set(event.turnId, late.id);
         return true;
@@ -2871,16 +2387,11 @@ export class ChannelService {
     return false;
   }
 
-  /**
-   * Summarizes a long channel after a turn ends. The summary used to run when the next assignment
-   * started, so that member waited for the lead's model before its own turn (#3957).
-   */
   #summarizeAhead(channelId: string): void {
     if (this.#stopped || this.#summaries.has(channelId) || this.#deletedChannels.has(channelId)) return;
     const channel = this.store.exists(channelId) ? this.store.get(channelId) : null;
     const lead = channel ? this.hooks.agents().find((agent) => agent.id === channel.leadAgentId) : undefined;
     if (!channel || channel.archived || !lead) return;
-    // With no spare generation, the next packet makes the summary when it needs one.
     if (this.hooks.spareGeneration?.() === false) return;
     const fallbacks = this.hooks
       .agents()
@@ -2888,7 +2399,6 @@ export class ChannelService {
     const fiber = Effect.runSync(
       Effect.forkIn(
         this.#history.summarizeAhead(channelId, lead, fallbacks).pipe(
-          // The next packet summarizes again. When that fails too, the packet gives the newest messages.
           Effect.catch((failure) =>
             Effect.sync(() =>
               logger.warn("A channel summary after a turn failed.", {
@@ -2908,10 +2418,6 @@ export class ChannelService {
     });
   }
 
-  /**
-   * Waits for the summary that runs after a turn, so a packet does not ask the model for it twice.
-   * A packet that fits without a new summary does not wait for it.
-   */
   #awaitSummary(channelId: string, budget: number | undefined): Effect.Effect<void, ChannelOperationError> {
     const fiber = this.#summaries.get(channelId);
     if (!fiber) return Effect.void;
@@ -2920,12 +2426,10 @@ export class ChannelService {
     );
   }
 
-  /** Native event callbacks and synchronous hooks own this work; stop drains it before closing the scope. */
   #dispatchEvent(operation: Effect.Effect<void, ChannelOperationError>): void {
     Effect.runSync(this.#forkEvent(operation));
   }
 
-  /** Runs event work in the owned scope; `stop` waits for it. */
   #forkEvent(operation: Effect.Effect<void, ChannelOperationError>): Effect.Effect<void> {
     return Effect.forkIn(
       operation.pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause)))),
@@ -2942,10 +2446,6 @@ export class ChannelService {
     );
   }
 
-  /**
-   * The member's last assignment, while its task is still completed at that revision in an open
-   * channel. A turn that the provider starts after a background job continues it.
-   */
   #lateAssignment(channelId: string, agentId: string): ChannelAssignment | undefined {
     if (this.store.get(channelId).archived) return undefined;
     const assignment = this.store
@@ -2960,13 +2460,16 @@ export class ChannelService {
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
-    const assignments = this.store.assignments(channelId);
+    const assignments =
+      turnId === undefined
+        ? this.store.assignments(channelId)
+        : this.store.agentAssignments(channelId, snapshot.agentId);
     const name = this.hooks.agents().find((agent) => agent.id === snapshot.agentId)?.name ?? "Former member";
-    // Indexed once, not per message: a streaming turn calls this for every delta, and the thread
-    // holds every message of the whole conversation. A read of the task table and two scans of the
-    // channel history for each of them made one capture cost the square of the transcript.
-    const tasks = new Map(this.store.tasks(channelId).map((task) => [task.id, task] as const));
-    // A delta reads the few messages of its turn by id. A whole snapshot reads the history once.
+    const taskReads = new Map<string, ChannelTask | null>();
+    const taskOf = (id: string): ChannelTask | undefined => {
+      if (!taskReads.has(id)) taskReads.set(id, this.store.task(channelId, id));
+      return taskReads.get(id) ?? undefined;
+    };
     const history =
       turnId === undefined
         ? new Map(this.store.messages(channelId).map((message) => [message.id, message] as const))
@@ -2985,8 +2488,6 @@ export class ChannelService {
     for (let message of turnId === undefined
       ? snapshot.messages
       : snapshot.messages.filter((item) => item.turnId === turnId)) {
-      // A member's Sign in card for an MCP server is the channel's too: the agent tells the channel
-      // that the card is in this conversation, and the person signs in from it (#6228).
       if (
         message.author !== "assistant" &&
         !message.questionPrompt &&
@@ -2995,13 +2496,14 @@ export class ChannelService {
       )
         continue;
       const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);
-      const late = lateId === undefined ? undefined : assignments.find((item) => item.id === lateId);
+      const late =
+        lateId === undefined
+          ? undefined
+          : (assignments.find((item) => item.id === lateId) ??
+            (turnId === undefined ? undefined : (this.store.assignment(channelId, lateId) ?? undefined)));
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const original = existing(message.id);
-      // The first rows of a turn come before its assignment knows the turn id, so they go to the
-      // running assignment. A row of another turn does not: in a whole snapshot, every old row of
-      // the thread went to the task that ran now.
       const assignment =
         owner ??
         (turnId !== undefined ||
@@ -3010,14 +2512,8 @@ export class ChannelService {
           ? active
           : undefined);
       if (!assignment) continue;
-      // A turn sends its final rows before it completes, so a new row of an ended assignment is not
-      // part of its reply. After a restart, the Claude history import wrote old turns again with new
-      // ids, and each such row showed as a new reply under a completed task.
-      // A row of a turn that continues the task after a background job is part of its reply while the
-      // task is not reopened and the channel is open. It gets its row when it completes: a turn that
-      // fails or stops leaves its row at streaming, and such a row stopped the channel's history (#3673).
       if (!original && !activeAssignment(assignment)) {
-        const task = tasks.get(assignment.taskId);
+        const task = taskOf(assignment.taskId);
         if (
           !late ||
           message.status === "streaming" ||
@@ -3027,14 +2523,10 @@ export class ChannelService {
         )
           continue;
       }
-      // A streaming row that has only the member's own label so far ("Ana:") waits for its text, so
-      // the label does not show for one update and then go.
       if (message.author === "assistant") {
         const text = withoutOwnNameLabel(message.text, name, !original && message.status === "streaming");
         if (text !== message.text) message = { ...message, text };
       }
-      // An empty row has nothing to show or to give another member. A streaming row gets its row
-      // when its first text arrives.
       if (
         !original &&
         message.author === "assistant" &&
@@ -3043,10 +2535,6 @@ export class ChannelService {
         !message.questionPrompt
       )
         continue;
-      // OpenCode's text before a tool call streams as the answer, and Pi's streams with no phase. Each
-      // becomes a step only at that call. Copied while it streamed, each such note showed as the
-      // member's message and then folded (#4844). The agent's own chat still streams it; the channel
-      // gets it when it completes.
       if (
         !original &&
         message.author === "assistant" &&
@@ -3055,21 +2543,14 @@ export class ChannelService {
         provisionalAnswers()
       )
         continue;
-      const task = tasks.get(assignment.taskId);
+      const task = taskOf(assignment.taskId);
       const result = existing(channelResultId(assignment));
-      // A repeat of the result adds nothing. But a row that streamed before its text matched still
-      // completes: a row left at streaming stopped every later assignment in the channel (#3673).
       if (result?.message.text === message.text && original?.message.status !== "streaming") continue;
-      // The result is the answer of the turn. Answer text that the running turn writes after it, such
-      // as a "Yes.", folds into its steps. Before, it showed as a second reply from the same member.
-      // Text from before the result has a row with a lower sequence and stays as it is, and so do the
-      // rows of older turns. A member reply ends the turn the same way: the task continues with the
-      // answer, so a note such as "I will report back" after the reply is a step, not a message.
       const end =
         result?.message.turnId === message.turnId
           ? result
           : task?.dependencies
-              .map((id) => tasks.get(id))
+              .map((id) => taskOf(id))
               .flatMap((child) => (child && isReplyTask(child) ? [existing(child.requestMessageId)] : []))
               .find((reply) => reply?.message.turnId === message.turnId);
       if (
@@ -3083,14 +2564,12 @@ export class ChannelService {
           : activeAssignment(assignment) || late !== undefined)
       )
         message = { ...message, itemType: "commentary" };
-      // A channel routine run with nothing to report posts no message: its answers are steps (#7166).
       if (
         message.author === "assistant" &&
         (message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
           (isTextAnswer(message) && message.turnId !== undefined && this.hooks.quietTurn?.(message.turnId) === true))
       )
         message = { ...message, itemType: "commentary" };
-      // The answer to a member reply shows as a reply to it, so the thread reads as an exchange.
       if (
         task &&
         isReplyTask(task) &&
@@ -3125,9 +2604,12 @@ export class ChannelService {
     if (messages.length) {
       const channel = this.store.get(channelId);
       const [only] = messages;
-      if (messages.length === 1 && only) this.store.captureMessage(channel, only);
-      else this.store.update(channel, { messages });
-      this.publish(channelId);
+      const written =
+        messages.length === 1 && only
+          ? this.store.captureMessage(channel, only)
+          : this.store.update(channel, { messages });
+      this.hooks.changed(channelId, written.revision, true);
+      if (!this.#activeAssignments.has(channelId)) this.#syncQueueHolds(channelId);
     }
     return true;
   }
@@ -3137,9 +2619,6 @@ export class ChannelService {
       const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
         (item) => item.turnId === turnId,
       );
-      // A turn with no active assignment, such as one that the provider started itself after a
-      // background job ended, still made its agent busy. A task that waits for that agent has no
-      // other trigger, so it waited until a restart (#6654).
       if (!assignment || !activeAssignment(assignment)) return yield* this.wake();
       if (assignment.pendingRevision !== null) {
         yield* channelSync(() =>
@@ -3152,9 +2631,6 @@ export class ChannelService {
       if (!task) return;
       const newChildren = task.dependencies.filter((id) => !assignment.awaitedTaskIds.includes(id));
       const pendingChildren = task.dependencies.some((id) => !tasks.some((item) => item.id === id && settled(item)));
-      // A result that the turn already published completes the task, also when the turn then fails, as
-      // when the provider rejects the empty reply after `channel_result`. Before, the result showed in
-      // the chat, but the task failed and its parent waited for it (#7007).
       const resultAfterFailure =
         status !== "completed" &&
         status !== "interrupted" &&
@@ -3165,8 +2641,6 @@ export class ChannelService {
           : status === "interrupted"
             ? "interrupted"
             : "failed";
-      // After a result, this is the provider's reason for the failed turn, not a failure that the agent
-      // reported, so the task does not keep it.
       const deliveryError =
         !resultAfterFailure && assignment.deliveryId
           ? this.mailbox.getDelivery(assignment.deliveryId)?.delivery.error
@@ -3187,20 +2661,14 @@ export class ChannelService {
           ...task,
           state: nextState,
           revision: nextState === "queued" ? task.revision + 1 : task.revision,
-          // The turn stored the provider's redacted reason on its delivery before it reported the end.
-          // Without it, the channel showed only this sentence and the reason was in the agent's chat.
           error:
             state === "failed"
               ? (deliveryError ?? "The agent could not complete this task.")
               : state === "interrupted"
                 ? sourceText("error.backend.channelTaskStopped")
                 : // The owner of a routine's request reported that the run failed (`routine_report_failure`).
-                  // The task completes, as the agent answered, and the routine run reads the reason. A task
-                  // that waits for its subtasks keeps the reason until its last turn (#6667).
                   (deliveryError ?? task.error),
         });
-        // A failed reply did not hold its caller (`settled`), so nothing waits for it when the run
-        // ends. It ends with the run, or its stopped-task card stayed with nothing to continue (#6417).
         if (nextState === "completed" && task.rootTaskId === task.id)
           updated.push(
             ...tasks
@@ -3218,10 +2686,6 @@ export class ChannelService {
     });
   }
 
-  /**
-   * A change that a member makes at a person's request, with a note that names both. It waits for
-   * the commands queued before it, so it changes the channel that those leave.
-   */
   readonly #manage = Effect.fn("ChannelService.manage")(function* (
     this: ChannelService,
     channelId: string,
@@ -3244,12 +2708,9 @@ export class ChannelService {
       );
       return { ...message, message: { ...message.message, source: "system" } };
     };
-    // A change that already committed: a retried call must not find the member it added, or the
-    // routine it made, and fail. The change and its note commit under this one receipt.
     const receipt = `${agentId}:${operationId}`;
     if ((yield* channelSync(() => this.store.database.commandResult(`channels:${receipt}`))) !== undefined)
       return { accepted: true };
-    // Archive does not wait in the queue, so the channel is read again at this change's turn.
     const open = () => {
       const current = this.store.get(channelId);
       if (current.archived) throw new Error("The channel was archived.");
@@ -3305,11 +2766,6 @@ export class ChannelService {
     };
   });
 
-  /**
-   * A command that was saved before: its change is in the database, but the turns that it stopped
-   * can still run if the first call ended before it interrupted them. Stop those turns and wake the
-   * channel again, then give the channel as it is.
-   */
   readonly #finishCommitted = Effect.fn("ChannelService.finishCommitted")(function* (
     this: ChannelService,
     channelId: string,
@@ -3329,7 +2785,6 @@ export class ChannelService {
     return channel;
   });
 
-  /** Cancels the tasks in one saved change, with the notes, then stops their turns. */
   readonly #cancelTasks = Effect.fn("ChannelService.cancelTasks")(function* (
     this: ChannelService,
     channel: Channel,
@@ -3355,13 +2810,6 @@ export class ChannelService {
     return result;
   });
 
-  /**
-   * `channel_cancel`: a member ends a whole run that it owns, at a person's request, as Cancel does
-   * for a stopped run. Active work ends too: the turns stop and queued deliveries are cancelled. The
-   * run of the caller's own task is refused, because the cancel would interrupt the turn that makes
-   * this call. A run that a task of another open run depends on is refused too: that task would
-   * wait for ever. The messages stay, and the note names the member and the person who asked.
-   */
   readonly #cancelOwnRun = Effect.fn("ChannelService.cancelOwnRun")(function* (
     this: ChannelService,
     channelId: string,
@@ -3371,7 +2819,6 @@ export class ChannelService {
     person: { id: string; name: string },
     args: DynamicRecord,
   ): Effect.fn.Return<unknown, ChannelOperationError> {
-    // The agent can correct these, so it gets the reason as a result (#4728). The log keeps a fixed reason.
     const refuse = (reason: string, logReason: string) => {
       logger.warn("A channel cancel was refused.", { channelId, agentId, reason: logReason });
       return { accepted: false, reason };
@@ -3383,14 +2830,11 @@ export class ChannelService {
     yield* this.#serialize(
       channelId,
       Effect.gen({ self: this }, function* () {
-        // A retried call finds its receipt here, in the queue, so a copy that waited behind the first
-        // is not refused for the run that the first ended. The turns that it did not stop stop now.
         if ((yield* channelSync(() => this.store.database.commandResult(`channels:${receipt}`))) !== undefined) {
           yield* this.#finishCommitted(channelId);
           result = { accepted: true };
           return;
         }
-        // Archive does not wait in the queue, so the channel is read again at this change's turn.
         const channel = yield* channelSync(() => this.store.get(channelId));
         if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
         const tasks = yield* channelSync(() => this.store.tasks(channelId));
@@ -3403,7 +2847,6 @@ export class ChannelService {
           return;
         }
         const root = tasks.find((item) => item.id === selected.rootTaskId);
-        // A run that ended can still hold a failed reply that an earlier version left (#6417).
         const cancelled = root ? descendants(tasks, root.id) : [];
         if (!root || !cancelled.length) {
           result = refuse("That run has already ended.", "run ended");
@@ -3437,7 +2880,6 @@ export class ChannelService {
           return;
         }
         const agent = { id: agentId, name: this.memberName(agentId) };
-        // The first line with text, cut by characters, so that an emoji is not split.
         const request = [...(root.instruction.trim().split("\n", 1)[0]?.trim() ?? "")];
         const note = this.message(
           channelId,
@@ -3465,7 +2907,6 @@ export class ChannelService {
     return result;
   });
 
-  /** The running task of the agent's active assignment in this turn. It fails when the assignment or the task changed. */
   readonly #runningTask = Effect.fn("ChannelService.runningTask")(function* (
     this: ChannelService,
     channelId: string,
@@ -3486,13 +2927,6 @@ export class ChannelService {
     return { channel, assignment, tasks, task };
   });
 
-  /**
-   * The task that a `channel_result` call reports on. A provider can end the channel turn while a
-   * background job still runs, as Claude does for an install or a dev server, so the assignment
-   * completes. When the job ends, the provider answers it in a turn of its own, with no assignment.
-   * Its result belongs to the member's last task while that task has no result from another turn.
-   * Before, the call failed and the result stayed in the agent's own chat (#7220).
-   */
   readonly #resultTask = Effect.fn("ChannelService.resultTask")(function* (
     this: ChannelService,
     channelId: string,
@@ -3517,23 +2951,12 @@ export class ChannelService {
     return { channel, assignment, tasks, task };
   });
 
-  /**
-   * The person whose request started the work of the agent's running task. The turn that a member
-   * reply started reads another agent's words, so it has no requester, whoever made the request of
-   * its run.
-   */
   #requester(channelId: string, task: ChannelTask, tasks: readonly ChannelTask[]) {
     return isReplyTask(task)
       ? null
       : channelRequester(task, tasks, (messageId) => this.store.message(channelId, messageId));
   }
 
-  /**
-   * Whether this computer's user made the request that started the agent's running task in this
-   * turn. Only then can the task create a channel or change another one (`create_channel`,
-   * `update_channel`). A routine run, an agent's request and a member reply are refused, as for the
-   * channel tools; so is a team member, whose agent access the Team API checks.
-   */
   readonly requestedByLocalPerson = Effect.fn("ChannelService.requestedByLocalPerson")(function* (
     this: ChannelService,
     channelId: string,
@@ -3545,12 +2968,6 @@ export class ChannelService {
     return person !== null && !(this.hooks.remotePerson?.(person.id) ?? false);
   });
 
-  /**
-   * Whether this computer's user started the agent's running task in this turn with a request whose
-   * text holds `value` as a whole token (`holdsKeyToken`). Only then can the task save that value to
-   * the Vault (#6369): the agent also reads the lead's and other members' words, which must not
-   * choose the key of every agent.
-   */
   readonly localRequestHolds = Effect.fn("ChannelService.localRequestHolds")(function* (
     this: ChannelService,
     channelId: string,
@@ -3567,12 +2984,6 @@ export class ChannelService {
     return request ? holdsKeyToken(request.message.text, value) : false;
   });
 
-  /**
-   * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
-   * of the routine's request, also one that the lead routed to a member: its failure call ends the
-   * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
-   * `quiet` is a run that nobody waits for, not a Test run. Null when a routine did not start the task.
-   */
   readonly routineRunPart = Effect.fn("ChannelService.routineRunPart")(function* (
     this: ChannelService,
     channelId: string,
@@ -3580,7 +2991,6 @@ export class ChannelService {
     turnId: string,
   ) {
     const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
-    // The root task holds the run's request, as for `channelRequester`; a member reply has its own.
     const root = tasks.find((item) => item.id === task.rootTaskId);
     const request = root ? yield* channelSync(() => this.store.message(channelId, root.requestMessageId)) : null;
     if (!root || request?.author.kind !== "member" || !request.author.id.startsWith("routine:")) return null;
@@ -3616,7 +3026,6 @@ export class ChannelService {
       return yield* this.#manage(channelId, task.id, agentId, `tool:${turnId}:${callId}`, person, tool, args);
     }
     if (tool === "channel_history") {
-      // After "New conversation", the history starts after its marker, as the packet does.
       const reset = yield* channelSync(() => this.store.contextResetSequence(channelId));
       if (isString(args.attachmentId)) {
         if (
@@ -3651,7 +3060,6 @@ export class ChannelService {
             : undefined,
         ),
       );
-      // The cursors still count every row, so the next page starts where this one ended.
       const shown = page.messages.filter((message) => message.sequence > reset);
       return boundedHistoryPage({
         ...page,
@@ -3662,9 +3070,6 @@ export class ChannelService {
     const operationId = `tool:${turnId}:${callId}`;
     if ((yield* channelSync(() => this.store.database.commandResult(`channels:${operationId}`))) !== undefined)
       return { accepted: true };
-    // A reply turn only answers: its answer goes back to the member that waits for it, so a reply,
-    // an assignment or a transfer from it would only make that member wait longer. The reply is
-    // another agent's text, so it must not change the channel memory either.
     if (
       isReplyTask(task) &&
       (tool === "channel_reply" ||
@@ -3685,10 +3090,6 @@ export class ChannelService {
         return { accepted: true };
       if (!isString(args.text) || !args.text.trim() || args.text.length > 100_000)
         return yield* channelFailure(new Error("Provide a task result."));
-      // A result before the answer to a reply is the bug that the wait fixes: the caller answered
-      // the person before the other member answered it. An assigned task is the same. A subtask from
-      // this turn also runs the task again when the turn ends, also when it settled during the turn,
-      // so a result posted now showed again after each subtask (#7788).
       const unanswered = tasks.find(
         (item) =>
           task.dependencies.includes(item.id) &&
@@ -3754,8 +3155,6 @@ export class ChannelService {
         rootTaskId: task.rootTaskId,
         expectedResult: channelReplyExpectedResult(sender),
       };
-      // The caller waits for the answer, as for an assignment: without it, a member that asked to agree
-      // on something answered the person before the other member had answered it.
       yield* channelSync(() =>
         this.store.update(
           channel,
@@ -3771,16 +3170,10 @@ export class ChannelService {
         instruction: `The reply is in the shared chat. End your turn now with no text and do not promise to report back: you continue this task when ${check.target.author.name} has answered.`,
       };
     }
-    /**
-     * The two memory tools commit at call time, unlike an agent's `remember`, which stages into the
-     * turn and commits when the turn completes. There is no race to stage against: the write is a
-     * single dispatch keyed on this call, so a retried call reads its receipt and writes nothing.
-     */
     if (tool === "channel_remember" || tool === "channel_forget_memory") {
       if (!isString(args.text) || !args.text.trim())
         return yield* channelFailure(new Error("Provide the memory text."));
       const text = args.text;
-      // A refusal, not a failure: the agent reads the reason and can save shorter facts (#6632).
       if (tool === "channel_remember" && text.length > INPUT_LIMITS.agentMemoryText)
         return {
           accepted: false,
@@ -3795,8 +3188,6 @@ export class ChannelService {
     }
     if (tool !== "channel_assign" && tool !== "channel_transfer")
       return yield* channelFailure(new Error("Unknown channel tool."));
-    // The agent can correct these arguments, so it gets the reason as a result. Codex replaces a
-    // failed tool request with "dynamic tool request failed" (#4728). The log keeps a fixed reason.
     const refuse = (reason: string, logReason = reason) => {
       logger.warn("A channel handoff was refused.", { channelId, agentId, tool, reason: logReason });
       return { accepted: false, reason };
@@ -3821,7 +3212,6 @@ export class ChannelService {
     if (Result.isFailure(recipient)) {
       if (!this.hooks.agents().some((agent) => agent.id === recipientAgentId))
         return refuse("Set recipientAgentId to the agent id of an available channel member.");
-      // The agent exists but is not a member. Only a person can add it, so the agent must not retry.
       const name = this.memberName(recipientAgentId);
       const others = this.eligibleMembers(channel).filter((id) => id !== agentId);
       const available = others.slice(0, 20).map((id) => `${this.memberName(id)} (${id})`);
@@ -3837,10 +3227,6 @@ export class ChannelService {
       return refuse("A source message is unavailable. Use the ids of shared channel messages.");
     const root = tasks.find((item) => item.id === task.rootTaskId);
     if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
-    // A member that answers the same request in a task of its own already gives its answer. A second
-    // task for that request made it post the same answer again, once for each member that gave it (#11082).
-    // The current request counts, not the older messages that a resumed task keeps, and a stopped or
-    // failed task gives no answer.
     if (
       tasks.some(
         (item) =>
@@ -3877,8 +3263,6 @@ export class ChannelService {
       return { accepted: false, reason: "The user must continue or reassign the task." };
     }
     const resources = Array.isArray(args.resources) && args.resources.every(isString) ? args.resources : [];
-    // Reject an oversized list before the loop. The loop runs a blocking `realpathSync` per
-    // workspace entry on the Electron main thread.
     if (resources.length > 64) return refuse("Give at most 64 task resources.");
     for (let i = 0; i < resources.length; i++) {
       const resource = resources[i] ?? "none";
@@ -3887,7 +3271,6 @@ export class ChannelService {
       else if (resource !== "host" && resource !== "browser" && resource !== "none")
         return refuse("Use browser, none, or workspace:<absolute path> for task resources.");
     }
-    // Measure each resource after canonicalization.
     if (resources.some((resource) => resource.length > 4096))
       return refuse("A task resource path is longer than 4096 characters.");
     const dependencies = Array.isArray(args.dependencies) && args.dependencies.every(isString) ? args.dependencies : [];
@@ -3934,7 +3317,6 @@ export class ChannelService {
       { kind: "agent", id: agentId, name: this.hooks.agents().find((item) => item.id === agentId)?.name ?? agentId },
       `${this.hooks.agents().find((item) => item.id === args.recipientAgentId)?.name ?? args.recipientAgentId}: ${args.task}`,
     );
-    // The check above rejects an empty list, so the first source message is always there.
     const [firstSourceMessageId] = sourceMessageIds;
     if (firstSourceMessageId !== undefined) handoff.message.replyToMessageId = firstSourceMessageId;
     yield* channelSync(() => this.store.update(channel, { tasks: changes, messages: [handoff] }, operationId));
@@ -3956,8 +3338,6 @@ export class ChannelService {
     task: ChannelTask,
     request: ChannelMessage,
   ): Effect.fn.Return<boolean, ChannelOperationError> {
-    // A steer carries text into a turn that is already running, and nothing else. A request with
-    // files therefore has to stay a delivery, or the member would never receive the upload.
     const steer = this.hooks.steer;
     if (!steer || request.message.attachments?.length) return false;
     const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
@@ -3966,7 +3346,6 @@ export class ChannelService {
         item.agentId === task.ownerAgentId &&
         item.state === "running" &&
         item.turnId &&
-        // A turn of this revision already has the correction in its packet.
         item.taskRevision < task.revision,
     );
     if (!assignment?.turnId) return false;
@@ -4041,7 +3420,6 @@ export class ChannelService {
     }
     const pendingOutcome = latest.pendingOutcome;
     const accepted = outcome === "accepted";
-    // As in `accepted`: a message changed after the packet was built, so the next packet is complete.
     const cursor =
       prepared === this.store.completedMessageChanges(channelId)
         ? { throughSequence: history.throughSequence, summaryVersion: history.summaryVersion }
@@ -4109,9 +3487,6 @@ export class ChannelService {
           (yield* channelSync(() => this.store.context(channelId, assignment.agentId))).threadId,
         );
         if (terminal) {
-          // Some providers emit turn completion before they acknowledge turn/interrupt. The
-          // lifecycle event is enough evidence that the provider stopped, so channel deletion
-          // must not stay blocked on an acknowledgement that may never arrive.
           yield* Effect.gen({ self: this }, function* () {
             yield* Effect.raceFirst(interruption, terminal);
           }).pipe(
@@ -4132,8 +3507,6 @@ export class ChannelService {
           yield* channelSync(() =>
             this.store.update(this.store.get(channelId), { assignments: [{ ...assignment, state: "interrupted" }] }),
           );
-          // A delivery that never started has no turn to complete, so this is the only place that
-          // can lift the hold it put on its agent.
           yield* this.#releaseHeldAgents([assignment.agentId]);
         }
       }
@@ -4203,10 +3576,6 @@ export class ChannelService {
     };
   }
 
-  /**
-   * The manual half of channel memories. `store.get` is the guard: it throws "Channel not found."
-   * for a channel that is gone, so the panel never writes a memory that nothing owns.
-   */
   listMemories(channelId: string): ChannelMemory[] {
     this.store.get(channelId);
     return this.memories.list(channelId);
@@ -4237,16 +3606,8 @@ export class ChannelService {
     if (this.memories.clear(channelId) > 0) this.hooks.memoriesChanged?.(channelId);
   }
 
-  /**
-   * A routine that is deleted takes the requests it posted with it when no member has started any
-   * task of them yet, as an agent routine's queued delivery does. Work that already ran keeps its
-   * Stop control. An assignment is created before its delivery is queued, so "assigned" is not
-   * "started": only a turn, or a delivery that left the queue, shows that a member worked on it.
-   */
   withdrawRequests(channelId: string, requests: ReadonlySet<string>): void {
     const assignments = this.store.assignments(channelId);
-    // Every assignment counts, not only the active ones: a request that ran, was stopped and was
-    // resumed is queued again, and only its earlier, ended assignment shows that it started.
     const tasks = this.store.tasks(channelId).filter((task) => requests.has(task.requestMessageId));
     const requestOf = new Map(tasks.map((task) => [task.id, task.requestMessageId]));
     const ran = (item: ChannelAssignment) => {
@@ -4256,17 +3617,10 @@ export class ChannelService {
       return status !== undefined && status !== "queued" && status !== "cancelled";
     };
     const started = (item: ChannelAssignment) => {
-      // A task reused for a newer request keeps the assignments of the older one; they show that
-      // the older request ran, not this one. An assignment stored without its request counts.
       if (item.requestMessageId !== null && item.requestMessageId !== requestOf.get(item.taskId)) return false;
       return ran(item);
     };
     const held = new Set(assignments.filter(started).map((item) => item.taskId));
-    // A task that delegates gives its children its request id and waits for them: once any task of
-    // a request has started, the whole request stays. An assignment that stored its request proves
-    // that start even after a newer request reused its task.
-    // An assignment from before requests were stored proves only that its task ran. When a newer
-    // request reused that task, its children may still belong to this request: keep them.
     const parentOf = new Map(this.store.tasks(channelId).map((task) => [task.id, task.parentTaskId]));
     const legacyRan = new Set(
       assignments.filter((item) => item.requestMessageId === null && ran(item)).map((item) => item.taskId),
@@ -4295,19 +3649,14 @@ export class ChannelService {
     const pending = tasks.filter((task) => task.state === "queued" && !begun.has(task.requestMessageId));
     if (!pending.length) return;
     const pendingIds = new Set(pending.map((task) => task.id));
-    // An assignment still being queued has no delivery yet: the dispatcher sees the cancelled task
-    // after the enqueue and withdraws the delivery itself.
     const withdrawn = assignments.filter(
       (item) =>
         activeAssignment(item) &&
         pendingIds.has(item.taskId) &&
         item.deliveryId !== null &&
-        // An older request's turn may still run on a reused task while the router stops it; that
-        // delivery is not this request's queued work.
         (item.requestMessageId === null || item.requestMessageId === requestOf.get(item.taskId)),
     );
     for (const item of withdrawn) {
-      // A retry after a failed channel write finds the delivery cancelled already.
       if (item.deliveryId && this.mailbox.getDelivery(item.deliveryId)?.delivery.status !== "cancelled") {
         this.mailbox.cancelNow(item.agentId, item.deliveryId);
       }
@@ -4318,7 +3667,6 @@ export class ChannelService {
     });
     for (const item of withdrawn) this.resolveAssignmentTerminal(item.id);
     this.publish(channelId);
-    // The withdrawn assignments reserved the host; let the agents queued behind them drain.
     if (withdrawn.length) for (const agent of this.hooks.agents()) this.hooks.schedule(agent.id);
   }
 
@@ -4327,29 +3675,15 @@ export class ChannelService {
     this.#syncQueueHolds(channelId);
   }
 
-  /**
-   * A queue snapshot names the channel work it waits behind, read at the moment the queue is
-   * emitted. A held agent drains nothing, so no queue event of its own follows: when the
-   * reservation moves to another channel or another agent, every held queue keeps naming work that
-   * has ended. This reports the change instead.
-   *
-   * The gate is which agent holds which assignment in this channel. Every message batch of a
-   * running channel turn publishes as well, and no queue names a turn of work that is already
-   * reported, so only a new or ended assignment is allowed through.
-   */
   #syncQueueHolds(channelId: string): void {
     const active = this.store
-      .assignments(channelId)
-      .filter(activeAssignment)
+      .assignmentsInStates(channelId, ACTIVE_ASSIGNMENT_STATES)
       .map((assignment) => `${assignment.id}:${assignment.agentId}`)
       .join(",");
-    // A channel with no assignment has nothing to report, so an unseen channel counts as empty.
     const previous = this.#activeAssignments.get(channelId) ?? "";
     if (previous === active) return;
     this.#activeAssignments.set(channelId, active);
     this.hooks.queueHoldChanged?.();
-    // A queued task of another channel can name the work of an agent that started or ended here, and
-    // its own channel did not change, so its page is read again only after this.
     const agents = new Set(
       [previous, active].flatMap((value) =>
         value ? value.split(",").map((entry) => entry.slice(entry.indexOf(":") + 1)) : [],
@@ -4380,18 +3714,11 @@ export class ChannelService {
   }, Effect.uninterruptible).bind(this);
 }
 
-/** The start of the request that fits in its routing bytes. Only whole characters are kept. */
 function routingRequest(text: string): string {
   const { read } = new TextEncoder().encodeInto(text, new Uint8Array(ROUTING_REQUEST_BYTES));
   return read < text.length ? `${text.slice(0, read)}\n\n[truncated]` : text;
 }
 
-/**
- * The channel text for a failed routing turn, or null when the cause has none. Backend catalog text
- * without a placeholder holds nothing from a provider, so the channel can show it. The routing turn
- * runs as a profile generation, whose texts name a profile; those become channel texts. Provider
- * texts can also name a profile, so they are not shown.
- */
 function routingFailureText(error: unknown): string | null {
   if (!(error instanceof Error) || !isFixedSourceText(error.message)) return null;
   if (error.message === sourceText("error.agent.profileTimedOut"))
@@ -4401,7 +3728,6 @@ function routingFailureText(error: unknown): string | null {
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
 }
 
-/** Words that members put after their own name in a label, such as "Launch check:". */
 const OWN_LABEL_WORDS = new Set([
   "answer",
   "check",
@@ -4415,12 +3741,6 @@ const OWN_LABEL_WORDS = new Set([
   "update",
 ]);
 
-/**
- * A member's message without a label of its own name at the start, such as "Research:",
- * "**Launch:**" or "Launch check:". The chat shows the name above each message. Members copied the
- * "Name: task" form of handoffs into their answers (#5717), and the prompt rule against it did not
- * stop all models. Only the member's own name is a label: "Ana: can you check?" from Ben speaks to Ana.
- */
 function withoutOwnNameLabel(text: string, name: string, streaming = false): string {
   const own = name.trim().toLocaleLowerCase();
   const match = /^\s*(?:\*\*|__)?([^\n:*_]{1,80}?)\s*(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*/u.exec(text);
@@ -4433,19 +3753,9 @@ function withoutOwnNameLabel(text: string, name: string, streaming = false): str
   return streaming ? "" : text;
 }
 
-/** The shortest key that a channel request can give to the Vault, as for log redaction. */
 const CHANNEL_KEY_MIN_LENGTH = 8;
-/**
- * A character that continues a key, so it cannot stand next to the key in the request. Not `=`: a
- * pasted `NAME=value` line gives the key after it.
- */
 const KEY_CHARACTER = /[\p{L}\p{N}_\-+/~.]/u;
 
-/**
- * Whether `text` holds `value` as a whole token: a key that the person wrote, not a word or a part
- * of a longer key, which another member's words could pick to replace a Vault key (#6369). A full
- * stop after the key ends a sentence, so it counts as a boundary.
- */
 function holdsKeyToken(text: string, value: string): boolean {
   if (value.length < CHANNEL_KEY_MIN_LENGTH) return false;
   for (let at = text.indexOf(value); at !== -1; at = text.indexOf(value, at + 1)) {
@@ -4458,23 +3768,14 @@ function holdsKeyToken(text: string, value: string): boolean {
   return false;
 }
 
-/** The id of the result that one assignment publishes with `channel_result`. */
 function channelResultId(assignment: ChannelAssignment): string {
   return `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
 }
 
-/**
- * A dependency that lets its parent continue. A member reply that failed does too: it was a short
- * question, so the caller continues without the answer instead of waiting for a person.
- */
 function settled(task: ChannelTask, state: string = task.state): boolean {
   return state === "completed" || (state === "failed" && isReplyTask(task));
 }
 
-/**
- * The waiting parent of `task` queued again, when `task` in `state` settles its last dependency.
- * Each path that ends a child task calls it, or a failed reply leaves its caller waiting.
- */
 function releasedParent(tasks: readonly ChannelTask[], task: ChannelTask, state: string): ChannelTask[] {
   const parent = task.parentTaskId ? tasks.find((item) => item.id === task.parentTaskId) : undefined;
   if (
@@ -4490,7 +3791,6 @@ function releasedParent(tasks: readonly ChannelTask[], task: ChannelTask, state:
 function terminal(task: ChannelTask): boolean {
   return task.state === "completed" || task.state === "cancelled";
 }
-/** The states in which an assignment still holds the host. */
 const ACTIVE_ASSIGNMENT_STATES: readonly ChannelAssignment["state"][] = ["starting", "running", "queued"];
 function activeAssignment(assignment: ChannelAssignment): boolean {
   return ACTIVE_ASSIGNMENT_STATES.includes(assignment.state);
@@ -4507,11 +3807,6 @@ function descendants(tasks: ChannelTask[], id: string): ChannelTask[] {
   }
   return tasks.filter((task) => selected.has(task.id) && !terminal(task));
 }
-/**
- * Whether two tasks need the same browser or workspace. "host" is what an earlier version stored as
- * the default, and like "none" and an empty list it reserves nothing: each agent runs one channel
- * turn at a time, and that is the only limit on work that declares no resource.
- */
 function resourcesConflict(left: string[], right: string[]): boolean {
   return left.some(
     (resource) =>

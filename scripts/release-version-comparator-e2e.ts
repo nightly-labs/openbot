@@ -1,10 +1,3 @@
-// Checks each release version comparator against scripts/release-version-cases.json: the shared
-// TypeScript one, the mobile and macOS host sites that use it with their own grammar, and the bash
-// `newer()` of the hosted server update script, which runs in bash from the real script file.
-// Writes .openbot-build/release-version-comparator-e2e.json.
-//
-//   bun scripts/release-version-comparator-e2e.ts
-
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,16 +41,12 @@ function record(comparator: string, candidate: string, current: string, expected
 
 for (const { candidate, current, newer } of cases) {
   record("contracts isNewerRelease", candidate, current, newer, isNewerRelease(candidate, current));
-  // The mobile grammar has no pre-release and no "v"; its order must be the shared one for X.Y.Z.
   if (STABLE.test(candidate) && STABLE.test(current) && !/(^|\.)0\d/u.test(`${candidate}.${current}`))
     record("mobile isNewerMobileVersion", candidate, current, newer, isNewerMobileVersion(candidate, current));
-  // The macOS host helper reads only X.Y.Z, and refuses an installed version that is not one.
   if (STABLE.test(candidate) && STABLE.test(current))
     record("macOS host isNewerRelease", candidate, current, newer, isNewerMacHostRelease(candidate, current));
 }
 
-// One bash process sources the real script (its main part runs only when bash executes it) and
-// answers one line for each tab-separated pair.
 const bashCases = cases.flatMap((entry) => (entry.bash === undefined ? [] : [{ ...entry, bash: entry.bash }]));
 const bash = Bun.spawnSync(
   [

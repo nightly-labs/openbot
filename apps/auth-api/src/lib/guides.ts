@@ -1,9 +1,3 @@
-// The one list of published guides. Same shape as the news registry, and read by
-// the same pages, feed, sitemap and image generator.
-//
-// The public guides explain how OpenBot works and how to use it. Contributor
-// instructions for adding a guide live in CONTRIBUTING.md instead.
-
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 

@@ -1,9 +1,3 @@
-/**
- * The Chat background setting: one trigger with the color picker in a popup, for the scheme that the
- * window shows. Each scheme keeps its own color; "Default" gives the canvas of the theme again. The
- * popup saves once, when it closes, as the Chat color popup does.
- */
-
 import { CHAT_BACKGROUND_PRESETS, type ChatBackgroundScheme } from "@openbot/brand/chat-colors";
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -33,7 +27,6 @@ function chatBackgroundPicker(presets: () => { value: AvatarColor; label: string
   };
 }
 
-/** One scheme's trigger. The scheme is fixed, so a draft saves to the scheme it was opened for. */
 function ChatBackgroundTrigger(props: {
   scheme: ChatBackgroundScheme;
   value: AvatarColor | null;
@@ -69,18 +62,12 @@ function ChatBackgroundTrigger(props: {
 }
 
 export interface ChatBackgroundSettingProps {
-  /** The scheme that the window shows now: the trigger edits its color. */
   scheme: ChatBackgroundScheme;
-  /** The saved color of each scheme, or null for the canvas of the theme. */
   light: AvatarColor | null;
   dark: AvatarColor | null;
   onChange: (scheme: ChatBackgroundScheme, value: AvatarColor | null) => void;
 }
 
-/**
- * The trigger of the Chat background row in Settings › General. It edits the color of the scheme that
- * the window shows; the other scheme keeps its color and shows it again when the theme changes.
- */
 export function ChatBackgroundSetting(props: ChatBackgroundSettingProps) {
   const savedColor = (scheme: ChatBackgroundScheme) => (scheme === "light" ? props.light : props.dark);
   return (

@@ -1,31 +1,3 @@
-import {
-  type AgentSessionSettings,
-  decodeAgentAnalytics,
-  decodeGithubSkillSource,
-  decodeHostAnalytics,
-  decodeHostProviderAccounts,
-  decodeInstalledSkills,
-  decodeProviderUsageResetOutcome,
-  decodeProviderUsageResets,
-  decodeUsageCredits,
-  type GithubSkillSource,
-  type HostDefaultProvider,
-  type HostProviderAccounts,
-  isAgentHostSettings,
-  isAgentNotificationLevelsSnapshot,
-  isAgentSessionSettings,
-  isAgentTask,
-  isAgentTaskPage,
-  isAgentTaskReadState,
-  isAgentTasksSnapshot,
-  isAgentTaskWindow,
-  isConversationSnapshot,
-  isHiddenAgentsSnapshot,
-  isSidebarPinsSnapshot,
-} from "@openbot/contracts/ipc";
-// Agent-shaped wire payloads: summaries, status, models, skills, memories, routines, queue.
-// See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
-
 import type {
   AccountUsage,
   AgentExclusionChange,
@@ -50,21 +22,43 @@ import type {
   UsageCredits,
 } from "@openbot/contracts/ipc";
 import {
+  type AgentSessionSettings,
+  decodeAgentAnalytics,
+  decodeGithubSkillSource,
+  decodeHostAnalytics,
+  decodeHostProviderAccounts,
+  decodeInstalledSkills,
+  decodeProviderUsageResetOutcome,
+  decodeProviderUsageResets,
+  decodeUsageCredits,
+  type GithubSkillSource,
+  type HostDefaultProvider,
+  type HostProviderAccounts,
   isAccountUsage,
   isAgentColors,
   isAgentExclusionChange,
   isAgentFolderBrowse,
   isAgentFolderChange,
   isAgentFolderList,
+  isAgentHostSettings,
   isAgentInstructionsFile,
   isAgentMemory,
   isAgentModel,
+  isAgentNotificationLevelsSnapshot,
   isAgentProvider,
+  isAgentSessionSettings,
   isAgentStatus,
+  isAgentTask,
+  isAgentTaskPage,
+  isAgentTaskReadState,
+  isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAttachmentSummary,
   isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
+  isConversationSnapshot,
+  isHiddenAgentsSnapshot,
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
@@ -72,6 +66,7 @@ import {
   isRoutineFlowLink,
   isRoutineRun,
   isSidebarLayoutSnapshot,
+  isSidebarPinsSnapshot,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -119,13 +114,7 @@ export function decodeDraftAttachment(value: unknown): DraftAttachment {
 }
 
 export function decodeAgentSummary(value: unknown): ClientAgentSummary {
-  // Backup models stay on their host, and this decoder drops them. A later host can save a provider
-  // or more models than this version accepts, so they are not checked. An owner or admin reads them
-  // on `agent-backup-models-v1`. `pendingRuntime` comes only under `agent-pending-runtime-v1`, whose
-  // codec has already left out one that this version does not know.
   const { backupModels: _backupModels, usageLimitReturn: _usageLimitReturn, ...record } = decodeRecord(value, "agent");
-  // Servers older than 63b55606 omit `avatarUrl` entirely. The shared guard requires the field, so
-  // normalize the absent case to null before validating rather than loosening the guard for everyone.
   const candidate = record.avatarUrl === undefined ? { ...record, avatarUrl: null } : record;
   if (!isClientAgentSummary(candidate)) throw new Error("Invalid agent.");
   const marketplaceSource = decodeMarketplaceSource(candidate.marketplaceSource);
@@ -176,8 +165,6 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
   };
 }
 
-// The `agent-folders-v1` and `agent-instructions-v1` replies. The preload has its own `FromMain`
-// decoders for the same shapes, because the main process is a different sender from a joined server.
 export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
 export const decodeRemoteAgentFolderBrowse = guardedDecoder(isAgentFolderBrowse, "remote agent folder browse");
 export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
@@ -192,8 +179,6 @@ export function decodeRemoteAgentExclusionChange(value: unknown): AgentExclusion
   return value;
 }
 
-// The `agent-new-chat-v1` and `agent-fast-mode-v1` replies. The preload reads the same shapes from main
-// with its own decoders.
 export function decodeRemoteAgentNewChatSettings(value: unknown): AgentNewChatSettings {
   if (!isDynamicRecord(value) || !isBoolean(value.allowNewChat)) throw new Error("Invalid remote new chat setting.");
   return { allowNewChat: value.allowNewChat };
@@ -212,20 +197,14 @@ export function decodeAgentStatusFromHost(value: unknown): AgentStatus {
   return value;
 }
 
-/** The `provider-accounts-v1` list, as the web client also reads it: an unknown provider is left out. */
 export function decodeHostProviderAccountsFromHost(value: unknown): HostProviderAccounts {
   return decodeHostProviderAccounts(value);
 }
 
-/** The `provider-use-v1` off list, as the web client also reads it: an unknown provider is left out. */
 export function decodeProviderUseFromHost(value: unknown): AgentProviderId[] {
   return decodeProviderUseResponse(value);
 }
 
-/**
- * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
- * which reads as none, and its model with it.
- */
 export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
   const { provider, model } = decodeRecord(value, "default provider");
   if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
@@ -234,7 +213,6 @@ export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultPr
   return { preferredProvider: provider, preferredModel: model };
 }
 
-/** The `provider-usage-reset-v1` list: an unknown provider is left out. */
 export function decodeProviderUsageResetsFromHost(value: unknown): ProviderUsageResets[] {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider usage resets.");
   return decodeProviderUsageResets(value.accounts);
@@ -252,22 +230,11 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   return value;
 }
 
-/** The `usage-credits-v1` list: an unknown provider is left out. */
 export function decodeUsageCreditsList(value: unknown): UsageCredits[] {
   if (!isDynamicRecord(value)) throw new Error("Invalid usage credits.");
   return decodeUsageCredits(value.accounts);
 }
 
-// Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed
-// known payload a `protocol_error`, and a list this build silently shortens is the shape that rule
-// exists to forbid -- the host and the client would disagree about what was offered with nothing
-// saying so. What made `claude-fable-5-1[1m]` take a whole server offline was not this guard but
-// `isAgentModel` having no square brackets in its character set, so a legitimate id read as
-// malformed; widening the set is the fix, and a model id is deliberately an opaque token there
-// rather than a closed list for exactly this reason. An id that still fails it is a host sending
-// something no version of this protocol allows. A new reasoning effort is an additive change the
-// contract routes through capability negotiation instead. A provider that this build does not know
-// is not malformed from a protocol 8 host: its model stays in the list, and the picker disables it.
 export function decodeAgentModelOptions(value: unknown): ClientAgentModelOption[] {
   if (!Array.isArray(value) || !value.every(isClientAgentModelOption)) {
     throw new Error("Invalid remote agent models.");
@@ -330,7 +297,6 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
   return decodeAgentAnalytics(value);
 }
 
-/** A remote report has no skills: the frozen wire has no such field, so one that a host sends is not read. */
 export function decodeHostAnalyticsFromHost(value: unknown) {
   return decodeHostAnalytics(isDynamicRecord(value) ? { ...value, skills: undefined } : value);
 }

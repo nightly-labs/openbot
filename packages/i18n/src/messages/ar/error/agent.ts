@@ -13,6 +13,8 @@ export const messages = {
     "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
   "error.agent.toolCallEnvelopeKeys":
     "لم تعمل الأداة. لا يقبل tool_call إلا name وarguments. ضع وسائط الأداة في arguments ككائن، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallMissingName":
+    "لم تعمل الأداة. لا يحتوي tool_call على name. ضع في name الاسم المؤهل الذي يعطيه tool_search، مثل openbot.history_read، ثم أرسل الاستدعاء مرة أخرى.",
   "error.agent.toolCallUnknownTool":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -110,6 +112,10 @@ export const messages = {
   "error.agent.deletionBusy": "حذف الوكيل قيد التنفيذ بالفعل.",
   "error.agent.stopBeforeDelete": "أوقف الوكيل وألغِ رسائله في قائمة الانتظار قبل حذفه.",
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
+  "error.agent.deleteFolderInUse":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. يحذف OpenBot هذا الوكيل عند انتهاء ذلك العمل.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
   "error.agent.waitBeforeDuplicate": "انتظر انتهاء الوكيل وإفراغ قائمة انتظاره قبل تكراره.",
   "error.agent.saveOtherAgent": "عملية الحفظ هذه تخص وكيلًا آخر.",
