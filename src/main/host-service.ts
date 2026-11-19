@@ -2244,9 +2244,11 @@ export class HostService extends EventEmitter<HostEvents> {
 
   /**
    * Whether an active member who is not an owner or admin can see `agentId`. Such a member reads the
-   * agent's chat and can add a routine to it, so the CRM tools refuse the agent.
+   * agent's chat and can add a routine to it, so the CRM tools refuse the agent. A computer with no
+   * team server has no members, so the CRM tools work there (#12475).
    */
   agentVisibleToMembers(agentId: string): boolean {
+    if (!this.#options.store.configured) return false;
     return this.#options.store
       .listMembers()
       .some(

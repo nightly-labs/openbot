@@ -38,6 +38,7 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   addSkillSuggestionNames,
@@ -839,6 +840,7 @@ export class TeamWebRtcHostPeer {
             channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
             channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+            routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

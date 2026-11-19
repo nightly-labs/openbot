@@ -983,10 +983,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isRunning: () => this.#initialized && !this.#stopping,
         // A ready backup model or pool account takes the run: the drain moves the agent to it, as it
         // does for a chat message. Only an agent with no ready backup skips the run (#11785).
-        usageLimited: (agentId) =>
-          !this.#usageLimits.mayDrain(agentId) &&
-          this.#usageLimitBackup(agentId) === undefined &&
-          !this.#poolBackup(agentId),
+        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId) && this.#waitsForLimit(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
           const keys = options.agentApiKeys;
@@ -1214,6 +1211,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#retryHeldMoves();
         },
         onAccountsChanged: () => this.#retryHeldMoves(),
+        onProvidersUnready: () => this.#refreshHeldAgents(),
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
@@ -2458,6 +2456,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       turn: this.#turn,
       attention: this.#attention,
       usageLimits: this.#usageLimits,
+      waitsForLimit: (agentId) => this.#waitsForLimit(agentId),
     });
   }
 
@@ -4374,6 +4373,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } else if (isHeld && input.backupModels !== undefined) {
       // New backup models can let the held queue move now, and the chat no longer asks.
       this.#drain.scheduleDrain(agent.id);
+      this.#emitRuntimeSnapshot();
     }
     return agent;
   }, Effect.uninterruptible);
@@ -4492,6 +4492,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Whether a provider error moves this agent to a backup model or to another account of its pool. */
   #mayFailOver(agentId: string): boolean {
     return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
+  }
+
+  /**
+   * Whether a usage limit on the agent's model makes its work wait for the reset: no backup model that
+   * it switches to without asking, and no other account of its pool, is ready now.
+   */
+  #waitsForLimit(agentId: string): boolean {
+    return !this.#mayFailOver(agentId);
   }
 
   /** Whether the agent's pooled provider has another account to move to now. */
@@ -4646,6 +4654,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#poolBackup(agent.id))
       )
         this.#drain.scheduleDrain(agent.id);
+    this.#refreshHeldAgents();
+  }
+
+  /**
+   * Sends the runtime snapshot again while a usage limit holds an agent. A backup that became ready or
+   * not ready decides whether an idle held agent shows that it waits for its limit (#12360).
+   */
+  #refreshHeldAgents(): void {
+    if (this.#usageLimits.limitedAgents().length > 0) this.#emitRuntimeSnapshot();
   }
 
   /**
@@ -7190,10 +7207,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ),
         );
     // A turn that waits on a question in this chat reads no message until that question is answered,
-    // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
+    // so the person who wrote instead would wait for it. A stopped turn clears its own questions. A
+    // detached question of the chat closes also with no running turn, but not for the hidden welcome or
+    // setup message, which the person did not write (#12449).
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
-      if (targetThreadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      if (!targetThreadId) return;
+      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
     // Claude's steer puts the message in the CLI's input at once, so the question closes after it.

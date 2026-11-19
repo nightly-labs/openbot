@@ -10,7 +10,8 @@
 // event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
 // protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
 // advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
-// into an OpenBot channel. The codec carries kinds and statuses that this app does not know, and
+// into an OpenBot channel. A member puts that output in a canvas group, but a change of its settings
+// still needs an owner. The codec carries kinds and statuses that this app does not know, and
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // The host advertises `workflows-media-v1` to a protocol 9 peer, and a member keeps an uploaded PNG
 // as a picture of the host; a GIF, a used draft and a client without the capability are refused.
@@ -42,6 +43,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
+  WORKFLOW_GROUP_FIELDS,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowMediaCatalogModel,
@@ -979,6 +981,47 @@ try {
     const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
     assert.ok(nodes.includes("chat-channel") && nodes.includes("channel-e2e"), nodes);
     return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
+  });
+
+  await step("groups: a member groups a channel output, and its settings still need an owner", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const output: WorkflowNode = {
+      id: "chat-channel-output",
+      kind: "output",
+      at: at(600),
+      fields: { target: "chat-channel", channelId: "channel-e2e" },
+    };
+    const group = { [WORKFLOW_GROUP_FIELDS.id]: "group-e2e", [WORKFLOW_GROUP_FIELDS.name]: "Posts" };
+    const grouped = (fields: WorkflowNode["fields"]): WorkflowGraph => {
+      const graph = withOutput(agentGraph(open), { ...output, fields: { ...fields, ...group } });
+      return {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+          node.kind === "agent" ? { ...node, fields: { ...node.fields, ...group } } : node,
+        ),
+      };
+    };
+    const saved = await ok(WORKFLOWS_ROUTES.saveGraph, member, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: grouped(output.fields),
+    });
+    assert.equal(saved.ok, true);
+    const after = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(after.graph, "graph").nodes);
+    assert.ok(nodes.includes("group-e2e") && nodes.includes("Posts"), nodes);
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      {
+        workflowId: ids.open,
+        baseRevision: Number(after.revision),
+        graph: grouped({ ...output.fields, channelId: "other" }),
+      },
+      403,
+      "error.team.adminRequired",
+    );
+    return { grouped: 200, denied };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {

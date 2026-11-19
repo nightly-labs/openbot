@@ -31,6 +31,7 @@ import {
   STORY_GITHUB,
   STORY_IMAGES,
   STORY_SEED,
+  type StoryWorkflow,
   storyWebhook,
   todayAt,
 } from "./workflow-story-data";
@@ -127,6 +128,54 @@ export const EmptyCanvas: Story = {
       workflows={[{ id: "untitled", title: "Untitled workflow", graph: { nodes: [], edges: [], strokes: [] } }]}
     />
   ),
+};
+
+/** Three pictures in one group, each connected to the image step: the group draws one line with a count. */
+function moodboardGroup(folded: boolean): StoryWorkflow {
+  const open = { group: "story-moodboard", groupName: "Moodboard" };
+  const group = folded ? { ...open, groupFolded: true } : open;
+  const pictures = ["moodboard-01.jpg", "moodboard-02.jpg", "moodboard-03.jpg"];
+  return {
+    id: "moodboard-group",
+    title: "Moodboard cover",
+    graph: {
+      nodes: [
+        ...pictures.map((file, index) => ({
+          kind: "asset" as const,
+          id: `picture-${index + 1}`,
+          at: { x: index * 300, y: 0 },
+          fields: { file, ...group },
+        })),
+        {
+          kind: "image",
+          id: "cover",
+          at: { x: 1100, y: 0 },
+          fields: { prompt: "Cover image for the note, in the moodboard style", aspect: "16:9" },
+        },
+      ],
+      edges: pictures.map((_, index) => ({
+        id: `picture-${index + 1}>cover:image`,
+        from: `picture-${index + 1}`,
+        to: "cover",
+        type: "image" as const,
+      })),
+      strokes: [],
+    },
+  };
+}
+
+/**
+ * A group: a frame with a name and one port. Select nodes and press Group (⌘G) to make one. Press the
+ * frame to select the group, and Collapse in its toolbar to show it as a stack card.
+ */
+export const Groups: Story = {
+  render: () => <WorkflowStory workflows={[moodboardGroup(false)]} features={STORY_ALL_FEATURES} />,
+};
+
+/** A collapsed group: a stack card with the pictures of its members. Double-click it to open it. */
+export const GroupsCollapsed: Story = {
+  name: "Groups, collapsed",
+  render: () => <WorkflowStory workflows={[moodboardGroup(true)]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Text: Story = {

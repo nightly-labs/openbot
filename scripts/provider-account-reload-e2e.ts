@@ -6,7 +6,8 @@ import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { ProviderAccountState, ProviderAccountStatus } from "@openbot/contracts/ipc";
+import { agentProviderName, type ProviderAccountState, type ProviderAccountStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { ProviderAccountStore } from "../src/backend/agent/provider-account-store";
@@ -278,6 +279,36 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await waitForAccounts(runtime, "signed-out");
     for (const account of lostLogin.list()) await saveAccount(lostLogin.home(account), "restored@example.invalid");
     results.push({ name: "an agent start that finds no login marks the account signed out", passed: true });
+    await stop(runtime);
+    runtime = undefined;
+
+    // A login that ends while the agent's process runs: the turn fails, and the row must not stay
+    // "connected" (#12479). A refusal without the sign-in expired text keeps it connected.
+    const turnLostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
+    await runCauseEffect(turnLostLogin.load());
+    runtime = createRuntime(turnLostLogin);
+    await runCauseEffect(runtime.start());
+    await waitForAccounts(runtime, "connected");
+    for (const provider of providersToCheck) {
+      const accountId = turnLostLogin.list(provider)[0]?.id;
+      assert.ok(accountId);
+      const client = await runCauseEffect(
+        runtime.ensureAgentClient({ ...agent, provider, providerAccountId: accountId }),
+      );
+      assert.ok(client instanceof EventEmitter);
+      const turnFailed = (message: string) =>
+        client.emit("notification", { method: "error", params: { threadId: "thread", turnId: "turn", message } });
+      turnFailed("API Error: 403 Forbidden");
+      const row = () =>
+        runtime
+          ?.status()
+          .providers?.find((status) => status.id === provider)
+          ?.accounts?.find((a) => a.id === accountId);
+      assert.equal(row()?.state, "connected");
+      turnFailed(sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }));
+      assert.equal(row()?.state, "signed-out");
+    }
+    results.push({ name: "a turn that finds no login marks the account signed out", passed: true });
     await stop(runtime);
     runtime = undefined;
 

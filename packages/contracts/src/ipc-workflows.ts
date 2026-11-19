@@ -116,6 +116,12 @@ export type WorkflowFieldValue = string | number | boolean;
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
+/**
+ * The view-state fields that put a node in a group of the canvas: the id of the group, its name, and whether
+ * the group is collapsed. A run does not read them.
+ */
+export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
+
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 

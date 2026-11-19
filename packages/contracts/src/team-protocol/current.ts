@@ -173,6 +173,7 @@ import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
 import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "./routine-quiet-answers-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "./routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
@@ -808,6 +809,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
   [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
   [SKILL_PROBLEMS_CAPABILITY, V10],
+  [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [REMOTE_AGENT_BRIDGE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
