@@ -1455,7 +1455,12 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(
+                args.targets,
+                args.submission,
+                args.submitTarget,
+                args.method === "password" && args.targets.length === 1,
+              ),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1489,11 +1494,13 @@ export class BrowserHost {
         agentScriptedOrigin:
           this.#agentCodeReaches(tab, [url.origin]) ||
           (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker)),
-        vaultFillable: entry.kinds.every((kind, index) =>
-          args.method === "password" && (index === 0 || confirmation)
-            ? kind.password
-            : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
-        ),
+        vaultFillable:
+          entry.hiddenPasswordFill ||
+          entry.kinds.every((kind, index) =>
+            args.method === "password" && (index === 0 || confirmation)
+              ? kind.password
+              : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
+          ),
         withCode,
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
@@ -1546,7 +1553,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(values),
+                      entry.enter(values, vault),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,

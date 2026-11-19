@@ -422,13 +422,15 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
     submission: "on_input" | "enter" | "click",
-    submitTarget?: BrowserTarget,
+    submitTarget: BrowserTarget | undefined,
+    singlePassword: boolean,
   ): Effect.fn.Return<
     {
-      enter: (values: readonly string[]) => Effect.Effect<void, BrowserOperationError>;
+      enter: (values: readonly string[], vault: boolean) => Effect.Effect<void, BrowserOperationError>;
       clear: (secrets: readonly string[]) => Effect.Effect<boolean, BrowserOperationError>;
       hide: (secret: string, shown: boolean) => void;
       kinds: Array<{ password: boolean; oneTimeCode: boolean }>;
+      hiddenPasswordFill: boolean;
       servedByWorker: boolean;
       origin: string;
     },
@@ -538,18 +540,63 @@ export class BrowserCdpEngine {
           hiddenPasswords.push(isDynamicRecord(kind) && kind.hiddenPassword === true);
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
+        const firstInput = inputs[0];
+        const companion =
+          singlePassword && firstInput && !kinds[0]?.password
+            ? yield* this.#hiddenPasswordOf(send, firstInput)
+            : undefined;
+        const companionFingerprint = companion
+          ? yield* this.#callOnNode(
+              send,
+              companion.backendNodeId,
+              fingerprint,
+              [],
+              companion.sessionId,
+              companion.contextId,
+            )
+          : undefined;
         if (submission === "enter" && hiddenPasswords.at(-1))
           return yield* browserFailure(
             new Error(
               "The password field is hidden, so Enter cannot be pressed in it. Use submission=click with the page's sign-in button as submitTarget.",
             ),
           );
-        return { inputs, button, fingerprints, kinds, hiddenPasswords, servedByWorker, origin: fieldOrigin };
+        return {
+          inputs,
+          button,
+          fingerprints,
+          kinds,
+          hiddenPasswords,
+          companion:
+            companion && isString(companionFingerprint)
+              ? { ...companion, fingerprint: companionFingerprint }
+              : undefined,
+          servedByWorker,
+          origin: fieldOrigin,
+        };
       }),
     );
     if (generation !== this.#documentGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
-    const enter = (values: readonly string[]) =>
+    const writeHidden = (
+      send: SendCommand,
+      node: { backendNodeId: number; sessionId: string | undefined; contextId: number },
+      text: string,
+    ) =>
+      this.#callOnNode(
+        send,
+        node.backendNodeId,
+        `function(origin, text) {
+                if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly || this.type !== 'password') throw new Error('Authentication target changed.');
+                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(this, text);
+                this.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
+                this.dispatchEvent(new Event('change', { bubbles: true }));
+              }`,
+        [nodes.origin, text],
+        node.sessionId,
+        node.contextId,
+      );
+    const enter = (values: readonly string[], vault: boolean) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -578,25 +625,32 @@ export class BrowserCdpEngine {
                 );
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
+              const { companion } = nodes;
+              if (vault && companion) {
+                if (
+                  (yield* this.#callOnNode(
+                    send,
+                    companion.backendNodeId,
+                    fingerprint,
+                    [],
+                    companion.sessionId,
+                    companion.contextId,
+                  )) !== companion.fingerprint
+                )
+                  return yield* browserFailure(new Error("Authentication target changed."));
+                const text = values[0];
+                if (text === undefined || values.length !== 1)
+                  return yield* browserFailure(new Error("Authentication target changed."));
+                yield* writeHidden(send, companion, text);
+              }
               for (const [index, node] of nodes.inputs.entries()) {
+                if (vault && companion) break;
                 if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 if (nodes.hiddenPasswords[index]) {
                   const text = values[index];
                   if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
-                  yield* this.#callOnNode(
-                    send,
-                    node.backendNodeId,
-                    `function(origin, text) {
-                if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly || this.type !== 'password') throw new Error('Authentication target changed.');
-                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(this, text);
-                this.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
-                this.dispatchEvent(new Event('change', { bubbles: true }));
-              }`,
-                    [nodes.origin, text],
-                    node.sessionId,
-                    node.contextId,
-                  );
+                  yield* writeHidden(send, node, text);
                   continue;
                 }
                 yield* send("DOM.focus", { backendNodeId: node.backendNodeId }, node.sessionId);
@@ -685,7 +739,7 @@ export class BrowserCdpEngine {
     const clear = (secrets: readonly string[]) =>
       this.#leaseEffect((send) =>
         Effect.gen({ self: this }, function* () {
-          for (const node of nodes.inputs) {
+          for (const node of [...nodes.inputs, ...(nodes.companion ? [nodes.companion] : [])]) {
             const cleared = yield* this.#callOnNode(
               send,
               node.backendNodeId,
@@ -719,7 +773,15 @@ export class BrowserCdpEngine {
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
     const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
-    return { enter, clear, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker, origin: nodes.origin };
+    return {
+      enter,
+      clear,
+      hide,
+      kinds: nodes.kinds,
+      hiddenPasswordFill: nodes.companion !== undefined,
+      servedByWorker: nodes.servedByWorker,
+      origin: nodes.origin,
+    };
   });
 
   readonly fillCard = Effect.fn("BrowserCdp.fillCard")(function* (
@@ -2627,6 +2689,44 @@ export class BrowserCdpEngine {
       if (own === true) return { frameId, contextId };
     }
     return undefined;
+  });
+
+  readonly #hiddenPasswordOf = Effect.fn("BrowserCdp.hiddenPasswordOf")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    node: { backendNodeId: number; sessionId: string | undefined; contextId: number },
+  ) {
+    const resolved = yield* send(
+      "DOM.resolveNode",
+      { backendNodeId: node.backendNodeId, executionContextId: node.contextId },
+      node.sessionId,
+    );
+    const objectId = stringValue(recordValue(resolved.object)?.objectId);
+    if (!objectId) return undefined;
+    return yield* Effect.gen(function* () {
+      const result = yield* send(
+        "Runtime.callFunctionOn",
+        {
+          objectId,
+          functionDeclaration: `function() {
+            const shown = (element) => element.checkVisibility({ visibilityProperty: true });
+            if (this.localName !== 'input' || this.type !== 'text' || !shown(this)) return null;
+            const passwords = [...(this.form?.elements ?? [])].filter((element) => element.localName === 'input' && element.type === 'password');
+            const [password] = passwords;
+            return passwords.length === 1 && !shown(password) && !password.disabled && !password.readOnly ? password : null;
+          }`,
+          returnByValue: false,
+        },
+        node.sessionId,
+      );
+      const found = stringValue(recordValue(result.result)?.objectId);
+      if (recordValue(result.exceptionDetails) || !found) return undefined;
+      const described = yield* send("DOM.describeNode", { objectId: found }, node.sessionId).pipe(
+        Effect.ensuring(send("Runtime.releaseObject", { objectId: found }, node.sessionId).pipe(Effect.ignore)),
+      );
+      const backendNodeId = numberValue(recordValue(described.node)?.backendNodeId);
+      return backendNodeId ? { backendNodeId, sessionId: node.sessionId, contextId: node.contextId } : undefined;
+    }).pipe(Effect.ensuring(send("Runtime.releaseObject", { objectId }, node.sessionId).pipe(Effect.ignore)));
   });
 
   readonly #nodeFrameContextId = Effect.fn("BrowserCdp.nodeFrameContextId")(function* (

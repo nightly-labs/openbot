@@ -2219,7 +2219,7 @@ export class AttentionRegistry {
         withCode
           ? `the field target is not a password input, or the code targets are not code fields. ${codeFields}`
           : kind === "password"
-            ? "the field target is not a password input. When the form keeps its real password input hidden, target that input with a css selector and use submission=click."
+            ? "the field target is not a password input."
             : `the field targets are not code fields. ${codeFields}`,
         namedCard("field-kind"),
       );
