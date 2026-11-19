@@ -309,6 +309,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const {
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     agentSettingRowRequest,
@@ -2897,6 +2898,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setPageContext,
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     changeMarkerActions,
