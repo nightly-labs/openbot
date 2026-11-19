@@ -3780,10 +3780,16 @@ export class ProviderRuntime implements ProviderPort {
     const rows = this.#credentials.mcpServers();
     const config =
       rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
-      rows.find((row) => key === providerMcpServerName(row.name));
+      rows.find((row) => key === providerMcpServerName(row.name)) ??
+      rows.find((row) => key === row.name);
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
-    stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+    stderrLogger.warn("A provider reported an MCP server failure.", {
+      provider: client.provider,
+      server: server ?? config?.id ?? null,
+      message,
+    });
+    if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID) this.#reportGitHubToolsFailure(client.provider);
     if (!server) return;
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
@@ -4179,6 +4185,16 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError(
       "mcp_server_not_started",
       sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
+    );
+  }
+
+  #reportGitHubToolsFailure(provider: AgentProvider): void {
+    const key = [provider, GITHUB_CONNECTOR_MCP_SERVER_ID].join("\u0000");
+    if (this.#reportedMcpFailures.has(key)) return;
+    this.#reportedMcpFailures.add(key);
+    this.#emitError(
+      "mcp_server_not_started",
+      sourceText("error.backend.githubToolsNotStarted", { provider: providerLabel(provider) }),
     );
   }
 

@@ -309,6 +309,8 @@ export const messages = {
     "{provider} não conseguiu iniciar o servidor MCP {name}, porque o servidor não está disponível agora. Aguarde alguns minutos e depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} não conseguiu acessar o servidor MCP {name}. Abra {name} na Loja, Apps, e confira se o endereço está correto e se o servidor está em execução. Depois inicie um novo chat para tentar de novo.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} não conseguiu obter as ferramentas do GitHub, porque o GitHub não respondeu. Abra o GitHub na Loja, Apps, e conecte-o de novo se ele pedir. Depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
   "error.backend.mcpServerSignInPage":

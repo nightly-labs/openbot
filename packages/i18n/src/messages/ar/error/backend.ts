@@ -280,6 +280,8 @@ export const messages = {
     "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم غير متاح الآن. انتظر بضع دقائق، ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpServerUnreachableInProvider":
     "تعذّر على {provider} الوصول إلى خادم MCP {name}. افتح {name} في المتجر، التطبيقات، وتأكد من أن عنوانه صحيح وأن الخادم يعمل. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.githubToolsNotStarted":
+    "تعذّر على {provider} الحصول على أدوات GitHub، لأن GitHub لم يردّ. افتح GitHub في المتجر، التطبيقات، واربطه مرة أخرى إذا طلب منك ذلك. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
