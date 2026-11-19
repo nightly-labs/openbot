@@ -179,6 +179,47 @@ export const Prompt: Story = {
   ),
 };
 
+const REFERENCES = [
+  { id: "file-1", name: "launch-hero.png" },
+  { id: "file-2", name: "launch-hero-dark.png" },
+];
+
+const agentWithReferences: StoryWorkflow = {
+  id: "agent-references",
+  title: "Launch illustration",
+  graph: {
+    nodes: [
+      ...REFERENCES.map((file, index) => ({
+        kind: "asset" as const,
+        id: `reference-${index + 1}`,
+        at: { x: 0, y: index * 340 },
+        fields: { fileId: file.id, file: file.name },
+      })),
+      {
+        kind: "agent",
+        id: "illustrate",
+        at: { x: 420, y: 120 },
+        fields: {
+          agentId: AGENT,
+          task: "Make one 4:5 illustration that keeps the character and the style of the two pictures. Do not invent a new character.",
+        },
+      },
+    ],
+    edges: REFERENCES.map((_, index) => ({
+      id: `reference-${index + 1}>illustrate:image`,
+      from: `reference-${index + 1}`,
+      to: "illustrate",
+      type: "image" as const,
+    })),
+    strokes: [],
+  },
+};
+
+export const AgentWithPictures: Story = {
+  name: "Agent with connected pictures",
+  render: () => <WorkflowStory workflows={[agentWithReferences]} features={STORY_ALL_FEATURES} />,
+};
+
 export const Agent: Story = {
   render: () => (
     <NodeGallery selected="result" results={{ result: [{ id: "agent-result", at: todayAt(9, 14), value: RESULT }] }}>

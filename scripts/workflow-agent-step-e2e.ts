@@ -20,7 +20,7 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  handoffs: { agentId: string; deliveryId: string; sourcePaths: readonly string[] }[];
+  handoffs: { agentId: string; deliveryId: string; text: string; sourcePaths: readonly string[] }[];
   stopped: { agentId: string; deliveryId: string }[];
   passed: boolean;
   failure?: string;
@@ -92,7 +92,12 @@ async function open() {
       sendHandoff: (input) =>
         Effect.sync(() => {
           const deliveryId = `delivery-${report.handoffs.length + 1}`;
-          report.handoffs.push({ agentId: input.agentId, deliveryId, sourcePaths: input.sourcePaths });
+          report.handoffs.push({
+            agentId: input.agentId,
+            deliveryId,
+            text: input.text,
+            sourcePaths: input.sourcePaths,
+          });
           return deliveryId;
         }),
       stopDelivery: (agentId, deliveryId) =>
@@ -211,6 +216,21 @@ try {
     JSON.stringify(viewerHandoff?.sourcePaths) ===
       JSON.stringify([storedPath("asset-file"), storedPath(GENERATED_FILE)]),
     viewerHandoff,
+  );
+  check(
+    "the agent step text tells the agent to use the attached files together and not invent a substitute",
+    viewerHandoff?.text.includes("Describe the pictures.") === true &&
+      viewerHandoff.text.includes(
+        "The 2 attached files come from the steps before this one. Use them together as given: keep what they show, and do not invent a substitute.",
+      ),
+    viewerHandoff?.text,
+  );
+  check(
+    "an agent step with no file gets no file note",
+    report.handoffs
+      .filter((handoff) => handoff.sourcePaths.length === 0)
+      .every((handoff) => !handoff.text.includes("attached file")),
+    report.handoffs,
   );
   check(
     "an agent step with only a text edge gets no file",

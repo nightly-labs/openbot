@@ -213,6 +213,7 @@
     "./team-protocol/workflows-github-v1": "./src/team-protocol/workflows-github-v1.ts",
     "./team-protocol/workflows-media-v1": "./src/team-protocol/workflows-media-v1.ts",
     "./team-protocol/workflows-sunra-v1": "./src/team-protocol/workflows-sunra-v1.ts",
+    "./team-protocol/workflows-agent-files-v1": "./src/team-protocol/workflows-agent-files-v1.ts",
     "./team-protocol/workflows-higgsfield-v1": "./src/team-protocol/workflows-higgsfield-v1.ts",
     "./team-protocol/workflows-media-service-account-v1": "./src/team-protocol/workflows-media-service-account-v1.ts",
     "./team-protocol/workflows-media-account-v1": "./src/team-protocol/workflows-media-account-v1.ts",

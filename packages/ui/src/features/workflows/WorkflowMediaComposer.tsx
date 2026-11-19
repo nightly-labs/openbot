@@ -28,6 +28,7 @@ import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { useBoard } from "./workflow-board";
+import { ROLE_BADGE, ROLE_TEXT } from "./workflow-input-pictures";
 import {
   ASPECT_SHAPE,
   BACKGROUND_TEXT,
@@ -40,8 +41,6 @@ import {
   modeNameKey,
   optionNameKey,
   optionValueKey,
-  ROLE_BADGE,
-  ROLE_TEXT,
   RunContent,
   readableName,
   resolutionName,

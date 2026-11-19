@@ -26,7 +26,8 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Play, Zap } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { resultValue, useBoard } from "./workflow-board";
+import { resultValue, useBoard, type WfnBoard } from "./workflow-board";
+import { type InputRole, orStoredPicture, pictureUrl as storedPictureUrl } from "./workflow-input-pictures";
 import { asString, oneOf, useField, useLocked, useStepRun, useTextField } from "./workflow-node-parts";
 
 function resolutionSize(value: string): number | null {
@@ -180,21 +181,6 @@ export const KIND_TEXT = {
   },
 } as const satisfies Record<WorkflowMediaKind, Record<string, AppTextKey>>;
 
-export type InputRole = "reference" | "first" | "last" | "both";
-
-export const ROLE_TEXT = {
-  reference: "workflow.video.role.reference",
-  first: "workflow.video.role.first",
-  last: "workflow.video.role.last",
-  both: "workflow.video.role.both",
-} as const satisfies Record<InputRole, AppTextKey>;
-
-export const ROLE_BADGE = {
-  first: "workflow.video.badge.first",
-  last: "workflow.video.badge.last",
-  both: "workflow.video.badge.both",
-} as const satisfies Record<Exclude<InputRole, "reference">, AppTextKey>;
-
 export function typedSide(text: string, current: number): number {
   const value = Math.round(Number(text));
   if (!text.trim() || !Number.isFinite(value)) return current;
@@ -216,10 +202,10 @@ export function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
-const openQuotes = new WeakMap<object, Map<string, Promise<WorkflowMediaPrice>>>();
+const openQuotes = new WeakMap<WfnBoard, Map<string, Promise<WorkflowMediaPrice>>>();
 
 function sharedQuote(
-  board: object,
+  board: WfnBoard,
   choices: string,
   quote: (request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>,
   request: WorkflowMediaPriceRequest,
@@ -360,20 +346,15 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const voiceText = () => voiceName() ?? t("workflow.video.voiceAuto");
   const [locked, setLocked] = useLocked(key);
   const run = useStepRun(id);
-  const fileUrl = (value: string) =>
-    board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined;
-  const orFile = (made: string | null | undefined, value: string) => made ?? fileUrl(value) ?? made;
-  const pictureUrl = (value: string) => {
-    const preview = board.catalogs().mediaPreview;
-    return orFile(preview ? preview(value) : board.catalogs().media?.(value, "image"), value);
-  };
+  const orFile = (made: string | null | undefined, value: string) => orStoredPicture(board, made, value);
+  const pictureUrl = (value: string) => storedPictureUrl(board, value);
   const inputUrl = (source: string) => {
     const shown = board.shown(source);
     const file = board.field(source, "fileId");
     const value = shown && !shown.failed ? resultValue(shown) : typeof file === "string" && file ? file : undefined;
     if (value !== undefined) return pictureUrl(value) ?? undefined;
     const name = board.field(source, "file");
-    return typeof name === "string" && name ? fileUrl(name) : undefined;
+    return typeof name === "string" && name ? (orStoredPicture(board, undefined, name) ?? undefined) : undefined;
   };
   return {
     kind,

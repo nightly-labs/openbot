@@ -236,6 +236,7 @@ import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -462,6 +463,7 @@ export {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOWS_AGENT_FILES_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -761,6 +763,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
   [VAULT_MEMBER_SAVE_CAPABILITY, V10],
+  [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
