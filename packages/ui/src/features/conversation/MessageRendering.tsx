@@ -403,19 +403,6 @@ export function MessageBody(props: {
       return shown;
     }),
   );
-  const standaloneAttachments = createMemo(() => {
-    const referencedIds = referencedAttachmentIds();
-    const generatedAttachmentId =
-      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
-    const showsReferencedImages = props.message.author === "you";
-    return shownAttachments().filter(
-      (attachment) =>
-        (!referencedIds.has(attachment.id) ||
-          (showsReferencedImages && attachment.kind === "image") ||
-          playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null) &&
-        attachment.id !== generatedAttachmentId,
-    );
-  });
   const namedImageFiles = createMemo(
     () => {
       if (props.message.author !== "agent" || props.message.streaming || !props.loadImageFile) return [];
@@ -432,6 +419,23 @@ export function MessageBody(props: {
     },
     { equals: (previous, next) => imageFileKeys(previous) === imageFileKeys(next) },
   );
+  const showsReferencedImage = (attachment: AttachmentSummary) =>
+    attachment.kind === "image" &&
+    (props.message.author === "you" ||
+      (!props.message.streaming &&
+        !namedImageFiles().some((file) => fileReferenceName(file.path) === attachment.name)));
+  const standaloneAttachments = createMemo(() => {
+    const referencedIds = referencedAttachmentIds();
+    const generatedAttachmentId =
+      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
+    return shownAttachments().filter(
+      (attachment) =>
+        (!referencedIds.has(attachment.id) ||
+          showsReferencedImage(attachment) ||
+          playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null) &&
+        attachment.id !== generatedAttachmentId,
+    );
+  });
   const [fileImages, setFileImages] = createSignal<AttachmentSummary[]>([]);
   createEffect(
     () => ({ files: namedImageFiles(), load: untrack(() => props.loadImageFile) }),
