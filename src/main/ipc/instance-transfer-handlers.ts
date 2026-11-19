@@ -143,13 +143,15 @@ export function instanceTransferIpcHandlers({
     return stageRemoteFile(serverId, path);
   };
 
-  const runningUploads = new Map<string, { path: string; preview: Promise<InstanceTransferPreview> }>();
+  const runningUploads = new Map<string, { file: string; preview: Promise<InstanceTransferPreview> }>();
 
-  const uploadOnce = (serverId: string, path: string): Promise<InstanceTransferPreview> => {
+  const uploadOnce = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
+    const info = await stat(path);
+    const file = JSON.stringify([path, info.size, info.mtimeMs]);
     const running = runningUploads.get(serverId);
-    if (running?.path === path) return running.preview;
+    if (running?.file === file) return running.preview;
     const upload = {
-      path,
+      file,
       preview: runCauseEffect(
         uploadTransferInParts(remoteServers, serverId, path, (sent, total) =>
           reportUploadProgress({ serverId, sent, total }),

@@ -211,10 +211,27 @@ async function checkOverlappingUploads(root: string): Promise<void> {
   const late = await run(current.chunks.writePart(part(second.uploadId), async () => bytes, "alice"));
   assert.equal(late.receivedBytes, bytes.length);
   assert.equal((await run(current.chunks.finishUpload(second.uploadId, "alice"))).token, preview.token);
+  const third = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.deepEqual([third.uploadId, third.received], [first.uploadId, [0]]);
   await assert.rejects(run(current.chunks.writePart(part(first.uploadId), async () => bytes, "bob")));
   await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "bob")));
   await verifyArchives(directory, 1);
   await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+  const afterApply = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.notEqual(afterApply.uploadId, first.uploadId);
+  assert.deepEqual(afterApply.received, []);
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "alice")));
+  await run(current.chunks.abortUpload(afterApply.uploadId, "alice"));
+  const wrong = createHash("sha256").update("another file").digest("hex");
+  const failed = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  await run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol"));
+  await assert.rejects(run(current.chunks.finishUpload(failed.uploadId, "carol")));
+  await assert.rejects(run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol")));
+  const retried = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  assert.notEqual(retried.uploadId, failed.uploadId);
+  assert.deepEqual(retried.received, []);
+  await run(current.chunks.abortUpload(retried.uploadId, "carol"));
   assert.deepEqual(await names(directory), []);
 }
 

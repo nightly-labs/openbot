@@ -50,10 +50,23 @@ const INITIAL: ServerTransferState = {
   importError: null,
 };
 
-const runningImports = new Map<string, Promise<InstanceTransferPreview | null>>();
+const PREVIEW_KEPT_MS = 25 * 60_000;
+
+interface RunningImport {
+  pending: Promise<InstanceTransferPreview | null>;
+  settledAt: number | null;
+}
+
+const runningImports = new Map<string, RunningImport>();
+
+function currentImport(serverId: string): RunningImport | undefined {
+  const running = runningImports.get(serverId);
+  if (running?.settledAt != null && Date.now() - running.settledAt > PREVIEW_KEPT_MS) runningImports.delete(serverId);
+  return runningImports.get(serverId);
+}
 
 export function createServerTransferStore(serverId: string, calls: ServerTransferCalls) {
-  const runningImport = runningImports.get(serverId);
+  const runningImport = currentImport(serverId);
   const [state, setState] = createStore<ServerTransferState>(
     runningImport ? { ...INITIAL, screen: "import", importPhase: "reading" } : { ...INITIAL },
   );
@@ -143,13 +156,14 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
     });
   }
 
-  function followImport(pending: Promise<InstanceTransferPreview | null>): void {
+  function followImport(running: RunningImport): void {
     const settle = (change: (draft: ServerTransferState) => void) => {
+      running.settledAt ??= Date.now();
       if (disposed) return;
-      if (runningImports.get(serverId) === pending) runningImports.delete(serverId);
+      if (runningImports.get(serverId) === running) runningImports.delete(serverId);
       setState(change);
     };
-    void pending.then(
+    void running.pending.then(
       (preview) =>
         settle((draft) => {
           if (preview) draft.preview = preview;
@@ -173,9 +187,9 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       draft.importProgress = null;
       draft.importError = null;
     });
-    const pending = calls.choose(serverId);
-    runningImports.set(serverId, pending);
-    followImport(pending);
+    const running: RunningImport = { pending: calls.choose(serverId), settledAt: null };
+    runningImports.set(serverId, running);
+    followImport(running);
   }
 
   function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {

@@ -138,7 +138,6 @@ export function createServerCopyStore(
     void copying.result.then(
       (result) => {
         if (!settled()) return;
-        desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" });
         setState((draft) => {
           draft.phase = "done";
           draft.progress = null;
@@ -148,11 +147,6 @@ export function createServerCopyStore(
       },
       (error: unknown) => {
         if (!settled()) return;
-        desktopAnalytics.track("server_transfer_action", {
-          action: "copy",
-          result: "failed",
-          failure_code: "copy_failed",
-        });
         setState((draft) => {
           draft.phase = "idle";
           draft.progress = null;
@@ -175,6 +169,15 @@ export function createServerCopyStore(
     });
     const copying = { fromId: state.fromId, toId, result: calls.copy({ fromServerId: state.fromId, agentIds }, toId) };
     runningCopies.set(serverId, copying);
+    void copying.result.then(
+      () => desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" }),
+      () =>
+        desktopAnalytics.track("server_transfer_action", {
+          action: "copy",
+          result: "failed",
+          failure_code: "copy_failed",
+        }),
+    );
     followCopy(copying);
   }
 

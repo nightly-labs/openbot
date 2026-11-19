@@ -8,7 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_CHUNK_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Exit } from "effect";
 import { diskSpace } from "../backend/storage-usage";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 
@@ -18,6 +18,7 @@ const FREE_SPACE_MARGIN_BYTES = 256 * 1024 * 1024;
 export interface InstanceTransferChunkFiles {
   directory: () => Effect.Effect<string, ArchiveOperationError>;
   stage: (path: string, owner: string) => Effect.Effect<InstanceTransferPreview, ArchiveOperationError>;
+  staged: (token: string) => boolean;
   exportTo: (
     path: string,
     input: ExportInstanceInput,
@@ -33,12 +34,15 @@ interface Upload {
   path: string;
   received: Set<number>;
   writing: number;
+  written: Deferred.Deferred<void> | null;
   timer: NodeJS.Timeout;
 }
 
 interface Finish {
   owner: string;
   size: number;
+  sha256: string;
+  token: string | null;
   result: Deferred.Deferred<InstanceTransferPreview, ArchiveOperationError>;
 }
 
@@ -136,6 +140,15 @@ export class InstanceTransferChunks {
     if (input.size === 0) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
     if (input.size > INSTANCE_TRANSFER_LIMITS.archiveBytes)
       return yield* archiveFailure(new Error(sourceText("error.import.transferTooLarge")));
+    for (const [uploadId, finish] of this.#finishes) {
+      if (finish.size !== input.size || finish.sha256 !== input.sha256) continue;
+      if (this.#finished(uploadId, owner))
+        return {
+          uploadId,
+          chunkBytes: INSTANCE_TRANSFER_CHUNK_BYTES,
+          received: Array.from({ length: partCount(input.size) }, (_, index) => index),
+        };
+    }
     const current = [...this.#uploads.values()].find((upload) => upload.owner === owner);
     if (current && current.size === input.size && current.sha256 === input.sha256) {
       current.timer.refresh();
@@ -157,6 +170,7 @@ export class InstanceTransferChunks {
       path,
       received: new Set(),
       writing: 0,
+      written: null,
       timer: setTimeout(() => {
         if (this.#uploads.get(id) === upload && upload.writing === 0) void Effect.runPromise(this.#dropUpload(upload));
         else upload.timer.refresh();
@@ -172,10 +186,10 @@ export class InstanceTransferChunks {
     read: (limit: number) => Promise<Uint8Array>,
     owner: string,
   ): Effect.fn.Return<{ receivedBytes: number }, ArchiveOperationError> {
-    const finishedSize = this.#finishedSize(input.uploadId, owner);
-    if (finishedSize !== null) {
+    const finished = this.#finished(input.uploadId, owner);
+    if (finished) {
       yield* archiveCall(() => read(INSTANCE_TRANSFER_CHUNK_BYTES));
-      return { receivedBytes: finishedSize };
+      return { receivedBytes: finished.size };
     }
     const upload = yield* this.#ownUpload(input.uploadId, owner);
     if (!Number.isSafeInteger(input.index) || input.index < 0 || input.index >= partCount(upload.size))
@@ -185,8 +199,8 @@ export class InstanceTransferChunks {
     if (bytes.length !== partLength(upload.size, input.index) || sha256Hex(bytes) !== input.sha256)
       return yield* invalidPart();
     if (this.#uploads.get(upload.id) !== upload) {
-      const size = this.#finishedSize(upload.id, owner);
-      return size === null ? yield* closed() : { receivedBytes: size };
+      const finished = this.#finished(upload.id, owner);
+      return finished ? { receivedBytes: finished.size } : yield* closed();
     }
     upload.writing++;
     yield* archiveCall(async () => {
@@ -196,7 +210,16 @@ export class InstanceTransferChunks {
       } finally {
         await handle.close();
       }
-    }).pipe(Effect.ensuring(Effect.sync(() => upload.writing--)));
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          upload.writing--;
+          if (upload.writing > 0 || !upload.written) return;
+          Deferred.doneUnsafe(upload.written, Effect.void);
+          upload.written = null;
+        }),
+      ),
+    );
     upload.received.add(input.index);
     upload.timer.refresh();
     let receivedBytes = 0;
@@ -209,13 +232,24 @@ export class InstanceTransferChunks {
     uploadId: string,
     owner: string,
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
-    const finished = this.#finishes.get(uploadId);
-    if (finished) return finished.owner === owner ? yield* Deferred.await(finished.result) : yield* closed();
+    const finished = this.#finished(uploadId, owner);
+    if (finished) return yield* Deferred.await(finished.result);
     const upload = yield* this.#ownUpload(uploadId, owner);
-    if (upload.writing > 0 || upload.received.size !== partCount(upload.size)) return yield* invalidPart();
+    if (upload.writing > 0) {
+      upload.written ??= Deferred.makeUnsafe<void>();
+      yield* Deferred.await(upload.written);
+      return yield* this.finishUpload(uploadId, owner);
+    }
+    if (upload.received.size !== partCount(upload.size)) return yield* invalidPart();
     this.#uploads.delete(upload.id);
     clearTimeout(upload.timer);
-    const finish: Finish = { owner, size: upload.size, result: Deferred.makeUnsafe() };
+    const finish: Finish = {
+      owner,
+      size: upload.size,
+      sha256: upload.sha256,
+      token: null,
+      result: Deferred.makeUnsafe(),
+    };
     this.#finishes.set(upload.id, finish);
     const zip = upload.path.replace(/\.part$/u, ".zip");
     return yield* Effect.gen({ self: this }, function* () {
@@ -225,7 +259,7 @@ export class InstanceTransferChunks {
       yield* archiveCall(() => rename(upload.path, zip));
       return yield* this.files.stage(zip, owner);
     }).pipe(
-      Effect.tapError(() =>
+      Effect.onError(() =>
         Effect.all([
           archiveCall(() => rm(upload.path, { force: true })),
           archiveCall(() => rm(zip, { force: true })),
@@ -233,10 +267,13 @@ export class InstanceTransferChunks {
       ),
       Effect.onExit((exit) =>
         Effect.sync(() => {
+          if (Exit.isSuccess(exit)) finish.token = exit.value.token;
           Deferred.doneUnsafe(finish.result, exit);
-          setTimeout(() => {
+          const forget = () => {
             if (this.#finishes.get(upload.id) === finish) this.#finishes.delete(upload.id);
-          }, IDLE_TTL_MS).unref();
+          };
+          if (Exit.isSuccess(exit)) setTimeout(forget, IDLE_TTL_MS).unref();
+          else forget();
         }),
       ),
     );
@@ -319,9 +356,12 @@ export class InstanceTransferChunks {
     };
   }
 
-  #finishedSize(uploadId: string, owner: string): number | null {
+  #finished(uploadId: string, owner: string): Finish | null {
     const finished = this.#finishes.get(uploadId);
-    return finished && finished.owner === owner ? finished.size : null;
+    if (!finished || finished.owner !== owner) return null;
+    if (finished.token === null || this.files.staged(finished.token)) return finished;
+    this.#finishes.delete(uploadId);
+    return null;
   }
 
   #ownUpload(uploadId: string, owner: string): Effect.Effect<Upload, ArchiveOperationError> {
