@@ -867,6 +867,21 @@ All notable changes to OpenBot will be documented here. The project follows
 - On Linux, an earlier restart, shutdown or suspend could leave OpenBot on CPU drawing at each
   start, and this version does not turn the GPU on again by itself. **On Linux, if OpenBot is still
   slow after the upgrade, delete `~/.config/OpenBot/gpu-crash.json` and start OpenBot again.**
+- When GitHub Copilot is connected, Providers no longer shows a second "GitHub Copilot" under
+  "Found on the server" or "Found on this computer". The list of ACP agent presets no longer has
+  GitHub Copilot, because GitHub Copilot is a provider.
+- An agent that asked several teammates in one message now reads the answers that came in, also when
+  one teammate does not finish. Before, the answers waited for the last teammate with no end, and the
+  agent stayed "queued". Now, after the agent's next turn in the same chat or thread ends, such as the
+  next routine run or your next message there, the agent reads the answers that came in. It is told
+  which teammates still work, and their answers come in a later turn.
+- When OpenBot was closed at the time of a routine and the routine skipped that run, the agent said
+  that the routine had no runs. Now the agent sees the skipped run and can tell you that OpenBot was
+  closed at the scheduled time. It also sees runs that were skipped because of a usage limit or
+  because the last run had not finished.
+- When you ask an agent where a setting is, it now gives the correct tab names: Settings > Mobile
+  Connect to connect a phone, and Settings > App behavior for the start, workspace, server connection
+  and keep-awake settings. Before, it named tabs that do not exist ("Phones" and "App").
 
 ### Security
 
