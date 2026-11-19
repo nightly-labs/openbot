@@ -166,7 +166,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         { headers: { "Content-Type": "text/html" } },
       );
     }
-    if (url.pathname === "/confirm" || url.pathname === "/confirm-get") return confirmLoginFixture(url.pathname);
+    if (url.pathname === "/confirm") return confirmLoginFixture();
     if (url.pathname === "/confirmed") {
       const password = new URLSearchParams(await request.text()).get("password");
       return new Response(
@@ -992,31 +992,31 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
 
 const CONFIRM_PASSWORD = "fixture confirm+password/381904";
 
-interface ResubmitCase {
+interface ResubmitStep {
   name: string;
-  submission: string;
-  keptInField: boolean;
-  secretInSnapshots: boolean;
+  secretInSnapshot: boolean;
   evaluateBlocked: boolean;
-  page: string;
-  fieldAfter: "empty" | "filled" | null;
   screenshotBlocked: boolean;
+  page: string;
+  field: "empty" | "filled" | null;
   secretInAnyAddress: boolean;
 }
 
-function confirmLoginFixture(path: string): Response {
-  const method = path === "/confirm-get" ? "get" : "post";
+function confirmLoginFixture(): Response {
+  const send = (method: string, target: string) =>
+    `const form = document.querySelector('#form'); form.method = '${method}'; form.target = '${target}'; form.submit()`;
   return new Response(
     `<!doctype html><body>
-    <form id="form" method="${method}" action="/confirmed">
+    <form id="form" method="post" action="/confirmed">
       <label>Password<input id="password" name="password" type="password"></label>
       <button type="button" id="sign-in" onclick="document.querySelector('#question').hidden = false">Sign in</button>
       <div id="question" hidden>User logged in on another device. Continue?
-        <button type="button" id="yes" onclick="document.querySelector('#form').submit()">Yes</button></div>
+        <button type="button" id="yes" onclick="${send("post", "")}">Yes</button>
+        <button type="button" id="yes-get" onclick="${send("get", "")}">Yes as GET</button>
+        <button type="button" id="yes-popup" onclick="${send("get", "_blank")}">Yes in a new window</button></div>
     </form>
     <label>Show password<input id="show" type="checkbox" onchange="document.querySelector('#password').type = this.checked ? 'text' : 'password'"></label>
     <button type="button" id="copy" onclick="const copy = document.createElement('input'); copy.value = document.querySelector('#password').value; document.body.append(copy)">Copy</button>
-    <button type="button" id="yes-popup" onclick="const form = document.querySelector('#form'); form.target = '_blank'; form.submit()">Yes in a new window</button>
     </body>`,
     { headers: { "Content-Type": "text/html" } },
   );
@@ -1035,20 +1035,17 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
         arguments: args,
       }),
     );
-  const cases: ResubmitCase[] = [];
-  for (const [path, action] of [
-    ["/confirm", "yes"],
-    ["/confirm", "show"],
-    ["/confirm", "copy"],
-    ["/confirm-get", "yes"],
-    ["/confirm-get", "yes-popup"],
+  const steps: ResubmitStep[] = [];
+  for (const [flow, actions] of [
+    ["resubmit", ["yes-get", "yes-popup", "yes"]],
+    ["reveal", ["copy", "show"]],
   ] as const) {
     const tab = await runCauseEffect(
-      browser.open(`https://authentication.openbot.test${path}`, "secret-thread", "secret-agent"),
+      browser.open("https://authentication.openbot.test/confirm", "secret-thread", "secret-agent"),
     );
     try {
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
-      if (!contents) throw new Error(`Missing ${path} fixture.`);
+      if (!contents) throw new Error("Missing confirm fixture.");
       await waitForPresentedFrame(contents);
       const handoff = await runCauseEffect(
         browser.prepareSecret({
@@ -1057,7 +1054,7 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
           threadId: "secret-thread",
           ownerAgentId: "secret-agent",
           turnId: "secret-turn",
-          callId: `resubmit-${path}-${action}`,
+          callId: `resubmit-${flow}`,
           arguments: {
             tabId: tab.id,
             method: "password",
@@ -1068,67 +1065,70 @@ async function runResubmitScenario(browser: BrowserHost): Promise<void> {
         }),
       );
       const submission = await runCauseEffect(handoff.submit(CONFIRM_PASSWORD, true));
-      const keptSnapshot = await runCauseEffect(browser.snapshot(tab.id));
       const kept = await contents.executeJavaScript(
         `document.querySelector('#password').value === ${JSON.stringify(CONFIRM_PASSWORD)}`,
       );
-      const evaluation = await call("evaluate", {
-        tabId: tab.id,
-        expression: "document.querySelector('#password').value",
-      });
-      await call("click", { tabId: tab.id, target: { kind: "css", selector: `#${action}` } });
-      if (action === "yes" && path === "/confirm" && new URL(contents.getURL()).pathname !== "/confirmed")
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error("The confirmed sign-in did not load.")), 10_000);
-          contents.once("did-finish-load", () => {
-            clearTimeout(timer);
-            resolve();
-          });
-        });
-      const after = await runCauseEffect(browser.snapshot(tab.id));
-      const screenshot = await call("screenshot", { tabId: tab.id });
-      const fieldAfter =
-        new URL(contents.getURL()).pathname === "/confirmed"
-          ? null
-          : await contents.executeJavaScript("document.querySelector('#password').value");
-      const result: ResubmitCase = {
-        name: `${path} ${action}`,
-        submission,
-        keptInField: kept === true,
-        secretInSnapshots: [keptSnapshot, after].some((item) => JSON.stringify(item).includes(CONFIRM_PASSWORD)),
-        evaluateBlocked: !evaluation.success,
-        page: after.text.includes("Signed in")
-          ? "signed-in"
-          : after.text.includes("Password cannot be blank")
-            ? "blank-password"
-            : new URL(after.url).pathname,
-        fieldAfter: fieldAfter === null ? null : fieldAfter === "" ? "empty" : "filled",
-        screenshotBlocked: !screenshot.success,
-        secretInAnyAddress: webContents.getAllWebContents().some((item) => item.getURL().includes("381904")),
+      if (submission !== "submitted" || kept !== true)
+        throw new Error(`The ${flow} sign-in did not keep the password: ${submission}, kept ${String(kept)}.`);
+      const observe = async (name: string): Promise<ResubmitStep> => {
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        const evaluation = await call("evaluate", { tabId: tab.id, expression: "document.title" });
+        const screenshot = await call("screenshot", { tabId: tab.id });
+        const confirmed = new URL(contents.getURL()).pathname === "/confirmed";
+        const field = confirmed ? null : await contents.executeJavaScript("document.querySelector('#password').value");
+        const step: ResubmitStep = {
+          name: `${flow} ${name}`,
+          secretInSnapshot: JSON.stringify(snapshot).includes(CONFIRM_PASSWORD),
+          evaluateBlocked: !evaluation.success,
+          screenshotBlocked: !screenshot.success,
+          page: snapshot.text.includes("Signed in")
+            ? "signed-in"
+            : snapshot.text.includes("Password cannot be blank")
+              ? "blank-password"
+              : new URL(snapshot.url).pathname,
+          field: field === null ? null : field === "" ? "empty" : "filled",
+          secretInAnyAddress: webContents.getAllWebContents().some((item) => item.getURL().includes("381904")),
+        };
+        steps.push(step);
+        return step;
       };
-      cases.push(result);
-      const expected =
-        action === "show"
-          ? result.fieldAfter === "empty"
-          : action === "copy"
-            ? result.page === "/confirm"
-            : path === "/confirm"
-              ? result.page === "signed-in"
-              : result.page === "/confirm-get";
-      if (
-        !expected ||
-        result.screenshotBlocked !== (action === "copy") ||
-        result.secretInAnyAddress ||
-        result.submission !== "submitted" ||
-        !result.keptInField ||
-        result.secretInSnapshots ||
-        !result.evaluateBlocked
-      )
-        throw new Error(`A kept password failed on ${path} with ${action}: ${JSON.stringify(result)}`);
+      const expected: Record<string, (step: ResubmitStep) => boolean> = {
+        submit: (step) => step.page === "/confirm" && step.field === "filled" && step.evaluateBlocked,
+        "yes-get": (step) => step.page === "/confirm" && step.field === "filled",
+        "yes-popup": (step) => step.page === "/confirm" && step.field === "filled",
+        yes: (step) => step.page === "signed-in",
+        copy: (step) => step.page === "/confirm" && step.screenshotBlocked,
+        show: (step) => step.page === "/confirm" && step.field === "empty",
+      };
+      for (const action of ["submit", ...actions]) {
+        if (action !== "submit") {
+          const loaded =
+            action === "yes"
+              ? new Promise<void>((resolve, reject) => {
+                  const timer = setTimeout(() => reject(new Error("The confirmed sign-in did not load.")), 10_000);
+                  contents.once("did-finish-load", () => {
+                    clearTimeout(timer);
+                    resolve();
+                  });
+                })
+              : Promise.resolve();
+          await call("click", { tabId: tab.id, target: { kind: "css", selector: `#${action}` } });
+          await loaded;
+        }
+        const step = await observe(action);
+        const screenshotExpected = flow === "reveal" && action !== "submit";
+        if (
+          !expected[action]?.(step) ||
+          step.secretInSnapshot ||
+          step.secretInAnyAddress ||
+          step.screenshotBlocked !== screenshotExpected
+        )
+          throw new Error(`A kept password failed at ${step.name}: ${JSON.stringify(step)}`);
+      }
     } finally {
       await runCauseEffect(browser.close(tab.id));
     }
   }
   await mkdir(".openbot-build", { recursive: true });
-  await writeFile(".openbot-build/browser-secret-resubmit.json", JSON.stringify({ status: "passed", cases }, null, 2));
+  await writeFile(".openbot-build/browser-secret-resubmit.json", JSON.stringify({ status: "passed", steps }, null, 2));
 }
