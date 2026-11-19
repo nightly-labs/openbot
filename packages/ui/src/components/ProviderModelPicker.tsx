@@ -295,10 +295,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** The provider whose mark the trigger shows, so only a changed one springs in. */
   let shownProvider = untrack(activeProvider);
 
-  /** The OpenCode, Pi and Custom tabs split one wire provider so each model appears once. */
+  /**
+   * The OpenCode, Pi and Custom tabs split one wire provider so each model appears once. A model that an
+   * admin turned off stays in the list while an agent uses it (`kept`); it shows only where it is the value.
+   */
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
-    if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
+    const options = props.modelOptions.filter(
+      (option) => option.listing !== "kept" || (option.provider === props.provider && option.id === props.value),
+    );
+    if (rail === CUSTOM_RAIL) return options.filter((option) => isCustomModel(option, customIds()));
+    return options.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   /**

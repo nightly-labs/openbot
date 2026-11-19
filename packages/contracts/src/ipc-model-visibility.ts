@@ -121,6 +121,20 @@ export function withModelListings<Model extends { provider: string; id: string; 
   });
 }
 
+/**
+ * Marks each model of `models` that the `model-visibility-kept-v1` route lists as `kept`. The route has
+ * the shape of the steering list, so `decodeAgentSteeringModels` reads it.
+ */
+export function withKeptModels<Model extends { provider: string; id: string; listing?: AgentModelListing }>(
+  models: readonly Model[],
+  kept: readonly AgentSteeringModel[],
+): Model[] {
+  const keys = new Set(kept.map((entry) => `${entry.provider}\u0000${entry.id}`));
+  return models.map((model) =>
+    keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, listing: "kept" } : model,
+  );
+}
+
 /** A model of a host whose agent takes a message into its running turn (`model-steering-v1`). */
 export interface AgentSteeringModel {
   provider: AgentProviderRef;

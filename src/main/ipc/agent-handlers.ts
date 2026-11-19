@@ -23,6 +23,10 @@ import {
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
@@ -78,6 +82,7 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withSteeringModels,
   withUsageCredits,
@@ -559,12 +564,26 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              // The four requests go to the same host at the same time.
-              const [options, fastModels, listed, steered] = yield* Effect.all([models, fast, listings, steering], {
-                concurrency: "unbounded",
-              });
+              // `model-visibility-kept-v1` lists the models that an admin turned off and an agent uses. A
+              // host without it, or a failed read, leaves them in every picker, as before (#12582).
+              const kept = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              // The requests go to the same host at the same time.
+              const [options, fastModels, listed, steered, keptModels] = yield* Effect.all(
+                [models, fast, listings, steering, kept],
+                { concurrency: "unbounded" },
+              );
               return withWorkspaceOnlyLimit(
-                withSteeringModels(withModelListings(withFastServiceTiers(options, fastModels), listed), steered),
+                withSteeringModels(
+                  withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
+                  steered,
+                ),
                 remoteServers.supportsCapability(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
               );
             }),

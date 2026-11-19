@@ -470,7 +470,8 @@ export interface ModelVisibilityOptions {
  * The file keeps only the models that an admin turned off, and the picker leaves them out. Every
  * other model shows: in the main list when `defaultShownModelIds` gives it, otherwise under Older
  * models. So a new release shows after an admin edits the list too. A model that an agent uses stays
- * in the picker, out of the fold, so its picker can show it.
+ * in the list, out of the fold, so its picker can show it. When an admin turned it off, it is `kept`:
+ * the other pickers leave it out (#12582).
  *
  * A file that is missing or unreadable as JSON reads as no changes. Writes are chained for the reason
  * `update-preference-store.ts` chains its own.
@@ -541,7 +542,8 @@ export class ModelVisibility {
   /**
    * The models of `models` that the picker lists, in the same order: less those that an admin turned
    * off, and with `listing` set to `older` for those that the default hides and to `new` for a recent
-   * release in the main list.
+   * release in the main list. A model that an admin turned off and an agent uses is `kept`: only the
+   * model choices that hold it show it (#12582).
    */
   picker<Model extends { provider: string; id: string; listing?: AgentModelListing }>(
     models: readonly Model[],
@@ -549,13 +551,27 @@ export class ModelVisibility {
     return this.#picker(models);
   }
 
-  /** The `listing` of each model that the provider list has one for, for a client that reads the released model list. */
+  /**
+   * The `listing` of each model that the provider list has one for, for a client that reads the released
+   * model list. `model-visibility-v1` knows only `new` and `older`; `kept` gives the others.
+   */
   listings(): Effect.Effect<AgentModelListingEntry[]> {
     return this.#picker(this.#options.listModels()).pipe(
       Effect.map((models) =>
         models.flatMap((model) =>
-          model.listing ? [{ provider: model.provider, id: model.id, listing: model.listing }] : [],
+          model.listing && model.listing !== "kept"
+            ? [{ provider: model.provider, id: model.id, listing: model.listing }]
+            : [],
         ),
+      ),
+    );
+  }
+
+  /** The models that an admin turned off and the list keeps because an agent uses them (`model-visibility-kept-v1`). */
+  kept(): Effect.Effect<{ provider: string; id: string }[]> {
+    return this.#picker(this.#options.listModels()).pipe(
+      Effect.map((models) =>
+        models.flatMap((model) => (model.listing === "kept" ? [{ provider: model.provider, id: model.id }] : [])),
       ),
     );
   }
@@ -629,7 +645,7 @@ export class ModelVisibility {
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
-      if (picker.hidden.has(model.id) && !used) return [];
+      if (picker.hidden.has(model.id)) return used ? [{ ...model, listing: "kept" }] : [];
       if (picker.byDefault.has(model.id)) {
         const released = Date.parse(picker.released.get(model.id) ?? "");
         return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
