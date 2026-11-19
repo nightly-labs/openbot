@@ -192,6 +192,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Impossible d’établir une connexion directe avec l’hôte. Un pare-feu, un VPN ou un proxy peut la bloquer.",
   "error.remote.iceDisconnected": "La connexion directe avec l’hôte a été perdue.",
+  "error.remote.webrtcBlocked":
+    "Cet appareil bloque la connexion dont OpenBot a besoin. Si le mode Isolement est activé, désactivez-le pour OpenBot dans Réglages > Confidentialité et sécurité > Mode Isolement.",
   "error.remote.directoryUnreachable": "OpenBot n’a pas pu joindre le service OpenBot. Vérifiez votre connexion.",
   "error.remote.directoryTimeout": "Le service OpenBot n’a pas répondu à temps. Réessayez.",
   "error.remote.inviteAlreadyUsed": "Cette invitation a déjà été utilisée. Demandez une nouvelle invitation.",

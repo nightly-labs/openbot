@@ -189,6 +189,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Non è stato possibile stabilire una connessione diretta con l'host. Un firewall, una VPN o un proxy possono bloccarla.",
   "error.remote.iceDisconnected": "La connessione diretta con l'host è andata persa.",
+  "error.remote.webrtcBlocked":
+    "Questo dispositivo blocca la connessione di cui OpenBot ha bisogno. Se la modalità di isolamento è attiva, disattivala per OpenBot in Impostazioni > Privacy e sicurezza > Modalità di isolamento.",
   "error.remote.directoryUnreachable":
     "OpenBot non è riuscito a raggiungere il servizio OpenBot. Controlla la connessione.",
   "error.remote.directoryTimeout": "Il servizio OpenBot non ha risposto in tempo. Riprova.",

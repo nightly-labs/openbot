@@ -173,6 +173,8 @@ export const messages = {
   "error.remote.relayUnavailable": "Signal 没有为这次连接提供中继服务器，请稍后重试。",
   "error.remote.iceFailed": "无法与主机建立直连。防火墙、VPN 或代理可能阻断了连接。",
   "error.remote.iceDisconnected": "与主机的直连已断开。",
+  "error.remote.webrtcBlocked":
+    "此设备阻止了 OpenBot 所需的连接。如果已打开锁定模式，请在“设置”>“隐私与安全性”>“锁定模式”中为 OpenBot 关闭它。",
   "error.remote.directoryUnreachable": "OpenBot 无法连接 OpenBot 服务，请检查网络连接。",
   "error.remote.directoryTimeout": "OpenBot 服务未及时响应，请重试。",
   "error.remote.inviteAlreadyUsed": "该邀请已被使用，请申请新的邀请。",
