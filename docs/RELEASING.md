@@ -648,8 +648,8 @@ Before a tag, run the release path without publishing:
 gh workflow run release.yml --ref <branch> -f mode=dry-run
 ```
 
-The dry run runs the tag validation (without the tag and `main` checks), the repository check, the
-Windows, Linux and Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
+The dry run runs the tag validation (without the tag and `main` checks), the Windows, Linux and
+Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
 and it makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive,
 and an attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
 tag ref to check the macOS Host signing keychain, and `-f mode=windows-signing` on a tag ref to check

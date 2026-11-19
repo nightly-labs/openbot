@@ -267,6 +267,7 @@ jobs:
   repository-check:
     name: Run repository check
     needs: validate
+    if: github.event_name == 'push'
     runs-on: macos-15
     timeout-minutes: 45
     permissions:
