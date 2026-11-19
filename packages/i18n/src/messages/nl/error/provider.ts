@@ -266,6 +266,10 @@ export const messages = {
     "Dit model is niet beschikbaar voor je. Kies een ander model voor deze agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Kies een lager denkniveau of een ander model en stuur je bericht opnieuw.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Open in Instellingen Eigen aanbieder, klik bij dit endpoint op Bewerken en stel een grotere Max. output in voor dit model. Of kies een lager denkniveau of een ander model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
   "error.provider.opencodeModelNotServed":

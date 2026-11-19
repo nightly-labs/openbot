@@ -39,7 +39,7 @@ export function BrowserSecretCard(props: {
   const formId = createUniqueId();
   const [saveChoice, setSaveChoice] = createSignal<boolean | null>(null);
   const saveBlocked = () => Boolean(props.vault?.blocked);
-  const saveToVault = () => !saveBlocked() && (saveChoice() ?? props.vault?.server === null);
+  const saveToVault = () => !saveBlocked() && (saveChoice() ?? true);
   const [preview, setPreview] = createSignal<BrowserPreview | null>(null);
   const [previewStatus, setPreviewStatus] = createSignal<"loading" | "ready" | "failed">("loading");
   const [previewHidden, setPreviewHidden] = createSignal(false);

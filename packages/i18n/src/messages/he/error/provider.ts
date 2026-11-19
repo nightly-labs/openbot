@@ -246,6 +246,10 @@ export const messages = {
   "error.provider.opencodeModelUnavailable": "המודל הזה אינו זמין עבורך. יש לבחור מודל אחר לסוכן הזה.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "התשובה של המודל נקטעה או שלא הייתה תקינה. יש לשלוח את ההודעה שוב או לבחור מודל אחר.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "התשובה של המודל ארוכה ממגבלת הפלט שלו שלוש פעמים, ולכן התור נעצר. בחרו מאמץ נמוך יותר או מודל אחר, ואז שלחו את ההודעה שוב.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "התשובה של המודל ארוכה ממגבלת הפלט שלו שלוש פעמים, ולכן התור נעצר. בהגדרות, פתחו את ספק מותאם אישית, לחצו על עריכה בנקודת הקצה הזו והגדירו פלט מרבי גדול יותר למודל הזה. או בחרו מאמץ נמוך יותר או מודל אחר.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
   "error.provider.opencodeModelNotServed":
