@@ -1,23 +1,38 @@
 import type { AgentExchangeSummary } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Link } from "expo-router";
-import { Typography } from "heroui-native";
-import ChevronDown from "lucide-react-native/icons/chevron-down";
-import { Pressable, View, type ViewStyle } from "react-native";
+import type { LucideIcon } from "lucide-react-native";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Forward from "lucide-react-native/icons/forward";
+import Inbox from "lucide-react-native/icons/inbox";
+import Megaphone from "lucide-react-native/icons/megaphone";
+import MessagesSquare from "lucide-react-native/icons/messages-square";
+import Send from "lucide-react-native/icons/send";
+import UserCheck from "lucide-react-native/icons/user-check";
+import type { ReactNode } from "react";
+import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import type { ChatMessage, ExchangeGroup, ExchangeMarker } from "@/features/chat/model/chat-messages";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
-import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import {
+  ACTIVITY_ICON_SIZE,
+  CHEVRON_SIZE,
+  ChatActivityLine,
+  ExpandChevron,
+  useActivityColors,
+} from "./chat-activity-line";
 import { useKeptOpen } from "./use-kept-open";
 
 type RoutingMarker = Extract<ChatMessage, { kind: "channel-routing" }>;
 
+const AVATAR_SIZE = 16;
+
 interface MarkerContext {
   agents: MobileAgent[];
   agentsById: ReadonlyMap<string, MobileAgent>;
-  muted: ViewStyle["backgroundColor"];
 }
 
 function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
@@ -28,6 +43,11 @@ function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
   return exchange.direction === "outgoing" ? t("mobile.chat.exchange.messaged") : t("mobile.chat.exchange.messageFrom");
 }
 
+function exchangeIcon(exchange: AgentExchangeSummary): LucideIcon {
+  if (exchange.direction === "incoming") return Inbox;
+  return exchange.expectsReply === false ? Megaphone : Send;
+}
+
 function exchangeAgentIds(exchange: AgentExchangeSummary) {
   return exchange.direction === "incoming" ? [exchange.senderAgentId] : exchange.recipientAgentIds;
 }
@@ -36,132 +56,157 @@ export function ChatExchangeMarker({
   message,
   agents,
   agentsById,
-  muted,
 }: MarkerContext & { message: ExchangeMarker | RoutingMarker }) {
   const { t } = useText();
+  const colors = useActivityColors();
   const [open, setOpen] = useKeptOpen(`marker:${message.id}`, false);
-  const label =
-    message.kind === "channel-routing"
-      ? message.event.action === "assigned"
-        ? t("mobile.chat.exchange.assignedTo")
-        : t("mobile.chat.exchange.continuingWith")
-      : exchangeLabel(message.exchange, t);
-  const ids = message.kind === "channel-routing" ? [message.event.agentId] : exchangeAgentIds(message.exchange);
-  const badges = ids.map((id) => {
-    const legacyName =
-      message.kind === "channel-routing" && message.event.agentId === null ? message.event.agentName : null;
+  const routing = message.kind === "channel-routing";
+  const label = routing
+    ? message.event.action === "assigned"
+      ? t("mobile.chat.exchange.assignedTo")
+      : t("mobile.chat.exchange.continuingWith")
+    : exchangeLabel(message.exchange, t);
+  const Icon = routing ? (message.event.action === "assigned" ? UserCheck : Forward) : exchangeIcon(message.exchange);
+  const icon = <Icon size={ACTIVITY_ICON_SIZE} color={colors.muted} />;
+  const ids = routing ? [message.event.agentId] : exchangeAgentIds(message.exchange);
+  const participants = ids.map((id) => {
+    const legacyName = routing && message.event.agentId === null ? message.event.agentName : null;
     const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
-    const participant = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
-    const badge = (
-      <AgentBadge
-        key={id ?? legacyName}
-        agent={participant}
-        name={
-          participant?.name ??
-          (message.kind === "channel-routing"
-            ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
-            : t("mobile.chat.exchange.unknownAgent"))
-        }
-        muted={muted}
+    const agent = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
+    const name =
+      agent?.name ??
+      (routing ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent")) : t("mobile.chat.exchange.unknownAgent"));
+    return { key: id ?? legacyName ?? name, agent, name };
+  });
+  const [only] = participants;
+  if (participants.length <= 1) {
+    return (
+      <AgentLine
+        agent={only?.agent}
+        linked={routing}
+        icon={icon}
+        label={label}
+        name={only?.name}
+        nameIcon={only?.agent ? <AgentThumbnail agent={only.agent} /> : null}
       />
     );
-    return message.kind === "channel-routing" && participant ? (
-      <Link key={participant.id} href={{ pathname: "/chat/[agentId]", params: { agentId: participant.id } }} asChild>
-        <ChatLinkPressable
-          accessibilityRole="link"
-          accessibilityLabel={t("mobile.chat.exchange.openChat", { name: participant.name })}
-        >
-          {badge}
-        </ChatLinkPressable>
-      </Link>
-    ) : (
-      <View key={id ?? legacyName}>{badge}</View>
-    );
-  });
-  if (badges.length > 1) {
-    const agentCount = t("mobile.chat.exchange.agentCount", { count: badges.length });
-    return (
-      <View className="items-center gap-2 py-2">
-        <View className="flex-row flex-wrap items-center justify-center gap-2">
-          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-            {label}
-          </Typography.Paragraph>
-          <AgentsToggle
-            agents={ids.map((id) => (id ? agentsById.get(id) : undefined))}
-            label={agentCount}
-            accessibilityLabel={agentCount}
-            open={open}
-            onToggle={() => setOpen((value) => !value)}
-            muted={muted}
-          />
-        </View>
-        {open ? <View className="flex-row flex-wrap items-center justify-center gap-2">{badges}</View> : null}
-      </View>
-    );
   }
+  const agentCount = t("mobile.chat.exchange.agentCount", { count: participants.length });
   return (
-    <View className="flex-row flex-wrap items-center justify-center gap-2 py-2">
-      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {label}
-      </Typography.Paragraph>
-      {badges}
+    <View>
+      <ChatActivityLine
+        icon={icon}
+        label={label}
+        name={agentCount}
+        nameIcon={<AgentStack agents={participants.map(({ agent }) => agent)} />}
+        accessibilityLabel={`${label}, ${agentCount}`}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        trailing={<ExpandChevron open={open} />}
+      />
+      {open ? (
+        <View className="ps-5">
+          {participants.map(({ key, agent, name }) => (
+            <AgentLine
+              key={key}
+              agent={agent}
+              linked={routing}
+              icon={agent ? <AgentThumbnail agent={agent} /> : icon}
+              name={name}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-export function ChatExchangeGroup({ group, agents, agentsById, muted }: MarkerContext & { group: ExchangeGroup }) {
+export function ChatExchangeGroup({ group, agents, agentsById }: MarkerContext & { group: ExchangeGroup }) {
   const { t } = useText();
+  const colors = useActivityColors();
   const [open, setOpen] = useKeptOpen(`group:${group.id}`, false);
   const ids = [...new Set(group.exchanges.flatMap(({ exchange }) => exchangeAgentIds(exchange)))];
   const participants = ids.map((id) => agentsById.get(id));
   const count = group.exchanges.length;
+  const label = t("mobile.chat.exchange.group", { count });
   const agentsLabel =
     ids.length === 1
       ? (participants[0]?.name ?? t("mobile.chat.exchange.unknownAgent"))
       : t("mobile.chat.exchange.agentCount", { count: ids.length });
   return (
-    <View className="items-center py-2">
-      <View className="flex-row flex-wrap items-center justify-center gap-2">
-        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-          {t("mobile.chat.exchange.group", { count })}
-        </Typography.Paragraph>
-        <AgentsToggle
-          agents={participants}
-          label={agentsLabel}
-          accessibilityLabel={t(open ? "mobile.chat.exchange.hideMessages" : "mobile.chat.exchange.showMessages", {
-            count,
-            agents: agentsLabel,
-          })}
-          open={open}
-          onToggle={() => setOpen((value) => !value)}
-          muted={muted}
-        />
-      </View>
-      {open
-        ? group.exchanges.map((item) => (
-            <ChatExchangeMarker key={item.id} message={item} agents={agents} agentsById={agentsById} muted={muted} />
-          ))
-        : null}
+    <View>
+      <ChatActivityLine
+        icon={<MessagesSquare size={ACTIVITY_ICON_SIZE} color={colors.muted} />}
+        label={label}
+        name={agentsLabel}
+        nameIcon={<AgentStack agents={participants} />}
+        accessibilityLabel={t(open ? "mobile.chat.exchange.hideMessages" : "mobile.chat.exchange.showMessages", {
+          count,
+          agents: agentsLabel,
+        })}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        trailing={<ExpandChevron open={open} />}
+      />
+      {open ? (
+        <View className="ps-5">
+          {group.exchanges.map((item) => (
+            <ChatExchangeMarker key={item.id} message={item} agents={agents} agentsById={agentsById} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function AgentBadge({
+function AgentLine({
   agent,
+  linked,
+  icon,
+  label,
   name,
-  muted,
+  nameIcon,
 }: {
   agent: MobileAgent | undefined;
-  name: string;
-  muted: ViewStyle["backgroundColor"];
+  linked: boolean;
+  icon: ReactNode;
+  label?: string;
+  name?: string;
+  nameIcon?: ReactNode;
 }) {
+  const { t } = useText();
+  const colors = useActivityColors();
+  const accessibilityLabel = [label, name].filter(Boolean).join(", ");
+  if (!linked || !agent)
+    return (
+      <ChatActivityLine
+        icon={icon}
+        label={label}
+        name={name}
+        nameIcon={nameIcon}
+        accessibilityLabel={accessibilityLabel}
+      />
+    );
   return (
-    <View className="flex-row items-center gap-1">
-      {agent ? <AgentThumbnail agent={agent} /> : null}
-      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {name}
-      </Typography.Paragraph>
-    </View>
+    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+      <ChatLinkPressable
+        accessibilityRole="link"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={t("mobile.chat.exchange.openChat", { name: agent.name })}
+        hitSlop={8}
+        className="max-w-full self-start"
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      >
+        <ChatActivityLine
+          icon={icon}
+          label={label}
+          name={name}
+          nameIcon={nameIcon}
+          accessibilityLabel={accessibilityLabel}
+          trailing={<ChevronRight size={CHEVRON_SIZE} color={colors.dim} style={MIRROR_IN_RTL} />}
+        />
+      </ChatLinkPressable>
+    </Link>
   );
 }
 
@@ -173,58 +218,21 @@ function AgentThumbnail({ agent }: { agent: MobileAgent }) {
       hue={agent.avatarHue}
       color={agent.avatarColor}
       seed={agent.avatarSeed}
-      size={22}
+      size={AVATAR_SIZE}
     />
   );
 }
 
-function AgentsToggle({
-  agents,
-  label,
-  accessibilityLabel,
-  open,
-  onToggle,
-  muted,
-}: {
-  agents: (MobileAgent | undefined)[];
-  label: string;
-  accessibilityLabel: string;
-  open: boolean;
-  onToggle: () => void;
-  muted: ViewStyle["backgroundColor"];
-}) {
+function AgentStack({ agents }: { agents: (MobileAgent | undefined)[] }) {
   const shown = agents.filter((agent) => agent !== undefined).slice(0, 3);
+  if (!shown.length) return null;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ expanded: open }}
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-      onPress={() => {
-        void haptics.selection();
-        onToggle();
-      }}
-      className="flex-row items-center gap-1"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      {shown.length ? (
-        <View className="flex-row">
-          {shown.map((agent, index) => (
-            <View key={agent.id} style={index ? { marginLeft: -8 } : undefined}>
-              <AgentThumbnail agent={agent} />
-            </View>
-          ))}
+    <View className="flex-row">
+      {shown.map((agent, index) => (
+        <View key={agent.id} style={index ? { marginLeft: -6 } : undefined}>
+          <AgentThumbnail agent={agent} />
         </View>
-      ) : null}
-      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
-        {label}
-      </Typography.Paragraph>
-      <ChevronDown
-        size={14}
-        color={String(muted)}
-        strokeWidth={2}
-        style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
-      />
-    </Pressable>
+      ))}
+    </View>
   );
 }

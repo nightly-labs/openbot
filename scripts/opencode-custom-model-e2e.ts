@@ -29,6 +29,7 @@ const WIDE_MODEL = "wide-model";
 const GUESSED_MODEL = "guessed-model";
 const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
+const NO_EFFORT_MODEL = "no-effort-model";
 const PLAIN_MODEL = "plain-model";
 const VISION_MODEL = "vision-model";
 const TEXT_MODEL = "text-model";
@@ -240,6 +241,7 @@ try {
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
       { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: NO_EFFORT_MODEL, name: "No effort model", reasoningEfforts: [] },
       { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
       { id: TEXT_MODEL, name: "Text model", inputs: [] },
       { id: PLAIN_MODEL, name: "Plain model" },
@@ -345,6 +347,27 @@ try {
     assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
   }
 
+  const noEffortModel = getArray(listed, "data").find(
+    (model) => getString(model, "model") === `${ENDPOINT}/${NO_EFFORT_MODEL}`,
+  );
+  assert.ok(
+    isRecord(noEffortModel) && noEffortModel.reasoningEffortConfigurable === false,
+    "A model saved with no efforts must offer no effort.",
+  );
+  const noEffortThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${NO_EFFORT_MODEL}` });
+  const noEffortTurn = await runTurn(client, noEffortThread, {
+    effort: "high",
+    text: "Say one word.",
+    timeoutMs: 120_000,
+  });
+  report.turns.push(noEffortTurn);
+  assert.equal(noEffortTurn.error, null, `The turn on ${NO_EFFORT_MODEL} failed: ${noEffortTurn.error}`);
+  const noEffortRequests = report.requests.filter((request) => request.model === NO_EFFORT_MODEL);
+  assert.ok(noEffortRequests.length > 0, `The endpoint got no request for ${NO_EFFORT_MODEL}.`);
+  for (const request of noEffortRequests) {
+    assert.equal(request.reasoningEffort, null, `${NO_EFFORT_MODEL} must send no effort.`);
+  }
+
   const image = join(workspace, "pixel.png");
   await writeFile(image, PNG);
   const visionThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${VISION_MODEL}` });
@@ -398,6 +421,7 @@ try {
   const known = new Set([
     AGENT_MODEL,
     EFFORT_MODEL,
+    NO_EFFORT_MODEL,
     PLAIN_MODEL,
     VISION_MODEL,
     TEXT_MODEL,

@@ -65,6 +65,7 @@ export function AgentActivityIndicator(props: {
   stepsOpenByDefault?: boolean | undefined;
   waitingFor?: string | null | undefined;
   plain?: boolean | undefined;
+  outputShown?: boolean | undefined;
   activity?: AgentStepActivity | null | undefined;
 }) {
   const { t, format } = useText();
@@ -79,7 +80,8 @@ export function AgentActivityIndicator(props: {
     if (provider) return t("chat.activity.waitingFor", { provider });
     return detail() ?? t(agentActivityLabelKey(props.label));
   };
-  const shownLabel = () => (props.plain && !props.waitingFor && !detail() ? null : label());
+  const plainGeneralLabel = () => props.plain && !props.waitingFor && !detail();
+  const shownLabel = () => (plainGeneralLabel() && props.outputShown ? null : label());
   const statusLabel = () => {
     const name = props.agent?.name ?? t("chat.activity.agentFallback");
     const provider = props.waitingFor;
@@ -96,7 +98,7 @@ export function AgentActivityIndicator(props: {
   const elapsed = createMemo(() => {
     const ms = elapsedMs();
     if (ms < (props.plain ? PLAIN_ELAPSED_VISIBLE_AFTER_MS : ELAPSED_VISIBLE_AFTER_MS)) return null;
-    if (props.plain && (!shownLabel() || (!props.waitingFor && detail() !== props.detail))) return null;
+    if (props.plain && (plainGeneralLabel() || (!props.waitingFor && detail() !== props.detail))) return null;
     const total = Math.floor(ms / 1_000);
     const seconds = format.number(total % 60, { style: "unit", unit: "second", unitDisplay: "narrow" });
     if (total < 60) return seconds;

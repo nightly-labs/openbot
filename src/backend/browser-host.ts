@@ -487,6 +487,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
+  readonly #agentChat: (threadId: string) => boolean;
   readonly #profileProxy: (profileId: string) => BrowserProxyConnection | null;
   readonly #onProxyStatusChanged: () => void;
   readonly #computerExit: (memberId: string) => RelayExit;
@@ -537,6 +538,7 @@ export class BrowserHost {
     { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
   >();
   readonly #memoryLow: () => boolean;
+  readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
@@ -550,8 +552,10 @@ export class BrowserHost {
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
       memoryLow?: () => boolean;
+      tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
+      agentChat?: (threadId: string) => boolean;
       profileProxy?: (profileId: string) => BrowserProxyConnection | null;
       onProxyStatusChanged?: () => void;
       computerExit?: (memberId: string) => RelayExit;
@@ -575,9 +579,11 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
+    this.#agentChat = options.agentChat ?? (() => false);
     this.#profileProxy = options.profileProxy ?? (() => null);
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
@@ -930,9 +936,7 @@ export class BrowserHost {
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
-      return yield* browserFailure(
-        new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs })),
-      );
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
     }
     if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
@@ -1016,7 +1020,7 @@ export class BrowserHost {
         tab.ownerThreadId === ownerThreadId &&
         (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
     );
-    return tabs.length < INPUT_LIMITS.browserTabs;
+    return tabs.length < this.#tabLimit();
   }
 
   readonly activate = Effect.fn("BrowserHost.activate")(function* (
@@ -1452,7 +1456,12 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(
+                args.targets,
+                args.submission,
+                args.submitTarget,
+                args.method === "password" && args.targets.length === 1,
+              ),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1486,11 +1495,13 @@ export class BrowserHost {
         agentScriptedOrigin:
           this.#agentCodeReaches(tab, [url.origin]) ||
           (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker)),
-        vaultFillable: entry.kinds.every((kind, index) =>
-          args.method === "password" && (index === 0 || confirmation)
-            ? kind.password
-            : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
-        ),
+        vaultFillable:
+          entry.hiddenPasswordFill ||
+          entry.kinds.every((kind, index) =>
+            args.method === "password" && (index === 0 || confirmation)
+              ? kind.password
+              : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
+          ),
         withCode,
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
@@ -1543,7 +1554,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(values),
+                      entry.enter(values, vault),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
@@ -2616,7 +2627,12 @@ export class BrowserHost {
     return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
   }
 
-  #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
+  #toolTabs(params: DynamicToolCallParams): {
+    tabs: BrowserTab[];
+    activeTabId: string | null;
+    otherChatTabs?: number;
+    note?: string;
+  } {
     const tabs = this.listTabs()
       .filter((tab) => this.#canUseToolTab(params, tab))
       .map((tab) => {
@@ -2626,7 +2642,19 @@ export class BrowserHost {
     const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
       ? this.#activeTabId
       : (tabs.at(-1)?.id ?? null);
-    return { tabs, activeTabId };
+    const ownerAgentId = params.ownerAgentId ?? null;
+    const otherChatTabs =
+      ownerAgentId === null
+        ? 0
+        : this.listTabs().filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab))
+            .length;
+    if (otherChatTabs === 0) return { tabs, activeTabId };
+    return {
+      tabs,
+      activeTabId,
+      otherChatTabs,
+      note: `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+    };
   }
 
   readonly #fillCard = Effect.fn("BrowserHost.fillCard")(function* (
@@ -4113,6 +4141,7 @@ export class BrowserHost {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
+    if (tab.ownerThreadId === null && this.#agentChat(params.threadId)) return true;
     return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
   }
 

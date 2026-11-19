@@ -131,6 +131,12 @@ interface StoredDelivery {
   planContinuation?: PlanContinuationMarker;
 }
 
+export interface TaskWork {
+  queuedMessages: Array<{ deliveryId: string; text: string; createdAt: string }>;
+  queue: QueueDelivery[];
+  active: boolean;
+}
+
 function waitsForPlanContinuation(delivery: StoredDelivery): boolean {
   return delivery.status === "queued" && delivery.planContinuation?.queued === true;
 }
@@ -1013,15 +1019,46 @@ export class MailboxStore {
     });
   }
 
-  taskQueue(agentId: string, taskId: string): QueueDelivery[] {
-    const queued = this.#queuedFor(agentId).filter((delivery) => !waitsForPlanContinuation(delivery));
-    if (queued.length === 0) return [];
+  taskWork(agentId: string): Map<string, TaskWork> {
+    const works = new Map<string, TaskWork>();
+    const workOf = (taskId: string): TaskWork => {
+      const existing = works.get(taskId);
+      if (existing) return existing;
+      const work: TaskWork = { queuedMessages: [], queue: [], active: false };
+      works.set(taskId, work);
+      return work;
+    };
+    const queued: StoredDelivery[] = [];
+    const active: StoredDelivery[] = [];
+    for (const delivery of this.#state.deliveries) {
+      if (delivery.recipientAgentId !== agentId) continue;
+      if (delivery.status === "queued") {
+        if (!waitsForPlanContinuation(delivery)) queued.push(delivery);
+      } else if (delivery.status === "starting" || delivery.status === "running") active.push(delivery);
+    }
+    if (queued.length === 0 && active.length === 0) return works;
     const messages = this.#messagesById();
-    const deliveries = queued.filter((delivery) => this.#taskIdOf(delivery, messages) === taskId);
-    const positions = new Map(deliveries.map((delivery, index) => [delivery.id, index + 1]));
-    return deliveries.map((delivery) =>
-      this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
-    );
+    for (const delivery of active) {
+      const taskId = this.#taskIdOf(delivery, messages);
+      if (taskId) workOf(taskId).active = true;
+    }
+    const queuedByTask = new Map<string, Array<{ delivery: StoredDelivery; message: StoredMessage }>>();
+    for (const delivery of queued.sort(compareQueueOrder)) {
+      const message = messages.get(delivery.messageId);
+      if (!message?.taskId) continue;
+      const items = queuedByTask.get(message.taskId) ?? [];
+      items.push({ delivery, message });
+      queuedByTask.set(message.taskId, items);
+    }
+    for (const [taskId, items] of queuedByTask) {
+      const work = workOf(taskId);
+      const positions = new Map(items.map(({ delivery }, index) => [delivery.id, index + 1]));
+      for (const { delivery, message } of items) {
+        work.queuedMessages.push({ deliveryId: delivery.id, text: message.text, createdAt: message.createdAt });
+        work.queue.push(this.#publicDelivery(delivery, positions, message));
+      }
+    }
+    return works;
   }
 
   laneActive(agentId: string, taskId: string | null): boolean {

@@ -71,6 +71,12 @@ if (
 
 process.env.CCACHE_BASEDIR ??= repositoryRoot;
 process.env.CCACHE_NOHASHDIR ??= "true";
+if (spawnSync("ccache", ["--version"], { stdio: "ignore" }).status === 0) {
+  process.env.CMAKE_C_COMPILER_LAUNCHER ??= "ccache";
+  process.env.CMAKE_CXX_COMPILER_LAUNCHER ??= "ccache";
+}
+
+process.env.OPENBOT_KEEP_METRO_CACHE = "1";
 
 run("node", [expo, "prebuild", "--platform", "android", "--no-clean", "--no-install"]);
 
