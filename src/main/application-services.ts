@@ -1952,6 +1952,7 @@ export async function createApplicationServices({
     browser,
     finishCheck: true,
     visualPreview: new ChatVisualPreviewer(),
+    avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
     clearPictureBackground: (bytes) => {
       const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
