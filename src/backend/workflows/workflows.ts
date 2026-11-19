@@ -510,16 +510,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
               images: images.success,
             };
-            const choice = dependencies.chooseTextModel
-              ? yield* dependencies.chooseTextModel(request).pipe(Effect.result)
-              : null;
-            if (choice && Result.isFailure(choice)) {
-              settle(step, { status: "failed", error: choice.failure.message });
-              return yield* requestSweep();
-            }
-            if (choice) runs.recordUsedSettings(step.id, { ...choice.success });
+            const chosen = Effect.gen(function* () {
+              if (!dependencies.chooseTextModel) return request;
+              const choice = yield* dependencies.chooseTextModel(request);
+              runs.recordUsedSettings(step.id, { ...choice });
+              return { ...request, ...choice };
+            });
             const result = yield* generationLock
-              .withPermit(dependencies.generateText(choice ? { ...request, ...choice.success } : request))
+              .withPermit(Effect.flatMap(chosen, (ready) => dependencies.generateText(ready)))
               .pipe(Effect.result);
             if (Result.isFailure(result)) {
               settle(step, { status: "failed", error: result.failure.message });
@@ -575,7 +573,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               : [];
             const model = workflowMediaModel(node.fields, live);
             const specs = workflowMediaSpecs(node.fields, kind, model);
-            if (model && !empty) runs.recordUsedSettings(step.id, usedMediaSettings(kind, model, specs));
+            if (model && !empty && generateMedia)
+              runs.recordUsedSettings(step.id, usedMediaSettings(kind, model, specs));
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model

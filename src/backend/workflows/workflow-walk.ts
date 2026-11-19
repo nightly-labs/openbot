@@ -209,7 +209,8 @@ export function stepRecord(
   const nodes = new Map(graph.nodes.map((item) => [item.id, item]));
   const sources = graph.edges.flatMap((edge) => {
     if (edge.to !== node.id) return [];
-    const stepId = latest.get(edge.from)?.id ?? null;
+    const source = latest.get(edge.from);
+    const stepId = source && edgeActive(edge, source) ? source.id : null;
     const attachmentId = edgeFile(nodes.get(edge.from), latest)[0]?.attachmentId ?? null;
     return stepId === null && attachmentId === null ? [] : [{ from: edge.from, type: edge.type, stepId, attachmentId }];
   });

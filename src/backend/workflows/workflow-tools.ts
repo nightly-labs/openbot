@@ -469,7 +469,7 @@ function applyWorkflowOps(
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
         const next = withSchedule({ ...node, fields }, scheduled);
-        checkMedia(next, n);
+        if (op.fields && ("media" in op.fields || "model" in op.fields)) checkMedia(next, n);
         replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
         return;
