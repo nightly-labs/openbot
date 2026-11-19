@@ -384,7 +384,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
-  "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot n’a pas pu lire la clé d’API. Saisissez une clé de 8 000 caractères au plus, puis choisissez qui peut l’utiliser.",
@@ -431,7 +430,7 @@ export const messages = {
     "La fenêtre contextuelle n’a pas pu se charger. Réessayez la connexion depuis la page d’origine.",
   "error.backend.browserTabNotFound": "Onglet de navigateur introuvable.",
   "error.backend.authActive": "L’authentification est déjà active.",
-  "error.backend.authHttpsRequired": "L’authentification sécurisée nécessite HTTPS.",
+  "error.backend.authWebPageRequired": "L’authentification sécurisée nécessite HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Les codes d’authentification doivent comporter de 4 à 12 chiffres.",
   "error.backend.authExpired": "La demande d’authentification a expiré.",
   "error.backend.authDigitsRequired": "Saisissez le nombre de chiffres demandé.",
