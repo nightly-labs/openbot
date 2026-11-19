@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/error/auth";
 export const messages = {
   "error.auth.serviceUnavailable":
     "OpenBot non è riuscito a raggiungere il servizio account. Controlla che l'API sia in esecuzione, poi riprova.",
+  "error.auth.sessionTimeout": "OpenBot non ha risposto in tempo. Controlla la connessione a internet, poi riprova.",
   "error.auth.networkBlocked":
     "Un firewall o un proxy di questa rete ha impedito a OpenBot di raggiungere {host}. Chiedi all'amministratore di rete di consentire {host}, poi riprova.",
   "error.auth.signInFirst": "Accedi prima a OpenBot.",

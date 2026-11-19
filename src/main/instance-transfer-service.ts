@@ -324,6 +324,7 @@ export class InstanceTransferService {
         return this.#prepareUploadDirectory(directory).pipe(Effect.as(directory));
       },
       stage: (path, owner) => this.#stageFile(path, owner, true, ARCHIVE),
+      staged: (token) => this.#staged.has(token),
       exportTo: (path, input, exporter) => this.exportTo(path, input, ARCHIVE, exporter),
     });
   }
