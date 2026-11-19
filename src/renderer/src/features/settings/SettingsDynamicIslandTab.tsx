@@ -37,42 +37,24 @@ import { settingsPort } from "./settings-port";
 import { XWaylandRestartRow } from "./XWaylandRestartRow";
 
 const PREVIEW_NOTCH_SIZE: DynamicIslandNotchSize = { width: 192, height: 32 };
-/** The space the preview keeps on each side of an island that it scales down to fit. */
 const PREVIEW_FIT_INSET = 12;
 
 export interface SettingsDynamicIslandTabProps {
   value: GeneralSettingsValue;
-  /** The previews draw the logo in the color of this build, as the real island does. */
   variant: AppVariant;
-  /** Windows has no notch and no Force Touch trackpad, so its text and switches differ. */
   platform: AppInfo["platform"] | undefined;
-  /**
-   * The built-in display's notch, or null when it has none: the built-in preview then draws the
-   * island that display shows. Undefined before main answers, and the preview draws a notch.
-   */
   builtInDisplayGeometry?: DynamicIslandGeometry | undefined;
-  /** The servers that the user can show in the island or hide from it. */
   servers: readonly ServerSummary[];
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  /** Saves several fields as one change, so a reset writes the preference once. */
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
 }
 
-/**
- * The Dynamic Island switches, the servers that it shows, and its size.
- *
- * Each slider step saves at once, so the island on the screen follows the thumb during a drag. A
- * step is 5%, so one drag across the track writes the preference at most 12 times.
- */
 export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   const i18n = useI18n();
   const isMac = () => props.platform === "darwin";
-  // The row key is also the settings search anchor in `settings-tabs.ts`, so the label and the anchor use one key.
   const showKey = () => (isMac() ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen");
   const platform = usePlatform();
-  /** Linux has no notch: the island floats at the top of the screen. */
   const linux = () => props.platform === "linux";
-  /** Linux with Wayland windows: the island above other apps needs a start on XWayland. */
   const screenSupport = () => (linux() && props.value.macBookNotch ? platform.appInfo()?.aboveAppsSupport : undefined);
   const widthPercent = () => props.value.macBookNotchWidthPercent;
   const heightPercent = () => props.value.macBookNotchHeightPercent;
@@ -91,10 +73,6 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
       serverId,
     );
 
-  /**
-   * Saves a choice for each listed server, so that a change to the default for later servers does
-   * not change a server that the user already has. A removed server loses its choice.
-   */
   function saveServerChoices(patch: Record<string, boolean>, newServersVisible: boolean): void {
     props.onUpdateSettings({
       macBookNotchServers: {
@@ -271,10 +249,6 @@ export function SettingsDynamicIslandTab(props: SettingsDynamicIslandTabProps) {
   );
 }
 
-/**
- * One server and its island switch. A muted server shows nothing in the island, so its switch is
- * off and disabled until the user unmutes the server. The stored choice stays.
- */
 function IslandServerRow(props: {
   server: ServerSummary;
   shown: boolean;
@@ -305,11 +279,6 @@ function IslandServerRow(props: {
   );
 }
 
-/**
- * A preview frame. It scales its island so that the widest width setting fits, such as the
- * built-in island with no notch at 130%. The scale changes only with the frame, not with the
- * setting, so a slider drag moves the island alone and every width shows at the same scale.
- */
 function PreviewFit(props: { widestWidth: number | undefined; children: JSX.Element }): JSX.Element {
   let frame: HTMLDivElement | undefined;
   const [available, setAvailable] = createSignal(0);

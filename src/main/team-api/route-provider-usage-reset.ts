@@ -13,10 +13,6 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_USAGE_RESET_ROUTES));
 
-/**
- * The usage reset credits of this host's provider accounts, read and spent from a joined server.
- * Frozen by `provider-usage-reset-v1`. `requireAdmin` runs on every route.
- */
 export async function routeProviderUsageReset(
   context: TeamApiRequestContext,
   resets: TeamApiProviderUsageResets | undefined,
@@ -26,7 +22,6 @@ export async function routeProviderUsageReset(
   if (!resets || !capabilities.has(PROVIDER_USAGE_RESET_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `provider-usage-reset-v1` codec.
   const body = await readJson(request);
   const provider = parseProviderId(body.provider);
   if (url.pathname === PROVIDER_USAGE_RESET_ROUTES.list)

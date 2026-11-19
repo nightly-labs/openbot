@@ -3,10 +3,6 @@ import { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "reac
 
 import { SIGN_IN_EASE_OUT } from "@/features/auth/components/sign-in-motion";
 
-/**
- * A short horizontal shake each time `rejection` grows, for a value that the service refused.
- * Reduced motion keeps only the color change of the field.
- */
 export function useShake(rejection: number, reduced: boolean) {
   const offset = useSharedValue(0);
   useEffect(() => {

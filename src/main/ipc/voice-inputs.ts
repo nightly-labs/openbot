@@ -10,6 +10,7 @@ import {
   isVoiceLanguage,
   isVoiceModelId,
   isVoiceServerRoutes,
+  isVoiceTurnPause,
   isXaiSpeechVoice,
   SPEECH_LIMITS,
   type SpeechApiKeyInput,
@@ -62,10 +63,8 @@ export function parseVoiceTranscription(input: unknown): VoiceTranscriptionInput
   return { audio };
 }
 
-/** The first bytes of an EBML file, such as WebM. */
 const EBML_MAGIC = [0x1a, 0x45, 0xdf, 0xa3];
 
-/** A recording to keep is the Opus/WebM that the recorder wrote. Main stores it and does not decode it. */
 export function parseVoiceRecording(input: unknown): VoiceTranscriptionInput {
   if (!isObject(input) || !(input.audio instanceof Uint8Array)) {
     throw new Error("Voice audio is required.");
@@ -96,24 +95,20 @@ export function parseVoiceSettings(input: unknown): VoiceSettings {
   return { modelId: input.modelId, language: input.language };
 }
 
-/** The one place a dictation provider's key from the renderer enters main. Null removes the saved key. */
 export function parseVoiceApiKey(input: unknown): VoiceApiKeyInput {
   if (!isObject(input) || !isDictationKeyProvider(input.provider)) throw new Error("A dictation provider is required.");
   return { provider: input.provider, key: parseApiKey(input.key) };
 }
 
-/** A provider API key, or null. Every voice key goes through these checks. */
 function parseApiKey(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim()) throw new Error(sourceText("error.provider.keyRequired"));
   if (value.length > VOICE_API_KEY_MAX_LENGTH) throw new Error(sourceText("error.provider.keyTooLong"));
   const key = value.trim();
-  // The key goes into an HTTP header, which refuses other characters when the socket opens.
   if (!/^[\x21-\x7e]+$/u.test(key)) throw new Error(sourceText("error.provider.keyInvalidCharacters"));
   return key;
 }
 
-/** A key of a provider that reads replies aloud, with the same checks as `parseVoiceApiKey`. */
 export function parseSpeechApiKey(input: unknown): SpeechApiKeyInput {
   if (!isObject(input) || !isSpeechKeyProvider(input.provider)) throw new Error("A speech provider is required.");
   return { provider: input.provider, key: parseApiKey(input.key) };
@@ -128,7 +123,6 @@ export function parseVoiceStream(input: unknown): VoiceStream {
 export function parseVoiceStreamAudio(input: unknown): VoiceStreamAudio {
   const { streamId } = parseVoiceStream(input);
   if (!isObject(input) || !(input.pcm instanceof Uint8Array)) throw new Error("Voice audio is required.");
-  // 16-bit samples: an odd length cannot be PCM.
   if (input.pcm.byteLength % 2 !== 0 || input.pcm.byteLength > VOICE_STREAM_LIMITS.maximumChunkBytes)
     throw new Error("Voice audio has an invalid length.");
   return { streamId, pcm: input.pcm };
@@ -144,9 +138,10 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     !isXaiSpeechVoice(input.xaiVoice) ||
     !isSpeechSpeed(input.speed) ||
     typeof input.codexLive !== "boolean" ||
-    !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice))
+    !(input.codexLiveVoice === null || isCodexLiveVoice(input.codexLiveVoice)) ||
+    !isVoiceTurnPause(input.turnPauseMs)
   ) {
-    throw new Error("Speech settings need a known model, voice and speed.");
+    throw new Error("Speech settings need a known model, voice, speed and pause.");
   }
   return {
     readReplies: input.readReplies,
@@ -157,10 +152,10 @@ export function parseSpeechSettings(input: unknown): SpeechSettings {
     speed: input.speed,
     codexLive: input.codexLive,
     codexLiveVoice: input.codexLiveVoice,
+    turnPauseMs: input.turnPauseMs,
   };
 }
 
-/** A Codex live voice start: the agent and the renderer's WebRTC offer. */
 export function parseVoiceLiveStart(input: unknown): VoiceLiveStart {
   if (!isObject(input) || !isString(input.agentId) || !input.agentId || !isString(input.sdp) || !input.sdp)
     throw new Error("Live voice needs an agent and an offer.");
@@ -181,21 +176,17 @@ export function parseSpeechInput(input: unknown): SpeechInput {
   return { text: input.text, language: input.language };
 }
 
-/** The address and key of a voice server to test. The key can be a credential: no message quotes it. */
 export function parseVoiceServerConnection(input: unknown): VoiceServerConnection {
   if (!isObject(input)) throw new Error("A voice server is required.");
-  // The same rules as a custom provider's base URL: http or https, and no password in it.
   const address = parseBaseUrl(input.address);
   if (input.apiKey !== null && input.apiKey !== undefined && !isString(input.apiKey))
     throw new Error("The API key is not text.");
   const apiKey = isString(input.apiKey) ? input.apiKey.trim() || null : null;
   if (apiKey && apiKey.length > VOICE_SERVER_LIMITS.apiKey) throw new Error(sourceText("error.provider.apiKeyTooLong"));
-  // The key goes into an HTTP header, which refuses other characters.
   if (apiKey && !/^[\x21-\x7e]+$/u.test(apiKey)) throw new Error(sourceText("error.provider.keyInvalidCharacters"));
   return { address, apiKey };
 }
 
-/** A server to save with its routes, or null to remove it. */
 export function parseVoiceServerSave(input: unknown): VoiceServerSave {
   if (!isObject(input)) throw new Error("A voice server is required.");
   if (input.server === null) return { server: null };

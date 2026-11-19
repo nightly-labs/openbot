@@ -3,7 +3,6 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
-import { useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
@@ -11,6 +10,7 @@ import type { ChatMessage, ExchangeGroup, ExchangeMarker } from "@/features/chat
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useKeptOpen } from "./use-kept-open";
 
 type RoutingMarker = Extract<ChatMessage, { kind: "channel-routing" }>;
 
@@ -20,10 +20,6 @@ interface MarkerContext {
   muted: ViewStyle["backgroundColor"];
 }
 
-/**
- * Matches the desktop marker. An absent mark means a request: that is what a host older than the
- * mark reports, and what every message stored before it meant.
- */
 function exchangeLabel(exchange: AgentExchangeSummary, t: MobileTranslate) {
   if (exchange.expectsReply === false)
     return exchange.direction === "outgoing"
@@ -36,7 +32,6 @@ function exchangeAgentIds(exchange: AgentExchangeSummary) {
   return exchange.direction === "incoming" ? [exchange.senderAgentId] : exchange.recipientAgentIds;
 }
 
-/** One message to or from other agents, or a channel routing. */
 export function ChatExchangeMarker({
   message,
   agents,
@@ -44,7 +39,7 @@ export function ChatExchangeMarker({
   muted,
 }: MarkerContext & { message: ExchangeMarker | RoutingMarker }) {
   const { t } = useText();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useKeptOpen(`marker:${message.id}`, false);
   const label =
     message.kind === "channel-routing"
       ? message.event.action === "assigned"
@@ -83,7 +78,6 @@ export function ChatExchangeMarker({
       <View key={id ?? legacyName}>{badge}</View>
     );
   });
-  // Like desktop, a message to several agents names how many, and opens to list them.
   if (badges.length > 1) {
     const agentCount = t("mobile.chat.exchange.agentCount", { count: badges.length });
     return (
@@ -115,13 +109,9 @@ export function ChatExchangeMarker({
   );
 }
 
-/**
- * Consecutive messages to and from other agents, drawn as one row as on desktop. The row names how
- * many messages and agents there are, and opens to show each message's own marker.
- */
 export function ChatExchangeGroup({ group, agents, agentsById, muted }: MarkerContext & { group: ExchangeGroup }) {
   const { t } = useText();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useKeptOpen(`group:${group.id}`, false);
   const ids = [...new Set(group.exchanges.flatMap(({ exchange }) => exchangeAgentIds(exchange)))];
   const participants = ids.map((id) => agentsById.get(id));
   const count = group.exchanges.length;
@@ -188,7 +178,6 @@ function AgentThumbnail({ agent }: { agent: MobileAgent }) {
   );
 }
 
-/** The avatars of up to three agents, as on desktop, and a label that opens the list under the row. */
 function AgentsToggle({
   agents,
   label,

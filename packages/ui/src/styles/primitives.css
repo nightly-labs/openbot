@@ -4,18 +4,13 @@
   font-family: var(--openbot-font-sans);
 }
 
-.ui-server-gradient-logo {
-  width: var(--server-gradient-logo-size, 40px);
-  height: var(--server-gradient-logo-size, 40px);
+.ui-server-plush-logo {
+  width: var(--server-plush-logo-size, 40px);
+  height: var(--server-plush-logo-size, 40px);
   display: block;
   flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: var(--server-gradient-logo-radius, var(--openbot-radius-lg));
-  background-color: var(--server-gradient-base);
-  background-image: var(--server-gradient-layers);
-  background-repeat: no-repeat;
-  outline: 1px solid var(--openbot-image-outline);
-  outline-offset: -1px;
+  object-fit: contain;
+  user-select: none;
 }
 
 :where(.ui-text)[data-tone="secondary"],
@@ -150,8 +145,6 @@
   padding-inline: var(--openbot-space-6);
 }
 
-/* A Lucide icon keeps width="24" when the caller sets no size, which is too large next to button
-   text. These rules have no specificity, so a size prop or a feature rule still wins. */
 :where(.ui-button > svg[width="24"]) {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -432,10 +425,6 @@
   color: var(--openbot-danger);
 }
 
-/* The design's "New" chip. Not a --openbot-success or --openbot-accent variant: an
- * announcement that something is newly available is neither a report that something
- * succeeded nor an action the user can take. The heavier weight and the open tracking
- * are part of the look, which is why this variant sets them and the others do not. */
 :where(.z-badge-variant-new) {
   background: var(--openbot-badge-new-soft);
   color: var(--openbot-badge-new);
@@ -478,17 +467,10 @@
   color: var(--openbot-accent-text);
 }
 
-/* Every Lucide icon takes the shared line. Without this rule, an icon outside a `.ui-button` and without a
- * feature rule keeps the Lucide line of 2 and looks heavier than the icons beside it. The rule has no
- * specificity, so a feature rule that sets a different line still wins. */
 :where(svg.lucide) {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The hand-drawn SVGs, which are on a 20-unit viewBox where lucide's is 24. Feeding them
- * --openbot-icon-stroke raw would paint them 20% heavier than every lucide icon beside
- * them, so it is scaled to the smaller grid instead. These carried 1.35 to 1.6 by hand
- * before, i.e. 1.08 to 1.43 device px against lucide's 1.0. */
 :where(.ui-glyph-20) {
   stroke-width: calc(var(--openbot-icon-stroke) * 20 / 24);
 }
@@ -541,8 +523,7 @@
 .ui-checkbox-visual svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
-  /* Heavier than --openbot-icon-stroke deliberately: a tick is a state indicator, and the
-   * shared weight paints 0.75 device px inside this 12px box. */
+
   stroke-width: 2.5;
 }
 
@@ -604,7 +585,6 @@
   display: grid;
 }
 
-/* The grip sits inside the bottom-right corner. It changes only the height. */
 .ui-textarea-resizer {
   --ui-textarea-grip: var(--openbot-text-dim);
 
@@ -643,7 +623,6 @@
   outline: 0;
 }
 
-/* In a right-to-left page the grip sits in the bottom-left corner, so its lines turn with it. */
 .ui-textarea-resizer:dir(rtl) {
   scale: -1 1;
 }
@@ -657,7 +636,6 @@ html.ui-textarea-resizing {
   color: var(--openbot-text-placeholder);
 }
 
-/* A focused field gets a neutral border and no ring. */
 :where(.ui-input, .ui-textarea, .ui-native-select):focus-visible {
   border-color: var(--openbot-border-focus);
 }
@@ -782,7 +760,6 @@ html.ui-textarea-resizing {
   outline: 0;
 }
 
-/* The search field stays at the top; only the rows scroll, so Kobalte scrolls the listbox. */
 .ui-search-select-content {
   display: flex;
   flex-direction: column;
@@ -1139,15 +1116,12 @@ html.ui-textarea-resizing {
   cursor: pointer;
 }
 
-/* The drawn track is 4px high, too thin to hit. A press on this area belongs to the track, so it
-   still sets the value from the pointer position and starts a drag. */
 .ui-slider-track::before {
   content: "";
   position: absolute;
   inset: -10px 0;
 }
 
-/* Kobalte places the fill and the thumb with inline `left`/`right` percentages. */
 .ui-slider-fill {
   position: absolute;
   height: 100%;
@@ -1155,8 +1129,6 @@ html.ui-textarea-resizing {
   background: var(--openbot-text-secondary);
 }
 
-/* Kobalte owns the inline `transform` that centres the thumb on its value, so the vertical centring
-   uses `top` instead. */
 .ui-slider-thumb {
   top: calc(50% - (var(--openbot-switch-thumb) / 2));
   width: var(--openbot-switch-thumb);
@@ -1177,7 +1149,6 @@ html.ui-textarea-resizing {
   cursor: grabbing;
 }
 
-/* The seek slider draws its picture on the track; the playhead shows on hover, focus and drag. */
 .ui-seek-slider {
   display: flex;
   touch-action: none;
@@ -1293,8 +1264,6 @@ html.ui-textarea-resizing {
   color: var(--openbot-text-muted);
 }
 
-/* An icon in the media slot stands beside a title and a description, so it is a large icon with the line of
- * the large icons. The selector is weak, so a feature can set a different size and line. */
 :where(.ui-item-media) > svg {
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
@@ -1547,8 +1516,6 @@ html.ui-textarea-resizing {
   display: block;
 }
 
-/* The logos sit in a hole that the code leaves clear, so no module is cut at their edge. They show
-   once the code is drawn around them. */
 .ui-qr-code-mark {
   display: inline-flex;
   align-items: center;
@@ -1625,9 +1592,6 @@ html.ui-textarea-resizing {
   line-height: var(--openbot-leading-sm);
 }
 
-/* A toned alert puts a wash over whatever is behind it, which lifts the background towards the
-   muted text colour and leaves this line under 4.5:1 on a panel. The tone carries the meaning;
-   the description only has to be readable. */
 .ui-alert[data-tone] .ui-alert-description {
   color: var(--openbot-text-secondary);
 }
@@ -1651,8 +1615,6 @@ html.ui-textarea-resizing {
   background: var(--openbot-border-strong);
 }
 
-/* Kobalte reports the value as a custom property and leaves the width to us, so a fill without this
-   line is a full bar at every value. */
 .ui-progress-fill {
   width: var(--kb-progress-fill-width, 0%);
   height: 100%;
@@ -1661,8 +1623,6 @@ html.ui-textarea-resizing {
   transition: width var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* An operation with no measurable end reports that it is still running, rather than sitting at a
-   number. Kobalte publishes no width for one, so the fill is a short bar that travels the track. */
 .ui-progress-fill[data-indeterminate] {
   width: 35%;
   animation: ui-progress-travel 1.4s var(--openbot-ease-in-out) infinite;
@@ -1748,7 +1708,6 @@ html.ui-textarea-resizing {
   color: var(--openbot-text-primary);
 }
 
-/* Both themes: Sonner sets its own colors under `[data-sonner-theme]`, so this keeps the same weight. */
 .ui-toaster[data-sonner-toaster][data-sonner-theme] {
   z-index: var(--openbot-layer-toast);
   color: var(--openbot-text-primary);
@@ -1761,17 +1720,9 @@ html.ui-textarea-resizing {
   --border-radius: var(--openbot-radius-card);
 }
 
-/* Four columns and two rows: the mark, the words, and an action row under them, with the secondary
-   action before the main one. Sonner lays the toast out as one flex line, which works until an action
-   is present — the button then sits between the description and the close control, and the
-   description wraps early around it. Placing the actions on their own row gives the words the full
-   width and puts the main action at the end, where a reader looks for it last. The columns are laid
-   out by hand rather than by auto-placement because a toast without an icon renders no `[data-icon]`
-   element at all. */
 .ui-toaster [data-sonner-toast][data-styled="true"] {
   --ui-toast-tone: transparent;
   --ui-toast-motion-duration: var(--openbot-duration-toast-enter);
-  /* Sonner pulls the icon 1px to the side; the mark sits on the padding edge instead. */
   --toast-svg-margin-start: 0px;
   --toast-svg-margin-end: 0px;
   display: grid;
@@ -1800,8 +1751,6 @@ html.ui-textarea-resizing {
   --ui-toast-motion-duration: var(--openbot-duration-toast-exit);
 }
 
-/* The button row sits 8px from the bottom and end edges, so the 6px button radius plus that space
-   gives the 14px card radius. */
 .ui-toaster [data-sonner-toast][data-styled="true"]:has([data-button]) {
   padding-bottom: var(--openbot-space-2);
 }
@@ -1828,8 +1777,6 @@ html.ui-textarea-resizing {
   margin-inline-start: var(--openbot-space-1);
 }
 
-/* The close control sits on the top right corner, mostly outside the card, so the words keep only a
-   small space from it. */
 .ui-toaster.ui-toaster-closeable [data-sonner-toast][data-styled="true"] [data-content],
 .ui-toaster [data-sonner-toast][data-styled="true"]:has([data-close-button]) [data-content] {
   padding-inline-end: var(--openbot-space-1);
@@ -1897,8 +1844,7 @@ html.ui-textarea-resizing {
   grid-area: 1 / 1;
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
-  /* The column gap is zero so that a toast with no icon starts its text at the padding edge. The
-     space between the mark and the words is this margin instead. */
+
   margin-block: 1px 0;
   margin-inline: 0 var(--openbot-space-3);
 }
@@ -1913,8 +1859,6 @@ html.ui-textarea-resizing {
   animation: ui-spin 720ms linear infinite;
 }
 
-/* The action that continues the flow has the light fill of the default Button. The action that only
-   closes or undoes is text. */
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-button] {
   height: var(--openbot-control-sm);
   margin: 0;
@@ -1933,13 +1877,10 @@ html.ui-textarea-resizing {
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The last button is 8px from the end edge, not at the 16px padding of the words. */
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-button]:last-of-type {
   margin-inline-end: calc(var(--openbot-space-2) - var(--openbot-space-4));
 }
 
-/* Sonner fills the cancel button in its dark theme with a selector of the same weight as the rules
-   above, so this one names the theme too. */
 .ui-toaster[data-sonner-toaster][data-sonner-theme] [data-sonner-toast][data-styled="true"] [data-cancel] {
   background: transparent;
   color: var(--openbot-text-secondary);
@@ -1959,9 +1900,6 @@ html.ui-textarea-resizing {
     0 0 0 2px var(--openbot-border-strong);
 }
 
-/* A small round button on the top right corner of the card, with 6px of it outside the card. The 1px
-   ring separates it from the card; it has no drop shadow. A toast that its caller draws (an unstyled
-   sonner toast) uses the same control with the `ui-toast-card-close` class. */
 .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button],
 .ui-toast-card-close {
   position: absolute;
@@ -2022,7 +1960,6 @@ html.ui-textarea-resizing {
     color: var(--openbot-text-primary);
   }
 
-  /* Close is a calm action, not a destructive one. */
   .ui-toaster [data-sonner-toast][data-styled="true"] [data-close-button]:hover:not(:focus-visible),
   .ui-toast-card-close:hover:not(:focus-visible) {
     background: var(--openbot-bg-control-active);
@@ -2047,8 +1984,6 @@ html.ui-textarea-resizing {
   transform: scale(0.96);
 }
 
-/* A toast that its caller draws (an unstyled sonner toast) uses the buttons of the shared toast. The
-   card has 16px of end padding; the button row sits 8px from the end edge. */
 .ui-toast-card-close > svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
@@ -2062,7 +1997,6 @@ html.ui-textarea-resizing {
   margin-inline-end: calc(var(--openbot-space-2) - var(--openbot-space-4));
 }
 
-/* The Button transitions, with the press scale added. */
 .ui-toast-card-actions .ui-button {
   height: var(--openbot-control-sm);
   border-radius: var(--openbot-radius-sm);
@@ -2129,11 +2063,6 @@ html.ui-textarea-resizing {
   }
 }
 
-/*
- * The plush loader: the lilac plush watches three felt balls bounce in a wave, and its eyes follow
- * the ball in the air. The parent sets --ui-plush-size, the width of the plush. With reduced motion
- * the plush and the balls stay still.
- */
 .ui-plush-loader {
   display: inline-flex;
   flex: 0 0 auto;
@@ -2170,7 +2099,6 @@ html.ui-textarea-resizing {
   -webkit-user-drag: none;
 }
 
-/* Each eye layer covers the whole body. Each eye turns about its own centre. */
 .ui-plush-eyes,
 .ui-plush-eye {
   position: absolute;
@@ -2367,10 +2295,6 @@ html.ui-textarea-resizing {
   }
 }
 
-/* An icon that points along the line points the other way in a right-to-left page, as the layout
-   does: a submenu chevron points to the side its submenu opens on, and Back points to the start.
-   A key in a shortcut hint is the key on the keyboard, so it stays as it is. `:where` keeps the rule
-   weaker than the transform of a component, such as the turn of an open disclosure chevron. */
 :where(
   svg:is(
     [class~="lucide-chevron-left"],
@@ -2407,7 +2331,6 @@ html.ui-textarea-resizing {
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   line-height: 1;
-  /* A shortcut such as "⌘F" keeps its key order in a right-to-left page. */
   direction: ltr;
   unicode-bidi: isolate;
 }
@@ -2452,8 +2375,6 @@ html.ui-textarea-resizing {
   transform: translateX(-50%) rotate(45deg);
 }
 
-/* A tooltip without space above its control goes to another side. The arrow then points to the
-   control from that side. */
 .ui-tooltip[data-placement="bottom"] {
   transform-origin: top center;
 }
@@ -2512,18 +2433,13 @@ html.ui-textarea-resizing {
     animation: none;
   }
 }
-/* A window that Chromium draws on the CPU (no GPU, a blocked GPU or a failed one) has this root
- * attribute. There a backdrop blur repaints all that is under it on each frame: an open dialog
- * dropped frames of more than 100 ms. So no surface blurs its backdrop. The rule wins over each
- * blur, `-webkit-backdrop-filter` included, because that name is an alias in Chromium. */
-:root[data-openbot-software-rendering] *,
-:root[data-openbot-software-rendering] *::before,
-:root[data-openbot-software-rendering] *::after {
+
+:root[data-openbot-no-blur] *,
+:root[data-openbot-no-blur] *::before,
+:root[data-openbot-no-blur] *::after {
   backdrop-filter: none !important;
 }
-/* The one dialog overlay. Each Dialog.Overlay and AlertDialog.Overlay has this class. It covers the
- * window on the dialog layer, centers the dialog that it holds, and fades in. A dialog changes only
- * what is different for it, such as a nested layer. */
+
 .ui-dialog-overlay {
   position: fixed;
   inset: 0;
@@ -2535,10 +2451,7 @@ html.ui-textarea-resizing {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: ui-dialog-overlay-in var(--openbot-duration-overlay) var(--openbot-ease-out);
-  /* The window swallows mouse events over a `-webkit-app-region: drag` area, such as the server rail
-   * and the window headers, and hands them to the window manager instead. A click there while a
-   * dialog was open started a window drag and never reached this overlay, so that side of the window
-   * could not dismiss the dialog. The overlay takes the region back for as long as it is on screen. */
+
   -webkit-app-region: no-drag;
 }
 
@@ -2553,7 +2466,6 @@ html.ui-textarea-resizing {
   box-shadow: none;
 }
 
-/* `StableLabel`: all texts share one grid cell, so the widest one sets the width. */
 .ui-stable-label {
   display: inline-grid;
 }
@@ -2567,10 +2479,6 @@ html.ui-textarea-resizing {
   visibility: hidden;
 }
 
-/* The standard confirmation: the icon beside a left-aligned title and description, and the actions
- * on a footer below a divider. The surface has a thin border and no shadow.
- * A confirmation always answers the surface that opened it, so it takes the top nested dialog step:
- * it also opens over the marketplace and skills modals on `--openbot-layer-dialog-host`. */
 .ui-confirm-dialog-overlay {
   z-index: calc(var(--openbot-layer-dialog-host) + 2);
 }
@@ -2704,8 +2612,6 @@ html.ui-textarea-resizing {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* Status text on a tinted fill reads the text step of its colour: the solid danger step measures
- * 3.7:1 on its own soft fill, under the 4.5:1 a label needs. */
 .ui-confirm-dialog-confirm.ui-button-variant-destructive {
   color: var(--openbot-danger-text);
 }
@@ -3010,16 +2916,14 @@ button.ui-bubble-content {
   justify-content: flex-end;
 }
 
-/* Keep notification actions usable while a Kobalte modal blocks the page. */
 .ui-toast-layer {
   pointer-events: auto;
 }
 
-/* The toasts float over areas that move the window: the window headers, and the full window on the
- * sign-in, setup, onboarding and loading screens. The window swallows mouse events over a
- * `-webkit-app-region: drag` area, so a pointer on a toast left the stack and collapsed it, and only its
- * buttons, which are `no-drag`, could be reached. The `::after` is the strip Sonner puts in the gap
- * between expanded toasts, so the pointer can cross it. */
+.ui-toast-layer-hidden {
+  visibility: hidden;
+}
+
 .ui-toaster [data-sonner-toast],
 .ui-toaster [data-sonner-toast]::after {
   -webkit-app-region: no-drag;

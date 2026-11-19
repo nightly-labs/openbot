@@ -3,7 +3,6 @@ import type { WhatsNewRelease } from "@openbot/ui/features/updates/whats-new";
 const WHATS_NEW_VERSION_KEY = "openbot:whats-new-version";
 const LEGACY_VERSION_KEY = "openbot:analytics-app-version";
 
-/** Desktop releases use stable x.y.z versions. Unknown builds must not consume release notes. */
 export function releaseVersion(value: string | null): string | null {
   return value !== null && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) ? value : null;
 }
@@ -38,7 +37,6 @@ export interface VersionStorage {
   setItem(key: string, value: string): void;
 }
 
-/** Read before Settings records analytics for this launch. Never write the old analytics key. */
 export function readWhatsNewVersion(storage: VersionStorage): string | null {
   try {
     return releaseVersion(storage.getItem(WHATS_NEW_VERSION_KEY) ?? storage.getItem(LEGACY_VERSION_KEY));
@@ -47,7 +45,6 @@ export function readWhatsNewVersion(storage: VersionStorage): string | null {
   }
 }
 
-/** Claim before opening. A failed write disables automatic display, so it cannot repeat each launch. */
 export function claimWhatsNewVersion(storage: VersionStorage, current: string): boolean {
   try {
     const saved = releaseVersion(storage.getItem(WHATS_NEW_VERSION_KEY));

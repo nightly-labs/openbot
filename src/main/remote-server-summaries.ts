@@ -1,9 +1,3 @@
-// The `ServerSummary` list the renderer sees: stored servers joined to their connection status, with
-// the local server in front.
-//
-// A pure function of two values, so a change to what the renderer is told can be checked against two
-// arrays rather than a manager holding a disk, a socket and a WebRTC transport.
-
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { RemoteServerConnectionStatus } from "./remote-server-connection-status";
@@ -14,18 +8,12 @@ export function remoteServerSummaries(
   servers: readonly StoredRemoteServerView[],
   activeServerId: string,
   statusFor: (serverId: string) => RemoteServerConnectionStatus,
-  /** The member limit of this computer's own host, when the account server lists it. */
   localMemberLimit: number | null = null,
-  /** The local servers that this app runs as its child processes. */
   isThisComputer: (serverId: string) => boolean = () => false,
-  /** When a host last changed its key with a verified handover. The local server is `LOCAL_SERVER_ID`. */
   keyChangedAt: (serverId: string) => number | undefined = () => undefined,
 ): ServerSummary[] {
   const localKeyChangedAt = keyChangedAt(LOCAL_SERVER_ID);
   return [
-    // Always present and always reachable: it is this computer. It has no host to be incompatible
-    // with and no connection to fail, which is why its status fields are literals rather than looked
-    // up.
     {
       id: LOCAL_SERVER_ID,
       notificationsMuted: false,
@@ -55,11 +43,10 @@ export function remoteServerSummaries(
         name: server.name,
         kind: "remote" as const,
         state: status.state,
-        // A WebRTC host has no HTTP origin to give out. Reporting its `webrtc://` placeholder as an
-        // apiUrl would let a caller try to fetch it.
         apiUrl: server.transport === "webrtc-v2" ? null : server.apiUrl,
         remoteDesktopAvailable: server.remoteDesktopAvailable ?? false,
         logoUrl: server.logoVersion ? remoteServerLogoUrl(server.id, server.logoVersion) : null,
+        ...(server.appearance === undefined ? {} : { appearance: server.appearance }),
         role: server.role,
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
@@ -71,6 +58,7 @@ export function remoteServerSummaries(
         compatibility: status.compatibility,
         issue: status.issue,
         connectionSequence: status.connectionSequence,
+        ...(status.capabilitiesPending ? { capabilitiesPending: true as const } : {}),
         hostRestart: status.hostRestart ?? null,
         hostedSleep: status.hostedSleep ?? null,
         hostedIssue: status.hostedIssue ?? null,

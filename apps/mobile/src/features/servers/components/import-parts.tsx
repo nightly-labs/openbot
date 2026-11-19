@@ -25,7 +25,6 @@ export function importCount(t: MobileText["t"], kind: ImportCountKind, count: nu
   }
 }
 
-/** The skills, routines, memories and files of one agent, on one line. */
 export function agentContents(
   t: MobileText["t"],
   agent: { skillCount: number; routineCount: number; memoryCount: number; fileCount: number },
@@ -39,7 +38,6 @@ export function agentContents(
   return parts.join(" · ");
 }
 
-/** What a transfer file holds with the chosen agents, one item for each line or part. */
 export function transferContents(
   t: MobileText["t"],
   format: AppFormat,
@@ -73,14 +71,12 @@ export function transferContents(
   ];
 }
 
-/** The date an export was made. A value that is not a date shows as it is. */
 export function exportDate(value: string, format: AppFormat): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return format.date(date, { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Adds or removes `key` from the keys that the user left out. */
 export function toggledKeys(set: ReadonlySet<string>, key: string, include: boolean): ReadonlySet<string> {
   const next = new Set(set);
   if (include) next.delete(key);
@@ -88,7 +84,6 @@ export function toggledKeys(set: ReadonlySet<string>, key: string, include: bool
   return next;
 }
 
-/** One item that the user includes or leaves out, such as an agent of an export. */
 export function IncludeRow({
   label,
   supportingText,
@@ -119,13 +114,11 @@ export function IncludeRow({
   );
 }
 
-/** Text that the host sent, such as the items an import leaves out. */
 export function NotesSection({ title, notes }: { title: string; notes: readonly string[] }) {
   const { sourceText } = useText();
   if (notes.length === 0) return null;
   return (
     <SettingsSection title={title}>
-      {/* The host can send the same text twice. It shows once. */}
       {[...new Set(notes)].map((note) => (
         <SettingsRow key={note} disclosure={false}>
           <Typography.Paragraph type="body-sm">{sourceText(note)}</Typography.Paragraph>

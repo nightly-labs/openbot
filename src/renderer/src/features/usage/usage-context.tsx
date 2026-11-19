@@ -1,12 +1,12 @@
-import { createEffect, createStore, untrack } from "solid-js";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
+import { createEffect, createMemo, createSignal, createStore, untrack } from "solid-js";
 import { createSimpleContext } from "../../simple-context";
+import { createCrmEnabled } from "../crm/crm-enabled";
+import { desktopCrmHost } from "../crm/crm-port";
+import { serverCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 
-/**
- * The host pane over the middle of the workspace: the usage report, the routine schedule, the
- * tasks, the workflows or the Library. One state holds them, so each path that uncovers the conversation closes any of them.
- */
-type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "library";
+type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "library" | "crm";
 
 const context = createSimpleContext({
   name: "UsageProvider",
@@ -19,7 +19,19 @@ const context = createSimpleContext({
       serverId: null,
       view: "usage",
     });
-    const { activeServerId } = useServers();
+    const [workflowRequest, setWorkflowRequest] = createSignal<{ serverId: string; workflowId: string }>();
+    const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
+    const { activeServer, activeServerId } = useServers();
+    const crmServerId = createMemo(() => {
+      const server = activeServer();
+      return serverCanAdminister(server, CRM_CAPABILITY) ? server.id : undefined;
+    });
+    const crm = createCrmEnabled(
+      createMemo(() => {
+        const serverId = crmServerId();
+        return serverId === undefined ? undefined : desktopCrmHost(serverId);
+      }),
+    );
     let trigger: HTMLElement | null = null;
 
     function open(view: HostPaneView, serverId: string, source: HTMLElement | null, agentId?: string) {
@@ -44,7 +56,8 @@ const context = createSimpleContext({
       open("tasks", serverId, source);
     }
 
-    function openWorkflows(serverId: string, source: HTMLElement | null) {
+    function openWorkflows(serverId: string, source: HTMLElement | null, workflowId?: string) {
+      setWorkflowRequest(workflowId === undefined ? undefined : { serverId, workflowId });
       open("workflows", serverId, source);
     }
 
@@ -52,19 +65,11 @@ const context = createSimpleContext({
       open("library", serverId, source);
     }
 
-    /**
-     * An open report follows the host the user switches to.
-     *
-     * This has to live here rather than in the shell that renders the panel.
-     * `ServerScopeBoundary` is keyed on the active server, so everything below it
-     * is disposed and rebuilt by a switch - a shell effect would initialize its
-     * "previous" server to the *new* one on every mount and could never see the
-     * change. This provider sits above that boundary, which is the whole reason
-     * the report survives a switch, and so is the only place that can observe it.
-     *
-     * The trigger goes with the old scope, so `null` replaces it: Back has nothing
-     * to return focus to once the element it was opened from is gone.
-     */
+    function openCrm(serverId: string, source: HTMLElement | null, connectors = false) {
+      setCrmConnectorsRequest(connectors ? serverId : undefined);
+      open("crm", serverId, source);
+    }
+
     let previousServer = untrack(activeServerId);
     createEffect(activeServerId, (serverId) => {
       if (serverId !== previousServer && untrack(() => state.serverId))
@@ -77,6 +82,8 @@ const context = createSimpleContext({
     });
 
     function clear() {
+      setWorkflowRequest(undefined);
+      setCrmConnectorsRequest(undefined);
       setState((draft) => {
         draft.serverId = null;
         delete draft.agentId;
@@ -89,20 +96,19 @@ const context = createSimpleContext({
       openSchedule,
       openTasks,
       openWorkflows,
+      workflowRequest,
+      takeWorkflowRequest: () => setWorkflowRequest(undefined),
       openLibrary,
+      openCrm,
+      crmEnabled: crm.enabled,
+      crmConnectorsRequest,
+      takeCrmConnectorsRequest: () => setCrmConnectorsRequest(undefined),
       closeUsage() {
         clear();
         queueMicrotask(() => {
           if (trigger?.isConnected) trigger.focus({ preventScroll: true });
         });
       },
-      /**
-       * Back gives focus to the element the report was opened from; this does not.
-       * A command that opens a conversation - a global search result, a Dynamic
-       * Island action - has to uncover it first, and the destination owns focus
-       * from there: the transcript scrolls to the message the user picked, and
-       * pulling focus back to the rail button would undo that.
-       */
       dismissUsage: clear,
     };
   },

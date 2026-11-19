@@ -26,7 +26,6 @@ describe("billing migration", () => {
     database.exec(migration("0022_billing.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker still creates and deletes accounts.
     database.exec(`
       INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
       VALUES ('user-2', 'email:two@example.test', 'two@example.test', NULL, NULL, 2, 2);
@@ -39,7 +38,6 @@ describe("billing migration", () => {
         current_period_end, cancel_at_period_end, updated_at
       ) VALUES ('sub_2', 'user-2', 'cus_2', 'host-2', 'standard', 'year', 'eur', 'active', 10, 0, 2);
     `);
-    // The plan of a removed host stays: Stripe still bills it until the account cancels it.
     database.exec("DELETE FROM remote_hosts WHERE host_id = 'host-2'");
     expect(database.prepare("SELECT server_id FROM billing_subscriptions").all()).toEqual([{ server_id: "host-2" }]);
     database.exec("DELETE FROM users WHERE id = 'user-2'");
@@ -48,7 +46,6 @@ describe("billing migration", () => {
     database.exec(
       "INSERT INTO billing_customers(user_id, stripe_customer_id, created_at, updated_at) VALUES ('user-1', 'cus_1', 1, 1)",
     );
-    // One Stripe customer belongs to one account.
     expect(() =>
       database.exec(`
         INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)

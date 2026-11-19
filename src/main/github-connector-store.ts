@@ -1,5 +1,3 @@
-// The one GitHub sign-in of this computer, encrypted at rest by the operating system.
-
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
@@ -16,30 +14,15 @@ const githubConnectorRecordSchema = z.object({
   login: z.string().min(1),
   userId: z.number(),
   avatarUrl: z.string().nullable(),
-  /**
-   * The loopback GitHub MCP server that agents reach. Its port and bearer stay the same across
-   * restarts, because a resumed Codex session keeps the URL and header that it started with.
-   */
   mcpProxy: z.object({ port: z.number().int().min(1).max(65_535), secret: z.string().min(32) }).nullish(),
 });
 
 export type GitHubConnectorRecord = z.infer<typeof githubConnectorRecordSchema>;
 
-/**
- * `version` is checked, not tolerated: an envelope that this build cannot read is reported as
- * unreadable. The file stays on disk until a new sign-in replaces it.
- */
 const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 
-/** One token set is small; a larger file is not one that this app wrote. */
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
-/**
- * Reads and writes the GitHub sign-in. The decrypted record is kept in memory only.
- *
- * `electron` is not imported: the cipher arrives as an argument, so a test can use a fake one.
- * Writes run one at a time, because a refresh and a disconnect can arrive together.
- */
 export class GitHubConnectorStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
@@ -50,8 +33,6 @@ export class GitHubConnectorStore {
     this.#path = path;
     this.#cipher = cipher;
   }
-
-  /** Reads the file. Returns the error when the file is there but cannot be read. */
 
   readonly load = Effect.fn("GitHubConnectorStore.load")(function* (this: GitHubConnectorStore) {
     this.#record = null;

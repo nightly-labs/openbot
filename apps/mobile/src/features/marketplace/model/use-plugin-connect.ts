@@ -13,26 +13,17 @@ import { useText } from "@/shared/lib/text";
 import type { MobilePluginApp } from "./plugin-catalog.generated";
 import { type PluginConnectMethod, pluginAppConfig, pluginKeyLinkError } from "./plugin-connect";
 
-/** How often the host is asked how a relayed sign-in is, as on the web and the provider page. */
 const RELAY_POLL_MS = 1_000;
 
-/** Where the connect step of one app is. */
 export type PluginConnectState =
   | { phase: "idle" }
   | { phase: "working" }
-  /** The host waits for the page of its sign-in; the phone has not opened it yet. */
   | { phase: "waiting"; flowId: string }
-  /** The page is open. A page that returns to the host's loopback address needs that address pasted back. */
   | { phase: "signIn"; flowId: string; url: string; state: string | null; paste: boolean }
   | { phase: "done" };
 
 const pause = () => new Promise<void>((resolve) => setTimeout(resolve, RELAY_POLL_MS));
 
-/**
- * Connects one plugin app on the host, as the desktop connect step does for a joined host: a key is
- * tested before it is saved, and a browser sign-in is relayed (`sign-in-relay-v1`) so that the host
- * keeps the grant. The host saves the configuration that connected, never the listing's alone.
- */
 export function usePluginConnect(serverId: string, app: MobilePluginApp | null, method: PluginConnectMethod | null) {
   const { t, sourceText, errorMessage } = useText();
   const { saveMcpServer, testMcpServer, mcpSignInRelay } = useMobileWorkspaceActions();
@@ -40,7 +31,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
   const queryScope = useQueryScope();
   const [state, setState] = useState<PluginConnectState>({ phase: "idle" });
   const [error, setError] = useState<string | null>(null);
-  // A sign-in that the page leaves while it runs is ended on the host.
   const activeFlow = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(
@@ -60,7 +50,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
     queryClient.setQueryData(queryKeys.mcpServers(queryScope, serverId), list);
   }
 
-  /** A failed test or sign-in, in the words of the host. It fails the operation, so analytics counts it. */
   const hostFailure = (message: string) => new Error(sourceText(message));
 
   async function run(operation: () => Promise<void>) {
@@ -79,7 +68,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
     }
   }
 
-  /** Adds an app that asks for nothing, or tests and adds one with the typed key. */
   function connect(values: McpAuthValues = {}) {
     if (!app || !method || state.phase !== "idle") return;
     const base = pluginAppConfig(app);
@@ -100,7 +88,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
     if (method.kind === "link") return run(() => signIn(base));
   }
 
-  /** The relayed sign-in: the host starts it, the phone opens the page, and the host keeps the grant. */
   async function signIn(config: McpServerConfig): Promise<void> {
     const relay = mcpSignInRelay(serverId);
     const flowId = await relay.start(config);
@@ -125,8 +112,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
         }
         await pause();
       }
-      // The page left while the sign-in ran, and the cleanup ended it on the host. Nothing was saved,
-      // so the operation must not count as an install. No one sees this text: the page is gone.
       throw new Error("The sign-in stopped because its page closed.");
     } catch (cause) {
       if (activeFlow.current === flowId) {
@@ -137,7 +122,6 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
     }
   }
 
-  /** The address the browser ended on. Only its query goes to the host. */
   async function paste(address: string) {
     if (state.phase !== "signIn") return;
     const query = relayCallbackQuery(address, state.state);
@@ -146,13 +130,11 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
       return;
     }
     setError(null);
-    // The waiting loop reads the result that this completes.
     await mcpSignInRelay(serverId)
       .complete(state.flowId, query)
       .catch((cause: unknown) => setError(errorMessage(cause, t("mobile.marketplace.app.connectFailed"))));
   }
 
-  /** Opens the sign-in page again, for a user who closed the browser. */
   function reopen() {
     if (state.phase !== "signIn") return;
     void Linking.openURL(state.url).catch(() => setError(t("mobile.marketplace.app.openFailed")));

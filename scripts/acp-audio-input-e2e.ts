@@ -1,8 +1,3 @@
-// Runs the real ACP client against owned stdio agents. No account or model request is used.
-// bun scripts/acp-audio-input-e2e.ts
-// An agent that advertises audio input gets an attached MP3 as an audio block with unchanged bytes,
-// and the path as text. An agent with no audio input, a video, and audio over the 19 MB base64
-// prompt limit get the path only (#4210).
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -17,7 +12,6 @@ const out = resolve(import.meta.dirname, "../.openbot-build/acp-audio-input-e2e"
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-audio-"));
 const MB = 1024 * 1024;
 
-// The agent records the blocks of each prompt. `audio` selects its `promptCapabilities.audio`.
 const childSource = String.raw`
 const fs = require("node:fs");
 const crypto = require("node:crypto");
@@ -111,7 +105,6 @@ function running(pid: number): boolean {
   }
 }
 
-/** Subscribe before the request. The deadline bounds failure; it is not a sleep. */
 async function turn(client: AgentClient, threadId: string, model: string, paths: string[]): Promise<void> {
   let finish: () => void = () => {};
   let fail: (error: Error) => void = () => {};

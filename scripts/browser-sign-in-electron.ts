@@ -9,7 +9,6 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { LocalSignInWindows } from "../src/main/local-sign-in-window";
 
-/** Electron reports the OS sandbox of a process on macOS and Windows only. */
 function assertSandboxed(contents: WebContents, name: string): void {
   if (process.platform === "linux") return;
   const metric = app.getAppMetrics().find((entry) => entry.pid === contents.getOSProcessId());
@@ -26,10 +25,9 @@ const reportPath = argument("report-path");
 const runId = argument("run-id");
 
 const cases: string[] = [];
-// Fixture values only. The report and the receipts carry cookie names, never values.
 const SESSION_VALUE = "fixture-session";
+const TOKEN_VALUE = "fixture-token";
 
-// `/sign-in` is the site's sign-in page on this computer; `/home` tells the server's tab whether it is signed in.
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://fixture");
   response.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -42,11 +40,10 @@ const server = createServer((request, response) => {
     ]);
     const other = url.searchParams.get("other") ?? "";
     response.end(
-      `<!doctype html><meta charset="utf-8"><title>Sign in</title><script>document.cookie = "js=1; path=/";</script><iframe src="${other}/other"></iframe>`,
+      `<!doctype html><meta charset="utf-8"><title>Sign in</title><script>document.cookie = "js=1; path=/"; localStorage.setItem("token", "${TOKEN_VALUE}");</script><iframe src="${other}/other"></iframe>`,
     );
     return;
   }
-  // A sign-in on an address with no sign-in word: the password field shows the step.
   if (url.pathname === "/welcome") {
     response.end(
       `<!doctype html><meta charset="utf-8"><title>Welcome</title><form method="post" action="/account"><input type="password" name="secret" value="fixture"></form>`,
@@ -90,7 +87,6 @@ async function main(): Promise<void> {
     const address = server.address();
     assert(address && typeof address === "object", "Fixture server address missing.");
     const origin = `http://127.0.0.1:${address.port}`;
-    // Another host name for the same server: a site that the tab does not show.
     const otherOrigin = `http://localhost:${address.port}`;
     await app.whenReady();
     phase("electron-ready");
@@ -114,7 +110,6 @@ async function main(): Promise<void> {
     assert(tabContents, "Missing the tab contents.");
     assert.equal(tabContents.getTitle(), "signed-out");
 
-    // 1. The window opens on its own session, with the embedded browser's sandbox.
     const created = nextWindow();
     const opened = runCauseEffect(signIns.open(target, `${origin}/sign-in?other=${encodeURIComponent(otherOrigin)}`));
     const signInWindow = await created;
@@ -131,7 +126,6 @@ async function main(): Promise<void> {
     assert.deepEqual(await tabContents.session.cookies.get({ url: origin }).then(names), []);
     recordCases("window-own-memory-session", "window-sandboxed", "app-and-tab-sessions-untouched");
 
-    // 2. Permissions other than a clipboard write are refused.
     assert.equal(
       await contents.executeJavaScript(
         "navigator.permissions.query({ name: 'geolocation' }).then((state) => state.state)",
@@ -140,12 +134,10 @@ async function main(): Promise<void> {
     );
     recordCases("permission-refused");
 
-    // 3. A popup of a web page opens on the same session with the same rules; another scheme does not.
     const popupCreated = nextWindow();
     await contents.executeJavaScript(`void window.open(${JSON.stringify(`${origin}/home`)}); true`, true);
     const popup = await popupCreated;
     assert.equal(popup.webContents.session, signInSession, "The popup has another session.");
-    // The script runs when the renderer process of the popup is ready, so its metric then exists.
     assert.equal(await popup.webContents.executeJavaScript("typeof require"), "undefined");
     assertSandboxed(popup.webContents, "The popup");
     assert.equal(await contents.executeJavaScript("window.open('about:blank') === null", true), true);
@@ -156,7 +148,6 @@ async function main(): Promise<void> {
       ["other"],
       "No other-site cookie.",
     );
-    // 4. Collect keeps the cookies of the tab's site only, without the address-bound ones.
     const collected = await runCauseEffect(signIns.collect());
     assert.deepEqual(names(collected), ["js", "pref", "session"]);
     const byName = new Map(collected.map((cookie) => [cookie.name, cookie]));
@@ -167,8 +158,11 @@ async function main(): Promise<void> {
     assert.equal(Number.isInteger(byName.get("pref")?.expirationDate), true);
     assert.deepEqual(signIns.target(), { ...target, host: "127.0.0.1" });
     recordCases("collect-site-only", "collect-drops-address-bound", "collect-keeps-attributes");
+    const storage = await runCauseEffect(signIns.collectStorage());
+    assert.equal(storage?.origin, origin);
+    assert.deepEqual(storage?.entries, [{ name: "token", value: TOKEN_VALUE }]);
+    recordCases("collect-storage-of-tab-site");
 
-    // 5. A closed window keeps the sign-in, so Done can still send it; it opens again on the same session.
     const popupClosed = closed(popup);
     popup.close();
     await popupClosed;
@@ -177,13 +171,13 @@ async function main(): Promise<void> {
     await windowClosed;
     await opened;
     assert.deepEqual(names(await runCauseEffect(signIns.collect())), ["js", "pref", "session"]);
+    assert.deepEqual(await runCauseEffect(signIns.collectStorage()), storage, "A closed window lost the storage.");
     const reopenedCreated = nextWindow();
     const reopened = runCauseEffect(signIns.open(target, `${origin}/home`));
     const reopenedWindow = await reopenedCreated;
     assert.equal(reopenedWindow.webContents.session, signInSession, "Reopen made a new session.");
-    recordCases("closed-window-keeps-sign-in", "reopen-same-session");
+    recordCases("closed-window-keeps-sign-in", "closed-window-keeps-storage", "reopen-same-session");
 
-    // 6. The host sets only the cookies of the tab's site, and loads the page again signed in.
     const foreign: BrowserSignInCookie = {
       name: "foreign",
       value: "fixture",
@@ -194,32 +188,37 @@ async function main(): Promise<void> {
       sameSite: "lax",
       expirationDate: null,
     };
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, [foreign])), 0, "A foreign cookie was set.");
-    // The domain text fits the tab's host, but the URL made from it points to another host.
+    const none = { cookies: 0, storage: 0 };
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [foreign])), none, "A foreign cookie was set.");
     const crafted = { ...foreign, name: "crafted", domain: "localhost#.127.0.0.1" };
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, [crafted])), 0, "A crafted domain was set.");
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [crafted])), none, "A crafted domain was set.");
+    const foreignStorage = { origin: otherOrigin, entries: [{ name: "foreign", value: "fixture" }] };
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [], foreignStorage)), none);
+    assert.equal(await tabContents.executeJavaScript('localStorage.getItem("foreign")'), null);
     const reloaded = loaded(tabContents);
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, collected)), 3);
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, collected, storage)), { cookies: 3, storage: 1 });
     await reloaded;
     assert.equal(tabContents.getTitle(), "signed-in");
+    assert.equal(await tabContents.executeJavaScript('localStorage.getItem("token")'), TOKEN_VALUE);
     assert.deepEqual(await tabContents.session.cookies.get({ url: origin }).then(names), ["js", "pref", "session"]);
     assert.deepEqual(await tabContents.session.cookies.get({ name: "foreign" }).then(names), []);
     assert.deepEqual(await tabContents.session.cookies.get({ name: "crafted" }).then(names), []);
     recordCases(
       "import-refuses-other-site",
       "import-refuses-crafted-domain",
+      "import-refuses-other-origin-storage",
       "import-sets-site-cookies",
+      "import-sets-tab-origin-storage",
       "import-reloads-signed-in",
     );
 
-    // 6b. A tab of an agent with a browser session of its own gets the sign-in in that session.
     const before = new Set(webContents.getAllWebContents());
     const ownTab = await runCauseEffect(host.open(`${origin}/home`, "own-session-thread", "own-session-agent"));
     const ownContents = webContents.getAllWebContents().find((item) => !before.has(item));
     assert(ownContents, "Missing the own-session tab contents.");
     assert.notEqual(ownContents.session, tabContents.session, "The agent tab uses the shared session.");
     const own: BrowserSignInCookie = { ...foreign, name: "own", domain: "127.0.0.1" };
-    assert.equal(await runCauseEffect(host.importSignIn(ownTab.id, [own])), 1);
+    assert.deepEqual(await runCauseEffect(host.importSignIn(ownTab.id, [own])), { cookies: 1, storage: 0 });
     assert.deepEqual(await ownContents.session.cookies.get({ name: "own" }).then(names), ["own"]);
     assert.deepEqual(
       await tabContents.session.cookies.get({ name: "own" }).then(names),
@@ -229,7 +228,6 @@ async function main(): Promise<void> {
     await runCauseEffect(host.close(ownTab.id));
     recordCases("import-uses-agent-session");
 
-    // 7. Discard closes every window of the sign-in and removes what it kept.
     await runCauseEffect(signIns.discard());
     await reopened;
     assert.equal(reopenedWindow.isDestroyed(), true);
@@ -238,7 +236,6 @@ async function main(): Promise<void> {
     assert.deepEqual(await runCauseEffect(signIns.collect()), []);
     recordCases("discard-closes-window", "discard-clears-session");
 
-    // 8. A sign-in for another tab discards the one that is open.
     const firstCreated = nextWindow();
     const first = runCauseEffect(signIns.open(target, `${origin}/sign-in`));
     const firstWindow = await firstCreated;
@@ -254,8 +251,6 @@ async function main(): Promise<void> {
     await second;
     recordCases("other-tab-replaces-sign-in");
 
-    // 9. A sign-in step, then a cookie that the page cannot read, then a page after the sign-in, ends the
-    // wait. The window stays open, and a new cookie is necessary to end the next wait.
     const autoTarget = { ...target, tabId: "auto-tab" };
     const autoCreated = nextWindow();
     const autoOpened = runCauseEffect(signIns.open(autoTarget, `${origin}/welcome`));
@@ -327,10 +322,6 @@ function loaded(contents: WebContents): Promise<void> {
   return new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
 }
 
-/**
- * The window checks the page when it stops changing. The submit waits for that check, so the cookie
- * comes after the sign-in step: the check sees the password field and the page does not change.
- */
 async function submitWhenSignInSeen(contents: WebContents): Promise<void> {
   await new Promise<void>((resolve) => {
     const poll = setInterval(() => {
@@ -350,7 +341,6 @@ function closed(window: BrowserWindow): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

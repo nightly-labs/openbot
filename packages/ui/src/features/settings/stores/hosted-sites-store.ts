@@ -6,10 +6,8 @@ export type HostedSiteDeleteResult = "succeeded" | "failed";
 
 interface HostedSitesStoreProps {
   open: boolean;
-  /** The server whose sites the store shows. Another server clears the list and reads again. */
   serverId: string;
   hostedSitesApi?: Pick<HostedSitesDesktopApi, "list" | "delete"> | undefined;
-  /** Called as a deletion starts. It returns the call that records the result, for the account that started it. */
   trackDelete?: (() => (result: HostedSiteDeleteResult) => void) | undefined;
 }
 
@@ -17,17 +15,12 @@ interface HostedSitesPanel {
   busy: boolean;
   error: string | null;
   sites: HostedSiteSummary[];
-  /** The active-site limit of the server's plan, or null before the first read. */
   limit: number | null;
-  /** The active sites that count against `limit`. */
   used: number;
-  /** The site the confirmation dialog asks about. */
   pendingDelete: HostedSiteSummary | null;
-  /** A failed deletion, shown in the confirmation dialog so the user can try again or cancel. */
   deleteError: string | null;
 }
 
-/** The Sites section of one server: the published site list, its reload loop and the delete confirmation. */
 export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isActive: () => boolean) {
   const [hosting, setHosting] = createStore<HostedSitesPanel>({
     busy: false,
@@ -41,7 +34,6 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
   let reloadRequested = false;
   let loadPromise: Promise<void> | null = null;
 
-  /** Reads props only after a microtask, so the effect callback that calls it reads none. */
   function load(): Promise<void> {
     reloadRequested = true;
     if (loadPromise) return loadPromise;
@@ -57,7 +49,6 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
             const serverId = props.serverId;
             if (api) {
               const list = await api.list(serverId);
-              // The dialog moved to another server during the read: read that server instead.
               if (serverId !== props.serverId) {
                 reloadRequested = true;
                 continue;
@@ -118,7 +109,6 @@ export function createSettingsHostedSitesStore(props: HostedSitesStoreProps, isA
     });
   }
 
-  /** Deletes the site the dialog asks about. A failed deletion keeps the dialog open with the error. */
   async function confirmDelete(): Promise<void> {
     const site = hosting.pendingDelete;
     if (!props.hostedSitesApi || !site || hosting.busy) return;

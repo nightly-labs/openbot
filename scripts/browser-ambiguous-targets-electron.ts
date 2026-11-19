@@ -20,7 +20,6 @@ const reportPath = argument("report-path");
 const runId = argument("run-id");
 
 const cases: string[] = [];
-// The refusal texts that the agent reads, for the report. They hold fixture data only.
 const refusals: Record<string, string> = {};
 const THREAD_ID = "fixture-thread";
 const SHARED_LAYOUT_SELECTOR = 'div[data-mh="event-7"]';
@@ -138,13 +137,9 @@ async function main(): Promise<void> {
         assert(line, `No candidate names ${lesson.id}: ${message}`);
         assert(line.includes(lesson.title) && line.includes(lesson.location), line);
       }
-      // A card is not actionable, so it has no ref, and the error says how to get one.
       assert(!message.includes("ref="), message);
       assert.match(message, /Take a fresh snapshot/u);
 
-      // Five of the six "Register" buttons are candidates: the selector leaves out the Boxing lesson in
-      // the Thursday column. The item of a candidate stops before another "Register" button, so the
-      // Thursday item does not take in that lesson.
       const buttons = refusal(
         await call("click", { tabId, target: { kind: "css", selector: `${SHARED_LAYOUT_SELECTOR} button` } }),
       );
@@ -162,7 +157,6 @@ async function main(): Promise<void> {
 
       assert(!message.includes("hidden-fixture-note"), "A candidate showed hidden text.");
       assert(!message.includes("fixture-field-secret"), "A candidate showed a field value.");
-      // innerText gives all of textContent for a node that is not rendered. A hidden match shows no text.
       const hiddenMatches = refusal(
         await call("click", { tabId, target: { kind: "css", selector: ".fixture-hidden-note" } }),
       );
@@ -193,7 +187,6 @@ async function main(): Promise<void> {
           line.includes(TARGET_LESSON.location),
       );
       const ref = intended && /ref=(\d+):(\S+)/u.exec(intended);
-      // The first five buttons are Monday to Thursday: the target lesson is among them.
       assert(ref?.[1], `No candidate names the intended lesson: ${message}`);
       const clicked = await call("click", {
         tabId,
@@ -225,7 +218,6 @@ async function main(): Promise<void> {
     }
 
     {
-      // The shared selector matches the five event-7 buttons in page order: L-1041 to L-1045.
       const buttons = `${SHARED_LAYOUT_SELECTOR} button`;
       const before = await clicks(contents);
       const missing = refusal(await call("click", { tabId, target: { kind: "css", selector: buttons, nth: 5 } }));
@@ -245,7 +237,6 @@ async function main(): Promise<void> {
       assert.deepEqual(calendar.registrations.slice(3), ["L-1041"]);
       recordCases("css-nth-picks-one-match");
 
-      // A booked lesson's button has another name, so two "Register" buttons are left: L-2001, then L-1045.
       const script = await call("run_script", {
         tabId,
         script: "await click(role('button', 'Register', { exact: true }).nth(1)); return true;",
@@ -289,7 +280,6 @@ async function main(): Promise<void> {
   }
 }
 
-/** Checks a state again after each turn of the event loop, until it holds. */
 async function waitUntil(check: () => Promise<boolean>): Promise<void> {
   const deadline = Date.now() + 10_000;
   while (!(await check())) {
@@ -300,7 +290,6 @@ async function waitUntil(check: () => Promise<boolean>): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

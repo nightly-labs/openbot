@@ -1,5 +1,3 @@
-// Team identity, membership and invitations, as a host or the account service sends them.
-
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import type {
   InvitePreview,

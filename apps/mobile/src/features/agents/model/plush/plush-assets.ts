@@ -13,11 +13,6 @@ import { Image } from "react-native";
 import type { PlushArt } from "./plush-draw";
 import { NOTIFY_COLOR, tintRamp } from "./plush-felt";
 
-/*
- * The felt pictures come from the bloub package (see `metro.config.js`). A body is grey, and the app
- * tints it in the agent colour once for each size it shows. The eye pads are large photos of felt;
- * they are reduced once, to a size that still has detail for the largest avatar.
- */
 const BODIES: Readonly<Record<ShapeId, number>> = {
   cercle: require("@norbert_bodziony/bloub/assets/forme-cercle.webp"),
   galet: require("@norbert_bodziony/bloub/assets/forme-galet.webp"),
@@ -35,18 +30,10 @@ const PAD_X = require("@norbert_bodziony/bloub/assets/fred-oeil0-x.webp");
 const PAD_Y = require("@norbert_bodziony/bloub/assets/fred-oeil0-y.webp");
 const BALL = require("@norbert_bodziony/bloub/assets/boule.webp");
 
-/** The longest side of a reduced eye pad. A 144 point avatar draws a pad at about 150 pixels. */
 const PAD_PIXELS = 512;
-/** A felt ball is at most a fifth of the avatar. */
 const BALL_PART = 0.2;
-/** Avatar sizes share a picture for each step of this many pixels. */
 const PIXEL_STEP = 32;
-/** Decoded grey bodies: each is 768 pixels square, so few stay. */
 const MAX_SOURCES = 2;
-/**
- * Most avatars draw a body this wide or smaller. Each shape keeps a grey body of this size, so a list
- * of many shapes does not decode the large pictures again for each new colour or size.
- */
 const REDUCED_PIXELS = 384;
 const MAX_ART = 32;
 
@@ -76,7 +63,6 @@ async function decode(module: number): Promise<SkImage> {
   return image;
 }
 
-/** `image` drawn at `width` x `height` on a raster surface, with mipmaps, so a reduction keeps detail. */
 function resized(image: SkImage, width: number, height: number): SkImage {
   const surface = Skia.Surface.Make(width, height);
   if (!surface) throw new Error("The plush surface is unavailable.");
@@ -94,15 +80,19 @@ function resized(image: SkImage, width: number, height: number): SkImage {
   return surface.makeImageSnapshot();
 }
 
-/** The grey picture `image` in `hex`, `pixels` square. */
 function tinted(image: SkImage, hex: string, pixels: number): SkImage {
-  const grey = resized(image, pixels, pixels);
+  return tintedGrey(resized(image, pixels, pixels), hex);
+}
+
+function tintedGrey(grey: SkImage, hex: string): SkImage {
+  const width = grey.width();
+  const height = grey.height();
   const rampImage = Skia.Image.MakeImage(
     { width: 256, height: 1, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Opaque },
     Skia.Data.fromBytes(tintRamp(hex)),
     256 * 4,
   );
-  const surface = Skia.Surface.Make(pixels, pixels);
+  const surface = Skia.Surface.Make(width, height);
   if (!rampImage || !surface) throw new Error("The plush tint is unavailable.");
   const paint = Skia.Paint();
   paint.setShader(
@@ -114,7 +104,7 @@ function tinted(image: SkImage, hex: string, pixels: number): SkImage {
       ],
     ),
   );
-  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, pixels, pixels), paint);
+  surface.getCanvas().drawRect(Skia.XYWHRect(0, 0, width, height), paint);
   surface.flush();
   return surface.makeImageSnapshot();
 }
@@ -132,7 +122,6 @@ function source(module: number, key: string): Promise<SkImage> {
   const cached = sources.get(key);
   if (cached) return remember(sources, key, cached, MAX_SOURCES);
   const loading = decode(module);
-  // A failed load tries again next time.
   loading.catch(() => sources.delete(key));
   return remember(sources, key, loading, MAX_SOURCES);
 }
@@ -158,7 +147,6 @@ function felt() {
     };
     return { x: reduce(x), y: reduce(y), ball };
   });
-  // A failed load tries again next time.
   loading.catch(() => {
     pads = null;
   });
@@ -166,7 +154,6 @@ function felt() {
   return loading;
 }
 
-/** The pixels of a plush drawn `size` points wide, in steps, so that near sizes share their pictures. */
 export function plushPixels(size: number, scale: number): number {
   return Math.max(PIXEL_STEP, Math.ceil((size * scale) / PIXEL_STEP) * PIXEL_STEP);
 }
@@ -175,7 +162,6 @@ const art = new Map<string, Promise<PlushArt>>();
 const ready = new Map<string, PlushArt>();
 const artKey = (shape: ShapeId, color: string, pixels: number) => `${shape}|${color}|${pixels}`;
 
-/** The pictures of a plush of `shape` in `color`, drawn `pixels` pixels wide. */
 export function loadPlushArt(shape: ShapeId, color: string, pixels: number): Promise<PlushArt> {
   const key = artKey(shape, color, pixels);
   const cached = art.get(key);
@@ -197,7 +183,83 @@ export function loadPlushArt(shape: ShapeId, color: string, pixels: number): Pro
   return remember(art, key, loading, MAX_ART);
 }
 
-/** The pictures when they are loaded already, so a remount draws at once. */
 export function loadedPlushArt(shape: ShapeId, color: string, pixels: number): PlushArt | null {
   return ready.get(artKey(shape, color, pixels)) ?? null;
+}
+
+const FUR_ALPHA = 16;
+const FUR_SOURCE_SCALE = 1.6;
+
+interface FurBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const furBoxes = new Map<ShapeId, FurBox>();
+
+function furBox(shape: ShapeId, image: SkImage): FurBox {
+  const known = furBoxes.get(shape);
+  if (known) return known;
+  const width = image.width();
+  const height = image.height();
+  const pixels = image.readPixels(0, 0, {
+    width,
+    height,
+    colorType: ColorType.RGBA_8888,
+    alphaType: AlphaType.Unpremul,
+  });
+  if (!pixels) throw new Error("The plush body could not be read.");
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if ((pixels[(y * width + x) * 4 + 3] ?? 0) < FUR_ALPHA) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  const box =
+    right < left
+      ? { x: 0, y: 0, width: 1, height: 1 }
+      : { x: left / width, y: top / height, width: (right + 1 - left) / width, height: (bottom + 1 - top) / height };
+  furBoxes.set(shape, box);
+  return box;
+}
+
+const furBodies = new Map<string, Promise<SkImage>>();
+
+export function loadFurBody(shape: ShapeId, color: string, pixels: number): Promise<SkImage> {
+  const key = artKey(shape, color, pixels);
+  const cached = furBodies.get(key);
+  if (cached) return remember(furBodies, key, cached, MAX_ART);
+  const loading = body(shape, Math.ceil(pixels * FUR_SOURCE_SCALE)).then((grey) => {
+    const box = furBox(shape, grey);
+    const greyWidth = grey.width();
+    const greyHeight = grey.height();
+    const scale = pixels / Math.max(box.width, box.height);
+    const width = box.width * scale;
+    const height = box.height * scale;
+    const surface = Skia.Surface.Make(pixels, pixels);
+    if (!surface) throw new Error("The plush surface is unavailable.");
+    surface
+      .getCanvas()
+      .drawImageRectOptions(
+        grey,
+        Skia.XYWHRect(box.x * greyWidth, box.y * greyHeight, box.width * greyWidth, box.height * greyHeight),
+        Skia.XYWHRect((pixels - width) / 2, (pixels - height) / 2, width, height),
+        FilterMode.Linear,
+        MipmapMode.Linear,
+        Skia.Paint(),
+      );
+    surface.flush();
+    return tintedGrey(surface.makeImageSnapshot(), color);
+  });
+  loading.catch(() => furBodies.delete(key));
+  return remember(furBodies, key, loading, MAX_ART);
 }

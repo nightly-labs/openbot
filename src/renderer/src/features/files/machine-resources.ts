@@ -4,17 +4,10 @@ import { createEffect, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { FilesPort } from "./files-port";
 
-/** Disk and memory change slowly, and the host reads CPU since the reading before. */
 const MACHINE_REFRESH_MS = 60_000;
 
-/** Machine use and its alerts are hidden for now: in Storage and in the sidebar card. */
 export const MACHINE_RESOURCES_SHOWN: boolean = false;
 
-/**
- * The machine use of one server and its alert settings, for an owner or admin. It reads again each
- * minute while Storage is open. `available` is false for a member, for a client with no machine
- * calls, and for a host without `machine-resources-v1`.
- */
 export function createMachineResources(target: () => { serverId: string; canManage: boolean }, calls: () => FilesPort) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<{
@@ -62,7 +55,6 @@ export function createMachineResources(target: () => { serverId: string; canMana
             draft.alerts = alerts;
           });
       })
-      // The machine part still shows the use; only the alert settings stay hidden.
       .catch(() => undefined);
     const timer = setInterval(() => void refresh(), MACHINE_REFRESH_MS);
     return () => {
@@ -71,8 +63,6 @@ export function createMachineResources(target: () => { serverId: string; canMana
     };
   });
 
-  // The settings show at once, so a second change in a row builds on the first, and the requests go
-  // to the host one at a time, in order. Only the answer to the newest request replaces the settings.
   let queue: Promise<unknown> = Promise.resolve();
   let latest = 0;
   async function saveAlerts(settings: MachineAlertSettings): Promise<void> {
@@ -93,7 +83,6 @@ export function createMachineResources(target: () => { serverId: string; canMana
         });
     } catch (error) {
       actionToast.error(errorMessage(error, t("files.machine.saveFailed")));
-      // The panel shows what the host keeps, not the change that failed.
       if (request === latest && target().serverId === serverId)
         admin
           .getMachineAlerts(serverId)

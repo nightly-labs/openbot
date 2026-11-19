@@ -1,8 +1,7 @@
-// Decodes what the settings page sends to the Vault. A malformed payload is refused with a plain
-// message; a value that the user typed wrong is refused with text that the page shows.
-
 import {
   API_KEY_NAME_PATTERN,
+  VAULT_AGENT_ID_LIMIT,
+  VAULT_AGENT_SCOPE_LIMIT,
   VAULT_API_KEY_LIMIT,
   VAULT_FILL_SITE_LIMIT,
   VAULT_NOTES_LIMIT,
@@ -10,6 +9,7 @@ import {
   VAULT_TEXT_LIMIT,
   type VaultContactFields,
   type VaultSaveInput,
+  type VaultSaveScope,
   type VaultSecretField,
   type VaultSecretRequest,
 } from "@openbot/contracts/ipc";
@@ -53,7 +53,6 @@ function id(value: unknown): string | null {
   return value;
 }
 
-/** An `https:` address or a bare host name. Any other scheme is refused, so a login never fills on `http:`. */
 export function vaultWebsite(value: string): string | null {
   const trimmed = value.trim();
   const url = websiteUrl(trimmed);
@@ -61,7 +60,6 @@ export function vaultWebsite(value: string): string | null {
   return trimmed;
 }
 
-/** Digits only, with spaces and dashes removed, or null when the number fails the Luhn check. */
 function cardNumber(value: string): string | null {
   const digits = value.replace(/[\s-]/gu, "");
   if (!/^\d{12,19}$/u.test(digits)) return null;
@@ -102,16 +100,11 @@ function contactFields(value: DynamicRecord): VaultContactFields {
   return fields;
 }
 
-/** The approved sites that a card keeps. The service keeps only those that it saved itself. */
 function siteList(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > VAULT_FILL_SITE_LIMIT) throw new Error("fillSites is invalid.");
   return value.map((site) => rawText(site, "fillSites", VAULT_TEXT_LIMIT));
 }
 
-/**
- * A login's two-step key as the Vault keeps it. Undefined keeps the saved key, and "" removes it. A
- * text that is not a TOTP setup key or `otpauth://totp/` link is refused.
- */
 function vaultTwoStepKey(value: unknown): string | undefined {
   if (value === undefined) return undefined;
   const key = text(value, "twoStepKey", TWO_STEP_KEY_LIMIT);
@@ -121,19 +114,27 @@ function vaultTwoStepKey(value: unknown): string | undefined {
   return normalized;
 }
 
-/**
- * The item to save. A login's website must be HTTPS; a card number must pass the Luhn check, and its
- * security code has 3 or 4 digits. An API key's name is an environment variable name. A null secret
- * keeps the saved value.
- */
+function scope(value: unknown): VaultSaveScope {
+  if (value === undefined) return {};
+  if (value === null) return { agents: null };
+  if (!Array.isArray(value) || value.length > VAULT_AGENT_SCOPE_LIMIT) throw new Error("agents is invalid.");
+  const agents = [...new Set(value.map((agent) => rawText(agent, "agents", VAULT_AGENT_ID_LIMIT)))];
+  if (agents.some((agent) => !agent)) throw new Error("agents is invalid.");
+  if (agents.length === 0) throw userError("error.vault.agentsRequired");
+  return { agents };
+}
+
 export function decodeVaultSaveInput(value: unknown): VaultSaveInput {
   if (!isObject(value)) throw new Error("Invalid Vault item.");
+  return { ...decodeItem(value), ...scope(value.agents) };
+}
+
+function decodeItem(value: DynamicRecord): VaultSaveInput {
   const itemId = id(value.id);
   switch (value.kind) {
     case "login": {
       const website = vaultWebsite(text(value.website, "website"));
       if (!website) throw userError("error.vault.websiteInvalid");
-      // A password keeps its spaces; only an empty one is refused.
       const password = value.password === null ? null : rawText(value.password, "password", VAULT_PASSWORD_LIMIT);
       if (password !== null && !password.trim()) throw userError("error.vault.passwordRequired");
       const twoStepKey = vaultTwoStepKey(value.twoStepKey);
@@ -172,7 +173,6 @@ export function decodeVaultSaveInput(value: unknown): VaultSaveInput {
     case "apiKey": {
       const name = text(value.name, "name");
       if (!API_KEY_NAME_PATTERN.test(name)) throw userError("error.vault.apiKeyNameInvalid");
-      // The ends are trimmed: a program reads the whole file, and a pasted key often has a line break.
       const key = nullableText(value.key, "key", VAULT_API_KEY_LIMIT);
       if (key === "") throw userError("error.vault.apiKeyRequired");
       return { kind: "apiKey", id: itemId, name, notes: text(value.notes, "notes", VAULT_NOTES_LIMIT), key };

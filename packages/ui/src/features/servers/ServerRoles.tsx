@@ -39,10 +39,8 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
-/** An agent as the role pages show it. */
 export type RoleAgent = Pick<AgentProfile, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
-/** The page that the Roles section shows: the list, Everyone, or one role. */
 export type ServerRolePage = { kind: "list" } | { kind: "everyone" } | { kind: "role"; roleId: string };
 
 const LEVEL_LABELS = {
@@ -52,7 +50,6 @@ const LEVEL_LABELS = {
   manage: "server.agentAccess.level.manage",
 } as const satisfies Record<AgentAccessLevel, AppTextKey>;
 
-/** Everyone gives `manage` for an agent that it does not list; another role gives `none`. */
 export function everyoneLevel(everyone: AgentAccessLevels, agentId: string): AgentAccessLevel {
   return everyone[agentId] ?? "manage";
 }
@@ -87,7 +84,6 @@ function AgentFaces(props: { agents: RoleAgent[] }) {
   );
 }
 
-/** A row that opens a role page. The whole row is the button, as on the Connectors page. */
 function RoleRow(props: { name: string; icon: JSX.Element; agents: RoleAgent[]; members: string; onOpen: () => void }) {
   const { t } = useText();
   return (
@@ -114,23 +110,14 @@ function RoleRow(props: { name: string; icon: JSX.Element; agents: RoleAgent[]; 
   );
 }
 
-/** An item of the level menu: a level, or, on a role page, the step to the Everyone page. */
 type LevelOption = AgentAccessLevel | "everyone";
-// Constant arrays: a new options array on each render keeps Kobalte busy.
 const EVERYONE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS];
 const ROLE_OPTIONS: LevelOption[] = [...AGENT_ACCESS_LEVELS, "everyone"];
 
-/** The access that a member of a role gets to an agent: the higher level of the role and of Everyone. */
 function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
   return agentAccessRank(everyone) >= agentAccessRank(role) ? everyone : role;
 }
 
-/**
- * One agent with the access that the open page gives. On a role page, `level` is the access that a
- * member gets and `everyone` is the level that Everyone gives. A role only adds access, so when
- * Everyone gives the level, the row shows "· Everyone", the lower levels are off, and the last item
- * opens Everyone.
- */
 function AgentAccessRow(props: {
   agent: RoleAgent;
   label: string;
@@ -205,10 +192,6 @@ function AgentAccessRow(props: {
   );
 }
 
-/**
- * The menu that gives one level to every agent of the open role. Its mark shows the level when all
- * agents have the same one.
- */
 function SetAllLevelsMenu(props: {
   title: string;
   levels: AgentAccessLevel[];
@@ -231,10 +214,8 @@ function SetAllLevelsMenu(props: {
         <span class="server-roles-member-summary">{t("server.roles.setAll")}</span>
         <ChevronDown aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content>
-          {/* With mixed levels no item is checked, so each choice is a change. */}
           <DropdownMenu.RadioGroup
             aria-label={t("server.roles.setAllLabel", { role: props.title })}
             value={common() ?? ""}
@@ -258,10 +239,8 @@ function SetAllLevelsMenu(props: {
   );
 }
 
-/** The name field of a role. It saves on Enter or when it loses focus, not on each key. */
 function RoleNameField(props: { name: string; disabled: boolean; onRename: (name: string) => void }) {
   const { t } = useText();
-  // A saved name, or a rename by another admin, replaces the draft.
   const [draft, setDraft] = createSignal(() => props.name);
   function commit() {
     const name = draft().trim();
@@ -294,15 +273,10 @@ export interface ServerRolesPanelProps {
   onCreate: () => void;
   onRename: (roleId: string, name: string) => void;
   onDelete: (roleId: string) => void;
-  /** Gives each agent of `levels` its level, in one save. */
   onSetEveryoneLevels: (levels: ReadonlyMap<string, AgentAccessLevel>) => void;
   onSetRoleLevels: (roleId: string, levels: ReadonlyMap<string, AgentAccessLevel>) => void;
 }
 
-/**
- * Server Settings > Roles, as Discord has them. Every member gets the agents of Everyone; each other
- * role adds agents for the members that have it. The caller saves each change.
- */
 export function ServerRolesPanel(props: ServerRolesPanelProps) {
   const { t } = useText();
   const [deleteId, setDeleteId] = createSignal<string | null>(null);
@@ -316,15 +290,12 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
     title: string,
     level: (agentId: string) => AgentAccessLevel,
     onChange: (levels: ReadonlyMap<string, AgentAccessLevel>) => void,
-    // On a role page: the level that Everyone gives, so each row shows the access that members get.
     everyone?: (agentId: string) => AgentAccessLevel,
   ) => {
     const shown = (agentId: string) => {
       const floor = everyone?.(agentId);
       return floor === undefined ? level(agentId) : memberLevel(level(agentId), floor);
     };
-    // A role keeps no level that Everyone gives already. Else the level stays out of sight, and
-    // members still get it after Everyone gives less.
     const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
       const levels = new Map<string, AgentAccessLevel>();
       for (const agentId of agentIds) {
@@ -491,7 +462,6 @@ export function ServerRolesPanel(props: ServerRolesPanelProps) {
   );
 }
 
-/** The check mark of the marketplace menus, for a checkbox or radio item. */
 function MenuMark(props: { on: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on ? "" : undefined}>
@@ -510,20 +480,14 @@ const SERVER_ROLE_LABELS = {
 export interface MemberRoleMenuProps {
   memberName: string;
   serverRole: "admin" | "member";
-  /** The roles of the server, or nothing when its host has no roles. */
   roles: readonly Pick<AgentAccessRole, "id" | "name" | "memberIds">[] | undefined;
   memberId: string;
   disabled: boolean;
   mount: HTMLElement | undefined;
-  /** The caller confirms the change; `trigger` gets the focus back. */
   onServerRole: (role: "admin" | "member", trigger: HTMLElement) => void;
   onToggleRole: (roleId: string, on: boolean) => void;
 }
 
-/**
- * The role menu at the end of a member row: the server role, then the roles. Its button names the
- * roles of the member. Roles apply only to a member, so an admin sees the server role only.
- */
 export function MemberRoleMenu(props: MemberRoleMenuProps) {
   const { t } = useText();
   let triggerElement: HTMLElement | undefined;
@@ -545,7 +509,6 @@ export function MemberRoleMenu(props: MemberRoleMenuProps) {
         <span class="server-roles-member-summary">{summary()}</span>
         <ChevronDown aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content>
           <span class="ui-menu-label" aria-hidden="true">

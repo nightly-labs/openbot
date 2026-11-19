@@ -22,11 +22,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Failed: Story = {};
 
-/** The composer holds other text, so Edit would replace it. */
 export const FailedWithDraft: Story = { args: { canEdit: false } };
 
-/** An older host cannot drop a repeated send, so there is no Retry: the first one may have arrived. */
 export const Unconfirmed: Story = { args: { retrySafe: false, error: null } };
 
-/** The composer shows the update notice, so the row keeps only Edit and Dismiss. */
 export const UpdateRequired: Story = { args: { updateRequired: true } };

@@ -1,14 +1,9 @@
-// Frozen decoder primitives for the optional admin wire contracts (`agent-admin-v1` and the codecs
-// that follow it). Every admin codec reads its bounds from the literals it passes here, so a change
-// to an IPC limit cannot move a shipped wire contract. A change to a primitive below changes every
-// admin contract at once: add a new primitive instead of loosening one.
 import { isDynamicRecord, isString } from "../runtime-values";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export type AdminDecoder = (value: unknown) => TeamProtocolV2Json;
 type Fields = Record<string, AdminDecoder>;
 
-/** One admin route: the request the host accepts and the response the client accepts. */
 export interface OptionalRouteCodec {
   request(value: unknown): TeamProtocolV2Json;
   response(status: number, value: unknown): TeamProtocolV2Json;
@@ -54,7 +49,6 @@ function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Js
   return Object.fromEntries(Object.entries(fields).map(([key, decode]) => [key, decode(value[key])]));
 }
 
-/** An absent optional field stays absent, so the IPC parser on the far side sees the shape the client built. */
 function sparseRecord(value: unknown, required: Fields, optional: Fields): Record<string, TeamProtocolV2Json> {
   if (!isDynamicRecord(value)) throw new Error("Invalid admin record.");
   const decoded = record(value, required);
@@ -67,7 +61,6 @@ export const fields =
   (value) =>
     sparseRecord(value, required, optional);
 
-/** One record decoder per `kind`; each case also decodes `kind`, so it stays in the result. */
 export const variant =
   (cases: Record<string, AdminDecoder>): AdminDecoder =>
   (value) => {

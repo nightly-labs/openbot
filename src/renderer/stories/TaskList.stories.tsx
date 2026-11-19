@@ -2,11 +2,6 @@ import { TaskList, type TaskListItem } from "@openbot/ui/features/conversation/T
 import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/*
- * The chat block of a plan an agent works through. The timeline shows one for each turn that
- * kept a plan with the provider's plan or todo tool.
- */
-
 const LABELS = [
   "Read the project structure",
   "Find where the settings are saved",
@@ -45,7 +40,6 @@ export const NotStarted: Story = { args: { items: tasks(-1) } };
 
 export const Done: Story = { args: { items: tasks(LABELS.length) } };
 
-/** The person closed the list. The header still shows the count. */
 export const Collapsed: Story = { args: { defaultOpen: false } };
 
 export const CustomTitle: Story = { args: { title: "Plan for the settings migration" } };
@@ -69,11 +63,9 @@ export const LongLabels: Story = {
   },
 };
 
-/** The agent works through the plan: each task fills, then the next one starts. The loop repeats. */
 export const Live: Story = {
   render: (args) => {
     const [step, setStep] = createSignal(0);
-    // Ten progress steps per task, then a pause on the finished list.
     const stepsPerTask = 10;
     const lastStep = LABELS.length * stepsPerTask + 12;
     onSettled(() => {

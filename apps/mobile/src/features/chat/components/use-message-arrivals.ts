@@ -1,38 +1,48 @@
-import { useState } from "react";
+import { useRef } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 
-// Only messages appended to an already visible conversation get an entrance.
-// Opening history, reconnecting, and returning from the background establish a new baseline.
 export function useMessageArrivals(agentId: string, messages: ChatMessage[], enabled: boolean) {
-  const [snapshot, setSnapshot] = useState(() => ({
-    agentId,
-    messages,
-    enabled,
-    arriving: new Set<string>(),
-  }));
+  const kept = useRef<ArrivalSnapshot | null>(null);
+  kept.current ??= { agentId, messages, enabled, arriving: new Set<string>() };
+  const snapshot = kept.current;
   if (snapshot.agentId !== agentId || snapshot.enabled !== enabled || snapshot.messages !== messages) {
-    const known = new Map(snapshot.messages.map((message) => [message.id, message]));
     const arriving = new Set<string>();
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
-      const previousTail = snapshot.messages.at(-1)?.id;
-      const tailIndex = previousTail ? messages.findIndex((message) => message.id === previousTail) : -1;
+      const previous = snapshot.messages;
+      let byId: Map<string, ChatMessage> | undefined;
+      const previousTail = previous.at(-1)?.id;
+      const tailIndex = !previousTail
+        ? -1
+        : messages[previous.length - 1]?.id === previousTail
+          ? previous.length - 1
+          : messages.findIndex((message) => message.id === previousTail);
       for (const [index, message] of messages.entries()) {
-        const old = known.get(message.id);
+        let old = previous[index];
+        if (old?.id !== message.id) {
+          if (!byId) byId = new Map(previous.map((item) => [item.id, item]));
+          old = byId.get(message.id);
+        }
         if (
           snapshot.arriving.has(message.id) ||
           (old?.kind === "message" && old.streaming && message.kind === "message" && message.status === "completed") ||
-          ((snapshot.messages.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !known.has(message.id))
+          ((previous.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !old)
         )
           arriving.add(message.id);
       }
     }
-    // Keep the same set while a reply streams, so rows that read it do not re-render per chunk.
     const next =
       arriving.size === snapshot.arriving.size && [...arriving].every((id) => snapshot.arriving.has(id))
         ? snapshot.arriving
         : arriving;
-    setSnapshot({ agentId, messages, enabled, arriving: next });
+    kept.current = { agentId, messages, enabled, arriving: next };
     return next;
   }
   return snapshot.arriving;
+}
+
+interface ArrivalSnapshot {
+  agentId: string;
+  messages: ChatMessage[];
+  enabled: boolean;
+  arriving: Set<string>;
 }

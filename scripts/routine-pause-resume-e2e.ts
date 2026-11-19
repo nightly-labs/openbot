@@ -1,11 +1,3 @@
-// Checks pause and resume of a routine on the real scheduler, SQLite stores and mailbox. Each request
-// goes through the real IPC decoder (`parseUpdateRoutine`) into `RoutineScheduler.update`. The clock
-// is moved with `setSystemTime`, because resume computes the next occurrence from the real clock.
-// Each scheduler pass gets an explicit clock, so no timer races it. No provider, account or network
-// is started: a queued delivery is cancelled to end its run, as a user does in the queue.
-// Run: `bun scripts/routine-pause-resume-e2e.ts`.
-// Writes .openbot-build/routine-pause-resume-e2e/report.json.
-
 import { setSystemTime } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -136,7 +128,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check awaits its own operation.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -179,14 +170,12 @@ function runs(id: string): Array<{ scheduledFor: string }> {
   return current().runs.listRuns(current().agentId, id, 50, true);
 }
 
-/** Saves a change as the renderer sends it, through the IPC decoder. */
 function update(fields: Omit<UpdateRoutineInput, "agentId">): Routine {
   return current().scheduler.update(parseUpdateRoutine({ agentId: current().agentId, ...fields }), {
     recordConversationEvent: false,
   });
 }
 
-/** Ends the queued routine runs, as a user who cancels them in the queue. */
 async function cancelQueued(): Promise<void> {
   const { mailbox, agentId } = current();
   for (const deliveryId of mailbox.queuedDeliveryIds(agentId))
@@ -245,7 +234,6 @@ try {
         .some((event) => event.type === "routines-changed" && event.agentId === current().agentId),
       "Pause reports the change to the renderer.",
     );
-    // Four occurrences come due while the routine is paused.
     setSystemTime(at("11:20"));
     await pass(at("11:20"));
     assert.equal(deliveries(cronId), 1);
@@ -258,7 +246,6 @@ try {
     current().close();
     fixture = undefined;
     fixture = await openFixture(root);
-    // The application start order: skip missed work, then process what is due.
     current().scheduler.skipMissed(new Date());
     await runCauseEffect(current().scheduler.resumePendingRuns());
     await pass(at("11:20"));

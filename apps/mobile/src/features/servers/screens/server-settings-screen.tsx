@@ -7,6 +7,7 @@ import LogOut from "lucide-react-native/icons/log-out";
 import Trash2 from "lucide-react-native/icons/trash";
 import { useRef, useState } from "react";
 import { Alert, Keyboard, View } from "react-native";
+import { ServerAppearancePicker } from "@/features/servers/components/server-appearance-picker";
 import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
@@ -36,11 +37,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server settings, on one page: the server name, logo and status, then a section for each group of
- * settings that has an item for this role, and the action that ends this member's use of the server.
- * Each section shows only the rows that the host serves to this role.
- */
 export function ServerSettingsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -57,25 +53,22 @@ export function ServerSettingsScreen() {
 
 function ServerSettingsHome({ server }: { server: MobileServer }) {
   const hostedServerIds = useOwnerHostedServerIds(server);
+  const { canEditServerAppearance } = useMobileWorkspace();
   return (
     <SettingsContent>
       {canAdministerServer(server.role) ? <ServerIdentityForm server={server} /> : <ServerHeader server={server} />}
+      {canEditServerAppearance(server.id) && !server.logoKey ? <ServerAppearancePicker server={server} /> : null}
       <ServerGeneralSection serverId={server.id} />
       <ServerPeopleSection server={server} />
       <ServerAiSection serverId={server.id} />
       <ServerDataSections serverId={server.id} />
       <ServerConnectionSection server={server} hostedServerIds={hostedServerIds} />
       <ServerExitSection server={server} hostedServerIds={hostedServerIds} />
-      {/* The owner rarely changes the key, so it comes last. */}
       <ServerKeySettings server={server} />
     </SettingsContent>
   );
 }
 
-/**
- * The connection status and the OpenBot version of the host, under the server name. The text of the
- * connection, such as an error, goes under them.
- */
 function ServerStatusLine({ server }: { server: MobileServer }) {
   const { t, sourceText } = useText();
   const version = useServerUpdate(server.id, { poll: false }).query.data?.status.currentVersion;
@@ -98,10 +91,6 @@ function ServerStatusLine({ server }: { server: MobileServer }) {
   );
 }
 
-/**
- * Leave for a member. For the owner: Delete for a server that the desktop app runs beside its own
- * server, or Remove from the account for a server that is not hosted.
- */
 function ServerExitSection({
   server,
   hostedServerIds,
@@ -147,8 +136,6 @@ function ServerExitSection({
   if (kind === "computer") return null;
   if (kind === "onComputer")
     return (
-      // A server that the desktop app runs beside its own server: that app stops it and moves its data
-      // to the Trash. Removed from the account only, it would come back at the next start of the app.
       <SettingsSection footer={error}>
         <SettingsRow
           leading={<RowIcon icon={Trash2} tone="danger" />}
@@ -182,7 +169,6 @@ function ServerExitSection({
     );
   if (!hostedServerIds || hostedServerIds.has(serverId)) return null;
   return (
-    // The owner removes the server from the account. The host does not need to be online.
     <SettingsSection footer={error}>
       <SettingsRow
         leading={<RowIcon icon={Trash2} tone="danger" />}
@@ -203,7 +189,6 @@ function ServerExitSection({
                       await removeServer(serverId);
                       router.dismiss();
                     },
-                    // The account service explains a refusal, such as a hosted server that Billing deletes.
                     (caught) => errorMessage(caught, t("mobile.server.settings.updateFailed")),
                   ),
               },
@@ -217,7 +202,6 @@ function ServerExitSection({
   );
 }
 
-/** The logo, name and status of the server, for a member, who cannot change the name or logo. */
 function ServerHeader({ server }: { server: MobileServer }) {
   const { t } = useText();
   return (
@@ -230,16 +214,11 @@ function ServerHeader({ server }: { server: MobileServer }) {
   );
 }
 
-/**
- * The server logo, name and status. The owner or admin taps the logo to change it, and edits the name
- * in place; Save in the header saves both. The host saves them and tells every connected client.
- */
 function ServerIdentityForm({ server }: { server: MobileServer }) {
   const { t, errorMessage } = useText();
   const { canEditServerIdentity, updateServerIdentity } = useMobileWorkspace();
   const available = canEditServerIdentity(server.id);
   const [draftName, setDraftName] = useState<string | undefined>();
-  // Undefined keeps the saved logo; null removes it.
   const [logo, setLogo] = useState<AvatarPhoto | null | undefined>();
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -250,12 +229,10 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
   const nameChanged = draftName !== undefined && trimmed !== server.name;
   const logoChanged = logo !== undefined && (logo !== null || server.logoKey !== null);
   const dirty = nameChanged || logoChanged;
-  // A saved name from an older rule stays valid until the user changes it.
   const nameValid =
     !nameChanged || (trimmed.length >= INPUT_LIMITS.serverNameMin && trimmed.length <= INPUT_LIMITS.serverName);
   const hasLogo = logo === undefined ? server.logoKey !== null : logo !== null;
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && (dirty || saving || picking), ({ repeat }) => {
     if (pending.current || picking) return;
@@ -289,7 +266,6 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
   }
 
   function editLogo(): void {
-    // The name field locks while the photo picker is open, so it gives up the keyboard first.
     Keyboard.dismiss();
     void haptics.impact("soft");
     if (!hasLogo) {

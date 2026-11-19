@@ -1,15 +1,3 @@
-// Reads the Cursor plan usage end to end on the real Cursor driver and ACP client, with a fake
-// `cursor-agent acp` and a local server in place of the Cursor backend (`CURSOR_API_ENDPOINT`). The
-// sign-in is a fake `auth.json` in a temporary home. Checks that a split plan gives the Cursor
-// models window and the other models window for the billing cycle, with its total as the third
-// window, that a plan with only a total
-// gives one window, that a merged plan gives the total alone and names Grok as sharing its quota, that
-// a plan info that fails to read keeps the split, and that a rejected token and a missing sign-in give
-// no reading.
-// `bun scripts/cursor-usage-e2e.ts`. Writes .openbot-build/cursor-usage-e2e/report.json.
-//
-// On macOS the reader asks the login Keychain first. With the Cursor CLI signed in there, the
-// local server sees a token that is not the fake one and the run fails: sign the CLI out first.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
@@ -29,7 +17,6 @@ const PLAN_INFO_PATH = "/aiserver.v1.DashboardService/GetPlanInfo";
 const CYCLE_START = Date.UTC(2026, 9, 1);
 const CYCLE_END = Date.UTC(2026, 9, 31);
 
-// Answers `initialize` and `session/new` with one model, so the client counts as signed in.
 const FAKE_CURSOR = `#!/usr/bin/env node
 const NL = String.fromCharCode(10);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
@@ -65,7 +52,6 @@ setInterval(() => {}, 1000);
 interface UsageRequest {
   method: string;
   path: string;
-  /** Whether the bearer token was the fake sign-in's. The token itself is not kept. */
   fakeToken: boolean;
   body: string;
 }
@@ -163,7 +149,6 @@ try {
   await mkdir(dirname(authFile), { recursive: true });
   await writeFile(authFile, JSON.stringify({ accessToken: FAKE_TOKEN, refreshToken: "fake-refresh" }));
 
-  // 1. A plan split into Cursor's own models and the others. Connect JSON writes int64 as strings.
   const split = await readUsage(200, {
     billingCycleStart: String(CYCLE_START),
     billingCycleEnd: String(CYCLE_END),
@@ -195,7 +180,6 @@ try {
   );
   assert.equal(split.reading.sharedQuotaWith, undefined, "a split plan shares no quota");
 
-  // 2. A plan with only a total fills the first window with it.
   const total = await readUsage(200, {
     billingCycleStart: CYCLE_START,
     billingCycleEnd: CYCLE_END,
@@ -210,8 +194,6 @@ try {
   assert.equal(total.reading.tertiary, undefined, "the total of a plan with no split is its first window");
   assert.equal(total.reading.sharedQuotaWith, undefined, "a plan that is not merged shares no quota");
 
-  // 3. A merged plan includes no other models: the total alone, with no other models window. That
-  // total is the Grok plan quota, so the reading and the dock limit name Grok as sharing it.
   const merged = await readUsage(
     200,
     {
@@ -231,7 +213,6 @@ try {
   assert.equal(merged.reading.sharedQuotaWith, "grok", "a merged plan shares the Grok quota");
   assert.equal(normalizeAccountUsage(merged.reading).limits[0]?.sharedQuotaWith, "grok", "the dock limit keeps it");
 
-  // 4. A plan info that fails to read keeps the split reading.
   const planInfoFailed = await readUsage(
     200,
     {
@@ -250,7 +231,6 @@ try {
   assert.deepEqual(planInfoFailed.reading.tertiary, { usedPercent: 60, ...cycle }, "the split keeps its total");
   assert.equal(planInfoFailed.reading.sharedQuotaWith, undefined, "an unread plan info shares no quota");
 
-  // 5. A token the backend rejects gives no reading.
   const rejected = await readUsage(
     401,
     { code: "unauthenticated" },
@@ -260,7 +240,6 @@ try {
   assert.equal(rejected.requests.length, 2);
   assert.equal(rejected.reading.rateLimits ?? null, null, "a rejected token gives no reading");
 
-  // 6. With no sign-in file there is nothing to send.
   await rm(authFile, { force: true });
   const noSignIn = await readUsage(200, { planUsage: { autoPercentUsed: 1 } });
   report.noSignIn = noSignIn;

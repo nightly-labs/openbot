@@ -1,7 +1,3 @@
-// Shared by the OpenCode prompt bench, the OpenCode agent smoke and the OpenCode tool-trim e2e: the real `opencode` provider
-// driver and the real OpenCode binary, against a fake OpenAI-compatible model on loopback. OpenCode
-// runs in a temporary HOME and XDG folders, so it never reads the developer's own config, keys or
-// sessions, and it gets its own service port, so it does not meet a running OpenBot's.
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -23,26 +19,17 @@ const ENDPOINT = "spark";
 const MODEL = "agent-model";
 export const OPENCODE_MODEL = `${ENDPOINT}/${MODEL}`;
 
-/** One chat request that OpenCode sent to the fake model. */
 export interface ModelRequest {
-  /** The parsed request body. */
   body: unknown;
-  /** The `role` of each message. */
   roles: string[];
-  /** The text of the system messages. */
   system: string;
-  /** The names of the function tools. */
   tools: string[];
-  /** The text of the last user message. */
   lastUser: string;
-  /** The number of tool results in the conversation. */
   toolResults: number;
 }
 
-/** A JSON value, such as a config file or the arguments of a tool call. */
 export type Json = string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json };
 
-/** What the fake model answers: text, or one tool call. */
 export type ModelAnswer = { text: string } | { tool: string; arguments: { readonly [key: string]: Json } };
 
 export type ModelScript = (request: ModelRequest) => ModelAnswer;
@@ -51,13 +38,9 @@ export interface OpenCodeHarness {
   readonly root: string;
   readonly workspace: string;
   readonly cli: AgentCliInfo;
-  /** Every request, in order. */
   readonly requests: ModelRequest[];
-  /** Replaces the answer of each later request. */
   script: ModelScript;
-  /** Writes the global `opencode.json` that the next process reads. */
   writeGlobalConfig(config: { readonly [key: string]: Json }): Promise<void>;
-  /** A new OpenCode agent client, which `stop` stops. */
   createClient(): AgentClient;
   stop(): Promise<void>;
 }
@@ -112,10 +95,6 @@ async function freePort(): Promise<number> {
   return address.port;
 }
 
-/**
- * Starts the fake model and points OpenCode at temporary folders. `OPENCODE_CLI` names the binary;
- * without it, the managed OpenCode install is used.
- */
 export async function startOpenCodeHarness(name: string): Promise<OpenCodeHarness> {
   const root = await mkdtemp(join(tmpdir(), `openbot-${name}-`));
   const requests: ModelRequest[] = [];
@@ -162,7 +141,6 @@ export async function startOpenCodeHarness(name: string): Promise<OpenCodeHarnes
     process.env[variable] = join(root, folder);
     await mkdir(join(root, folder), { recursive: true });
   }
-  // A config file or folder of the developer would add their rules, and the driver would add none.
   delete process.env.OPENCODE_CONFIG;
   delete process.env.OPENCODE_CONFIG_DIR;
   await mkdir(join(root, "config", "opencode"), { recursive: true });
@@ -214,7 +192,6 @@ export async function startOpenCodeHarness(name: string): Promise<OpenCodeHarnes
   };
 }
 
-/** The OpenBot tools in the Code Mode catalog, and the namespace header, such as `16 tools, 14 shown`. */
 export function codeModeCatalog(system: string): { openbot: string[]; opencode: string[]; header: string | null } {
   const names = (namespace: string) => [
     ...new Set(
@@ -228,7 +205,6 @@ export function codeModeCatalog(system: string): { openbot: string[]; opencode: 
   };
 }
 
-/** The skill ids that the system prompt lists. */
 export function listedSkills(system: string): string[] {
   return [...system.matchAll(/<id>([^<]+)<\/id>/gu)].map((match) => match[1] ?? "").sort();
 }
