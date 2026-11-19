@@ -373,6 +373,20 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         };
         const requestSweep = (): Effect.Effect<void> => Effect.forkIn(sweep(), scope).pipe(Effect.asVoid);
 
+        const inputFilePaths = Effect.fn("Workflows.inputFilePaths")(function* (attachmentIds: readonly string[]) {
+          if (attachmentIds.length > INPUT_LIMITS.attachments)
+            return Result.fail(sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }));
+          const paths: string[] = [];
+          for (const attachmentId of attachmentIds) {
+            const path = dependencies.filePath
+              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
+              : null;
+            if (!path) return Result.fail(sourceText("error.workflow.mediaInputMissing"));
+            paths.push(path);
+          }
+          return Result.succeed(paths);
+        });
+
         const sendAgentStep = Effect.fn("Workflows.sendAgentStep")(function* (step: StoredWorkflowStep) {
           if (!step.agentId) {
             settle(step, { status: "failed", error: sourceText("error.workflow.agentMissing") });
@@ -383,24 +397,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const attachmentIds = graph
             ? agentFileInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
             : [];
-          if (attachmentIds.length > INPUT_LIMITS.attachments) {
-            settle(step, {
-              status: "failed",
-              error: sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }),
-            });
+          const resolved = yield* inputFilePaths(attachmentIds);
+          if (Result.isFailure(resolved)) {
+            settle(step, { status: "failed", error: resolved.failure });
             return;
           }
-          const sourcePaths: string[] = [];
-          for (const attachmentId of attachmentIds) {
-            const path = dependencies.filePath
-              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
-              : null;
-            if (!path) {
-              settle(step, { status: "failed", error: sourceText("error.workflow.mediaInputMissing") });
-              return;
-            }
-            sourcePaths.push(path);
-          }
+          const sourcePaths = resolved.success;
           const sent = yield* dependencies
             .sendHandoff({
               run: {
@@ -457,20 +459,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const inputs = graph
             ? mediaInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
             : [];
-          const attachmentIds = [...new Set(inputs.map((input) => input.attachmentId))];
-          if (attachmentIds.length > INPUT_LIMITS.attachments)
-            return Result.fail(sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }));
-          const paths: string[] = [];
-          for (const attachmentId of attachmentIds) {
-            const path = dependencies.filePath
-              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
-              : null;
-            if (!path) return Result.fail(sourceText("error.workflow.mediaInputMissing"));
-            if (!MODEL_IMAGE_TYPES.has(attachmentMimeTypeForName(path)))
-              return Result.fail(sourceText("error.workflow.modelImageType"));
-            paths.push(path);
-          }
-          return Result.succeed(paths);
+          const paths = yield* inputFilePaths([...new Set(inputs.map((input) => input.attachmentId))]);
+          if (
+            Result.isSuccess(paths) &&
+            paths.success.some((path) => !MODEL_IMAGE_TYPES.has(attachmentMimeTypeForName(path)))
+          )
+            return Result.fail(sourceText("error.workflow.modelImageType"));
+          return paths;
         });
 
         const startGeneration = (
