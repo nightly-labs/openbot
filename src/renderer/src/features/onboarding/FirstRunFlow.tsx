@@ -6,6 +6,7 @@ import { createEffect, createSignal, createStore, createUniqueId, For, Match, Sh
 import { desktopAnalytics } from "../../analytics";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { FirstRunChoice } from "./FirstRunChoice";
+import { FirstRunExistingServers, type FirstRunServer } from "./FirstRunExistingServers";
 import { FirstRunLaunch } from "./FirstRunLaunch";
 import { FirstRunPlanStep } from "./FirstRunPlanStep";
 import { firstRunTransition } from "./first-run-transition";
@@ -24,6 +25,8 @@ export interface FirstRunFlowProps extends SetupProviderProps {
   onAnalyticsChoice: (enabled: boolean, chosen: boolean) => void;
   onProviderStepShown?: () => void;
   logoVariant?: AppLogoVariant;
+  existingServers?: readonly FirstRunServer[];
+  onOpenServer?: (serverId: string, provider: AgentProviderId) => Promise<boolean>;
 }
 
 const TEAM_SIZE = 7;
@@ -41,6 +44,8 @@ interface FirstRunState {
   skipped: boolean;
   analytics: boolean;
   analyticsTouched: boolean;
+  startNew: boolean;
+  openingServer: string | null;
 }
 
 export function FirstRunFlow(props: FirstRunFlowProps) {
@@ -53,6 +58,8 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     skipped: false,
     analytics: false,
     analyticsTouched: false,
+    startNew: false,
+    openingServer: null,
   });
   void onboardingPort()
     .getAnalyticsDefault()
@@ -136,13 +143,21 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     },
   );
 
-  function trackStep(action: "viewed" | "next" | "back" | "skipped", path: FirstRunPath = state.path): void {
-    desktopAnalytics.track("onboarding_step", { step: state.step, action, ...(path ? { path } : {}) });
+  const existingShown = () =>
+    state.step === "choose" &&
+    !state.startNew &&
+    state.path === null &&
+    !state.analyticsTouched &&
+    (props.existingServers?.length ?? 0) > 0;
+  const shownStep = () => (existingShown() ? "existing" : state.step);
+
+  function trackStep(
+    action: "viewed" | "next" | "back" | "skipped",
+    path: FirstRunPath | "existing" = state.path,
+  ): void {
+    desktopAnalytics.track("onboarding_step", { step: shownStep(), action, ...(path ? { path } : {}) });
   }
-  createEffect(
-    () => state.step,
-    () => untrack(() => trackStep("viewed")),
-  );
+  createEffect(shownStep, () => untrack(() => trackStep("viewed")));
 
   function moveTo(step: FirstRunStep): void {
     providers.clearErrors();
@@ -228,6 +243,36 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     if (sent) return;
     setState((current) => {
       current.finishWhenReady = false;
+    });
+  }
+
+  async function openServer(server: FirstRunServer): Promise<void> {
+    if (state.openingServer !== null || !props.onOpenServer) return;
+    props.onAnalyticsChoice(state.analytics, state.analyticsTouched);
+    trackStep("next", "existing");
+    setState((current) => {
+      current.openingServer = server.id;
+    });
+    providers.setError("");
+    const failed = t("onboarding.existing.openFailed", { name: server.name });
+    try {
+      if (await props.onOpenServer(server.id, FREE_PROVIDER)) return;
+      providers.setError(failed);
+    } catch (cause) {
+      providers.setError(errorMessage(cause, failed), cause);
+    }
+    setState((current) => {
+      current.openingServer = null;
+    });
+  }
+
+  function startNew(): void {
+    trackStep("skipped");
+    providers.clearErrors();
+    void firstRunTransition("step", () => {
+      setState((current) => {
+        current.startNew = true;
+      });
     });
   }
 
@@ -322,8 +367,20 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
             </nav>
           </Show>
 
-          <div class="onboarding-step" data-step={state.step}>
+          <div class="onboarding-step" data-step={shownStep()}>
             <Switch>
+              <Match when={existingShown()}>
+                <FirstRunExistingServers
+                  servers={props.existingServers ?? []}
+                  opening={state.openingServer}
+                  disabled={busy()}
+                  onOpen={(server) => void openServer(server)}
+                  onStartNew={startNew}
+                  onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
+                  onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
+                />
+              </Match>
+
               <Match when={state.step === "choose"}>
                 <FirstRunChoice
                   team={team}

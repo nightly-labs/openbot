@@ -181,11 +181,18 @@ const ServerSelection = createSimpleContext({
       await saveSetup(provider);
     }
 
+    async function openServerDuringSetup(serverId: string, provider: AgentProviderId): Promise<boolean> {
+      if (!(await selectServer(serverId, false))) return false;
+      await saveSetup(provider, null, { path: "existing" });
+      return true;
+    }
+
     return {
       selectServer,
       joinServer,
       createLocalServer,
       joinRemoteDuringSetup,
+      openServerDuringSetup,
       openInstalledMarketplaceAgent,
     };
   },
