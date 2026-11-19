@@ -281,7 +281,7 @@ interface BoardState {
   points: Record<string, PortPoint>;
   message: string;
   results: Record<string, WfnResult[]>;
-  picked: Record<string, string>;
+  picked: Record<string, { result: string; newest: string | undefined }>;
   viewing: number | null;
 }
 
@@ -710,9 +710,10 @@ export function createBoard(options: BoardOptions) {
     const result: WfnResult = { id: crypto.randomUUID(), at: new Date().toISOString(), value };
     if (run !== undefined) result.run = run;
     if (failed) result.failed = true;
+    const newest = state.viewing === null || run === state.viewing ? result.id : latestOf(id)?.id;
     setState((draft) => {
       draft.results[id] = [...(draft.results[id] ?? []), result];
-      draft.picked[id] = result.id;
+      draft.picked[id] = { result: result.id, newest };
     });
   };
 
@@ -742,6 +743,11 @@ export function createBoard(options: BoardOptions) {
   };
 
   const resultsOf = (id: string): readonly WfnResult[] => options.resultsOf?.(id) ?? state.results[id] ?? [];
+  const latestOf = (id: string): WfnResult | undefined => {
+    const list = resultsOf(id);
+    const viewing = state.viewing;
+    return viewing === null ? list.at(-1) : list.findLast((result) => result.run === viewing);
+  };
   const selectedIds = createMembership(() => state.selection);
   const removedIds = createMembership(() => state.removed);
   const lockedIds = createMembership(() => state.locked);
@@ -825,17 +831,17 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     shown: (id) => {
-      const list = resultsOf(id);
+      const latest = latestOf(id);
       const picked = state.picked[id];
-      if (picked) return list.find((result) => result.id === picked);
-      const viewing = state.viewing;
-      if (viewing !== null) return list.findLast((result) => result.run === viewing);
-      return list.at(-1);
+      const stillNewest = picked !== undefined && latest?.id === picked.newest;
+      return stillNewest ? resultsOf(id).find((result) => result.id === picked.result) : latest;
     },
-    pick: (id, result) =>
+    pick: (id, result) => {
+      const newest = latestOf(id)?.id;
       setState((draft) => {
-        draft.picked[id] = result;
-      }),
+        draft.picked[id] = { result, newest };
+      });
+    },
     record: (id, value, run) => add(id, value, run, false),
     recordFailure: (id, message, run) => add(id, message, run, true),
     viewing: () => state.viewing,
