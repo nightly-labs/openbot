@@ -9,12 +9,6 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, stringField } from "./request-helpers";
 import { answer } from "./route-agent-import";
 
-/**
- * The Hermes Agent profiles of the host's own Hermes folder, imported from a joined server. Only owners
- * and admins: an import adds agents, skills and MCP servers to the whole server. The host reads the
- * folder that Hermes uses on the host; the client cannot name a folder. Frozen by `hermes-import-v1`.
- * `newAgentHidden` says that a new agent would start on a provider that the caller does not see.
- */
 export async function routeHermesImport(
   context: TeamApiRequestContext,
   hermesImport: TeamApiHermesImport | undefined,
@@ -31,7 +25,6 @@ export async function routeHermesImport(
   if (!hermesImport || !capabilities.has(HERMES_IMPORT_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.hermesImportUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the hermes-import wire codec.
   const body = await readJson(request);
   if (route === HERMES_IMPORT_ROUTES.discard) {
     await Effect.runPromise(hermesImport.discard(stringField(body, "token")));

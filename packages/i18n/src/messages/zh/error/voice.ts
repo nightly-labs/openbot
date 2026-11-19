@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/voice";
 
 export const messages = {
-  // Voice transcription errors.
   "error.voice.downloadFailed": "无法下载语音模型，请重试。",
   "error.voice.downloadStopped": "语音模型下载已停止。",
   "error.voice.removeBusy": "请等语音转写结束后再移除该模型。",

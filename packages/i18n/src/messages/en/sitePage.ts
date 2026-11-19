@@ -1,10 +1,5 @@
 import { defineMessages } from "../../message";
 
-/**
- * The public web pages: the home page, the header, menu and footer around every page, and the pages
- * that do one task: join a server, return from Slack or Discord, return from billing, report a hosted
- * site, and the load error page. `apps/auth-api` renders them on the server in the visitor's language.
- */
 export const messages = defineMessages("sitePage", {
   "sitePage.error.title": "This page could not load",
   "sitePage.error.body":
@@ -20,19 +15,15 @@ export const messages = defineMessages("sitePage", {
     "This invitation link is not valid or is not complete. Ask the server owner for a new invitation.",
   "sitePage.join.open": "Open OpenBot",
   "sitePage.join.browser": "Open in browser",
-  // {browser} and {download} are links. Their text is browserLink and downloadLink.
   "sitePage.join.noApp": "No app? {browser} or {download}.",
   "sitePage.join.noAppMobile": "No app? {browser}.",
   "sitePage.join.browserLink": "Join in this browser",
   "sitePage.join.downloadLink": "download OpenBot",
-  // {open} is the label of the button that did not open OpenBot.
   "sitePage.join.notOpened":
     "If OpenBot is on this computer, start it, then press {open} again. If it is not, download it first.",
-  // {open} is the label of the button above this note.
   "sitePage.join.mobile":
     "If OpenBot is installed, tap {open}. You can also paste this link into Add server in the app.",
   "sitePage.join.email": "If the invitation came by email, sign in to OpenBot with that email address.",
-  // {name} is Slack or Discord on all the connect keys.
   "sitePage.connect.title": "Return to OpenBot",
   "sitePage.connect.failedTitle": "The connection did not finish",
   "sitePage.connect.openApp": "Open OpenBot",
@@ -52,7 +43,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.connect.failure.tabClosed":
     "The OpenBot tab that started the {name} connection did not answer. Open OpenBot in your browser and connect {name} again.",
   "sitePage.connect.failure.failed": "{name} did not finish the connection. Try again.",
-  // {marketplace}, {apps} and {connect} are the names of these screens and that button in the app.
   "sitePage.connect.restartHint": "In OpenBot, open {marketplace}, then {apps}, then {name}, and select {connect}.",
   "sitePage.connect.notOpened":
     "Start OpenBot, then try again. If OpenBot is not on this computer, download it and connect {name} from the app.",
@@ -81,7 +71,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.report.sending": "Sending…",
   "sitePage.report.tooMany": "Too many reports. Try again later.",
   "sitePage.report.sendFailed": "Could not send the report. Try again.",
-  // {email} is the contact address. The page shows it as a link.
   "sitePage.report.writeTo": "You can also write to {email}.",
   "sitePage.report.sentTitle": "Report sent",
   "sitePage.report.sentBody": "Thanks. We received your report.",
@@ -91,27 +80,22 @@ export const messages = defineMessages("sitePage", {
     "Hosted servers and a license for teams. OpenBot is free for personal use on your own computer.",
   "sitePage.pricing.imageAlt": "Small team. Bright ideas. Three OpenBot agents under a glass dome",
   "sitePage.pricing.heading": "Pricing",
-  // The first block of the pricing page, above the order form.
   "sitePage.pricing.personal.title": "Personal use is free",
   "sitePage.pricing.personal.body":
     "Every feature, on your own computer, with the AI plans you already pay for. No server and no license.",
   "sitePage.pricing.enterprise.title": "Enterprise",
-  // {count} is the largest number of members that the page sells, such as 25.
   "sitePage.pricing.enterprise.body":
     "Larger servers, more than {count} members, or anything else you need. With enterprise support.",
   "sitePage.pricing.enterprise.contact": "Contact sales",
-  // A checkbox above the buy button. {policy} links to the privacy policy, and {terms} links to the Terms,
-  // which include the consumer right of withdrawal. The buyer ticks it before Checkout.
   "sitePage.pricing.consent.statement": "I declare that I accept {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "policy",
   "sitePage.pricing.consent.terms": "terms and right of withdrawal",
-  // The /teams page for companies.
+  "sitePage.pricing.consent.earlyStart":
+    "I request that the hosting service begin before the 14-day withdrawal period ends. I acknowledge that if I withdraw from the contract before the service has been fully performed, I will have to pay for the services provided up to the time of withdrawal, and that once the service has been fully performed, I will lose my right to withdraw from the contract.",
   "sitePage.teams.title": "OpenBot for Teams",
   "sitePage.teams.description":
     "Run OpenBot on managed infrastructure or let us design a custom deployment around your team, workflows and existing systems.",
-  // The text of the social image is English. Keep it as it is.
   "sitePage.teams.imageAlt": "Big plans. Better together. Two OpenBot agents joined by a paper bridge",
-  // {team} is a row of agent avatars. The word before {team} stays on one line with the avatars.
   "sitePage.teams.hero.heading": "Bring a team of {team} AI coworkers into your company",
   "sitePage.teams.setups.heading": "Choose the setup that fits your team",
   "sitePage.teams.setups.question": "Not sure which setup you need?",
@@ -143,33 +127,27 @@ export const messages = defineMessages("sitePage", {
   "sitePage.teams.custom.heading": "OpenBot, adapted to your business",
   "sitePage.teams.custom.intro":
     "Getting a server is only the beginning. If your company needs a complete solution, we can help design and implement OpenBot around your actual processes.",
-  // The five steps of a custom project, in order.
   "sitePage.teams.custom.infrastructure": "Infrastructure setup and configuration",
   "sitePage.teams.custom.agents": "Initial agent configuration",
   "sitePage.teams.custom.integrations": "Integration with existing tools and internal systems",
   "sitePage.teams.custom.features": "Custom features and workflows",
   "sitePage.teams.custom.support": "Ongoing maintenance and development support",
   "sitePage.teams.audience.heading": "Built for teams ready to unlock the full potential of AI",
-  // The page shows the first word of each audience item in bold.
   "sitePage.teams.audience.companies": "Companies introducing AI agents across multiple departments.",
   "sitePage.teams.audience.agencies": "Agencies deploying agent environments for their clients.",
   "sitePage.teams.audience.allDay": "Teams that need agents available around the clock.",
   "sitePage.teams.audience.integrations": "Organizations that need integrations with internal tools.",
   "sitePage.teams.audience.support":
     "Businesses that want implementation support instead of building everything themselves.",
-  // {accent} is the accent key. The page shows its words in colour.
   "sitePage.teams.closing.heading": "Tell us what you want your {accent} to accomplish",
   "sitePage.teams.closing.accent": "AI coworkers",
   "sitePage.teams.closing.action": "Discuss your setup",
-  // The /contact page and its form.
   "sitePage.contact.title": "Contact the OpenBot team",
   "sitePage.contact.description":
     "Send the OpenBot team a message about a custom setup, a partnership or the press. A person reads each message.",
-  // The text of the social image is English. Keep it as it is.
   "sitePage.contact.imageAlt": "Small team. Always on it. OpenBot agents around a paper planet",
   "sitePage.contact.heading": "Talk to the team",
   "sitePage.contact.intro": "Tell us what you need. A person on the OpenBot team reads each message.",
-  // The other ways to reach the team. Discord, GitHub and X are names.
   "sitePage.contact.channel.discord": "Community and help",
   "sitePage.contact.channel.github": "Bugs and source code",
   "sitePage.contact.channel.x": "News",
@@ -178,7 +156,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.contact.company": "Company",
   "sitePage.contact.topic": "Topic",
   "sitePage.contact.message": "Message",
-  // Shows beside the label of a field that the visitor can leave empty.
   "sitePage.contact.optional": "Optional",
   "sitePage.contact.placeholder": "How can we help?",
   "sitePage.contact.emailInvalid": "Enter a valid email",
@@ -190,17 +167,12 @@ export const messages = defineMessages("sitePage", {
   "sitePage.contact.send": "Send message",
   "sitePage.contact.sending": "Sending…",
   "sitePage.contact.privacy": "We use your email only to answer you.",
-  // A link to the privacy policy, after the privacy key.
   "sitePage.contact.privacyLink": "Privacy",
-  // {email} is the team's email address, as a link.
   "sitePage.contact.limited": "Too many messages. Try again later, or write to {email}.",
-  // {email} is the team's email address, as a link.
   "sitePage.contact.failed": "Could not send. Try again, or write to {email}.",
   "sitePage.contact.sentTitle": "Message sent",
-  // {email} is the address that the visitor entered.
   "sitePage.contact.sentBody": "We will answer at {email}.",
   "sitePage.contact.sendAnother": "Send another message",
-  // The public Marketplace on openbot.run. The tab and category names are the app's `marketplace.*` keys.
   "sitePage.marketplace.agents.title": "Agents — OpenBot Marketplace",
   "sitePage.marketplace.agents.description":
     "Agents that people made in OpenBot. Add one to OpenBot with its skills and routines.",
@@ -209,10 +181,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.marketplace.apps.title": "Apps — OpenBot Marketplace",
   "sitePage.marketplace.apps.description":
     "Apps and tools that an OpenBot agent can use. Open an app in OpenBot, and decide there what it connects to.",
-  // {name} is the name of an agent or a skill.
   "sitePage.marketplace.agentTitle": "{name} — OpenBot agent",
   "sitePage.marketplace.skillTitle": "{name} — OpenBot skill",
-  // The text of the share image for screen readers. {creator} is the name of the person who made it.
   "sitePage.marketplace.agentImageAlt": "{name}, an OpenBot agent by {creator}",
   "sitePage.marketplace.skillImageAlt": "{name}, an OpenBot skill by {creator}",
   "sitePage.marketplace.categories": "Categories",
@@ -224,25 +194,19 @@ export const messages = defineMessages("sitePage", {
   "sitePage.marketplace.results": "Results",
   "sitePage.marketplace.seeAll": "See all",
   "sitePage.marketplace.add": "Add",
-  // {name} is the name of the person who made the agent or the skill.
   "sitePage.marketplace.by": "by {name}",
-  // A screen reader reads this after the name of a verified agent or skill.
   "sitePage.marketplace.verifiedName": ", verified by OpenBot",
-  // A screen reader reads this when a search or a category changes the list.
   "sitePage.marketplace.shownAgents": "Agents shown: {shown} of {total}",
   "sitePage.marketplace.shownSkills": "Skills shown: {shown} of {total}",
   "sitePage.marketplace.shownApps": "Apps shown: {shown} of {total}",
   "sitePage.marketplace.emptyAgentsCategory": "No agents in this category yet.",
   "sitePage.marketplace.emptySkillsCategory": "No skills in this category yet.",
-  // {query} is the text in the search field.
   "sitePage.marketplace.emptyAgentsQuery": "No agents match “{query}”.",
   "sitePage.marketplace.emptySkillsQuery": "No skills match “{query}”.",
   "sitePage.marketplace.emptyApps": "No app matches.",
   "sitePage.marketplace.breadcrumb": "Breadcrumb",
   "sitePage.marketplace.addToOpenBot": "Add to OpenBot",
-  // Shows after "Add to OpenBot" did not open the app.
   "sitePage.marketplace.addFromApp": "{name} is added from inside OpenBot. Get the app, then open this link again.",
-  // {platform} is macOS, Windows or Linux.
   "sitePage.marketplace.downloadFor": "Download for {platform}",
   "sitePage.marketplace.copyLink": "Copy link",
   "sitePage.marketplace.copied": "Copied",
@@ -260,24 +224,17 @@ export const messages = defineMessages("sitePage", {
   "sitePage.marketplace.fact.category": "Category",
   "sitePage.marketplace.fact.version": "Version",
   "sitePage.marketplace.fact.updated": "Updated",
-  // {version} is a number, such as 3.
   "sitePage.marketplace.skillVersion": "Version {version}",
-  // A routine that the agent brings switched off. It runs only after the user switches it on.
   "sitePage.marketplace.routineOff": "Starts off",
   "sitePage.marketplace.missing.title": "Not in the Marketplace",
   "sitePage.marketplace.missing.body": "The creator removed it, OpenBot did not approve it, or the link is wrong.",
   "sitePage.marketplace.missing.open": "Open the Marketplace",
-  // The home page. The title and the description are also the text of a search result and a link preview.
   "sitePage.landing.title": "OpenBot: Run a team of AI agents on your computer",
   "sitePage.landing.description":
     "A free desktop app that runs AI agents as a team on your own computer, with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or your own model.",
-  // A badge before "Available on". Keep it short and in capitals.
   "sitePage.landing.hero.new": "NEW",
-  // Platform logos and names follow: macOS, Windows, Linux, iOS, Android.
   "sitePage.landing.hero.availableOn": "Available on",
-  // The page heading. {name} is the OpenBot logo and the name OpenBot.
   "sitePage.landing.hero.title": "Meet {name}",
-  // {codex}, {claude}, {gemini} and {grok} are provider names with their logos.
   "sitePage.landing.hero.description":
     "Run {codex}, {claude}, {gemini}, {grok} and your own models in one persistent workspace. Agents hand off work, use tools and collaborate with your real teammates. Free for personal use.",
   "sitePage.landing.hero.contact": "Contact",
@@ -286,37 +243,24 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.hero.phoneApps": "Phone apps",
   "sitePage.landing.preview.title": "Interactive OpenBot application preview",
   "sitePage.landing.preview.loading": "Loading OpenBot preview",
-  // The words of this heading appear one at a time.
   "sitePage.landing.network.title": "Your agents work together.",
   "sitePage.landing.network.description":
     "Each agent has its own role, instructions and workspace. They message one another, hand off tasks, share files and review results.",
-  // Easter eggs: short lines that the agents in the picture say. Each reaction chooses one line at
-  // random. One line on each row; the number of rows can change.
-  // The visitor types "hello".
   "sitePage.landing.network.eggs.greetings":
     "Hi!\nHello.\nHey there.\nOh, hi.\nGood to see you.\nHello, human.\nWelcome back.",
-  // The visitor types the Konami code.
   "sitePage.landing.network.eggs.konami": "Cheat code accepted.\nThirty extra agents.\nAchievement unlocked.",
-  // The visitor types "party".
   "sitePage.landing.network.eggs.party": "Party mode.\nWho brought the confetti?\nDance break.",
-  // The visitor types "sudo".
   "sitePage.landing.network.eggs.sudo": "This incident will be reported.\nNice try.\nYou are not in the sudoers file.",
-  // The centre of the picture after 3, 5 and 8 quick clicks.
   "sitePage.landing.network.eggs.tickle": "That tickles.\nHey.\nI felt that.",
   "sitePage.landing.network.eggs.awake": "Okay, okay. I am awake.\nYes? Can I help you?\nI am listening.",
   "sitePage.landing.network.eggs.busy": "Please. I am routing messages.\nI have work to do.\nStop that, please.",
-  // The agents answer the centre after 5 clicks.
   "sitePage.landing.network.eggs.wonder": "What was that?\nDid you feel that?\nIs the hub okay?",
-  // After 12 clicks the centre sneezes, and the agents answer.
   "sitePage.landing.network.eggs.sneeze": "Achoo!\nAh… choo!",
   "sitePage.landing.network.eggs.blessings": "Bless you.\nGesundheit.\nSalud.\nBless you!",
-  // The agents wake up after the visitor leaves the page alone.
   "sitePage.landing.network.eggs.wake":
     "I was not asleep.\nJust resting my tokens.\nBack to work.\nWho turned off the lights?\nFive more minutes.",
-  // Agents answer a click.
   "sitePage.landing.network.eggs.chats":
     "On it.\nGot it. Starting now.\nTests pass on my side.\nI can take the review.\nI pushed a fix.\nWho has the Safari task?\nDone. Over to you.\nI need one more file.\nMerged.\nThe build is green.\nI found the bug.\nCan someone review my branch?\nShip it.\nGive me five minutes.\nI wrote the release notes.",
-  // An agent under a pointer that does not move.
   "sitePage.landing.network.eggs.hover":
     "I only look busy.\nAsk me about the Safari task.\nI read the whole repository. Twice.\nMy context window has room for you.\nPlease do not close this tab.\nI fixed one bug and found three.\nI run on your computer, not in a cloud.",
   "sitePage.landing.features.title": "What OpenBot does",
@@ -326,8 +270,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.features.team.description":
     "Each agent has its own name, instructions and workspace. Agents send each other messages, hand off tasks and share files.",
   "sitePage.landing.features.providers.title": "Use the AI plan you have",
-  // Each placeholder is a link to a provider page. {acp} is acpLink, {local} is localLink, the others
-  // are product names.
   "sitePage.landing.features.providers.description":
     "Run {codex}, {claudeCode}, {gemini}, {grok}, {opencode}, {cursor}, {cline}, {museCode}, {pi} or {mercury}. Or add {acp}, an OpenAI-compatible endpoint, {local}.",
   "sitePage.landing.features.providers.acpLink": "an ACP agent",
@@ -344,19 +286,15 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.features.persist.title": "Change the provider, keep the agent",
   "sitePage.landing.features.persist.description":
     "An agent keeps its workspace and conversation when you restart the app or move it to a different provider. When a plan reaches its limit, it can move to a backup model.",
-  // The pictures on the feature tiles copy the app. Ada, Linus and Grace are agent names.
-  // A channel name, shown after "#". Lower case, no spaces.
   "sitePage.landing.picture.channel": "launch",
   "sitePage.landing.picture.team.first": "The sign-in test fails on Safari. Linus, can you take it?",
   "sitePage.landing.picture.team.second": "Fixed in session.ts. Grace, can you review it?",
   "sitePage.landing.picture.team.third": "Looks good. I merged it.",
   "sitePage.landing.picture.team.reply": "Thanks. I closed the issue.",
-  // {from} and {to} are agent names.
   "sitePage.landing.picture.team.handoff": "{from} gave the task to {to}",
   "sitePage.landing.picture.persist.earlier": "I read the billing code. Six tables use it.",
   "sitePage.landing.picture.persist.request": "Move the billing tables to their own schema.",
   "sitePage.landing.picture.persist.before": "Done. I changed 4 files and wrote the migration.",
-  // {agent} is an agent name. {provider} is a provider name.
   "sitePage.landing.picture.persist.switch": "{agent} now uses {provider}",
   "sitePage.landing.picture.persist.after": "I continue from the billing migration. Next is its test.",
   "sitePage.landing.picture.local.title": "On this computer",
@@ -364,16 +302,12 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.picture.local.conversations": "Conversations",
   "sitePage.landing.picture.local.files": "Files",
   "sitePage.landing.picture.local.browserData": "Browser data",
-  // Maya and Sam are people. Ada is an agent.
   "sitePage.landing.picture.multiplayer.first": "Ada, can you draft the launch post?",
   "sitePage.landing.picture.multiplayer.second": "Done. Sam, can you check it?",
   "sitePage.landing.picture.multiplayer.third": "Looks good. I posted it.",
-  // The button that adds a person to the channel.
   "sitePage.landing.picture.multiplayer.invite": "Invite",
-  // The steps of a workflow, as on the workflow canvas of the app.
   "sitePage.landing.picture.workflows.trigger": "Trigger",
   "sitePage.landing.picture.workflows.schedule": "Every Monday at 9:00",
-  // Four agent steps. The first two run at the same time, then the next two use their results.
   "sitePage.landing.picture.workflows.issues": "Summarize last week's issues",
   "sitePage.landing.picture.workflows.usage": "Collect the usage numbers",
   "sitePage.landing.picture.workflows.report": "Write the weekly report",
@@ -440,26 +374,20 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.download.title": "Download OpenBot",
   "sitePage.landing.download.description":
     "Choose your platform. Run Codex, Claude, Gemini, Grok, OpenCode, Muse Code, Pi or your own model from one desktop app, and talk to your agents from your phone.",
-  // The badge on a download card.
   "sitePage.landing.download.available": "Available",
-  // {store} is App Store or Google Play.
   "sitePage.landing.download.phoneDescription": "{store} · Connects to your computer",
   "sitePage.landing.download.appStore": "Download on the App Store",
   "sitePage.landing.download.googlePlay": "Get it on Google Play",
-  // Links to the install page of each platform follow.
   "sitePage.landing.download.pages": "System requirements and install steps:",
-  // The header, the menu, the footer and the last call to action of the public site.
+  "sitePage.landing.download.apk": "Get the APK",
   "sitePage.site.download": "Download",
   "sitePage.site.app": "App",
   "sitePage.site.primaryNavigation": "Primary navigation",
   "sitePage.site.siteMenu": "Site menu",
   "sitePage.site.openMenu": "Open menu",
   "sitePage.site.closeMenu": "Close menu",
-  // The label of the list of the languages of the site.
   "sitePage.site.language": "Language",
-  // The header button that opens the list of languages. {language} is the name of the page language in that language.
   "sitePage.site.language.current": "Language: {language}",
-  // A badge on the newest article in the menu.
   "sitePage.site.latest": "Latest",
   "sitePage.site.home": "OpenBot home",
   "sitePage.site.logo.menu": "Logo",
@@ -518,10 +446,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.site.footer.localModels": "Ollama and LM Studio",
   "sitePage.site.footer.allProviders": "All providers",
   "sitePage.site.footer.bestApps": "Best AI agent apps",
-  // {year} is the current year. Synthetify Labs is a company name.
   "sitePage.site.footer.rights": "© {year} Synthetify Labs, All rights reserved.",
   "sitePage.site.footer.available": "Available for macOS, Windows, Linux, iOS and Android",
-  // {love} is a heart icon. Its spoken name is the love key.
   "sitePage.site.footer.made": "Made with {love} in Poland",
   "sitePage.site.footer.love": "love",
 });

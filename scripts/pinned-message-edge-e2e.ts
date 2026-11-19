@@ -1,14 +1,3 @@
-// Checks what a pin does when its message or thread goes away, in this worktree's dev app.
-//
-// Seed and start the app as `scripts/pinned-message-jump-e2e.ts` says, then run:
-// `bun scripts/pinned-message-edge-e2e.ts --allow-mutations`
-//
-// It branches a small thread from the seeded one, and checks:
-// 1. A deleted message leaves the pin list.
-// 2. A pin of a thread whose delete waits for Undo does not open its tab, and opens again after Undo.
-// 3. A deleted thread takes its pins out of the open pin list.
-// 4. A thread that shows a part around an old message drops a message that another device deleted.
-// The report goes to `.openbot-build/pinned-message-edge-e2e/report.json`.
 import assert from "node:assert/strict";
 import { translateFor } from "@openbot/i18n";
 import { connectChannelE2e, writeReport } from "./channel-e2e-support";
@@ -71,7 +60,6 @@ async function closePinList(): Promise<void> {
   await page.keyboard.press("Escape");
   await pinList.waitFor({ state: "detached", timeout: UI_WAIT_MS });
 }
-/** Clicks a pin and waits until the jump ends: its message shows, or the "did not open" toast does. */
 async function clickPin(text: string, messageId: string): Promise<"opened" | "missing"> {
   await openPinList();
   await pinEntry(text).locator(".pinned-messages-jump").click();
@@ -108,7 +96,6 @@ try {
   }
   await openAgent();
 
-  // A small thread with copies of the first 22 seeded messages.
   const branch = await page.evaluate((input) => window.openbot.agent.branchTask(input), {
     agentId: seed.agentId,
     taskId: seed.taskId,
@@ -126,7 +113,6 @@ try {
   const deletedText = "Pin timing message 7.";
   const threadText = "Pin timing message 9.";
 
-  // 1. A deleted message leaves the pin list.
   await setPinned(branch.id, deletedPin, true);
   await setPinned(branch.id, threadPin, true);
   await openPinList();
@@ -150,7 +136,6 @@ try {
     },
   );
 
-  // 2. A pin of a thread whose delete waits for Undo.
   const opened = await clickPin(threadText, threadPin);
   await tab(branch.id).waitFor({ timeout: UI_WAIT_MS });
   record("small thread: a pin opens its tab at the message", opened === "opened", { opened });
@@ -183,7 +168,6 @@ try {
   record("after Undo: the pin opens the thread again", afterUndo === "opened", { afterUndo, stateAfterUndo: archived });
   await clearToasts();
 
-  // 3. A deleted thread takes its pins out of the open pin list.
   await openPinList();
   await pinEntry(threadText).waitFor({ timeout: UI_WAIT_MS });
   await page.evaluate((input) => window.openbot.agent.deleteTask(input), { agentId: seed.agentId, taskId: branch.id });
@@ -205,8 +189,6 @@ try {
   );
   await closePinList();
 
-  // 4. A part around an old message drops a message that another device deleted.
-  // The seeded thread starts closed and not read, as after a start of the app: the pin opens its tab.
   const anchor = seedId(30_000);
   await setPinned(seed.taskId, anchor, true);
   if ((await tab(seed.taskId).count()) > 0) {
@@ -216,7 +198,6 @@ try {
   await page.reload();
   await openAgent();
   const jumped = await clickPin("Pin timing message 30000.", anchor);
-  // A message of the part after the pinned one. Each run deletes one more.
   const victim = await page.evaluate((anchorId) => {
     const ids = [...document.querySelectorAll<HTMLElement>("[data-chat-search-message]")].map(
       (row) => row.dataset.chatSearchMessage ?? "",
@@ -226,8 +207,6 @@ try {
   assert.ok(victim.startsWith("pin-timing-"), "The part has no seeded message after the pin.");
   const victimRow = page.locator(`[data-chat-search-message="${victim}"]`);
   const victimShown = await victimRow.count();
-  // The thread reads its newest messages after the jump, to compare the next changes with them. This
-  // read goes after it.
   await page.evaluate((input) => window.openbot.agent.readTask(input), { agentId: seed.agentId, taskId: seed.taskId });
   await page.evaluate((input) => window.openbot.agent.deleteConversationMessage(input), {
     agentId: seed.agentId,

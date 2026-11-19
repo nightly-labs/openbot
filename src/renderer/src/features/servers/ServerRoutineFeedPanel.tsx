@@ -28,18 +28,14 @@ import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 export interface ServerRoutineFeedOptions {
   api: RoutineFeedDesktopApi;
-  /** This computer's agents, for the filter. */
   listAgents: () => Promise<readonly { id: string; name: string }[]>;
 }
 
-/** The select value for the feed of every routine. An agent's value is `agent:<id>`, so it never collides. */
 const ALL_AGENTS = "all";
 const AGENT_PREFIX = "agent:";
 
-/** Both actions stop the current URL, so each one asks first. */
 type FeedConfirm = "regenerate" | "turnOff";
 
-/** Server Settings > Routines: the iCalendar feed of this computer's routines. */
 export function ServerRoutineFeedPanel(
   props: ServerRoutineFeedOptions & Pick<ServerSettingsSectionHost, "busy" | "run" | "menuMount" | "showCopyError">,
 ) {
@@ -67,7 +63,6 @@ export function ServerRoutineFeedPanel(
           current.loading = false;
         }),
     );
-    // Without names the filter has only "All"; the feed still works, and a caption says why.
     props.listAgents().then(
       (agents) =>
         setState((current) => {
@@ -88,7 +83,6 @@ export function ServerRoutineFeedPanel(
     read();
   };
 
-  // The panel mounts when the section opens, so each visit reads the feed again.
   untrack(read);
 
   const url = () => {
@@ -108,7 +102,6 @@ export function ServerRoutineFeedPanel(
         current.feed = feed;
       });
     });
-  // A failure shows as a toast and keeps the dialog open, so the user can try again or cancel.
   const confirmChange = async (key: string, action: () => Promise<RoutineFeed>) => {
     if (await change(key, action)) setConfirm(null);
   };

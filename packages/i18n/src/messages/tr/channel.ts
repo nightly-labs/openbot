@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "Üyeler bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
   "channel.conversation.noMembers": "Çalışmayı başlatmak için kanal ayarlarından ajan ekleyin.",
+  "channel.conversation.waitFull": "Bekliyor - {name}, devam eden bir görev bitince başlayacak",
   "channel.conversation.archivedNotice": "Silinmiş kanal. Yalnızca önizleme.",
   "channel.composer.label": "Kanala mesaj",
   "channel.composer.placeholder": "{name} kanalına mesaj gönder",

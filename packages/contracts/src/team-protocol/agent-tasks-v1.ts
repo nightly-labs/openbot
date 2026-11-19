@@ -1,20 +1,3 @@
-// Frozen optional agent-tasks-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a signed-in member who can
-// send a message to an agent can also list, read, start, send to, stop, close and reopen the tasks of
-// that agent. The host does not ask for a role, the same as `POST /v1/agents/:id/messages`. The host
-// records the member as the sender of a start and of a message. A hidden agent, or an agent that the
-// peer cannot see, is not found (404). A start carries text only: no attachments. Moving a queued
-// message into a task stays local. Every route is a POST with its ids in the body.
-//
-// Events use the in-app spelling (`agentId`, not the frozen `botId`), the same shape as the local
-// events: `agent-tasks-changed` with the whole task list of one agent, `agent-task-conversation` with
-// the conversation of one task, and `agent-task-conversation-delta` with streamed text. The host sends
-// them only to a peer that has this capability. A task conversation is checked with the released
-// provider-aware conversation validator, after its keys are put in the wire spelling. It carries only
-// the message keys of a v7 conversation route. The host redacts the task `error` text before it
-// reaches this contract. Bounds and meaning do not follow IPC changes;
-// widening any of it needs a second capability string.
 import { type AgentTasksSnapshot, isAgentTasksSnapshot } from "../ipc-agent-tasks";
 import { type ConversationSnapshot, isConversationSnapshot } from "../ipc-conversations";
 import { isDynamicRecord } from "../runtime-values";
@@ -35,7 +18,7 @@ import { withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
 import { toCurrentAgentKeys, toWireAgentKeys } from "./current-agent-keys";
 import { isProviderAwareConversationSnapshot, projectProviderAwareConversation } from "./provider-aware-codec";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const AGENT_TASKS_CAPABILITY = "agent-tasks-v1";
 export const AGENT_TASKS_ROUTES = {
@@ -67,7 +50,6 @@ const queuePosition: AdminDecoder = (input) => {
   return input;
 };
 const queuedMessage = fields({ deliveryId: identifier, text: string(500), createdAt: time });
-/** The host keeps no limit on the messages that wait in a task, so the wire carries the 1,000 oldest. */
 const queuedMessages: AdminDecoder = (input) => {
   if (!Array.isArray(input)) throw new Error("Invalid agent task queue.");
   return input.slice(0, 1_000).map(queuedMessage);
@@ -90,11 +72,6 @@ const task = fields({
   closedAt: nullable(time),
 });
 const snapshot = fields({ agentId: identifier, tasks: list(task, 50), limit: taskLimit });
-/**
- * The conversation has the message keys of a v7 conversation route: the frozen provider-aware
- * projection, then the `expectsReply`, `plan` and `senderMember` side channels. A key that the IPC
- * adds later does not reach the wire.
- */
 const conversation: AdminDecoder = (input) => {
   if (!isDynamicRecord(input)) throw new Error("Invalid agent task conversation.");
   const copy: TeamProtocolV2Json = JSON.parse(JSON.stringify(input));
@@ -169,13 +146,11 @@ const delta = fields({
   },
 });
 
-/** Unknown event types return null. A malformed task event throws. */
 export function agentTasksEvent(input: unknown): AgentTasksEvent | null {
   if (!isDynamicRecord(input)) return null;
   switch (input.type) {
     case "agent-tasks-changed": {
       const decoded = snapshot(input.snapshot);
-      // The frozen decoder above sets what the wire accepts; the IPC guard only gives the type.
       if (!isAgentTasksSnapshot(decoded)) throw new Error("Invalid agent tasks event.");
       return { type: "agent-tasks-changed", snapshot: decoded };
     }

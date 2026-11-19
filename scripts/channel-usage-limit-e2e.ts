@@ -1,15 +1,3 @@
-// Checks that channel work moves to the backup model when the agent's model is at its usage limit, in
-// this worktree's running dev app with real provider turns. Start the app with `bun run dev` (never
-// `--shared`), then run `bun scripts/channel-usage-limit-e2e.ts --allow-mutations [--spent=<provider id>]`.
-// It needs a signed-in provider whose account is at its usage limit (default: codex), and a visible
-// agent on another provider that lists two models.
-//
-// It puts the agent on the spent model with an automatic backup on its own provider, sends it channel
-// work, and checks that the agent moves to the backup, that the channel task completes on it, and that
-// the model switch note shows in the channel and in the agent's chat. It makes its own channel and
-// deletes it, and gives the agent its model and backup models back. A model that the user picks ends
-// the way back to the spent model, so the agent does not return to it at the reset.
-// Writes .openbot-build/channel-usage-limit-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor, isAgentProvider } from "@openbot/contracts/agent-providers";
 import { type AgentSummary, type ChannelPage, MODEL_SWITCH_ITEM_TYPES } from "@openbot/contracts/ipc";

@@ -1,25 +1,4 @@
 #!/bin/bash
-# Runs several OpenBot containers on one host. Each instance has its own CPU, memory and disk limit,
-# its own data and its own account. See docs/docker.md#several-instances-on-one-host.
-#
-# An instance is the env file <name>.env next to this script and the folder /srv/openbot/<name>.
-# /srv/openbot/<name>/data is an ext4 image on a loop device, so the disk limit is the size of that
-# file system. Before the mount, the folder belongs to root, so a container that starts before the
-# mount cannot write to /data and stops. It never starts with an empty home folder.
-#
-# All instances use the Docker network `openbot`, on which they cannot reach each other.
-# openbot-firewall.service lets them reach only the internet. `setup` installs both once per host.
-#
-# The owner can update an instance from the app. OpenBot writes an empty request file to
-# /srv/openbot/<name>/update-requests, which the container can write, and
-# openbot-instance-update@<name>.path runs `update-request <name>` as root. That pulls the image, and
-# for an install makes the container again. Root reports in /srv/openbot/<name>/update-status, which
-# the container can only read. The container never gets the Docker socket.
-#
-# `backup` stops an instance, copies all of /data into one archive in OPENBOT_BACKUP_DIR, and starts
-# it again. `verify` unpacks a backup into a folder that no container mounts and checks it. `restore`
-# replaces /data with a backup and does not start the instance. Root never opens a database or
-# unpacks an archive: agents can change every file in /data, so the user of the data does that.
 set -euo pipefail
 
 HERE=$(dirname "$(readlink -f "$0")")
@@ -33,11 +12,9 @@ UNIT_DIRECTORY=/etc/systemd/system
 UPDATE_UNIT=openbot-instance-update
 BACKUP_UNIT=openbot-instance-backup
 LOCKS=/run
-# LXCFS shows each container its own CPU and memory limits in these files. See lxcfs.yaml.
 LXCFS=/var/lib/lxcfs
 LXCFS_FILES=(proc/cpuinfo proc/stat proc/meminfo proc/swaps)
 LXCFS_DROP_IN=/etc/systemd/system/lxcfs.service.d/openbot.conf
-# The files without which a backup cannot open: the database and the keyring with its password.
 REQUIRED_FILES=(.config/OpenBot/openbot.db .local/share/keyrings/login.keyring .config/openbot-container/keyring-password)
 SHARED_DATABASE=OpenBot/Shared/Data/agent-data.db
 
@@ -94,23 +71,16 @@ compose() {
   check_name "$name"
   [ -f "$(env_file "$name")" ] || fail "There is no instance $name."
   local files=(--file "$COMPOSE")
-  # Without LXCFS, an instance still starts, so an update from the app works. OpenBot then limits
-  # only the Node programs of agents to the CPU limit (resources/agent-runtime/cpu-limit.cjs).
   if lxcfs_ready; then files+=(--file "$HERE/lxcfs.yaml"); fi
   docker compose --project-name "openbot-$name" "${files[@]}" --env-file "$(env_file "$name")" "$@"
 }
 
-# LXCFS runs and has all the files of lxcfs.yaml. Docker cannot start a container whose mount source
-# is missing.
 lxcfs_ready() {
   systemctl is-active --quiet lxcfs.service || return
   local file
   for file in "${LXCFS_FILES[@]}"; do [ -e "$LXCFS/$file" ] || return; done
 }
 
-# Installs LXCFS with --enable-cfs. A restart of LXCFS breaks its files in the containers that run, so
-# a change of the options waits until no container uses them. The instances start without LXCFS, so
-# each problem here is a warning, and setup runs it after everything that the instances need.
 setup_lxcfs() {
   local skip="The instances start without LXCFS and see the CPUs of the host."
   if ! command -v lxcfs >/dev/null; then
@@ -137,7 +107,6 @@ setup_lxcfs() {
     echo "LXCFS does not show its files in $LXCFS. $skip" >&2
     return 0
   fi
-  # Each setup says it again until LXCFS runs with the options of the drop-in.
   tr '\0' ' ' <"/proc/$(systemctl show --property MainPID --value lxcfs.service)/cmdline" | grep -q -- --enable-cfs ||
     echo "LXCFS runs without --enable-cfs, so the containers see the CPUs of the host. Stop the instances, run 'systemctl restart lxcfs', and start them." >&2
 }
@@ -151,7 +120,6 @@ setup() {
   sed "s#/opt/openbot-docker/instances/#$HERE/#" "$HERE/$FIREWALL" >"$UNIT_DIRECTORY/$FIREWALL"
   systemctl daemon-reload
   systemctl enable --quiet "$FIREWALL"
-  # Docker requires the unit, so a restart of the unit would restart Docker. Apply the rules directly.
   "$HERE/openbot-firewall"
   systemctl start "$FIREWALL"
   docker network inspect "$NETWORK" >/dev/null 2>&1 ||
@@ -160,7 +128,6 @@ setup() {
       --opt com.docker.network.bridge.enable_icc=false "$NETWORK" >/dev/null
   install -m 0644 "$HERE/openbot-sysctl.conf" /etc/sysctl.d/90-openbot-docker.conf
   sysctl --quiet --load /etc/sysctl.d/90-openbot-docker.conf
-  # Container logs: rsyslog writes them to /var/log/openbot, and openbot-logrotate.timer limits them.
   install -d -m 0755 /var/lib/openbot-docker "$(dirname "$LOG_SOCKET")"
   install -d -o syslog -g adm -m 0750 /var/log/openbot
   install -m 0644 "$HERE/openbot-logrotate" /etc/openbot-docker/logrotate.conf
@@ -168,10 +135,8 @@ setup() {
   install -m 0644 "$HERE/openbot-logrotate.service" "$HERE/openbot-logrotate.timer" /etc/systemd/system/
   install -d -m 0755 /etc/systemd/system/docker.service.d
   install -m 0644 "$HERE/docker-openbot.conf" /etc/systemd/system/docker.service.d/openbot.conf
-  # The update requests of the app. `start` enables the path unit of each instance.
   install -m 0644 "$HERE/$UPDATE_UNIT@.path" "$UNIT_DIRECTORY/"
   sed "s#/opt/openbot-docker/instances/#$HERE/#" "$HERE/$UPDATE_UNIT@.service" >"$UNIT_DIRECTORY/$UPDATE_UNIT@.service"
-  # Backups. The operator enables the timer of each instance.
   install -m 0644 "$HERE/$BACKUP_UNIT@.timer" "$UNIT_DIRECTORY/"
   sed "s#/opt/openbot-docker/instances/#$HERE/#" "$HERE/$BACKUP_UNIT@.service" >"$UNIT_DIRECTORY/$BACKUP_UNIT@.service"
   systemctl daemon-reload
@@ -186,7 +151,6 @@ setup() {
   setup_lxcfs
 }
 
-# Starts nothing without the firewall, the network and the log socket.
 ready() {
   [ -S "$LOG_SOCKET" ] || fail "The log socket $LOG_SOCKET is missing. Run: openbot-instance setup"
   systemctl is-active --quiet "$FIREWALL" || fail "The firewall of the instances is off. Run: openbot-instance setup"
@@ -199,15 +163,10 @@ ready() {
 start() {
   ready
   update_folders "$1" || fail "The update folders of $1 could not be made."
-  # update_request runs start in a subshell on the left of `||`, where `set -e` is off: a failed
-  # `up` must still be the result of start.
   compose "$1" up --detach || return
   check_swap "$1"
 }
 
-# compose.yaml gives no swap above the memory limit. A container that swaps stops for seconds at a
-# time when it is full, and its clients lose the connection, so a limit that Docker did not apply is
-# reported.
 check_swap() {
   local id swap
   id=$(docker inspect --format '{{.Id}}' "openbot-$1") || return 0
@@ -218,10 +177,6 @@ check_swap() {
   [ "$swap" = 0 ] || echo "openbot-$1 can use swap (memory.swap.max is $swap). Check the swap accounting of Docker." >&2
 }
 
-# The folders that compose.yaml mounts for updates from the app. Docker would make a missing one as
-# root, and the container could not write requests to it. The container can write the request
-# folder, so it is a small tmpfs, not a folder on the disk of the host outside the disk limit.
-# /etc/fstab mounts it before Docker starts.
 update_folders() {
   check_name "$1"
   local folder=$DATA/$1 owner requests
@@ -235,8 +190,6 @@ update_folders() {
   fi
   mountpoint -q "$requests" || mount "$requests" || return
   systemctl enable --now --quiet "$UPDATE_UNIT@$1.path" || return
-  # OpenBot offers updates only when this file is there. An instance with a fixed OPENBOT_TAG keeps
-  # the version that the administrator chose.
   if grep -q '^OPENBOT_TAG=' "$(env_file "$1")"; then
     rm -f "$folder/update-status/enabled"
   else
@@ -249,15 +202,12 @@ set_state() {
   mv -f "$1.new" "$1"
 }
 
-# The version label of an image or a container. Empty when it is missing or not a release version.
 release_version() {
   local version
   version=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$1" 2>/dev/null || true)
   if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "$version"; fi
 }
 
-# Pulls the image of instance $1. Writes its version to staged.ready only when it is newer than the
-# container: an older OpenBot cannot open a database that a newer one migrated.
 stage() {
   local name=$1 status=$DATA/$1/update-status running pulled image
   rm -f "$status/staged.ready"
@@ -272,20 +222,14 @@ stage() {
   fi
 }
 
-# The container owns the request folder, so root only tests a request and removes it. It never reads
-# or follows one. An install makes the container again only from a newer image.
 update_request() {
   check_name "$1"
   local name=$1 requests=$DATA/$1/update-requests status=$DATA/$1/update-status install=0 result=0 keeper
   exec 9>"$LOCKS/$UPDATE_UNIT-$name.lock"
   flock 9
   if [ -e "$requests/update-install" ] || [ -L "$requests/update-install" ]; then install=1; fi
-  # OpenBot waits while the request is there, then reads the state. So the state comes first.
   if [ "$install" -eq 1 ]; then set_state "$status/state" installing; else set_state "$status/state" waiting; fi
   rm -rf -- "$requests/update-stage" "$requests/update-install"
-  # OpenBot sees that the request runs while the time of the state changes. `set -e` does not apply
-  # in the subshells below, so each step checks its own result.
-  # -c: a touch that runs during the end of the request does not make the state again.
   (while sleep 5; do touch -c "$status/state"; done) >/dev/null 2>&1 &
   keeper=$!
   (stage "$name") || result=$?
@@ -298,8 +242,6 @@ update_request() {
   return "$result"
 }
 
-# The host UID:GID of the image user, 1000:1000. With userns-remap, Docker adds the start of the
-# ranges of dockremap in /etc/subuid and /etc/subgid.
 data_owner() {
   if ! docker info --format '{{.SecurityOptions}}' | grep -q name=userns; then
     echo 1000:1000
@@ -340,17 +282,11 @@ create() {
 
   install -d -m 0755 "$DATA"
   install -d -m 0700 "$folder"
-  # Until the instance exists, a failed step removes what create made, so create can run again.
   trap 'umount "$folder/data" 2>/dev/null || true; rm -rf "$folder"' ERR
   install -d -m 0755 "$folder/data"
-  # Reserve all of the space now. A sparse image could grow past the free space of the host, and the
-  # database in it would then get write errors.
   fallocate --length "$disk" "$folder/data.img"
-  # No blocks kept for root: the user of the image uses all of the limit. A discard would free the
-  # reserved space again, so mkfs does none and fstrim.timer skips the mount (X-fstrim.notrim).
   mkfs.ext4 -q -m 0 -E nodiscard "$folder/data.img"
   mount -o loop "$folder/data.img" "$folder/data"
-  # The image user. This changes the mounted file system, not the folder under it.
   chown "$(data_owner)" "$folder/data"
   chmod 0700 "$folder/data"
   printf '%s %s ext4 loop,nofail,x-systemd.before=docker.service,X-fstrim.notrim 0 2\n' "$folder/data.img" "$folder/data" >>/etc/fstab
@@ -378,7 +314,6 @@ list() {
   done
 }
 
-# The value of $2 in the env file of instance $1. Empty when it is not set.
 setting() {
   sed -n "s/^$2=//p" "$(env_file "$1")" | tail -n 1
 }
@@ -398,7 +333,6 @@ json_string() {
   printf '"%s"' "$value"
 }
 
-# One flat value of a manifest or status file that this script wrote.
 json_value() {
   sed -n "s/^ *\"$2\": \"\{0,1\}\([^\",]*\)\"\{0,1\},\{0,1\}\$/\1/p" "$1" | head -n 1
 }
@@ -407,8 +341,6 @@ human_bytes() {
   numfmt --to=iec --suffix=B "$1"
 }
 
-# The folder of the backups of instance $1. A backup has the keys of the instance, so it is never in
-# the data of an instance, where agents could read it.
 backup_root() {
   local folder real
   folder=$(setting "$1" OPENBOT_BACKUP_DIR)
@@ -427,7 +359,6 @@ backup_keep() {
   echo "$keep"
 }
 
-# The complete backups of instance $1, oldest first. A folder becomes a backup only when it is complete.
 complete_backups() {
   local folder
   for folder in "$1"/[0-9]*T[0-9]*Z; do
@@ -436,7 +367,6 @@ complete_backups() {
   return 0
 }
 
-# A backup by its folder or its name, or the newest when $2 is empty.
 find_backup() {
   local root=$1 wanted=${2:-} found
   if [ -z "$wanted" ]; then
@@ -465,14 +395,10 @@ decompress() {
   esac
 }
 
-# Runs a command as the user of the data. Root changes to the folder first, so that the user needs no
-# access to the folders above it.
-# OWNER is the result of data_owner, which each step sets once.
 as_owner() {
   setpriv --reuid="${OWNER%:*}" --regid="${OWNER#*:}" --clear-groups --no-new-privs -- "$@"
 }
 
-# A container that is not there does not run. When Docker does not answer, nothing is known.
 container_running() {
   local state
   if ! state=$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null); then
@@ -482,7 +408,6 @@ container_running() {
   [ "$state" = true ]
 }
 
-# A required file must be a file of its own, not a link that root would follow.
 check_required_files() {
   local folder=$1 file
   for file in "${REQUIRED_FILES[@]}"; do
@@ -491,7 +416,6 @@ check_required_files() {
   done
 }
 
-# Writes the state of a backup step as one JSON object, and keeps the result of the last success.
 record() {
   local status=$1 step=$2 started=$3 result=$4 errors=$5 details=$6 error='' json
   [ "$result" -eq 0 ] || error=$(grep -v '^$' "$errors" | tail -n 1 || true)
@@ -503,13 +427,10 @@ record() {
   [ "$result" -ne 0 ] || set_state "$status/$step-success.json" "$json"
 }
 
-# Marks a step as running. A run that a kill or a restart of the host stops keeps this state.
 record_start() {
   set_state "$1/$2-attempt.json" "$(printf '{\n  "step": "%s",\n  "result": "running",\n  "startedAt": "%s"\n}' "$2" "$3")"
 }
 
-# The result of the last attempt in $1 for instance $2: ok, failed, running, or stopped when the run
-# ended without a result. A running step holds the lock of the instance.
 attempt_state() {
   local state
   state=$(json_value "$1" result 2>/dev/null || true)
@@ -519,8 +440,6 @@ attempt_state() {
   echo "$state"
 }
 
-# Runs step $2 (backup or verify) as the command in the other arguments, with a details file as its
-# last argument, and writes the result to the status folder $1. Exits when the step fails.
 run_step() {
   local status=$1 step=$2 started errors details result
   shift 2
@@ -528,7 +447,6 @@ run_step() {
   record_start "$status" "$step" "$started"
   errors=$(mktemp)
   details=$(mktemp)
-  # The errors go to the terminal and to the status. Standard output stays on file descriptor 3.
   set +e
   {
     (
@@ -543,9 +461,6 @@ run_step() {
   [ "$result" -eq 0 ] || exit "$result"
 }
 
-# Holds the lock of instance $1 until the command ends or locks another instance. Updates, backups,
-# restores, up, down, restart and upgrade take it, so that none starts or stops the container while
-# another runs.
 lock_instance() {
   check_name "$1"
   exec 9>"$LOCKS/$UPDATE_UNIT-$1.lock"
@@ -568,26 +483,21 @@ backup() {
   [ -f "$(env_file "$name")" ] || fail "There is no instance $name."
   status=$DATA/$name/backup-status
   install -d -m 0700 "$status"
-  # Updates use the same lock, so a backup never stops a container that an update makes again.
   lock_instance "$name"
   made=$(mktemp)
-  # shellcheck disable=SC2064 # The value is fixed now.
+  # shellcheck disable=SC2064
   trap "rm -f -- '$made'" EXIT
   run_step "$status" backup backup_steps "$name" "$made"
   final=$(cat "$made")
-  # Old backups go only after the new one is complete, and verified when --verify is given. When the
-  # verification fails, they all stay.
   [ "$verify_after" -eq 0 ] || verify_locked "$name" "$final"
   prune_backups "$name" "$final"
 }
 
-# Removes the partial copy, and starts the instance again when the backup stopped it.
 backup_cleanup() {
   rm -rf -- "$PARTIAL"
   [ "$RESTART" -eq 0 ] || docker start "$CONTAINER" >/dev/null || echo "$CONTAINER did not start again." >&2
 }
 
-# Runs in a subshell, so its globals end with it. Each failure ends it, and the trap cleans up.
 backup_steps() {
   local name=$1 made_file=$2 details_file=$3 data=$DATA/$1/data root used available stamp final archive
   local version image image_id was_running=false exit_code=null stopped_at downtime=0 archive_bytes
@@ -600,7 +510,6 @@ backup_steps() {
   mountpoint -q "$data" || fail "$data is not mounted."
   check_required_files "$data"
   install -d -m 0700 "$root"
-  # A partial copy is left only by a backup that stopped. The lock is held, so none is running.
   rm -rf -- "$root"/*.partial
   used=$(df --block-size=1 --output=used "$data" | tail -n 1 | tr -d ' ')
   available=$(df --block-size=1 --output=avail "$root" | tail -n 1 | tr -d ' ')
@@ -608,7 +517,6 @@ backup_steps() {
     fail "The backup can need $(human_bytes "$used") in $root, which has $(human_bytes "$available") free."
 
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  # The name is the time to the second. A second backup in the same second takes the next one.
   while [ -e "$root/$stamp" ]; do
     sleep 1
     stamp=$(date -u +%Y%m%dT%H%M%SZ)
@@ -625,8 +533,6 @@ backup_steps() {
   version=$(release_version "$CONTAINER")
   image=$(docker inspect --format '{{.Config.Image}}' "$CONTAINER" 2>/dev/null || true)
   image_id=$(docker inspect --format '{{.Image}}' "$CONTAINER" 2>/dev/null || true)
-  # `down` removes the container. Then the version comes from the image of the instance, so that a
-  # restore can refuse an older image.
   if [ -z "$image" ]; then
     image=$(compose "$name" config --images | head -n 1 || true)
     image_id=$(docker image inspect --format '{{.Id}}' "$image" 2>/dev/null || true)
@@ -647,7 +553,6 @@ backup_steps() {
   echo "Copying $data."
   locations=$(cd "$data" && find . -mindepth 1 -maxdepth 1 ! -name lost+found -printf '%P\0' |
     sort -z | while IFS= read -r -d '' entry; do json_string "$entry"; printf ', '; done)
-  # The user of the data reads the files, so that a link in /data cannot show root's files.
   (cd "$data" && as_owner sha256sum -- "${REQUIRED_FILES[@]}" &&
     if [ -f "$SHARED_DATABASE" ] && [ ! -L "$SHARED_DATABASE" ]; then as_owner sha256sum -- "$SHARED_DATABASE"; fi) \
     >"$PARTIAL/required.sha256"
@@ -660,7 +565,6 @@ backup_steps() {
     echo "Started $CONTAINER again after $downtime s."
   fi
 
-  # Read the archive again from the destination, so that the checksum is of what was written.
   archive_sha=$(sha256sum "$PARTIAL/$archive" | cut -d ' ' -f 1)
   archive_bytes=$(stat --format=%s "$PARTIAL/$archive")
   cp "$(env_file "$name")" "$PARTIAL/instance.env"
@@ -679,8 +583,6 @@ backup_steps() {
   echo "Backup $final: $(human_bytes "$archive_bytes"), $downtime s offline."
 }
 
-# Deletes the oldest complete backups of instance $1 above OPENBOT_BACKUP_KEEP. The new backup $2 stays
-# also when the clock went back and its name sorts before the others.
 prune_backups() {
   local keep existing
   keep=$(backup_keep "$1")
@@ -705,8 +607,6 @@ verify_locked() {
   run_step "$DATA/$1/backup-status" verify verify_steps "$1" "$2"
 }
 
-# The number of rows of $2 in database $1, or null when the table is not there. Runs as the user of
-# the data in the unpacked folder: -safe refuses ATTACH, extensions and file access.
 row_count() {
   local exists
   exists=$(sqlite "$1" "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = '$2';")
@@ -730,13 +630,11 @@ verify_steps() {
   (cd "$backup" && sha256sum --check --quiet --strict SHA256SUMS) || fail "The files of $backup do not match their checksums."
   needed=$(json_value "$backup/manifest.json" dataBytes)
   [[ $needed =~ ^[0-9]+$ ]] || fail "The manifest of $backup has no size."
-  # No container mounts the temporary folder, and nothing in it runs. SQLite opens a database by its
-  # full path, so the user of the data must reach the folder, which the backups do not permit.
   parent=$(setting "$name" OPENBOT_BACKUP_WORK)
   parent=${parent:-/var/tmp}
   [ -d "$parent" ] || fail "OPENBOT_BACKUP_WORK $parent is not a folder."
   work=$(mktemp -d "$parent/openbot-verify.XXXXXX")
-  # shellcheck disable=SC2064 # The value is fixed now.
+  # shellcheck disable=SC2064
   trap "rm -rf -- '$work'" EXIT
   available=$(df --block-size=1 --output=avail "$work" | tail -n 1 | tr -d ' ')
   [ "$available" -gt "$needed" ] ||
@@ -757,7 +655,6 @@ verify_steps() {
     warnings+=("openbot.db has rows whose references are missing.")
   version=$(sqlite "${REQUIRED_FILES[0]}" "SELECT max(version) FROM schema_migrations;") ||
     fail "openbot.db has no schema version."
-  # Agents can change the database, so only a number goes into the JSON.
   [[ $version =~ ^[0-9]+$ ]] || fail "openbot.db has no schema version."
   agents=$(row_count "${REQUIRED_FILES[0]}" projection_agents)
   threads=$(row_count "${REQUIRED_FILES[0]}" projection_threads)
@@ -769,7 +666,6 @@ verify_steps() {
     [ "$integrity" = ok ] || fail "The shared tables are damaged: $(head -n 1 <<<"$integrity")"
     shared_tables=$(sqlite "$SHARED_DATABASE" \
       "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite~_%' ESCAPE '~' AND name <> 'openbot_metadata';")
-    # The owner of each shared table is an agent ID, which a restore keeps.
     if [ "$(row_count "$SHARED_DATABASE" openbot_metadata)" != null ] && [ "$agents" != null ]; then
       owners=$(comm -23 <(sqlite "$SHARED_DATABASE" "SELECT DISTINCT owner_agent_id FROM openbot_metadata;" | sort -u) \
         <(sqlite "${REQUIRED_FILES[0]}" "SELECT agent_id FROM projection_agents;" | sort -u))
@@ -810,7 +706,6 @@ restore() {
   backup=$(find_backup "$root" "$wanted")
   archive=$(backup_archive "$backup")
   (cd "$backup" && sha256sum --check --quiet --strict SHA256SUMS) || fail "The files of $backup do not match their checksums."
-  # An older OpenBot cannot open a database that a newer one migrated.
   version=$(json_value "$backup/manifest.json" openbotVersion)
   target=$(release_version "$(compose "$name" config --images | head -n 1)")
   if [ -n "$version" ] && [ -n "$target" ] && [ "$version" != "$target" ] &&
@@ -828,8 +723,6 @@ restore() {
   fi
   lock_instance "$name"
   install -d -m 0700 "$DATA/$name/backup-status"
-  # A checksum-consistent archive can contain a damaged database. Verify it while the same lock
-  # protects the target, before restore_steps stops the container or replaces any data.
   verify_locked "$name" "$backup"
   set +e
   (
@@ -849,7 +742,7 @@ restore_steps() {
   [[ $needed =~ ^[0-9]+$ ]] || fail "The manifest of $backup has no size."
   if container_running "$container"; then
     start="docker start '$container' >/dev/null"
-    # shellcheck disable=SC2064 # The value is fixed now.
+    # shellcheck disable=SC2064
     trap "$start" EXIT
     echo "Stopping $container."
     docker stop "$container" >/dev/null
@@ -858,19 +751,16 @@ restore_steps() {
   available=$(df --block-size=1 --output=avail "$data" | tail -n 1 | tr -d ' ')
   [ "$available" -gt "$needed" ] ||
     fail "The restore needs $(human_bytes "$needed") free in $data, which has $(human_bytes "$available"). The old data stays until the backup is unpacked. Copy the old data to another disk, delete it from $data, then restore again."
-  # mktemp makes a new folder with a new name. It does not follow a link that an agent made in /data
-  # before the container stopped.
   stage=$(mktemp -d "$data/.openbot-restore.XXXXXX")
-  # shellcheck disable=SC2064 # The value is fixed now.
+  # shellcheck disable=SC2064
   trap "rm -rf -- '$stage'; $start" EXIT
   chown "$OWNER" "$stage"
   echo "Unpacking $backup."
   (cd "$stage" && decompress "$archive" "$backup/$archive" |
     as_owner tar --extract --file=- --preserve-permissions) || fail "The archive of $backup does not unpack."
   check_required_files "$stage"
-  # From here the old data moves aside. When a move fails, both folders stay for the operator.
   replaced=$(mktemp -d "$data/.openbot-replaced.XXXXXX")
-  # shellcheck disable=SC2064 # The value is fixed now.
+  # shellcheck disable=SC2064
   trap "echo 'The restore stopped while it moved files. The old data is in $replaced, the backup in $stage.' >&2" EXIT
   cd "$data"
   find . -mindepth 1 -maxdepth 1 ! -name lost+found ! -name "${stage##*/}" ! -name "${replaced##*/}" -print0 |
@@ -975,7 +865,6 @@ case $command in
   backups) backups "$@" ;;
   run)
     check_name "${1:-}"
-    # login asks for the code in a terminal. Scripts and ssh without -t have none.
     terminal=()
     [ ! -t 0 ] || terminal=(--tty)
     docker exec --interactive "${terminal[@]}" "openbot-$1" openbot "${@:2}"

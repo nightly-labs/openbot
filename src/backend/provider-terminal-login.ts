@@ -45,12 +45,10 @@ const CLOSE_MAC = `on run argv
   end tell
 end run`;
 
-/** The path comes from the CLI resolver. Quote it as one shell word, including embedded apostrophes. */
 function terminalLoginCommand(executable: string): string {
   return `'${executable.replaceAll("'", "'\\''")}'`;
 }
 
-/** Owns the terminal opened for Pi login. Closing Pi causes CliLoginFlow to refresh its account. */
 export const startProviderTerminalLogin = Effect.fn("ProviderTerminalLogin.start")(function* (
   cli: AgentCliInfo,
   timeoutMs: number,
@@ -67,7 +65,6 @@ export const startProviderTerminalLogin = Effect.fn("ProviderTerminalLogin.start
       return yield* providerSync(() => {
         throw new Error(sourceText("error.provider.terminalLoginFailed"));
       });
-    // The TTY identifies only the tab this operation opened. Other windows and tabs stay open.
     yield* Effect.addFinalizer(() =>
       providerCall(() =>
         execute("/usr/bin/osascript", ["-e", CLOSE_MAC, tty], { timeout: 10_000, maxBuffer: 4096 }),

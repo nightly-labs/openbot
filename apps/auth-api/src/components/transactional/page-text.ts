@@ -3,23 +3,14 @@ import type { AppTranslate } from "@openbot/i18n";
 import { DOWNLOAD_PLATFORMS, type DownloadPlatform } from "../../lib/download-platforms";
 import type { FailureKind } from "./MessagingConnectPage";
 
-/*
- * The text of the pages that do one task, built from `sitePage.*` catalog keys. A route loader runs
- * these builders with `loadPageText`, and the components get plain strings as props. This module has
- * only a type import of the catalogs, so the components do not pull them into the browser bundle.
- */
-
 const PROVIDER_NAMES: Record<WebMessagingInstallPlatform, string> = { slack: "Slack", discord: "Discord" };
 
-/** Private-use characters that mark where the two links go in the "No app?" sentence. */
 const JOIN_LINK_MARKERS = { browser: "", download: "" } as const;
 
 export type JoinLink = keyof typeof JOIN_LINK_MARKERS;
 
-/** Splits a sentence at each marker and keeps the markers as parts. */
 const JOIN_LINK_SPLIT = new RegExp(`([${Object.values(JOIN_LINK_MARKERS).join("")}])`, "u");
 
-/** One part of a sentence with links: plain text, or the text of the link that `link` names. */
 export interface JoinTextPart {
   text: string;
   link?: JoinLink;
@@ -42,13 +33,11 @@ export function joinPageText(t: AppTranslate) {
   return {
     eyebrow: t("sitePage.join.eyebrow"),
     title: t("sitePage.join.title"),
-    /** The page description and the link preview text. */
     description: t("sitePage.join.description"),
     intro: t("sitePage.join.intro"),
     invalid: t("sitePage.join.invalid"),
     open,
     noApp: joinTextParts(t("sitePage.join.noApp", JOIN_LINK_MARKERS), links),
-    /** Phones get no download link: the desktop download does not install there. */
     noAppMobile: joinTextParts(t("sitePage.join.noAppMobile", { browser: JOIN_LINK_MARKERS.browser }), links),
     mobile: t("sitePage.join.mobile", { open }),
     email: t("sitePage.join.email"),
@@ -93,9 +82,7 @@ export function messagingConnectText(t: AppTranslate, platform: WebMessagingInst
 
 export type MessagingConnectText = ReturnType<typeof messagingConnectText>;
 
-/** The "Nothing opened?" dialog. `body` says what to do on this page. */
 function openAppFallbackText(t: AppTranslate, body: string) {
-  /** The label of the download button, by platform. The page finds the visitor's platform. */
   const downloadFor = (id: DownloadPlatform) =>
     t("sitePage.marketplace.downloadFor", { platform: DOWNLOAD_PLATFORMS[id].label });
   const download: Record<DownloadPlatform, string> = {
@@ -118,7 +105,6 @@ export function billingReturnText(t: AppTranslate) {
   };
 }
 
-/** A private-use character that marks where the contact link goes in `writeTo`. */
 const EMAIL_MARKER = "";
 
 export function reportSiteText(t: AppTranslate) {
@@ -132,7 +118,6 @@ export function reportSiteText(t: AppTranslate) {
     hostnameLabel: t("sitePage.report.hostnameLabel"),
     hostnameMissing: t("sitePage.report.hostnameMissing"),
     reasonLabel: t("sitePage.report.reasonLabel"),
-    /** The labels of the reasons that `/v1/sites/reports` accepts, by reason ID. */
     reasons: {
       phishing: t("sitePage.report.reason.phishing"),
       malware: t("sitePage.report.reason.malware"),
@@ -147,7 +132,6 @@ export function reportSiteText(t: AppTranslate) {
     sending: t("sitePage.report.sending"),
     tooMany: t("sitePage.report.tooMany"),
     sendFailed: t("sitePage.report.sendFailed"),
-    /** The sentence around the contact link: the text before the link and the text after it. */
     writeTo: { before: writeToBefore, after: writeToAfter },
     sentTitle: t("sitePage.report.sentTitle"),
     sentBody: t("sitePage.report.sentBody"),
@@ -168,7 +152,6 @@ function pageErrorText(t: AppTranslate) {
 
 export type PageErrorText = ReturnType<typeof pageErrorText>;
 
-/** The text that the root route owns: the load error page. */
 export function rootPageText(t: AppTranslate) {
   return { error: pageErrorText(t) };
 }

@@ -1,16 +1,3 @@
-// Stops a release whose CHANGELOG.md section is missing, empty or malformed.
-//
-//   bun scripts/check-release-notes.ts           checks the package.json version on disk
-//   bun scripts/check-release-notes.ts --staged  checks the index, only when the commit changes the version
-//   bun scripts/check-release-notes.ts [--staged] --fragments <path>...  checks changelog.d fragments
-//   --mobile checks the version of apps/mobile/app.json in apps/mobile/CHANGELOG.md instead, and
-//            accepts "In review" and the dates of each store as its date
-//   --no-pending also stops when notes wait for a version: in the fragment folder or under Unreleased
-//   bun scripts/check-release-notes.ts [--staged] --ota  checks each OTA section of apps/mobile/CHANGELOG.md,
-//            such as "## [1.4.8.1] - 2026-11-12 (Android)". An OTA update does not change a version file.
-//
-// No package imports: `release.yml` runs this before `bun install`.
-
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -33,7 +20,11 @@ const product = mobile ? "OpenBot mobile" : "OpenBot";
 
 const show = (object: string): string | undefined => {
   try {
-    return execFileSync("git", ["show", object], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    return execFileSync("git", ["show", object], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
   } catch {
     return undefined;
   }
@@ -79,7 +70,6 @@ if (process.argv.includes("--ota")) {
 function version(json: string | undefined): string | undefined {
   if (json === undefined) return undefined;
   const parsed = JSON.parse(json);
-  // `app.json` keeps the version under `expo`.
   const value = mobile ? parsed?.expo?.version : parsed?.version;
   return typeof value === "string" ? value : undefined;
 }
@@ -94,7 +84,6 @@ if (staged && version(show(`HEAD:${versionFile}`)) === nextVersion) process.exit
 const problems = releaseNotesProblems(
   (staged ? show(`:${changelogFile}`) : readFileSync(changelogFile, "utf8")) ?? "",
   nextVersion,
-  // A new mobile version waits for store review before `/changelog` shows it.
   { storeReview: mobile },
 );
 if (problems.length > 0) {
@@ -110,8 +99,6 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-// Every TestFlight upload reaches open testers, so it is a release. Notes that wait for a version
-// would ship with no entry on /changelog, under a version that testers already have.
 if (process.argv.includes("--no-pending")) {
   const fragmentDir = mobile ? MOBILE_FRAGMENT_DIR : FRAGMENT_DIR;
   const fragments = existsSync(fragmentDir)

@@ -1,4 +1,3 @@
-/* The logo color swatches, in the same shape as the agent avatar color grid. */
 .logo-color-grid {
   display: grid;
   grid-template-columns: repeat(5, 32px);

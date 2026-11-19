@@ -60,11 +60,8 @@ export function AddServerScreen({
 }: {
   initialInvite?: string;
   onJoined?: () => void;
-  /** The scanner page of the sheet that shows this page. */
   scanHref?: Href;
-  /** An inner page under a native header: its back button replaces Cancel. */
   underHeader?: boolean;
-  /** The create page of a server on an owned computer, in this sheet. Without it, the page offers none. */
   localServerPathname?: LocalServerPathname;
 } = {}) {
   const { t, format, errorDetails, sourceText } = useText();
@@ -75,7 +72,6 @@ export function AddServerScreen({
   const [joinedId, setJoinedId] = useState<string | null>(null);
   const joinedServer = useLiveServerRecovery(servers.find((server) => server.id === joinedId));
   const [inviteLink, setInviteLink] = useState(initialInvite);
-  // A new object repeats a failed preview for the same link; an unchanged link keeps the result.
   const [request, setRequest] = useState(() => {
     const url = normalizeInviteUrl(initialInvite, inviteLinks);
     return url ? { url } : null;
@@ -86,9 +82,7 @@ export function AddServerScreen({
   const [error, setError] = useState<UserErrorDetails | null>(null);
   const [joining, setJoining] = useState(false);
   const joinInFlight = useRef(false);
-  usePreventRemove(joining, () => {
-    // A join can consume a single-use token; wait for its result before leaving.
-  });
+  usePreventRemove(joining, () => {});
 
   useEffect(() => {
     let active = true;
@@ -117,8 +111,6 @@ export function AddServerScreen({
     };
   }, [request, teamDirectory]);
 
-  // Verification starts as soon as the field holds a complete invitation, so a paste needs no
-  // separate review step before the server identity is shown.
   function changeLink(value: string): void {
     setInviteLink(value);
     const url = normalizeInviteUrl(value, inviteLinks);
@@ -262,7 +254,6 @@ export function AddServerScreen({
             </View>
           ) : null}
 
-          {/* The join button shows once the field has text, so an empty sheet has no dimmed button. */}
           {!inviteLink.trim() ? null : preview || !reviewedInvite || previewing ? (
             <Button size="lg" isDisabled={!preview || joining || previewing} onPress={() => void joinServer()}>
               <Button.Label className="font-sans font-semibold">
@@ -275,7 +266,6 @@ export function AddServerScreen({
             </Button>
           )}
 
-          {/* Another way to get a server: one more on a computer that runs OpenBot, while no link is typed. */}
           {localServerPathname && !inviteLink.trim() ? <LocalServerOptions pathname={localServerPathname} /> : null}
 
           {underHeader ? null : (
@@ -299,9 +289,7 @@ export function AddServerScreen({
   );
 }
 
-/** The height and shape of the two quiet actions under the field. */
 const QUICK_ACTION_CLASS = `h-12 flex-1 overflow-hidden bg-control ${isIOS ? "" : "rounded-2xl"}`;
-/** The corners of `SheetFormField` on iOS, so the actions match the field above them. Android uses its class. */
 const QUICK_ACTION_SHAPE = isIOS ? ({ borderCurve: "continuous", borderRadius: 16 } as const) : null;
 
 function QuickAction({
@@ -336,10 +324,6 @@ function QuickAction({
   );
 }
 
-/**
- * Paste the invitation from the clipboard: the text, or a link that another app copied as a link.
- * It is the app's own action, so it always shows; it is dimmed while the clipboard has neither.
- */
 function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: (value: string) => void }) {
   const { t } = useText();
   const [foreground] = useThemeColor(["foreground"]);
@@ -361,10 +345,6 @@ function PasteInviteButton({ disabled, onPaste }: { disabled: boolean; onPaste: 
   );
 }
 
-/**
- * Whether the clipboard has text or a link. These checks read no content, so iOS shows no paste
- * prompt. The user copies the invitation in another app, so the check runs again on each return.
- */
 function useClipboardHasLink(): boolean {
   const [pasteable, setPasteable] = useState(false);
   useEffect(() => {

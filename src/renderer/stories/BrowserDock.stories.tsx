@@ -70,10 +70,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The composer alone, with no turn and no queue. */
 export const Idle: Story = {};
 
-/** The agent acts on the page. The island shows the step and offers to take over. */
 export const AgentActing: Story = {
   args: {
     working: true,
@@ -87,17 +85,14 @@ export const AgentActing: Story = {
   },
 };
 
-/** The user controls the page. The agent waits until the user gives it back. */
 export const UserControl: Story = {
   args: { working: true, island: { kind: "activity", control: "user" }, onHandoff: fn() },
 };
 
-/** The agent asks for a code that only the user has. */
 export const SecretRequest: Story = {
   args: { working: true, island: { kind: "secret", request: secretRequest } },
 };
 
-/** The agent's answer, which closes by itself. */
 export const Reply: Story = {
   args: {
     island: {

@@ -5,9 +5,9 @@ import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
+import { providerCanRun } from "./model-tools";
 import { providerLabel } from "./thread-items";
 
-/** The provider and model setup or Settings recorded, `model` being `null` for the provider's default. */
 export interface ProviderPreference {
   provider: AgentProvider;
   model: AgentModelId | null;
@@ -18,14 +18,6 @@ export interface ModelChoice {
   model: AgentModelOption;
 }
 
-/**
- * The model a new agent, or a profile draft with no agent, starts on for `provider`.
- *
- * Setup records a model beside the preferred provider, so that model comes first -- but only while
- * the CLI still lists it, because the list is the provider's answer and a saved id can name an
- * endpoint or a model that is gone. After it come the provider's own default and then whatever it
- * does list; `null` means it listed nothing at all.
- */
 export function startingModel(
   provider: AgentProvider,
   models: AgentModelOption[],
@@ -38,12 +30,6 @@ export function startingModel(
   );
 }
 
-/**
- * Why `model` of `provider` is not in `models`: the provider is not connected, it listed no models
- * (with its last error), or its list does not hold the id. A custom agent's model is checked against
- * that agent's own models, because one agent that failed to list leaves the others on `acp`. With no
- * provider there is nothing to check, and the error names no cause.
- */
 export function modelUnavailableError(
   model: string,
   provider: AgentProvider | undefined,
@@ -70,11 +56,6 @@ export function modelUnavailableError(
   );
 }
 
-/**
- * The provider and model a creation request names, resolved against what the CLIs list right now,
- * or `null` when the request names neither. A named model must be listed for the named provider;
- * a lone provider takes its default when listed, else whatever it lists first.
- */
 export function creationModel(
   input: Pick<CreateAgentInput, "provider" | "model">,
   models: AgentModelOption[],
@@ -101,34 +82,14 @@ export function creationModel(
   return { provider, model };
 }
 
-/** Whether the development defaults stand in for `preference`: a development build, and no choice beyond the built-in provider. */
 export function developmentDefaultsApply(preference: ProviderPreference, developmentDefaults: boolean): boolean {
   return developmentDefaults && builtInDefault(preference);
 }
 
-/** Whether `preference` is the built-in provider with no model chosen beside it. */
 function builtInDefault(preference: ProviderPreference): boolean {
   return preference.provider === DEFAULT_AGENT_PROVIDER && preference.model === null;
 }
 
-/**
- * The provider and model a new agent starts on, or `null` when no provider lists a model it can use.
- *
- * `startingModel` answers for one provider; this one chooses the provider too, which is what a
- * development default needs: the models it names belong to Claude and OpenCode, and a preferred
- * provider of Codex would never list them.
- *
- * That default stands in for the built-in one and nothing else. A preferred provider that is not
- * the built-in one, or a model recorded beside it, is the developer's own choice and is left as
- * it is. When no development default can run, Codex starts an agent only while it can run one.
- *
- * A preferred provider that lists nothing -- Grok, which has no built-in list, before its CLI
- * answers, or a CLI that answered with an empty catalog -- is not a reason to refuse the agent
- * while another provider can run it. The others are tried in picker order, the same order the
- * new-agent form uses, but only while they are installed, current and signed in: Codex and Claude
- * list built-in models before any CLI answers, and an agent moved onto a provider that cannot
- * start would not answer either.
- */
 export function startingChoice(
   models: AgentModelOption[],
   preference: ProviderPreference,
@@ -141,8 +102,6 @@ export function startingChoice(
     providerAvailable: context.providerAvailable,
   });
   if (development) return development;
-  // `PICKER_PROVIDERS` leaves out `acp`: a custom agent is a program the user added for a purpose,
-  // so no agent moves to one unasked.
   const others = PICKER_PROVIDERS.filter((provider) => provider !== preference.provider);
   for (const provider of [preference.provider, ...others]) {
     const chosen = provider === preference.provider && !developmentStart;
@@ -153,14 +112,6 @@ export function startingChoice(
   return null;
 }
 
-/**
- * The provider of a workflow step that names no provider and no model, given the starting choice
- * `starting`. A step is one generation and cannot wait for a sign-in. So when the starting choice is
- * the built-in default with no model chosen, and that provider is off or cannot run (signed out,
- * missing, outdated or failed), the first provider in picker order that can run and lists a model
- * takes its place. Another preferred provider, or a model chosen beside the built-in one, stays, and
- * the step's error names it.
- */
 export function workflowProvider(
   starting: AgentProvider,
   preference: ProviderPreference,
@@ -168,10 +119,7 @@ export function workflowProvider(
   models: readonly AgentModelOption[],
 ): AgentProvider {
   if (starting !== DEFAULT_AGENT_PROVIDER || !builtInDefault(preference)) return starting;
-  const row = providers.find((candidate) => candidate.id === starting);
-  // A provider that starts or runs keeps the step. A missing Codex reports "error", not "not-installed".
-  if (!row || (!row.off && (row.state === "available" || row.state === "checking" || row.state === "not-started")))
-    return starting;
+  if (providerCanRun(starting, providers)) return starting;
   return (
     PICKER_PROVIDERS.find(
       (provider) =>

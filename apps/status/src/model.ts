@@ -1,5 +1,3 @@
-// The data of the status page. `scripts/update.ts` writes `state.json` (kept on the `status-data`
-// branch) and the public `status.json`; the page decodes `status.json` when it loads it.
 import { Schema } from "effect";
 
 export const SERVICE_IDS = ["accounts", "connections", "hosted", "updates", "marketplace"] as const;
@@ -26,7 +24,6 @@ export const SERVICES: readonly ServiceInfo[] = [
 
 export const serviceName = (id: ServiceId) => SERVICES.find((service) => service.id === id)?.name ?? id;
 
-/** The result of one health check. `unknown` is a service that no run has checked yet. */
 export const CheckResult = Schema.Literals(["ok", "degraded", "down", "unknown"]);
 export type CheckResult = typeof CheckResult.Type;
 
@@ -49,7 +46,6 @@ export const IncidentUpdate = Schema.Struct({ at: Schema.String, stage: Stage, b
 export type IncidentUpdate = typeof IncidentUpdate.Type;
 
 export const Incident = Schema.Struct({
-  /** The GitHub issue number. */
   id: Schema.Int,
   url: Schema.String,
   title: Schema.String,
@@ -57,14 +53,11 @@ export const Incident = Schema.Struct({
   impact: Impact,
   components: Schema.Array(ServiceId),
   startedAt: Schema.String,
-  /** Null while the incident is open. For maintenance, the planned end. */
   resolvedAt: Schema.NullOr(Schema.String),
-  /** Newest first. */
   updates: Schema.Array(IncidentUpdate),
 });
 export type Incident = typeof Incident.Type;
 
-/** One UTC day of checks for one service. Minutes are the time that the checks of the day cover. */
 export const CheckDay = Schema.Struct({
   date: Schema.String,
   checks: Schema.Int,
@@ -77,12 +70,10 @@ export type CheckDay = typeof CheckDay.Type;
 export const ServiceStatus = Schema.Struct({
   id: ServiceId,
   result: CheckResult,
-  /** Oldest first, at most `HISTORY_DAYS`. */
   days: Schema.Array(CheckDay),
 });
 export type ServiceStatus = typeof ServiceStatus.Type;
 
-/** `status.json`, the public file that the page reads. */
 export const StatusFile = Schema.Struct({
   version: Schema.Literal(1),
   checkedAt: Schema.NullOr(Schema.String),
@@ -96,13 +87,11 @@ export const ServiceState = Schema.Struct({
   changedAt: Schema.NullOr(Schema.String),
   failedRuns: Schema.Int,
   healthyRuns: Schema.Int,
-  /** The automatic issue that is open for this service. */
   openIssue: Schema.NullOr(Schema.Int),
   days: Schema.Array(CheckDay),
 });
 export type ServiceState = typeof ServiceState.Type;
 
-/** `state.json` on the `status-data` branch. Only the update workflow reads it. */
 export const StateFile = Schema.Struct({
   version: Schema.Literal(1),
   checkedAt: Schema.NullOr(Schema.String),
@@ -127,7 +116,6 @@ const STATE_RANK: Record<StatusState, number> = { operational: 0, maintenance: 1
 
 export const worseState = (a: StatusState, b: StatusState): StatusState => (STATE_RANK[b] > STATE_RANK[a] ? b : a);
 
-/** The days, oldest first, that end with the day of `now`. */
 export function statusDates(count: number, now: string): string[] {
   const today = Date.parse(`${now.slice(0, 10)}T00:00:00Z`);
   return Array.from({ length: count }, (_, index) =>
@@ -135,20 +123,16 @@ export function statusDates(count: number, now: string): string[] {
   );
 }
 
-/** A day with no checks and no incident has no state. */
 export interface StatusDay {
   date: string;
   state: StatusState | null;
   check: CheckDay | null;
   incidents: Incident[];
-  /** Down minutes from the incidents of the day: all of a major outage, 30% of a partial outage. */
   outageMinutes: number;
 }
 
-/** The share of a partial outage that counts as down time, as in Atlassian Statuspage. */
 const PARTIAL_WEIGHT = 0.3;
 
-/** A day with checks that failed for 30 minutes or more is a major outage. */
 const MAJOR_FAILED_MINUTES = 30;
 
 function checkState(day: CheckDay) {
@@ -158,7 +142,6 @@ function checkState(day: CheckDay) {
   return "operational";
 }
 
-/** One entry per day for one service, from its checks and from the incidents that touch the day. */
 export function serviceDays(
   service: ServiceStatus,
   incidents: readonly Incident[],
@@ -191,7 +174,6 @@ export function serviceDays(
   });
 }
 
-/** The time that the intervals cover, with overlaps counted once. */
 function coveredMs(intervals: [number, number][]) {
   let total = 0;
   let reached = -Infinity;
@@ -204,16 +186,11 @@ function coveredMs(intervals: [number, number][]) {
   return total;
 }
 
-/**
- * The share of time in which the service was available, or null when there is no data. A failed
- * check and an outage incident are both down time, so an outage that the checks missed also counts.
- */
 export function uptimePercent(days: readonly StatusDay[]): number | null {
   let minutes = 0;
   let down = 0;
   for (const day of days) {
     const failed = day.check?.failedMinutes ?? 0;
-    // A day with an incident but no checks, such as a day before the checks started, is one full day.
     const checked = day.check && day.check.checks > 0 ? day.check.minutes : day.outageMinutes > 0 ? DAY_MINUTES : 0;
     minutes += Math.max(checked, day.outageMinutes);
     down += Math.max(failed, day.outageMinutes);
@@ -228,7 +205,6 @@ const RESULT_STATE: Record<CheckResult, StatusState | null> = {
   unknown: null,
 };
 
-/** Incidents that run at `now`. Maintenance counts only inside its window. */
 export function isActive(incident: Incident, now: string): boolean {
   const nowMs = Date.parse(now);
   return (
@@ -236,7 +212,6 @@ export function isActive(incident: Incident, now: string): boolean {
   );
 }
 
-/** The worst of the last check and the incidents that run now. */
 export function currentState(service: ServiceStatus, incidents: readonly Incident[], now: string): StatusState | null {
   let state = RESULT_STATE[service.result];
   for (const incident of incidents) {

@@ -1,6 +1,3 @@
-// The model list request and the detection settings. The list request can carry a key, so no
-// message here quotes the input.
-
 import type { DiscoverModelsInput, ProviderDetectionSettings } from "@openbot/contracts/ipc";
 import {
   customProviderEndpointKey,
@@ -35,7 +32,6 @@ function parseList(value: unknown, limit: number, check: (entry: string) => bool
       throw new Error("A list entry is not valid text.");
     }
     const trimmed = entry.trim();
-    // A blank row is the form's empty field, not an entry.
     if (!trimmed) continue;
     if (!check(trimmed)) throw new Error(sourceText("error.provider.detectionEntryInvalid"));
     if (!entries.includes(trimmed)) entries.push(trimmed);

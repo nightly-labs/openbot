@@ -282,6 +282,7 @@ function toIslandAgent(agent: (typeof STORY_AGENTS)[number]): DynamicIslandAgent
     name: agent.name,
     avatarSeed: agent.avatarSeed,
     avatarHue: agent.avatarHue,
+    avatarColor: agent.avatarColor ?? null,
     avatarUrl: agent.avatarUrl,
   };
 }
@@ -336,7 +337,6 @@ export const OpenChatReturnsToIdle: Story = {
   },
 };
 
-/** Issue #1704: reply, answer and stop on the island. The main window stays where it is. */
 export const InlineReplyMessage: Story = {
   args: { scenario: "chat", defaultState: "expanded", inlineReply: true },
 };

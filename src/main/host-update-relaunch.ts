@@ -25,7 +25,6 @@ export const relaunchManagedTenant = Effect.fn("HostUpdate.relaunchTenant")(func
   if ((yield* remoteCall(operations.runningTenants)).some((running) => running.uid === uid)) return;
   if ((yield* remoteCall(operations.installedVersion)) !== state.version)
     return yield* new RemoteWorkflowError({ cause: new Error("Installed release does not match host state.") });
-  // Recheck the control state after potentially slow signature verification.
   const latest = yield* readOwnedJson(join(directory, "state.json"), hostUid, hostStateSchema).pipe(
     Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
   );

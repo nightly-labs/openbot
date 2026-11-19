@@ -23,22 +23,18 @@ function brandOf(number: string): "visa" | "mastercard" | "amex" | "discover" | 
   return null;
 }
 
-/**
- * An empty Vault kept in memory. The import adds one login, as if the user chose a CSV file. The
- * preview has one host, so the `host*` calls of every server use the same items.
- */
 export function createMockVault(): OpenBotDesktopApi["vault"] {
-  let state: VaultState = EMPTY_VAULT;
+  let state: VaultState = { ...EMPTY_VAULT, agentScope: true };
   const secrets = new Map<string, Partial<Record<VaultSecretField, string>>>();
   const twoStepKeys = new Map<string, string>();
   const listeners = new Set<(state: VaultState) => void>();
   let nextId = 1;
   const change = (items: VaultItemSummary[]) => {
-    state = { status: "ready", items };
+    state = { status: "ready", items, agentScope: true };
     for (const listener of listeners) listener(state);
     return state;
   };
-  const summary = (input: VaultSaveInput, id: string): VaultItemSummary => {
+  const summary = ({ agents: _agents, ...input }: VaultSaveInput, id: string): VaultItemSummary => {
     const saved = secrets.get(id) ?? {};
     if (input.kind === "login") {
       if (input.password !== null) saved.password = input.password;
@@ -68,10 +64,12 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
     }
     return { ...input, id };
   };
-  const save = async (input: VaultSaveInput) => {
+  const save = async ({ agents, ...input }: VaultSaveInput) => {
     const id = input.id ?? `mock-${nextId++}`;
-    const item = summary(input, id);
-    const exists = state.items.some((current) => current.id === id);
+    const saved = state.items.find((current) => current.id === id);
+    const scope = agents === undefined ? saved?.agents : (agents ?? undefined);
+    const item = { ...summary(input, id), ...(scope ? { agents: scope } : {}) };
+    const exists = saved !== undefined;
     return change(exists ? state.items.map((current) => (current.id === id ? item : current)) : [...state.items, item]);
   };
   const remove = async (id: string) => {

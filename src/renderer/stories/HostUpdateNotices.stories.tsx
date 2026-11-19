@@ -29,12 +29,10 @@ function RestartStory(props: { restart: HostRestartView["restart"]; online: bool
   return <NoticeStory start={() => undefined} />;
 }
 
-/** Every member sees this while the host waits for idle agents before it restarts. */
 export const RestartWaiting: Story = {
   render: () => <RestartStory restart="waiting" online />,
 };
 
-/** Every member sees this while the host restarts and the connection is away. */
 export const Restarting: Story = {
   render: () => <RestartStory restart="restarting" online />,
 };

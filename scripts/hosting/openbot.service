@@ -1,12 +1,7 @@
-# OpenBot on a hosted server. provision.sh replaces @SERVICE_USER@ and enables this unit. boat
-# stop and resume work like a reboot, so the unit starts again on each wake. boat starts the desktop
-# about 8 seconds before the enabled units, and OpenBot starts with it.
 [Unit]
 Description=OpenBot hosted server
 Wants=network-online.target openbot-update-apply.service
 After=network-online.target display-manager.service
-# openbot-boat-pre-stop stops OpenBot before boat saves the disk, and makes this file so that nothing
-# starts it again before the save. /run is empty at each boot.
 ConditionPathExists=!/run/openbot-pre-stop
 
 [Service]
@@ -15,21 +10,13 @@ User=@SERVICE_USER@
 RuntimeDirectory=openbot
 RuntimeDirectoryMode=0700
 Environment=XDG_RUNTIME_DIR=/run/openbot
-# As root (+), and OpenBot starts when it fails (-). It repairs the modes of the release, and installs
-# the update request units when an older release moved this one into place; openbot-hosted-update
-# says why.
 ExecStartPre=-+/opt/OpenBot/hosted/openbot-hosted-update trigger
 ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
-# Stops OpenBot before its virtual displays, so that it closes its database first.
 ExecStop=/opt/OpenBot/hosted/openbot-hosted-server --stop
 Restart=always
 RestartSec=10
+RestartPreventExitStatus=78
 TimeoutStopSec=60
-# Memory guards. The machine is small, and this unit holds OpenBot, its browser tabs and every agent
-# process. The OOM killer of the unit acts before the kernel's own, so the desktop, sshd and the boat
-# agent keep running. systemd sets -500 as root, before it changes the user; main then gives each
-# process it starts 500, so the OOM killer picks an agent process before main. One killed agent does
-# not stop the unit: the default policy "stop" would stop OpenBot too.
 MemoryMax=90%
 OOMScoreAdjust=-500
 OOMPolicy=continue

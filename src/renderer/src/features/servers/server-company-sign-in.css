@@ -1,5 +1,3 @@
-/* Company sign-in in Members: the setup dialog and the one-time SCIM token. */
-
 .custom-provider-dialog.company-sign-in-dialog {
   width: min(520px, 100%);
 }

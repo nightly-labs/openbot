@@ -4,12 +4,6 @@ import { type EventRoutine, isEventRoutineTrigger } from "./ipc-events";
 import { isRoutineRun, ROUTINE_MISSED_POLICIES, type RoutineRun } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values";
 
-/**
- * Routine flows: what happens after an agent routine's own agent answers. A link hands that answer
- * on to another agent, inside one routine; each agent's part of one run is a step. These IPC types
- * never cross the Team API: the frozen `routine-flows-v1` codec carries a canvas to a joined client.
- */
-
 export const ROUTINE_FLOW_STEP_STATUSES = ["running", "succeeded", "failed", "skipped", "cancelled"] as const;
 export type RoutineFlowStepStatus = (typeof ROUTINE_FLOW_STEP_STATUSES)[number];
 
@@ -18,7 +12,6 @@ export interface RoutineFlowLink {
   routineId: string;
   fromAgentId: string;
   toAgentId: string;
-  /** What the receiving agent is asked to do with the answer. May be empty. */
   instruction: string;
   createdAt: string;
 }
@@ -27,7 +20,6 @@ export interface RoutineFlowStep {
   id: string;
   runId: string;
   agentId: string;
-  /** The delivery that carried the input; null for the routine's own agent. */
   deliveryId: string | null;
   input: string;
   output: string | null;
@@ -37,30 +29,21 @@ export interface RoutineFlowStep {
   updatedAt: string;
 }
 
-/** Where a node sits on one agent's canvas. `nodeKey` is `routine:<id>` or `agent:<id>`. */
 export interface RoutineFlowPosition {
   nodeKey: string;
   x: number;
   y: number;
 }
 
-/** A routine on a canvas, with what starts it: a schedule, or a webhook with its URL and filters. */
 export type RoutineFlowRoutineInfo = Omit<EventRoutine, "owner"> & { agentId: string };
 
 export interface RoutineFlowRoutine {
   routine: RoutineFlowRoutineInfo;
-  /** Newest first. */
   recentRuns: RoutineRun[];
-  /** The times it fires in the next seven days, soonest first. Empty while it is paused. */
   upcomingRuns: string[];
-  /** The steps of its newest run. */
   steps: RoutineFlowStep[];
 }
 
-/**
- * One agent's canvas: every routine that starts it or passes work through it, the links of those
- * routines, where the nodes sit, and the agents placed on it before any link reaches them.
- */
 export interface RoutineFlowCanvas {
   agentId: string;
   routines: RoutineFlowRoutine[];
@@ -70,7 +53,6 @@ export interface RoutineFlowCanvas {
 }
 
 export interface SaveRoutineFlowPositionInput {
-  /** The agent whose canvas it is. */
   agentId: string;
   nodeKey: string;
   x: number;
@@ -93,13 +75,16 @@ export interface DisconnectRoutineFlowInput {
   linkId: string;
 }
 
-/** A new instruction for one link: what the next agent is asked to do with the answer. May be empty. */
 export interface UpdateRoutineFlowLinkInput {
   linkId: string;
   instruction: string;
 }
 
-/** The largest coordinate a node may take; far beyond any canvas a person would build. */
+export interface StopRoutineFlowRunInput {
+  routineId: string;
+  runId: string;
+}
+
 export const ROUTINE_FLOW_MAX_COORDINATE = 1_000_000;
 
 export function routineFlowAgentKey(agentId: string): string {
@@ -225,6 +210,10 @@ export function isConnectRoutineFlowInput(value: unknown): value is ConnectRouti
 
 export function isDisconnectRoutineFlowInput(value: unknown): value is DisconnectRoutineFlowInput {
   return isDynamicRecord(value) && isIdentifier(value.linkId);
+}
+
+export function isStopRoutineFlowRunInput(value: unknown): value is StopRoutineFlowRunInput {
+  return isDynamicRecord(value) && isIdentifier(value.routineId) && isIdentifier(value.runId);
 }
 
 export function isUpdateRoutineFlowLinkInput(value: unknown): value is UpdateRoutineFlowLinkInput {

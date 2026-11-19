@@ -1,7 +1,3 @@
-/* The theme change sweep (`theme-sweep.ts`). The old theme stays whole under the new one. The new one
-   shows inside an ellipse at the bottom middle of the window, or at the top middle for a change
-   from dark to light. The script's SVG filter makes a ripple
-   at the front. The script grows the ellipse, so no picture animates. */
 .theme-sweep-canvas {
   position: fixed;
   inset: 0;
@@ -11,7 +7,6 @@
   view-transition-name: theme-sweep;
 }
 
-/* The ring from `beam`. It is not part of a view transition, so it stays above the live interface. */
 .theme-sweep-beam {
   position: fixed;
   inset: 0;

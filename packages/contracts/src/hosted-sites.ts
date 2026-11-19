@@ -1,10 +1,6 @@
 import type { HostedSiteList, HostedSiteStatus, HostedSiteSummary } from "./ipc-hosted-sites";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * The upload rules that the desktop checks before an upload and the account server enforces.
- * Released desktop builds send uploads that these rules accept, so the server must keep accepting them.
- */
 export const HOSTED_SITE_UPLOAD_LIMITS = {
   files: 20,
   totalBytes: 2 * 1024 * 1024,
@@ -13,46 +9,24 @@ export const HOSTED_SITE_UPLOAD_LIMITS = {
   uploadLifetimeMs: 15 * 60_000,
 } as const;
 
-/**
- * The number of active sites that one account can keep with no proven server: a desktop that is not a
- * registered server, or a desktop release from before sites belonged to servers. A server's own limit
- * comes from its plan (`siteLimitForPlan`), or from a custom limit in the account server. A server with
- * neither shares the account's pool (`HOSTED_SITE_SHARED_FREE_LIMIT`, or the license sites).
- */
 export const HOSTED_SITE_UNLINKED_LIMIT = 1;
 
-/**
- * The active sites that all servers of an account with no plan share when the account has no entitled
- * license. A license gives `LICENSE_SITES_PER_USER` for each user instead.
- */
 export const HOSTED_SITE_SHARED_FREE_LIMIT = 1;
 
-/**
- * The most active sites of one account on all servers and the unlinked bucket, so that many paid servers
- * cannot hold sites without bound. Sites on a server with a custom limit do not count.
- */
 export const HOSTED_SITE_ACCOUNT_LIMIT = 300;
 
-/**
- * Why other sites can take the slots of a list: `shared` when the server shares the pool of the servers
- * with no plan, `account` when the account has `HOSTED_SITE_ACCOUNT_LIMIT` active sites. The account server
- * sends `limitReason` in a site list only for these cases; an older one never sends it.
- */
 const HOSTED_SITE_LIMIT_REASONS = ["shared", "account"] as const;
 export type HostedSiteLimitReason = (typeof HOSTED_SITE_LIMIT_REASONS)[number];
 
-/** The `limitReason` of a site list response, or null when the account server sends none. */
 export function parseHostedSiteLimitReason(value: unknown): HostedSiteLimitReason | null {
   if (!isDynamicRecord(value)) return null;
   const reason = value.limitReason;
   return isOneOf(HOSTED_SITE_LIMIT_REASONS, reason) ? reason : null;
 }
 
-/** The request headers that tie a site request to a registered server: its host id and machine token. */
 export const HOSTED_SITE_HOST_ID_HEADER = "OpenBot-Host-Id";
 export const HOSTED_SITE_HOST_TOKEN_HEADER = "OpenBot-Host-Token";
 
-/** The MIME types allowed for each file extension. The desktop sends the first one. */
 export const HOSTED_SITE_MIME_TYPES: Readonly<Record<string, readonly [string, ...string[]]>> = {
   html: ["text/html"],
   css: ["text/css"],
@@ -76,7 +50,6 @@ const UNSAFE_SEGMENTS = new Set([".env", ".git", "node_modules", "server", "api"
 const UNSAFE_FILE_NAME = /(?:^|[-_.])(?:credentials?|private[-_]?key|secret|service[-_]?account)(?:[-_.]|$)/iu;
 const SERVER_SOURCE_NAME = /^(?:server|worker)\.[cm]?[jt]s$/iu;
 
-/** Normalizes a site file path, or names the first rule that the path breaks. */
 export function checkHostedSitePath(value: string): { path: string } | { problem: HostedSitePathProblem } {
   const path = value.replaceAll("\\", "/").replace(/^\.\//u, "");
   if (
@@ -101,7 +74,6 @@ export function isHostedSiteStatus(value: unknown): value is HostedSiteStatus {
   return value === "active" || value === "deleted" || value === "expired" || value === "blocked";
 }
 
-/** Returns null for a value that is not a site summary in the desktop shape. */
 export function parseHostedSiteSummary(value: unknown): HostedSiteSummary | null {
   if (
     !isDynamicRecord(value) ||
@@ -132,12 +104,10 @@ export function parseHostedSiteSummary(value: unknown): HostedSiteSummary | null
     size: value.size,
     expiresAt: value.expiresAt,
     updatedAt: value.updatedAt,
-    // An account server from before sites belonged to servers does not send the field.
     serverId: isString(value.serverId) ? value.serverId : null,
   };
 }
 
-/** Returns null for a value that is not a site list. An older account server sends no `used` count. */
 export function parseHostedSiteList(value: unknown): HostedSiteList | null {
   if (!isDynamicRecord(value) || !Array.isArray(value.sites) || !isNumber(value.limit)) return null;
   const sites: HostedSiteSummary[] = [];
@@ -156,7 +126,6 @@ export interface HostedSiteRouteFile {
   mimeType: string;
 }
 
-/** The route object that the account server writes to R2 and the site router reads. Stored objects use version 1. */
 export interface HostedSiteRouteManifest {
   version: 1;
   status: HostedSiteStatus;
@@ -179,7 +148,6 @@ export function hostedSiteBlockKey(hostname: string): string {
   return `blocks/${hostname}`;
 }
 
-/** Returns null for a route object that is malformed or points outside its own deployment. */
 export function decodeHostedSiteRouteManifest(value: unknown): HostedSiteRouteManifest | null {
   if (
     !isDynamicRecord(value) ||

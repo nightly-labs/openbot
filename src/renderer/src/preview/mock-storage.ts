@@ -17,15 +17,13 @@ import {
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
 
-/** The Files fixtures as one server's storage, so a delete or clear in the preview shows at once. */
-export function createMockStorage(): StorageDesktopApi {
+export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
   let files = structuredClone(FILES_ROWS);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
   let libraryFolders = structuredClone(EMPTY_LIBRARY_FOLDERS);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
-    // The fixtures hold no channel messages, so a channel has no files here.
     const inScope = (agentId: string | null, conversationId: string | null) =>
       input.scope === "host" ||
       (input.scope === "agent" && agentId === input.agentId) ||
@@ -50,7 +48,6 @@ export function createMockStorage(): StorageDesktopApi {
   return {
     getUsage: async (input) => usage(input),
     getDisk: async () => ({ freeBytes: FREE_BYTES, totalBytes: 994 * GB }),
-    // The disk matches `getDisk`; memory and CPU are those of a busy 16 GB, 10-core machine.
     getMachineMetrics: async () => ({
       diskUsedBytes: 812 * GB,
       diskFreeBytes: FREE_BYTES,
@@ -75,10 +72,10 @@ export function createMockStorage(): StorageDesktopApi {
     getLibraryFolders: async () => structuredClone(libraryFolders),
     changeLibraryFolders: async (action) => {
       libraryFolders = applyLibraryFolderAction(libraryFolders, action, {
-        // The preview has no fixed list of agents: each agent can have folders.
         agentIds: { has: () => true },
         fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
       });
+      onFoldersChanged();
       return structuredClone(libraryFolders);
     },
     getRemovableRuntimes: async () => structuredClone(removableRuntimes),

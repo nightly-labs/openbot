@@ -1,17 +1,12 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 
-/** Another tab of this browser has the host open. The host itself can be online. */
 export class WebHostOtherTabError extends Error {
   constructor() {
     super(currentText().t("webClient.error.otherTab"));
   }
 }
 
-/**
- * A logical host session belongs to one account credential. Prevent tabs from replacing each other's peer.
- * With `wait`, the request queues until the lock is free or the signal aborts.
- */
 export async function acquireWebHostLock(
   accountId: string,
   hostId: string,
@@ -37,14 +32,8 @@ export async function acquireWebHostLock(
   });
 }
 
-/** The connection state that a tab reports for a host it holds. "unknown" before the first result. */
 export type WebHostState = "unknown" | "connecting" | "online" | "offline" | "error" | "incompatible";
 
-/**
- * The messages between the tabs of one account. A tab that opens a host asks the tab that holds it
- * for a status connection to let it go; a tab that has the host open answers `busy`. With `take`, the
- * user moves the host to the tab that asks, so every tab lets it go. A tab of an older build ignores `take`.
- */
 export type WebHostTabMessage =
   | { type: "release"; hostId: string; requestId: string }
   | { type: "take"; hostId: string; requestId: string }
@@ -76,22 +65,15 @@ export function decodeWebHostTabMessage(value: unknown): WebHostTabMessage | nul
   return null;
 }
 
-/** Null where the browser has no BroadcastChannel. Then no tab keeps status connections. */
 export function openWebHostChannel(accountId: string): BroadcastChannel | null {
   return typeof BroadcastChannel === "function" ? new BroadcastChannel(`openbot.web.hosts:${accountId}`) : null;
 }
 
-/**
- * The lock of a host this tab opens. When another tab holds it, asks that tab to let its status
- * connection go and waits for the lock. A tab that has the host open refuses at once, unless `takeOver`
- * asks it to close the host.
- */
 export async function acquireOpenedWebHostLock(
   accountId: string,
   hostId: string,
   channel: BroadcastChannel | null,
   acquire: typeof acquireWebHostLock = acquireWebHostLock,
-  // The other tab ends its session before it gives up the lock, which is a request to the account service.
   timeoutMs = 15_000,
   takeOver = false,
 ): Promise<() => void> {
