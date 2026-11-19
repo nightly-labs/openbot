@@ -76,3 +76,25 @@ export const FinishFails: Story = {
     }),
   },
 };
+
+const ACCOUNT_SERVERS: NonNullable<FirstRunFlowProps["existingServers"]> = [
+  { id: "host-7f3a91c2", name: "MacBook-Pro", state: "online", logoUrl: null },
+  { id: "host-0b6d44e8", name: "MacBook-Air", state: "offline", logoUrl: null },
+  { id: "host-52c9e0aa", name: "Research server on a Hetzner VPS in Falkenstein", state: "connecting", logoUrl: null },
+];
+
+export const ExistingServers: Story = {
+  args: {
+    existingServers: ACCOUNT_SERVERS,
+    onOpenServer: fn(async () => new Promise<boolean>(() => undefined)),
+  },
+};
+
+export const ExistingServerOpenFails: Story = {
+  args: {
+    existingServers: ACCOUNT_SERVERS,
+    onOpenServer: fn(async () => {
+      throw new Error("The server did not answer.");
+    }),
+  },
+};

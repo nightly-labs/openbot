@@ -584,6 +584,7 @@
 }
 
 ::view-transition-group(first-run-step),
+::view-transition-group(first-run-team),
 ::view-transition-group(first-run-progress),
 ::view-transition-group(first-run-actions) {
   animation-duration: 440ms;
@@ -699,6 +700,7 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   justify-content: center;
   gap: var(--openbot-space-3);
   margin-bottom: 40px;
+  view-transition-name: first-run-team;
 }
 
 .first-run-choice-avatar {
@@ -824,6 +826,27 @@ html:active-view-transition-type(open)::view-transition-new(*) {
   height: 16px;
   overflow: visible;
   fill: var(--openbot-provider-current);
+}
+
+.first-run-existing-mark {
+  --server-plush-logo-size: 32px;
+  flex: none;
+  display: flex;
+}
+
+.first-run-existing-mark .server-rail-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--openbot-radius-md);
+}
+
+.first-run-choice-rows.first-run-existing-servers {
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.first-run-choice-rows + .first-run-existing-new {
+  margin-top: var(--openbot-space-3);
 }
 
 .first-run-choice-row-chevron {

@@ -11,6 +11,7 @@ import { SetupReadError } from "./features/onboarding/SetupReadError";
 import { useSetupProviderProps } from "./features/onboarding/setup-provider-props";
 import { useServerScope } from "./features/servers/server-scope";
 import { useServerSelection } from "./features/servers/server-selection";
+import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
@@ -42,7 +43,11 @@ export function AppAccessGate() {
   const setupProviders = useSetupProviderProps();
   const detection = useProviderDetection();
   const settings = useSettings();
-  const { joinRemoteDuringSetup } = useServerSelection();
+  const { joinRemoteDuringSetup, openServerDuringSetup } = useServerSelection();
+  const { servers } = useServers();
+  const accountServers = createMemo(() =>
+    servers().filter((server) => server.kind === "remote" && server.thisComputer !== true),
+  );
   const updates = useUpdates();
   const [requiredUpdateDismissed, setRequiredUpdateDismissed] = createSignal(false);
   const updateRequired = () => updates.status().requiredVersion !== undefined && !requiredUpdateDismissed();
@@ -149,6 +154,8 @@ export function AppAccessGate() {
                             }
                             onProviderStepShown={detection.scanOnce}
                             logoVariant={platform.appInfo()?.variant ?? "production"}
+                            existingServers={accountServers()}
+                            onOpenServer={openServerDuringSetup}
                           />
                         </Loading>
                       }
