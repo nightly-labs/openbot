@@ -252,7 +252,7 @@ function MenuItem(props: {
       class={props.danger ? "ui-action-menu-danger" : ""}
       onFocus={() => props.onAim?.(true)}
       onBlur={() => props.onAim?.(false)}
-      onSelect={props.onSelect}
+      onSelect={() => props.onSelect?.()}
       onSelectAfterClose={props.onSelectAfterClose}
     >
       <span class="wfn-menu-glyph" aria-hidden="true">
