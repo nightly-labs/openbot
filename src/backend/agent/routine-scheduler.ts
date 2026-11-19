@@ -101,6 +101,7 @@ export interface RoutineHooks {
 const logger = createOpenBotLogger("routine-scheduler");
 
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
+const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was not running at the scheduled time.";
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -1176,12 +1177,16 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   #lastRun(agentId: string, routineId: string) {
-    const run = this.#routines.listRuns(agentId, routineId, 1)[0];
+    const run = this.#routines.listRuns(agentId, routineId, 1, true)[0];
     if (!run) return null;
+    const reason = run.error ? redactText(run.error) : run.missed ? SKIPPED_WHILE_CLOSED : null;
     return {
       status: run.status,
       at: run.updatedAt,
-      ...(run.error ? { reason: redactText(run.error) } : {}),
+      ...(run.missed
+        ? { skipped: { scheduledFor: run.scheduledFor, until: run.missed.until, count: run.missed.count } }
+        : {}),
+      ...(reason ? { reason } : {}),
     };
   }
 
