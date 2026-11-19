@@ -65,6 +65,7 @@ export function AgentActivityIndicator(props: {
   stepsOpenByDefault?: boolean | undefined;
   waitingFor?: string | null | undefined;
   plain?: boolean | undefined;
+  outputShown?: boolean | undefined;
   activity?: AgentStepActivity | null | undefined;
 }) {
   const { t, format } = useText();
@@ -80,6 +81,7 @@ export function AgentActivityIndicator(props: {
     return detail() ?? t(agentActivityLabelKey(props.label));
   };
   const plainGeneralLabel = () => props.plain && !props.waitingFor && !detail();
+  const shownLabel = () => (plainGeneralLabel() && props.outputShown ? null : label());
   const statusLabel = () => {
     const name = props.agent?.name ?? t("chat.activity.agentFallback");
     const provider = props.waitingFor;
@@ -120,7 +122,7 @@ export function AgentActivityIndicator(props: {
         <Show
           when={plain()}
           fallback={
-            <Show when={label()}>
+            <Show when={shownLabel()}>
               {(text) => (
                 <span class="agent-activity-label">
                   {text()}
@@ -130,7 +132,7 @@ export function AgentActivityIndicator(props: {
             </Show>
           }
         >
-          <Show when={label()} keyed>
+          <Show when={shownLabel()} keyed>
             {(text) => (
               <span class="agent-activity-label">
                 {text}

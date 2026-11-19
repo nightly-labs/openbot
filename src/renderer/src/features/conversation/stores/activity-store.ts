@@ -40,7 +40,7 @@ export interface TurnRuntime {
 
 export interface ActivityStoreDeps {
   props: ConversationProps;
-  activeDeliveries: () => Array<{ id: string }>;
+  activeDeliveries: () => Array<{ id: string; turnId?: string | null }>;
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
 }
@@ -76,6 +76,13 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     const current = untrack(renderedAgentActivity);
     if (current?.agent?.id === agentId) return current.activityId;
     return `${agentId}:message:${streamingMessage.id}`;
+  });
+  const activeTurnOutputShown = createMemo<boolean>((previous) => {
+    if (!activeActivityId()) return previous ?? false;
+    if (streamingAgentMessage()) return true;
+    const turnId = deps.props.activeTurnId ?? deps.activeDeliveries()[0]?.turnId;
+    if (!turnId) return false;
+    return deps.props.messages.some((message) => message.author === "agent" && message.turnId === turnId);
   });
   const latestActiveCommentary = createMemo(() => {
     const activeTurnId = deps.props.activeTurnId;
@@ -308,6 +315,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     activeActivityId,
     activeActivityDetail,
     activeStepActivity,
+    activeTurnOutputShown,
     agentActivity,
     activityLabel,
     runningTurnRuntime,
