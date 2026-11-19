@@ -31,6 +31,8 @@ export const messages = {
     "1Password otrzymał zbyt wiele żądań. Poczekaj kilka minut i spróbuj ponownie.",
   "error.connector.onePasswordNoVault":
     "Konto usługi nie może odczytać żadnego sejfu. Daj mu dostęp do sejfu i spróbuj ponownie.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot nie może odczytać Twoich danych logowania w 1Password. Odłącz 1Password, a potem połącz go ponownie.",
   "error.connector.onePasswordFileUnreadable": "Nie można odczytać pliku połączenia z 1Password.",
   "error.connector.onePasswordFileTooLarge": "Plik połączenia z 1Password jest za duży.",
   "error.connector.bitwardenFailed":
