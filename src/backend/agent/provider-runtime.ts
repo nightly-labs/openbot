@@ -804,8 +804,17 @@ export class ProviderRuntime implements ProviderPort {
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
           // Read as the own sign-in's catalogue is. An account process never gets the saved key.
-          readModels: (client) =>
-            this.#modelCatalog.read(client, requireProviderDriver(client.provider).catalog).pipe(
+          // A new Codex process lists its models only after it fetched them, so a list that timed out
+          // is read once more with the full request timeout, as `#relistModels` does for the own
+          // sign-in (#12627). Without it, the account kept no models until its next check.
+          readModels: (client) => {
+            const catalog = requireProviderDriver(client.provider).catalog;
+            return this.#modelCatalog.read(client, catalog).pipe(
+              Effect.catch((failure) =>
+                isProviderTimeout(failure.cause) && !catalog?.slowList
+                  ? this.#modelCatalog.read(client, catalog, this.#requestTimeoutMs)
+                  : Effect.fail(failure),
+              ),
               Effect.map(({ models }) => models),
               Effect.catch((failure) =>
                 Effect.sync(() => {
@@ -816,7 +825,8 @@ export class ProviderRuntime implements ProviderPort {
                   return null;
                 }),
               ),
-            ),
+            );
+          },
           resetCredits: (client) => this.#resetCredits.get(client),
           consumeUsageReset: (client) =>
             this.#consumeUsageReset(client).pipe(
