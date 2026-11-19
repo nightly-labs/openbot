@@ -579,7 +579,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           // With push to talk, the user ends the turn when they let go.
           if (current.spoke && quietFor >= TURN_END_SILENCE_MS && !pushToTalk) endTurn(current);
         }
-        if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
+        // With push to talk, the hold lasts until the user lets go: the end of the turn decides.
+        if (held && !pushToTalk && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);
       }, LEVEL_INTERVAL_MS),
     );
@@ -836,11 +837,18 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (push !== muted) applyMute(push);
   }
 
-  /** Push to talk: the user presses. A reply that plays stops, and the microphone opens. */
+  /**
+   * Push to talk: the user presses, and the microphone opens. The reply waits, paused, as when the user
+   * speaks over it with the open microphone: words or a short press stop it, and a cancel lets it go on.
+   */
   function startTalking(): void {
     if (!pushToTalk || talking) return;
     setTalking(true);
-    if (step === "waiting") interrupt();
+    // While a turn is sent, there is no reply to hold yet: the press stops the wait, as before.
+    if (step === "waiting") {
+      if (sending === 0) holdReply();
+      else interrupt();
+    }
     if (muted) applyMute(false);
   }
 
@@ -862,7 +870,27 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       releaseTurn();
       return;
     }
+    // A short press stops the reply, as the stop button does.
+    if (held) {
+      desktopAnalytics.track("voice_conversation_action", {
+        action: "interrupt",
+        server_kind: serverKind,
+        result: "succeeded",
+        trigger: "button",
+      });
+      dropReply();
+    }
     applyMute(true);
+  }
+
+  /**
+   * Push to talk: the user pressed another key with the talk key, for a shortcut. The microphone closes,
+   * nothing is sent, and a reply that waits goes on.
+   */
+  function cancelTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    if (!muted) applyMute(true);
   }
 
   function applyMute(next: boolean): void {
@@ -955,6 +983,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     setTalkMode,
     startTalking,
     stopTalking,
+    cancelTalking,
     interrupt,
   };
 }

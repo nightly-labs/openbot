@@ -676,6 +676,13 @@ export const messages = {
   "settings.voice.speech.sample": "你好，你的回复听起来就是这样。",
   "settings.voice.speech.listenFailed": "无法播放示例。",
   "settings.voice.live.section": "实时语音",
+  "settings.voice.talk.section": "语音对话",
+  "settings.voice.talkKey.title": "按键说话快捷键",
+  "settings.voice.talkKey.description": "在语音对话中按住这些键即可说话。",
+  "settings.voice.talkKey.change": "更改按键说话快捷键",
+  "settings.voice.talkKey.recording": "请按下按键",
+  "settings.voice.talkKey.refused": "再加一个键",
+  "settings.voice.talkKey.reset": "重置",
   "settings.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
   // No value may end with the word "import": the CommonJS shim of electron-vite reads `import"` in the
   // main bundle as an import statement and inserts its code inside the string.

@@ -30,6 +30,7 @@ import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfil
 import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
+import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
@@ -40,6 +41,7 @@ import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-s
 import { webReportsEnabled } from "../../error-reports";
 import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
+import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
@@ -104,6 +106,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const compactMessageActions = useCompactMessageActions();
   const bubbleStyle = useChatBubbleStyle();
   const webLiveVoice = useWebLiveVoice();
+  const talkKey = useVoiceTalkKey();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
@@ -293,6 +296,19 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                     onChange={setChatBubbleStyle}
                     {...(modalElement ? { mount: modalElement } : {})}
                   />
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
+          <SettingsSection title={t("settings.voice.talk.section")}>
+            <ItemGroup class="settings-modal-card">
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.voice.talkKey.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.voice.talkKey.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <TalkKeyRecorder binding={talkKey()} onChange={(key) => setVoiceTalkKey(key, talkKey().platform)} />
                 </ItemActions>
               </Item>
             </ItemGroup>

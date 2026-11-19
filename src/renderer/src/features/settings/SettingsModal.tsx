@@ -368,6 +368,7 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
             codexLiveAccess={props.codexLiveAccess}
             onConnectCodex={props.onConnectCodex}
+            platform={props.appInfo?.platform}
           />
         </Tabs.Content>
 

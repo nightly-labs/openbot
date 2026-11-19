@@ -701,6 +701,13 @@ export const messages = {
   "settings.voice.speech.sample": "Olá. É assim que suas respostas vão soar.",
   "settings.voice.speech.listenFailed": "Não foi possível reproduzir a amostra.",
   "settings.voice.live.section": "Voz ao vivo",
+  "settings.voice.talk.section": "Conversa por voz",
+  "settings.voice.talkKey.title": "Tecla para falar",
+  "settings.voice.talkKey.description": "Mantenha estas teclas pressionadas para falar em uma conversa por voz.",
+  "settings.voice.talkKey.change": "Alterar a tecla para falar",
+  "settings.voice.talkKey.recording": "Pressione as teclas",
+  "settings.voice.talkKey.refused": "Adicione mais uma tecla",
+  "settings.voice.talkKey.reset": "Restaurar",
   "settings.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
   "settings.transfer.title": "Mover este servidor para outro computador",
   "settings.transfer.lede":

@@ -43,6 +43,7 @@ import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import type { RoutineResultsCalls } from "./routines-port";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
+import { useVoiceTalkKey } from "./voice-talk-key";
 import { setVoiceTalkMode, useVoiceTalkMode } from "./voice-talk-mode";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
@@ -120,6 +121,7 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
   // The saved way to talk, push to talk by default, reaches a conversation that runs already too.
   const talkMode = useVoiceTalkMode();
   createEffect(talkMode, (mode) => conversation.setTalkMode(mode));
+  const talkKey = useVoiceTalkKey(() => props.platform);
   // Codex live voice speaks at the speed of the realtime model, so it has no speed button.
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
@@ -136,9 +138,11 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           onToggleMute={conversation.toggleMute}
           talkMode={talkMode()}
           onTalkModeChange={setVoiceTalkMode}
+          talkKey={talkKey()}
           talking={conversation.talking()}
           onTalkStart={conversation.startTalking}
           onTalkEnd={conversation.stopTalking}
+          onTalkCancel={conversation.cancelTalking}
           onInterrupt={conversation.interrupt}
           onEnd={endVoiceConversation}
           speed={replySpeed()}

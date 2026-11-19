@@ -294,6 +294,11 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (!muted) applyMute(true);
   }
 
+  /** Push to talk: the user pressed another key with the talk key. Live voice hears the voice as it comes, so only the microphone closes. */
+  function cancelTalking(): void {
+    stopTalking();
+  }
+
   function setTalking(next: boolean): void {
     talking = next;
     setState((draft) => {
@@ -349,6 +354,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     setTalkMode,
     startTalking,
     stopTalking,
+    cancelTalking,
     interrupt,
   };
 }

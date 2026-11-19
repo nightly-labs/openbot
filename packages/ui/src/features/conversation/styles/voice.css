@@ -198,6 +198,7 @@
   opacity: 0;
   pointer-events: auto;
   transform-origin: top center;
+  --voice-pill-push-share: clamp(0, var(--voice-pill-push, 0), 1);
 }
 
 /* The face is drawn low in its own box; the app lifts it by the same share. */
@@ -280,15 +281,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+.voice-pill-talk-slot {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 100%;
+  align-items: center;
+  justify-items: center;
+}
+
+.voice-pill-talk-slot > * {
+  grid-area: 1 / 1;
+}
+
+.voice-pill-wave {
+  display: flex;
+  opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2.5, 1);
+  filter: blur(calc(var(--voice-pill-push-share) * 4px));
+  scale: calc(1 - var(--voice-pill-push-share) * 0.2);
+}
+
 /*
  * Push to talk: a quiet pad that says how to talk. While the user holds it, it takes the accent with a
  * soft halo, as a recording does. The pad keeps its width, so the pill does not jump at a press.
  */
 .voice-pill .voice-pill-talk {
-  min-width: 196px;
-  flex: 0 0 auto;
+  min-width: 0;
+  justify-self: stretch;
   justify-content: center;
-  gap: var(--openbot-space-2);
+  overflow: hidden;
+  padding-inline: 0;
+  opacity: clamp(0, var(--voice-pill-push, 0) * 2.5 - 0.25, 1);
   border-radius: var(--openbot-radius-pill);
   background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
   box-shadow: none;
@@ -312,6 +334,19 @@
   color: var(--openbot-text-on-accent);
 }
 
+.voice-pill-talk-face {
+  display: flex;
+  min-width: 196px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-3);
+  opacity: clamp(0, (var(--voice-pill-push, 0) - 0.4) * 2, 1);
+  filter: blur(calc((1 - var(--voice-pill-push-share)) * 4px));
+  scale: calc(0.92 + var(--voice-pill-push-share) * 0.08);
+}
+
 .voice-pill-talk svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -328,6 +363,37 @@
   font-size: var(--openbot-text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.voice-pill-talk-key {
+  --talk-key-icon-size: var(--openbot-icon-sm);
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--openbot-space-1);
+}
+
+/* The caps beside "Hold to talk" are one step larger than a shortcut hint, so the key reads at a glance. */
+.voice-pill-talk-key .ui-kbd {
+  min-width: var(--openbot-control-xs);
+  height: var(--openbot-control-xs);
+  font-size: var(--openbot-text-md);
+}
+
+/* A macOS modifier cap: the icon sits in the middle of the cap, where the ⌃ character would sit high. */
+.talk-key-symbol svg {
+  width: var(--talk-key-icon-size, var(--openbot-icon-xs));
+  height: var(--talk-key-icon-size, var(--openbot-icon-xs));
+}
+
+.voice-pill-mute {
+  display: flex;
+  width: calc(var(--openbot-control-md) * (1 - var(--voice-pill-push-share)));
+  flex: 0 0 auto;
+  justify-content: center;
+  margin-inline-start: calc(var(--openbot-space-2) * -1 * var(--voice-pill-push-share));
+  overflow: hidden;
+  opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2, 1);
+  scale: calc(1 - var(--voice-pill-push-share) * 0.4);
 }
 
 /* The open microphone or push to talk: two round icons, with the pill under the one in use. */

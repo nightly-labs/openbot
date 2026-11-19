@@ -1,5 +1,6 @@
 import { nextSpeechSpeed } from "@openbot/contracts/ipc";
 import { Button } from "@openbot/ui";
+import { defaultTalkKey } from "@openbot/ui/features/conversation/talk-key";
 import { VoicePill } from "@openbot/ui/features/conversation/VoicePill";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Show, untrack } from "solid-js";
@@ -28,6 +29,8 @@ const meta = {
     talking: false,
     onTalkStart: fn(),
     onTalkEnd: fn(),
+    onTalkCancel: fn(),
+    talkKey: { key: defaultTalkKey("darwin"), platform: "darwin" },
     onInterrupt: fn(),
     onEnd: fn(),
     speed: 1,
@@ -87,6 +90,10 @@ const meta = {
               setTalking(false);
               args.onTalkEnd();
             }}
+            onTalkCancel={() => {
+              setTalking(false);
+              args.onTalkCancel();
+            }}
             speed={speed()}
             onCycleSpeed={
               args.onCycleSpeed
@@ -112,8 +119,21 @@ export const Starting: Story = { args: { phase: "starting" } };
 /** Push to talk, the default: the pad says how to talk, and the microphone is off until a press. */
 export const PushToTalk: Story = { args: { muted: true } };
 
-/** The user holds the pad or Space: it takes the accent and shows the voice. */
+/** The user holds the pad or the talk key: it takes the accent and shows the voice. */
 export const Talking: Story = { args: { talking: true, levels: SPEECH } };
+
+/** Windows and Linux show the key names; the default there is Ctrl and the Windows key. */
+export const PushToTalkWindows: Story = {
+  args: { muted: true, talkKey: { key: defaultTalkKey("win32"), platform: "win32" } },
+};
+
+/** A chosen key with a letter shows the letter of the user's keyboard layout. */
+export const PushToTalkCustomKey: Story = {
+  args: {
+    muted: true,
+    talkKey: { key: { ctrl: false, alt: true, shift: false, meta: false, code: "KeyQ" }, platform: "darwin" },
+  },
+};
 
 export const Listening: Story = { args: { talkMode: "open" } };
 
