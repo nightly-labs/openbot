@@ -15,7 +15,7 @@ function MenuMark(props: { on: boolean }) {
 export function ModelChoiceMenu<T extends string>(props: {
   label: string;
   empty: string;
-  none?: string;
+  none?: string | undefined;
   noneChosen?: boolean;
   onNone?: (on: boolean) => void;
   choices: readonly T[];
