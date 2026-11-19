@@ -44,6 +44,7 @@ export interface BrowserFullViewProps {
   canCloseTabs?: boolean;
   canEnterPip?: boolean;
   onBack: () => void;
+  onCompleteStep?: (() => Promise<unknown>) | undefined;
   onEnterPip: () => void;
   onSignInLocally?: ((tabId: string) => void) | undefined;
   macWindowControls?: boolean;
