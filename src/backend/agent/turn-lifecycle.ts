@@ -1837,6 +1837,7 @@ export class TurnLifecycle {
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
+      const tokenRefused = failover !== undefined && isRefusedGeminiToken(failover.context.provider, failover.message);
       const stoppedAfterWork = failedOnProvider && this.#carriesWork(agentId, turnId, running);
       const spentAfterWork = stoppedAfterWork && failover.context.causeCode === "usage_limit";
       const failedAfterWork = stoppedAfterWork && CONTINUE_CAUSES.has(failover.context.causeCode);
@@ -1935,7 +1936,7 @@ export class TurnLifecycle {
         backupTakes();
       const mayRunHere =
         !failedOver &&
-        mayRunAgain &&
+        (mayRunAgain || (failedOnProvider && tokenRefused)) &&
         failedKey !== null &&
         deliveries.length > 0 &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey));
@@ -1951,7 +1952,7 @@ export class TurnLifecycle {
         channelRunsAgain ||
         (mayRunHere &&
           this.#conversation.channelForThread(snapshot.threadId) === null &&
-          (isRefusedGeminiToken(failover.context.provider, failover.message) ||
+          (tokenRefused ||
             (failover.context.causeCode === "empty_answer" &&
               deliveries.every(
                 ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
@@ -2048,7 +2049,7 @@ export class TurnLifecycle {
           turnId,
           snapshot,
           deliveries,
-          failedOver && mayContinue ? yield* continuedWork : undefined,
+          (failedOver && mayContinue) || (runsAgainHere && !mayRunAgain) ? yield* continuedWork : undefined,
           running?.failureReports,
         );
         if (failedOver || (channelRunsAgain && backupTakes())) this.#markFailed(agentId, model, failover);
@@ -2220,7 +2221,9 @@ export class TurnLifecycle {
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
           const temporary =
-            !refused && !limited && failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause);
+            !refused &&
+            !limited &&
+            (tokenRefused || (failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause)));
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
         }
         for (const { delivery } of deliveries) {
