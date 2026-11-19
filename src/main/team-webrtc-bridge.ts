@@ -7,7 +7,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
+import { BrowserWindow, MessageChannelMain, type MessagePortMain, webContents } from "electron";
 import { z } from "zod";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
@@ -115,7 +115,8 @@ type BridgeCommand =
         | "renew-host-signal"
         | "close"
         | "open-egress"
-        | "close-egress";
+        | "close-egress"
+        | "ping";
       peerId: string;
     }
   | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
@@ -123,6 +124,8 @@ type BridgeCommand =
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
+const LIVENESS_INTERVAL_MS = 30_000;
+const LIVENESS_MISSES = 2;
 
 const logger = createOpenBotLogger("team-webrtc-bridge");
 
@@ -341,6 +344,39 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         Exit.isFailure(exit) ? remoteDecode(() => port1.off("message", listener)).pipe(Effect.orDie) : Effect.void,
       ),
     );
+    yield* Effect.forkIn(this.#watch(window, port1).pipe(Effect.ignore), this.#scope);
+  });
+
+  readonly #watch = Effect.fn("TeamWebRtcBridge.watch")(function* (
+    this: TeamWebRtcBridge,
+    window: BrowserWindow,
+    port: MessagePortMain,
+  ) {
+    let misses = 0;
+    while (misses < LIVENESS_MISSES) {
+      yield* Effect.sleep(LIVENESS_INTERVAL_MS);
+      if (this.#port !== port) return;
+      const answered = yield* this.#command({ type: "ping", peerId: "all" }).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (this.#port !== port) return;
+      misses = answered ? 0 : misses + 1;
+    }
+    const shared = yield* remoteDecode(() => {
+      const processId = window.webContents.getOSProcessId();
+      return webContents
+        .getAllWebContents()
+        .some((other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId);
+    });
+    if (shared) {
+      logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
+      return;
+    }
+    logger.warn(
+      `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
+    );
+    yield* remoteDecode(() => window.webContents.forcefullyCrashRenderer());
   });
 
   readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
