@@ -534,7 +534,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
   const making = () => run.running();
-  const generated = () => !making() && Boolean(shownPicture());
+  const pictureLoading = () =>
+    shownValue() !== undefined && shownPicture() === undefined && Boolean(board.catalogs().media);
+  const generated = () => !making() && (Boolean(shownPicture()) || pictureLoading());
   const panelShown = () => generated() || !collapsed();
   const specsDisabled = () => locked() || making();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
