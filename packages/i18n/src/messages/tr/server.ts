@@ -230,6 +230,22 @@ export const messages = {
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
   "server.settings.unavailable": "Bu sunucu kullanılamıyor.",
+  "server.settings.remoteAgentsTitle": "Bağlı sunucular",
+  "server.settings.remoteAgentsDescription":
+    "Bu sunucudaki aracılar, bağlı bir sunucudaki aracılara mesaj ve dosya gönderebilir.",
+  "server.settings.remoteAgentsCreate": "Bağlantı kodu oluştur",
+  "server.settings.remoteAgentsPaste": "Kodu kullan",
+  "server.settings.remoteAgentsRevoke": "Kaldır",
+  "server.settings.remoteAgentsExpires": "{date} tarihinde sona erer",
+  "server.settings.remoteAgentsEmpty": "Bağlı sunucu yok.",
+  "server.settings.remoteAgentsCode": "Bağlantı kodu",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Ağlar arası bağlantı",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Bu bilgisayarda Tailscale kullanın. OpenBot tailnette yalnızca bağlı sunucu yollarını açar ve bu adresi bağlantı kodlarına yazar.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Ağlar arası bağlantıyı hazırla",
+  "server.settings.remoteAgentsCrossNetworkReady": "Başka ağ için hazır",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale açık; hazırlık yok",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale bağlı değil",
   "server.settings.identityRefreshFailed": "Sunucu kimliği yenilenemedi.",
   "server.settings.loadFailed": "Sunucu ayarları yüklenemedi.",
   "server.settings.identityLocalOnly":

@@ -38,7 +38,8 @@ export interface QueueDelivery {
   sender:
     | { kind: "user" }
     | { kind: "agent"; agentId: string }
-    | { kind: "routine"; routineId: string; runId: string; routineName: string; scheduledFor: string };
+    | { kind: "routine"; routineId: string; runId: string; routineName: string; scheduledFor: string }
+    | { kind: "remote-agent"; agentId: string; agentName: string; linkId: string; serverName: string };
   text: string;
   attachments: AttachmentSummary[];
   replyToMessageId: string | null;
@@ -102,6 +103,14 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
   if (!isDynamicRecord(value)) return false;
   if (value.kind === "user") return true;
   if (value.kind === "agent") return isIdentifier(value.agentId);
+  if (value.kind === "remote-agent") {
+    return (
+      isIdentifier(value.agentId) &&
+      isIdentifier(value.linkId) &&
+      isBoundedString(value.agentName, INPUT_LIMITS.agentName) &&
+      isBoundedString(value.serverName, INPUT_LIMITS.agentName)
+    );
+  }
   return (
     value.kind === "routine" &&
     isIdentifier(value.routineId) &&

@@ -225,6 +225,22 @@ export const messages = {
   "server.select.failedDescription": "サーバーを切り替えられませんでした。もう一度お試しください。",
   "server.select.openAgentFailed": "{name} を開けませんでした。サイドバーで探してください。",
   "server.settings.unavailable": "このサーバーは利用できません。",
+  "server.settings.remoteAgentsTitle": "リンク済みサーバー",
+  "server.settings.remoteAgentsDescription":
+    "このサーバーのエージェントは、リンク先サーバーのエージェントにメッセージとファイルを送れます。",
+  "server.settings.remoteAgentsCreate": "リンクコードを作成",
+  "server.settings.remoteAgentsPaste": "コードを入力",
+  "server.settings.remoteAgentsRevoke": "削除",
+  "server.settings.remoteAgentsExpires": "有効期限 {date}",
+  "server.settings.remoteAgentsEmpty": "リンク済みサーバーはありません。",
+  "server.settings.remoteAgentsCode": "リンクコード",
+  "server.settings.remoteAgentsCrossNetworkTitle": "ネットワーク間のリンク",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "このコンピューターで Tailscale を使います。OpenBot は tailnet 上でリンク済みサーバー用のルートだけを公開し、そのアドレスをリンクコードに入れます。",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "ネットワーク間リンクを準備",
+  "server.settings.remoteAgentsCrossNetworkReady": "別ネットワークの準備完了",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale はオン；準備未完了",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale は未接続",
   "server.settings.identityRefreshFailed": "サーバーの ID を更新できませんでした。",
   "server.settings.loadFailed": "サーバーの設定を読み込めませんでした。",
   "server.settings.identityLocalOnly":

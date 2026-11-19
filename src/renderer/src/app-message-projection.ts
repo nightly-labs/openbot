@@ -174,6 +174,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(message.questionPrompt === undefined ? {} : { questionPrompt: message.questionPrompt }),
     ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
     ...(message.exchange === undefined ? {} : { exchange: message.exchange }),
+    ...(message.remoteSender === undefined ? {} : { remoteSender: message.remoteSender }),
     ...(message.reaction === undefined ? {} : { reaction: message.reaction }),
     reactions:
       message.reactions ?? (message.reaction ? [{ emoji: message.reaction, actor: { kind: "user" as const } }] : []),

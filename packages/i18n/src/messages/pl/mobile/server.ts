@@ -499,6 +499,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "Import i przeniesienie",
   "mobile.server.settings.serverSection": "Serwer",
   "mobile.server.settings.timezone": "Strefa czasowa",
+  "mobile.server.settings.remoteAgents": "Połączone serwery",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Agenci tutaj mogą wysyłać wiadomości do agentów na połączonym serwerze.",
+  "mobile.server.settings.remoteAgentsCreate": "Utwórz kod połączenia",
+  "mobile.server.settings.remoteAgentsPaste": "Wykorzystaj kod",
+  "mobile.server.settings.remoteAgentsRevoke": "Usuń",
+  "mobile.server.settings.remoteAgentsExpires": "Wygasa {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "Brak połączonych serwerów.",
+  "mobile.server.settings.remoteAgentsCode": "Kod połączenia",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Przygotuj połączenie między sieciami",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Wykonaj to na hoście z Tailscale, zanim utworzysz kod dla innej sieci.",
   "mobile.server.settings.timezoneAutomatic": "Automatyczna",
   "mobile.server.settings.timezoneSystem": "Strefa serwera: {zone}",
   "mobile.server.settings.timezonePhone": "Ten telefon",

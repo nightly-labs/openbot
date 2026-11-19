@@ -174,6 +174,18 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "O estado da caixa de mensagens está corrompido ou é de uma versão mais recente do OpenBot; ele não será sobrescrito.",
   "error.backend.recipientDeleting": "O destinatário está sendo excluído. Tente novamente quando a exclusão terminar.",
+  "error.backend.remoteAgentBridgePeerDown": "O servidor ligado não respondeu. Tente novamente quando estiver ligado.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Este código de ligação expirou. Crie um novo.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Este código de ligação já não é válido.",
+  "error.backend.remoteAgentBridgeSameServer": "Um servidor não se pode ligar a si próprio.",
+  "error.backend.remoteAgentBridgeRevoked": "A ligação a este servidor foi removida.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Um ficheiro excede o limite de anexos. Nada foi enviado.",
+  "error.backend.remoteAgentBridgeUnsupported": "Atualize o OpenBot neste servidor para ligar outro servidor.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Instale o Tailscale neste computador, inicie sessão e tente de novo.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "O Tailscale não está ligado neste computador.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Não foi possível preparar o endereço de servidores ligados no Tailscale. Tente de novo.",
   "error.backend.recipientHidden": "Este agente está oculto. Restaure-o para enviar mensagens.",
   "error.backend.agentIdUnknown":
     "Nenhum agente tem o ID {id}. Obtenha os IDs com openbot.list_agents e tente novamente.",

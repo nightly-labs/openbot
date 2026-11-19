@@ -51,6 +51,7 @@ export const messages = {
   "error.team.bindFailed": "Impossibile mettere in ascolto l'API del team.",
   "error.team.signInRequired": "È necessario accedere a OpenBot.",
   "error.team.authenticationRequired": "Autenticazione richiesta.",
+  "error.team.invalidRequest": "La richiesta non è valida.",
   "error.team.agentNotFound": "Agente non trovato.",
   "error.team.routeNotFound": "Percorso non trovato.",
   "error.team.requestFailed": "Richiesta non riuscita.",

@@ -344,6 +344,7 @@ import {
 } from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext, requireProviderDriver } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
+import { RemoteAgentBridge } from "./remote-agent-bridge";
 import { recordAgentRestartActivity } from "./restart-activity";
 import type { RoutineFlowTools } from "./routine-flows/routine-flow-tools";
 import { RoutineRecords } from "./routine-records";
@@ -422,6 +423,8 @@ export interface AgentServiceOptions {
   feedbackFacts?: FeedbackFacts | null;
   feedback?: AgentFeedback | null;
   serverClaims?: AgentServerClaims | null;
+  remoteAgentBridgeCipher?: { encrypt(value: string): Buffer; decrypt(value: Buffer): string };
+  serverName?: () => string;
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
@@ -515,6 +518,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #pendingAgentCreates = new Map<string, Deferred.Deferred<AgentSummary, AgentLifecycleFailed>>();
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
+  readonly #remoteAgentBridge: RemoteAgentBridge;
   readonly #browser: AgentBrowserHost;
   readonly #reader: ConversationReader;
   readonly #memories: AgentMemories;
@@ -1902,6 +1906,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         settleModelMoves: () => this.#endpoints.runExclusive(() => Effect.void),
       },
     });
+    this.#remoteAgentBridge = new RemoteAgentBridge({
+      db: store.database.connection,
+      cipher: options.remoteAgentBridgeCipher ?? {
+        encrypt: (value) => Buffer.from(value, "utf8"),
+        decrypt: (value) => Buffer.from(value).toString("utf8"),
+      },
+      listLocalAgents: () => this.listAgents().map((agent) => ({ id: agent.id, name: agent.name })),
+      serverName: options.serverName ?? (() => "OpenBot"),
+      enqueue: (input) => this.#mailbox.enqueue(input),
+    });
     this.#tools = new OpenBotToolRouter({
       capturedSteps: (session) => this.#threads.capturedWorkSteps(session).pipe(toToolOperationFailed),
       store,
@@ -1966,6 +1980,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
       hooks: {
         listAgents: () => this.listAgents(),
+        remoteAgents: {
+          list: () => this.#remoteAgentBridge.listRemoteAgents().pipe(toToolOperationFailed),
+          deliver: (input) => this.#remoteAgentBridge.deliver(input).pipe(toToolOperationFailed),
+        },
         listModels: () => this.listModels(),
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
@@ -2083,6 +2101,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   getProviderAccountUsage() {
     return this.#providers.accountUsage();
+  }
+
+  get remoteAgentBridge(): RemoteAgentBridge {
+    return this.#remoteAgentBridge;
   }
 
   listAgents(): AgentSummary[] {

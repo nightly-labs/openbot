@@ -351,6 +351,7 @@ export const messages = defineMessages("chat", {
   "chat.video.unmute": "Unmute video",
   "chat.message.you": "You",
   "chat.message.agentFallback": "Agent",
+  "chat.exchange.remoteSender": "{name} on {server}",
   "chat.message.memberFallback": "Team member",
   "chat.message.attachment": "Attachment",
   "chat.message.showFull": "Show full message",

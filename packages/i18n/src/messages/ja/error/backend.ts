@@ -173,6 +173,20 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "メールボックスの状態が破損しているか、新しいバージョンの OpenBot のものです。上書きしません。",
   "error.backend.recipientDeleting": "受信者を削除中です。削除が終わってから再試行してください。",
+  "error.backend.remoteAgentBridgePeerDown":
+    "リンク先サーバーが応答しませんでした。オンラインになったら再試行してください。",
+  "error.backend.remoteAgentBridgeInviteExpired": "このリンクコードは期限切れです。新しいコードを作成してください。",
+  "error.backend.remoteAgentBridgeInviteUsed": "このリンクコードは無効です。",
+  "error.backend.remoteAgentBridgeSameServer": "サーバーは自分自身にリンクできません。",
+  "error.backend.remoteAgentBridgeRevoked": "このサーバーとのリンクは削除されました。",
+  "error.backend.remoteAgentBridgeFileTooLarge": "ファイルが添付の上限を超えています。何も送信されませんでした。",
+  "error.backend.remoteAgentBridgeUnsupported":
+    "別のサーバーをリンクするには、このサーバーで OpenBot を更新してください。",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "このコンピューターに Tailscale をインストールしてサインインし、もう一度試してください。",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "このコンピューターで Tailscale が接続されていません。",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Tailscale でリンク済みサーバーのアドレスを準備できませんでした。もう一度試してください。",
   "error.backend.recipientHidden": "このエージェントは非表示です。メッセージを送るには元に戻してください。",
   "error.backend.agentIdUnknown":
     "ID {id} のエージェントはありません。openbot.list_agents で ID を取得してから、もう一度お試しください。",

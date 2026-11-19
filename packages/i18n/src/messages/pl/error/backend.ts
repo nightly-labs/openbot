@@ -168,6 +168,19 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "Stan skrzynki jest uszkodzony lub pochodzi z nowszej wersji OpenBot; odmowa nadpisania.",
   "error.backend.recipientDeleting": "Odbiorca jest usuwany. Spróbuj ponownie po zakończeniu usuwania.",
+  "error.backend.remoteAgentBridgePeerDown":
+    "Połączony serwer nie odpowiedział. Spróbuj ponownie, gdy będzie włączony.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Ten kod połączenia wygasł. Utwórz nowy.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Ten kod połączenia nie jest już ważny.",
+  "error.backend.remoteAgentBridgeSameServer": "Serwer nie może połączyć się sam ze sobą.",
+  "error.backend.remoteAgentBridgeRevoked": "Połączenie z tym serwerem zostało usunięte.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Plik przekracza limit załączników. Nic nie wysłano.",
+  "error.backend.remoteAgentBridgeUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby połączyć inny serwer.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Zainstaluj Tailscale na tym komputerze, zaloguj się i spróbuj ponownie.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale nie jest połączony na tym komputerze.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Nie można przygotować adresu połączonych serwerów w Tailscale. Spróbuj ponownie.",
   "error.backend.recipientHidden": "Ten agent jest ukryty. Przywróć go, aby wysyłać wiadomości.",
   "error.backend.agentIdUnknown":
     "Żaden agent nie ma identyfikatora {id}. Pobierz identyfikatory z openbot.list_agents i spróbuj ponownie.",

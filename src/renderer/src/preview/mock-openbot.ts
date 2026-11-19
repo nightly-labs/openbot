@@ -3566,6 +3566,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     servers: mockTeam.servers,
     localServers: mockTeam.localServers,
+    remoteAgentBridge: mockTeam.remoteAgentBridge,
     plugins: {
       takePendingListing: async () => null,
       onOpenListing: (listener) => {

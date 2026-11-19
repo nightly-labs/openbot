@@ -366,6 +366,7 @@ export const messages = {
   "chat.video.unmute": "Riattiva audio del video",
   "chat.message.you": "Tu",
   "chat.message.agentFallback": "Agente",
+  "chat.exchange.remoteSender": "{name} su {server}",
   "chat.message.memberFallback": "Membro del team",
   "chat.message.attachment": "Allegato",
   "chat.message.showFull": "Mostra tutto il messaggio",

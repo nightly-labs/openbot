@@ -190,6 +190,7 @@ export function encodeTeamProtocolV7CurrentHttpResponse(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
   } = {},
 ): string {
   const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, ...frozen } = options;

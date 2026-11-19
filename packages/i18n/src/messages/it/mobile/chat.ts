@@ -414,6 +414,7 @@ export const messages = {
   "mobile.chat.exchange.updateFrom": "Aggiornamento da",
   "mobile.chat.exchange.messaged": "Ha scritto a",
   "mobile.chat.exchange.messageFrom": "Messaggio da",
+  "mobile.chat.exchange.remoteSender": "{name} su {server}",
   "mobile.chat.exchange.agentCount": { one: "{count} agente", other: "{count} agenti" },
   "mobile.chat.exchange.group": { one: "{count} messaggio con", other: "{count} messaggi con" },
   "mobile.chat.exchange.showMessages": {

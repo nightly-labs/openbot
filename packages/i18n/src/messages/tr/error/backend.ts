@@ -163,6 +163,17 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "Posta kutusu durumu bozuk veya daha yeni bir OpenBot sürümünden; üzerine yazılması reddedildi.",
   "error.backend.recipientDeleting": "Alıcı siliniyor. Silme işlemi tamamlandıktan sonra tekrar deneyin.",
+  "error.backend.remoteAgentBridgePeerDown": "Bağlı sunucu yanıt vermedi. Açıkken tekrar deneyin.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Bu bağlantı kodunun süresi doldu. Yeni bir kod oluşturun.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Bu bağlantı kodu artık geçerli değil.",
+  "error.backend.remoteAgentBridgeSameServer": "Bir sunucu kendine bağlanamaz.",
+  "error.backend.remoteAgentBridgeRevoked": "Bu sunucu bağlantısı kaldırıldı.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Bir dosya ek boyut sınırını aşıyor. Hiçbir şey gönderilmedi.",
+  "error.backend.remoteAgentBridgeUnsupported": "Başka bir sunucu bağlamak için bu sunucuda OpenBot'u güncelleyin.",
+  "error.backend.remoteAgentBridgeTailscaleMissing": "Bu bilgisayara Tailscale kurun, oturum açın ve yeniden deneyin.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Bu bilgisayarda Tailscale bağlı değil.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Tailscale üzerinde bağlı sunucu adresi hazırlanamadı. Yeniden deneyin.",
   "error.backend.recipientHidden": "Bu ajan gizli. Mesaj göndermek için onu geri yükleyin.",
   "error.backend.agentIdUnknown":
     "{id} kimliğine sahip bir ajan yok. Kimlikleri openbot.list_agents ile alın ve tekrar deneyin.",

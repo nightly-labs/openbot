@@ -456,6 +456,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "Import und Übertragung",
   "mobile.server.settings.serverSection": "Server",
   "mobile.server.settings.timezone": "Zeitzone",
+  "mobile.server.settings.remoteAgents": "Verknüpfte Server",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Agenten hier können Agenten auf einem verknüpften Server Nachrichten senden.",
+  "mobile.server.settings.remoteAgentsCreate": "Linkcode erstellen",
+  "mobile.server.settings.remoteAgentsPaste": "Code einlösen",
+  "mobile.server.settings.remoteAgentsRevoke": "Entfernen",
+  "mobile.server.settings.remoteAgentsExpires": "Läuft ab am {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "Keine verknüpften Server.",
+  "mobile.server.settings.remoteAgentsCode": "Linkcode",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Netzwerkverbindung vorbereiten",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Führe dies auf dem Host mit Tailscale aus, bevor du einen Code für ein anderes Netzwerk erstellst.",
   "mobile.server.settings.timezoneAutomatic": "Automatisch",
   "mobile.server.settings.timezoneSystem": "Serverzone: {zone}",
   "mobile.server.settings.timezonePhone": "Dieses Telefon",

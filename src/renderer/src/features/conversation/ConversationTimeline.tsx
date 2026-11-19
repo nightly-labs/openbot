@@ -419,6 +419,14 @@ export function ConversationTimeline() {
       ),
   );
   const exchangeAuthor = (message: AgentMessage): ChatMessageAuthor => {
+    const remote = message.remoteSender;
+    if (remote) {
+      return {
+        kind: "agent",
+        name: t("chat.exchange.remoteSender", { name: remote.agentName, server: remote.serverName }),
+        avatarSeed: remote.agentId,
+      };
+    }
     const agentId = message.exchange?.senderAgentId;
     const agent = props.agents.find((candidate) => candidate.id === agentId);
     return { kind: "agent", name: agent?.name ?? t("chat.message.agentFallback"), agent, avatarSeed: agentId };

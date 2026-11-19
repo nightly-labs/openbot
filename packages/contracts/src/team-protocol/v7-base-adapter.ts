@@ -67,6 +67,7 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
   } = {},
 ): string | null {
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));

@@ -235,6 +235,22 @@ export const messages = {
   "server.select.failedDescription": "Не удалось переключить сервер. Повторите попытку.",
   "server.select.openAgentFailed": "Не удалось открыть {name}. Найдите его на боковой панели.",
   "server.settings.unavailable": "Этот сервер недоступен.",
+  "server.settings.remoteAgentsTitle": "Связанные серверы",
+  "server.settings.remoteAgentsDescription":
+    "Агенты на этом сервере могут отправлять сообщения и файлы агентам на связанном сервере.",
+  "server.settings.remoteAgentsCreate": "Создать код связи",
+  "server.settings.remoteAgentsPaste": "Активировать код",
+  "server.settings.remoteAgentsRevoke": "Удалить",
+  "server.settings.remoteAgentsExpires": "Истекает {date}",
+  "server.settings.remoteAgentsEmpty": "Нет связанных серверов.",
+  "server.settings.remoteAgentsCode": "Код связи",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Связь между сетями",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Используйте Tailscale на этом компьютере. OpenBot публикует в tailnet только маршруты связанных серверов и подставляет этот адрес в коды связи.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Подготовить связь между сетями",
+  "server.settings.remoteAgentsCrossNetworkReady": "Готово для другой сети",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale включён; подготовка не выполнена",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale не подключён",
   "server.settings.identityRefreshFailed": "Не удалось обновить данные сервера.",
   "server.settings.loadFailed": "Не удалось загрузить настройки сервера.",
   "server.settings.identityLocalOnly":

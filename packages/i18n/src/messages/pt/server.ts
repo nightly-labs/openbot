@@ -230,6 +230,22 @@ export const messages = {
   "server.select.failedDescription": "Não foi possível trocar de servidor. Tente novamente.",
   "server.select.openAgentFailed": "Não foi possível abrir {name}. Encontre-o na barra lateral.",
   "server.settings.unavailable": "Este servidor está indisponível.",
+  "server.settings.remoteAgentsTitle": "Servidores ligados",
+  "server.settings.remoteAgentsDescription":
+    "Os agentes neste servidor podem enviar mensagens e ficheiros aos agentes de um servidor ligado.",
+  "server.settings.remoteAgentsCreate": "Criar código de ligação",
+  "server.settings.remoteAgentsPaste": "Resgatar um código",
+  "server.settings.remoteAgentsRevoke": "Remover",
+  "server.settings.remoteAgentsExpires": "Expira em {date}",
+  "server.settings.remoteAgentsEmpty": "Nenhum servidor ligado.",
+  "server.settings.remoteAgentsCode": "Código de ligação",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Ligação entre redes",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Use o Tailscale neste computador. O OpenBot expõe só as rotas de servidores ligados na sua tailnet e coloca esse endereço nos códigos de ligação.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Preparar ligação entre redes",
+  "server.settings.remoteAgentsCrossNetworkReady": "Pronto para outra rede",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale ativo; preparação pendente",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale não está conectado",
   "server.settings.identityRefreshFailed": "Não foi possível atualizar a identidade do servidor.",
   "server.settings.loadFailed": "Não foi possível carregar as configurações do servidor.",
   "server.settings.identityLocalOnly":

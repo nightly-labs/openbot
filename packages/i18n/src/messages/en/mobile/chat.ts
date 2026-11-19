@@ -403,6 +403,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.exchange.updateFrom": "Update from",
   "mobile.chat.exchange.messaged": "Messaged",
   "mobile.chat.exchange.messageFrom": "Message from",
+  "mobile.chat.exchange.remoteSender": "{name} on {server}",
   "mobile.chat.exchange.agentCount": { one: "{count} agent", other: "{count} agents" },
   "mobile.chat.exchange.group": { one: "{count} message with", other: "{count} messages with" },
   "mobile.chat.exchange.showMessages": {

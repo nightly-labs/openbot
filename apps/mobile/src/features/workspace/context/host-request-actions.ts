@@ -168,6 +168,7 @@ import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protoc
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import { REMOTE_AGENT_BRIDGE_ROUTES } from "@openbot/contracts/team-protocol/remote-agent-bridge-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -505,6 +506,13 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadRemoteAgentBridge"
+  | "remoteAgentBridgeReachStatus"
+  | "prepareRemoteAgentBridgeReach"
+  | "createRemoteAgentBridgeInvite"
+  | "redeemRemoteAgentBridge"
+  | "revokeRemoteAgentBridgeInvite"
+  | "revokeRemoteAgentBridgeLink"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
   | "loadMemoryReview"
@@ -719,6 +727,67 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   };
 }
 
+function decodeBridgeInvite(value: unknown): {
+  inviteId: string;
+  code: string;
+  expiresAt: string;
+  serverName: string;
+} {
+  if (!isDynamicRecord(value) || !isString(value.inviteId) || !isString(value.expiresAt))
+    throw new Error("Invalid server link.");
+  return {
+    inviteId: value.inviteId,
+    code: isString(value.code) ? value.code : "",
+    expiresAt: value.expiresAt,
+    serverName: isString(value.serverName) ? value.serverName : "",
+  };
+}
+
+function decodeBridgeLink(value: unknown): { linkId: string; peerName: string; createdAt: string } {
+  if (!isDynamicRecord(value) || !isString(value.linkId) || !isString(value.peerName))
+    throw new Error("Invalid server link.");
+  return {
+    linkId: value.linkId,
+    peerName: value.peerName,
+    createdAt: isString(value.createdAt) ? value.createdAt : "",
+  };
+}
+
+function decodeBridgeInvites(value: unknown): ReturnType<typeof decodeBridgeInvite>[] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.invites)) throw new Error("Invalid server link.");
+  return value.invites.map(decodeBridgeInvite);
+}
+
+function decodeBridgeLinks(value: unknown): ReturnType<typeof decodeBridgeLink>[] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.links)) throw new Error("Invalid server link.");
+  return value.links.map(decodeBridgeLink);
+}
+
+function decodeBridgeReachStatus(value: unknown): {
+  ready: boolean;
+  reach: string;
+  tailscaleConnected: boolean;
+  serveConfigured: boolean;
+  dnsName: string;
+} {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.ready !== "boolean" ||
+    typeof value.tailscaleConnected !== "boolean" ||
+    typeof value.serveConfigured !== "boolean" ||
+    !isString(value.reach) ||
+    !isString(value.dnsName)
+  )
+    throw new Error("Invalid server link.");
+  return {
+    ready: value.ready,
+    reach: value.reach,
+    tailscaleConnected: value.tailscaleConnected,
+    serveConfigured: value.serveConfigured,
+    dnsName: value.dnsName,
+  };
+}
+
 export function createHostRequestActions({
   request,
   teamApi,
@@ -852,6 +921,71 @@ export function createHostRequestActions({
   const checks = createHostRequestChecks(capabilities);
   const actions: HostRequestActions = {
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
+    loadRemoteAgentBridge: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      const invites = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.invites, decodeBridgeInvites, {}, serverId);
+      const links = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.links, decodeBridgeLinks, {}, serverId);
+      return { invites, links };
+    },
+    remoteAgentBridgeReachStatus: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, decodeBridgeReachStatus, {}, serverId);
+    },
+    prepareRemoteAgentBridgeReach: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, decodeBridgeReachStatus, {}, serverId);
+    },
+    createRemoteAgentBridgeInvite: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.createInvite, decodeBridgeInvite, {}, serverId);
+    },
+    redeemRemoteAgentBridge: async (code, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.redeem, decodeBridgeLink, { code }, serverId);
+    },
+    revokeRemoteAgentBridgeInvite: async (inviteId, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.revokeInvite, () => undefined, { inviteId }, serverId);
+    },
+    revokeRemoteAgentBridgeLink: async (linkId, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.revokeLink, () => undefined, { linkId }, serverId);
+    },
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),

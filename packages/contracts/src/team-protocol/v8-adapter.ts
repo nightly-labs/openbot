@@ -48,6 +48,7 @@ import { OPEN_PROVIDER_ID } from "./provider-aware-codec";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
 import { withQueueHold } from "./queue-hold-v1";
 import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
+import { withConversationRemoteSender } from "./remote-agent-bridge-v1";
 import {
   decodeRemoteDesktopSetupRequest,
   decodeRemoteDesktopSetupResponse,
@@ -196,6 +197,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
@@ -208,6 +210,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     subagents,
     promptMultiSelect,
     videoGeneration,
+    remoteSender,
     usageTertiary,
     agentPendingRuntime,
     memoryChanges,
@@ -224,6 +227,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const withSubagents = subagents && isConversationRoute(method, path);
   const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
   const withVideo = videoGeneration && isConversationRoute(method, path);
+  const withRemote = remoteSender && isConversationRoute(method, path);
   const withPending = agentPendingRuntime && isAgentListRoute(method, path);
   const withMemory = memoryChanges && isConversationRoute(method, path);
   if (
@@ -233,6 +237,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     !withSubagents &&
     !withMultiSelect &&
     !withVideo &&
+    !withRemote &&
     !withPending &&
     !withMemory
   )
@@ -244,6 +249,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   if (withSubagents) output = withConversationSubagents(output, value);
   if (withMultiSelect) output = withConversationPromptMultiSelect(output, value);
   if (withVideo) output = withConversationVideoGeneration(output, value);
+  if (withRemote) output = withConversationRemoteSender(output, value);
   if (withPending) output = withAgentPendingRuntimes(output, value, true);
   if (withMemory) output = withConversationMemoryChanges(output, value);
   return JSON.stringify(output);
@@ -318,10 +324,13 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
   const withUsage = isUsageRoute(method, path) ? withUsageTertiary(decoded, value) : decoded;
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;
   if (!isConversationRoute(method, path)) return withExtent;
-  return withConversationMemoryChanges(
-    withConversationVideoGeneration(
-      withConversationPromptMultiSelect(
-        withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+  return withConversationRemoteSender(
+    withConversationMemoryChanges(
+      withConversationVideoGeneration(
+        withConversationPromptMultiSelect(
+          withConversationSubagents(withConversationUiBlocks(withExtent, value), value),
+          value,
+        ),
         value,
       ),
       value,

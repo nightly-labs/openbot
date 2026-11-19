@@ -278,6 +278,7 @@ export interface ConversationMessage {
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
   videoGeneration?: VideoGenerationInfo | undefined;
+  remoteSender?: { agentId: string; agentName: string; serverName: string } | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
   steered?: true | undefined;
   exchange?: AgentExchangeSummary | undefined;
@@ -343,6 +344,11 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
     (value.videoGeneration === undefined || isVideoGenerationInfo(value.videoGeneration)) &&
+    (value.remoteSender === undefined ||
+      (isDynamicRecord(value.remoteSender) &&
+        isString(value.remoteSender.agentId) &&
+        isString(value.remoteSender.agentName) &&
+        isString(value.remoteSender.serverName))) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&

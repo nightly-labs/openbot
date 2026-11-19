@@ -1381,6 +1381,37 @@ export const IPC_ENDPOINTS = {
     restart: request<string, void>()("local-servers:restart"),
     delete: request<string, void>()("local-servers:delete"),
   },
+  remoteAgentBridge: {
+    list: scopedQuery<{
+      invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
+      links: { linkId: string; peerName: string; peerReach: string; createdAt: string }[];
+    }>()("remote-agent-bridge:list"),
+    createInvite: scopedQuery<{
+      inviteId: string;
+      code: string;
+      expiresAt: string;
+      serverName: string;
+    }>()("remote-agent-bridge:create-invite"),
+    revokeInvite: scopedRequest<string, void>()("remote-agent-bridge:revoke-invite"),
+    redeem: scopedRequest<string, { linkId: string; peerName: string; peerReach: string; createdAt: string }>()(
+      "remote-agent-bridge:redeem",
+    ),
+    revokeLink: scopedRequest<string, void>()("remote-agent-bridge:revoke-link"),
+    reachStatus: scopedQuery<{
+      ready: boolean;
+      reach: string;
+      tailscaleConnected: boolean;
+      serveConfigured: boolean;
+      dnsName: string;
+    }>()("remote-agent-bridge:reach-status"),
+    prepareReach: scopedQuery<{
+      ready: boolean;
+      reach: string;
+      tailscaleConnected: boolean;
+      serveConfigured: boolean;
+      dnsName: string;
+    }>()("remote-agent-bridge:prepare-reach"),
+  },
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
     get: request<string, MarketplaceAgentDetail>()("marketplace-agents:get"),
@@ -2009,6 +2040,7 @@ export const IPC_GROUP_PATHS = {
   license: "license",
   hostedServers: "hostedServers",
   localServers: "localServers",
+  remoteAgentBridge: "remoteAgentBridge",
   marketplaceAgents: "marketplaceAgents",
   agentTemplates: "agentTemplates",
   auth: "auth",

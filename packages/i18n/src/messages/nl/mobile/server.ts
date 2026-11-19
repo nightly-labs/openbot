@@ -447,6 +447,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "Importeren en overdracht",
   "mobile.server.settings.serverSection": "Server",
   "mobile.server.settings.timezone": "Tijdzone",
+  "mobile.server.settings.remoteAgents": "Gekoppelde servers",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Agenten hier kunnen agenten op een gekoppelde server berichten sturen.",
+  "mobile.server.settings.remoteAgentsCreate": "Koppelcode maken",
+  "mobile.server.settings.remoteAgentsPaste": "Code inwisselen",
+  "mobile.server.settings.remoteAgentsRevoke": "Verwijderen",
+  "mobile.server.settings.remoteAgentsExpires": "Verloopt op {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "Geen gekoppelde servers.",
+  "mobile.server.settings.remoteAgentsCode": "Koppelcode",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Koppeling tussen netwerken voorbereiden",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Doe dit op de host met Tailscale voordat je een code voor een ander netwerk maakt.",
   "mobile.server.settings.timezoneAutomatic": "Automatisch",
   "mobile.server.settings.timezoneSystem": "Serverzone: {zone}",
   "mobile.server.settings.timezonePhone": "Deze telefoon",

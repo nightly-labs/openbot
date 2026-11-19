@@ -352,6 +352,8 @@ the destination, applies all of its agents with the settings, and removes the fi
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
 
+An owner or an admin can link two servers in Server settings. The hosts then exchange agent messages and files over HTTP, and both servers must be on this version. A reach that is not http or https fails and does not wake a hosted server. The account service does not hold those messages or files. On a host that runs Tailscale, **Prepare link across networks** in Linked servers uses Tailscale Serve for `/v1/remote-agent-bridge` only, then puts the MagicDNS https address in link codes for another machine or network.
+
 The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
 is the server of the page, and the destination is another online server that the user administers
 with `instance-transfer-v1`. The phone downloads the file from the source with the export route,

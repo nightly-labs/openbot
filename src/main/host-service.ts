@@ -1175,6 +1175,10 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.port === null ? null : `http://localhost:${this.#api.port}`;
   }
 
+  teamApiPort(): number | null {
+    return this.#api.port;
+  }
+
   readonly createDevelopmentConnection = Effect.fn("HostService.createDevelopmentConnection")(
     function* (this: HostService): Effect.fn.Return<
       {

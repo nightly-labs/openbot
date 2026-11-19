@@ -177,6 +177,19 @@ export const messages = {
     "L’état de la messagerie est corrompu ou provient d’une version plus récente d’OpenBot ; il ne sera pas écrasé.",
   "error.backend.recipientDeleting":
     "Le destinataire est en cours de suppression. Réessayez une fois la suppression terminée.",
+  "error.backend.remoteAgentBridgePeerDown": "Le serveur lié n’a pas répondu. Réessayez quand il est en ligne.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Ce code de liaison a expiré. Créez-en un nouveau.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Ce code de liaison n’est plus valide.",
+  "error.backend.remoteAgentBridgeSameServer": "Un serveur ne peut pas se lier à lui-même.",
+  "error.backend.remoteAgentBridgeRevoked": "La liaison avec ce serveur a été supprimée.",
+  "error.backend.remoteAgentBridgeFileTooLarge":
+    "Un fichier dépasse la limite des pièces jointes. Rien n’a été envoyé.",
+  "error.backend.remoteAgentBridgeUnsupported": "Mettez à jour OpenBot sur ce serveur pour lier un autre serveur.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Installez Tailscale sur cet ordinateur, connectez-vous, puis réessayez.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale n’est pas connecté sur cet ordinateur.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Impossible de préparer l’adresse des serveurs liés sur Tailscale. Réessayez.",
   "error.backend.recipientHidden": "Cet agent est masqué. Restaurez-le pour envoyer des messages.",
   "error.backend.agentIdUnknown":
     "Aucun agent n’a l’identifiant {id}. Obtenez les identifiants avec openbot.list_agents, puis réessayez.",

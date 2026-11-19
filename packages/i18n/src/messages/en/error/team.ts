@@ -45,6 +45,7 @@ export const messages = defineMessages("error.team", {
   "error.team.bindFailed": "Could not bind the team API.",
   "error.team.signInRequired": "OpenBot sign-in is required.",
   "error.team.authenticationRequired": "Authentication required.",
+  "error.team.invalidRequest": "The request is invalid.",
   "error.team.agentNotFound": "Agent not found.",
   "error.team.routeNotFound": "Route not found.",
   "error.team.requestFailed": "Request failed.",

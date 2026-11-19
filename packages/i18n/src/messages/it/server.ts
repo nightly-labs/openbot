@@ -226,6 +226,22 @@ export const messages = {
   "server.select.failedDescription": "Impossibile cambiare server. Riprova.",
   "server.select.openAgentFailed": "Impossibile aprire {name}. Trovalo nella barra laterale.",
   "server.settings.unavailable": "Questo server non è disponibile.",
+  "server.settings.remoteAgentsTitle": "Server collegati",
+  "server.settings.remoteAgentsDescription":
+    "Gli agenti di questo server possono scrivere agli agenti di un server collegato e inviare file.",
+  "server.settings.remoteAgentsCreate": "Crea un codice",
+  "server.settings.remoteAgentsPaste": "Riscatta un codice",
+  "server.settings.remoteAgentsRevoke": "Rimuovi",
+  "server.settings.remoteAgentsExpires": "Scade il {date}",
+  "server.settings.remoteAgentsEmpty": "Nessun server collegato.",
+  "server.settings.remoteAgentsCode": "Codice di collegamento",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Collegamento tra reti",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Usa Tailscale su questo computer. OpenBot espone solo le route dei server collegati sulla tailnet e mette quell'indirizzo nei codici.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Prepara collegamento tra reti",
+  "server.settings.remoteAgentsCrossNetworkReady": "Pronto per un'altra rete",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale attivo; prepara non eseguito",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale non connesso",
   "server.settings.identityRefreshFailed": "Impossibile aggiornare l'identità del server.",
   "server.settings.loadFailed": "Impossibile caricare le impostazioni del server.",
   "server.settings.identityLocalOnly":

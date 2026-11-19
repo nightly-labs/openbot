@@ -239,6 +239,22 @@ export const messages = {
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",
   "server.settings.unavailable": "Deze server is niet beschikbaar.",
+  "server.settings.remoteAgentsTitle": "Gekoppelde servers",
+  "server.settings.remoteAgentsDescription":
+    "Agenten op deze server kunnen agenten op een gekoppelde server berichten en bestanden sturen.",
+  "server.settings.remoteAgentsCreate": "Koppelcode maken",
+  "server.settings.remoteAgentsPaste": "Code inwisselen",
+  "server.settings.remoteAgentsRevoke": "Verwijderen",
+  "server.settings.remoteAgentsExpires": "Verloopt op {date}",
+  "server.settings.remoteAgentsEmpty": "Geen gekoppelde servers.",
+  "server.settings.remoteAgentsCode": "Koppelcode",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Koppeling tussen netwerken",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Gebruik Tailscale op deze computer. OpenBot zet alleen de routes voor gekoppelde servers op je tailnet en gebruikt dat adres in koppelcodes.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Koppeling tussen netwerken voorbereiden",
+  "server.settings.remoteAgentsCrossNetworkReady": "Klaar voor een ander netwerk",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale aan; voorbereiding ontbreekt",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale is niet verbonden",
   "server.settings.identityRefreshFailed": "De identiteit van de server kon niet worden vernieuwd.",
   "server.settings.loadFailed": "De serverinstellingen konden niet laden.",
   "server.settings.identityLocalOnly":

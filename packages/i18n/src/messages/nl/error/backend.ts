@@ -171,6 +171,19 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "De status van de postbus is beschadigd of komt van een nieuwere versie van OpenBot; OpenBot overschrijft deze niet.",
   "error.backend.recipientDeleting": "De ontvanger wordt verwijderd. Probeer het opnieuw als dit klaar is.",
+  "error.backend.remoteAgentBridgePeerDown":
+    "De gekoppelde server reageerde niet. Probeer het opnieuw wanneer deze online is.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Deze koppelcode is verlopen. Maak een nieuwe.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Deze koppelcode is niet meer geldig.",
+  "error.backend.remoteAgentBridgeSameServer": "Een server kan niet aan zichzelf koppelen.",
+  "error.backend.remoteAgentBridgeRevoked": "De koppeling met deze server is verwijderd.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Een bestand is groter dan de bijlagelimiet. Er is niets verzonden.",
+  "error.backend.remoteAgentBridgeUnsupported": "Werk OpenBot op deze server bij om een andere server te koppelen.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Installeer Tailscale op deze computer, meld je aan en probeer het opnieuw.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale is niet verbonden op deze computer.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Kon het adres voor gekoppelde servers op Tailscale niet voorbereiden. Probeer het opnieuw.",
   "error.backend.recipientHidden": "Deze agent is verborgen. Herstel de agent om berichten te sturen.",
   "error.backend.agentIdUnknown":
     "Geen agent heeft de id {id}. Haal de id's op met openbot.list_agents en probeer het opnieuw.",

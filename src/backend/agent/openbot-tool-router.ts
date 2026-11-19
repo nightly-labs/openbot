@@ -112,6 +112,7 @@ import {
   webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
+import { parseRemoteAgentId } from "../remote-agent-bridge";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import type { VaultItems } from "../vault-items";
@@ -383,6 +384,17 @@ function captureFailure(failure: ScreenCaptureFailed) {
 
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
+  remoteAgents?: {
+    list(): Effect.Effect<{ id: string; name: string }[], ToolOperationFailed>;
+    deliver(input: {
+      senderAgentId: string;
+      senderAgentName: string;
+      recipients: { linkId: string; agentId: string }[];
+      text: string;
+      paths: string[];
+      replyToMessageId: string | null;
+    }): Effect.Effect<{ messageIds: string[] }, ToolOperationFailed>;
+  };
   listModels(): AgentModelOption[];
   agentModels(choice: Pick<AgentModelChoice, "provider" | "providerAccountId">): AgentModelOption[];
   providerAccounts: ProviderAccountRows;
@@ -1964,6 +1976,7 @@ export class OpenBotToolRouter {
     if (params.tool === "list_agents") {
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
+      const remoteListed = this.#hooks.remoteAgents ? yield* this.#hooks.remoteAgents.list() : [];
       const agents = this.#hooks.listAgents().map((agent) => {
         const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
         const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
@@ -1992,7 +2005,19 @@ export class OpenBotToolRouter {
           ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
         };
       });
-      return openBotToolResult({ agents });
+      return openBotToolResult({
+        agents: [
+          ...agents,
+          ...remoteListed.map((agent) => ({
+            id: agent.id,
+            name: agent.name,
+            title: "",
+            description: "",
+            status: "ready" as const,
+            queuedMessages: 0,
+          })),
+        ],
+      });
     }
 
     if (params.tool === "list_models") {
@@ -3302,9 +3327,16 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
+      const remoteRecipients: { linkId: string; agentId: string }[] = [];
+      const localRecipients: string[] = [];
+      for (const recipient of recipientValues) {
+        const remote = parseRemoteAgentId(recipient);
+        if (remote) remoteRecipients.push(remote);
+        else localRecipients.push(recipient);
+      }
       const agents = this.#hooks.listAgents();
       const known = new Map(agents.map((agent) => [agent.id, agent]));
-      for (const recipient of recipientValues) {
+      for (const recipient of localRecipients) {
         const agent = known.get(recipient);
         if (!agent)
           throw new Error(
@@ -3383,10 +3415,34 @@ export class OpenBotToolRouter {
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
+      const senderName = agents.find((agent) => agent.id === senderAgentId)?.name ?? senderAgentId;
+      const remoteSent =
+        remoteRecipients.length === 0
+          ? null
+          : yield* this.#hooks.remoteAgents?.deliver({
+              senderAgentId,
+              senderAgentName: senderName,
+              recipients: remoteRecipients,
+              text,
+              paths,
+              replyToMessageId: replyTo,
+            }) ??
+              Effect.fail(new ToolOperationFailed({ cause: new Error("This host cannot message a linked server.") }));
+      if (localRecipients.length === 0) {
+        return {
+          success: true,
+          contentItems: [
+            {
+              type: "inputText",
+              text: JSON.stringify({ messageIds: remoteSent?.messageIds ?? [], deliveries: [] }),
+            },
+          ],
+        };
+      }
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
-          recipientAgentIds: recipientValues,
+          recipientAgentIds: localRecipients,
           text,
           sourcePaths: paths,
           replyToMessageId: replyTo,

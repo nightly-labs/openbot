@@ -93,6 +93,7 @@ import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { createServerMemorySection } from "./ServerMemorySection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
+import { type RemoteAgentBridgeCalls, ServerRemoteAgentsSection } from "./ServerRemoteAgentsSection";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
@@ -139,6 +140,7 @@ export interface ServerSettingsModalProps {
   instanceTransfer?: ServerTransferOptions | undefined;
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
+  remoteAgentBridge?: RemoteAgentBridgeCalls | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
@@ -193,8 +195,19 @@ export type ServerSettingsSection =
   | "transfer"
   | "routines"
   | "browser-profiles"
-  | "experimental";
+  | "experimental"
+  | "remote-agents";
 type Section = ServerSettingsSection;
+
+const desktopRemoteAgentBridgeCalls: RemoteAgentBridgeCalls = {
+  list: (serverId) => window.openbot.remoteAgentBridge.list(serverId),
+  reachStatus: (serverId) => window.openbot.remoteAgentBridge.reachStatus(serverId),
+  prepareReach: (serverId) => window.openbot.remoteAgentBridge.prepareReach(serverId),
+  createInvite: (serverId) => window.openbot.remoteAgentBridge.createInvite(serverId),
+  revokeInvite: (inviteId, serverId) => window.openbot.remoteAgentBridge.revokeInvite(inviteId, serverId),
+  redeem: (code, serverId) => window.openbot.remoteAgentBridge.redeem(code, serverId),
+  revokeLink: (linkId, serverId) => window.openbot.remoteAgentBridge.revokeLink(linkId, serverId),
+};
 
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
@@ -217,6 +230,10 @@ const sections = {
   experimental: {
     title: "server.settings.experimentalTitle",
     description: "server.settings.experimentalDescription",
+  },
+  "remote-agents": {
+    title: "server.settings.remoteAgentsTitle",
+    description: "server.settings.remoteAgentsDescription",
   },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
@@ -273,6 +290,7 @@ const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group
   { value: "import", icon: Download, group: "server.settings.group.server" },
   { value: "transfer", icon: ArrowLeftRight, group: "server.settings.group.server" },
   { value: "experimental", icon: FlaskConical, group: "server.settings.group.server" },
+  { value: "remote-agents", icon: ArrowLeftRight, group: "server.settings.group.server" },
 ];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
@@ -430,6 +448,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return Boolean(props.browserProfiles);
       case "experimental":
         return Boolean(crmHost());
+      case "remote-agents":
+        return serverCanAdminister(props.server, "remote-agent-bridge-v1");
     }
   };
   const sectionMatches = (value: Section): boolean => {
@@ -619,7 +639,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "transfer" ||
         value === "routines" ||
         value === "browser-profiles" ||
-        value === "experimental"
+        value === "experimental" ||
+        value === "remote-agents"
       )
         setSection(value);
     },
@@ -954,6 +975,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               </SettingsSection>
             </Tabs.Content>
           )}
+        </Show>
+        <Show when={sectionSupported("remote-agents")}>
+          <Tabs.Content
+            value="remote-agents"
+            class="settings-modal-tab-panel server-settings-panel"
+            data-tab="remote-agents"
+          >
+            <ServerRemoteAgentsSection
+              serverId={props.server.id}
+              calls={props.remoteAgentBridge ?? desktopRemoteAgentBridgeCalls}
+            />
+          </Tabs.Content>
         </Show>
       </SettingsDialogShell>
 

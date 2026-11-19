@@ -60,6 +60,7 @@ export interface TeamHttpCodecOptions {
   subagents?: boolean;
   promptMultiSelect?: boolean;
   videoGeneration?: boolean;
+  remoteSender?: boolean;
   usageTertiary?: boolean;
   agentPendingRuntime?: boolean;
   memoryChanges?: boolean;

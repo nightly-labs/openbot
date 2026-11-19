@@ -74,8 +74,15 @@ export function ChatExchangeMarker({
     const legacyMatches = legacyName ? agents.filter((agent) => agent.name === legacyName) : [];
     const agent = id ? agentsById.get(id) : legacyMatches.length === 1 ? legacyMatches[0] : undefined;
     const name =
-      agent?.name ??
-      (routing ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent")) : t("mobile.chat.exchange.unknownAgent"));
+      message.kind === "exchange" && message.remoteSender
+        ? t("mobile.chat.exchange.remoteSender", {
+            name: message.remoteSender.agentName,
+            server: message.remoteSender.serverName,
+          })
+        : (agent?.name ??
+          (routing
+            ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
+            : t("mobile.chat.exchange.unknownAgent")));
     return { key: id ?? legacyName ?? name, agent, name };
   });
   const [only] = participants;

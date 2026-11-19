@@ -401,8 +401,31 @@ export interface MobileWorkspaceContextValue {
   canRestartServerItself: (serverId: string) => boolean;
   restartServerItself: (serverId: string) => Promise<void>;
   canManageServerTimezone: (serverId: string) => boolean;
+  canManageRemoteAgentBridge: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  loadRemoteAgentBridge: (serverId: string) => Promise<{
+    invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
+    links: { linkId: string; peerName: string; createdAt: string }[];
+  }>;
+  remoteAgentBridgeReachStatus: (serverId: string) => Promise<{
+    ready: boolean;
+    reach: string;
+    tailscaleConnected: boolean;
+    serveConfigured: boolean;
+    dnsName: string;
+  }>;
+  prepareRemoteAgentBridgeReach: (serverId: string) => Promise<{
+    ready: boolean;
+    reach: string;
+    tailscaleConnected: boolean;
+    serveConfigured: boolean;
+    dnsName: string;
+  }>;
+  createRemoteAgentBridgeInvite: (serverId: string) => Promise<{ inviteId: string; code: string; expiresAt: string }>;
+  redeemRemoteAgentBridge: (code: string, serverId: string) => Promise<{ linkId: string; peerName: string }>;
+  revokeRemoteAgentBridgeInvite: (inviteId: string, serverId: string) => Promise<void>;
+  revokeRemoteAgentBridgeLink: (linkId: string, serverId: string) => Promise<void>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
@@ -821,6 +844,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageRemoteAgentBridge"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

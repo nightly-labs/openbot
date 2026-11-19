@@ -233,6 +233,22 @@ export const messages = {
   "server.select.failedDescription": "Der Server konnte nicht gewechselt werden. Versuche es erneut.",
   "server.select.openAgentFailed": "{name} konnte nicht geöffnet werden. Suche ihn in der Seitenleiste.",
   "server.settings.unavailable": "Dieser Server ist nicht verfügbar.",
+  "server.settings.remoteAgentsTitle": "Verknüpfte Server",
+  "server.settings.remoteAgentsDescription":
+    "Agenten auf diesem Server können Agenten auf einem verknüpften Server Nachrichten senden und Dateien übertragen.",
+  "server.settings.remoteAgentsCreate": "Linkcode erstellen",
+  "server.settings.remoteAgentsPaste": "Code einlösen",
+  "server.settings.remoteAgentsRevoke": "Entfernen",
+  "server.settings.remoteAgentsExpires": "Läuft ab am {date}",
+  "server.settings.remoteAgentsEmpty": "Keine verknüpften Server.",
+  "server.settings.remoteAgentsCode": "Linkcode",
+  "server.settings.remoteAgentsCrossNetworkTitle": "Verbindung über Netzwerke",
+  "server.settings.remoteAgentsCrossNetworkDescription":
+    "Nutze Tailscale auf diesem Computer. OpenBot stellt nur die Routen für verknüpfte Server in deinem Tailnet bereit und verwendet diese Adresse in Linkcodes.",
+  "server.settings.remoteAgentsCrossNetworkPrepare": "Netzwerkverbindung vorbereiten",
+  "server.settings.remoteAgentsCrossNetworkReady": "Bereit für ein anderes Netzwerk",
+  "server.settings.remoteAgentsCrossNetworkPending": "Tailscale aktiv; Vorbereitung fehlt",
+  "server.settings.remoteAgentsCrossNetworkNoTailscale": "Tailscale ist nicht verbunden",
   "server.settings.identityRefreshFailed": "Die Serveridentität konnte nicht aktualisiert werden.",
   "server.settings.loadFailed": "Die Servereinstellungen konnten nicht geladen werden.",
   "server.settings.identityLocalOnly":

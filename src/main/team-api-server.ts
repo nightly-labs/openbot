@@ -239,6 +239,7 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { REMOTE_AGENT_BRIDGE_CAPABILITY } from "@openbot/contracts/team-protocol/remote-agent-bridge-v1";
 import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
@@ -440,6 +441,11 @@ import { routeProviderUsageReset } from "./team-api/route-provider-usage-reset";
 import { routeProviderUse } from "./team-api/route-provider-use";
 import { routeProviders } from "./team-api/route-providers";
 import { routePushNotifications } from "./team-api/route-push-notifications";
+import {
+  remoteAgentBridgePeerPath,
+  routeRemoteAgentBridge,
+  routeRemoteAgentBridgePeer,
+} from "./team-api/route-remote-agent-bridge";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutinePauseReasons } from "./team-api/route-routine-pause-reasons";
@@ -1085,6 +1091,19 @@ export class TeamApiServer {
         return this.#json(response, 200, await runCauseEffect(this.#options.store.loginWithAccount(user)));
       }
 
+      if (remoteAgentBridgePeerPath(url.pathname)) {
+        await routeRemoteAgentBridgePeer(
+          request,
+          url.pathname,
+          request.socket.remoteAddress ?? "local",
+          this.#options.admin,
+          (status, value) => {
+            this.#json(response, status, value);
+          },
+        );
+        return;
+      }
+
       const token = bearerToken(request.headers.authorization);
       const authenticated = token ? this.#options.store.authenticateSession(token) : null;
       if (!authenticated || !token) {
@@ -1270,6 +1289,7 @@ export class TeamApiServer {
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
+      if ((await routeRemoteAgentBridge(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routeSkillLearning(context, this.#options.admin)) === "handled") return;
@@ -2583,6 +2603,7 @@ export class TeamApiServer {
           return this.#options.channels !== undefined;
         if (capability === "remote-desktop-setup")
           return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
+        if (capability === REMOTE_AGENT_BRIDGE_CAPABILITY) return this.#options.admin?.remoteAgentBridge !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         if (capability === ATTACHMENT_PREVIEW_CAPABILITY) return this.#options.attachmentPreviews !== undefined;
         if (capability === LIVE_VOICE_CAPABILITY) return this.#options.liveVoice !== undefined;
