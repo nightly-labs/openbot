@@ -823,9 +823,13 @@ class Pool {
   }
 
   #hostingCopy() {
-    const archive = execFileSync("tar", ["-czf", "-", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"], {
-      maxBuffer: 16 * 1024 * 1024,
-    });
+    const archive = execFileSync(
+      "tar",
+      ["-czf", "-", "--no-xattrs", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"],
+      {
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
     return `set -euo pipefail
 rm -rf ${MACHINE_HOSTING}
 install -d -m 0700 ${MACHINE_HOSTING}
