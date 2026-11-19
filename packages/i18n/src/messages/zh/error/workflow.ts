@@ -32,6 +32,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "前一步的图片不可用，请再次运行该步骤。",
   "error.workflow.mediaEmptyRequest": "请写一段描述，或先运行前面的步骤，让文本或图片传进来。",
   "error.workflow.mediaInputNotImage": "此步骤只接收图片，不接收视频。请删除来自视频的连接。",
+  "error.workflow.mediaInputNotClip": "此输入只接收视频和音频文件。请删除来自该文件的连接。",
   "error.workflow.stepMissing": "该步骤已不存在。",
   "error.workflow.nodeMissing": "该步骤不在工作流中。",
   "error.workflow.runMissing": "该运行已不存在。",

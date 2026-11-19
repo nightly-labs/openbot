@@ -40,6 +40,8 @@ export const messages = {
   "error.workflow.mediaEmptyRequest":
     "Escribe una descripción o ejecuta los pasos anteriores para que llegue un texto o una imagen.",
   "error.workflow.mediaInputNotImage": "Este paso solo acepta imágenes, no vídeos. Quita la conexión desde el vídeo.",
+  "error.workflow.mediaInputNotClip":
+    "Esta entrada solo acepta vídeos y archivos de audio. Quita la conexión desde el archivo.",
   "error.workflow.stepMissing": "Este paso ya no existe.",
   "error.workflow.nodeMissing": "Este paso no está en el flujo de trabajo.",
   "error.workflow.runMissing": "Esta ejecución ya no existe.",

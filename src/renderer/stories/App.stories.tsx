@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, WorkflowNode } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -84,6 +84,68 @@ export const CompactSidebar: Story = {
 export const LinuxWindow: Story = {
   render: () => (
     <SidebarStatePlayground compact={false} options={{ appInfo: { ...STORY_APP_INFO, platform: "linux" } }} />
+  ),
+};
+
+function mediaStep(id: string, column: number, fields: WorkflowNode["fields"]): WorkflowNode {
+  return { kind: "image", id, at: { x: column * 460, y: 0 }, fields };
+}
+
+export const CanvasMediaSteps: Story = {
+  render: () => (
+    <SidebarStatePlayground
+      compact={false}
+      options={{
+        workflows: [
+          {
+            id: "launch-media",
+            title: "Launch media",
+            graph: {
+              nodes: [
+                mediaStep("poster", 0, {
+                  media: "image",
+                  model: "higgsfield-gpt_image_2_6",
+                  prompt: "The product box on a white table, soft light, no text",
+                  aspect: "4:3",
+                }),
+                mediaStep("teaser", 1, {
+                  media: "video",
+                  model: "higgsfield-seedance_2_0",
+                  prompt: "A slow push-in on the product window at dusk, soft city sounds",
+                  aspect: "21:9",
+                  duration: 7,
+                  resolution: "720p",
+                }),
+                mediaStep("clip", 2, {
+                  media: "video",
+                  model: "sunra-veo-3.1",
+                  prompt: "A hand opens the box; the camera follows the lid",
+                  aspect: "16:9",
+                }),
+                mediaStep("unboxing", 3, {
+                  media: "video",
+                  model: "higgsfield-kling4_0",
+                  prompt: "The product turns slowly on a stand; the light moves across it",
+                  aspect: "16:9",
+                  duration: 12,
+                }),
+                mediaStep("banner", 4, {
+                  media: "image",
+                  model: "sunra-nano-banana-pro",
+                  prompt: "A wide banner of the product on a city street at night",
+                  aspect: "16:9",
+                }),
+              ],
+              edges: [
+                { id: "poster>teaser:image", from: "poster", to: "teaser", type: "image" },
+                { id: "clip>unboxing:file", from: "clip", to: "unboxing", type: "file" },
+              ],
+              strokes: [],
+            },
+          },
+        ],
+      }}
+    />
   ),
 };
 

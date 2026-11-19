@@ -26,6 +26,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -230,13 +234,17 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         return { ...sunra, ...higgsfield, accounts: null };
       },
       mediaCatalog: async () =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-          : { models: [] },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : { models: [] },
       mediaPrice: async (input) =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-          : { credits: null },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : { credits: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {

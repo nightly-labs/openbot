@@ -1,9 +1,17 @@
 import {
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX,
+  WORKFLOW_MEDIA_INPUTS,
+  WORKFLOW_MEDIA_MODE_OPTION,
+  WORKFLOW_MEDIA_OPTION_TEXT_MAX,
+  WORKFLOW_MEDIA_OPTION_VALUES_MAX,
+  WORKFLOW_MEDIA_OPTIONS_MAX,
   type WorkflowMediaAspect,
   type WorkflowMediaCatalogModel,
+  type WorkflowMediaInput,
   type WorkflowMediaKind,
+  type WorkflowMediaMode,
+  type WorkflowMediaOption,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
@@ -16,8 +24,13 @@ export interface HiggsfieldPlan {
   exclusive?: boolean;
   endNeedsStart?: boolean;
   mode?: { text: string; frames: string | null; references: string | null };
+  modes?: Readonly<Record<string, readonly WorkflowMediaInput[]>>;
+  videos?: { role: string; max: number };
+  audios?: { role: string; max: number };
   resolution?: { param: string; values: Readonly<Record<string, string>> };
   background?: { param: "background"; opaque: boolean } | { param: "remove_bg" };
+  options?: Readonly<Record<string, Readonly<Record<string, string | boolean>>>>;
+  defaults?: Readonly<Record<string, string>>;
 }
 
 export interface HiggsfieldCatalogEntry {
@@ -26,16 +39,22 @@ export interface HiggsfieldCatalogEntry {
 }
 
 const IMAGE_ROLES = ["start_image", "end_image", "image_references", "image"] as const;
+const VIDEO_ROLES = ["video_references", "video"] as const;
+const AUDIO_ROLES = ["audio_references", "audio"] as const;
+const DEFAULT_CLIPS = 3;
 const DEFAULT_REFERENCES = 16;
 const SIZE_OPTION = /^\d+(?:\.\d+)?k$|^\d+p$/iu;
 const NEEDS_INPUT = /exactly one(?![^.|]*\bfor (?:edit|extend)\b)/iu;
 
-const KNOWN_LIMITS: Readonly<Record<string, Partial<Pick<HiggsfieldPlan, "references" | "total">>>> = {
+const KNOWN_LIMITS: Readonly<
+  Record<string, Partial<Pick<HiggsfieldPlan, "references" | "total"> & { videos: number; audios: number }>>
+> = {
   gpt_image_2_6: { references: 16 },
   nano_banana_pro: { references: 14 },
   seedream_v5_pro: { references: 10 },
   flux_3_image: { references: 10 },
-  seedance_2_0: { references: 9, total: 9 },
+  seedance_2_0: { references: 9, total: 9, videos: 3, audios: 3 },
+  seedance_2_0_mini: { videos: 3, audios: 3 },
   kling4_0: { references: 10, total: 10 },
 };
 
@@ -98,6 +117,100 @@ function videoDurations(item: DynamicRecord, duration: DynamicRecord | undefined
   return min !== null && max !== null ? range(min, max) : [];
 }
 
+const RESERVED_OPTIONS = new Set([
+  "model",
+  "prompt",
+  "count",
+  "use_unlim",
+  "get_cost",
+  "medias",
+  "aspect_ratio",
+  "duration",
+  "resolution",
+  "quality",
+  "background",
+  "remove_bg",
+  "is_inpaint",
+  "multi_shots",
+  "multi_shot_mode",
+  "batch_size",
+  "seed",
+  "extension_mode",
+  "draft_job_id",
+  "output_format",
+  "prompt_language",
+  "folder_id",
+]);
+const OPTION_NAME = /^[a-z][a-z0-9_]{0,63}$/iu;
+const isOptionValue = (value: string) => value.length > 0 && value.length <= WORKFLOW_MEDIA_OPTION_TEXT_MAX;
+
+const NEEDS_MORE = new Set(["custom", "user"]);
+const SERVICE_CHOICE = "auto";
+const CANVAS_DEFAULTS: Readonly<Record<string, string>> = { bitrate_mode: "high" };
+
+function optionChoice(
+  parameter: DynamicRecord,
+): { option: WorkflowMediaOption; sent: Record<string, string | boolean> } | null {
+  const name = text(parameter.name);
+  const values: unknown[] = Array.isArray(parameter.options) ? parameter.options : [];
+  const flags = values.length > 0 && values.every((value) => typeof value === "boolean");
+  if (parameter.type === "boolean" || typeof parameter.default === "boolean" || flags) {
+    return {
+      option: { name, kind: "switch", values: ["off", "on"], default: parameter.default === true ? "on" : "off" },
+      sent: { off: false, on: true },
+    };
+  }
+  const listed = [...new Set(strings(values))];
+  if (listed.length !== values.length) return null;
+  const options = listed.filter((value) => !NEEDS_MORE.has(value));
+  if (options.length < 2) return null;
+  const fallback = text(parameter.default);
+  if (options.length === 2 && options.includes("on") && options.includes("off")) {
+    return {
+      option: { name, kind: "switch", values: ["off", "on"], default: fallback === "on" ? "on" : "off" },
+      sent: { off: "off", on: "on" },
+    };
+  }
+  const preferred = CANVAS_DEFAULTS[name];
+  if (preferred !== undefined && options.includes(preferred)) {
+    if (options.length > WORKFLOW_MEDIA_OPTION_VALUES_MAX || !options.every(isOptionValue)) return null;
+    return {
+      option: { name, kind: "choice", values: options, default: preferred },
+      sent: Object.fromEntries(options.map((value) => [value, value])),
+    };
+  }
+  const chosen = options.includes(fallback) ? fallback : SERVICE_CHOICE;
+  const shown = options.includes(chosen) ? options : [SERVICE_CHOICE, ...options];
+  if (shown.length > WORKFLOW_MEDIA_OPTION_VALUES_MAX || !options.every(isOptionValue)) return null;
+  return {
+    option: { name, kind: "choice", values: shown, default: chosen },
+    sent: Object.fromEntries(options.map((value) => [value, value])),
+  };
+}
+
+function optionChoices(
+  parameters: readonly DynamicRecord[],
+  reserved: ReadonlySet<string>,
+  first: { option: WorkflowMediaOption; sent: Record<string, string> } | null,
+) {
+  const options: WorkflowMediaOption[] = first ? [first.option] : [];
+  const sent: Record<string, Readonly<Record<string, string | boolean>>> = first
+    ? { [first.option.name]: first.sent }
+    : {};
+  const defaults: Record<string, string> = {};
+  for (const parameter of parameters) {
+    const name = text(parameter.name);
+    if (!OPTION_NAME.test(name) || RESERVED_OPTIONS.has(name) || reserved.has(name) || name in sent) continue;
+    const choice = optionChoice(parameter);
+    if (!choice) continue;
+    options.push(choice.option);
+    sent[name] = choice.sent;
+    if (CANVAS_DEFAULTS[name] === choice.option.default) defaults[name] = choice.option.default;
+    if (options.length === WORKFLOW_MEDIA_OPTIONS_MAX) break;
+  }
+  return { options, sent, defaults: Object.keys(defaults).length > 0 ? defaults : undefined };
+}
+
 function idName(id: string): string {
   const words: string[] = [];
   for (const word of id.split(/[_-]+/u).filter(Boolean)) {
@@ -142,6 +255,30 @@ function modeChoice(parameter: DynamicRecord | undefined): HiggsfieldPlan["mode"
   return null;
 }
 
+function modeInputs(value: string, takes: ReadonlySet<WorkflowMediaInput>): WorkflowMediaInput[] | null {
+  const name = value.toLowerCase();
+  const wanted: readonly WorkflowMediaInput[] | null = /^(?:t2v|text[-_]?to[-_]?video)$/u.test(name)
+    ? []
+    : /^(?:i2v|image[-_]?to[-_]?video)$|frame/u.test(name)
+      ? ["frames"]
+      : /^(?:r2v|reference[-_]?to[-_]?video)$/u.test(name)
+        ? ["references", "videos", "audios"]
+        : /omni|reference/u.test(name)
+          ? WORKFLOW_MEDIA_INPUTS
+          : null;
+  return wanted ? wanted.filter((input) => takes.has(input)) : null;
+}
+
+function chosenModes(parameter: DynamicRecord | undefined, takes: ReadonlySet<WorkflowMediaInput>) {
+  const modes: WorkflowMediaMode[] = [];
+  for (const value of new Set(strings(parameter?.options))) {
+    const inputs = modeInputs(value, takes);
+    if (inputs && isOptionValue(value) && modes.length < WORKFLOW_MEDIA_OPTION_VALUES_MAX)
+      modes.push({ value, inputs });
+  }
+  return modes.length >= 2 ? modes : [];
+}
+
 export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEntry | null {
   const id = text(item.id);
   const kind: WorkflowMediaKind | null =
@@ -170,6 +307,7 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
       : [];
   if (kind === "video" && durations.length === 0) return null;
 
+  const known = KNOWN_LIMITS[id];
   const referenceRole = roles.has("image_references") ? "image_references" : roles.has("image") ? "image" : null;
   const referenceText = referenceRole ? texts.get(referenceRole) : undefined;
   const listedMax =
@@ -177,19 +315,53 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
       .filter((media) => referenceRole !== null && strings(media.roles).includes(referenceRole))
       .map((media) => wholeNumber(media.max))
       .find((value) => value !== null) ?? null;
-  const known = KNOWN_LIMITS[id];
   const references = referenceRole
     ? (known?.references ?? listedMax ?? textLimit(referenceText) ?? DEFAULT_REFERENCES)
     : 0;
   const total =
     known?.total ??
     (referenceText && /across/iu.test(referenceText) ? (textLimit(referenceText) ?? undefined) : undefined);
+  const clips = (candidates: readonly string[], limit: number | undefined) => {
+    const role = kind === "video" ? candidates.find((name) => roles.has(name)) : undefined;
+    return role ? { role, max: limit ?? textLimit(texts.get(role)) ?? DEFAULT_CLIPS } : undefined;
+  };
+  const videos = clips(VIDEO_ROLES, known?.videos);
+  const audios = clips(AUDIO_ROLES, known?.audios);
+  const takes = new Set<WorkflowMediaInput>([
+    ...(roles.has("start_image") || roles.has("end_image") ? (["frames"] as const) : []),
+    ...(referenceRole ? (["references"] as const) : []),
+    ...(videos ? (["videos"] as const) : []),
+    ...(audios ? (["audios"] as const) : []),
+  ]);
+  const modes = mode
+    ? chosenModes(
+        parameters.find((entry) => entry.name === "mode"),
+        takes,
+      )
+    : [];
   const startText = texts.get("start_image") ?? "";
   const endText = texts.get("end_image") ?? "";
   const resolution = resolutionChoice(parameters);
   const background = parameters.find((entry) => entry.name === "background");
   const removesBackground = parameters.some((entry) => entry.name === "remove_bg");
   const transparent = kind === "image" && (strings(background?.options).includes("transparent") || removesBackground);
+  const modeOption =
+    modes.length > 0
+      ? {
+          option: {
+            name: WORKFLOW_MEDIA_MODE_OPTION,
+            kind: "choice" as const,
+            values: modes.map((entry) => entry.value),
+            default: mode && modes.some((entry) => entry.value === mode.text) ? mode.text : (modes[0]?.value ?? ""),
+          },
+          sent: Object.fromEntries(modes.map((entry) => [entry.value, entry.value])),
+        }
+      : null;
+  const settings = optionChoices(
+    parameters.filter((entry) => entry.required !== "required"),
+    new Set([...(mode ? ["mode"] : []), ...(resolution ? [resolution.param] : [])]),
+    modeOption,
+  );
   const plan: HiggsfieldPlan = {
     referenceRole: mode && mode.references === null && mode.frames === null ? null : referenceRole,
     references: mode && mode.references === null ? 0 : references,
@@ -202,6 +374,9 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
       : {}),
     ...(/requires start_image/iu.test(endText) ? { endNeedsStart: true } : {}),
     ...(mode ? { mode } : {}),
+    ...(modes.length > 0 ? { modes: Object.fromEntries(modes.map((entry) => [entry.value, entry.inputs])) } : {}),
+    ...(videos ? { videos } : {}),
+    ...(audios ? { audios } : {}),
     ...(resolution ? { resolution: { param: resolution.param, values: resolution.values } } : {}),
     ...(transparent
       ? {
@@ -211,6 +386,8 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
               : { param: "remove_bg" as const },
         }
       : {}),
+    ...(settings.options.length > 0 ? { options: settings.sent } : {}),
+    ...(settings.defaults ? { defaults: settings.defaults } : {}),
   };
   const name = text(item.name).trim().slice(0, 160) || idName(id);
   const maker = text(item.provider_name).trim().slice(0, 120) || "Higgsfield";
@@ -226,6 +403,9 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
       durations,
       resolutions: resolution?.shown.slice(0, 16) ?? [],
       transparent,
+      ...(settings.options.length > 0 ? { options: settings.options } : {}),
+      ...(kind === "video" ? { inputs: WORKFLOW_MEDIA_INPUTS.filter((input) => takes.has(input)) } : {}),
+      ...(modes.length > 0 ? { modes } : {}),
     },
     plan,
   };
@@ -248,7 +428,15 @@ const FIXED_PLANS: Readonly<Record<string, HiggsfieldPlan>> = {
     background: { param: "remove_bg" },
   },
   flux_3_image: { referenceRole: "image_references", references: 10, start: false, end: false },
-  seedance_2_0: { referenceRole: "image_references", references: 9, start: true, end: true, total: 9 },
+  seedance_2_0: {
+    referenceRole: "image_references",
+    references: 9,
+    start: true,
+    end: true,
+    total: 9,
+    videos: { role: "video_references", max: 3 },
+    audios: { role: "audio_references", max: 3 },
+  },
   kling4_0: {
     referenceRole: "image_references",
     references: 10,

@@ -3,8 +3,10 @@ import {
   canAdministerServer,
   graphAgentIds,
   WORKFLOW_GROUP_FIELDS,
+  WORKFLOW_MEDIA_CATALOG_V1_ASPECTS,
   type WorkflowDetail,
   type WorkflowGraph,
+  type WorkflowMediaCatalog,
   type WorkflowRunDetail,
   type WorkflowRunPage,
   type WorkflowStep,
@@ -21,6 +23,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
@@ -72,7 +78,17 @@ const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTE
 const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
 const WORKFLOW_HIGGSFIELD_PATHS = new Set<string>(Object.values(WORKFLOWS_HIGGSFIELD_ROUTES));
 const WORKFLOW_MEDIA_CATALOG_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_ROUTES));
+const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES));
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
+
+function catalogV1(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
+  return {
+    models: catalog.models.flatMap(({ options: _options, inputs: _inputs, modes: _modes, ...model }) => {
+      const aspects = model.aspects.filter((aspect) => WORKFLOW_MEDIA_CATALOG_V1_ASPECTS.includes(aspect));
+      return aspects.length > 0 ? [{ ...model, aspects }] : [];
+    }),
+  };
+}
 
 function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
@@ -160,10 +176,20 @@ export async function routeWorkflows(
   const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
   const higgsfieldPath = WORKFLOW_HIGGSFIELD_PATHS.has(path);
   const catalogPath = WORKFLOW_MEDIA_CATALOG_PATHS.has(path);
+  const catalogV2Path = WORKFLOW_MEDIA_CATALOG_V2_PATHS.has(path);
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
   if (
     method !== "POST" ||
-    !(githubPath || mediaPath || sunraPath || higgsfieldPath || catalogPath || accountPath || WORKFLOW_PATHS.has(path))
+    !(
+      githubPath ||
+      mediaPath ||
+      sunraPath ||
+      higgsfieldPath ||
+      catalogPath ||
+      catalogV2Path ||
+      accountPath ||
+      WORKFLOW_PATHS.has(path)
+    )
   )
     return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
@@ -178,6 +204,8 @@ export async function routeWorkflows(
   if (higgsfieldPath && !capabilities.has(WORKFLOWS_HIGGSFIELD_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (catalogPath && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (catalogV2Path && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
@@ -376,8 +404,9 @@ export async function routeWorkflows(
     return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
     return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price)
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, catalogV1(await run(workflows.mediaCatalog())));
+  if (path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price || path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price)
     return json(200, await run(workflows.mediaPrice(parse(parseWorkflowMediaPrice, body))));
   if (!github) return "unmatched";
   switch (path) {

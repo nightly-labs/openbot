@@ -64,8 +64,17 @@ export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
-export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4", "21:9", "3:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+export const WORKFLOW_MEDIA_CATALOG_V1_ASPECTS: readonly WorkflowMediaAspect[] = [
+  "1:1",
+  "4:3",
+  "16:9",
+  "9:16",
+  "4:5",
+  "5:4",
+];
+const WORKFLOW_IMAGE_ASPECTS = WORKFLOW_MEDIA_CATALOG_V1_ASPECTS;
 const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
 export const WORKFLOW_MEDIA_LEGACY_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_VIDEO_ASPECTS;
 
@@ -94,7 +103,36 @@ export interface WorkflowMediaModel {
   durations?: readonly number[];
   resolutions?: readonly string[];
   transparent?: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
 }
+
+export interface WorkflowMediaOption {
+  name: string;
+  kind: "switch" | "choice";
+  values: readonly string[];
+  default: string;
+}
+
+export interface WorkflowMediaOptionValue {
+  name: string;
+  value: string;
+}
+
+export const WORKFLOW_MEDIA_INPUTS = ["frames", "references", "videos", "audios"] as const;
+export type WorkflowMediaInput = (typeof WORKFLOW_MEDIA_INPUTS)[number];
+
+export interface WorkflowMediaMode {
+  value: string;
+  inputs: readonly WorkflowMediaInput[];
+}
+export const WORKFLOW_MEDIA_MODE_OPTION = "mode";
+
+export const WORKFLOW_MEDIA_OPTIONS_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_VALUES_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_TEXT_MAX = 64;
+export const WORKFLOW_MEDIA_SWITCH_VALUES = ["off", "on"] as const;
 
 const SUNRA_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 const SUNRA_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
@@ -230,13 +268,13 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
   return fields.media === "video" ? "video" : "image";
 }
 
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
+type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent" | "options">;
 
 export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
   kind: WorkflowMediaKind,
 ): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_IMAGE_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
@@ -307,6 +345,26 @@ export interface WorkflowMediaSpecs {
   resolution: string | null;
   transparent: boolean;
   size: WorkflowMediaSize | null;
+  options: readonly WorkflowMediaOptionValue[];
+}
+
+export function workflowMediaOptions(
+  fields: WorkflowFields,
+  model: WorkflowMediaRange | null | undefined,
+): WorkflowMediaOptionValue[] {
+  const options = model?.options;
+  if (!options?.length || typeof fields.options !== "string" || !fields.options) return [];
+  let chosen: unknown;
+  try {
+    chosen = JSON.parse(fields.options);
+  } catch {
+    return [];
+  }
+  if (!isDynamicRecord(chosen)) return [];
+  return options.flatMap((option) => {
+    const value = chosen[option.name];
+    return typeof value === "string" && option.values.includes(value) ? [{ name: option.name, value }] : [];
+  });
 }
 
 export function workflowMediaSpecs(
@@ -333,7 +391,7 @@ export function workflowMediaSpecs(
       ? preferred
       : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
-  return { aspect, duration, resolution, transparent, size };
+  return { aspect, duration, resolution, transparent, size, options: workflowMediaOptions(fields, model) };
 }
 
 export function workflowMediaModel(
@@ -507,7 +565,7 @@ export const WORKFLOW_PORTS: Readonly<
   asset: { in: [], out: ALL_PORTS },
   llm: { in: ALL_PORTS, out: ["text"] },
   agent: { in: ALL_PORTS, out: ["text"] },
-  image: { in: ["text", "image"], out: ["image"] },
+  image: { in: ["text", "image", "file"], out: ["image", "file"] },
   condition: { in: ["text"], out: ["text"] },
   approval: { in: ["text"], out: ["text"] },
   output: { in: ALL_PORTS, out: [] },
@@ -1090,6 +1148,9 @@ export interface WorkflowMediaCatalogModel {
   durations: readonly number[];
   resolutions: readonly string[];
   transparent: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
 }
 
 export interface WorkflowMediaCatalog {
@@ -1108,13 +1169,45 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
     isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
     isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
     isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
-    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.aspects, WORKFLOW_MEDIA_ASPECTS.length, (entry): entry is WorkflowMediaAspect =>
+      isOneOf(WORKFLOW_MEDIA_ASPECTS, entry),
+    ) &&
     isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOption)) &&
+    (value.inputs === undefined || isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)) &&
+    (value.modes === undefined || isListOf(value.modes, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isWorkflowMediaMode))
   );
+}
+
+const isWorkflowMediaInput = (value: unknown): value is WorkflowMediaInput => isOneOf(WORKFLOW_MEDIA_INPUTS, value);
+
+function isWorkflowMediaMode(value: unknown): value is WorkflowMediaMode {
+  return (
+    isDynamicRecord(value) &&
+    isOptionText(value.value) &&
+    isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)
+  );
+}
+
+const isOptionText = (value: unknown): value is string =>
+  isBoundedString(value, WORKFLOW_MEDIA_OPTION_TEXT_MAX) && value.length > 0;
+
+function isWorkflowMediaOption(value: unknown): value is WorkflowMediaOption {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.name) &&
+    isOneOf(["switch", "choice"] as const, value.kind) &&
+    isListOf(value.values, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isOptionText) &&
+    isOptionText(value.default)
+  );
+}
+
+function isWorkflowMediaOptionValue(value: unknown): value is WorkflowMediaOptionValue {
+  return isDynamicRecord(value) && isIdentifier(value.name) && isOptionText(value.value);
 }
 
 export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
@@ -1139,6 +1232,9 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
     ...(kind === "video" ? { durations: entry.durations } : {}),
     resolutions: entry.resolutions,
     transparent: kind === "image" && entry.transparent,
+    ...(entry.options?.length ? { options: entry.options } : {}),
+    ...(kind === "video" && entry.inputs ? { inputs: entry.inputs } : {}),
+    ...(kind === "video" && entry.modes?.length ? { modes: entry.modes } : {}),
   };
 }
 
@@ -1168,6 +1264,7 @@ export interface WorkflowMediaPriceRequest {
   duration: number;
   resolution: string | null;
   transparent: boolean;
+  options?: readonly WorkflowMediaOptionValue[];
 }
 
 export interface WorkflowMediaPrice {
@@ -1184,7 +1281,8 @@ export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMe
     isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
     isCreditCount(value.duration) &&
     (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOptionValue))
   );
 }
 

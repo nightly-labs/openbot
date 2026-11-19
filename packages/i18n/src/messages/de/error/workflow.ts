@@ -45,6 +45,8 @@ export const messages = {
     "Schreibe eine Beschreibung oder führe die Schritte davor aus, damit ein Text oder ein Bild ankommt.",
   "error.workflow.mediaInputNotImage":
     "Dieser Schritt nimmt nur Bilder an, keine Videos. Entferne die Verbindung vom Video.",
+  "error.workflow.mediaInputNotClip":
+    "Dieser Eingang nimmt nur Videos und Audiodateien an. Entferne die Verbindung von der Datei.",
   "error.workflow.stepMissing": "Dieser Schritt existiert nicht mehr.",
   "error.workflow.nodeMissing": "Dieser Schritt ist nicht im Workflow.",
   "error.workflow.runMissing": "Dieser Lauf existiert nicht mehr.",

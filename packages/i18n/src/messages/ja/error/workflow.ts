@@ -41,6 +41,8 @@ export const messages = {
   "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
   "error.workflow.mediaInputNotImage":
     "このステップは画像のみを受け取り、動画は受け取れません。動画からの接続を削除してください。",
+  "error.workflow.mediaInputNotClip":
+    "この入力は動画と音声ファイルのみを受け取ります。ファイルからの接続を削除してください。",
   "error.workflow.stepMissing": "このステップはもう存在しません。",
   "error.workflow.nodeMissing": "この手順はワークフローにありません。",
   "error.workflow.runMissing": "この実行はもう存在しません。",

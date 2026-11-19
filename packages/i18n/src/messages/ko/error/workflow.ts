@@ -38,6 +38,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
   "error.workflow.mediaEmptyRequest": "설명을 작성하거나 앞 단계를 실행해 텍스트나 이미지가 들어오게 해 주세요.",
   "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",
+  "error.workflow.mediaInputNotClip": "이 입력은 동영상과 오디오 파일만 받아요. 파일에서 오는 연결을 지워 주세요.",
   "error.workflow.stepMissing": "이 단계는 더 이상 존재하지 않아요.",
   "error.workflow.nodeMissing": "이 단계는 워크플로에 없어요.",
   "error.workflow.runMissing": "이 실행은 더 이상 존재하지 않아요.",

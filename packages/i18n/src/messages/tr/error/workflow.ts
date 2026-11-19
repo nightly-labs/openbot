@@ -39,6 +39,8 @@ export const messages = {
   "error.workflow.mediaEmptyRequest":
     "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
   "error.workflow.mediaInputNotImage": "Bu adım yalnızca görsel alır, video almaz. Videodan gelen bağlantıyı kaldırın.",
+  "error.workflow.mediaInputNotClip":
+    "Bu giriş yalnızca video ve ses dosyası alır. Dosyadan gelen bağlantıyı kaldırın.",
   "error.workflow.stepMissing": "Bu adım artık yok.",
   "error.workflow.nodeMissing": "Bu adım iş akışında yok.",
   "error.workflow.runMissing": "Bu çalıştırma artık yok.",

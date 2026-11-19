@@ -44,6 +44,8 @@ export const messages = {
     "Schrijf een beschrijving, of voer de stappen ervoor uit zodat er een tekst of afbeelding binnenkomt.",
   "error.workflow.mediaInputNotImage":
     "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
+  "error.workflow.mediaInputNotClip":
+    "Deze invoer neemt alleen video’s en audiobestanden aan. Verwijder de verbinding vanaf het bestand.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",
   "error.workflow.nodeMissing": "Deze stap staat niet in de workflow.",
   "error.workflow.runMissing": "Deze run bestaat niet meer.",
