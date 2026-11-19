@@ -444,7 +444,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
     threads: {},
   });
   const [sidePanelShown, setSidePanelShown] = createSignal(storedSidePanels.shown);
-  if (keepSidePanelFiles) writeSidePanelsOnChange(sidePanels.side, sidePanelShown);
+  if (keepSidePanelFiles) writeSidePanelsOnChange(sidePanels, sidePanelShown);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
