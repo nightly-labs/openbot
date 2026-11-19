@@ -453,17 +453,23 @@ export class BillingReferral {
           credit.amount - credit.reversed_amount,
         ),
       );
+      // The guard writes nothing when another webhook queued, sent or converted the credit after the read.
+      // Then this refund fails, and the retry takes the share back from the credit as it is then.
       yield* billingCall(() =>
         this.#database.batch([
           this.#database
             .prepare(
               `INSERT OR IGNORE INTO referral_reversals(reversal_id, invoice_id, amount, balance_transaction_id, created_at)
-               VALUES (?, ?, ?, '', ?)`,
+               SELECT ?1, ?2, ?3, '', ?4 WHERE EXISTS (
+                 SELECT 1 FROM referral_credits
+                 WHERE invoice_id = ?2 AND currency = ?5 AND queued_at IS NULL AND balance_transaction_id IS NULL
+               )`,
             )
-            .bind(reversal.objectId, payment.invoiceId, amount, this.#now()),
+            .bind(reversal.objectId, payment.invoiceId, amount, this.#now(), credit.currency),
           this.#reversedAmount(payment.invoiceId),
         ]),
       );
+      if (!(yield* this.#reversalRow(reversal.objectId))) return yield* new BillingOperationError({});
       return;
     }
     // A refund of all of a waiting credit leaves nothing to take back.
