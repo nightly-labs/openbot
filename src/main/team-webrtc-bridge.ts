@@ -5,7 +5,7 @@ import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { iceServerErrorDetail } from "@openbot/team-client/ice-diagnostics";
+import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
@@ -120,8 +120,6 @@ type BridgeCommand =
     }
   | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
   | { type: "send"; peerId: string; channel: TeamWebRtcChannel; data: string | ArrayBuffer };
-
-const ICE_ROUTE = /^[a-z]{1,8}\/[a-z]{1,8} -> [a-z]{1,8}\/[a-z]{1,8}$/u;
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
@@ -433,8 +431,9 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "peer-path-lost") this.emit("pathLost", message.peerId);
     else if (message.type === "peer-path-restored") this.emit("pathRestored", message.peerId);
     else if (message.type === "ice-path" && message.path) {
-      const route = message.route && ICE_ROUTE.test(message.route) ? message.route : "unknown";
-      logger.info(`WebRTC ${message.side ?? "unknown"} connection uses ${message.path}: ${route}.`);
+      logger.info(
+        `WebRTC ${message.side ?? "unknown"} connection uses ${message.path}: ${knownIceCandidateRoute(message.route)}.`,
+      );
       this.emit("path", message.peerId, message.path);
     } else if (message.type === "ice-candidate-error" && message.errorCode !== undefined)
       logger.warn(

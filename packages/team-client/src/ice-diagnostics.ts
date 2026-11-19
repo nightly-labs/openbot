@@ -12,3 +12,25 @@ export function iceServerErrorDetail(url: string, errorCode: number, errorText: 
   const text = errorText.replace(ADDRESS, "[address]").trim().slice(0, 120);
   return `${server} ${errorCode}${text ? ` ${text}` : ""}`;
 }
+
+const ICE_ROUTE = /^[a-z]{1,8}\/[a-z]{1,8} -> [a-z]{1,8}\/[a-z]{1,8}$/u;
+
+interface IceCandidateStats {
+  candidateType?: string;
+  protocol?: string;
+}
+
+function candidateRoute(candidate: IceCandidateStats | null | undefined): string {
+  return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
+}
+
+export function iceCandidateRoute(
+  local: IceCandidateStats | null | undefined,
+  remote: IceCandidateStats | null | undefined,
+): string {
+  return `${candidateRoute(local)} -> ${candidateRoute(remote)}`;
+}
+
+export function knownIceCandidateRoute(route: string | undefined): string {
+  return route && ICE_ROUTE.test(route) ? route : "unknown";
+}

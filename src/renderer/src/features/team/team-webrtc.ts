@@ -10,6 +10,7 @@ import {
 import { BROWSER_EGRESS_CHANNEL } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
+import { iceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
 import { isPrivateNetworkCandidate, privateNetworkSdp } from "./team-webrtc-private-network";
 
@@ -932,12 +933,8 @@ async function selectedPath(connection: RTCPeerConnection): Promise<{ path: "rel
   const remote = pair ? stats.get(pair.remoteCandidateId) : null;
   return {
     path: local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "p2p",
-    route: `${candidateRoute(local)} -> ${candidateRoute(remote)}`,
+    route: iceCandidateRoute(local, remote),
   };
-}
-
-function candidateRoute(candidate: { candidateType?: string; protocol?: string } | null | undefined): string {
-  return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
 }
 
 function sendSignal(state: PeerState, message: SignalClientMessage): void {
