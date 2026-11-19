@@ -9,6 +9,9 @@ import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
 const VISUAL_PAGE_CACHE = 8;
 const VISUAL_PAGE_READS = 4;
+const visualPageReads = new WeakMap<VisualPageRemote, ReturnType<typeof createReadQueue>>();
+
+type VisualPageRemote = Pick<WebWorkspaceRuntime, "download">;
 
 export function createWebAttachmentFiles(
   remote: Pick<WebWorkspaceRuntime, "download" | "sharedFile" | "workspaceFile">,
@@ -17,7 +20,7 @@ export function createWebAttachmentFiles(
 ) {
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
-  const readPage = createReadQueue(VISUAL_PAGE_READS);
+  const readPage = visualPageQueue(remote);
   return {
     async download(id: string): Promise<void> {
       const held = await media.file(id);
@@ -70,6 +73,14 @@ export function createWebAttachmentFiles(
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
   };
+}
+
+function visualPageQueue(remote: VisualPageRemote) {
+  const shared = visualPageReads.get(remote);
+  if (shared) return shared;
+  const queue = createReadQueue(VISUAL_PAGE_READS);
+  visualPageReads.set(remote, queue);
+  return queue;
 }
 
 function createReadQueue(limit: number) {
