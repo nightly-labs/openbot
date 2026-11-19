@@ -41,6 +41,7 @@ export function ChatActivityLine({
   icon,
   label,
   name,
+  nameIcon,
   meta,
   accessibilityLabel,
   accessibilityHint,
@@ -51,6 +52,7 @@ export function ChatActivityLine({
   icon: ReactNode;
   label?: string;
   name?: string;
+  nameIcon?: ReactNode;
   meta?: string;
   accessibilityLabel: string;
   accessibilityHint?: string;
@@ -74,6 +76,7 @@ export function ChatActivityLine({
           {label}
         </Typography.Paragraph>
       ) : null}
+      {nameIcon}
       {name ? (
         <Typography.Paragraph
           type="body-xs"
