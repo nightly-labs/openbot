@@ -34,7 +34,7 @@ interface AccountLoginProps {
   /** Shows the optional invite code in a corner of the email step. Off where no account can be created. */
   inviteField?: boolean;
   /** The first invite code, such as the code of an invite link that the web client kept. The screen celebrates it. */
-  initialInviteCode?: string;
+  initialInviteCode?: string | undefined;
   /** `false` while a loading screen still covers this screen. The invite burst waits for it. */
   revealed?: boolean;
 }

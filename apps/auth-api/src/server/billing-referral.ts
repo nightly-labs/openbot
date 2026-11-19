@@ -134,11 +134,13 @@ export class BillingReferral {
     this: BillingReferral,
     event: StripeEvent,
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null } | null,
+    /** The account that owns the subscription of the event, or null. */
+    ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
     if (event.type === "invoice.paid") return yield* this.#creditInvoice(event);
     const reversal = paymentReversal(event);
     if (reversal && payment && (reversal.type === "payment_refunded" || reversal.type === "dispute_lost")) {
-      yield* this.#reverse(reversal, payment);
+      yield* this.#reverse(reversal, payment, ownerId);
     }
   }).bind(this);
 
@@ -281,6 +283,7 @@ export class BillingReferral {
     this: BillingReferral,
     referrer: string,
   ): Effect.fn.Return<void, Failure> {
+    yield* this.#followReferrerCurrency(referrer);
     const totals = yield* billingCall(() =>
       this.#database
         .prepare(
@@ -321,6 +324,73 @@ export class BillingReferral {
     for (const credit of queued.results ?? []) yield* this.#send(credit);
   }).bind(this);
 
+  /**
+   * A referrer with no Stripe currency gets credit in the friend's currency. A plan that the referrer starts
+   * later sets the currency of its Stripe customer, and Stripe takes credit only off invoices in that
+   * currency. Credit that is not queued yet moves to that currency, with its waiting refunds.
+   */
+  readonly #followReferrerCurrency = Effect.fn("BillingReferral.followReferrerCurrency")(function* (
+    this: BillingReferral,
+    referrer: string,
+  ): Effect.fn.Return<void, Failure> {
+    const waiting = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT invoice_id, source_currency, source_amount, currency FROM referral_credits
+           WHERE referrer_user_id = ? AND queued_at IS NULL AND balance_transaction_id IS NULL`,
+        )
+        .bind(referrer)
+        .all<{ invoice_id: string; source_currency: string; source_amount: number; currency: string }>(),
+    );
+    const rows = waiting.results ?? [];
+    if (rows.length === 0) return;
+    const customerId = yield* this.#customerId(referrer);
+    if (!customerId) return;
+    const customer = yield* this.#stripeCall(() => this.#stripe.getCustomerCredit(customerId));
+    const target = customer?.currency;
+    if (!target || !isOneOf(BILLING_CURRENCIES, target)) return;
+    const statements: D1PreparedStatement[] = [];
+    for (const row of rows) {
+      if (row.currency === target) continue;
+      if (!isOneOf(BILLING_CURRENCIES, row.currency) || !isOneOf(BILLING_CURRENCIES, row.source_currency)) continue;
+      const amount = convertReferralAmount(row.source_amount, row.source_currency, target);
+      const from = row.currency;
+      const reversals = yield* billingCall(() =>
+        this.#database
+          .prepare("SELECT reversal_id, amount FROM referral_reversals WHERE invoice_id = ?")
+          .bind(row.invoice_id)
+          .all<{ reversal_id: string; amount: number }>(),
+      );
+      for (const reversal of reversals.results ?? []) {
+        statements.push(
+          this.#database
+            .prepare(
+              `UPDATE referral_reversals SET amount = ?1 WHERE reversal_id = ?2
+               AND EXISTS (SELECT 1 FROM referral_credits WHERE invoice_id = ?3 AND currency = ?4)`,
+            )
+            .bind(
+              Math.min(amount, convertReferralAmount(reversal.amount, from, target)),
+              reversal.reversal_id,
+              row.invoice_id,
+              from,
+            ),
+        );
+      }
+      // The batch is one transaction. The guards on the old currency keep a second webhook at the same time
+      // from converting the row and its refunds twice.
+      statements.push(
+        this.#database
+          .prepare(
+            `UPDATE referral_credits SET currency = ?, amount = ?, reversed_amount = 0
+             WHERE invoice_id = ? AND currency = ? AND queued_at IS NULL AND balance_transaction_id IS NULL`,
+          )
+          .bind(target, amount, row.invoice_id, from),
+        this.#reversedAmount(row.invoice_id),
+      );
+    }
+    if (statements.length > 0) yield* billingCall(() => this.#database.batch(statements));
+  }).bind(this);
+
   /** Gives one credit to the referrer, less the part that a refund took back while it waited. */
   readonly #send = Effect.fn("BillingReferral.send")(function* (
     this: BillingReferral,
@@ -356,8 +426,15 @@ export class BillingReferral {
     this: BillingReferral,
     reversal: PaymentReversal,
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null },
+    ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
     let credit = yield* this.#creditRow(payment.invoiceId);
+    // Stripe does not keep the order of events, and sends a failed `invoice.paid` again later. A refund of an
+    // invoice of an invited friend that has no credit yet fails, so Stripe sends the refund again after the
+    // credit is written. Otherwise the referrer would keep credit for a refunded payment.
+    if (!credit && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
+      return yield* new BillingOperationError({});
+    }
     // A queued credit keeps its amount until Stripe accepts it, because its idempotency key is fixed. It goes
     // to Stripe first, and the refund then takes the share back from the Stripe credit.
     if (credit && credit.queued_at !== null && credit.balance_transaction_id === null) {

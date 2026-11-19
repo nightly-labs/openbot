@@ -1097,7 +1097,7 @@ export class BillingService {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
       if (this.#oss) yield* this.#oss.record(event);
-      yield* this.#referral.record(event, payment);
+      yield* this.#referral.record(event, payment, sold?.userId ?? null);
       // The event is recorded only after it is applied, so a failed event is applied again on retry.
       yield* billingCall(() =>
         dependencies.database.batch([
