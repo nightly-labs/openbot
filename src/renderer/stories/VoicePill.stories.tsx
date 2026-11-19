@@ -96,6 +96,10 @@ export const Speaking: Story = { args: { phase: "speaking", levels: SPEECH } };
 
 export const LiveVoice: Story = { args: { onCycleSpeed: undefined } };
 
+export const LiveVoiceChosen: Story = { args: { onCycleSpeed: undefined, voice: "Voice: Juniper" } };
+
+export const LiveVoiceAutomatic: Story = { args: { onCycleSpeed: undefined, voice: "Voice: Automatic" } };
+
 export const MicrophoneBlocked: Story = {
   args: { muted: true, error: "OpenBot cannot use the microphone. Allow it in System Settings." },
 };

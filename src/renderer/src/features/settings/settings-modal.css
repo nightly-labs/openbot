@@ -63,6 +63,11 @@
   text-align: center;
 }
 
+.settings-live-voice-hint {
+  margin-inline-start: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+}
+
 .settings-voice-model-actions {
   display: flex;
   align-items: center;
