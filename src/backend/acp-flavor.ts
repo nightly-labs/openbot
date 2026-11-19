@@ -507,12 +507,14 @@ export interface AcpFlavor {
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 
 /**
- * The billing wall of Cursor and GitHub Copilot when the account needs a payment method for more use
- * (#4556, #9808). As answer text, only the whole chunk matches, so an answer that quotes it stays an
- * answer. In an error, the text can be part of a longer message.
+ * GitHub Copilot's texts for a used-up plan: the billing wall when the account needs a payment
+ * method for more use (#9808), and the spent monthly quota, "Error: You have exceeded your monthly
+ * quota (Request ID: …)" (#12383). As answer text, only the whole chunk matches, so an answer that
+ * quotes it stays an answer. In an error, the text can be part of a longer message.
  */
-const PAYMENT_METHOD_WALL = /^\s*Add a payment method to continue\.?\s*$/u;
-const PAYMENT_METHOD_WALL_TEXT = /\bAdd a payment method to continue\b/u;
+const COPILOT_PLAN_USED_UP =
+  /^\s*(?:Add a payment method to continue\.?|Error: You have exceeded your monthly quota\b[^\n]*)\s*$/u;
+const COPILOT_PLAN_USED_UP_TEXT = /\bAdd a payment method to continue\b|\bexceeded your monthly quota\b/u;
 
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
 export const CLINE_ACP_FLAVOR: AcpFlavor = {
@@ -533,8 +535,9 @@ export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   turnFailure: copilotTurnFailure,
   // GitHub Copilot CLI 1.0.112 sent its billing wall as the whole answer, or as the turn's error. The
   // chat showed only "Add a payment method to continue", and no backup model took the turn (#9808).
-  planUsedUpChunk: PAYMENT_METHOD_WALL,
-  failureCause: (error) => (PAYMENT_METHOD_WALL_TEXT.test(errorText(error)) ? "usage_limit" : null),
+  // GitHub Copilot does the same with its spent monthly quota (#12383).
+  planUsedUpChunk: COPILOT_PLAN_USED_UP,
+  failureCause: (error) => (COPILOT_PLAN_USED_UP_TEXT.test(errorText(error)) ? "usage_limit" : null),
   // GitHub Copilot CLI 1.0.112 compacts its session by itself. The context meter said "This agent
   // does not compact its context." (#10643).
   compactsItself: true,
@@ -547,7 +550,7 @@ export const COPILOT_ACP_FLAVOR: AcpFlavor = {
  * and the effort, so the user's action is another model.
  */
 function copilotTurnFailure(_error: unknown, detail: string): string {
-  if (PAYMENT_METHOD_WALL_TEXT.test(detail))
+  if (COPILOT_PLAN_USED_UP_TEXT.test(detail))
     return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
   return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
     ? sourceText("error.provider.copilotThinkingRejected")
