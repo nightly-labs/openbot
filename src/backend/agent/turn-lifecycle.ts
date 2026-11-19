@@ -2342,14 +2342,17 @@ export class TurnLifecycle {
       const channelTask =
         this.#conversation.channelForThread(snapshot.threadId) !== null ||
         deliveries.some(({ channelId }) => channelId !== undefined);
+      // Whether a backup model takes this turn, in the agent's own chat and for a channel task alike.
+      const backupTakes = () =>
+        ((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
+        (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId));
       const failedOver =
         (mayRunAgain || mayContinue) &&
         failedKey !== null &&
         deliveries.length > 0 &&
         !channelTask &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
-          (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)));
+        backupTakes();
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
       // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
       // thread too (#8503). So does the turn of an
@@ -2479,7 +2482,13 @@ export class TurnLifecycle {
         return;
       }
       // A thread turn that does not run again still makes the agent leave the failing model before its next turn (#5220).
-      if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
+      // So does a channel task that a backup would take in the agent's own chat: the channel gives the
+      // task to the agent again, and a spent Gemini quota failed each try on the same model (#12484).
+      if (
+        failover &&
+        failedKey !== null &&
+        ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
+      )
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as
       // it does with no backup.
