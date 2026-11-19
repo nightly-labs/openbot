@@ -1637,18 +1637,19 @@ short-lived signed addresses, in transit only.
   database holds the chat name and IDs, which agent is the Telegram Orchestrator, and one row per
   conversation that an agent answers. The messages of that conversation are kept as a conversation
   of that agent, with the Telegram name of each author, and files people send are kept with the
-  agent's attachments. The names of authors and the last messages of a chat are also kept in memory
-  for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
-  Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
-  memories; deleting an agent removes its conversations.
+  agent's attachments. The names of authors are also kept in memory for context, until OpenBot
+  quits. The messages of the chat that OpenBot sees, also those that do not address it, are kept in
+  the database for 90 days after they arrive, with the names of their files, so that an agent can
+  read them after a restart. Workspace memories are kept for each chat, as for Slack.
+  Disconnect makes the bot leave the chat, unlinks it, deletes the saved messages and keeps the
+  conversations and the workspace memories; deleting an agent removes its conversations.
 - **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
   agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
-  run instead; see [Workflows](#workflows). The other messages of a group stay in the
-  computer's memory until OpenBot quits, and an agent can read the last of them with its history
-  tool, as for Slack.
+  run instead; see [Workflows](#workflows). The other messages of a group are saved on the
+  host as above, and an agent can read the last of them with its history tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.
