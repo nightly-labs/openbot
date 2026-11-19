@@ -349,8 +349,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
   readonly #getLocalHostId: () => string | null;
-  /** From the last host list. Null before one, or when this computer hosts nothing that the account lists. */
-  #localMemberLimit: number | null = null;
+  /** From the last host list. Empty before one, or when this computer hosts nothing that the account lists. */
+  #localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {};
   /** When each listed host last changed its key, by server id. The local host is `LOCAL_SERVER_ID`. */
   #keyChangedAt = new Map<string, number>();
   /** The local servers that this app runs as its child processes. See `local-servers/`. */
@@ -2928,7 +2928,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     // The account can be signed out or not loaded yet; that is a failed read, not a defect.
     const email = yield* remoteDecode(() => this.#centralAccount.getEmail());
     const localHostId = this.#getLocalHostId();
-    this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
+    const localHost = hosts.find((host) => host.hostId === localHostId);
+    this.#localMemberLimit = {
+      ...(localHost?.memberLimit === undefined ? {} : { memberLimit: localHost.memberLimit }),
+      ...(localHost?.licenseRaisesMemberLimit === undefined
+        ? {}
+        : { licenseRaisesMemberLimit: localHost.licenseRaisesMemberLimit }),
+    };
     const followedHandovers = yield* followedHostKeyHandovers({
       hosts,
       servers: this.#store.servers,

@@ -42,6 +42,8 @@ export interface RemoteTeamHost {
   role: "owner" | "admin" | "member";
   /** The active members that the host's plan allows. An account server from before plans sends none. */
   memberLimit?: number;
+  /** True for the owner when one more user on their license raises `memberLimit`. An older account server sends none. */
+  licenseRaisesMemberLimit?: boolean;
   /**
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
@@ -204,6 +206,7 @@ export class RemoteTeamDirectoryClient {
             if (!isDynamicRecord(candidate) || !isString(candidate.devicePublicKey) || !candidate.devicePublicKey)
               return [];
             const memberLimit = candidate.memberLimit;
+            const licenseRaisesMemberLimit = candidate.licenseRaisesMemberLimit;
             const hosted = candidate.hosted;
             const restartAvailable = candidate.restartAvailable;
             const storageGb = candidate.storageGb;
@@ -241,6 +244,7 @@ export class RemoteTeamDirectoryClient {
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
                 // A bad value drops only the flag, so the server stays in the list.
+                ...(isBoolean(licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit } : {}),
                 ...(isBoolean(hosted) ? { hosted } : {}),
                 ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
                 // A bad value drops only the storage, as for the flag.

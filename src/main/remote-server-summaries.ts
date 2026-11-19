@@ -15,7 +15,7 @@ export function remoteServerSummaries(
   activeServerId: string,
   statusFor: (serverId: string) => RemoteServerConnectionStatus,
   /** The member limit of this computer's own host, when the account server lists it. */
-  localMemberLimit: number | null = null,
+  localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {},
   /** The local servers that this app runs as its child processes. */
   isThisComputer: (serverId: string) => boolean = () => false,
   /** When a host last changed its key with a verified handover. The local server is `LOCAL_SERVER_ID`. */
@@ -39,7 +39,7 @@ export function remoteServerSummaries(
       logoUrl: null,
       role: null,
       active: activeServerId === LOCAL_SERVER_ID,
-      ...(localMemberLimit === null ? {} : { memberLimit: localMemberLimit }),
+      ...localMemberLimit,
       ...(localKeyChangedAt === undefined ? {} : { keyChangedAt: localKeyChangedAt }),
       compatibility: null,
       issue: null,
@@ -64,6 +64,9 @@ export function remoteServerSummaries(
         role: server.role,
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
+        ...(server.licenseRaisesMemberLimit === undefined
+          ? {}
+          : { licenseRaisesMemberLimit: server.licenseRaisesMemberLimit }),
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
         ...(server.restartAvailable === undefined ? {} : { restartAvailable: server.restartAvailable }),
         ...(server.storageGb === undefined ? {} : { storageGb: server.storageGb }),

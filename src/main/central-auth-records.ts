@@ -40,6 +40,8 @@ export interface RemoteHostSummary {
   role: "owner" | "admin" | "member";
   /** The active members that the host's plan allows. An account server from before plans sends none. */
   memberLimit?: number;
+  /** True for the owner when one more user on their license raises `memberLimit`. An older account server sends none. */
+  licenseRaisesMemberLimit?: boolean;
   /**
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
@@ -207,6 +209,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       role: host.role,
       ...(validLimit ? { memberLimit } : {}),
       // A bad value drops only the flag, as for the limit.
+      ...(isBoolean(host.licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit } : {}),
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
       ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),

@@ -675,6 +675,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         remoteDesktopAvailable: false,
         ...(appearance === undefined ? {} : { appearance }),
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
+        ...(host.licenseRaisesMemberLimit === undefined
+          ? {}
+          : { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),

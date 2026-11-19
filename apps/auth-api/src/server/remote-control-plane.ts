@@ -113,6 +113,8 @@ interface MemberLimit {
   readonly limit: number;
   /** True when the users of the owner's license give the limit. */
   readonly fromLicense: boolean;
+  /** True when one more user on the owner's license raises the limit that the host list shows. */
+  readonly licenseRaises: boolean;
 }
 
 /** The membership row that this accept wrote: its id and its update time. */
@@ -978,7 +980,7 @@ export class RemoteControlPlane {
         (row) =>
           Effect.gen({ self: this }, function* () {
             const license = yield* this.#ownerLicense(row.host_id);
-            const { limit } = yield* this.#memberLimit(row.host_id, license);
+            const { limit, licenseRaises } = yield* this.#memberLimit(row.host_id, license);
             return {
               hostId: row.host_id,
               name: row.name,
@@ -992,6 +994,9 @@ export class RemoteControlPlane {
               // The license counts the people of all the owner's servers, and any open license refuses a
               // join after its users. So no server takes more people than the license has users.
               memberLimit: license ? Math.min(limit, license.users) : limit,
+              // For the owner: one more user on their license raises this limit. A full server then asks the
+              // owner to add a license user, not to remove a member. False when a plan or a custom limit stops it.
+              licenseRaisesMemberLimit: row.role === "owner" && licenseRaises,
               // A server with an ended plan is not marked: a restart needs a new plan, which only the owner buys.
               hosted: row.hosted_plan !== null,
               // The account service has no call that restarts the machine of an operator, so a client hides
@@ -3267,14 +3272,22 @@ export class RemoteControlPlane {
     const custom = yield* remoteCall(() =>
       dependencies.database.prepare(SERVER_MEMBER_LIMIT_SQL).bind(hostId).first<{ member_limit: number }>(),
     );
-    if (custom) return { limit: custom.member_limit, fromLicense: false };
+    // The host list shows the lower of the limit and the license users, so a smaller license is what stops it.
+    const below = (limit: number) => license !== null && license.users < limit;
+    if (custom) return { limit: custom.member_limit, fromLicense: false, licenseRaises: below(custom.member_limit) };
     const plan = yield* getServerEntitlement(dependencies.database, hostId, dependencies.now()).pipe(
       Effect.mapError((error) => (error instanceof RemoteControlPlaneError ? error : new RemoteOperationError({}))),
     );
-    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false };
+    if (plan?.hosted) return { limit: plan.memberLimit, fromLicense: false, licenseRaises: below(plan.memberLimit) };
     if (license?.entitled && license.users > (plan?.memberLimit ?? 0))
-      return { limit: license.users, fromLicense: true };
-    return { limit: plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT, fromLicense: false };
+      return { limit: license.users, fromLicense: true, licenseRaises: true };
+    const limit = plan?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
+    // An entitled license as large as a self-hosted plan takes the limit with one more user.
+    return {
+      limit,
+      fromLicense: false,
+      licenseRaises: below(limit) || (license?.entitled === true && plan !== null && license.users === limit),
+    };
   });
 
   #assertRole<Row extends RemoteMembershipRow>(membership: Row | null, roles: RemoteMemberRole[]): Row {

@@ -101,6 +101,11 @@ export interface ServerSummary {
   active: boolean;
   /** The active members that the host allows. Absent when the account server did not give one. */
   memberLimit?: number;
+  /**
+   * True for the owner when one more user on their license raises `memberLimit`: a full server then asks
+   * to add a license user. Absent when the account server did not say.
+   */
+  licenseRaisesMemberLimit?: boolean;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
   /**
