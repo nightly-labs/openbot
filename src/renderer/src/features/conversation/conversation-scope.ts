@@ -1665,14 +1665,14 @@ export function createConversationViewScope(props: ConversationProps) {
         if (target) {
           importSounds.finished(event.requestId, "error");
           // The chip of the file shows the failure, with Retry. An import with no chip has the banner.
-          // Electron puts the IPC channel in front of the sentence; the chip shows only the sentence.
-          if (attachmentUploads.get(event.requestId)) {
-            const { t, errorMessage } = currentText();
-            attachmentUploads.fail(event.requestId, errorMessage(event.message, t("composer.upload.failed")));
-          } else
+          // Electron puts the IPC channel in front of the sentence; the chip and the banner show only the sentence.
+          const { t, errorMessage } = currentText();
+          const message = errorMessage(event.message, t("composer.upload.failed"));
+          if (attachmentUploads.get(event.requestId)) attachmentUploads.fail(event.requestId, message);
+          else
             setConversationErrors((current) => ({
               ...current,
-              [composerDraftKey(target)]: event.message,
+              [composerDraftKey(target)]: message,
             }));
         } else importSounds.cancel(event.requestId);
         // Only a chip offers Retry, so the files of an import with none are not kept for one.

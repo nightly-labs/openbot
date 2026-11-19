@@ -530,7 +530,7 @@ listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
 
 /**
  * Each file is its own import, so a failed file does not drop the others and can be sent again. A
- * set over the count or size limit stays one import, so main refuses it whole, as before.
+ * set over the count or total size limit stays one import, so main refuses it whole, as before.
  */
 async function importFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
@@ -544,7 +544,12 @@ async function importFiles(files: File[]): Promise<void> {
     await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  const fits = ({ file }: NamedFile) => file.size <= ATTACHMENT_LIMITS.fileBytes;
+  await Promise.all(named.filter(fits).map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  // A retry of a file over the size limit cannot pass, so the file gets no chip: main refuses it, and
+  // the banner says why. It goes after the others, because a file that lands clears the banner.
+  const tooLarge = named.filter((file) => !fits(file));
+  if (tooLarge.length > 0) await runAttachmentImport(crypto.randomUUID(), serverId, tooLarge, false);
 }
 
 /**
