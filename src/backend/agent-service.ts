@@ -4706,7 +4706,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? Effect.void
         : Effect.forEach(
             this.#removal.heldFoldersReleased(),
-            (agentId) => this.#deleteAgentAndPlaces(agentId).pipe(Effect.ignore),
+            (agentId) =>
+              this.#deleteAgentAndPlaces(agentId).pipe(
+                Effect.catch((failure) =>
+                  Effect.sync(() => this.#emitError("agent_delete_failed", failure.cause, agentId)),
+                ),
+              ),
             { discard: true },
           ),
     );
