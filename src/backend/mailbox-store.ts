@@ -1864,11 +1864,15 @@ export class MailboxStore {
           candidate.messageId === request.id &&
           candidate.recipientAgentId !== answeredBy &&
           isActiveDelivery(candidate),
-      ) && !this.#laterTurnEnded(delivery, messages)
+      ) && !this.#turnAfterRequestEnded(delivery, request, messages)
     );
   }
 
-  #laterTurnEnded(held: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): boolean {
+  #turnAfterRequestEnded(
+    held: StoredDelivery,
+    request: StoredMessage,
+    messages?: ReadonlyMap<string, StoredMessage>,
+  ): boolean {
     const lane = this.#laneOf(held, messages);
     return this.#state.deliveries.some(
       (candidate) =>
@@ -1876,7 +1880,7 @@ export class MailboxStore {
         candidate.turnId !== null &&
         candidate.steeredAt === undefined &&
         !isActiveDelivery(candidate) &&
-        candidate.createdAt > held.createdAt &&
+        candidate.createdAt > request.createdAt &&
         this.#laneOf(candidate, messages) === lane,
     );
   }
