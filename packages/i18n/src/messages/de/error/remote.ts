@@ -24,6 +24,8 @@ export const messages = {
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
   "error.remote.windowsSessionDisconnected":
     "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
+  "error.remote.macScreenLocked":
+    "Der Mac ist gesperrt und kann seinen Bildschirm nicht teilen. Entsperre den Mac an seinem Bildschirm und versuche es erneut.",
   "error.remote.streamTooSlowLowerQuality":
     "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
   "error.remote.streamTooSlow":
