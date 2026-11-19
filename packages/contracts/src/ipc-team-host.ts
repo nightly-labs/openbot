@@ -97,7 +97,7 @@ export interface ServerSummary {
 
 export type HostedServerIssue = "plan_ended" | "wake_failed" | "start_timeout";
 
-export type HostedServerStartStep = "machine" | "openbot" | "provider_limit";
+export type HostedServerStartStep = "machine" | "restore" | "openbot" | "provider_limit";
 
 export interface HostedServerStart {
   step: HostedServerStartStep;

@@ -111,7 +111,9 @@ export function BillingManagedServer(props: {
         price={price()}
         paidThrough={props.server.deletionScheduledAt ?? props.paidThrough}
         running={props.server.state === "running"}
-        statusLabel={t(stateNames[props.server.state])}
+        statusLabel={t(
+          props.server.restoring ? "settings.hostedServers.state.restoring" : stateNames[props.server.state],
+        )}
         cancelAtPeriodEnd={props.plan.cancelAtPeriodEnd}
         scheduled={props.server.deletionScheduledAt != null}
         deleted={false}

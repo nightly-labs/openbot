@@ -458,6 +458,7 @@
     "test:hosted-operator-host": "bun apps/auth-api/scripts/hosted-operator-host-e2e.ts",
     "test:hosted-operator-pool": "bun apps/auth-api/scripts/hosted-operator-pool-e2e.ts",
     "test:hosted-pool-assignment": "bun apps/auth-api/scripts/hosted-pool-assignment-e2e.ts",
+    "test:hosted-pool-restore": "bun apps/auth-api/scripts/hosted-pool-restore-e2e.ts",
     "test:purchase-alert": "bun apps/auth-api/scripts/purchase-alert-e2e.ts",
     "test:remote-auth-events": "bun apps/auth-api/scripts/remote-auth-events-e2e.ts",
     "test:remote-signal-homes": "bun apps/auth-api/scripts/remote-signal-homes-e2e.ts",

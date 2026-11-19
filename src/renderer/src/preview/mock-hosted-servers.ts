@@ -71,6 +71,7 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
       error: "plan_ended",
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
+      dataKeptUntil: Date.now() + 12 * 24 * 60 * 60_000,
     },
   ];
   if (billingPlans) {

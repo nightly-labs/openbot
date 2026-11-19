@@ -601,6 +601,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan sona erdi",
   "settings.hostedServers.state.creating": "Oluşturuluyor",
   "settings.hostedServers.state.starting": "Başlatılıyor",
+  "settings.hostedServers.state.restoring": "Geri yükleniyor",
   "settings.hostedServers.state.running": "Çalışıyor",
   "settings.hostedServers.state.stopping": "Durduruluyor",
   "settings.hostedServers.state.stopped": "Durduruldu",
@@ -611,6 +612,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Kurulum, Stripe ödemeyi onayladığında başlar.",
   "settings.hostedServers.planEndedDescription":
     "Plan sona erdi, bu nedenle sunucu durduruldu. Verileri kalır. Başlatmak için planı yenileyin.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Plan sona erdi, bu nedenle sunucu durduruldu. Verileri {date} tarihine kadar kalır. Başlatmak için planı bu tarihten önce yenileyin.",
   "settings.hostedServers.pay": "Ödeme sayfasını aç",
   "settings.hostedServers.payLabel": "{name} için ödeme sayfasını aç",
   "settings.hostedServers.renew": "Planı yenile",

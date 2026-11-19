@@ -357,7 +357,7 @@ database_is_unchanged() {
 
 stop_offer() {
   rm -f "$OFFER/token"
-  if [ -e /etc/systemd/system/openbot-pool-wait.service ]; then
+  if [ -z "${OPENBOT_POOL_RESTORE:-}" ] && [ -e /etc/systemd/system/openbot-pool-wait.service ]; then
     systemctl disable --quiet --now openbot-pool-wait.service
   fi
 }
@@ -387,6 +387,7 @@ offer() {
     fail "This machine names no account service."
   install -d -m 0755 "$OFFER_INSTALL"
   install -m 0755 "$source/openbot-pool-wait" "$OFFER_INSTALL/openbot-pool-wait"
+  install -m 0755 "$0" "$OFFER_INSTALL/move-from-boat.sh"
   install -m 0644 "$source/openbot-pool-wait.service" /etc/systemd/system/openbot-pool-wait.service
   install -d -m 0700 "$OFFER"
   printf '%s\n' "$host" >"$OFFER/host"
@@ -928,6 +929,33 @@ discard() {
   echo "Removed the restored data on $(hostname). The apt packages of the import stay. The machine is prepared again: run the import."
 }
 
+restore() {
+  [ "$#" -eq 1 ] || fail "usage: $0 restore <sha256 of the encrypted archive> (the age key and the archive URL on standard input)"
+  local expected=$1 identity url dir key summer
+  [[ $expected =~ ^[0-9a-f]{64}$ ]] || fail "The checksum is not valid."
+  IFS= read -r identity || true
+  IFS= read -r url || true
+  [[ $identity =~ ^AGE-SECRET-KEY-1[0-9A-Z]{58}$ ]] || fail "Standard input has no age key."
+  [[ $url =~ ^https://[A-Za-z0-9.-]+/[^[:space:]]+$ ]] || fail "Standard input has no archive URL."
+  command -v age >/dev/null || fail "This machine has no age. Run leaseweb-bootstrap.sh again."
+  is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
+  openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
+  dir=$(mktemp -d /var/tmp/openbot-restore.XXXXXX)
+  key=$(mktemp /run/openbot-restore-key.XXXXXX)
+  trap "rm -rf '$dir' '$key'" EXIT
+  printf '%s\n' "$identity" >"$key"
+  unset identity
+  mkfifo "$dir/sum"
+  sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
+  summer=$!
+  curl --fail --silent --show-error --proto '=https' "$url" | tee "$dir/sum" | age -d -i "$key" >"$dir/archive.tar" ||
+    fail "The archive was not downloaded or not decrypted. Nothing was restored."
+  wait "$summer"
+  rm -f "$key"
+  [ "$(cat "$dir/sha256")" = "$expected" ] || fail "The download is not the archive. Nothing was restored."
+  import_data "$dir/archive.tar"
+}
+
 [ "$(id -u)" -eq 0 ] || fail "Run this as root."
 command=${1:-}
 shift || true
@@ -940,7 +968,8 @@ case $command in
   install-packages) install_packages "$@" ;;
   export) export_data "$@" ;;
   import) import_data "$@" ;;
+  restore) restore "$@" ;;
   start) start "$@" ;;
   discard) discard "$@" ;;
-  *) fail "usage: $0 prepare|upgrade|offer|withdraw|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
+  *) fail "usage: $0 prepare|upgrade|offer|withdraw|packages|install-packages|export|import|restore|start|discard (the top of this file has the arguments)" ;;
 esac

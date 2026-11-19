@@ -622,6 +622,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Тариф истёк",
   "settings.hostedServers.state.creating": "Создаётся",
   "settings.hostedServers.state.starting": "Запускается",
+  "settings.hostedServers.state.restoring": "Восстановление данных",
   "settings.hostedServers.state.running": "Работает",
   "settings.hostedServers.state.stopping": "Останавливается",
   "settings.hostedServers.state.stopped": "Остановлен",
@@ -632,6 +633,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Настройка начнётся, когда Stripe подтвердит оплату.",
   "settings.hostedServers.planEndedDescription":
     "Тариф закончился, поэтому сервер остановлен. Данные сохранены. Продлите тариф, чтобы запустить сервер.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Тариф закончился, поэтому сервер остановлен. Данные хранятся до {date}. Продлите тариф до этой даты, чтобы запустить сервер.",
   "settings.hostedServers.pay": "Открыть страницу оплаты",
   "settings.hostedServers.payLabel": "Открыть страницу оплаты для {name}",
   "settings.hostedServers.renew": "Продлить тариф",
