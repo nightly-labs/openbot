@@ -6,6 +6,7 @@ import type {
   AgentEvent,
   AgentPromptQuestion,
   AgentPromptResolution,
+  AgentProviderId,
   AgentRuntimeSnapshot,
   BrowserTab,
   BrowserTakeoverRequest,
@@ -142,7 +143,7 @@ interface PendingPrompt {
   uiBlock?: SurfacedUiBlock;
   saving?: boolean;
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
-  detach?: { target: LateAnswerTarget; timer: ReturnType<typeof setTimeout> };
+  detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
   detached?: LateAnswerTarget;
   subagent?: true;
 }
@@ -2069,14 +2070,18 @@ export class AttentionRegistry {
   }
 
   #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
-    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    if (deadlines.length === 0) return;
     const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
-    if (target)
-      pending.detach = {
-        target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)),
-      };
+    if (!target) return;
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    pending.detach =
+      deadlines.length === 0
+        ? { target }
+        : { target, timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)) };
+  }
+
+  detachPromptsOf(provider: AgentProviderId): void {
+    for (const [requestId, pending] of this.#prompts)
+      if (pending.client.provider === provider && pending.detach) this.#detachPrompt(requestId, pending);
   }
 
   #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
