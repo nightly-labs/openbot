@@ -128,6 +128,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelSeenSubtasks: true,
               channelTaskWaits: true,
               mcpManyServers: true,
+              routineResultsWhatsApp: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>

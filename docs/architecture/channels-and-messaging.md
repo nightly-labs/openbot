@@ -895,7 +895,9 @@ is one linked number (`workspace_id` is the number in digits).
   chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
   each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
-  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
+  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only. A client
+  that sends `routine-results-whatsapp-v1` also gets the WhatsApp numbers in the routine-results
+  options, so a routine on a joined server can send its answers to WhatsApp.
 
 ## Mobile chat queue
 

@@ -5,6 +5,10 @@ import {
   ROUTINE_RESULTS_PLATFORMS,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
+import {
+  ROUTINE_RESULTS_WHATSAPP_CAPABILITY,
+  ROUTINE_RESULTS_WHATSAPP_PLATFORMS,
+} from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -37,9 +41,13 @@ export async function routeRoutineResults(
   const body = await readJson(request);
   if (path === ROUTINE_RESULTS_ROUTES.options) {
     const connections = await Effect.runPromise(results.options());
+    // WhatsApp goes only to a client that reads it (`routine-results-whatsapp-v1`).
+    const platforms = capabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY)
+      ? ROUTINE_RESULTS_WHATSAPP_PLATFORMS
+      : ROUTINE_RESULTS_PLATFORMS;
     return json(200, {
       connections: connections
-        .filter((connection) => isOneOf(ROUTINE_RESULTS_PLATFORMS, connection.platform))
+        .filter((connection) => isOneOf(platforms, connection.platform))
         .map((connection) => ({ ...connection, places: connection.places.slice(0, ROUTINE_RESULTS_PLACE_LIMIT) })),
     });
   }
