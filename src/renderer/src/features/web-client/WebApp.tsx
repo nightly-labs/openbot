@@ -41,6 +41,7 @@ import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
 import { keepCachedWorkflows } from "../workflows/workflow-cache";
 import { WebLanguageStep } from "./WebLanguageStep";
 import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
+import { WebSlowLoadNotice } from "./WebSlowLoadNotice";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
@@ -73,6 +74,8 @@ class SignInIssueShown extends Error {
 class CompanySignInRequired extends Error {}
 
 const EMAIL_START_TIMEOUT_MS = 35_000;
+
+const SESSION_CHECK_TIMEOUT_MS = 15_000;
 
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
 
@@ -166,11 +169,13 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const [state, setState] = createStore<{
     account: CentralAuthUser | null;
     loaded: boolean;
+    retrying: boolean;
     login: CentralAuthState;
     resendAt: number;
   }>({
     account: null,
     loaded: false,
+    retrying: false,
     login: { status: "signed_out" },
     resendAt: 0,
   });
@@ -267,7 +272,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       | { email: string }
       | { challengeId: string | null; code: string; firstTouch?: FirstTouch; referralCode?: string }
       | Record<string, never>,
-    send?: { idempotencyKey: string; signal: AbortSignal },
+    send?: { idempotencyKey?: string; signal: AbortSignal },
   ) {
     const response = await accountFetch(`/api/browser/${path}`, {
       method: body ? "POST" : "GET",
@@ -277,7 +282,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         ? {
             "Content-Type": "application/json",
             "X-OpenBot-Browser": "1",
-            ...(send ? { "Idempotency-Key": send.idempotencyKey } : {}),
+            ...(send?.idempotencyKey ? { "Idempotency-Key": send.idempotencyKey } : {}),
           }
         : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
@@ -354,8 +359,17 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   async function checkSession() {
     const generation = sessionGeneration;
     void loadWorkspace().catch(() => undefined);
+    const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
+    if (screenWaits && state.loaded)
+      setState((draft) => {
+        draft.retrying = true;
+      });
     try {
-      const session = await request("session");
+      const session = await request(
+        "session",
+        undefined,
+        screenWaits ? { signal: AbortSignal.timeout(SESSION_CHECK_TIMEOUT_MS) } : undefined,
+      );
       markRemoteSync("session");
       const account = await showAccount(accountFrom(session));
       markRemoteSync("workspace-code");
@@ -377,7 +391,13 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
           setState((draft) => {
             draft.login = {
               status: "error",
-              issue: { code: "auth_api_unavailable", message: sourceText("error.auth.serviceUnavailable") },
+              issue: {
+                code: "auth_api_unavailable",
+                message:
+                  error instanceof DOMException && error.name === "TimeoutError"
+                    ? sourceText("error.auth.sessionTimeout")
+                    : sourceText("error.auth.serviceUnavailable"),
+              },
             };
           });
       }
@@ -387,6 +407,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       if (!disposed)
         setState((draft) => {
           draft.loaded = true;
+          draft.retrying = false;
           if (returnError !== null && !draft.account && draft.login.status === "signed_out")
             draft.login = { status: "error", issue: companySignInIssue(returnError) };
         });
@@ -653,6 +674,12 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
                 void loadWorkspace().catch(() => undefined);
               }}
             />
+          </Show>
+          <Show when={!state.loaded}>
+            <WebSlowLoadNotice />
+          </Show>
+          <Show when={state.retrying}>
+            <WebSlowLoadNotice startsWait />
           </Show>
         </div>
       </NotificationObserver>

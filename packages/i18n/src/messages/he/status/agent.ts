@@ -24,6 +24,7 @@ export const messages = {
   "status.agent.channelTaskCancelled": "{agent} ביטל את המשימה ״{task}״ ואת תתי-המשימות שלה. {person} ביקש זאת.",
   "status.agent.screenCaptureScreen": "צילום המסך הראשי ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureChannel": "התמונה מוצגת בערוץ {channel}, וכל חבר בשרת הזה שקורא את הערוץ יכול לראות אותה.",
+  "status.agent.screenCapturePermissionNext": "לאחר מכן macOS עשוי לבקש ממך לאפשר ל-OpenBot את Screen Recording.",
   "status.agent.screenCaptureDisplay": "צילום התצוגה {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureWindow": "צילום החלון {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureRegion":
@@ -111,6 +112,7 @@ export const messages = {
     "הוספת שרת MCP {name}: {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
   "status.agent.mcpServerChange":
     "שינוי שרת MCP {name} אל {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
+  "status.agent.mcpServerHeaders": "הוא גם משנה את הכותרות האלה: {names}.",
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",

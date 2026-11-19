@@ -12,6 +12,7 @@ import {
   customProviderOfModel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
+  queueHoldWorker,
   routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import {
@@ -559,7 +560,7 @@ export function ConversationComposer() {
                   <Loading>
                     <QueuePanel
                       deliveries={queueRows()}
-                      hold={props.queue?.hold?.agentId === props.agent?.id ? null : props.queue?.hold}
+                      hold={queueHoldWorker(props.queue?.hold) === props.agent?.id ? null : props.queue?.hold}
                       agents={props.agents}
                       skills={installedSkills()}
                       editingDeliveryId={editingDeliveryId()}

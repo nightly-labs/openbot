@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,6 +26,9 @@ const countsFile = join(root, "empty-counts.json");
 const PRIMARY = defaultProviderModel("codex");
 const BACKUP = `${PRIMARY}-backup`;
 const NO_ANSWER = sourceText("error.provider.acpNoAnswer", { provider: agentProviderDescriptor("codex").displayName });
+const CHANNEL_NO_ANSWER = sourceText("error.provider.channelNoAnswer", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
 const NO_ANSWER_AFTER_STEPS = sourceText("error.provider.noAnswerAfterSteps", {
   provider: agentProviderDescriptor("codex").displayName,
 });
@@ -123,7 +127,7 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
@@ -410,6 +414,51 @@ async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode:
   }
 }
 
+async function askInChannel(leadId: string, mode: string) {
+  const person = { id: "local", name: "Alex" };
+  const channelId = randomUUID();
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId,
+        draft: { name: mode, title: "", instructions: "", members: [{ agentId: leadId }], leadAgentId: leadId },
+      },
+      person,
+    ),
+  );
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId,
+        text: `TEAM-RESULT mode:${mode}`,
+        recipientAgentId: leadId,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      person,
+    ),
+  );
+  const task = await waitFor(`the ${mode} channel task to end`, () =>
+    agents.channels.store
+      .tasks(channelId)
+      .find((item) => item.state === "completed" || item.state === "failed" || item.state === "paused"),
+  );
+  await waitFor("the lead to be idle", () => agents.listQueue(leadId).deliveries.every((d) => ended(d.status)));
+  const reply = agents.channels.store
+    .messages(channelId)
+    .findLast((entry) => entry.author.kind === "agent" && entry.message.itemType !== "commentary");
+  return {
+    turns: fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode),
+    state: task.state,
+    error: task.error,
+    reply: reply?.message.text,
+  };
+}
+
 async function lastAnswer(agentId: string): Promise<string | undefined> {
   const snapshot = await runCauseEffect(agents.readConversation(agentId));
   return snapshot.messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")
@@ -692,6 +741,30 @@ try {
     assert.match(result.text, /Status: blocked/u, `The lead gets the note: ${result.text}`);
     assert.match(result.text, /Tool steps in the turn: 1/u);
     return { status: result.status, text: result.text };
+  });
+
+  await check("in a channel, an empty lead turn runs once more and its answer completes the task", async () => {
+    const outcome = await askInChannel(lead.id, "channel-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.equal(outcome.state, "completed", JSON.stringify(outcome));
+    assert.equal(outcome.error, null);
+    assert.equal(outcome.reply, "Team done.");
+    return outcome;
+  });
+
+  await check("in a channel, a second empty run fails the task with the channel's text", async () => {
+    const outcome = await askInChannel(lead.id, "channel-empty-always");
+    assert.equal(outcome.turns.length, 2, `The task runs again only once: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.state, "failed");
+    assert.equal(outcome.error, CHANNEL_NO_ANSWER);
+    return outcome;
   });
 
   report.passed = true;

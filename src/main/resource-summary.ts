@@ -82,6 +82,7 @@ export const RESOURCE_PROPERTY_NAMES = [
   "renderer_long_task_count",
   "renderer_input_delay_ms_p95",
   "renderer_gone_count",
+  "window_gone_count",
   "child_gone_count",
   ...CHILD_TYPES.map((type): ChildGonePropertyName => `child_gone_${type}_count`),
   ...GONE_REASONS.map((reason): GonePropertyName => `gone_${reason}_count`),
@@ -324,6 +325,7 @@ export const METRIC = {
 
 export const COUNTER = {
   rendererGone: "gone.renderer",
+  windowGone: "gone.window",
   childGone: "gone.child",
   childType: (type: ChildType) => `gone.child_type.${type}`,
   mainLoopStall: "loop.stalls",
@@ -361,6 +363,7 @@ export function resourceEventProperties(day: ResourceDay, device: DeviceClass): 
     window_array_buffer_mb_p95: roundMb(percentile(day, METRIC.windowArrayBuffers, 0.95)),
     window_dom_node_count_p95: roundWhole(percentile(day, METRIC.windowDomNodes, 0.95)),
     renderer_gone_count: day.counters[COUNTER.rendererGone] ?? 0,
+    window_gone_count: day.counters[COUNTER.windowGone] ?? 0,
     child_gone_count: day.counters[COUNTER.childGone] ?? 0,
     active_turn_count_max: roundWhole(day.peaks[METRIC.activeTurns]),
     browser_tab_count_max: roundWhole(day.peaks[METRIC.browserTabs]),

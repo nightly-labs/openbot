@@ -367,6 +367,7 @@ export const resolveAntigravityCli: (input?: {
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
       if (Result.isSuccess(attempt)) return attempt.success;
+      if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
     }
     if (!found && override.length > 0)
       throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
@@ -1161,6 +1162,7 @@ export function cliSpawnTarget(
 }
 
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+const ANTIGRAVITY_VERSION_TIMEOUT_MS = 90_000;
 const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
 const slowVersionReads = new Set<string>();
 
@@ -1177,7 +1179,8 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
   const slow = slowVersionReads.has(candidate);
-  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
   const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
   const output = yield* Effect.tryPromise({
     try: (signal) =>

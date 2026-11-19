@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:f
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { app, type Details } from "electron";
+import { app, type Details, powerMonitor } from "electron";
 import { isMissingFileError } from "../backend/file-errors";
 import { countCrashDumps } from "./run-marker";
 
@@ -123,8 +123,14 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     void app.whenReady().then(() => setTimeout(confirmStart, options.startConfirmMs ?? DEFAULT_START_CONFIRM_MS));
     app.once("before-quit", confirmStart);
   }
+  let stopping = false;
+  const stop = () => {
+    stopping = true;
+  };
+  app.once("before-quit", stop);
+  void app.whenReady().then(() => powerMonitor.on("shutdown", stop));
   app.on("child-process-gone", (_event, details) => {
-    if (details.type !== "GPU" || !GPU_FAILURE_REASONS.has(details.reason)) return;
+    if (stopping || details.type !== "GPU" || !GPU_FAILURE_REASONS.has(details.reason)) return;
     if (details.reason === "abnormal-exit" && details.exitCode === GPU_EXIT_ON_CONTEXT_LOST) return;
     logger.warn(`The GPU process stopped (${details.reason}, exit code ${details.exitCode}).`);
     writeGpuFailure(crashPath, chromiumMajor);
