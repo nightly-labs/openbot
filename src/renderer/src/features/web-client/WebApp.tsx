@@ -422,9 +422,11 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     const generation = sessionGeneration;
     // The workspace code loads beside the session check, not after it.
     void loadWorkspace().catch(() => undefined);
-    // The start screen waits for the first check. Without a time limit, a request that gets no answer keeps
-    // it with no way out. A later check, such as on focus, waits as before: the screen stays usable.
-    const limit = state.loaded ? null : new AbortController();
+    // The start screen and "Try again" on the error screen wait for this check. Without a time limit, a
+    // request that gets no answer keeps them with no way out. A check from a usable screen, such as on
+    // focus, waits as before.
+    const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
+    const limit = screenWaits ? new AbortController() : null;
     let timedOut = false;
     const timer = limit
       ? window.setTimeout(() => {
