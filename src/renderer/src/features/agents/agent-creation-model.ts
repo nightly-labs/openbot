@@ -52,10 +52,12 @@ export interface DevelopmentCreation {
  */
 export function resolveCreationModel(
   setup: CreationPreference | null,
-  modelOptions: ClientAgentModelOption[],
+  listedOptions: ClientAgentModelOption[],
   status: AgentStatus | null | undefined,
   development: DevelopmentCreation | null = null,
 ): CreationModelChoice | null {
+  // A model that an admin turned off stays in the list while another agent uses it; a new agent does not start on it.
+  const modelOptions = listedOptions.filter((option) => option.listing !== "kept");
   const preferred = setup?.preferredProvider ?? null;
   const developmentStart = development !== null && (preferred ?? "codex") === "codex" && !setup?.preferredModel;
   const start = developmentStartingModel({

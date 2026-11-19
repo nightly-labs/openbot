@@ -88,6 +88,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -174,6 +175,10 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -1833,9 +1838,10 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers, the picker listing and the steering models are optional: when a route fails,
-      // the picker gets the models with no Fast switch or listing, and a custom agent shows Send now.
-      const [fast, listings, steering] = await Promise.all([
+      // The fast tiers, the picker listing, the steering and the kept models are optional: when a route
+      // fails, the picker gets the models with no Fast switch or listing, a custom agent shows Send now,
+      // and a model that an admin turned off and an agent uses shows in every picker (#12582).
+      const [fast, listings, steering, kept] = await Promise.all([
         // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
@@ -1848,9 +1854,15 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },

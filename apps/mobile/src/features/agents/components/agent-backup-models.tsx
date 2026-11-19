@@ -208,7 +208,17 @@ function useBackupModelEditor(props: BackupModelsProps) {
       order,
       ownModel,
       entries: order.map(option),
-      addable: all(own ? [own, ...order] : order).filter((candidate) => candidate.ready),
+      // A model that an admin turned off (`kept`) stays only where an agent already uses it (#12582).
+      addable: all(own ? [own, ...order] : order).filter(
+        (candidate) =>
+          candidate.ready &&
+          !models.data?.some(
+            (model) =>
+              model.listing === "kept" &&
+              model.provider === candidate.choice.provider &&
+              model.id === candidate.choice.model,
+          ),
+      ),
       enabled,
       models: { pending: models.isPending, failed: models.isError, retry: () => void models.refetch() },
       error,

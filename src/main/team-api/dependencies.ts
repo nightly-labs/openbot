@@ -618,8 +618,11 @@ export interface TeamApiAdmin {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
     settings: Pick<ProviderDetectionSettingsStore, "get" | "set">;
   };
-  /** `model-visibility-v1`: which models the model picker of this computer shows, for each provider. */
-  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
+  /**
+   * `model-visibility-v1`: which models the model picker of this computer shows, for each provider.
+   * `model-visibility-kept-v1`: the models that an admin turned off and an agent uses.
+   */
+  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings" | "kept">;
   /** `provider-default-v1`: the provider and model that a new agent of this computer starts on. */
   defaultProvider?: TeamApiDefaultProvider;
   /** `routine-results-v1`: the place where an agent routine sends its answers. */

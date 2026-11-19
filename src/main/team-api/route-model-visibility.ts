@@ -1,5 +1,9 @@
 import { parseProviderModelVisibilityChange, parseProviderModelVisibilityProvider } from "@openbot/contracts/ipc";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
@@ -10,12 +14,22 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** Which models the model picker of this server shows, read and set from a joined server, and how it lists them. Frozen by `model-visibility-v1`. */
+/**
+ * Which models the model picker of this server shows, read and set from a joined server, and how it lists
+ * them. Frozen by `model-visibility-v1`, and the kept models by `model-visibility-kept-v1`.
+ */
 export async function routeModelVisibility(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
+  if (method === "POST" && url.pathname === MODEL_VISIBILITY_KEPT_ROUTES.list) {
+    const visibility = admin?.modelVisibility;
+    if (!visibility || !capabilities.has(MODEL_VISIBILITY_KEPT_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.modelVisibilityUnsupported"));
+    // Each member's picker reads it, as the listing; it holds no more than the model list.
+    return json(200, { models: await runCauseEffect(visibility.kept()) });
+  }
   if (
     method !== "POST" ||
     (url.pathname !== MODEL_VISIBILITY_ROUTES.settings &&

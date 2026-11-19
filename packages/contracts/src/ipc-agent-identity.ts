@@ -142,9 +142,10 @@ export function isAvatarHue(value: unknown): value is AvatarHue {
 /**
  * How the model picker of a server lists a model. `new`: the model came out in the last days, and the
  * picker labels it. `older`: the server shows a newer model in its place, so the picker folds it
- * under Older models. Absent: a plain row.
+ * under Older models. `kept`: an admin turned the model off, but an agent uses it, so only a model
+ * choice that holds it shows it. Absent: a plain row.
  */
-export const AGENT_MODEL_LISTINGS = ["new", "older"] as const;
+export const AGENT_MODEL_LISTINGS = ["new", "older", "kept"] as const;
 export type AgentModelListing = (typeof AGENT_MODEL_LISTINGS)[number];
 
 export interface AgentModelOption {

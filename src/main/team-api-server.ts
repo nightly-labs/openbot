@@ -224,6 +224,7 @@ import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mc
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
@@ -2989,7 +2990,8 @@ export class TeamApiServer {
         if (capability === PROVIDER_ENVIRONMENT_CAPABILITY)
           return this.#options.admin?.providerEnvironment !== undefined;
         if (capability === PROVIDER_DETECTION_CAPABILITY) return this.#options.admin?.providerDetection !== undefined;
-        if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
+        if (capability === MODEL_VISIBILITY_CAPABILITY || capability === MODEL_VISIBILITY_KEPT_CAPABILITY)
+          return this.#options.admin?.modelVisibility !== undefined;
         if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;
         if (capability === AGENT_ACCESS_CAPABILITY) return this.#options.agentAccess !== undefined;
         if (capability === SERVER_AUDIT_CAPABILITY) return this.#options.serverAudit !== undefined;

@@ -50,8 +50,11 @@ export function AgentModelPickerScreen() {
     if (!request && router.canGoBack()) router.back();
   }, [request]);
   const words = search.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+  // A model that an admin turned off stays in the list while an agent uses it; only that agent's list shows it.
   const options = withAccountModels(
-    models.data?.filter((option) => option.provider === request?.provider) ?? [],
+    models.data?.filter(
+      (option) => option.provider === request?.provider && (option.listing !== "kept" || option.id === request?.model),
+    ) ?? [],
     request?.accountModels ?? [],
   );
   // The search also reads the model id, as the backup model search does.
