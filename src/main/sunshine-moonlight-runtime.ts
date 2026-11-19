@@ -23,6 +23,7 @@ import { listenLoopback } from "./listen-loopback";
 import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
+import { windowsShortPath } from "./windows-short-path";
 
 export class SunshineApiError extends Schema.TaggedError<SunshineApiError>()("SunshineApiError", {
   status: Schema.Int,
@@ -651,6 +652,7 @@ export class SunshineMoonlightRuntime {
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const basePort = this.#sunshineBasePort;
     if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
+    const directory = windowsShortPath(this.#options.stateDirectory);
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
       // The base port: every other Sunshine port (GameStream HTTP/HTTPS, Web UI HTTPS, video,
@@ -662,12 +664,12 @@ export class SunshineMoonlightRuntime {
       "origin_web_ui_allowed = pc",
       "address_family = ipv4",
       "bind_address = 127.0.0.1",
-      `credentials_file = ${join(this.#options.stateDirectory, "sunshine-credentials.json")}`,
-      `file_state = ${join(this.#options.stateDirectory, "sunshine-state.json")}`,
-      `file_apps = ${join(this.#options.stateDirectory, "sunshine-apps.json")}`,
-      `pkey = ${join(this.#options.stateDirectory, "sunshine-key.pem")}`,
-      `cert = ${join(this.#options.stateDirectory, "sunshine-cert.pem")}`,
-      `log_path = ${join(this.#options.stateDirectory, "sunshine.log")}`,
+      `credentials_file = ${join(directory, "sunshine-credentials.json")}`,
+      `file_state = ${join(directory, "sunshine-state.json")}`,
+      `file_apps = ${join(directory, "sunshine-apps.json")}`,
+      `pkey = ${join(directory, "sunshine-key.pem")}`,
+      `cert = ${join(directory, "sunshine-cert.pem")}`,
+      `log_path = ${join(directory, "sunshine.log")}`,
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
       // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
       // probe the others.
@@ -809,9 +811,10 @@ export class SunshineMoonlightRuntime {
     // A restart is how a newly granted permission takes effect, so the verdict is this process's
     // alone -- carrying the previous one over would keep reporting a grant the user has already made.
     this.#screenCaptureDenied = false;
+    const executable = windowsShortPath(this.#options.paths.sunshine);
     this.#sunshine = yield* desktopSync(() =>
-      this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
-        cwd: dirname(this.#options.paths.sunshine),
+      this.#spawn(executable, [join(windowsShortPath(this.#options.stateDirectory), "sunshine.conf")], {
+        cwd: dirname(executable),
         env: { ...process.env, ...agentDisplayEnvironment(this.#options.platform), OPENBOT_REMOTE_SETUP: "1" },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
