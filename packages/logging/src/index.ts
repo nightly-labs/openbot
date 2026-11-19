@@ -57,10 +57,14 @@ export function registerPublicValues(values: Iterable<string>): void {
   for (const value of values) if (value) publicValues.add(value);
 }
 
+function isPublicValueAround(candidate: string, secret: string): boolean {
+  return candidate.length > secret.length && candidate.includes(secret) && publicValues.has(candidate);
+}
+
 function isPublicToken(token: string, secret: string): boolean {
-  return [token, token.replace(/\.+$/u, "")].some(
-    (candidate) => candidate.length > secret.length && candidate.includes(secret) && publicValues.has(candidate),
-  );
+  if (publicValues.size === 0) return false;
+  if (isPublicValueAround(token, secret)) return true;
+  return token.endsWith(".") && isPublicValueAround(token.replace(/\.+$/u, ""), secret);
 }
 
 export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {

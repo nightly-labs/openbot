@@ -139,7 +139,7 @@ export class ModelCatalog {
     const sorted = catalog.ownOrder
       ? models
       : [...models].sort((left, right) => rank(left) - rank(right) || compareModelVersions(left, right));
-    return { models: sorted, listed: serverModels.size };
+    return { models: withPublicIds(sorted), listed: serverModels.size };
   });
 
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
