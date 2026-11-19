@@ -757,7 +757,9 @@ export class AttentionRegistry {
       const values = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder)?.values;
       const answered = values?.[API_KEY_FIELD_ID];
       const value = typeof answered === "string" ? answered.trim() : "";
-      if (value === "") return null;
+      const typed = value !== "" || input.answers[API_KEY_FIELD_ID]?.some((answer) => answer.trim() !== "");
+      if (!typed) return null;
+      if (value === "") throw new Error(sourceText("error.backend.apiKeyAnswerUnreadable"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
       const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;
       if (toVault && !this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));

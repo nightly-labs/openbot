@@ -371,6 +371,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot could not read the API key. Enter a key of 8,000 characters or less, and select who can use it.",
   "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",

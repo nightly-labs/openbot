@@ -142,6 +142,7 @@ function openCodeRequestFailure(
   detail: string,
   redact: (text: string) => string,
   log: (text: string) => void,
+  endpoint: AcpCustomEndpoint | null,
 ): string {
   if (!(error instanceof RequestError) || error.code !== -32603) return detail;
   const reason = error.message.replace(/^Internal error:\s*/u, "");
@@ -158,6 +159,8 @@ function openCodeRequestFailure(
   }
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  if (isRecord(error.data) && error.data.errorName === "output-limit")
+    return sourceText(endpoint ? "error.provider.opencodeOutputLimitEndpoint" : "error.provider.opencodeOutputLimit");
   if (/\breasoning start before end\b/u.test(reason)) {
     log(`OpenCode could not read the model's reasoning stream: ${reason}`);
     return sourceText("error.provider.opencodeReasoningOverlap");
@@ -201,6 +204,7 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
   "provider.timeout": "timeout",
   "provider.internal": "provider_unavailable",
   "provider.invalid-output": "provider_internal_error",
+  "output-limit": "provider_internal_error",
   "provider.invalid-request": "invalid_request",
   "provider.unsupported-operation": "invalid_request",
   "provider.no-route": "model_not_found",
@@ -241,7 +245,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       logger.warn("A custom endpoint refused the reasoning effort.", { detail });
       return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
     }
-    return openCodeRequestFailure(error, detail, redact, log);
+    return openCodeRequestFailure(error, detail, redact, log, endpoint);
   },
   failureCause: openCodeFailureCause,
   serverLost: isOpenCodeServerLost,

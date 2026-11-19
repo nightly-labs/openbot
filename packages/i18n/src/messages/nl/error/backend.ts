@@ -376,6 +376,8 @@ export const messages = {
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot kon de API-sleutel niet lezen. Voer een sleutel van maximaal 8.000 tekens in en kies wie hem mag gebruiken.",
   "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",

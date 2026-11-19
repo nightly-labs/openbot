@@ -382,6 +382,8 @@ export const messages = {
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "O OpenBot não conseguiu ler a chave de API. Digite uma chave de até 8.000 caracteres e escolha quem pode usá-la.",
   "error.backend.authRequestInactive": "Esta solicitação de autenticação segura não está mais ativa.",
   "error.backend.secureAuthUnavailable": "A autenticação segura está indisponível.",
   "error.backend.browserUrlRequired": "É necessário informar uma URL para o navegador.",

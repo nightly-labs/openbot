@@ -330,6 +330,8 @@ export const messages = {
   "error.backend.authSubmitting": "身份验证正在提交中。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot 无法读取 API 密钥。请输入不超过 8,000 个字符的密钥，并选择谁可以使用它。",
   "error.backend.vaultItemSaving": "该保险库项目正在保存中。",
   "error.backend.authRequestInactive": "该安全验证请求已不再有效。",
   "error.backend.secureAuthUnavailable": "安全验证不可用。",

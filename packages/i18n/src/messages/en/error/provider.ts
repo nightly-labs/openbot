@@ -256,6 +256,10 @@ export const messages = defineMessages("error.provider", {
     "This model is not available to you. Select a different model for this agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "The model's reply was longer than its output limit three times, so the turn stopped. Choose a lower effort or another model, then send your message again.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "The model's reply was longer than its output limit three times, so the turn stopped. In Settings, open Custom provider, click Edit on this endpoint, and set a larger Max output for this model. Or choose a lower effort or another model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeModelNotServed":

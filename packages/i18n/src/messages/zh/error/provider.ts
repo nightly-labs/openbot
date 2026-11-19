@@ -231,6 +231,10 @@ export const messages = {
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeModelUnavailable": "你无法使用此模型。请为该助手改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请选择更低的强度或其他模型，然后重新发送消息。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请在设置中打开自定义服务商，点击此端点的编辑，为该模型设置更大的最大输出。也可以选择更低的强度或其他模型。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
   "error.provider.opencodeModelNotServed": "模型服务商目前不向你的账号提供此模型。请选择其他模型，然后重新发送消息。",

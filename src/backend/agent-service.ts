@@ -1671,7 +1671,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
         followUsageLimit: (agentId) => {
           if (this.#startPendingRuntime(agentId)) return true;
-          if (!this.#usageLimitMove(agentId)) return false;
+          if (!this.#usageLimitMove(agentId)) return this.#returnCheckPending(agentId);
           Effect.runFork(
             this.#followUsageLimit(agentId).pipe(
               Effect.tap((moved) =>
@@ -3879,7 +3879,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (agent.usageLimitReturn && this.#usageLimitReady(agent.usageLimitReturn))
+    if (
+      agent.usageLimitReturn &&
+      this.#usageLimitReady(agent.usageLimitReturn) &&
+      this.#usageLimits.returnConfirmed(usageLimitOf(agent.usageLimitReturn))
+    )
       return {
         input: {
           ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
@@ -3895,6 +3899,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#hasWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
+  }
+
+  #returnCheckPending(agentId: string): boolean {
+    const returnTo = this.#store.get(agentId)?.usageLimitReturn;
+    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(returnTo));
   }
 
   #hasWaitingWork(agentId: string): boolean {
