@@ -876,6 +876,7 @@ export class DrainScheduler {
           }),
           [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
           agentNames,
+          [...requestIds].flatMap((requestId) => this.#mailbox.stillWorkingRecipients(agent.id, requestId)),
         );
         return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
       };

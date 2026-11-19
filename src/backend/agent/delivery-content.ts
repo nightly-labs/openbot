@@ -181,6 +181,8 @@ const NO_ANSWER_FROM = "No answer comes from ";
 const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
+const STILL_WORKING_FROM = "No answer yet from ";
+const STILL_WORKING_REASON = ": they still work on the request. Their answer comes in a later turn.";
 export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
 export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
@@ -199,7 +201,9 @@ const TEAMMATE_PROMPT = new RegExp(
   "gm",
 );
 const COMBINED_HEADER = /^This turn starts with (\d+) messages\. Read all of them before you answer\.\n\n/;
-const UNANSWERED_TAIL = new RegExp(`\\n\\n${NO_ANSWER_FROM}[^\\n]*${escapeRegExp(NO_ANSWER_REASON)}$`);
+const UNANSWERED_TAIL = new RegExp(
+  `(?:\\n\\n(?:${NO_ANSWER_FROM}[^\\n]*${escapeRegExp(NO_ANSWER_REASON)}|${STILL_WORKING_FROM}[^\\n]*${escapeRegExp(STILL_WORKING_REASON)}))+$`,
+);
 
 export interface TeammatePrompt {
   senderAgentId: string;
@@ -581,15 +585,19 @@ export function combinedPromptInput(
   inputs: readonly DeliveryInputItem[][],
   unanswered: readonly string[],
   agentNames: ReadonlyMap<string, string>,
+  stillWorking: readonly string[] = [],
 ): DeliveryInputItem[] {
   const [only] = inputs;
-  if (inputs.length === 1 && only && unanswered.length === 0) return only;
+  if (inputs.length === 1 && only && unanswered.length === 0 && stillWorking.length === 0) return only;
   const texts = inputs.flatMap((items) => items.flatMap((item) => (item.type === "text" ? [item.text] : [])));
-  const names = unanswered.map((agentId) => agentNames.get(agentId) ?? agentId);
+  const namesOf = (agentIds: readonly string[]) => agentIds.map((agentId) => agentNames.get(agentId) ?? agentId);
+  const names = namesOf(unanswered);
+  const working = namesOf(stillWorking);
   const text = [
     inputs.length > 1 ? `This turn starts with ${inputs.length} messages. Read all of them before you answer.` : null,
     ...texts,
     names.length ? `${NO_ANSWER_FROM}${names.join(", ")}${NO_ANSWER_REASON}` : null,
+    working.length ? `${STILL_WORKING_FROM}${working.join(", ")}${STILL_WORKING_REASON}` : null,
   ]
     .filter(Boolean)
     .join("\n\n");
