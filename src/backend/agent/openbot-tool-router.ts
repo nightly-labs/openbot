@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import {
@@ -121,6 +121,12 @@ import {
   WORKFLOW_TOOL_NAMES,
   type WorkflowTools,
 } from "../workflows/workflow-tools";
+import type { AgentImportToolPort } from "./agent-import-tool-port";
+import {
+  AGENT_IMPORT_TOOL_NAMES,
+  applyAgentImportToolSchema,
+  previewAgentImportToolSchema,
+} from "./agent-import-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
 import { AgentSettingsRefused } from "./agent-settings-refused";
@@ -463,6 +469,7 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
+  agentImportTools?: (() => AgentImportToolPort | null) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -515,6 +522,7 @@ export class OpenBotToolRouter {
   readonly #personCanAdminister: (personId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
+  readonly #agentImportTools: (() => AgentImportToolPort | null) | undefined;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
   readonly #browserSchemasGiven = new Set<string>();
@@ -578,6 +586,7 @@ export class OpenBotToolRouter {
     this.#personCanAdminister = options.personCanAdminister ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
+    this.#agentImportTools = options.agentImportTools;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -942,7 +951,8 @@ export class OpenBotToolRouter {
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
-              tool === "create_server_install_command";
+              tool === "create_server_install_command" ||
+              AGENT_IMPORT_TOOL_NAMES.has(tool);
             const correctable = (cause: unknown) =>
               correctableTool ||
               ((WORKFLOW_TOOL_NAMES.has(tool) || CRM_TOOL_NAMES.has(tool)) && cause instanceof z.ZodError);
@@ -2027,6 +2037,11 @@ export class OpenBotToolRouter {
 
     if (params.tool === "create_agent") return yield* this.#createAgent(params, senderAgentId);
 
+    if (params.tool === "preview_agent_import") return yield* this.#previewAgentImport(params);
+
+    if (params.tool === "apply_agent_import")
+      return yield* this.#applyAgentImport(client, request, params, senderAgentId);
+
     if (params.tool === "update_profile") return yield* this.#updateProfile(params, senderAgentId);
 
     if (params.tool === "update_agents") return yield* handleUpdateAgentsTool(params, senderAgentId, this.#hooks);
@@ -2981,6 +2996,87 @@ export class OpenBotToolRouter {
     };
     return result;
   }, Effect.uninterruptible);
+
+  readonly #previewAgentImport = Effect.fn("OpenBotToolRouter.previewAgentImport")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const args = previewAgentImportToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+    const path = args.zipPath;
+    if (!path.toLowerCase().endsWith(".zip")) return openBotToolFailure("The export path must end with .zip.");
+    yield* Effect.tryPromise({
+      try: () => access(path),
+      catch: (cause) => new ToolOperationFailed({ cause }),
+    });
+    const port = this.#agentImportTools?.() ?? null;
+    if (!port)
+      return yield* Effect.fail(
+        new ToolOperationFailed({ cause: new Error(sourceText("error.agent.agentImportUnavailable")) }),
+      );
+    const preview = yield* port.stage(path);
+    return openBotToolResult(preview);
+  });
+
+  readonly #applyAgentImport = Effect.fn("OpenBotToolRouter.applyAgentImport")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const args = applyAgentImportToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+    const port = this.#agentImportTools?.() ?? null;
+    if (!port)
+      return yield* Effect.fail(
+        new ToolOperationFailed({ cause: new Error(sourceText("error.agent.agentImportUnavailable")) }),
+      );
+    const channelKeys = args.channelKeys ?? [];
+    const summary = yield* port.stagedSummary(args.token, args.keys, channelKeys);
+    const names = summary.agents.map((agent) => agent.name).join(", ");
+    let reason = sourceText("status.agent.agentImportApply", {
+      count: summary.agents.length,
+      source: summary.sourceApp,
+      names,
+    });
+    if (summary.channels.length) {
+      reason += sourceText("status.agent.agentImportChannels", {
+        names: summary.channels.map((channel) => channel.name).join(", "),
+      });
+    }
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason,
+        grantRoot: null,
+        permissions: null,
+      },
+      { alwaysAsk: true },
+    );
+    if (decision !== "accept") {
+      yield* port.discard(args.token).pipe(Effect.catch(() => Effect.void));
+      return openBotToolFailure(sourceText("error.agent.agentImportDeclined"));
+    }
+    const result = yield* port.apply({
+      token: args.token,
+      keys: args.keys,
+      channelKeys: args.channelKeys ?? [],
+    });
+    return openBotToolResult({
+      agents: result.agents.map((agent) => ({ id: agent.id, name: agent.name })),
+      channels: result.channels,
+      skipped: result.skipped,
+      skippedChannels: result.skippedChannels,
+      warnings: result.warnings,
+    });
+  });
 
   readonly #createAgent = Effect.fn("OpenBotToolRouter.createAgent")(
     function* (

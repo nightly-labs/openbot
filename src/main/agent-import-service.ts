@@ -104,6 +104,7 @@ interface StagedImport {
   path: string;
   fingerprint: string;
   limits: ArchiveLimits;
+  sourceApp: string;
   agents: ImportAgent[];
   channels: ImportChannel[];
   wrapper: string;
@@ -441,6 +442,7 @@ export class AgentImportService {
         path,
         fingerprint: archive.fingerprint,
         limits,
+        sourceApp: manifest.sourceApp,
         agents: manifest.agents,
         channels: manifest.channels,
         wrapper,
@@ -497,6 +499,33 @@ export class AgentImportService {
   ) {
     const slot = this.#staged.get(token);
     if (slot && slot.owner === owner) yield* this.#drop(token, slot);
+  }).bind(this);
+
+  /**
+   * Names the agents the user chose for a staged export, for an approval card before `apply`.
+   * The token must still be staged and every key must be in that export.
+   */
+  readonly stagedSummary = Effect.fn("AgentImportService.stagedSummary")(function* (
+    this: AgentImportService,
+    token: string,
+    keys: readonly string[],
+    channelKeys: readonly string[],
+    owner = LOCAL_IMPORT_OWNER,
+  ) {
+    const slot = this.#staged.get(token);
+    if (!slot || slot.owner !== owner) return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    const wanted = new Set(keys);
+    const agents = slot.value.agents
+      .filter((agent) => wanted.has(agent.key))
+      .map((agent) => ({ key: agent.key, name: agent.name }));
+    if (agents.length !== keys.length) return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    const channelsWanted = new Set(channelKeys);
+    const channels = slot.value.channels
+      .filter((channel) => channelsWanted.has(channel.key))
+      .map((channel) => ({ key: channel.key, name: channel.name }));
+    if (channels.length !== channelKeys.length)
+      return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
+    return { sourceApp: slot.value.sourceApp, agents, channels };
   }).bind(this);
 
   readonly apply = Effect.fn("AgentImportService.apply")(function* (

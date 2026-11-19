@@ -62,6 +62,9 @@ export const messages = {
     "Verplaats {agents} naar het gedeelde browserprofiel. Ze krijgen de aanmeldingen en cookies ervan. Hun open tabbladen sluiten.",
   "status.agent.browserProfileOwn": "Geef {agents} elk een eigen browserprofiel. Hun open tabbladen sluiten.",
   "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.deleteAgents": "Verwijder {agents} met hun chats en bestanden. Je kunt dit niet ongedaan maken.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",

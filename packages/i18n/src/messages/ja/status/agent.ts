@@ -60,6 +60,9 @@ export const messages = {
   "status.agent.browserProfileOwn":
     "{agents} にそれぞれ専用のブラウザープロファイルを与えます。開いているタブは閉じます。",
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.deleteAgents": "{agents} をチャットとファイルごと削除します。元に戻せません。",

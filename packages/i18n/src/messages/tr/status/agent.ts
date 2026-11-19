@@ -58,6 +58,9 @@ export const messages = {
   "status.agent.browserProfileOwn":
     "{agents} ajanlarının her birine kendi tarayıcı profilini ver. Açık sekmeleri kapanır.",
   "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
   "status.agent.deleteAgents": "{agents} ajanlarını sohbetleri ve dosyalarıyla birlikte silin. Bu işlem geri alınamaz.",

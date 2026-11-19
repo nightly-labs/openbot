@@ -33,6 +33,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "에이전트 설정은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.skillsLocalOnly": "스킬은 에이전트를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.agent.addLocalOnly": "에이전트는 실행하는 컴퓨터에서만 추가할 수 있어요.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "참여한 서버의 에이전트는 여기서 업데이트할 수 없어요.",
   "error.agent.searchQueryRequired": "검색어가 필요해요.",
   "error.agent.messageTooLong": "메시지가 너무 길어요.",

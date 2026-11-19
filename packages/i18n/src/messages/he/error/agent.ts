@@ -31,6 +31,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "אפשר לשנות הגדרות של סוכן רק במחשב שמריץ את הסוכן.",
   "error.agent.skillsLocalOnly": "אפשר לשנות מיומנויות רק במחשב שמריץ את הסוכן.",
   "error.agent.addLocalOnly": "אפשר להוסיף סוכנים רק במחשב שמריץ אותם.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "אי אפשר לעדכן מכאן סוכן בשרת שהצטרפת אליו.",
   "error.agent.searchQueryRequired": "נדרשת שאילתת חיפוש.",
   "error.agent.messageTooLong": "ההודעה ארוכה מדי.",

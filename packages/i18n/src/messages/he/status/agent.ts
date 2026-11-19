@@ -56,6 +56,9 @@ export const messages = {
     "העבר את {agents} לפרופיל הדפדפן המשותף. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.browserProfileOwn": "תן לכל אחד מ-{agents} פרופיל דפדפן משלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.deleteAgents": "מחיקת {agents} יחד עם הצ'אטים והקבצים שלהם. לא ניתן לבטל פעולה זו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",

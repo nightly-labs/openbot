@@ -31,6 +31,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "لا يمكن تغيير إعدادات الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.skillsLocalOnly": "لا يمكن تغيير المهارات إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.addLocalOnly": "لا يمكن إضافة الوكلاء إلا على الحاسوب الذي يشغّلهم.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "لا يمكن تحديث وكيل على خادم منضم إليه من هنا.",
   "error.agent.searchQueryRequired": "عبارة البحث مطلوبة.",
   "error.agent.messageTooLong": "الرسالة طويلة جدًا.",

@@ -31,6 +31,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "助手设置只能在运行该助手的电脑上更改。",
   "error.agent.skillsLocalOnly": "技能只能在运行该助手的电脑上更改。",
   "error.agent.addLocalOnly": "助手只能在运行它们的电脑上添加。",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "无法从这里更新已加入服务器上的助手。",
   "error.agent.searchQueryRequired": "需要提供搜索关键词。",
   "error.agent.messageTooLong": "消息过长。",

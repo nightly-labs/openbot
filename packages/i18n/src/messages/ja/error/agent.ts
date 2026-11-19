@@ -35,6 +35,8 @@ export const messages = {
     "エージェントの設定は、そのエージェントを実行しているコンピューターでのみ変更できます。",
   "error.agent.skillsLocalOnly": "スキルは、エージェントを実行しているコンピューターでのみ変更できます。",
   "error.agent.addLocalOnly": "エージェントは、それを実行するコンピューターでのみ追加できます。",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "参加中のサーバーのエージェントはここから更新できません。",
   "error.agent.searchQueryRequired": "検索語句が必要です。",
   "error.agent.messageTooLong": "メッセージが長すぎます。",

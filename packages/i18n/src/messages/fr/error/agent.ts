@@ -35,6 +35,8 @@ export const messages = {
     "Les réglages de l’agent ne peuvent être modifiés que sur l’ordinateur qui exécute l’agent.",
   "error.agent.skillsLocalOnly": "Les compétences ne peuvent être modifiées que sur l’ordinateur qui exécute l’agent.",
   "error.agent.addLocalOnly": "Les agents ne peuvent être ajoutés que sur l’ordinateur qui les exécute.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "Un agent d’un serveur rejoint ne peut pas être modifié d’ici.",
   "error.agent.searchQueryRequired": "Une requête de recherche est requise.",
   "error.agent.messageTooLong": "Le message est trop long.",

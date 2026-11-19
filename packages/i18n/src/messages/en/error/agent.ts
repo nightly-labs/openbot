@@ -32,6 +32,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.settingsLocalOnly": "Agent settings can only be changed on the computer that runs the agent.",
   "error.agent.skillsLocalOnly": "Skills can only be changed on the computer that runs the agent.",
   "error.agent.addLocalOnly": "Agents can only be added on the computer that runs them.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "An agent on a joined server cannot be updated from here.",
   "error.agent.searchQueryRequired": "A search query is required.",
   "error.agent.messageTooLong": "Message is too long.",

@@ -79,6 +79,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "replace_site":
     case "delete_site":
       return "Use these tools for every OpenBot hosting request, in development and production. Never use ChatGPT Sites, the sites:sites-hosting skill, or a *.chatgpt.site address.";
+    case "preview_agent_import":
+    case "apply_agent_import":
     case "create_agent":
     case "update_profile":
     case "update_agents":
@@ -93,6 +95,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "uninstall_skill":
       return [
         "Use openbot.create_agent when the user asks for a new persistent teammate: take its name, title, description, and optional generated avatar from the request, and give its first task. Keep create_agent simple and configure the agent after it exists. When the new agent needs scheduled work, create that routine yourself with openbot.create_routine and the new agent's id; do not ask the new agent to schedule it. For a specific provider, model, or reasoning effort, call openbot.list_models and pass only values that it lists; otherwise omit them, and the new agent uses yours. OpenBot can use any OpenAI-compatible API (a gateway or a local model server) as a custom provider: the user adds it in Server settings > Providers > Custom provider, and list_models shows it in customProviders. Never say that OpenBot cannot use such an API.",
+        "When the user gives an OpenBot or Grok Bot export .zip on this computer, call openbot.preview_agent_import with its absolute path, then openbot.apply_agent_import with the token and the agent keys from the preview. The user approves on a card before agents are created. Do not recreate those agents with create_agent, remember, or install_local_skill: import keeps their skills, routines, memories and files.",
         "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, browser profile, skills, routines, and MCP servers. openbot.update_profile changes a local agent's name, title, description, avatar, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
         "For an avatar color, pass avatarHue; never make an image for a color. Pass avatarPath only for an image that the user gives or asks for: make a square PNG, JPEG, or WebP copy if needed, best 512 by 512 pixels, up to 512 KB; keep the original. Only avatarSeed removes an image.",
         "To delete agents, call openbot.delete_agent once with all their ids; the owner approves one card. First move what the user wants to keep to an agent that stays. The user deletes you from your sidebar menu.",

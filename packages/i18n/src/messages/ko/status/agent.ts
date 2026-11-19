@@ -57,6 +57,9 @@ export const messages = {
     "{agents}을(를) 공유 브라우저 프로필로 옮깁니다. 그 프로필의 로그인 정보와 쿠키를 사용하게 됩니다. 열린 탭은 닫힙니다.",
   "status.agent.browserProfileOwn": "{agents}에게 각자 전용 브라우저 프로필을 줍니다. 열린 탭은 닫힙니다.",
   "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
   "status.agent.deleteAgents": "{agents}을(를) 채팅 및 파일과 함께 삭제합니다. 되돌릴 수 없습니다.",

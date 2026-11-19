@@ -64,6 +64,7 @@ import {
   systemPreferences,
   webContents,
 } from "electron";
+import type { AgentImportToolPort } from "../backend/agent/agent-import-tool-port";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
@@ -1947,6 +1948,7 @@ export async function createApplicationServices({
     agents: () => service.listAgents(),
   });
   let hostedStorageGb: number | null = null;
+  const agentImportHolder: { current: AgentImportToolPort | null } = { current: null };
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2106,6 +2108,7 @@ export async function createApplicationServices({
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
+    agentImportTools: () => agentImportHolder.current,
     webhookRoutines: () => agentWebhookRoutineWriter(events),
     approvalAutomation,
     busyMessageMode: () => busyMessageMode.get().mode,
@@ -2782,6 +2785,17 @@ export async function createApplicationServices({
     () => serverTimezone.effective(),
     join(app.getPath("userData"), "agent-import-uploads"),
   );
+  agentImportHolder.current = {
+    stage: (path) => agentImport.stage(path).pipe(toToolOperationFailed),
+    apply: (input) => agentImport.apply(input).pipe(toToolOperationFailed),
+    discard: (token) =>
+      agentImport.discard(token).pipe(
+        toToolOperationFailed,
+        Effect.map(() => undefined),
+      ),
+    stagedSummary: (token, keys, channelKeys) =>
+      agentImport.stagedSummary(token, keys, channelKeys).pipe(toToolOperationFailed),
+  };
   const hermesImport = new HermesImportService(
     {
       listAgents: () => service.listAgents(),

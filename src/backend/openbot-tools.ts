@@ -18,6 +18,7 @@ import { isUiBlockId, UI_BLOCK_LIMITS } from "@openbot/contracts/ui-blocks";
 import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
+import { applyAgentImportToolSchema, previewAgentImportToolSchema } from "./agent/agent-import-tools";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
@@ -463,8 +464,20 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_agent",
     description:
-      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, effort and account. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits.",
+      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, effort and account. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits. When the user gives an OpenBot or Grok Bot export .zip on this computer, use preview_agent_import and apply_agent_import instead. create_agent does not import skills, routines or memories from that file.",
     shape: createAgentToolSchema.shape,
+  },
+  {
+    name: "preview_agent_import",
+    description:
+      "Read an OpenBot agent export .zip on this computer and return a preview: token, source app, agent keys, counts of skills, routines, memories and files, and any warnings. The path must be absolute and readable on the host that runs OpenBot. Call apply_agent_import with the token and the agent keys to import; the user approves on a card first. Preview again when the export changes.",
+    shape: previewAgentImportToolSchema.shape,
+  },
+  {
+    name: "apply_agent_import",
+    description:
+      "Import the agents the user chose from a preview_agent_import token. Pass every agent key to import and optional channel keys from the same preview. The user must approve on a card before agents are created. This is the same import as Server settings: it brings skills, routines, memories and workspace files. A decline or cancel leaves nothing imported.",
+    shape: applyAgentImportToolSchema.shape,
   },
   {
     name: "update_profile",

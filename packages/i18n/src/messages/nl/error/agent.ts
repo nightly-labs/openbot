@@ -35,6 +35,8 @@ export const messages = {
     "Instellingen van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.skillsLocalOnly": "Vaardigheden kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.addLocalOnly": "Agents kun je alleen toevoegen op de computer waarop ze draaien.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "Een agent op een server waaraan je deelneemt, kun je hier niet bijwerken.",
   "error.agent.searchQueryRequired": "Een zoekopdracht is verplicht.",
   "error.agent.messageTooLong": "Het bericht is te lang.",

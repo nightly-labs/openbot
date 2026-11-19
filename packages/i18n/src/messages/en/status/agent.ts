@@ -63,6 +63,9 @@ export const messages = defineMessages("status.agent", {
     "Move {agents} to the shared browser profile. They get its sign-ins and cookies. Their open tabs close.",
   "status.agent.browserProfileOwn": "Give {agents} each a browser profile of its own. Their open tabs close.",
   "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.deleteAgents": "Delete {agents} with their chats and files. You cannot undo this.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",

@@ -33,6 +33,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "Ajan ayarları yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.skillsLocalOnly": "Beceriler yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.addLocalOnly": "Ajanlar yalnızca onları çalıştıran bilgisayarda eklenebilir.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "Katılınan bir sunucudaki ajan buradan güncellenemez.",
   "error.agent.searchQueryRequired": "Bir arama sorgusu gereklidir.",
   "error.agent.messageTooLong": "Mesaj çok uzun.",

@@ -37,6 +37,8 @@ export const messages = {
     "Die Agenteneinstellungen können nur auf dem Computer geändert werden, auf dem der Agent läuft.",
   "error.agent.skillsLocalOnly": "Fähigkeiten können nur auf dem Computer geändert werden, auf dem der Agent läuft.",
   "error.agent.addLocalOnly": "Agenten können nur auf dem Computer hinzugefügt werden, auf dem sie laufen.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate":
     "Ein Agent auf einem Server, dem du beigetreten bist, kann hier nicht aktualisiert werden.",
   "error.agent.searchQueryRequired": "Eine Suchanfrage ist erforderlich.",

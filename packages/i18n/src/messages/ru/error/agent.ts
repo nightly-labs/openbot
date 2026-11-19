@@ -32,6 +32,8 @@ export const messages = {
   "error.agent.settingsLocalOnly": "Настройки агента можно изменить только на компьютере, где он работает.",
   "error.agent.skillsLocalOnly": "Навыки можно изменить только на компьютере, где работает агент.",
   "error.agent.addLocalOnly": "Агентов можно добавлять только на компьютере, где они работают.",
+  "error.agent.agentImportUnavailable": "Agent import is not available on this host.",
+  "error.agent.agentImportDeclined": "The user declined the agent import. Nothing was imported.",
   "error.agent.joinedServerUpdate": "Агента на подключённом сервере нельзя обновить отсюда.",
   "error.agent.searchQueryRequired": "Нужен поисковый запрос.",
   "error.agent.messageTooLong": "Сообщение слишком длинное.",

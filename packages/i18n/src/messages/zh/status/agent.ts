@@ -55,6 +55,9 @@ export const messages = {
     "将 {agents} 移到共享浏览器配置文件。它们会使用其中的登录信息和 Cookie。它们打开的标签页会关闭。",
   "status.agent.browserProfileOwn": "为 {agents} 各自提供专用的浏览器配置文件。它们打开的标签页会关闭。",
   "status.agent.feedbackSending": "正在将你的反馈发送给 OpenBot 团队…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete": "删除工作流 {title} 及其运行记录和版本。其未完成的步骤会停止。",
   "status.agent.deleteAgents": "删除 {agents} 及其聊天和文件。此操作无法撤销。",
   "status.agent.vaultCardFillFrames": "银行卡字段位于来自 {origins} 的框架中。",

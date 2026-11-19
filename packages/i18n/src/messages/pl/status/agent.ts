@@ -60,6 +60,9 @@ export const messages = {
   "status.agent.browserProfileOwn":
     "Daj każdemu z {agents} własny profil przeglądarki. Ich otwarte karty zostaną zamknięte.",
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
+  "status.agent.agentImportApply":
+    "Import {count} agents from a {source} export: {names}. Their skills, routines, memories and workspace files come with them.",
+  "status.agent.agentImportChannels": " Group chats: {names}.",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
   "status.agent.deleteAgents": "Usuń {agents} razem z ich czatami i plikami. Tej operacji nie można cofnąć.",
