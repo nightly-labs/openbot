@@ -53,6 +53,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
   "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot could not load the page in the sign-in window. Check the internet connection, then open the sign-in window again.",
   "error.backend.browserSignInReadFailed": "OpenBot could not read the sign-in from the window.",
   "error.backend.browserStopUnsupported": "This remote host cannot stop a page load.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",

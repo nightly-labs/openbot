@@ -51,6 +51,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",

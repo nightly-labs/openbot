@@ -54,6 +54,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "이 원격 호스트는 브라우저 탭 제어권 가져오기를 지원하지 않아요.",
   "error.backend.browserSignInUnsupported": "이 원격 호스트는 이 컴퓨터에서 로그인을 받을 수 없어요.",
   "error.backend.browserSignInOpenFailed": "OpenBot이 로그인 창을 열 수 없었어요.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot이 로그인 창에서 페이지를 불러올 수 없었어요. 인터넷 연결을 확인한 다음 로그인 창을 다시 열어 주세요.",
   "error.backend.browserSignInReadFailed": "OpenBot이 창에서 로그인 정보를 읽을 수 없었어요.",
   "error.backend.browserStopUnsupported": "이 원격 호스트는 페이지 로딩을 중지할 수 없어요.",
   "error.backend.sharedDataLocalOnly": "공유 데이터는 이 에이전트를 실행하는 컴퓨터에서 관리해요.",
