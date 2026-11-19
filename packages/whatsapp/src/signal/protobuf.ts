@@ -1,14 +1,9 @@
-// A minimal protobuf wire encoder and decoder. It supports only what the Signal messages and the
-// stored records use: `uint32` varints (wire type 0) and length-delimited bytes (wire type 2).
-// The decoder skips unknown 64-bit and 32-bit fields.
-
 const VARINT = 0;
 const FIXED64 = 1;
 const LENGTH_DELIMITED = 2;
 const FIXED32 = 5;
 const UINT32_RANGE = 2 ** 32;
 
-/** Writes fields in the order of the calls. */
 export class ProtoWriter {
   readonly #chunks: number[] = [];
 
@@ -42,7 +37,6 @@ export class ProtoWriter {
   }
 }
 
-/** The fields of one decoded message, by field number, in wire order. */
 export class ProtoFields {
   readonly #fields = new Map<number, Array<number | Uint8Array>>();
 
@@ -67,7 +61,6 @@ export class ProtoFields {
       if (field === 0) throw new Error("Protobuf: field number 0");
       let value: number | Uint8Array;
       if (wireType === VARINT) {
-        // A uint32 parser keeps the low 32 bits of a longer varint.
         value = readVarint() % UINT32_RANGE;
       } else if (wireType === LENGTH_DELIMITED) {
         const length = readVarint();
@@ -87,7 +80,6 @@ export class ProtoFields {
     }
   }
 
-  /** The last value of a `uint32` field, as protobuf parsers do for repeated scalars. */
   uint32(field: number): number | undefined {
     const value = this.#fields.get(field)?.at(-1);
     if (value === undefined) return undefined;

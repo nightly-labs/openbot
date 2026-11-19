@@ -54,7 +54,6 @@ describe("decodeAgentStatusFromMain", () => {
   });
 });
 
-// Null hides the hint. An empty list shows it with no names: the user guards every quit and no agent works.
 describe("decodeQuitShortcutHint", () => {
   it("keeps the hidden hint and the hint with no agents apart", () => {
     expect(decodeQuitShortcutHint(null)).toBeNull();
@@ -68,7 +67,6 @@ describe("decodeQuitShortcutHint", () => {
   });
 });
 
-// A joined server's pools reach the provider settings only through this decoder (#8612, #8955).
 describe("decodeHostProviderAccountsFromMain", () => {
   const accounts = (pools?: unknown) => ({
     providers: [],

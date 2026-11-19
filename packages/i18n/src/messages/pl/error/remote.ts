@@ -23,6 +23,12 @@ export const messages = {
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
   "error.remote.windowsSessionDisconnected":
     "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
+  "error.remote.macScreenLocked":
+    "Mac jest zablokowany, więc nie może udostępnić ekranu. Odblokuj Maca na jego ekranie, a następnie spróbuj ponownie.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
+  "error.remote.streamTooSlow":
+    "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Użyj szybszej sieci, a następnie spróbuj ponownie.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",
@@ -81,7 +87,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Tylko właściciel może usunąć ten serwer.",
   "error.remote.requestTimeout": "Przekroczono limit czasu zdalnego żądania.",
   "error.remote.requestFailed": "Zdalne żądanie nie powiodło się.",
-  "error.remote.pinnedKeyMissing": "Zdalny host nie ma przypiętego klucza urządzenia.",
+  "error.remote.hostKeyMissing":
+    "OpenBot nie może zweryfikować tego serwera, ponieważ brakuje jego klucza bezpieczeństwa lub klucz się zmienił. Poproś właściciela serwera o sprawdzenie serwera.",
+  "error.remote.connectionNotStarted":
+    "OpenBot nie mógł nawiązać połączenia z tym serwerem. Jeśli problem się powtarza, zamknij OpenBot i otwórz go ponownie.",
   "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
   "error.remote.hostDisconnected":
@@ -182,6 +191,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Nie udało się nawiązać bezpośredniego połączenia z hostem. Może je blokować zapora, VPN lub serwer proxy.",
   "error.remote.iceDisconnected": "Bezpośrednie połączenie z hostem zostało utracone.",
+  "error.remote.webrtcBlocked":
+    "To urządzenie blokuje połączenie, którego potrzebuje OpenBot. Jeśli tryb blokady jest włączony, wyłącz go dla OpenBot w Ustawienia > Prywatność i ochrona > Tryb blokady.",
   "error.remote.directoryUnreachable": "OpenBot nie mógł połączyć się z usługą OpenBot. Sprawdź połączenie.",
   "error.remote.directoryTimeout": "Usługa OpenBot nie odpowiedziała na czas. Spróbuj ponownie.",
   "error.remote.inviteAlreadyUsed": "To zaproszenie zostało już użyte. Poproś o nowe zaproszenie.",

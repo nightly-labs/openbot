@@ -16,11 +16,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server settings › Transfer › Export. The host packs the chosen agents into a transfer file, the
- * phone receives it and opens the share sheet, where the user saves it or sends it to the new computer.
- * The phone keeps the file until the page closes, so it can share it again.
- */
 export function ServerTransferExportScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -28,7 +23,6 @@ export function ServerTransferExportScreen() {
   const { canTransferServer } = useMobileWorkspace();
   const { loadInstanceTransferSummary, downloadInstanceTransfer } = useMobileWorkspaceActions();
   const available = canTransferServer(serverId);
-  // The agents are read again each time the page opens.
   const summary = useQuery({
     queryKey: queryKeys.instanceTransferSummary(queryScope, serverId),
     enabled: available,
@@ -42,11 +36,8 @@ export function ServerTransferExportScreen() {
   const [settings, setSettings] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The kept file. The host sends the file only, with no warnings.
   const [saved, setSaved] = useState<string | null>(null);
 
-  // The file holds memories and workspace files, so it leaves this phone with the page. A file that
-  // arrives after the page closes is not kept.
   const release = useRef<(() => void) | null>(null);
   const closed = useRef(false);
   useEffect(() => {

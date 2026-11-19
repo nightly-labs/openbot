@@ -1,6 +1,3 @@
-// The shared parts of the Claude agent scripts (`claude-agent-smoke.ts`,
-// `claude-prompt-settings-bench.ts`): a real `ClaudeAgentClient` on the real SDK, a temporary git
-// workspace, and the clean-up of the CLI sessions of that workspace.
 import { execFileSync } from "node:child_process";
 import { readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -11,7 +8,6 @@ import type { ClaudeCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
 
-/** The real SDK query. `onMessage` sees each message; `changeOptions` can change the query options. */
 export function observedQuery(
   onMessage: (message: SDKMessage) => void,
   changeOptions: (options: Options) => Options = (options) => options,
@@ -34,16 +30,11 @@ export function observedQuery(
   };
 }
 
-/** The names in an init message list, whose entries are strings or records with a `name`. */
 export const messageNames = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.map((entry) => (typeof entry === "string" ? entry : (getString(entry, "name") ?? JSON.stringify(entry))))
     : [];
 
-/**
- * A started client that accepts each tool approval, as a user who allows the step. `runTurn` waits
- * for `turn/completed` and fails on an error notification or a turn that did not complete.
- */
 export function startClaudeAgent(
   cli: ClaudeCliInfo,
   createQuery: ReturnType<typeof observedQuery>,
@@ -69,7 +60,6 @@ export function startClaudeAgent(
   client.on("notification", (notification: AppServerNotification) => {
     if (notification.method === "error") failures.push(JSON.stringify(notification.params));
     if (notification.method !== "turn/completed") return;
-    // A turn can end as failed or interrupted with no error notification.
     const status = getString(getRecord(notification.params, "turn"), "status");
     if (status !== "completed") failures.push(`turn ended as ${status ?? "unknown"}`);
     const threadId = getString(notification.params, "threadId");
@@ -99,10 +89,6 @@ export function startClaudeAgent(
   return { client, startThread, runTurn, stop };
 }
 
-/**
- * A git workspace with two small files and one commit. With `origin`, the repository is its own
- * `origin` with `origin/HEAD` set, for skills that compare with the default branch.
- */
 export async function makeGitWorkspace(workspace: string, origin = false): Promise<(...args: string[]) => string> {
   await writeFile(join(workspace, "notes.md"), "# Garden plan\n\nTomatoes by the wall.\n");
   await writeFile(join(workspace, "count.txt"), "42\n");
@@ -120,11 +106,6 @@ export async function makeGitWorkspace(workspace: string, origin = false): Promi
   return git;
 }
 
-/**
- * Removes the run's temporary folder and the CLI sessions of its workspaces. The CLI keeps each
- * session under ~/.claude/projects in a folder named after the workspace path; only the folders
- * of this run are removed.
- */
 export async function removeRun(root: string): Promise<void> {
   const projects = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
   const runName = basename(root);

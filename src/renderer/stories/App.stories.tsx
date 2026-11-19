@@ -22,7 +22,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Sets one stored layout value for the story, and puts the old value back when the story ends. */
 function useStoredLayoutValue(key: string, value: string): void {
   const previous = window.localStorage.getItem(key);
   window.localStorage.setItem(key, value);
@@ -46,14 +45,12 @@ export const ExpandedSidebar: Story = {
   render: () => <SidebarStatePlayground compact={false} />,
 };
 
-/** The servers in a rail at the left of the sidebar, instead of the server menu. */
 export const ServerRailView: Story = {
   render: () => <SidebarStatePlayground compact={false} serverView="rail" />,
 };
 
 const SLOW_REMOTE_LOAD_MS = 15_000;
 
-/** The agents of the remote server arrive late: its first load stays on screen past the 10 s toast. */
 function SlowRemotePlayground() {
   useStoredLayoutValue(LEFT_PANEL_COLLAPSED_STORAGE_KEY, "false");
   useStoredLayoutValue(SERVER_VIEW_STORAGE_KEY, "rail");
@@ -76,7 +73,6 @@ function SlowRemotePlayground() {
   );
 }
 
-/** Select the remote server in the rail: its first load covers the whole window. */
 export const SlowRemoteServer: Story = {
   render: () => <SlowRemotePlayground />,
 };
@@ -169,7 +165,6 @@ export const DifferentRemoteVersions: Story = {
   ),
 };
 
-/** A joined server has a new OpenBot version. Entering it opens the update dialog each time. */
 export const RemoteHostUpdate: Story = {
   render: () => (
     <OpenBotPlayground
@@ -220,10 +215,6 @@ export const AgentStarting: Story = {
   ),
 };
 
-/**
- * The signed-out provider in the real shell. `sign-in-required` is the only input: the notice, the
- * model picker's label and the suppressed usage chip all read that one field.
- */
 export const ProviderSignInRequired: Story = {
   render: () => (
     <OpenBotPlayground
@@ -247,7 +238,6 @@ export const ProviderSignInRequired: Story = {
   ),
 };
 
-/** One agent for each wait: a question, a command approval and a browser takeover. */
 const STORY_WAITING_EVENTS: AgentEvent[] = [
   {
     type: "prompt",
@@ -295,11 +285,6 @@ const STORY_WAITING_EVENTS: AgentEvent[] = [
   },
 ];
 
-/**
- * The "Needs you" group in the real shell. The waits arrive as agent events, so the sidebar reads
- * them through the same bridge as on desktop. Each subscriber gets them again, which is harmless:
- * a wait is kept per agent.
- */
 function WaitingForInputPlayground(props: { compact: boolean }) {
   useStoredLayoutValue(LEFT_PANEL_COLLAPSED_STORAGE_KEY, props.compact ? "true" : "false");
   return (

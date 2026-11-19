@@ -7,12 +7,6 @@ import { cachedStatement } from "./statement-cache";
 
 type AgentRuntime = Pick<AgentSummary, "provider" | "model" | "reasoningEffort">;
 
-/**
- * The audit entry of a model change that one agent made to another agent, or to itself. It rides in
- * the roster event of the same write, so the entry and the change commit or fail together. A change
- * the user makes carries none: the user is the default author of every roster event. `replaceAgents`
- * keeps each `agent.model-changed` event when it drops the older roster events, so the audit stays.
- */
 export interface AgentModelChange {
   initiatingAgentId: string;
   targetAgentId: string;
@@ -24,19 +18,6 @@ export interface AgentRosterOptions {
   core: DatabaseCore;
 }
 
-/**
- * The set of agents that exist and the thread row each one owns.
- *
- * Owns `projection_agents` and the `projection_threads` row implied by an agent having a thread,
- * which is why `ensureThreadProjection` is public here and not on the facade: the conversation
- * writer calls it from inside its own dispatch, passing the `db` that dispatch handed it.
- *
- * `hardDeleteAgent` is the one method here that erases history rather than projecting it. Each
- * receipt DELETE selects its command ids out of `orchestration_events`, so receipts must go before
- * the matching events in all four blocks — grouping the receipt deletes together would leave orphan
- * receipts, and `dispatch` replays an orphan receipt's stale result to a future command as though
- * it had already run. The class never imports the facade.
- */
 export class AgentRoster {
   readonly #core: DatabaseCore;
 
@@ -50,7 +31,6 @@ export class AgentRoster {
     ).map((row) => JSON.parse(requiredStringColumn(row, "agent_json")));
   }
 
-  /** One agent by its id. A conversation write reads its agent here rather than parse the whole roster. */
   getAgent(agentId: string): AgentSummary | undefined {
     const row = databaseRow(
       this.#core.connection.prepare("SELECT agent_json FROM projection_agents WHERE agent_id = ?").get(agentId),
@@ -58,22 +38,6 @@ export class AgentRoster {
     return row ? JSON.parse(requiredStringColumn(row, "agent_json")) : undefined;
   }
 
-  /**
-   * Every thread row no agent claims as its own `thread_id`.
-   *
-   * `projection_threads.agent_id` carries no foreign key to `projection_agents`, the chat list is the
-   * roster with no join, and nothing else in the app enumerates threads -- so a thread that falls out
-   * of the roster becomes unreachable rather than broken, and reports itself as an empty chat. This is
-   * the only query that can see one. `replaceAgents` is how they appear: it truncates the roster and
-   * re-inserts the in-memory list, while `ensureThreadProjection` never deletes, so a persist made
-   * with an agent missing leaves that agent's thread and every message in it behind.
-   *
-   * Claimed by `thread_id` rather than matched on `agent_id`, because both halves of the split have to
-   * be caught: an agent rebuilt under its own id points at no thread while its old row still names it,
-   * and a thread whose `agent_id` keeps a pre-rename spelling names an agent that no longer answers to
-   * it. Ordered so that a repair over the result is deterministic. A side thread is claimed by its row,
-   * so a repair never makes it an agent's own chat.
-   */
   unclaimedThreads(): { threadId: string; agentId: string }[] {
     return databaseRows(
       this.#core.connection
@@ -92,21 +56,6 @@ export class AgentRoster {
     }));
   }
 
-  /**
-   * The agent list the newest roster event carries, for a roster projection that has lost its rows.
-   *
-   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
-   * aggregate, so the newest event on it is the roster. `replaceAgents` drops the older roster events,
-   * except the model-change audit entries. Nothing else reads events back into
-   * `projection_agents`: the projection is written only by `replaceAgents`, and an empty projection
-   * beside a non-empty log reads as "no agents" -- every chat gone, with each thread and message row
-   * still on disk.
-   *
-   * Newest only, never a fold over the whole aggregate. `hardDeleteAgent` appends the *remaining*
-   * agents, so a fold would resurrect an agent the user deleted on purpose, and a newest event with an
-   * empty list correctly means the user has no agents. The rows are returned unvalidated because the
-   * roster class holds no agent decoder; the caller validates each entry and drops the ones that fail.
-   */
   latestRosterAgents(): unknown[] {
     const row = databaseRow(
       this.#core.connection
@@ -141,7 +90,6 @@ export class AgentRoster {
             changed ? this.ensureThreadProjection(db, agent, sequence) : claimThreadProjection(db, agent, sequence),
           );
         } else {
-          // A repeated id fails on the primary key, as the whole rewrite always did.
           db.exec("DELETE FROM projection_agents");
           agents.forEach((agent, index) => {
             insertAgentRow(db, agent, index, JSON.stringify(agent), sequence);
@@ -245,16 +193,12 @@ export class AgentRoster {
         db.prepare("DELETE FROM projection_agent_memories WHERE agent_id = ?").run(agentId);
         revokeRoutineWebhooks(db, "agent", routineIds, { forget: true });
         db.prepare("DELETE FROM projection_agent_routines WHERE agent_id = ?").run(agentId);
-        // Agent ids carry no foreign key, so the routine flows lose a deleted agent by hand. Its own
-        // routines' links and steps go with the routines above, through their foreign keys.
         db.prepare("DELETE FROM routine_flow_links WHERE from_agent_id = ? OR to_agent_id = ?").run(agentId, agentId);
         db.prepare("DELETE FROM routine_flow_positions WHERE canvas_agent_id = ? OR node_key = ?").run(
           agentId,
           `agent:${agentId}`,
         );
         db.prepare("DELETE FROM routine_flow_steps WHERE agent_id = ?").run(agentId);
-        // Workflows keep their nodes and step history without the agent. The workflows it was in get a
-        // new revision, so an open editor reloads instead of saving the agent back.
         db.prepare(
           `UPDATE workflows SET graph_revision = graph_revision + 1
            WHERE workflow_id IN (SELECT workflow_id FROM workflow_nodes WHERE agent_id = ?)`,
@@ -317,12 +261,6 @@ function insertAgentRow(db: DatabaseSync, agent: AgentSummary, index: number, js
   );
 }
 
-/**
- * Writes only the roster rows that changed. A send or a turn end changes the preview of one agent,
- * and the roster is written for each of them: with 100 agents, a rewrite of every row and every
- * thread row made each write grow with the agent count. A row whose JSON and place are the same is
- * already what the rewrite would write. `onAgent` gets each agent that holds a thread, with whether its row changed.
- */
 function writeChangedAgents(
   db: DatabaseSync,
   agents: readonly AgentSummary[],
@@ -360,12 +298,6 @@ function writeChangedAgents(
   });
 }
 
-/**
- * The thread row of an agent whose roster row did not change. Its title and time are the ones the
- * last roster write set, so the row changes only when it is missing or names another agent, as after
- * a repair (`unclaimedThreads`). A row that does not change keeps its revision: a new revision on all
- * threads at each roster write made each reader of an unchanged thread read it again.
- */
 function claimThreadProjection(db: DatabaseSync, agent: AgentSummary, sequence: number): void {
   if (!agent.threadId) return;
   const updatedAt = agent.updatedAt ?? new Date().toISOString();
@@ -385,12 +317,6 @@ function claimThreadProjection(db: DatabaseSync, agent: AgentSummary, sequence: 
   ).run(agent.threadId, agent.id, agent.name, updatedAt, updatedAt, sequence);
 }
 
-/**
- * Drops the roster events older than `retainedSequence`, with their receipts. Each roster event holds
- * the whole agent list and only the newest one is read, so without this the log grows by one roster
- * on each send and each turn end (#2282). A database from an earlier build is cleaned by its first
- * roster write. An `agent.model-changed` event stays: it is the audit entry of a model change.
- */
 function pruneRosterEvents(db: DatabaseSync, retainedSequence: number): void {
   const matchOlder = `
     aggregate_type = 'agents' AND aggregate_id = 'agents' AND sequence < ?

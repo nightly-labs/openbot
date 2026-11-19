@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sandboxArguments } from "./local-servers";
 
-// A server on this computer is never less sandboxed than the desktop app that starts it (#10585).
 describe("sandboxArguments", () => {
   it("keeps the sandbox of a child when this process has it", () => {
     expect(sandboxArguments([])).toEqual([]);

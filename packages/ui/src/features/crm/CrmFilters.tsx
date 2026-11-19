@@ -38,13 +38,11 @@ import {
 } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
 
-/** A customer with its open payments, as the customer sheet shows it. */
 export interface CustomerRow {
   customer: CrmCustomer;
   summary: CustomerSummary;
 }
 
-/** The customer rows, with the open payments of each customer. The paid ones come from the customer totals. */
 export function createCustomerRows(crm: CrmViewModel) {
   const openByCustomer = createMemo(() => {
     const groups = new Map<string, CrmPayment[]>();
@@ -69,7 +67,6 @@ interface FilterOption {
   id: string;
   label: string;
   tone?: CrmTone;
-  /** An owner: the agent, or null for no owner. */
   agent?: CrmAgent | null;
 }
 
@@ -81,10 +78,8 @@ export interface FilterFieldDef {
   test: (row: CustomerRow, value: string) => boolean;
 }
 
-/** The option of a field for a customer that has no value, such as no owner. */
 const NONE = "none";
 
-/** The filter fields of the customer sheet. */
 export function useCustomerFilterFields(crm: CrmViewModel): FilterFieldDef[] {
   const { t } = useText();
   const paymentFits = (row: CustomerRow, value: string) => {
@@ -154,7 +149,6 @@ export function useCustomerFilterFields(crm: CrmViewModel): FilterFieldDef[] {
   ];
 }
 
-/** True when the row fits all filters. `skip` leaves out the filter of one field, to count its options. */
 export function fitsFilters(
   fields: readonly FilterFieldDef[],
   rules: readonly CrmFilterRule[],
@@ -179,13 +173,11 @@ function toggleFilter(crm: CrmViewModel, field: CrmFilterField, value: string) {
   });
 }
 
-/** A value of a field, as a row of a filter menu. */
 interface FilterRow {
   def: FilterFieldDef;
   option: FilterOption;
 }
 
-/** The values of `fields` that match the search. A match in the field name finds all values of the field. */
 function findRows(fields: readonly FilterFieldDef[], query: string): FilterRow[] {
   return fields
     .flatMap((def) => {
@@ -199,12 +191,10 @@ function findRows(fields: readonly FilterFieldDef[], query: string): FilterRow[]
     .map((item) => item.row);
 }
 
-/** The picked values of a field. */
 function pickedOf(crm: CrmViewModel, field: CrmFilterField) {
   return crm.layout.filters.find((rule) => rule.field === field)?.values ?? [];
 }
 
-/** The face of a value: the agent of an owner, the mark of no owner, or the field icon in a search of all fields. */
 function OptionLead(props: { row: FilterRow; fieldIcon: boolean }) {
   return (
     <Show
@@ -230,7 +220,6 @@ function OptionLead(props: { row: FilterRow; fieldIcon: boolean }) {
   );
 }
 
-/** The value name, with the matched part in bold. A status keeps its color. */
 function OptionName(props: { option: FilterOption; query: string }) {
   return (
     <Show
@@ -249,18 +238,10 @@ function OptionName(props: { option: FilterOption; query: string }) {
   );
 }
 
-/**
- * The menu of the filters, as the add menu of the agent dock: a search field that has the focus,
- * and rows under it that the arrow keys move through. A value row has a tick and the number of
- * customers that it shows; a click adds or removes the value, and the menu stays open. Without
- * `field`, the menu starts with the fields: a click on one shows its values, and typing finds
- * values in all fields at once, so "crypto" finds Pays by Crypto and "late" finds Payment Late.
- */
 function FilterMenu(props: {
   crm: CrmViewModel;
   fields: readonly FilterFieldDef[];
   rows: readonly CustomerRow[];
-  /** The field of a filter in the bar. The menu shows only its values. */
   field?: FilterFieldDef;
   trigger: () => JSX.Element;
 }) {
@@ -268,7 +249,6 @@ function FilterMenu(props: {
   const [query, setQuery] = createSignal("");
   const [openedId, setOpenedId] = createSignal<CrmFilterField | null>(null);
   const count = countOf(props);
-  /** The field whose values the menu shows: the filter of the chip, or the field that the user opened. */
   const field = () => props.field ?? props.fields.find((item) => item.id === openedId());
   const searching = () => query().trim() !== "";
   const values = createMemo((): FilterRow[] => {
@@ -281,7 +261,6 @@ function FilterMenu(props: {
       );
     return searching() ? findRows(props.fields, query()) : [];
   });
-  /** The number of rows in the list, so its height follows them. The empty text takes one row. */
   const rowCount = () => Math.max(1, field() || searching() ? values().length : props.fields.length);
   const empty = () => (field() || searching()) && values().length === 0;
   const fades = createScrollFades();
@@ -291,7 +270,6 @@ function FilterMenu(props: {
     enter: searching,
   });
   let input: HTMLInputElement | undefined;
-  /** True just after the menu changed its rows. Then the search field takes back the focus. */
   let holdField = false;
   const reset = () => {
     const list = menu.list();
@@ -306,13 +284,11 @@ function FilterMenu(props: {
     const def = field();
     return def ? t("crm.filter.findValue", { field: def.label }) : t("crm.filter.find");
   };
-  /** Shows the values of a field, or the fields again, with an empty search and the focus in it. */
   const openField = (id: CrmFilterField | null) => {
     setOpenedId(id);
     setQuery("");
     flush();
     reset();
-    // The menu moves the focus to a row after the chosen row goes. The field keeps it until the next frames.
     holdField = true;
     input?.focus();
     requestAnimationFrame(() =>
@@ -364,7 +340,6 @@ function FilterMenu(props: {
               value={query()}
               onValueChange={search}
               onKeyDown={(event: KeyboardEvent) => {
-                // Backspace in an empty search goes back to the fields.
                 if (event.key === "Backspace" && query() === "" && !props.field && openedId() !== null) {
                   event.preventDefault();
                   openField(null);
@@ -427,7 +402,6 @@ function FilterMenu(props: {
   );
 }
 
-/** The number of customers that an option shows, with the other filters on. */
 function countOf(props: { crm: CrmViewModel; fields: readonly FilterFieldDef[]; rows: readonly CustomerRow[] }) {
   return (field: FilterFieldDef, value: string) =>
     props.rows.filter(
@@ -435,7 +409,6 @@ function countOf(props: { crm: CrmViewModel; fields: readonly FilterFieldDef[]; 
     ).length;
 }
 
-/** One filter in the bar: "Status Lead, Trial". A click changes the values; the cross removes the filter. */
 export function FilterChip(props: {
   crm: CrmViewModel;
   fields: readonly FilterFieldDef[];
@@ -487,7 +460,6 @@ export function FilterChip(props: {
   );
 }
 
-/** "Add filter": the fields, and a search that finds values in all of them. */
 export function AddFilter(props: {
   crm: CrmViewModel;
   fields: readonly FilterFieldDef[];

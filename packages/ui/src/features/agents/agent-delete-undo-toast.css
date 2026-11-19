@@ -1,10 +1,7 @@
-/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
 .agent-delete-undo-toast-host {
   width: var(--width);
 }
 
-/* The raised toast surface with the 1px ring only. Undo sits on its own row, 8px from the bottom and
-   end edges, as in the shared toast. The bar runs along the bottom edge below it. */
 .agent-delete-undo-toast {
   position: relative;
   display: grid;
@@ -24,8 +21,6 @@
   grid-column: 1 / -1;
 }
 
-/* Without a fixed track, the grid row grows to the drawing's width, and the drawing's 128% height
-   then resolves against that row. The drawing becomes taller than wide and the body sits low. */
 .agent-delete-undo-toast-avatar {
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   width: 32px;
@@ -56,7 +51,6 @@
   white-space: nowrap;
 }
 
-/* The bar sits on the bottom edge, inside the rounded corners. */
 .agent-delete-undo-toast-bar {
   position: absolute;
   right: 0;

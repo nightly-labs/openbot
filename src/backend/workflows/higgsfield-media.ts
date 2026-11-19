@@ -1,14 +1,3 @@
-/**
- * Makes the image or the video of a canvas step with the tools of Higgsfield's MCP server
- * (https://mcp.higgsfield.ai/mcp), on the Higgsfield sign-in that the user made for the Higgsfield app
- * in Apps.
- *
- * Running a step with a Higgsfield model is the user's request to spend Higgsfield credits. The
- * request always says `use_unlim: false`: OpenBot never spends a free-trial allowance of unlimited
- * generations, because only the user can choose that. The file stays in the user's Higgsfield history
- * with no project, and OpenBot keeps a copy in Storage, as it does for the other media models.
- */
-
 import { readFile } from "node:fs/promises";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs } from "@openbot/contracts/ipc";
@@ -36,60 +25,39 @@ import {
 } from "./mcp-media";
 import type { MediaImageRole } from "./workflow-walk";
 
-/** The host of Higgsfield's MCP server. An enabled http MCP row with this host is the Higgsfield connection. */
 export const HIGGSFIELD_MCP_HOST = "mcp.higgsfield.ai";
 
-/**
- * The hosts that Higgsfield serves results from. OpenBot downloads a result from these hosts only:
- * the CloudFront host of the generation history, and Higgsfield's own hosts.
- */
 const HIGGSFIELD_MEDIA_HOSTS: ReadonlySet<string> = new Set(["d8j0ntlcm91z4.cloudfront.net"]);
 const HIGGSFIELD_DOMAIN = "higgsfield.ai";
 
-/** How long a step waits for Higgsfield, from the generate call to the finished file. */
 const HIGGSFIELD_DEADLINE = { image: Duration.minutes(5), video: Duration.minutes(20) } as const;
-/** The wait between two status reads when Higgsfield does not say. `poll_after_seconds` is kept in range. */
 const HIGGSFIELD_POLL = { image: Duration.seconds(3), video: Duration.seconds(6) } as const;
 const HIGGSFIELD_POLL_SECONDS = { min: 1, max: 15 } as const;
-/** One tool call. `job_status` with `sync` waits up to about 25 seconds on Higgsfield's side. */
 const HIGGSFIELD_CALL_TIMEOUT_MS = 120_000;
-/** A read of the credits that takes longer shows no credits. */
 const HIGGSFIELD_CREDITS_DEADLINE = Duration.seconds(20);
-/** The longest time for one upload of an input picture, and for the download of the file. */
 const HIGGSFIELD_TRANSFER_DEADLINE = { upload: Duration.minutes(2), download: Duration.minutes(5) } as const;
-/** How many `job_status` calls in a row can fail before the step fails. */
 const HIGGSFIELD_POLL_FAILURES = 3;
-/** A read of the model list or of a price that takes longer gives no list or no price. */
 const HIGGSFIELD_CATALOG_DEADLINE = Duration.seconds(45);
 const HIGGSFIELD_PRICE_DEADLINE = Duration.seconds(20);
-/** One page of `models_explore`, and the most pages of one kind. */
 const HIGGSFIELD_CATALOG_PAGE = 100;
 const HIGGSFIELD_CATALOG_PAGES = 10;
-/** The description of a price quote. Higgsfield prices a file by its choices, not by its words. */
 const HIGGSFIELD_PRICE_PROMPT = "A picture.";
 
 const TERMINAL_FAILURES: ReadonlySet<string> = new Set(["canceled", "failed"]);
-/** Higgsfield's checks stopped the file. Only the user can confirm the rights to see it. */
 const BLOCKED: ReadonlySet<string> = new Set(["nsfw", "ip_detected"]);
 
 export interface HiggsfieldMediaRequest {
   kind: WorkflowMediaKind;
-  /** The Higgsfield model id, such as "nano_banana_pro". */
   model: string;
   prompt: string;
   specs: WorkflowMediaSpecs;
   images: readonly { role: MediaImageRole; attachmentId: string }[];
-  /** How the request takes the pictures and the choices of the step. */
   plan: HiggsfieldPlan;
 }
 
 const notSignedIn = () => mediaFail(sourceText("error.workflow.higgsfieldSignIn"));
 const timedOut = () => mediaFail(sourceText("error.workflow.higgsfieldTimeout"));
 
-/**
- * The error for a refusal or a failed job, from the words of Higgsfield and, when the answer has
- * them, its billing fields: `monetization_intent` says whether credits or a plan are missing.
- */
 function higgsfieldFailure(reason: string | null, answer: DynamicRecord | null = null): McpMediaFailed {
   const intent = mediaText(answer?.monetization_intent);
   if (
@@ -101,8 +69,6 @@ function higgsfieldFailure(reason: string | null, answer: DynamicRecord | null =
   if (
     intent === "upgrade" ||
     intent === "trial" ||
-    // Higgsfield says, for example, "Requires basic plan or higher." for a model that a free account
-    // cannot use.
     (reason && /subscription|upgrade|requires? [\w -]{0,24}plan|plan or higher/iu.test(reason))
   )
     return mediaFail(sourceText("error.workflow.higgsfieldNeedsPlan"));
@@ -113,10 +79,6 @@ function higgsfieldFailure(reason: string | null, answer: DynamicRecord | null =
 
 const HIGGSFIELD_TOOLS = { timeoutMs: HIGGSFIELD_CALL_TIMEOUT_MS, refusal: higgsfieldFailure };
 
-/**
- * Calls one tool. Higgsfield can refuse in a normal answer, with an `error`, an upgrade link or the
- * question about the unlimited allowance, so those fail here too.
- */
 const callTool = (client: Client, name: string, args: McpToolArguments) =>
   callMediaTool(client, HIGGSFIELD_TOOLS, name, args).pipe(
     Effect.flatMap((answer) =>
@@ -129,7 +91,6 @@ const callTool = (client: Client, name: string, args: McpToolArguments) =>
     ),
   );
 
-/** Whether a result address is on Higgsfield's file hosts, over https. */
 function isHiggsfieldMedia(value: string): boolean {
   if (!isHttps(value)) return false;
   const host = new URL(value).hostname;
@@ -138,7 +99,6 @@ function isHiggsfieldMedia(value: string): boolean {
 
 const firstRecord = (value: unknown) => (Array.isArray(value) ? value.find(isDynamicRecord) : undefined) ?? null;
 
-/** Puts one input picture in the user's Higgsfield uploads and answers its media id. */
 const uploadPicture = Effect.fnUntraced(function* (
   client: Client,
   file: { path: string; mimeType: string },
@@ -153,7 +113,6 @@ const uploadPicture = Effect.fnUntraced(function* (
   const uploadUrl = mediaText(target?.upload_url);
   const media = mediaText(target?.media_id);
   if (!target || !uploadUrl || !media) return yield* mediaFailed();
-  // Higgsfield chooses the upload address. It must not point at this computer or its local network.
   yield* uploadToService(
     {
       url: uploadUrl,
@@ -170,11 +129,6 @@ const uploadPicture = Effect.fnUntraced(function* (
   return media;
 });
 
-/**
- * The `medias` of the request: each picture in a role that the model takes, within its limits. A
- * model that takes frames but no references (Wan 2.7) gets a reference as the frame that is still
- * free, first frame before last frame, as Higgsfield itself does with such a request.
- */
 function requestMedias(
   plan: HiggsfieldPlan,
   media: (role: MediaImageRole) => string[],
@@ -198,10 +152,6 @@ function requestMedias(
   ];
 }
 
-/**
- * The `mode` of the request, from the pictures it has. With a frame it is the frame mode; Kling uses
- * the references there as ordered middle frames.
- */
 function requestMode(plan: HiggsfieldPlan, medias: readonly { role: string }[]): string | undefined {
   if (!plan.mode) return undefined;
   if (medias.some((media) => media.role === "start_image" || media.role === "end_image"))
@@ -209,11 +159,6 @@ function requestMode(plan: HiggsfieldPlan, medias: readonly { role: string }[]):
   return medias.length > 0 ? (plan.mode.references ?? plan.mode.text) : plan.mode.text;
 }
 
-/**
- * The choices of the step as the model takes them: aspect, resolution, length and background. GPT
- * Image is told "opaque" for a solid background: its default, "auto", can make a clear background
- * that the canvas did not ask for.
- */
 function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
   const resolution = specs.resolution
     ? plan.resolution
@@ -240,21 +185,18 @@ function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan
   };
 }
 
-/** The address of the finished file in a generation, or null. */
 function generationFile(generation: DynamicRecord): string | null {
   const results = isDynamicRecord(generation.results) ? generation.results : firstRecord(generation.results);
   const url = mediaText(results?.rawUrl);
   return url && isHiggsfieldMedia(url) ? url : null;
 }
 
-/** The wait before the next status read: Higgsfield's `poll_after_seconds`, kept in range. */
 function pollDelay(answer: DynamicRecord, kind: WorkflowMediaKind): Duration.Duration {
   const seconds = answer.poll_after_seconds;
   if (typeof seconds !== "number" || !Number.isFinite(seconds)) return HIGGSFIELD_POLL[kind];
   return Duration.seconds(Math.min(HIGGSFIELD_POLL_SECONDS.max, Math.max(HIGGSFIELD_POLL_SECONDS.min, seconds)));
 }
 
-/** What a generation's status means: its file, a failure, or null while it runs. */
 function settled(generation: DynamicRecord): string | McpMediaFailed | null {
   const status = (mediaText(generation.status) ?? "").toLowerCase();
   if (status === "completed") return generationFile(generation) ?? mediaFailed();
@@ -263,10 +205,6 @@ function settled(generation: DynamicRecord): string | McpMediaFailed | null {
   return null;
 }
 
-/**
- * Asks for the job until it is done, and answers the address of its file. A short network failure
- * must not lose a job that Higgsfield already charged for, and the generate call is never sent again.
- */
 const waitForFile = Effect.fnUntraced(function* (client: Client, job: string, kind: WorkflowMediaKind) {
   let failures = 0;
   while (true) {
@@ -287,9 +225,6 @@ const waitForFile = Effect.fnUntraced(function* (client: Client, job: string, ki
   }
 });
 
-/**
- * Makes one file with Higgsfield and keeps it in Storage. Answers the id of the stored attachment.
- */
 export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(function* (
   dependencies: McpMediaDependencies,
   request: HiggsfieldMediaRequest,
@@ -300,8 +235,6 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);
-      // Only the pictures that the request sends, and one upload for each file, also when a picture is
-      // both frames.
       const sent = requestMedias(request.plan, (role) =>
         files.filter((file) => file.role === role).map((file) => file.path),
       );
@@ -355,16 +288,11 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
   return stored.id;
 });
 
-/** The credits in a `balance` answer. Higgsfield can count part of a credit; the count is rounded down. */
 function higgsfieldCredits(answer: DynamicRecord): WorkflowMediaCreditBalance | null {
   const available = creditCount(answer.credits);
   return available === null ? null : { available, quota: null };
 }
 
-/**
- * The credits that the Higgsfield sign-in can spend now, or null when Higgsfield does not tell them.
- * `balance` only reads the balance: it spends no credits.
- */
 export const readHiggsfieldCredits = Effect.fn("readHiggsfieldCredits")(function* (signIn: McpMediaSignIn) {
   return yield* Effect.scoped(
     Effect.gen(function* () {
@@ -374,16 +302,11 @@ export const readHiggsfieldCredits = Effect.fn("readHiggsfieldCredits")(function
   ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_CREDITS_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });
 
-/** One page of `models_explore`: its items, and the cursor of the next page or null. */
 function catalogPage(answer: DynamicRecord): { items: DynamicRecord[]; next: string | null } {
   const items = Array.isArray(answer.items) ? answer.items.filter(isDynamicRecord) : [];
   return { items, next: answer.has_more === true ? mediaText(answer.next_page_token) : null };
 }
 
-/**
- * The image and video models of Higgsfield's catalog that the canvas can run, with their plans.
- * `models_explore` only reads the catalog: it spends no credits.
- */
 export const readHiggsfieldCatalog = Effect.fn("readHiggsfieldCatalog")(function* (signIn: McpMediaSignIn) {
   return yield* Effect.scoped(
     Effect.gen(function* () {
@@ -423,11 +346,6 @@ export interface HiggsfieldPriceRequest {
   plan: HiggsfieldPlan;
 }
 
-/**
- * What one file costs with the choices of the step, in credits, or null when Higgsfield gives no
- * price. `get_cost` only asks for the price: Higgsfield starts no job and spends no credits. The quote
- * sends no picture, so a mode is the mode with no picture.
- */
 export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
   signIn: McpMediaSignIn,
   request: HiggsfieldPriceRequest,
@@ -448,7 +366,7 @@ export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
       });
       const cost = isDynamicRecord(answer.cost) ? answer.cost : null;
       const credits = cost?.credits_exact ?? cost?.credits;
-      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : null;
+      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : yield* mediaFailed();
     }),
   ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

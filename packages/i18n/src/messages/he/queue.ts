@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "קובץ מצורף",
   "queue.hold.named": "ממתין - {name} עובד ב-{channel}",
   "queue.hold.unnamed": "ממתין - הסוכן הזה עובד ב-{channel}",
+  "queue.hold.providerRestart": "ממתין - {provider} יופעל מחדש אחרי שהמשימות שרצות בו יסתיימו",
   "queue.item.label": "הודעה בתור {position}: {preview}",
   "queue.item.labelEditing": "הודעה בתור {position}, בעריכה: {preview}",
   "queue.item.editing": "בעריכה",

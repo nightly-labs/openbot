@@ -2,32 +2,11 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, configure } from "@solidjs/testing-library";
 import { afterEach } from "vitest";
 
-/**
- * How long a `findBy*` or `waitFor` polls before failing with the query that never matched.
- *
- * Testing Library's own default is 1000 ms, which says how long a browser takes to paint, not how
- * long a loaded runner takes to get back to a test. The release job builds and signs on the machine
- * that runs these tests, and a renderer test that finishes in 4 s locally lost that one-second race
- * there and stopped the release of v0.14.0. What a test waits for is unchanged - it waits for the
- * element, never for elapsed time; only the point at which waiting is called hopeless moves. The
- * vitest per-test budget in `src/backend/test-deadlines.ts` stays twice this, so a slow test still
- * fails with the query rather than with vitest's generic "test timed out".
- */
 const DOM_WAIT_TIMEOUT_MS = 10_000;
 
 configure({ asyncUtilTimeout: DOM_WAIT_TIMEOUT_MS });
 
 export class TestResizeObserver implements ResizeObserver {
-  /**
-   * The observers that are currently watching something.
-   *
-   * Membership follows the observed elements rather than construction, because
-   * the browser keeps an observer alive only while it has a target: one that has
-   * released every element holds nothing open and is collected. Counting
-   * constructed instances instead would report a leak for any library that
-   * releases with `unobserve` rather than `disconnect` - `@tanstack/virtual-core`
-   * is one - and miss nothing in return.
-   */
   static readonly instances = new Set<TestResizeObserver>();
 
   readonly #elements = new Map<Element, ResizeObserverBoxOptions>();
@@ -115,7 +94,6 @@ if (htmlElement && !htmlElement.prototype.scrollTo) {
   htmlElement.prototype.scrollTo = () => undefined;
 }
 
-// jsdom has no User Timing API. The app marks startup points for `dev:bench` and reads none back.
 if (typeof performance.mark !== "function") {
   Object.defineProperty(performance, "mark", { configurable: true, value: () => undefined });
 }

@@ -1,15 +1,5 @@
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
-/**
- * The 1Password connection of this computer: a service account that reads one vault the user shares
- * with OpenBot. The embedded browser fills logins from it. The token never crosses to the renderer.
- *
- * - `disconnected`: no token is stored.
- * - `connecting`: the 1Password CLI creates the vault and the service account. 1Password can ask the
- *   user to approve it.
- * - `choose-account`: the CLI is signed in to several accounts. The user picks one in `accounts`.
- * - `connected`: the browser fills logins from `vaultNames`.
- */
 export type OnePasswordConnectorState = "disconnected" | "connecting" | "choose-account" | "connected";
 
 function isOnePasswordConnectorState(value: unknown): value is OnePasswordConnectorState {
@@ -18,47 +8,28 @@ function isOnePasswordConnectorState(value: unknown): value is OnePasswordConnec
 
 export interface OnePasswordAccount {
   id: string;
-  /** The email and the sign-in address, as the user knows the account. */
   label: string;
 }
 
-/**
- * The 1Password CLI that Connect runs.
- *
- * - `checking`: OpenBot looks for it.
- * - `missing`: no CLI of version 2.18 or later is on this computer.
- * - `installing`: OpenBot downloads its own copy.
- * - `ready`: Connect can run.
- */
 export type OnePasswordCliState = "checking" | "missing" | "installing" | "ready";
 
 function isOnePasswordCliState(value: unknown): value is OnePasswordCliState {
   return value === "checking" || value === "missing" || value === "installing" || value === "ready";
 }
 
-/** What Connect needs on this computer, as steps the page shows before it. */
 export interface OnePasswordSetup {
   cli: OnePasswordCliState;
   cliVersion: string | null;
-  /** False when OpenBot has no CLI build for this computer. The user installs it from 1Password. */
   canInstall: boolean;
-  /**
-   * Whether the 1Password app lets the CLI use the user's accounts (Settings > Developer). Null
-   * until the CLI is ready and was asked.
-   */
   appIntegration: boolean | null;
 }
 
 export interface OnePasswordConnectorStatus {
   state: OnePasswordConnectorState;
   setup: OnePasswordSetup;
-  /** Set only in `choose-account`. */
   accounts: OnePasswordAccount[];
-  /** The vaults that the service account reads. Empty when not connected. */
   vaultNames: string[];
-  /** The logins that the browser can fill, or null when not counted yet. */
   loginCount: number | null;
-  /** The last connection failure, as a sentence. Null after a success or a cancel. */
   error: string | null;
 }
 
@@ -71,12 +42,10 @@ export const DISCONNECTED_ONEPASSWORD_CONNECTOR: OnePasswordConnectorStatus = {
   error: null,
 };
 
-/** `accountId` is null for the account the CLI uses when it is signed in to only one. */
 export interface OnePasswordConnectInput {
   accountId: string | null;
 }
 
-/** A service account token for a joined server's connection (`onepassword-connector-v1`). */
 export interface OnePasswordHostConnectInput {
   token: string;
 }
@@ -104,7 +73,6 @@ function parseOnePasswordSetup(value: unknown): OnePasswordSetup | null {
   };
 }
 
-/** Returns null for a value that is not a connector status in the desktop shape. */
 export function parseOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus | null {
   const setup = isDynamicRecord(value) ? parseOnePasswordSetup(value.setup) : null;
   if (
@@ -135,11 +103,6 @@ export function parseOnePasswordConnectorStatus(value: unknown): OnePasswordConn
   };
 }
 
-/**
- * The status of a joined server's connection (`onepassword-connector-v1`), in the desktop shape. The
- * host connects with a token only, so the status has no setup steps and no accounts. A state that this
- * build does not know shows as not connected. Throws for a value that is not a host status.
- */
 export function decodeHostOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
   if (
     !isDynamicRecord(value) ||

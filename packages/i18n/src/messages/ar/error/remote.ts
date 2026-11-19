@@ -23,6 +23,11 @@ export const messages = {
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
   "error.remote.windowsSessionDisconnected":
     "جلسة Windows على المضيف غير متصلة، لذلك لا توجد شاشة لمشاركتها. سجّل الدخول إلى Windows على شاشة المضيف، ثم أعد المحاولة.",
+  "error.remote.macScreenLocked":
+    "جهاز Mac مقفل، لذلك لا يمكنه مشاركة شاشته. افتح قفل جهاز Mac من شاشته، ثم أعد المحاولة.",
+  "error.remote.streamTooSlowLowerQuality":
+    "الاتصال بالمضيف بطيء جدًا لعرض الصورة. أعد المحاولة: سيستخدم الاتصال التالي جودة أقل.",
+  "error.remote.streamTooSlow": "الاتصال بالمضيف بطيء جدًا لعرض الصورة. استخدم شبكة أسرع، ثم أعد المحاولة.",
   "error.remote.teamSessionExpired": "انتهت صلاحية جلسة الفريق.",
   "error.remote.finishTestBeforeSwitch": "أنهِ اختبار سطح المكتب البعيد قبل تبديل الشاشات.",
   "error.remote.displayNotFound": "الشاشة البعيدة غير موجودة.",
@@ -79,7 +84,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "يمكن للمالك فقط إزالة هذا الخادم.",
   "error.remote.requestTimeout": "انتهت مهلة الطلب البعيد.",
   "error.remote.requestFailed": "فشل الطلب البعيد.",
-  "error.remote.pinnedKeyMissing": "لا يملك المضيف البعيد مفتاح جهاز مثبّتًا.",
+  "error.remote.hostKeyMissing":
+    "لا يمكن لـ OpenBot التحقق من هذا الخادم لأن مفتاح الأمان الخاص به مفقود أو تغيّر. اطلب من مالك الخادم فحص الخادم.",
+  "error.remote.connectionNotStarted":
+    "تعذّر على OpenBot بدء الاتصال بهذا الخادم. إذا استمرت المشكلة، فأغلق OpenBot ثم افتحه مرة أخرى.",
   "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
   "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
@@ -175,6 +183,8 @@ export const messages = {
   "error.remote.relayUnavailable": "لم يرسل Signal أي خوادم ترحيل لهذا الاتصال. أعد المحاولة لاحقًا.",
   "error.remote.iceFailed": "تعذّر إنشاء اتصال مباشر بالمضيف. قد يحظره جدار حماية أو VPN أو وكيل.",
   "error.remote.iceDisconnected": "فُقد الاتصال المباشر بالمضيف.",
+  "error.remote.webrtcBlocked":
+    "هذا الجهاز يحظر الاتصال الذي يحتاجه OpenBot. إذا كان نمط المنع قيد التشغيل، فأوقفه لـ OpenBot في الإعدادات > الخصوصية والأمن > نمط المنع.",
   "error.remote.directoryUnreachable": "تعذّر على OpenBot الوصول إلى خدمة OpenBot. تحقق من اتصالك.",
   "error.remote.directoryTimeout": "لم ترد خدمة OpenBot في الوقت المحدد. أعد المحاولة.",
   "error.remote.inviteAlreadyUsed": "استُخدمت هذه الدعوة بالفعل. اطلب دعوة جديدة.",

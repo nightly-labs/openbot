@@ -1,4 +1,3 @@
-/* A ```html or ```mermaid block drawn in the code block's frame, and its larger dialog. */
 .message-code-actions {
   flex: none;
   display: flex;
@@ -6,13 +5,11 @@
   gap: var(--openbot-space-0-5);
 }
 
-/* The same icon size as Copy beside it. */
 .message-preview-expand svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
 }
 
-/* The Preview and Code switch, sized to the header's buttons. */
 .ui-sliding-tabs.message-preview-switch {
   gap: var(--openbot-space-0-5);
   padding: var(--openbot-space-0-5);
@@ -30,8 +27,6 @@
   height: 22px;
 }
 
-/* The two views share one cell. Only the selected view sets the height, so the block eases from
-   one height to the other while the views cross-fade. */
 .message-preview-resize {
   overflow: hidden;
 }
@@ -59,8 +54,6 @@
   overscroll-behavior-x: contain;
 }
 
-/* The frame takes the page height that the app measures, up to the height of a code block. The
-   page scrolls inside the frame beyond that. */
 .message-preview-frame {
   width: 100%;
   height: min(var(--message-preview-height, 160px), 420px);
@@ -82,7 +75,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* Why Mermaid could not draw the diagram, above its code. */
 .message-preview-failure {
   display: flex;
   flex-wrap: wrap;
@@ -94,7 +86,6 @@
   font-size: var(--openbot-text-xs);
 }
 
-/* Mermaid points at the error with a caret line, which lines up only in a monospace font. */
 .message-preview-failure-detail {
   flex-basis: 100%;
   margin: 0;
@@ -103,7 +94,6 @@
   white-space: pre;
 }
 
-/* The preview animates its backdrop from script, with the surface. */
 .message-preview-backdrop {
   animation: none;
 }
@@ -118,11 +108,9 @@
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-control);
   color: var(--openbot-text-primary);
-  /* The dialog grows from the block that opened it: the block's corner is the fixed point. */
   transform-origin: 0 0;
 }
 
-/* Hidden until its first frame of motion, so it never shows at full size before it grows. */
 .message-preview-dialog:not([data-shown]) {
   opacity: 0;
 }
@@ -152,7 +140,6 @@
   background: var(--openbot-bg-sidebar);
 }
 
-/* The diagram canvas fills the dialog body and moves inside it, so the body does not scroll. */
 .message-preview-dialog-body[data-preview-kind="mermaid"] {
   overflow: hidden;
 }
@@ -181,7 +168,6 @@
   box-shadow: inset 0 0 0 2px var(--openbot-border-focus);
 }
 
-/* Hidden until it has its first place, so it never shows at its drawn size in a corner. */
 .message-preview-canvas-image {
   position: absolute;
   top: 0;
@@ -203,7 +189,6 @@
     width var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* The zoom controls float over the bottom of the canvas. */
 .message-preview-zoom {
   position: absolute;
   bottom: var(--openbot-space-4);

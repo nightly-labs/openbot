@@ -1,10 +1,3 @@
-/* The chat color setting: the color dot, the popup and the picker (a port of the beUI motion color picker,
- * ChatColorPicker.tsx). The popup has a 1px ring and no shadow. */
-
-/* ---------------------------------------------------------------------------------------------
- * The color dot of the row
- * ------------------------------------------------------------------------------------------- */
-
 .chat-color-dot {
   display: inline-block;
   width: 14px;
@@ -16,13 +9,11 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 18%, transparent);
 }
 
-/* While the popup is open, a ring marks the dot that it came from. */
 .chat-color-dot.chat-color-dot-open {
   outline: 1px solid color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
   outline-offset: 2px;
 }
 
-/* The own row: the dot sits where a select shows its value text, before the name. */
 .chat-color-own-trigger .chat-color-dot {
   margin-inline: 0 var(--openbot-space-2);
 }
@@ -31,11 +22,6 @@
   flex: 1 1 auto;
   text-align: start;
 }
-
-/* ---------------------------------------------------------------------------------------------
- * The popup. It opens as the select menus of the app do: a short scale and fade toward the row,
- * from the color dot. The script sets the origin and the 6px shift.
- * ------------------------------------------------------------------------------------------- */
 
 .chat-color-popover {
   --chat-color-shift: -6px;
@@ -55,12 +41,6 @@
     transform: translateY(var(--chat-color-shift)) scale(0.96);
   }
 }
-
-/* ---------------------------------------------------------------------------------------------
- * The picker. Sizes follow beUI: a 264px column, 36px fields with an 8px radius, a 160px area with
- * a 12px radius, an 18px thumb with a 3px light rim and 24px presets. Where beUI has a drop
- * shadow, the port keeps only its 1px ring.
- * ------------------------------------------------------------------------------------------- */
 
 .chat-color-picker,
 .chat-color-picker-presets {
@@ -86,7 +66,6 @@
   gap: var(--openbot-space-3);
 }
 
-/* The area, the hue and the fields are left to right in each language, as the color models are. */
 .chat-color-picker-area,
 .chat-color-picker-hue,
 .chat-color-picker-row.chat-color-picker-fields {
@@ -96,8 +75,6 @@
 .chat-color-picker-row.chat-color-picker-fields {
   gap: var(--openbot-space-1-5);
 }
-
-/* Saturation and brightness */
 
 .chat-color-picker-area {
   position: relative;
@@ -155,7 +132,6 @@
   outline-offset: 2px;
 }
 
-/* The rim and the color shrink together while the thumb is held, as in beUI. */
 .chat-color-picker-thumb-dot {
   position: absolute;
   inset: 0;
@@ -170,7 +146,6 @@
   scale: 0.78;
 }
 
-/* The loupe above the thumb shows the color under it, and swings against the drag. */
 .chat-color-picker-loupe {
   position: absolute;
   z-index: 1;
@@ -203,8 +178,6 @@
   }
 }
 
-/* Hue */
-
 .chat-color-picker-hue {
   position: relative;
   height: 14px;
@@ -215,13 +188,10 @@
   touch-action: none;
 }
 
-/* Inset by half a thumb, so the thumb never leaves the rounded track. */
 .chat-color-picker-hue-rail {
   position: absolute;
   inset: 0 9px;
 }
-
-/* The eye dropper, the format switch, the fields and the swatch: 36px boxes with a 1px edge. */
 
 .chat-color-picker-icon-button,
 .chat-color-picker-format {
@@ -336,7 +306,6 @@
   gap: var(--openbot-space-1-5);
 }
 
-/* The channel letter sits in the field, as the # of the hex field, so the row keeps its height. */
 .chat-color-picker-channel {
   position: relative;
   min-width: 0;
@@ -368,9 +337,6 @@
   transition: background-color 150ms var(--openbot-ease-out);
 }
 
-/* Presets. The ring hops between them (see Presets in the picker). */
-
-/* The empty choice and the 11 chat colors fill two rows of 6. */
 .chat-color-picker-presets {
   position: relative;
   display: grid;
@@ -420,7 +386,6 @@
   opacity: 1;
 }
 
-/* No color: a slash, as the beUI "none" swatch. */
 .chat-color-dot.chat-color-none,
 .chat-color-picker-swatch.chat-color-none,
 .chat-color-picker-preset.chat-color-none {

@@ -1,6 +1,5 @@
 import { defineMessages } from "../../../message";
 
-/** Errors that the workflow store and runtime send. */
 export const messages = defineMessages("error.workflow", {
   "error.workflow.missing": "This workflow no longer exists.",
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",

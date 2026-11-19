@@ -1,10 +1,3 @@
-/**
- * The server name, Back and Forward, the sidebar toggle, the server update, the marketplace
- * button, and an optional detail from the app - plus the window drag region. A window with the page rail shows the server in the rail, and
- * its styles hide the name here. The styles also hide Back, Forward and the update in a compact
- * sidebar that has no room for them.
- */
-
 import { ArrowLeft, ArrowRight, Button, CircleFadingArrowUp, IconButton, PanelLeft, Puzzle } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
@@ -105,9 +98,6 @@ export function SidebarTopbar() {
             );
           }}
         </Show>
-        {/* The open sidebar shows its toggle at its end, so there the update button comes before the toggle.
-         * The focus order is then the order on the screen, and the toggle keeps its focus when it changes
-         * the sidebar. */}
         <Show when={!props.compact}>{updateButton()}</Show>
         <Show when={props.compact || props.onCollapse}>
           <Button
@@ -125,7 +115,6 @@ export function SidebarTopbar() {
           </Button>
         </Show>
         <Show when={props.compact}>{updateButton()}</Show>
-        {/* The menu view needs the room for the server name. The page rail also opens the marketplace. */}
         <Show when={!props.compact && props.marketplaceSupported !== false && props.serverMenu?.view !== "menu"}>
           <Button
             variant="ghost"

@@ -1,8 +1,3 @@
-// The real account service over a SQLite database file, for `scripts/mobile-connected-devices-e2e.ts`.
-// It serves only the routes that the check uses, with the request handling of the Worker routes, and
-// writes `{"port":<port>}` on one line when it listens. Development codes come back in the answers.
-//
-// Run: bun apps/auth-api/scripts/mobile-connected-devices-server.ts <database path>
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { isMobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
@@ -107,8 +102,6 @@ function route(request: IncomingMessage, body: DynamicRecord) {
       return user ? { status: 200, body: user } : failure(401, "unauthorized", "The session is invalid.");
     }
     if (key === "POST /v1/mobile-auth/ticket") {
-      // The Worker route also asks the remote control plane to check the host. The redeem checks the
-      // same binding against the directory row, so this check leaves it out.
       if (!isMobileConnectHostBinding(body.host)) {
         return failure(
           400,

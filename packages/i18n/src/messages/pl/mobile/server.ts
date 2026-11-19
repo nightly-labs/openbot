@@ -799,6 +799,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "W Proton Pass utwórz klucz dostępu, który może czytać tylko sejf udostępniony OpenBotowi, i wklej go tutaj. {host} przechowuje klucz; ten telefon nie.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Twój plan Proton nie obejmuje narzędzia wiersza poleceń Proton Pass. Potrzebny jest plan Proton, który obejmuje Pass Plus. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan konta, a potem połącz ponownie.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} nie jest dostępny na tym serwerze.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Zaloguj się do {name} na tym telefonie. Potem {host} tworzy udostępniony sejf i klucz dostępu tylko do odczytu dla niego, i przechowuje tylko ten klucz. Agenci nigdy nie widzą hasła.",
@@ -833,8 +835,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Tylko do odczytu",
   "mobile.server.connectors.passwordManager.keyExpires": "Tylko do odczytu. Wygasa {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Wygasł {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Narzędzie wiersza poleceń {name} wymaga płatnego planu. Zmień plan konta, a potem połącz ponownie.",
   "mobile.server.connectors.passwordManager.expiredTitle": "Klucz {name} wygasł",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agenci na {host} nie mogą logować się udostępnionymi loginami, dopóki nie połączysz ponownie.",
@@ -1630,7 +1630,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Dodano {member} do roli {role}",
   "mobile.server.audit.roleMemberRemoved": "Usunięto {member} z roli {role}",
   "mobile.server.audit.agentLevel": "{agent} dla {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importuj agentów",
   "mobile.server.route.import": "Importuj agentów",
   "mobile.server.import.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby importować tutaj agentów.",
@@ -1733,7 +1732,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanał",
   "mobile.server.import.notImportedTitle": "Nie zaimportowano",
   "mobile.server.import.resultWarnings": "Niektóre elementy nie zostały przeniesione",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Przeniesienie",
   "mobile.server.route.transfer": "Przeniesienie",
   "mobile.server.route.transferExport": "Eksport",
@@ -1826,6 +1824,10 @@ export const messages = {
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Kopiuj duplikaty",
   "mobile.server.transfer.copying": "Kopiowanie…",
   "mobile.server.transfer.copyFailed": "Kopiowanie nie zostało ukończone.",
   "mobile.server.transfer.copied": {

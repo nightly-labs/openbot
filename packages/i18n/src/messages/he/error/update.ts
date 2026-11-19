@@ -7,7 +7,10 @@ export const messages = {
   "error.update.restartFailed": "OpenBot לא הצליח להפעיל את עצמו מחדש כדי להתקין את העדכון.",
   "error.update.downloadStalled": "הורדת העדכון הפסיקה להגיב. יש לנסות שוב.",
   "error.update.installFailed": "לא ניתן להתקין את העדכון. יש לצאת מ-OpenBot, לפתוח אותו מחדש ולנסות שוב.",
+  "error.update.notInstalled": "ההפעלה מחדש האחרונה לא התקינה את העדכון. יש להפעיל מחדש כדי לנסות שוב.",
   "error.update.downloadFailed": "לא ניתן להוריד את העדכון. יש לנסות שוב.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot לא הצליח לאמת את העדכון. יש לנסות שוב. אם השגיאה נמשכת, יש להוריד את OpenBot מ-openbot.run/download.",
   "error.update.checkFailed": "לא ניתן לבדוק אם יש עדכונים. יש לנסות שוב.",
   "error.update.checkStalled": "בדיקת העדכונים הפסיקה להגיב. יש לנסות שוב.",
   "error.update.checkOffline": "לא ניתן להתחבר לשירות העדכונים. יש לבדוק את חיבור האינטרנט ולנסות שוב.",

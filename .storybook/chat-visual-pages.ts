@@ -1,17 +1,10 @@
 import { createHash } from "node:crypto";
 import type { Plugin } from "vite";
 
-/** The route where a story publishes a visual reply page and where the frame loads it. `ChatVisual.stories.tsx` uses it too. */
 const CHAT_VISUAL_PAGES_ROUTE = "/__openbot/chat-visual";
 
-/** A collage carries its images as data URLs, so a page can be a few megabytes. */
 const PAGE_LIMIT = 8 * 1024 * 1024;
 
-/**
- * Serves visual reply pages from a real URL with a sandbox policy, as the app will. A sandboxed
- * frame does not run the scripts of a `blob:` or `data:` page in every Chromium build, so a story
- * cannot use one. Pages are kept by content hash, so the set stays as small as the fixtures.
- */
 export function chatVisualPages(): Plugin {
   const pages = new Map<string, Buffer>();
   return {

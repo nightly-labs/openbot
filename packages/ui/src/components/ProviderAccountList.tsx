@@ -49,14 +49,9 @@ export interface ProviderAccountListProps {
   accounts: readonly ProviderPickerAccount[];
   actions: ProviderAccountActions;
   disabled?: boolean | undefined;
-  /** The dialog element the menus portal into, as the provider row's menu does. */
   menuMount?: HTMLElement | undefined;
 }
 
-/**
- * The accounts of one provider, under its row. The first is the provider's own sign-in: it can be
- * named, and it goes only with the provider.
- */
 export function ProviderAccountList(props: ProviderAccountListProps) {
   const { t, format, errorMessage } = useText();
   const [renaming, setRenaming] = createSignal<string | null>(null);
@@ -86,15 +81,12 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
               ]
                 .filter(Boolean)
                 .join(" · ");
-            // A state that a newer host added shows as a failure.
             const state = (): ProviderAccountState =>
               Object.hasOwn(ACCOUNT_STATE_TEXT, account().state) ? account().state : "error";
-            // An account that is an API key has no sign-in: its key changes in the provider's settings page.
             const signInOffered = () =>
               !own() &&
               !isProviderKeyAccount(props.provider, account().id) &&
               (state() === "signed-out" || state() === "error");
-            // The check of a new key has no sign-in to cancel.
             const connecting = () =>
               !own() && !isProviderKeyAccount(props.provider, account().id) && state() === "connecting";
             return (
@@ -193,16 +185,13 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
   );
 }
 
-/** A name that turns into a field. Enter or leaving the field keeps the new name; Escape keeps the old one. */
 export function ProviderAccountRenameField(props: {
   value: string;
   placeholder: string;
   label: string;
-  /** The longest name the owner of the account keeps. A provider account keeps a short label. */
   maxLength?: number | undefined;
   onDone: (value: string | null) => void;
 }) {
-  // Enter and Escape remove the field, and the removal blurs it. Finish only once.
   let done = false;
   const finish = (value: string | null) => {
     if (done) return;

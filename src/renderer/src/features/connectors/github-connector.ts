@@ -14,36 +14,20 @@ import {
 } from "./connector-controller";
 import { type GitHubConnectorPort, githubConnectorPort } from "./github-connector-port";
 
-/** A controller whose page is the GitHub page, for a view that shows a part of it. */
 export interface GitHubConnectorController extends ConnectorController {
   readonly detail: { id: "github"; props: GitHubConnectorPanelProps };
 }
 
-/**
- * The GitHub connection of this computer or of a joined server. Reads the status once and then
- * follows the port's `changed` event, because the sign-in finishes in the browser, outside this
- * window. Call it inside a component: the subscription ends with that component.
- *
- * The repository list is read when the connection becomes active, on each `reload`, and when this
- * window gets the focus back after "Choose repositories" opened GitHub.
- *
- * Cancel does not wait for another action. The connect action waits for GitHub's first answer, and
- * Cancel is the way out of that wait.
- */
 export function createGitHubConnector(
   port: () => GitHubConnectorPort = githubConnectorPort,
-  /** The joined server whose connection this is, or undefined for this computer's. */
   hostName: () => string | undefined = () => undefined,
 ): GitHubConnectorController {
   const [status, setStatus] = createSignal<GitHubConnectorStatus>(DISCONNECTED_GITHUB_CONNECTOR);
   const [repositories, setRepositories] = createSignal<GitHubConnectorRepositories | null>(null);
   const [repositoriesError, setRepositoriesError] = createSignal<string | null>(null);
-  /** False until the first status read ends. Until then, `available` is not known. */
   const [read, setRead] = createSignal(false);
   const actions = createConnectorActions("connector.github.actionFailed", "github");
-  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let repositoriesRead = 0;
-  /** Set when GitHub opened to change the repositories. The next window focus reads them again. */
   let awaitingInstall = false;
 
   const readRepositories = () => {
@@ -83,7 +67,6 @@ export function createGitHubConnector(
   const unsubscribe = port().onChanged((next) => {
     if (!actions.disposed()) setStatus(next);
   });
-  // A failed read keeps the last status. The next `reload` or `changed` event replaces it.
   const reload = () => {
     if (status().state === "connected") readRepositories();
     void port()

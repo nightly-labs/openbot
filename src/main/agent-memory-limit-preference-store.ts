@@ -8,14 +8,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * How many memories one agent can hold. The backend reads it each time a memory is added, so it is
- * held in memory after `load` rather than read from disk each time.
- *
- * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default. Writes are chained for the reason
- * `update-preference-store.ts` chains its own.
- */
 export class AgentMemoryLimitPreferenceStore {
   readonly #path: string;
   #preference: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
@@ -64,15 +56,12 @@ export class AgentMemoryLimitPreferenceStore {
   });
 }
 
-/** The limit as Settings and a joined server's admin set it. */
 export interface AgentMemoryLimitSetting {
   get(): AgentMemoryLimitPreference;
   set(preference: AgentMemoryLimitPreference): Effect.Effect<AgentMemoryLimitPreference, PreferenceFileFailure>;
-  /** Calls `listener` with each saved limit, so the window of this computer shows a remote change. */
   subscribe(listener: (preference: AgentMemoryLimitPreference) => void): () => void;
 }
 
-/** The developer instructions state the limit, so a new limit reloads every agent's threads. */
 export function reloadingAgentMemoryLimit(
   store: AgentMemoryLimitPreferenceStore,
   agents: { memoryLimitChanged(): void },

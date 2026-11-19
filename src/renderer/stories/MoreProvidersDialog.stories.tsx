@@ -1,9 +1,3 @@
-/**
- * The "More providers" dialog of the provider picker. The rows use the names of the provider
- * registry and the same description keys as the setup picker. A provider that is included with
- * OpenBot has no description.
- */
-
 import { agentProviderName, PICKER_PROVIDERS } from "@openbot/contracts/agent-providers";
 import type { AgentProviderId } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -24,7 +18,6 @@ const DESCRIPTION_KEYS: Partial<Record<AgentProviderId, AppTextKey>> = {
 };
 
 interface MoreProvidersStoryProps {
-  /** The providers that the dialog lists, in this order. */
   providerIds: readonly AgentProviderId[];
   custom: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,7 +44,6 @@ function MoreProvidersStory(props: MoreProvidersStoryProps) {
   );
 }
 
-/** The providers after the first rows of the picker. */
 const HIDDEN_PROVIDERS = PICKER_PROVIDERS.slice(5);
 
 const args: MoreProvidersStoryProps = {
@@ -72,20 +64,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A short list has no search field. */
 export const Short: Story = {};
 
-/** The custom provider entry is last, below a divider. */
 export const WithCustom: Story = {
   args: { custom: true },
 };
 
-/** Only the custom provider entry is left to offer. */
 export const OnlyCustom: Story = {
   args: { providerIds: [], custom: true },
 };
 
-/** Eight or more providers show the search field. Type a text that has no match to see the empty result. */
 export const Searchable: Story = {
   args: { providerIds: PICKER_PROVIDERS, custom: true },
 };

@@ -17,7 +17,6 @@ import {
 import { SettingsContent, SettingsNote, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** The limits of every provider of a server, the provider with the least left first. */
 export function PlanLimitsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -49,7 +48,6 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
   const [success, warning, danger] = useCSSVariable(["--openbot-success", "--openbot-warning", "--openbot-danger"]);
   const fill = { neutral: success, warning, critical: danger }[window.tone];
   const resetsAt = planLimitResetDate(window);
-  // The amount left at an even pace, as on desktop. A fill that ends before the mark runs out before the reset.
   const pace = usagePaceRemainingPercent(window.durationMins, window.resetsAt, Date.now());
   return (
     <View className="gap-1.5 px-4 py-3">
@@ -63,7 +61,6 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
       </View>
       <View className="h-1.5 justify-center">
         <View className="h-full overflow-hidden rounded-full">
-          {/* The track of the desktop rings: the text colour, faint. */}
           <View className="absolute inset-0" style={{ backgroundColor: track, opacity: 0.15 }} />
           <View
             className="h-full rounded-full"

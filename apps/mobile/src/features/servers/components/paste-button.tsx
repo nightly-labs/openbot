@@ -4,10 +4,6 @@ import { useCSSVariable } from "uniwind";
 import { readClipboardText } from "@/shared/lib/clipboard";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The trailing Paste action of a field: the user copied the value in another app, so one tap puts
- * it in the field. iOS asks before the app reads the clipboard.
- */
 export function PasteButton({ disabled, onPaste }: { disabled: boolean; onPaste: (value: string) => void }) {
   const { t } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));

@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "중지됨",
   "status.messaging.stop": "중지",
   "status.messaging.approvalTitle": "OpenBot이 계속 진행하려면 승인이 필요해요.",
+  "status.messaging.approvalTitleTeammate": "팀원 {agent}이(가) 계속 진행하려면 승인이 필요해요.",
   "status.messaging.approvalCommand": "명령 실행",
   "status.messaging.approvalFileChange": "파일 변경",
   "status.messaging.approvalPermissions": "추가 권한 받기",

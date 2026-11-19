@@ -1,13 +1,7 @@
 import { Effect } from "effect";
 
-/** Why a body was not read: it is larger than the limit, or the connection failed while reading. */
 export type LimitedBodyFailure = "too-large" | "unreadable";
 
-/**
- * A response body of at most `limit` bytes. A declared `content-length` above the limit fails
- * before any byte is read; a body without one is counted as it arrives and stopped at the limit.
- * The body is cancelled and released on success, failure and interruption.
- */
 export function readLimitedBody<E>(
   response: Response,
   limit: number,

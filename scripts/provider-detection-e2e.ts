@@ -1,11 +1,3 @@
-// Runs local detection and endpoint Edit end to end on the real main-process modules: the detection
-// settings file, the scan, the model probe, and the encrypted endpoint store, against fake
-// OpenAI-compatible servers on this computer. A fake cipher replaces the operating system's secret
-// storage, which exists only in Electron. It also scans a folder that holds a file named like a known
-// agent, and proves that the scan never starts it. A model list in the models.dev, OpenRouter and
-// vLLM shapes gives each model's input kinds, context window and max output (#3946). A list with
-// model names only gets each model's limits from the models.dev copy of OpenCode (#3946, #5789).
-// `bun scripts/provider-detection-e2e.ts`. Writes .openbot-build/provider-detection-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server } from "node:http";
@@ -36,7 +28,6 @@ interface FakeServer {
   close: () => Promise<void>;
 }
 
-/** A model list entry with the fields of models.dev, OpenRouter and vLLM. The input is wrong on purpose in one entry. */
 interface ListedModel {
   id: string;
   object?: string;
@@ -48,10 +39,6 @@ interface ListedModel {
   max_model_len?: number;
 }
 
-/**
- * An OpenAI-compatible server that lists `models`, or redirects every request to `redirectTo`. A
- * string is a bare entry; an object is sent as it is.
- */
 async function fakeServer(models: (string | ListedModel)[], redirectTo?: string): Promise<FakeServer> {
   const seen: Seen[] = [];
   const server: Server = createServer((request: IncomingMessage, response) => {
@@ -116,23 +103,18 @@ try {
   const primary = await fakeServer(["llama-3.1-8b", "qwen2.5-coder"]);
   const other = await fakeServer(["other-model"]);
   const redirecting = await fakeServer([], primary.baseUrl);
-  // #3946: what a list says about each model, in the shapes that servers publish.
   const catalog = await fakeServer([
-    // models.dev, as the gateway of #5332 lists it.
     {
       id: "gateway-vision",
       modalities: { input: ["text", "image", "pdf"] },
       limit: { context: 200_000, output: 32_000 },
     },
-    // OpenRouter: `file` is a PDF input.
     {
       id: "router-model",
       context_length: 131_072,
       architecture: { input_modalities: ["text", "file"] },
       top_provider: { max_completion_tokens: 65_536 },
     },
-    // OpenRouter often lists the max output as the whole window: it leaves no room for the prompt.
-    // An empty `modalities` does not hide the OpenRouter kinds.
     {
       id: "router-full-cap",
       context_length: 163_840,
@@ -140,11 +122,8 @@ try {
       architecture: { input_modalities: ["text", "image"] },
       top_provider: { max_completion_tokens: 163_840 },
     },
-    // vLLM: a window, and no input kinds.
     { id: "vllm-model", object: "model", max_model_len: 32_768 },
-    // A text-only list entry.
     { id: "text-only", modalities: { input: ["text"] } },
-    // Values out of range and of the wrong type are left out; a max output with no window too.
     { id: "odd-model", context_length: 12, limit: { output: 4_096 }, modalities: { input: "image" } },
     "bare-model",
   ]);
@@ -164,7 +143,6 @@ try {
   );
   detections.push(detection);
 
-  // 1. A listed address is found with its models, with no key; a redirect is not followed.
   const agentFolder = join(root, "tools");
   const marker = join(root, "started");
   await mkdir(agentFolder);
@@ -200,7 +178,6 @@ try {
     agentStarted: false,
   };
 
-  // 2. Add the found server with a key and a header.
   await runCauseEffect(
     endpoints.save({
       id: row.id,
@@ -215,7 +192,6 @@ try {
   assert.ok(!envelope.includes(KEY) && !envelope.includes(HEADER.value), "The file holds no plain key or header.");
   const cipherBefore = JSON.parse(envelope).providers[0].secret;
 
-  // 3. Edit with an empty key field: the models change, the stored key and header stay.
   await runCauseEffect(
     endpoints.update({
       id: row.id,
@@ -233,8 +209,6 @@ try {
   const cipherAfter = JSON.parse(await readFile(join(root, "custom-providers.json"), "utf8")).providers[0].secret;
   assert.deepEqual(cipherAfter, cipherBefore, "A kept key keeps its ciphertext.");
 
-  // 4. Load models for the saved endpoint with an empty key field: the server gets the stored key.
-  // With no header rows, the saved header is not sent: the user removed it in the form.
   await Effect.runPromise(
     detection.discoverModels({ baseUrl: row.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
   );
@@ -242,7 +216,6 @@ try {
   assert.equal(loaded?.authorization, `Bearer ${KEY}`);
   assert.equal(loaded?.team, null, "A removed header row is not sent.");
 
-  // 5. The stored key never goes to another origin.
   await Effect.runPromise(
     detection.discoverModels({ baseUrl: other.baseUrl, apiKey: null, headers: [], savedProviderId: row.id }),
   );
@@ -252,7 +225,6 @@ try {
     runCauseEffect(endpoints.update({ id: row.id, name: "Local server", baseUrl: other.baseUrl, models: [] })),
     "A new address with a kept key is refused.",
   );
-  // 5b. Edit shows the saved header names. A null value keeps the saved value of that name.
   const savedHeaders = endpoints.list().find((summary) => summary.id === row.id)?.headerNames;
   assert.deepEqual(savedHeaders, [HEADER.name], "The list names the saved header.");
   const editBase = { id: row.id, name: "Local server", baseUrl: row.baseUrl, models: edited?.models ?? [] };
@@ -334,7 +306,6 @@ try {
     newAddressWithKeptKeyRefused: true,
   };
 
-  // 6. A model list gives the input kinds, the window and the max output that it says, and no more.
   const listed = await Effect.runPromise(
     detection.discoverModels({ baseUrl: catalog.baseUrl, apiKey: null, headers: [] }),
   );
@@ -350,8 +321,6 @@ try {
     { id: "bare-model" },
   ]);
 
-  // 6b. A list with names only gets the limits of the models.dev copy that OpenCode keeps. A model
-  // that the endpoint gives a window keeps it, and a model that the copy does not have gets none.
   const cache = join(root, "cache");
   const copy = join(cache, "opencode", "models.json");
   await mkdir(join(cache, "opencode"), { recursive: true });
@@ -366,7 +335,6 @@ try {
       "relay-e": { models: { "full-cap": { limit: { context: 200_000, output: 200_000 } } } },
     }),
   );
-  // A confined OpenCode on this computer can have a copy of its own. This one is the newer.
   const later = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await utimes(copy, later, later);
   const namesOnly = await fakeServer([
@@ -393,17 +361,13 @@ try {
   report.catalogLimits = filled.models;
   assert.ok(isDiscoverModelsResult(filled), "The preload decoder accepts the filled list.");
   assert.deepEqual(filled.models, [
-    // The id ends in a catalog key: the maker's limits, not those of a relay.
     { id: "proxy/google/gemini-3.8-flash", contextWindow: 1_048_576, maxOutput: 65_536 },
-    // By name: the window that most services give.
     { id: "Big.Model", contextWindow: 1_000_000, maxOutput: 64_000 },
     { id: "full-cap", contextWindow: 200_000 },
     { id: "unknown-model" },
     { id: "local/big-model", contextWindow: 32_768 },
   ]);
 
-  // 6c. OpenCode can write the copy during the read. Text that is not JSON gives a list with no
-  // limits; it does not make the search fail.
   await writeFile(copy, '{"google": {"models": {"gemini-3.8-fl');
   const afterTear = new Date(later.getTime() + 60 * 1000);
   await utimes(copy, afterTear, afterTear);
@@ -419,7 +383,6 @@ try {
     { id: "local/big-model", contextWindow: 32_768 },
   ]);
 
-  // 7. Detection off: nothing is probed.
   const before = primary.seen.length;
   await runCauseEffect(settings.set({ ...settings.get(), enabled: false }));
   assert.deepEqual(await Effect.runPromise(detection.scanModelServers()), []);

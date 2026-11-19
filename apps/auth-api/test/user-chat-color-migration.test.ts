@@ -67,7 +67,6 @@ describe("user chat color migration", () => {
   it("accepts the insert of the Worker that runs before the deploy, and only a lower-case #rrggbb color", () => {
     const database = migratedTo("0049");
     database.exec(migration);
-    // The email sign-up insert of the deployed Worker names no chat color column.
     database.exec(`INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
       VALUES ('old-worker', 'old-worker', 'old@example.com', NULL, NULL, 1, 1)`);
     expect(database.prepare("SELECT chat_color FROM users WHERE id = 'old-worker'").get()).toEqual({

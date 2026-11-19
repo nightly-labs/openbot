@@ -25,14 +25,9 @@ function subscribe(listener: () => void) {
 }
 
 function snapshot(): boolean {
-  // Android has no such setting and always answers false. Until iOS answers, controls draw solid.
   return isAndroid ? false : (reduced ?? true);
 }
 
-/**
- * Whether Reduce Transparency is on. The answer is kept for the app run, so only the first screen
- * that asks renders again when it arrives; a chat that opens later draws its controls at once.
- */
 export function useReducedTransparency(): boolean {
   return useSyncExternalStore(subscribe, snapshot);
 }

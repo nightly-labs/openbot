@@ -1,18 +1,3 @@
-// Checks that a chat update on a snapshot that the runtime cache no longer holds writes only the
-// messages that changed, and that those changes are stored. Runs the real SQLite database and
-// conversation runtime on a temporary profile. The chat has more messages than the 100 the runtime
-// keeps. A caller takes the chat, then something replaces the cached copy, then the caller edits one
-// message and adds one, and publishes its copy. Before the fix (#8166), each such update wrote every
-// message of the chat again into the event log.
-//
-// The cases:
-// - `provider-read`: a provider read replaces the cached chat.
-// - `idle-eviction`: the idle sweep removes the cached chat.
-// - `other-thread`: a read of another thread of the same agent replaces the cached chat.
-// No app, provider, account or network is started.
-//
-// Run: bun scripts/conversation-cache-miss-write-e2e.ts
-// Writes .openbot-build/conversation-cache-miss-write-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -25,7 +10,6 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/conversation-cache-miss-write-e2e");
-/** More than `CONVERSATION_SNAPSHOT_MESSAGE_LIMIT`, so the runtime keeps only part of the chat. */
 const SEEDED_MESSAGES = 150;
 const IDLE_LATER_MS = 24 * 60 * 60 * 1000;
 
@@ -99,7 +83,6 @@ async function runCase(name: CaseName, result: CaseReport): Promise<void> {
     conversation.emitConversation(held);
     result.writtenMessageIds = writes.slice(first).flat();
 
-    // A page read returns at most 100 messages, so the rows are read directly.
     const stored = database.connection
       .prepare("SELECT message_id, message_json FROM projection_thread_messages WHERE thread_id = ?")
       .all(threadId)

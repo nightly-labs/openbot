@@ -26,6 +26,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Ana ekranı yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureChannel":
     "Görüntü {channel} kanalında görünür ve bu sunucuda kanalı okuyan her üye onu görebilir.",
+  "status.agent.screenCapturePermissionNext": "Ardından macOS, OpenBot için Ekran Kaydı'na izin vermenizi isteyebilir.",
   "status.agent.screenCaptureDisplay": "{name} ekranını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":
@@ -110,8 +111,10 @@ export const messages = {
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
   "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
   "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
+  "status.agent.finishCheckContinues": "İstek henüz bitmedi. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
+  "status.agent.planStopped": "Ajan, planında açık adımlar varken durdu. Devam etmesi için bir mesaj gönderin.",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
   "status.agent.providerExitContinues": "Ajan yanıtını bitirmeden durdu. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",

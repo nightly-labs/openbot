@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.voice", {
-  // Voice transcription errors.
   "error.voice.downloadFailed": "Could not download the voice model. Try again.",
   "error.voice.downloadStopped": "Voice model download was stopped.",
   "error.voice.removeBusy": "Wait until the voice transcription ends, then remove the model.",
@@ -12,7 +11,6 @@ export const messages = defineMessages("error.voice", {
   "error.voice.prepareRequired":
     "Local voice transcription is unavailable. Run `bun run voice:prepare` and restart OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot could not transcribe this recording.",
-  // A provider that takes dictation or reads replies aloud with the user's own key. {provider} is ElevenLabs or xAI.
   "error.voice.cloud.keyRequired": "Add your {provider} API key in Settings → Voice.",
   "error.voice.cloud.keyRejected": "{provider} did not accept the API key. Check the key in Settings → Voice.",
   "error.voice.cloud.quotaExceeded": "Your {provider} quota is used up.",
@@ -25,7 +23,6 @@ export const messages = defineMessages("error.voice", {
   "error.voice.speech.modelRequired": "Download the speech model in Settings → Voice.",
   "error.voice.speech.timedOut": "Reading the reply aloud timed out.",
   "error.voice.speech.failed": "OpenBot could not read the reply aloud.",
-  // A cloud model for spoken replies. {provider} is ElevenLabs or xAI.
   "error.voice.speech.providerFailed": "{provider} did not send the audio. Try again.",
   "error.voice.speech.providerUnreachable": "Could not connect to {provider}. Check the connection.",
   "error.voice.recordingNotKept": "OpenBot could not keep the voice recording.",
@@ -40,7 +37,6 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.refused":
     "OpenAI refused to start live voice. Try again later, or turn off live voice in Settings to talk by voice.",
   "error.voice.live.off": "Codex live voice is off. Turn it on in Settings → Voice.",
-  // The user's own voice server.
   "error.voice.server.routeOff": "The voice server is not set up for this. Check Settings → Voice.",
   "error.voice.server.keyRefused": "{host} refused the API key.",
   "error.voice.server.invalidAnswer": "{host} did not send an OpenAI-compatible answer.",

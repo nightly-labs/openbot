@@ -34,10 +34,6 @@ const catalogs = {
   zh: zhMobile,
 } as const;
 
-/**
- * The mobile catalog of `locale`. The main process reads this module. Metro reads
- * `mobile-catalogs.native.ts`, which loads a language only when the app first shows it.
- */
 export function mobileCatalog(locale: TranslatedLocale): PartialTranslation<AppMobileMessages> {
   return catalogs[locale];
 }

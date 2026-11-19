@@ -479,7 +479,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Das Bild konnte nicht kopiert werden.",
   "settings.profile.share.createFailed": "Das Bild konnte nicht erstellt werden.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Meine letzten sechs Monate mit OpenBot",
   "settings.profile.activity.title": "Aktivität auf diesem Computer",
   "settings.profile.activity.activeDays": {
@@ -489,7 +488,6 @@ export const messages = {
   "settings.profile.activity.empty": "Noch keine Aktivität",
   "settings.profile.activity.loading": "Aktivität wird geladen…",
   "settings.profile.activity.loadFailed": "Deine Aktivität konnte nicht geladen werden.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} Tokens an {count} aktiven Tag im letzten Jahr",
     other: "{tokens} Tokens an {count} aktiven Tagen im letzten Jahr",
@@ -673,7 +671,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Für ein kleines Team mit täglichen Routinen.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Für viele Agenten und intensive Browserarbeit.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Diktieren",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
@@ -853,6 +850,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Ihre Kanäle, Routinenabläufe, Workflows und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
   "settings.transfer.copy.submit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
+  "settings.transfer.copy.duplicatesTitle": "Doppelte Agenten kopieren?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} hat bereits Agenten mit diesen Namen: {names}. Die Kopie fügt jeweils einen zweiten Agenten hinzu. Jede Kopie ist ein eigener Agent mit eigenen Chats, Dateien und Erinnerungen.",
+  "settings.transfer.copy.duplicatesConfirm": "Duplikate kopieren",
   "settings.transfer.copy.copying": "Wird kopiert…",
   "settings.transfer.copy.done": {
     one: "{count} Agent auf {server} kopiert.",

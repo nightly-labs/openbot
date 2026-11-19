@@ -17,10 +17,6 @@ import { loadShortcutAgent, saveShortcutAgent, useShortcutAgent } from "../model
 import type { ShortcutTarget } from "../model/shortcut-target";
 import { shortcutsSupported } from "../shortcuts-native";
 
-/**
- * Settings > Shortcuts: the agent that gets the messages of the iOS shortcut Send Message. The
- * choice is for this phone and this account.
- */
 export function ShortcutsSettingsScreen() {
   const { t } = useText();
   const { session } = useMobileSession();

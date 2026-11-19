@@ -18,12 +18,6 @@ import { usePlatform } from "./platform";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 
-/**
- * Cross-domain open/select commands (agent chat, direct conversation, message focus, global
- * search). Leaf context below agents/conversation/direct-messages so one call can write to
- * all three without cycles (`noImportCycles` is an error). See docs/architecture/change-rules.md.
- * Ungated - see `app-providers.tsx`.
- */
 const Navigation = createSimpleContext({
   name: "Navigation",
   init: () => {
@@ -64,43 +58,23 @@ const Navigation = createSimpleContext({
       nonce: number;
     } | null>(null);
 
-    /**
-     * False when the chat opens in another window. With `tabId`, the agent opens at that thread tab, not
-     * at the tab it showed last: a link from a message opens a conversation of that message.
-     */
     function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
       return openAgent(agentId, tabId);
     }
 
-    /**
-     * Opens the agent that the setup form just made. The form is still open and creating until the
-     * update ends, so the guard of `selectAgent` would stop this open.
-     */
     function openCreatedAgent(agentId: string): boolean {
       return openAgent(agentId);
     }
 
     function openAgent(agentId: string, tabId?: string): boolean {
-      // The tab is written first, so a chat window that opens for the agent reads it.
       if (tabId !== undefined) agentThreads.open(agentId, tabId);
-      // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
-      // opens in its own chat window, from search, a schedule or the Dynamic Island.
       const chatWindow = platform.chatWindow;
       if (chatWindow && agentId !== chatWindow.agentId) {
         void appPort().openChatWindow({ serverId: chatWindow.serverId, agentId });
         return false;
       }
-      // The rail and the sidebar sit outside the markup the report covers, so a
-      // conversation is one click away while the report hides where it opens. Opening
-      // one that stays hidden also reads it: `requestConversationRead` below is the
-      // explicit read, and a search result runs `openAgentMessage`, which marks every
-      // message through the match. Both would be messages nobody saw. The settings page covers the
-      // conversation in the same way.
       windowPage.showAgents();
-      // An open channel covers the workspace the same way the report does, so it has to leave here
-      // rather than in each caller: Edit agent and a global-search result open a chat that would
-      // otherwise stay hidden under it.
       channels.close();
       const previousAgentId = activeAgentId();
       if (previousAgentId && previousAgentId !== agentId) pruneInactiveAgentHistory(previousAgentId);
@@ -118,7 +92,6 @@ const Navigation = createSimpleContext({
     async function selectDirectMember(memberId: string): Promise<void> {
       if (agentSetupOpen() && creatingAgent()) return;
       if (!peopleEnabled || !currentTeamMember() || !directPeople().some((member) => member.id === memberId)) return;
-      // Past the guards, so a call that opens nothing leaves the page or the channel alone.
       windowPage.showAgents();
       channels.close();
       const previousAgentId = activeAgentId();
@@ -130,8 +103,6 @@ const Navigation = createSimpleContext({
       await openDirectConversation(memberId);
     }
 
-    // The element that had focus before the search opened. A dialog that the search opens returns
-    // focus to it, because the search input is gone when that dialog closes.
     let globalSearchOpener: HTMLElement | null = null;
 
     function setGlobalSearchVisibility(open: boolean): void {
@@ -141,7 +112,6 @@ const Navigation = createSimpleContext({
       setGlobalSearchOpen(open);
     }
 
-    /** The side thread of each message that the last search found there, by agent and message id. */
     const searchHitThreads = new Map<string, string>();
     const searchHitKey = (agentId: string, messageId: string) => `${agentId}\n${messageId}`;
 
@@ -161,7 +131,6 @@ const Navigation = createSimpleContext({
         for (const result of page.results) {
           if (result.taskId) searchHitThreads.set(searchHitKey(result.agentId, result.message.id), result.taskId);
         }
-        // One search counts once, not once per page.
         if (cursor === undefined) {
           analytics.track("search_action", { scope: "global", result: "succeeded", result_count: page.total });
         }
@@ -182,20 +151,16 @@ const Navigation = createSimpleContext({
     }
 
     function selectGlobalSearchMessage(agentId: string, messageId: string): void {
-      // A side thread loads its whole conversation in its tab. Its tab is written first, so a chat
-      // window that opens for the agent reads it.
       const taskId = searchHitThreads.get(searchHitKey(agentId, messageId));
       if (taskId) {
         agentThreads.open(agentId, taskId);
         selectAgent(agentId);
         return;
       }
-      // The other window reads the chat when it opens. This one does not mark its messages read.
       if (!selectAgent(agentId) && platform.chatWindow) return;
       void openAgentMessage(agentId, messageId);
     }
 
-    /** Opens the agent's own chat at a message. Resolves false when the chat does not have the message. */
     async function openAgentMessage(agentId: string, messageId: string): Promise<boolean> {
       const serverId = activeServerId();
       await Promise.resolve();
@@ -215,9 +180,7 @@ const Navigation = createSimpleContext({
             });
             if (!scopeIsCurrent()) return true;
             readBoundary = latestPage.messages.at(-1)?.id ?? readBoundary;
-          } catch {
-            // The focused page still gives us a safe read boundary when the latest-page refresh fails.
-          }
+          } catch {}
           await markAgentMessagesRead(agentId, readBoundary, serverId);
         } catch (error) {
           appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
@@ -239,10 +202,8 @@ const Navigation = createSimpleContext({
       }
       return peopleEnabled && directPeople().some((member) => member.id === entry.id);
     });
-    /** The index that Back or Forward opens. The chat records it when it opens; a refused open keeps it until then. */
     let historyTarget: number | null = null;
 
-    /** The chat that shows when no page covers it. The new agent form has none. */
     const currentChat = (): ChatHistoryEntry | null => {
       if (agentSetupOpen()) return null;
       const channelId = channels.state.selectedId;
@@ -252,9 +213,7 @@ const Navigation = createSimpleContext({
       const agent = activeAgent();
       return agent ? { kind: "agent", id: agent.id } : null;
     };
-    /** The chat that the sidebar marks as open. A page or the new agent form has none. */
     const openChat = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? currentChat() : null);
-    /** The chat under a page such as Settings or the Marketplace. Back closes the page and shows it. */
     const chatUnderPage = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? null : currentChat());
     createEffect(
       () => {
@@ -279,10 +238,6 @@ const Navigation = createSimpleContext({
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
-    /**
-     * Back first leaves an open settings detail page, such as Providers › ChatGPT, for its list. Then it
-     * leaves a page for the chat under it, not for the chat before that one.
-     */
     const goBack = () => {
       const pageBack = windowPage.pageBack();
       if (pageBack) pageBack.back();
@@ -291,7 +246,6 @@ const Navigation = createSimpleContext({
     };
     const goForward = () => goInHistory(1);
 
-    /** A dialog or menu over the chat keeps its keys and mouse buttons. */
     const handledElsewhere = (event: Event): boolean =>
       event.defaultPrevented ||
       (event.target instanceof Element &&
@@ -306,7 +260,6 @@ const Navigation = createSimpleContext({
         if (command === "back") goBack();
         else goForward();
       };
-      // The side buttons of a mouse.
       const onMouseUp = (event: MouseEvent) => {
         if (handledElsewhere(event)) return;
         if (event.button === 3) goBack();

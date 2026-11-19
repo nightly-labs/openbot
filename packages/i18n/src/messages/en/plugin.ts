@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("plugin", {
-  // The plugin page in the marketplace.
   "plugin.link.website": "Website",
   "plugin.link.privacyPolicy": "Privacy Policy",
   "plugin.link.terms": "Terms of Service",
@@ -13,7 +12,6 @@ export const messages = defineMessages("plugin", {
   "plugin.info.category": "Category",
   "plugin.info.version": "Version",
 
-  // The uninstall confirmation. {number} is a count that has no plural form here.
   "plugin.uninstallDialog.title": "Disconnect {name}?",
   "plugin.uninstallDialog.description":
     "This removes what {name} installed on this computer. Nothing else on this host or on this agent changes.",

@@ -14,7 +14,6 @@ import { answer } from "./route-agent-import";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_DETECTION_ROUTES));
 
-/** A refused input; the parsers do not quote it, because a model list request can carry a key. */
 function parsed<T>(parse: () => T): T {
   try {
     return parse();
@@ -24,12 +23,6 @@ function parsed<T>(parse: () => T): T {
   }
 }
 
-/**
- * The local model servers and ACP agent commands that this server finds, for a joined server's
- * Server Settings > Providers. The host makes each request from the host, as the Providers section
- * does on this computer. A response never carries a key or a header value. Frozen by
- * `provider-detection-v1`.
- */
 export async function routeProviderDetection(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -40,7 +33,6 @@ export async function routeProviderDetection(
   if (!detection || !capabilities.has(PROVIDER_DETECTION_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providerDetectionUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the provider-detection wire codec.
   const body = await readJson(request);
   switch (url.pathname) {
     case PROVIDER_DETECTION_ROUTES.settings:
@@ -55,7 +47,6 @@ export async function routeProviderDetection(
       return json(200, { agents: await runCauseEffect(detection.detection.scanAgents()) });
     default: {
       const input = parsed(() => parseDiscoverModels(body));
-      // A probe error names only the host of the address, never a key or a header value.
       return json(200, await answer(() => Effect.runPromise(detection.detection.discoverModels(input)), 409));
     }
   }

@@ -1,10 +1,3 @@
-/**
- * The chat over the routine canvas. A request goes into the open agent's own conversation, where
- * the agent changes routines and flows with its tools; its answer comes back when the turn that
- * read the request ends. The panel shows only the exchange started here: the whole conversation
- * stays on the Agents tab.
- */
-
 import { latestTurnAnswer } from "@openbot/contracts/ipc";
 import { toast } from "@openbot/ui";
 import type { DiagramChatMessage } from "@openbot/ui/features/diagrams/diagram-model";
@@ -12,7 +5,6 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, onSettled } from "solid-js";
 import type { RoutineFlowsHost } from "./routine-flows-port";
 
-/** A request sent and not answered yet. `deliveryId` names the request in the conversation. */
 interface PendingRequest {
   agentId: string;
   deliveryId: string | null;
@@ -32,12 +24,6 @@ export function createRoutineFlowAssistant(host: () => RoutineFlowsHost, agentId
     });
   });
 
-  /**
-   * Looks at the request in the conversation, around its own message, whenever a turn of the agent
-   * ends or its queue moves. A request still in the queue takes no answer: the turn that ended read
-   * other work. A request whose delivery failed or was cancelled ends with an error, and one whose
-   * turn ended shows that turn's answer, or ends without one.
-   */
   const check = async (forAgent: string, endedTurnId: string | null) => {
     const pending = chat.pending;
     if (!pending?.deliveryId || pending.agentId !== forAgent) return;
@@ -56,18 +42,13 @@ export function createRoutineFlowAssistant(host: () => RoutineFlowsHost, agentId
     }
     const turnId = asked.turnId ?? endedTurnId;
     let reply = turnId ? latestTurnAnswer(page.messages.slice(index + 1), turnId) : undefined;
-    // The answer is the last message of the turn, and a long turn ends past the page around the
-    // request, which can hold only an earlier message of it. Once the turn has ended, the newest
-    // page holds its end, so its answer there wins.
     if (turnId && status === "completed") {
       const latest = await host().conversation.page(forAgent);
       if (chat.pending !== pending) return;
       reply = latestTurnAnswer(latest.messages, turnId) ?? reply;
     }
-    // Without the turn, a queue change can come before the answer does: only an ended turn ends it.
     if (!reply && (status !== "completed" || !turnId)) return;
     setChat((draft) => {
-      // An ended turn and its queue change check at the same time; only the first answers.
       if (draft.pending?.deliveryId !== pending.deliveryId) return;
       if (reply) draft.messages.push({ id: reply.id, author: "agent", text: reply.text, createdAt: reply.createdAt });
       draft.pending = null;

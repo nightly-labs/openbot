@@ -6,9 +6,6 @@ import { type CollectionArticle, findArticle } from "../../lib/content-collectio
 import { articleHead } from "../../lib/content-metadata";
 import { PROVIDERS_COLLECTION } from "../../lib/providers";
 
-// In `loader` for the reason given in routes/news/$slug.tsx: an unknown slug is a
-// real not-found response, not a 200 with an error card.
-// `loader` and `head` import the pages when they run, as in routes/compare/$slug.tsx.
 async function loadProvider(slug: string): Promise<CollectionArticle> {
   const article = findArticle(PROVIDERS_COLLECTION, slug);
   const { PROVIDER_PAGES } = await import("../../content/providers");
@@ -35,8 +32,6 @@ export const Route = createFileRoute("/providers/$slug")({
 function ProviderRoute() {
   const article = Route.useLoaderData();
   return (
-    // Keyed: a link from one provider page to another keeps this route mounted, so
-    // each page gets a fresh tree, as on /compare.
     <Show when={PROVIDER_PAGES[article().slug]} keyed>
       {(page) => <ProviderArticlePage collection={PROVIDERS_COLLECTION} article={article()} page={page} />}
     </Show>

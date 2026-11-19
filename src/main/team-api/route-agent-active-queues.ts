@@ -11,11 +11,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, stringArray, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 
-/**
- * `agent-active-queues-v1`: the open work of the queue of each agent that this peer can see, in one
- * request. A client with many agents read each queue on its own route to show the agent rows. The
- * route changes nothing.
- */
 export async function routeAgentActiveQueues(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listAgents" | "listActiveQueues">,
@@ -25,10 +20,8 @@ export async function routeAgentActiveQueues(
   if (method !== "POST" || url.pathname !== AGENT_ACTIVE_QUEUES_ROUTES.list) return "unmatched";
   if (!capabilities.has(AGENT_ACTIVE_QUEUES_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.activeQueuesUnsupported"));
-  // `readJson` has already run the body through the agent-active-queues wire codec.
   const body = await readJson(request);
   const named = body.agentIds === undefined ? null : new Set(stringArray(body, "agentIds", AGENT_ACTIVE_QUEUES_LIMIT));
-  // An agent that this peer cannot see is left out, as one that does not exist is.
   const agentIds = agents
     .listAgents()
     .map((agent) => agent.id)
@@ -42,7 +35,6 @@ export async function routeAgentActiveQueues(
   return json(200, inFrame(agents.listActiveQueues(agentIds)));
 }
 
-/** A preview URL is an address on this computer: a client reads the file through its own route. */
 function withoutHostAddresses(queue: QueueSnapshot): QueueSnapshot {
   return {
     agentId: queue.agentId,
@@ -54,14 +46,8 @@ function withoutHostAddresses(queue: QueueSnapshot): QueueSnapshot {
   };
 }
 
-/**
- * The queues that fit in one WebRTC frame, in the order of the agent list. An agent that does not fit,
- * or that has more open work than one answer carries, is named in `omitted`, and the client reads its
- * queue on the released route.
- */
 function inFrame(queues: readonly QueueSnapshot[]): { queues: QueueSnapshot[]; omitted: string[] } {
   const omittedIds = queues.map((queue) => queue.agentId);
-  // The answer with every agent omitted is the largest frame that the list of IDs can need.
   let bytes = Buffer.byteLength(JSON.stringify({ queues: [], omitted: omittedIds }));
   const kept: QueueSnapshot[] = [];
   const omitted: string[] = [];
