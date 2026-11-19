@@ -155,6 +155,12 @@ const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
   image: "prompt",
 };
 const LABEL_CHARS = 40;
+/**
+ * The model fields of an LLM or condition step (`WorkflowFields`). An agent step runs on its agent's
+ * model, so an op may not set them on it. The canvas keeps a copy of the agent's model in them, which
+ * no run reads.
+ */
+const STEP_MODEL_FIELDS = ["provider", "model", "effort"] as const;
 
 /**
  * The size of each card on the canvas: the widths of "Size" in
@@ -420,6 +426,15 @@ function applyWorkflowOps(
     if (typeof agentId === "string" && agentId.length > 0 && !agentIds.has(agentId))
       refuse(`Op ${op}: unknown agent ${agentId}.`);
   };
+  /** An agent step runs on its agent's model, so a run would not use a model that an op gives it. */
+  const checkAgentModel = (kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number) => {
+    if (kind !== "agent") return;
+    const given = STEP_MODEL_FIELDS.filter((name) => patch?.[name] !== undefined && patch[name] !== null);
+    if (given.length > 0)
+      refuse(
+        `Op ${op}: an agent step uses its agent's model, not ${given.join(", ")}. For another model, add an llm step.`,
+      );
+  };
   const replace = (next: WorkflowNode) => {
     nodes = nodes.map((node) => (node.id === next.id ? next : node));
   };
@@ -434,6 +449,7 @@ function applyWorkflowOps(
         if (!op.kind) refuse(`Op ${n}: add needs kind.`);
         if (op.ref !== undefined && ids[op.ref] !== undefined) refuse(`Op ${n}: ref ${op.ref} is already used.`);
         const id = `${op.kind}-${crypto.randomUUID()}`;
+        checkAgentModel(op.kind, op.fields, n);
         const fields = withRepositoryList(op.kind, mergeFields(newNodeFields(op.kind), op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
@@ -452,6 +468,7 @@ function applyWorkflowOps(
       }
       case "update": {
         const node = resolve(op.node, n);
+        checkAgentModel(node.kind, op.fields, n);
         const fields = withRepositoryList(node.kind, mergeFields(node.fields, op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);

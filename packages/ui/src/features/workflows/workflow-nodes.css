@@ -230,6 +230,16 @@
   background: var(--wfn-hover);
 }
 
+/* The model of an agent step is its agent's model. It is text, not a control, so it has no hover. */
+.wfn-stage .wfn-pill[data-static] {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wfn-stage .wfn-pill[data-static]:hover {
+  background: transparent;
+}
+
 .wfn-pill > svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
