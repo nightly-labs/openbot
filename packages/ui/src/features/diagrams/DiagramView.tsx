@@ -1,13 +1,3 @@
-/**
- * A diagram in the chat area: its header, the canvas, the assistant over the canvas, and the last
- * run beside it. The view owns what is only presentation (the selection, the routine in focus, and
- * which panels are open); the diagram and every edit to it belong to the caller.
- *
- * When an agent is started by several routines, one routine is in focus at a time: the canvas shows
- * its path and its last run, and the panel shows what each agent received and returned in it. The
- * focus follows the newest run until the user picks a routine.
- */
-
 import {
   Button,
   ChevronRight,
@@ -27,7 +17,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramBoardEmpty } from "./DiagramBoardEmpty";
 import { DiagramChatPanel } from "./DiagramChatPanel";
-import { DiagramInspector } from "./DiagramInspector";
+import { DiagramInspector, type DiagramRunStop, DiagramStopButton } from "./DiagramInspector";
 import type { DiagramModelChoice, DiagramNewAgentDraft } from "./DiagramNewAgentCard";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { diagramRunStepStatus } from "./DiagramRoutineVisuals";
@@ -38,12 +28,9 @@ import type { Diagram, DiagramChatMessage, DiagramNode, DiagramPoint, DiagramRun
 export interface DiagramViewProps {
   diagram: Diagram;
   agents: AgentProfile[];
-  /** The agent whose routines the diagram holds; its face replaces the diagram icon. */
   owner?: AgentProfile | undefined;
-  /** The day the routine week strips start on. Defaults to the time the view opens. */
   now?: string | undefined;
   editable?: boolean | undefined;
-  /** The agent that edits the diagram from the chat panel. Without it, the panel is hidden. */
   assistant?:
     | {
         agent: AgentProfile;
@@ -54,33 +41,23 @@ export interface DiagramViewProps {
       }
     | undefined;
   onMoveNode: (nodeId: string, position: DiagramPoint) => void;
-  /**
-   * `routineId` is the routine in focus when the connection was drawn, or null on "All routines".
-   * Answers whether the connection was saved, as on `DiagramBoard`.
-   */
   onConnect: (from: string, to: string, routineId: string | null) => boolean | Promise<boolean>;
   onRemoveEdge: (edgeId: string) => void;
   onRemoveNode: (nodeId: string, routineId: string | null) => void;
-  /** A connection belongs to one routine, so new ones are drawn only while a routine is in focus. */
   connectsWithinRoutine?: boolean;
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
-  /** Agents the canvas's right-click menu offers to place where the user clicked. */
+  onStopRun?: ((routineNodeId: string, runId: string) => Promise<void>) | undefined;
   addableAgents?: readonly AgentProfile[] | undefined;
   onPlaceAgent?: ((agentId: string, position: DiagramPoint) => void) | undefined;
-  /** Creates an agent from the right-click menu and places it. */
   onCreateAgent?: ((draft: DiagramNewAgentDraft, position: DiagramPoint) => Promise<void>) | undefined;
   newAgentModels?: DiagramModelChoice | undefined;
-  /** Sets the webhook of a routine that a webhook starts, from the panel. */
   webhooks?: DiagramWebhookActions | undefined;
-  /** Saves what an agent does in one routine, from the panel. Without it, tasks are read-only. */
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
-  /** Opens the settings of a new routine, from the canvas before its first routine. */
   onCreateRoutine?: (() => void) | undefined;
 }
 
-/** One choice in the routine selector, with its colour and how its last run went. */
 interface RoutineOption {
   id: string;
   name: string;
@@ -108,7 +85,6 @@ function RoutineOptionLabel(props: { option: RoutineOption }) {
   );
 }
 
-/** The lens value that shows every routine at once. A node id never takes this form. */
 const ALL = "routine-lens:all";
 
 export function DiagramView(props: DiagramViewProps) {
@@ -118,7 +94,6 @@ export function DiagramView(props: DiagramViewProps) {
   const now = () => (props.now ? new Date(props.now) : new Date());
   const routines = () =>
     props.diagram.nodes.filter((node): node is Extract<DiagramNode, { kind: "routine" }> => node.kind === "routine");
-  /** `undefined` follows the newest run; `null` shows every routine at once, with no run. */
   const [picked, setPicked] = createSignal<string | null | undefined>(undefined);
   const focusRoutineId = (): string | null => {
     const choice = picked();
@@ -131,12 +106,20 @@ export function DiagramView(props: DiagramViewProps) {
     props.onRunRoutine?.(routineId);
   };
   const runTarget = () => focusRoutineId() ?? routines()[0]?.id;
-  /**
-   * Before its first routine, while it holds at most the owner's own card, the canvas shows how a
-   * routine works, and nothing in it to inspect. Agents placed before a routine stay on the board.
-   */
+  const [stopping, setStopping] = createSignal<string | null>(null);
+  const runStop = (routineId: string | null | undefined): DiagramRunStop | undefined => {
+    const stop = props.onStopRun;
+    const run = routineId ? diagramRunOf(props.diagram, routineId) : undefined;
+    if (!stop || !routineId || run?.status !== "running") return undefined;
+    return {
+      stopping: stopping() === run.id,
+      onStop: () => {
+        setStopping(run.id);
+        stop(routineId, run.id).catch(() => setStopping((current) => (current === run.id ? null : current)));
+      },
+    };
+  };
   const empty = () => props.diagram.nodes.every((node) => node.kind === "agent" && node.agentId === props.owner?.id);
-  /** The routines to highlight, after the choice to show them all. */
   const routineOptions = (): RoutineOption[] => [
     { id: ALL, name: t("diagram.routine.all"), color: undefined, status: undefined },
     ...routines().map((routine) => ({
@@ -146,7 +129,6 @@ export function DiagramView(props: DiagramViewProps) {
       status: diagramRunOf(props.diagram, routine.id)?.status,
     })),
   ];
-  /** A routine also takes the focus, as picking it in the routine select does. */
   const select = (nodeId: string | null) => {
     setSelectedNodeId(nodeId);
     if (nodeId && routines().some((node) => node.id === nodeId)) setPicked(nodeId);
@@ -170,13 +152,20 @@ export function DiagramView(props: DiagramViewProps) {
         </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
         <span class="diagram-view-actions">
-          <Show when={props.onRunRoutine && runTarget()}>
-            {(routineId) => (
-              <Button type="button" size="xs" onClick={() => runRoutine(routineId())}>
-                <Play aria-hidden="true" />
-                {t("diagram.node.runNow")}
-              </Button>
-            )}
+          <Show
+            when={runStop(runTarget())}
+            fallback={
+              <Show when={props.onRunRoutine && runTarget()}>
+                {(routineId) => (
+                  <Button type="button" size="xs" onClick={() => runRoutine(routineId())}>
+                    <Play aria-hidden="true" />
+                    {t("diagram.node.runNow")}
+                  </Button>
+                )}
+              </Show>
+            }
+          >
+            {(stop) => <DiagramStopButton stop={stop()} />}
           </Show>
           <Show when={!empty()}>
             <Button
@@ -255,7 +244,6 @@ export function DiagramView(props: DiagramViewProps) {
               </Show>
             </DiagramBoard>
           </Show>
-          {/* Outside the switch, so the first routine keeps the draft and the place of the panel. */}
           <Show when={props.assistant}>
             {(assistant) => (
               <div class="diagram-view-chat">
@@ -288,6 +276,7 @@ export function DiagramView(props: DiagramViewProps) {
             onFocusRoutine={setPicked}
             onEditTask={props.onEditTask}
             webhooks={props.webhooks}
+            runStop={runStop(focusRoutineId())}
           />
         </Show>
       </div>

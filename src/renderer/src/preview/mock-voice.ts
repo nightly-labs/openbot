@@ -24,36 +24,26 @@ import {
 import { clone, type Listener, type MockRuntime } from "./mock-support";
 
 export interface MockVoiceOptions {
-  /** The models already downloaded, and each cloud model whose key is saved. Parakeet when not given. */
   voiceModelsReady?: readonly VoiceModelId[];
   voiceSettings?: VoiceSettings;
-  /** True when the speech model is downloaded. */
   speechModelReady?: boolean;
-  /** True when the xAI key for replies is saved. The ElevenLabs key is the dictation key. */
   xaiKeySaved?: boolean;
   speechSettings?: SpeechSettings;
-  /** The user's own voice server. None when not given. */
   voiceServer?: VoiceServerSettings | null;
 }
 
-/** A Speaches server: Whisper for dictation and Kokoro for replies. */
 const MOCK_SERVER_MODELS: VoiceServerModels = {
   transcription: ["Systran/faster-whisper-large-v3", "Systran/faster-distil-whisper-small.en"],
   speech: ["speaches-ai/Kokoro-82M-v1.0-ONNX"],
   voices: ["af_heart", "af_sky", "am_adam", "bm_george"],
 };
 
-/** Kokoro-FastAPI: speech only. */
 const MOCK_SPEECH_ONLY_MODELS: VoiceServerModels = {
   transcription: [],
   speech: ["kokoro"],
   voices: ["af_heart", "af_bella", "am_michael", "bf_emma"],
 };
 
-/**
- * What a test of the preview finds. Port 8880 has speech only, a host with "offline" does not
- * answer, the key "wrong" is refused, and every other address has both routes.
- */
 function probeMockServer(address: string, apiKey: string | null): VoiceServerProbe {
   const url = new URL(address);
   if (url.hostname.includes("offline"))
@@ -62,10 +52,8 @@ function probeMockServer(address: string, apiKey: string | null): VoiceServerPro
   return { ok: true, models: clone(url.port === "8880" ? MOCK_SPEECH_ONLY_MODELS : MOCK_SERVER_MODELS) };
 }
 
-/** The sample rate of Supertonic 3. */
 const MOCK_SPEECH_SAMPLE_RATE = 44_100;
 
-/** The dictation models, with download progress and a streamed transcript the preview makes up. */
 export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: MockRuntime) {
   const ready = new Set(options.voiceModelsReady ?? ["parakeet-tdt-0.6b-v3"]);
   let settings: VoiceSettings = clone(options.voiceSettings ?? DEFAULT_VOICE_SETTINGS);
@@ -81,7 +69,6 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const transcriptListeners = new Set<Listener<VoiceStreamTranscript>>();
   const transfers = new Map<VoiceModelId, { settle: (status: VoiceModelStatus) => void }>();
   let speechSettings: SpeechSettings = clone(options.speechSettings ?? DEFAULT_SPEECH_SETTINGS);
-  // The status of Supertonic. The status of a cloud model follows its provider's key.
   let supertonicStatus: SpeechModelStatus = options.speechModelReady
     ? { modelId: SPEECH_MODEL_ID, phase: "ready", progress: 100, message: null }
     : { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
@@ -138,7 +125,6 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
   const download = (modelId: VoiceModelId) =>
     new Promise<VoiceModelStatus>((resolve) => {
       const current = status(modelId);
-      // A cloud model has nothing to download: its key makes it ready.
       if (current.phase === "ready" || !isLocalVoiceModelId(modelId)) return resolve(current);
       const transfer = { settle: resolve };
       transfers.set(modelId, transfer);
@@ -156,7 +142,6 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       schedule(() => advance(5), 200);
     });
 
-  /** A key makes each model of its provider ready. */
   const setDictationKey = (provider: DictationKeyProvider, key: string | null) => {
     for (const model of VOICE_MODELS) {
       if (model.kind !== "cloud" || model.provider !== provider) continue;
@@ -221,7 +206,6 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     setSpeechSettings: async (next) => {
       const changed = next.modelId !== speechSettings.modelId;
       if (changed && speechTransfer) {
-        // As in main, a Supertonic download stops when the user chooses another model.
         const transfer = speechTransfer;
         speechTransfer = null;
         supertonicStatus = { modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null };
@@ -252,13 +236,11 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       setSpeechStatus({ modelId: SPEECH_MODEL_ID, phase: "missing", progress: null, message: null });
       return speechStatus();
     },
-    // Silence of about the length the text would take to read.
     speak: async ({ text }) => ({
       pcm: new Uint8Array(Math.min(10, Math.max(0.5, text.length / 15)) * MOCK_SPEECH_SAMPLE_RATE * 2),
       sampleRate: MOCK_SPEECH_SAMPLE_RATE,
     }),
     warmSpeech: async () => undefined,
-    // The preview host keeps no files, and its messages carry no recording.
     keepRecording: async ({ audio }) => ({
       id: `mock-voice-recording-${audio.byteLength}`,
       name: "voice.webm",
@@ -288,8 +270,6 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       serverListeners.add(listener);
       return () => serverListeners.delete(listener);
     },
-    // The preview has no Codex App Server: a peer in this page answers the offer, and the transcript
-    // shows what a live session sends. No audio plays.
     startLive: async ({ sdp }) => {
       const answerer = new RTCPeerConnection();
       await answerer.setRemoteDescription({ type: "offer", sdp });

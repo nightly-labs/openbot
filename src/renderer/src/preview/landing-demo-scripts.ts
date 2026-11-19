@@ -10,16 +10,10 @@ import { LANDING_LEAD_AGENT_ID, landingAttachment } from "./landing-fixtures";
 export const LANDING_SCRIPT_MESSAGE_PREFIX = "landing-script:";
 export const LANDING_DIRECT_SCRIPT_MESSAGE_PREFIX = "landing-direct-script:";
 
-/** The answers to a question prompt, by question id. */
 export type LandingPromptAnswers = Record<string, string[]>;
 
 type LandingSubagent = Omit<ConversationSubagent, "startedAt" | "endedAt" | "error">;
 
-/**
- * One step of a scene. `at` is the time in milliseconds from the start of the scene. A `prompt`
- * step and an `answer` step hold the scene until they end: the steps after them keep their spacing
- * from that point on.
- */
 export type LandingSceneStep =
   | { at: number; kind: "user"; text: string }
   | { at: number; kind: "progress"; detail: string }
@@ -27,9 +21,7 @@ export type LandingSceneStep =
   | { at: number; kind: "memory"; text: string }
   | { at: number; kind: "plan"; plan: ConversationPlan }
   | { at: number; kind: "subagents"; subagents: LandingSubagent[] }
-  /** The lead sends one message to its teammates. Each one starts a turn in its own chat. */
   | { at: number; kind: "exchange"; text: string; recipientAgentIds: string[] }
-  /** A teammate ends its turn: a summary comes back to the lead, the full answer stays in its chat. */
   | {
       at: number;
       kind: "teammate-reply";
@@ -38,7 +30,6 @@ export type LandingSceneStep =
       answer: string;
       attachments?: AttachmentSummary[];
     }
-  /** Waits for the visitor, or answers with `autoAnswers` after `autoAnswerAfter` milliseconds. */
   | {
       at: number;
       kind: "prompt";
@@ -46,7 +37,6 @@ export type LandingSceneStep =
       autoAnswers: LandingPromptAnswers;
       autoAnswerAfter: number;
     }
-  /** Streams the final answer and ends the turn. */
   | {
       at: number;
       kind: "answer";
@@ -68,7 +58,6 @@ const LAUNCH_PLAN_STEPS: Omit<ConversationPlanStep, "status">[] = [
   { id: "plan", text: "Send the launch plan", activeText: "Writing the launch plan" },
 ];
 
-/** The launch plan with the first `done` steps completed and the next one in progress. */
 function launchPlan(done: number): ConversationPlan {
   return {
     explanation: "Friday's launch, split across the team.",
@@ -380,7 +369,6 @@ export const LANDING_DEMO_SCENES: Record<string, LandingDemoScene> = {
   [PULSE_SCENE.agentId]: PULSE_SCENE,
 };
 
-/** What each agent answers when the visitor types a message. */
 export const LANDING_TYPED_REPLIES: Record<string, { progress: string; answer: string }> = {
   atlas: {
     progress: "Checking Friday's launch plan",

@@ -1,35 +1,14 @@
-/**
- * The addresses one agent template has: the page a person shares, the link that opens that template in
- * the app, and the browser client's entry for it.
- *
- * ```
- * https://openbot.run/agents/<id>    the link a person shares and the app copies
- * openbot://agents/<id>              the link the page button opens
- * /app?agent=<id>                    the page's link to the browser client, on the same origin
- * ```
- *
- * This follows `plugin-links.ts`: the host gives the kind, one path segment gives the id, and a
- * query is refused, so the shape cannot grow an `?install=1`. A link opens a preview in the app;
- * installing is still a press of Install there.
- */
-
 export const OPENBOT_AGENT_TEMPLATE_ORIGIN = "https://openbot.run";
 export const OPENBOT_AGENT_TEMPLATE_PATH_PREFIX = "/agents/";
 export const OPENBOT_AGENT_TEMPLATE_HOST = "agents";
 export const WEB_APP_AGENT_TEMPLATE_PARAM = "agent";
 
-/** The Worker makes ids from 16 random bytes in base64url, which is 22 characters. */
 const AGENT_TEMPLATE_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/u;
 
 export function isAgentTemplateId(value: string): boolean {
   return AGENT_TEMPLATE_ID_PATTERN.test(value);
 }
 
-/**
- * The site a share link names: `openbot.run`, or a loopback origin while a developer runs the Account
- * Worker on this computer. Nothing else passes, so a configured address cannot turn the copied link
- * into another site.
- */
 export function isAgentTemplateShareOrigin(origin: string): boolean {
   if (origin === OPENBOT_AGENT_TEMPLATE_ORIGIN) return true;
   try {
@@ -44,7 +23,6 @@ export function isAgentTemplateShareOrigin(origin: string): boolean {
   }
 }
 
-/** The share origin for an Account Worker: the local Worker in development, `openbot.run` otherwise. */
 export function agentTemplateShareOrigin(apiOrigin: string): string {
   return apiOrigin !== OPENBOT_AGENT_TEMPLATE_ORIGIN && isAgentTemplateShareOrigin(apiOrigin)
     ? apiOrigin
@@ -57,16 +35,11 @@ export function createAgentTemplateShareUrl(id: string, origin: string = OPENBOT
   return `${origin}${OPENBOT_AGENT_TEMPLATE_PATH_PREFIX}${id}`;
 }
 
-/**
- * The browser client's entry for a template. It opens the same preview as the app; `/app` removes the
- * query after it reads it, so a reload does not open the preview again.
- */
 export function createWebAppAgentTemplatePath(id: string): string {
   assertAgentTemplateId(id);
   return `/app?${WEB_APP_AGENT_TEMPLATE_PARAM}=${id}`;
 }
 
-/** The template id in a `/app` query, or null when the query names none or an invalid one. */
 export function agentTemplateIdFromWebAppSearch(search: string): string | null {
   const id = new URLSearchParams(search).get(WEB_APP_AGENT_TEMPLATE_PARAM);
   return id !== null && isAgentTemplateId(id) ? id : null;
@@ -77,7 +50,6 @@ export function createOpenBotAgentTemplateUrl(id: string): string {
   return `openbot://${OPENBOT_AGENT_TEMPLATE_HOST}/${id}`;
 }
 
-/** The template id a link names, in either form. Throws for anything else. */
 export function parseAgentTemplateUrl(value: string): string {
   let url: URL;
   try {
@@ -86,7 +58,6 @@ export function parseAgentTemplateUrl(value: string): string {
     throw new Error("The OpenBot agent link is invalid.");
   }
 
-  // The origin is compared as one string, so `openbot.run.example.com` does not pass.
   const canonical =
     url.protocol === "https:" &&
     url.origin === OPENBOT_AGENT_TEMPLATE_ORIGIN &&

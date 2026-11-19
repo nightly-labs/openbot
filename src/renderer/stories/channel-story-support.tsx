@@ -1,10 +1,3 @@
-/**
- * The channel chat as the app shows it: the conversation view with a channel source. The source
- * is written out here rather than built from the channels store, which needs the account, server and
- * turns contexts and a channel-aware `window.openbot` behind it. `ChannelConversation.stories.tsx`
- * builds its variants on it, and the diagram workspace story shows it when a channel is open.
- */
-
 import { Button } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
@@ -24,7 +17,6 @@ const members = [CHANNEL_STORY_CHIEF, CHANNEL_STORY_RESEARCH, CHANNEL_STORY_SALE
   agentId: agent.id,
 }));
 
-/** A message time of the story day as the stored timestamp, so that a run of one author groups. */
 function storyCreatedAt(time: string) {
   return `2026-09-01T${time}:00`;
 }
@@ -101,7 +93,6 @@ export interface ChannelStoryProps {
   firstUnreadMessageId?: string | null;
 }
 
-/** The channel chat on a mocked bridge, for a story that shows a channel or composes screens. */
 export function StoryChannelConversation(props: ChannelStoryProps) {
   const name = () => props.name ?? "Project room";
   const agentName = (id: string | null) => STORY_AGENTS.find((agent) => agent.id === id)?.name ?? "Unassigned";

@@ -35,33 +35,20 @@ import {
 
 export interface OnePasswordConnectorPanelProps extends IntegrationPageSlots {
   status: OnePasswordConnectorStatus;
-  /** True while an action runs. Every button waits for it. */
   busy: boolean;
-  /** Starts checking the setup while the page shows, and returns the stop. */
   onWatchSetup: () => () => void;
   onCheckSetup: () => void;
   onInstallCli: () => void;
   onOpenApp: () => void;
-  /** `accountId` is null until the user picks one of several accounts. */
   onConnect: (accountId: string | null) => void;
   onConnectWithToken: (token: string) => void;
   onCancel: () => void;
   onDisconnect: () => void;
-  /**
-   * The joined server whose connection this is, or undefined for this computer's. A server connects
-   * with a service account token only, so the page shows no setup steps.
-   */
   hostName?: string | undefined;
-  /**
-   * Why the last status read failed, when no newer status came. The state is not known: the page
-   * shows the reason and Retry, not the setup steps of a connection that may be there.
-   */
   statusError?: string | null | undefined;
-  /** Reads the status again. */
   onRetry?: (() => void) | undefined;
 }
 
-/** The status of the connection, as its page header and every list of connectors show it. */
 export const ONEPASSWORD_STATUS = {
   disconnected: { status: "idle", label: "marketplace.app.notConnected" },
   connecting: { status: "connecting", label: "connector.onePassword.statusConnecting" },
@@ -69,7 +56,6 @@ export const ONEPASSWORD_STATUS = {
   connected: { status: "connected", label: "connector.onePassword.statusConnected" },
 } as const satisfies Record<OnePasswordConnectorStatus["state"], VaultStatus>;
 
-/** `done` shows a check; `waiting` is a step whose earlier step is not done, so its action is off. */
 type StepState = "done" | "current" | "waiting";
 
 function setupSteps(setup: OnePasswordSetup): { cli: StepState; app: StepState; vault: StepState } {
@@ -82,16 +68,6 @@ function setupSteps(setup: OnePasswordSetup): { cli: StepState; app: StepState; 
   };
 }
 
-/**
- * The 1Password page of one OpenBot computer. The token never reaches this component after the user
- * types it: the status holds the setup, the vault names and the login count only.
- *
- * Before a connection the page is three steps, each with the one button it needs: install the CLI,
- * turn on its integration in the 1Password app, and create the shared vault. Only the current step's
- * button is primary. The page checks the setup while it shows and when the window gets the focus back,
- * so a step done in the 1Password app is ticked without a click. A user without the CLI pastes a
- * service account token instead. A joined server has only the token form.
- */
 export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps) {
   const { t } = useText();
   const [tokenOpen, setTokenOpen] = createSignal(false);
@@ -105,7 +81,6 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
     props.status.loginCount === null
       ? t("connector.onePassword.loginsLoading")
       : t("connector.onePassword.loginCount", { count: props.status.loginCount });
-  /** The login count belongs to the one vault. With more vaults it is a note for all of them. */
   const vaultDescription = () => (props.status.vaultNames.length === 1 ? loginText() : undefined);
 
   return (
@@ -339,7 +314,6 @@ export function OnePasswordConnectorPanel(props: OnePasswordConnectorPanelProps)
   );
 }
 
-/** One setup step: a check when done, its text, and the buttons it needs while it is the current one. */
 function SetupStep(props: { state: StepState; title: string; description: string; children: JSX.Element }) {
   return (
     <Item class="settings-modal-row onepassword-connector-step" data-step={props.state}>

@@ -8,20 +8,12 @@ export interface AppLogoProps {
   variant: AppLogoVariant;
   animation?: AppLogoAnimation;
   interactive?: boolean;
-  /**
-   * An element around an interactive logo, such as a hero panel. The eyes follow the pointer anywhere
-   * on it, and a click on it counts as a click on the logo. The logo stays the one control for the
-   * keyboard and for screen readers.
-   */
   pointerArea?: HTMLElement | undefined;
   class?: string;
 }
 
-/** How far the eyes move, as a share of the logo, when the pointer is at the edge of the area. */
 const EYE_RANGE = { x: 2.4, y: 1.8 };
-/** A larger area gives the eyes more room: the pointer can be far from the logo. */
 const AREA_EYE_RANGE = { x: 9, y: 7 };
-/** The eyes close and open in 192 ms, once every 4.8 s. The first blink comes 44% into the first period. */
 const BLINK_PERIOD = 4_800;
 const BLINK_DURATION = 192;
 const FIRST_BLINK_DELAY = 2_112;
@@ -51,7 +43,6 @@ export function AppLogo(props: AppLogoProps) {
     setEyePosition(0, 0);
   }
 
-  /** The eyes look at the pointer. Its distance is measured against the logo, or against the area. */
   function lookAt(event: PointerEvent, area: Element): void {
     if (!props.interactive || shouldReduceMotion()) return;
     if (event.pointerType && event.pointerType !== "mouse") return;
@@ -60,7 +51,6 @@ export function AppLogo(props: AppLogoProps) {
     const bounds = area.getBoundingClientRect();
     const centerX = logo.left + logo.width / 2;
     const centerY = logo.top + logo.height / 2;
-    // From the centre of the logo to the far edge of the area is the full range.
     const reachX = Math.max(centerX - bounds.left, bounds.right - centerX);
     const reachY = Math.max(centerY - bounds.top, bounds.bottom - centerY);
     const x = Math.max(-1, Math.min(1, (event.clientX - centerX) / reachX));
@@ -115,7 +105,6 @@ export function AppLogo(props: AppLogoProps) {
     (area) => {
       if (!area) return;
       const handleAreaPointerMove = (event: PointerEvent) => lookAt(event, area);
-      // A click on the logo itself already reached `handleClick`.
       const handleAreaClick = (event: MouseEvent) => {
         if (event.target instanceof Node && logoElement?.contains(event.target)) return;
         handleClick();
@@ -131,7 +120,6 @@ export function AppLogo(props: AppLogoProps) {
     },
   );
 
-  // A timer starts each blink, so the page draws frames only while the eyes move.
   createEffect(
     () => animation() === "blink",
     (blinks) => {
@@ -139,7 +127,6 @@ export function AppLogo(props: AppLogoProps) {
       let blinkEndTimer: number | undefined;
       let blinkInterval: number | undefined;
       const blink = () => {
-        // The reduced-motion setting can change while the logo shows.
         if (shouldReduceMotion()) return;
         setBlinking(true);
         blinkEndTimer = window.setTimeout(() => setBlinking(false), BLINK_DURATION);

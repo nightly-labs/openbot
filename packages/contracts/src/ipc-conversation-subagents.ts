@@ -1,21 +1,11 @@
 import { isBoundedString, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/**
- * The subagents that an agent started in one turn: Claude `Task` and `Agent` calls, Codex
- * `spawnAgent` calls, OpenCode child sessions, and the subagent tool calls of Kimi, Cline and Hermes.
- * The backend maps each provider to this one shape. Each update holds the full list, and it is stored
- * on one message of the turn, as the plan is.
- */
 export const CONVERSATION_SUBAGENTS_ITEM_TYPE = "subagents";
 
 export const CONVERSATION_SUBAGENT_STATUSES = ["running", "completed", "failed", "stopped"] as const;
 export type ConversationSubagentStatus = (typeof CONVERSATION_SUBAGENT_STATUSES)[number];
 
-/**
- * What one step of a subagent did. The text is what the provider sent: the thought, the search, the
- * path, the command or the answer. The screen gives each kind its icon and its label.
- */
 export const CONVERSATION_SUBAGENT_STEP_KINDS = [
   "thinking",
   "text",
@@ -29,28 +19,21 @@ export const CONVERSATION_SUBAGENT_STEP_KINDS = [
 export type ConversationSubagentStepKind = (typeof CONVERSATION_SUBAGENT_STEP_KINDS)[number];
 
 export interface ConversationSubagentStep {
-  /** Stays the same when older steps are dropped, so a list keeps its rows. */
   id: string;
   kind: ConversationSubagentStepKind;
   text: string;
 }
 
 export interface ConversationSubagent {
-  /** The provider's id: the Claude tool-use id, or the Codex thread of the subagent. */
   id: string;
-  /** What the agent called the work, such as the Claude `description`. */
   title: string;
-  /** The provider's type of subagent, such as the Claude `subagent_type`. */
   agentType: string | null;
-  /** What the agent asked the subagent to do. */
   prompt: string | null;
   status: ConversationSubagentStatus;
   startedAt: string;
   endedAt: string | null;
-  /** The newest steps, up to `CONVERSATION_SUBAGENT_STEP_LIMIT`. */
   steps: ConversationSubagentStep[];
   error: string | null;
-  /** A subagent that works on after the turn ends, such as a Claude `run_in_background` call. */
   background?: true;
 }
 
@@ -94,10 +77,6 @@ function isConversationSubagentStep(value: unknown): value is ConversationSubage
   );
 }
 
-/**
- * The subagents inside the bounds of `isConversationSubagents`, with blank steps removed. The backend
- * applies it before each write, so a stored list always decodes. Returns null when no subagent is left.
- */
 export function clampConversationSubagents(subagents: readonly ConversationSubagent[]): ConversationSubagent[] | null {
   const result: ConversationSubagent[] = [];
   const ids = new Set<string>();
@@ -125,7 +104,6 @@ export function clampConversationSubagents(subagents: readonly ConversationSubag
   return result.length ? result : null;
 }
 
-/** One line, cut to `limit`. A prompt keeps its line breaks. */
 function clampText(value: string, limit: number, oneLine = true): string {
   return (oneLine ? value.replace(/\s+/gu, " ") : value).trim().slice(0, limit);
 }
@@ -134,10 +112,6 @@ function nullableText(value: string | null, limit: number, oneLine = true): stri
   return value === null ? null : clampText(value, limit, oneLine) || null;
 }
 
-/**
- * The subagents as a markdown list of their titles. It is the message text, so a client that does
- * not know the subagents field (a released Team API peer) still shows what the agent started.
- */
 export function conversationSubagentsText(subagents: readonly ConversationSubagent[]): string {
   return subagents.map((subagent) => `- ${subagent.title || subagent.agentType || subagent.id}`).join("\n");
 }

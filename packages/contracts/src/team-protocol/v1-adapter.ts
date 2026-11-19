@@ -27,7 +27,6 @@ export type TeamProtocolV1CurrentEventDecodeResult =
 
 export function decodeTeamProtocolV1CurrentEvent(value: unknown): TeamProtocolV1CurrentEventDecodeResult {
   if (isDynamicRecord(value) && value.type === "turn-progress") {
-    // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
     const wireValue: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value));
     const current = toCurrentAgentKeys(wireValue);
     return isAgentEvent(current) ? { kind: "known", event: current } : { kind: "invalid", type: value.type };
@@ -44,7 +43,6 @@ export function encodeTeamProtocolV1CurrentEvent(
   event: AgentEvent | TeamRealtimeEvent,
   options: { preserveSemanticTags?: boolean } = {},
 ): string | null {
-  // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
   const currentValue: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(event));
   const wireValue = toWireAgentKeys(currentValue);
@@ -81,7 +79,6 @@ export function encodeTeamProtocolV1CurrentHttpResponse(
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
   const currentValue: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value));
-  // The installed-skills route bypasses the frozen codec, so it needs the vocabulary swap by hand.
   const wireValue = toWireAgentKeysForRequestPath(path, currentValue);
   if (status < 400 && isInstalledSkillsRoute(method, path)) return JSON.stringify(wireValue);
   const downconvertedValue = options.preserveSemanticTags ? wireValue : downconvertCurrentTags(wireValue);
@@ -127,16 +124,10 @@ function toCurrentAgentKeysForResponsePath(path: string, value: TeamProtocolV1Js
   return isDynamicRecord(value) ? toCurrentAgentKeysObjectForPath(path, value) : toCurrentAgentKeys(value);
 }
 
-/**
- * The client control channel is the one frozen payload a caller builds by hand rather than handing to
- * the key walk, so its single agent field is converted field by field. Widening it to the walk would
- * mean asserting the result back into the union; naming the one member keeps `tsc` doing the checking.
- */
 export type TeamProtocolV1CurrentClientEvent =
   | Exclude<TeamProtocolV1ClientEvent, { type: "team-typing" }>
   | { type: "team-typing"; agentId: string | null; typing: boolean };
 
-/** The subset a v2 event-control frame carries: everything except the scope declaration. */
 export type TeamProtocolV1CurrentEventControl = Exclude<
   TeamProtocolV1CurrentClientEvent,
   { type: "agent-event-scope" }

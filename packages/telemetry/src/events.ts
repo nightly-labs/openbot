@@ -86,12 +86,8 @@ export const Report = Schema.Struct({
 export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
-/**
- * The current analytics generation of each surface. Product events and failure reports send the same value.
- * Change a value only together with ANALYTICS.md.
- */
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 18,
+  desktop_host: 19,
   desktop: 13,
   web: 2,
   mobile: 4,
@@ -117,12 +113,10 @@ const FAILURE_CODES = new Set([
   ),
 ]);
 
-/** Drop all free text and unrecognized properties before writing or sending. */
 export function safeProperties(input: unknown): FailureProperties | null {
   const decoded = Schema.decodeUnknownOption(FailureProperties)(input);
   if (Option.isNone(decoded)) return null;
   const value = decoded.value;
-  // Only public model families can cross this boundary. Custom endpoints can put private names in model ids.
   const model =
     value.provider !== "acp" && value.model
       ? /^(?:(?:openai|anthropic|google|opencode|codex|claude)\/)?(?:gpt-\d+(?:\.\d+)*(?:-(?:mini|nano|pro|codex|max|sol|astra|luna|terra|chat|latest|preview))*|o[134](?:-(?:mini|pro|preview))*|claude-(?:opus|sonnet|haiku|fable)(?:-\d+)*(?:\[1m\])?|gemini-\d+(?:\.\d+)*(?:-(?:pro|flash|lite|preview))*|big-pickle|auto)$/u.test(
@@ -163,7 +157,6 @@ export function safeReport(input: unknown): Report | null {
     !Number.isFinite(Date.parse(value.timestamp)) ||
     !/^(?:\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?|web|unknown)$/u.test(value.app_version) ||
     !isReportProfileId(value.profileId) ||
-    // A stored report from an older generation can still be sent: its properties pass the current filter.
     !Number.isInteger(value.event_schema_version) ||
     value.event_schema_version < 1 ||
     value.event_schema_version > ANALYTICS_GENERATIONS[value.surface]
@@ -209,7 +202,6 @@ const STRUCTURED_CAUSES: Readonly<Record<string, CauseCode>> = {
   ABORT_ERR: "cancelled",
 };
 
-/** Inspect locally. The result is always a fixed code, never part of the input. */
 export function classifyFailure(error: unknown): CauseCode {
   const record = isDynamicRecord(error) ? error : undefined;
   for (const key of [record?.codexErrorInfo, record?.code]) {
@@ -227,15 +219,12 @@ export function classifyFailure(error: unknown): CauseCode {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : record?.message;
   if (typeof message !== "string") return "unknown";
   if (/\binvalid upload request\b/iu.test(message)) return "invalid_upload_request";
-  // The limit and outage rules come first, so a text that names a limit and a size, such as "rate
-  // limit: too many tokens per minute", keeps the cause that a backup model can pass.
   if (
     /\b(?:401 unauthorized|invalid[ _]api[ _]key|api key not valid|API_KEY_INVALID|not authenticated|UNAUTHENTICATED|authentication failed|authentication_error|token (?:has )?expired|sign in again|log in again)\b/iu.test(
       message,
     )
   )
     return "authentication";
-  // Google's 429 is RESOURCE_EXHAUSTED.
   if (
     /\b(?:rate[ _-]?limit(?:ed|ing|_error|_exceeded)?|too many requests|RESOURCE_EXHAUSTED|resource has been exhausted)\b/iu.test(
       message,
@@ -243,20 +232,19 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "rate_limit";
   if (
-    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
+    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|payment (?:is )?past due|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
       message,
     )
   )
     return "billing";
   if (
-    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|(?:hit|reached) your (?:weekly|session|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded|credits? balance (?:is )?too low)\b/iu.test(
       message,
     )
   )
     return "usage_limit";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))
     return "timeout";
-  // A tool's MCP server that does not connect is not a provider network failure.
   if (
     /\b(?:fetch failed|failed to fetch|network request failed|connection error|socket hang up|stream disconnected|error sending request|(?:unable to|failed to|could not|cannot) connect(?!\s+to\s+(?:the\s+)?MCP\b)|ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|EAI_AGAIN)\b/iu.test(
       message,
@@ -265,8 +253,6 @@ export function classifyFailure(error: unknown): CauseCode {
     return "network";
   if (/\b(?:ENOSPC|SQLITE_FULL|disk full)\b/iu.test(message)) return "storage";
   if (/\b(?:EACCES|permission denied|403 forbidden)\b/iu.test(message)) return "permission";
-  // An outage: Claude's "API Error: 529 … overloaded_error", OpenAI's "server_error", Google's
-  // UNAVAILABLE status in capitals, or a 5xx status that the text names as a status.
   if (
     /\b(?:service unavailable|bad gateway|internal server error|overloaded(?:_error)?|server_error|api_error|server had an error|high demand|temporarily unavailable|upstream connect error)\b/iu.test(
       message,
@@ -275,15 +261,12 @@ export function classifyFailure(error: unknown): CauseCode {
     /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}5\d\d\b/iu.test(message)
   )
     return "provider_unavailable";
-  // Before the status: a 400 or 413 that names the context is a context that is too long. "Too many
-  // tokens, please wait" is Vertex's rate limit.
   if (
     /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
       message,
     )
   )
     return "context_too_long";
-  // OpenRouter's 403: "<model> requires moderation. Your input was flagged for …".
   if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
     return "content_blocked";
   if (
@@ -294,8 +277,6 @@ export function classifyFailure(error: unknown): CauseCode {
     return "model_not_found";
   if (/\b(?:empty response|no visible content|reasoning_only)\b/iu.test(message)) return "empty_answer";
   if (/\b(?:turn|request|operation) (?:was )?cancell?ed\b/iu.test(message)) return "cancelled";
-  // A status that the text names as a status, such as "(status 402)" or "HTTP 413". Status 0 only
-  // counts in structured data: "exited with status 0" is not a network failure.
   const status = /\b(?:API Error|status(?: code)?|HTTP(?:\/[\d.]+)?)\W{0,4}([1-4]\d\d)\b/iu.exec(message)?.[1];
   const statusCause = status === undefined ? null : httpStatusCause(Number(status));
   if (statusCause) return statusCause;
@@ -303,10 +284,6 @@ export function classifyFailure(error: unknown): CauseCode {
   return "unknown";
 }
 
-/**
- * The cause of an HTTP status that a provider answered with, or `null` for a status that names none.
- * Status 0 is a request that got no answer.
- */
 export function httpStatusCause(status: number): CauseCode | null {
   if (status === 0) return "network";
   if (status === 400 || status === 422) return "invalid_request";
@@ -321,24 +298,13 @@ export function httpStatusCause(status: number): CauseCode | null {
   return status >= 500 && status <= 599 ? "provider_unavailable" : null;
 }
 
-/** Causes that say only that the provider refused a request, not why. */
 const REFUSAL_CAUSES: ReadonlySet<CauseCode> = new Set(["invalid_request", "permission", "not_found"]);
 
-/**
- * The cause that a structured field names, such as an HTTP status or an error name, else the cause
- * of the text. A field that says only that the request was refused yields to a text that says why,
- * such as a 400 for a context that is too long or a 403 for a flagged input.
- */
 export function structuredCause(structured: CauseCode | null, text: CauseCode): CauseCode {
   if (!structured || (text !== "unknown" && REFUSAL_CAUSES.has(structured))) return text;
   return structured;
 }
 
-/**
- * Codex names a failed connection, a broken stream or a spent retry budget as an object, with the last
- * HTTP status when the provider answered. No status means that the provider did not answer. Any other
- * 4xx is a request that each model can refuse, so the message decides.
- */
 function codexFailureCause(info: DynamicRecord): CauseCode | null {
   const failure = [
     "httpConnectionFailed",

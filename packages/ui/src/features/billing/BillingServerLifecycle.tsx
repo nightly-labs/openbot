@@ -26,7 +26,7 @@ export interface BillingServerLifecycleProps {
   price: string;
   running: boolean;
   statusLabel?: string;
-  onChangePlan?: (() => void) | undefined;
+  onAddStorage?: (() => void) | undefined;
   onWake?: (() => void) | undefined;
   cancelAtPeriodEnd: boolean;
   deletionTiming: "period-end" | "now";
@@ -44,7 +44,6 @@ export interface BillingServerLifecycleProps {
   onConfirm: () => void;
 }
 
-/** Shared server plan controls. The caller owns data and mutations. */
 export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
   const { t, format } = useText();
   let panel: HTMLElement | undefined;
@@ -61,7 +60,6 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
     format.date(new Date(props.paidThrough), { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
   const dateLabel = () => t("billing.lifecycle.dateUtc", { date: date() });
   const deletesNow = () => props.action === "delete" && props.deletionTiming === "now";
-  // Both deletion timings take the size of the larger text, so the dialog does not move when the timing changes.
   const timingText = (periodEnd: string, now: string) => (
     <StableLabel labels={[periodEnd, now]} active={deletesNow() ? 1 : 0} />
   );
@@ -127,15 +125,14 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
                     if (!deleteRequested) return;
                     event.preventDefault();
                     deleteRequested = false;
-                    // Let the shared menu restore its trigger before the dialog takes focus.
                     menuCloseFrame = requestAnimationFrame(() => {
                       menuCloseFrame = requestAnimationFrame(() => props.onAction("delete"));
                     });
                   }}
                 >
-                  <Show when={props.onChangePlan}>
-                    <DropdownMenu.Item onSelect={() => props.onChangePlan?.()}>
-                      {t("billing.action.change")}
+                  <Show when={props.onAddStorage}>
+                    <DropdownMenu.Item onSelect={() => props.onAddStorage?.()}>
+                      {t("billing.action.addStorage")}
                     </DropdownMenu.Item>
                   </Show>
                   <Show when={props.onWake}>

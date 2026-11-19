@@ -1,9 +1,3 @@
-// Runs the real `acp` provider driver over three fake agents to check which ACP session requests
-// carry the agent's workspace roots as `additionalDirectories`. Grok 1.0.60 does not advertise the
-// field and refuses it on `session/new`, `session/load` and `session/resume`, so every new Grok
-// session failed. The fake "strict" agents answer as Grok does: one resumes with `session/resume`,
-// one with `session/load`. The "wide" agent advertises the field and must still get the roots.
-// `bun run test:acp-directories`. Writes .openbot-build/acp-additional-directories-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -86,7 +80,6 @@ try {
 
   for (const mode of MODES) {
     const model = `${mode}/default`;
-    // A new session, a turn, then a new process that opens the saved session again.
     let client = open();
     const thread = await startThread(client, { model, cwd: workspace, runtimeWorkspaceRoots: roots });
     const firstReply = await reply(client, thread, model);
@@ -102,7 +95,6 @@ try {
     const resumedReply = await reply(client, thread, model);
     await runCauseEffect(client.stop());
 
-    // The client also opens sessions of its own to list models. They carry no roots.
     const requests = await readJsonl<SessionRequest>(join(root, `${mode}.jsonl`));
     const resumeMethod = mode === "strict-load" ? "session/load" : "session/resume";
     const withRoots = requests.filter((request) => request.additionalDirectories !== null);
@@ -134,7 +126,6 @@ try {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
 
-/** Runs a turn that must succeed and answers its reply. */
 async function reply(client: AgentClient, thread: string, model: string): Promise<string> {
   const turn = await runTurn(client, thread, { model, text: "Reply with OK only." });
   assert.equal(turn.error, null, `The turn on ${model} succeeds.`);

@@ -1,12 +1,3 @@
-// The user's own ACP agents: what is on disk, and every write that changes it.
-//
-// An agent carries environment values, often an API key, so this file is the only place they exist
-// outside the agent process OpenBot starts. The renderer is given `list()`, which has the variable
-// names only; the backend is given `configs()`, which is what a spawn needs. Nothing else reads the
-// file.
-//
-// Electron-free, with the cipher injected, so its tests need neither a keychain nor a display.
-
 import { readFile } from "node:fs/promises";
 import type { CustomAgentEnvInput, CustomAgentSummary, SaveCustomAgentInput } from "@openbot/contracts/ipc";
 import { CUSTOM_AGENT_LIMITS, isCustomAgentUsagePrompt } from "@openbot/contracts/ipc";
@@ -27,25 +18,16 @@ export class CustomAgentFailure extends Schema.TaggedError<CustomAgentFailure>()
 const { io: agentIO, sync: agentSync, rewrap: toCustomAgentFailure } = causeHelpers(CustomAgentFailure);
 export const CUSTOM_AGENTS_FILE = "custom-agents.json";
 
-/**
- * A plaintext envelope around one encrypted field, as for the endpoints: a computer that loses its
- * keychain keeps its agents and their variable names, and only the values are gone.
- */
 const entrySchema = z.object({
   id: z.string(),
   name: z.string(),
   command: z.string(),
   args: z.array(z.string()),
   envNames: z.array(z.string()),
-  /**
-   * Added in version 1 with no bump: a build that does not know it reads the file and drops it. A
-   * value that the save path would refuse reads as none, because the renderer refuses the whole list.
-   */
   usagePrompt: z
     .string()
     .nullish()
     .transform((value) => (value && isCustomAgentUsagePrompt(value.trim()) ? value.trim() : null)),
-  /** One ciphertext for every environment value, or absent for an agent with no variables. */
   secret: z.string().nullish(),
 });
 
@@ -57,7 +39,6 @@ type AgentFile = z.infer<typeof fileSchema>;
 
 interface Entry {
   readonly stored: StoredEntry;
-  /** The decrypted values by name, or null for none and for a ciphertext this computer cannot open. */
   readonly values: Readonly<Record<string, string>> | null;
 }
 
@@ -69,7 +50,6 @@ export class CustomAgentStore {
   readonly #cipher: CustomProviderCipher;
   readonly #resolve: (command: string) => Effect.Effect<string | null, CustomAgentFailure>;
   #entries: Entry[] = [];
-  /** Set when the file exists and this build cannot read it. See `load`. */
   #readOnly = false;
   #writes = Semaphore.makeUnsafe(1);
 
@@ -83,11 +63,6 @@ export class CustomAgentStore {
     this.#resolve = options.resolve ?? ((command) => resolveAgentCommand(command).pipe(toCustomAgentFailure));
   }
 
-  /**
-   * A missing file is a first run. A file this build cannot read is a list that must not be
-   * overwritten, because a newer build's agents would be lost with it: the app starts with no custom
-   * agents, and every write is refused until the file is readable again.
-   */
   load(): Effect.Effect<void, CustomAgentFailure> {
     return Effect.gen({ self: this }, function* () {
       const contents = yield* agentIO(() => readFile(this.#path, "utf8")).pipe(
@@ -111,7 +86,6 @@ export class CustomAgentStore {
     });
   }
 
-  /** What the renderer may know: the variable names, and never a value. */
   list(): Effect.Effect<CustomAgentSummary[]> {
     return Effect.suspend(() =>
       Effect.forEach(
@@ -134,7 +108,6 @@ export class CustomAgentStore {
     );
   }
 
-  /** What an agent spawn needs. Only ever passed to `AgentService`, never to an IPC handler. */
   configs(): readonly CustomAgentConfig[] {
     return this.#entries.map(({ stored, values }) => ({
       id: stored.id,
@@ -142,7 +115,6 @@ export class CustomAgentStore {
       command: stored.command,
       args: stored.args,
       usagePrompt: stored.usagePrompt,
-      // A value this computer cannot open is left out, and the agent starts without it.
       env: stored.envNames.flatMap((name) => {
         const value = values?.[name];
         return value === undefined ? [] : [{ name, value }];
@@ -150,21 +122,11 @@ export class CustomAgentStore {
     }));
   }
 
-  /**
-   * The environment of a check: a `null` value takes the value saved for `savedAgentId`. Throws when
-   * there is no saved value to take.
-   */
   checkEnv(env: readonly CustomAgentEnvInput[], savedAgentId: string | undefined): Record<string, string> {
     const saved = savedAgentId ? this.#entries.find((entry) => entry.stored.id === savedAgentId) : undefined;
     return Object.fromEntries(mergeEnv(env, saved?.values ?? null));
   }
 
-  /**
-   * Adds an agent, or replaces the saved agent with the same id. A `null` value keeps the saved value
-   * of that name. When the names and all values are kept, the ciphertext is kept byte for byte, so
-   * an edit on a computer whose keychain is gone does not lose values that a later keychain could
-   * still open.
-   */
   save(input: SaveCustomAgentInput): Effect.Effect<void, CustomAgentFailure> {
     return this.#mutate(() => {
       const index = this.#entries.findIndex((entry) => entry.stored.id === input.id);
@@ -204,7 +166,6 @@ export class CustomAgentStore {
     });
   }
 
-  /** Removes one agent and its values. An id that is not saved writes nothing. */
   remove(id: string): Effect.Effect<void, CustomAgentFailure> {
     return this.#mutate(() => {
       const remaining = this.#entries.filter((entry) => entry.stored.id !== id);
@@ -212,15 +173,10 @@ export class CustomAgentStore {
     });
   }
 
-  /** Throws when a write would be refused, before a caller moves agents for it. */
   assertWritable(): void {
     if (this.#readOnly) throw new Error(READ_ONLY_MESSAGE);
   }
 
-  /**
-   * One change, start to end, with no other change between its read and its write. The list is
-   * published only after the durable write, so a failed write leaves what the file still holds.
-   */
   #mutate(build: () => Entry[] | null): Effect.Effect<void, CustomAgentFailure> {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -240,10 +196,6 @@ export class CustomAgentStore {
     );
   }
 
-  /**
-   * A ciphertext this computer cannot read leaves the agent in the list with no values, and throws
-   * nothing: the user can still see the agent, and enter the values again.
-   */
   #openSecret = Effect.fn("CustomAgentStore.openSecret")(function* (
     this: CustomAgentStore,
     sealed: string | null | undefined,
@@ -257,7 +209,6 @@ export class CustomAgentStore {
   });
 }
 
-/** Each variable with its value: a new one, or the saved one for `null`. */
 function mergeEnv(
   env: readonly CustomAgentEnvInput[],
   saved: Readonly<Record<string, string>> | null,
@@ -274,7 +225,6 @@ function sameNames(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((name, index) => name === right[index]);
 }
 
-/** The file, or null when this build cannot read it: malformed JSON or an unknown version. */
 function parseAgentFile(contents: string): AgentFile | null {
   try {
     return fileSchema.parse(JSON.parse(contents));

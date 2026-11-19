@@ -19,7 +19,6 @@ const webhookRouteSchema = z.object({
     .max(WEBHOOK_ROUTES_LIMIT),
 });
 
-// Signal asks this while it starts. D1 confirms every route ID and link timestamp in the ticket.
 export const Route = createFileRoute("/v2/remote/webhook-route/validate")({
   server: {
     handlers: {

@@ -1,15 +1,3 @@
-// Frozen optional hermes-import-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a server
-// can read the Hermes Agent folder of the host (`~/.hermes`, or the folder that `HERMES_HOME` sets on
-// the host) and import its profiles as agents of the host, item by item, as the user of the host's
-// computer does in Server settings > Import. The client cannot name a folder: the folder dialog is on
-// the client's computer, and the host does not read the client's files. `read` keeps the profiles under
-// a token and answers what each one holds; a new `read` on the host, by any user, closes the earlier
-// one. The preview shows the host's home folder as `~` and carries no value from `.env` or `auth.json`.
-// `apply` names the token, the profiles, and the items that need approval and that the caller allows.
-// The response names the new and updated agents only; the client reads them with the agent list.
-// Widening any of it needs a second capability string.
 import { INPUT_LIMITS } from "../input-limits";
 import { AGENT_IMPORT_LIMITS } from "../ipc-agent-import";
 import {
@@ -75,8 +63,6 @@ const preview = fields({
 
 const message = string(AGENT_IMPORT_LIMITS.message);
 
-// Hermes makes no channels, so both channel lists are always empty. The shape is the shape of the
-// `agent-import-v1` result, so a client reads both with one decoder.
 const result = fields({
   agents: list(fields({ agentId: identifier, name: agentName }), HERMES_IMPORT_LIMITS.profiles),
   skipped: list(fields({ key: profileKey, name: agentName, reason: message }), HERMES_IMPORT_LIMITS.profiles),
@@ -86,7 +72,6 @@ const result = fields({
 });
 
 export const HERMES_IMPORT_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
-  // Null: the host's Hermes folder has no profiles.
   [HERMES_IMPORT_ROUTES.read, adminRoute(empty, nullable(preview))],
   [
     HERMES_IMPORT_ROUTES.apply,
@@ -104,8 +89,6 @@ export const HERMES_IMPORT_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new
   [HERMES_IMPORT_ROUTES.discard, adminRoute(fields({ token: identifier }), empty)],
 ]);
 
-// The client decoder of the read answer. It is not the preload decoder: the two check different
-// senders. The codec above checks the bounds; the functions below only give the checked value its type.
 const readResponse = nullable(preview);
 
 function invalidPreview(): never {
@@ -158,7 +141,6 @@ function previewProfile(value: unknown): HermesImportProfile {
   };
 }
 
-/** The preview that a host answers, or null when the host's Hermes folder has no profiles. */
 export function decodeHermesImportReadResponse(value: unknown): HermesImportPreview | null {
   const decoded = readResponse(value);
   if (decoded === null) return null;

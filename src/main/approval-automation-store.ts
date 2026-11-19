@@ -13,15 +13,8 @@ import { PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "
 
 const DENY_ALL: ApprovalAutomationPreference = { defaultAutoApprove: false, autoApproveOverrides: {} };
 
-/** Turbo mode gave every agent Full access, so a file that had it on keeps that for each agent. */
 const TURBO_ON: ApprovalAutomationPreference = { defaultAutoApprove: true, autoApproveOverrides: {} };
 
-/**
- * Missing settings use the product default; invalid settings always require approval.
- *
- * Older files stay in place, so a downgraded build still reads its own version. `legacyPaths` lists
- * them newest first: the v2 file, then the v1 file.
- */
 export const readApprovalAutomation = Effect.fn("ApprovalAutomation.read")(function* (
   path: string,
   knownAgentIds: Iterable<string>,
@@ -58,7 +51,6 @@ export const readApprovalAutomation = Effect.fn("ApprovalAutomation.read")(funct
     if (Array.isArray(ids) && ids.length <= INPUT_LIMITS.agents && ids.every(isString)) {
       if (parsed.turbo) return yield* writeApprovalAutomation(path, TURBO_ON);
       const granted = new Set(ids);
-      // Snapshot every existing choice before enabling the default for future agents.
       return yield* writeApprovalAutomation(path, {
         defaultAutoApprove: true,
         autoApproveOverrides: Object.fromEntries([...knownAgentIds].map((id) => [id, granted.has(id)])),
@@ -76,7 +68,6 @@ const writeApprovalAutomation = Effect.fn("ApprovalAutomation.write")(function* 
   return { ...preference, autoApproveOverrides: { ...preference.autoApproveOverrides } };
 });
 
-/** One agent's Full access grant. */
 export interface AgentApprovalGrant {
   agentId: string;
   autoApprove: boolean;
@@ -85,19 +76,9 @@ export interface AgentApprovalGrant {
 export interface ApprovalAutomationOptions {
   path: string;
   initial: ApprovalAutomationPreference;
-  /** Agent ids that still exist. A grant for an agent the user deleted is dropped rather than kept. */
   knownAgentIds: () => Iterable<string>;
 }
 
-/**
- * Owns the preference in memory so the approval path can read it without waiting on a file, and
- * applies one agent's grant at a time.
- *
- * Writes are chained for the reason `update-preference-store.ts` chains its own: each one renames
- * its temporary file into place, so two quick toggles could otherwise land in the wrong order and
- * persist the value the user just turned off. Here the chain also protects the read-modify-write,
- * because a partial update reads the current value before it writes the next one.
- */
 export class ApprovalAutomation {
   readonly #path: string;
   readonly #knownAgentIds: () => Iterable<string>;
@@ -112,7 +93,6 @@ export class ApprovalAutomation {
     this.#preference = options.initial;
   }
 
-  /** The stored value, with grants for agents that no longer exist left out. */
   current(): ApprovalAutomationPreference {
     const known = new Set(this.#knownAgentIds());
     return {
@@ -131,10 +111,6 @@ export class ApprovalAutomation {
     );
   }
 
-  /**
-   * Called after each saved change. A remote admin can change a grant through `agent-admin-v1`, so
-   * the local window cannot rely on its own writes to know the current value.
-   */
   subscribe(listener: (preference: ApprovalAutomationPreference) => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
@@ -151,7 +127,6 @@ export class ApprovalAutomation {
     });
   }
 
-  /** Persist revocation before deleting data, and keep grant writes behind the deletion. */
   deleteAgent<E>(
     agentId: string,
     remove: () => Effect.Effect<void, E>,
@@ -177,7 +152,6 @@ export class ApprovalAutomation {
 
   #apply = Effect.fn("ApprovalAutomation.apply")(function* (this: ApprovalAutomation, input: AgentApprovalGrant) {
     const next = this.#next(input);
-    // Apply the new choice while the file write is pending; restore it when the write fails.
     const previous = this.#preference;
     this.#preference = next;
     const saved = yield* Effect.result(writeApprovalAutomation(this.#path, next));

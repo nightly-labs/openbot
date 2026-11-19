@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenBot pool machine waits for a server
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/openbot-pool/token
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/openbot-pool/openbot-pool-wait
+RuntimeDirectory=openbot-pool
+RuntimeDirectoryMode=0700
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

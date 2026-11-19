@@ -251,6 +251,7 @@ export const messages = {
     "서버가 중지된 후 다시 시작돼요. 약 1분 정도 걸려요. 실행 중인 에이전트 턴이 중지되고, 서버가 돌아올 때까지 멤버의 연결이 끊겨요. 파일과 채팅은 그대로 유지돼요.",
   "mobile.server.settings.restartConfirm": "다시 시작",
   "mobile.server.settings.restarted": "{name}을(를) 다시 시작하는 중이에요",
+  "mobile.server.settings.restartUnsupported": "여기에서 다시 시작하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.leaveTitle": "{name}에서 나갈까요?",
   "mobile.server.settings.leaveBody": "다시 참여하려면 새 초대가 필요해요.",
   "mobile.server.settings.leave": "서버 나가기",
@@ -274,6 +275,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "여기에서 이름과 로고를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.identityOffline": "서버 이름과 로고를 변경하려면 이 서버에 연결하세요.",
+  "mobile.server.settings.appearance": "모양과 색상",
+  "mobile.server.settings.appearanceShape": "모양",
+  "mobile.server.settings.appearanceShapeOption": "모양 {number}",
+  "mobile.server.settings.appearanceColor": "서버 색상",
+  "mobile.server.settings.appearanceAutomatic": "자동",
+  "mobile.server.settings.appearanceReset": "초기화",
+  "mobile.server.settings.appearanceSaveFailed": "서버 모양과 색상을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.route.cropLogo": "로고 자르기",
   "mobile.server.members.remove": "멤버 삭제",
   "mobile.server.members.invitePeople": "사람 초대",
@@ -313,6 +321,8 @@ export const messages = {
   "mobile.server.route.invite": "사람 초대",
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
+  "mobile.server.route.personality": "에이전트 성격",
+  "mobile.server.route.agents": "에이전트",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -363,10 +373,37 @@ export const messages = {
   "mobile.server.library.noMatches": "일치하는 파일이 없어요",
   "mobile.server.library.showInChat": "채팅에서 보기",
   "mobile.server.library.share": "공유",
+  "mobile.server.library.folders.title": "폴더",
+  "mobile.server.library.folders.allFiles": "모든 파일",
+  "mobile.server.library.folders.removedAgents": "삭제된 에이전트",
+  "mobile.server.library.folders.notInFolder": "폴더 없음",
+  "mobile.server.library.folders.path": "폴더: {path}",
+  "mobile.server.library.folders.pathHint": "폴더를 표시합니다",
+  "mobile.server.library.folders.new": "새 폴더",
+  "mobile.server.library.folders.name": "폴더 이름",
+  "mobile.server.library.folders.inFolder": "{name} 안",
+  "mobile.server.library.folders.create": "만들기",
+  "mobile.server.library.folders.rename": "이름 변경",
+  "mobile.server.library.folders.renameTitle": "폴더 이름 변경",
+  "mobile.server.library.folders.save": "저장",
+  "mobile.server.library.folders.delete": "폴더 삭제",
+  "mobile.server.library.folders.deleteTitle": "‘{name}’을(를) 삭제할까요?",
+  "mobile.server.library.folders.deleteBody": "안에 있는 폴더도 삭제됩니다. 파일은 에이전트에 남습니다.",
+  "mobile.server.library.folders.moveTo": "폴더로 이동",
+  "mobile.server.library.folders.actions": "{name} 작업",
+  "mobile.server.library.folders.expand": "{name} 폴더 표시",
+  "mobile.server.library.folders.collapse": "{name} 폴더 숨기기",
+  "mobile.server.library.folders.emptyTitle": "이 폴더에 파일이 없습니다",
+  "mobile.server.library.folders.emptyBody": "{agent}은(는) 폴더 경로 {path}로 여기에 파일을 저장할 수 있습니다.",
+  "mobile.server.library.folders.loadFailed": "폴더를 불러올 수 없습니다",
+  "mobile.server.library.folders.changeFailed": "폴더를 변경할 수 없어요",
+  "mobile.server.library.folders.gone": "이 폴더는 더 이상 서버에 없습니다.",
+  "mobile.server.library.folders.fileGone": "이 파일은 더 이상 서버에 없거나 이동할 수 없습니다.",
+  "mobile.server.library.folders.unsupported":
+    "이 서버의 라이브러리에는 폴더가 없습니다. 사용하려면 서버를 업데이트하세요.",
   "mobile.server.route.providers": "제공자",
   "mobile.server.route.provider": "제공자",
   "mobile.server.route.providerModels": "모델",
-  "mobile.server.route.mcp": "MCP 서버",
   "mobile.server.route.mcpServer": "MCP 서버",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (나)",
@@ -400,7 +437,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "시간대 검색",
   "mobile.server.settings.timezoneNoMatch": "검색과 일치하는 시간대가 없어요.",
   "mobile.server.settings.timezoneMore": "이름을 더 입력하면 다른 시간대를 볼 수 있어요.",
-  "mobile.server.settings.timezoneDescription": "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요.",
+  "mobile.server.settings.timezoneDescription":
+    "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "mobile.server.settings.timezoneLoading": "시간대 불러오는 중…",
   "mobile.server.settings.timezoneLoadFailed": "서버 시간대를 불러오지 못했어요.",
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
@@ -428,6 +466,33 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.memoryReview": "메모리 검토",
+  "mobile.server.settings.memoryReviewDescription":
+    "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",
+  "mobile.server.settings.memoryReviewOff": "끄기",
+  "mobile.server.settings.memoryReviewTurns": { other: "{count}턴마다" },
+  "mobile.server.settings.memoryReviewLoadFailed": "메모리 검토 설정을 불러올 수 없었어요.",
+  "mobile.server.settings.skillLearning": "스킬 학습",
+  "mobile.server.settings.skillLearningDescription": "이 서버의 에이전트가 배운 내용을 스킬로 저장할지 여부입니다.",
+  "mobile.server.settings.skillLearningAutomatic": "자동",
+  "mobile.server.settings.skillLearningAsk": "먼저 묻기",
+  "mobile.server.settings.skillLearningOff": "끄기",
+  "mobile.server.settings.skillLearningLoadFailed": "스킬 학습 설정을 불러오지 못했습니다.",
+  "mobile.server.settings.browsingMemory": "내 브라우징에서 학습",
+  "mobile.server.settings.browsingMemoryDescription":
+    "에이전트의 브라우저를 조작하면 에이전트가 사용한 페이지와 버튼에서 사이트 사용법을 학습합니다. 입력한 텍스트는 저장되지 않습니다.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "브라우징 설정을 불러올 수 없습니다.",
+  "mobile.server.settings.learningSaveFailed": "이 설정을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.learningUnsupported": "여기에서 이 설정을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.responseStyleDescription":
+    "자연형: 에이전트가 작업 중에 짧은 업데이트를 보내고 채팅에 표시돼요. 클래식: 에이전트가 끝나면 한 번만 답해요.",
+  "mobile.server.settings.responseStyleNatural": "자연형",
+  "mobile.server.settings.responseStyleClassic": "클래식",
+  "mobile.server.settings.personalityLoadFailed": "서버 성격을 불러올 수 없었어요.",
+  "mobile.server.settings.personalitySaveFailed": "응답 스타일을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.personalityUnsupported":
+    "여기에서 응답 스타일을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.agentsUnavailable": "에이전트 설정을 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.route.browserProfiles": "브라우저 프로필",
   "mobile.server.browserProfiles.unavailable": "온라인 서버의 소유자나 관리자만 브라우저 프로필을 관리할 수 있습니다.",
   "mobile.server.browserProfiles.unsupported":
@@ -616,6 +681,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass에서 OpenBot과 공유하는 보관함만 읽을 수 있는 액세스 키를 만든 다음 여기에 붙여 넣으세요. 키는 {host}에 보관되고 이 휴대폰에는 저장되지 않아요.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "사용 중인 Proton 플랜에는 Proton Pass 명령줄 도구가 포함되지 않아요. Pass Plus가 포함된 Proton 플랜이 필요해요. Mail Plus 같은 다른 유료 플랜에는 포함되지 않아요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.unavailable": "이 서버에서는 {name}을(를) 사용할 수 없어요.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "이 휴대폰에서 {name}에 로그인하세요. 그러면 {host}이(가) 공유 보관함과 그 보관함의 읽기 전용 액세스 키를 만들고, 그 키만 보관해요. 에이전트는 비밀번호를 볼 수 없어요.",
@@ -644,8 +711,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "읽기 전용",
   "mobile.server.connectors.passwordManager.keyExpires": "읽기 전용. {date}에 만료돼요.",
   "mobile.server.connectors.passwordManager.keyExpired": "{date}에 만료됨",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} 명령줄 도구에는 유료 플랜이 필요해요. 계정의 플랜을 변경한 다음 다시 연결하세요.",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} 키가 만료되었어요",
   "mobile.server.connectors.passwordManager.expiredBody":
     "다시 연결할 때까지 {host}의 에이전트는 공유 로그인 항목으로 로그인할 수 없어요.",
@@ -677,6 +742,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. 워크스페이스 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.slack.helpRelay":
     "{host}의 OpenBot이 Slack 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "이 워크스페이스는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "이 에이전트가 Slack의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 스레드에 답변을 게시해요.",
@@ -719,6 +786,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. Discord 서버 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.discord.helpRelay":
     "{host}의 OpenBot이 Discord 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "이 Discord 서버는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "이 에이전트가 Discord의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 채널에 답장으로 답변해요.",
@@ -751,6 +820,8 @@ export const messages = {
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제하세요.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "이 채팅은 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.telegram.retryAt": "Telegram이 OpenBot에 대기를 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.telegram.linkTitle": "채팅 연결",
   "mobile.server.connectors.telegram.linkAnother": "다른 채팅 연결",
@@ -787,14 +858,19 @@ export const messages = {
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot이 이 번호에 저장된 키를 읽을 수 없어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
   "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 답변만 보내려면 끄세요.",
+  "mobile.server.connectors.whatsapp.statusReactions": "상태 반응",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",
@@ -810,10 +886,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "번호",
   "mobile.server.connectors.whatsapp.kindPersonal": "내 개인 번호",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 전용 번호",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "mobile.server.connectors.whatsapp.phoneLabel": "전화번호",
   "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123처럼 국가 코드를 포함해 주세요.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "국가 코드를 포함한 전화번호를 입력하세요.",
@@ -861,7 +937,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "선택 사항이에요. 비워 두면 목록에 전화번호가 표시돼요.",
   "mobile.server.connectors.whatsapp.add": "추가",
   "mobile.server.connectors.whatsapp.groupTitle": "그룹 추가",
-  "mobile.server.connectors.whatsapp.groupDescription": "이 그룹의 사람들은 내 에이전트에게 작업을 맡길 수 있어요.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "이 그룹의 사람들은 이 번호를 멘션하거나 이 번호의 메시지에 답장하면 내 에이전트에게 작업을 맡길 수 있어요.",
   "mobile.server.connectors.whatsapp.groupSearch": "그룹 검색",
   "mobile.server.connectors.whatsapp.groupsLoading": "그룹을 읽는 중이에요…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot이 그룹을 읽지 못했어요",
@@ -970,6 +1047,15 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.addAccountWithCode": "코드로 계정 추가",
+  "mobile.server.providers.accountSignInWithCode": "코드로 로그인",
+  "mobile.server.providers.accountsKeyHint":
+    "에이전트마다 계정 하나를 사용해요. 에이전트 설정에서 선택하세요. 새 계정에는 해당 계정의 API 키가 필요해요.",
+  "mobile.server.providers.accountChangeKey": "키 변경",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} 계정의 API 키를 붙여넣으세요. 키는 서버로 전송돼요. 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.providers.accountKeyChecking": "키 확인 중…",
+  "mobile.server.providers.accountKeyAddFailed": "계정을 추가하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.providers.pool": "계정 풀 사용",
   "mobile.server.providers.poolHint":
     "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
@@ -1011,6 +1097,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code 기본값",
   "mobile.server.providers.compactWindowTokens": "토큰 {size}",
   "mobile.server.providers.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
+  "mobile.server.environment.row": "변수",
+  "mobile.server.environment.title": "환경",
+  "mobile.server.environment.hint":
+    "{name}의 각 프로세스가 받는 API 키, 기본 URL 등 설정이에요. 변경은 진행 중인 턴이 끝나면 적용돼요.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL과 키인 OPENAI_API_KEY로 ChatGPT의 모델 요청을 그 주소로 보내요.",
+  "mobile.server.environment.shellNote": "에이전트가 실행하는 명령은 이 값들을 읽을 수 있어요.",
+  "mobile.server.environment.add": "변수 추가",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "값",
+  "mobile.server.environment.saved": "저장됨",
+  "mobile.server.environment.sensitive": "민감",
+  "mobile.server.environment.remove": "제거",
+  "mobile.server.environment.save": "저장",
+  "mobile.server.environment.loadFailed": "{name}의 변수를 불러올 수 없었어요.",
+  "mobile.server.environment.invalid": "먼저 이름을 고치세요.",
   "mobile.server.providers.disconnect": "연결 해제",
   "mobile.server.providers.disconnectTitle": "{name} 연결을 해제할까요?",
   "mobile.server.providers.disconnectBody":
@@ -1049,21 +1151,10 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "새 에이전트 기본값",
   "mobile.server.providers.startsWith": "새 에이전트는 {name}(으)로 시작해요.",
   "mobile.server.providers.connectFirst": "먼저 {name}을(를) 연결하세요.",
-  "mobile.server.settings.mcp": "MCP 서버",
-  "mobile.server.settings.mcpCount": { other: "서버 {count}개" },
   "mobile.server.mcp.unsupported": "여기에서 MCP 서버를 관리하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.unavailable": "MCP 서버를 관리하려면 소유자나 관리자로 이 서버에 연결하세요.",
-  "mobile.server.mcp.description":
-    "MCP 서버는 이 서버의 에이전트에게 더 많은 도구를 제공해요. Claude와 Codex 에이전트는 이 목록에 있는 서버만 사용해요.",
+  "mobile.server.mcp.accessUnsupported": "MCP 서버를 받을 대상을 선택하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.mcp.loading": "MCP 서버 불러오는 중…",
-  "mobile.server.mcp.loadFailed": "MCP 서버를 불러오지 못했어요.",
-  "mobile.server.mcp.empty": "아직 MCP 서버가 없어요.",
-  "mobile.server.mcp.retry": "다시 시도",
-  "mobile.server.mcp.add": "MCP 서버 추가",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "켜짐",
-  "mobile.server.mcp.disabled": "꺼짐",
-  "mobile.server.mcp.signedIn": "로그인됨",
   "mobile.server.mcp.gone": "이 MCP 서버는 더 이상 이 서버에 없어요.",
   "mobile.server.mcp.addTitle": "MCP 서버 추가",
   "mobile.server.mcp.addConfirm": "추가",
@@ -1123,6 +1214,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "이 서버의 에이전트가 더 이상 이 서버의 도구를 사용할 수 없어요. 설정은 저장되지 않아요.",
   "mobile.server.mcp.remove": "MCP 서버 삭제",
+  "mobile.server.mcp.access.title": "액세스",
+  "mobile.server.mcp.access.agents": "에이전트",
+  "mobile.server.mcp.access.agentsOf": "{name}을(를) 사용할 수 있는 에이전트",
+  "mobile.server.mcp.access.allAgents": "모든 에이전트",
+  "mobile.server.mcp.access.allAgentsHint": "모든 에이전트에는 나중에 추가되는 에이전트도 포함됩니다.",
+  "mobile.server.mcp.access.noAgents": "에이전트 없음",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "사용 가능",
+  "mobile.server.mcp.access.fromEveryone": "모든 사람과 같음",
+  "mobile.server.mcp.access.level": "{name}에 대한 {role}의 액세스",
+  "mobile.server.mcp.access.hint":
+    "멤버는 모든 사람과 자신의 역할 중 가장 높은 수준을 받습니다. 소유자, 관리자, 서버를 추가한 사람은 항상 관리할 수 있습니다.",
+  "mobile.server.mcp.access.loadFailed": "이 MCP 서버의 액세스를 불러오지 못했습니다.",
+  "mobile.server.mcp.access.unavailable":
+    "온라인 서버의 소유자나 관리자만 이 MCP 서버를 받을 대상을 선택할 수 있습니다.",
   "mobile.server.usage.agents": "에이전트",
   "mobile.server.usage.agentLine": "토큰 {tokens}개 · {cost} · {percent}",
   "mobile.server.usage.noAgents": "이 기간에 기록된 에이전트 사용량이 없어요.",
@@ -1278,6 +1384,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { other: "에이전트 {count}개" },
   "mobile.server.roles.memberCount": { other: "멤버 {count}명" },
   "mobile.server.roles.agentLevel": "{agent}에 대한 {role}의 접근 권한",
+  "mobile.server.roles.changeInEveryone": "모든 사람에서 변경",
+  "mobile.server.roles.setAll": "모두 설정",
+  "mobile.server.roles.setAllLabel": "모두 설정: 모든 에이전트에 대한 {role}의 액세스",
+  "mobile.server.roles.mixed": "혼합",
   "mobile.server.roles.delete": "역할 삭제",
   "mobile.server.roles.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.roles.deleteBody": "이 역할을 가진 멤버는 이 역할로 사용하던 에이전트에 접근할 수 없게 돼요.",
@@ -1318,7 +1428,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} 님을 {role}에 추가했어요",
   "mobile.server.audit.roleMemberRemoved": "{member} 님을 {role}에서 제거했어요",
   "mobile.server.audit.agentLevel": "{role}의 {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "에이전트 가져오기",
   "mobile.server.route.import": "에이전트 가져오기",
   "mobile.server.import.unsupported": "여기서 에이전트를 가져오려면 이 서버의 OpenBot을 업데이트하세요.",
@@ -1390,11 +1499,11 @@ export const messages = {
   "mobile.server.import.channel": "채널",
   "mobile.server.import.notImportedTitle": "가져오지 못함",
   "mobile.server.import.resultWarnings": "일부 항목은 옮겨지지 않았어요",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "이전",
   "mobile.server.route.transfer": "이전",
   "mobile.server.route.transferExport": "내보내기",
   "mobile.server.route.transferImport": "가져오기",
+  "mobile.server.route.transferCopy": "다른 서버로 복사",
   "mobile.server.transfer.unsupported": "여기서 이전하려면 이 서버의 OpenBot을 업데이트하세요.",
   "mobile.server.transfer.unavailable": "이전하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.transfer.title": "이 서버를 다른 컴퓨터로 옮기기",
@@ -1456,4 +1565,21 @@ export const messages = {
     "이 제공자들은 다른 서버에서 로그인되어 있었지만 여기서는 로그인되어 있지 않아요. 서버 설정 › 제공자에서 로그인하세요.",
   "mobile.server.transfer.notImported": "가져오지 않음",
   "mobile.server.transfer.warnings": "확인 필요",
+  "mobile.server.transfer.copy": "다른 서버로 복사",
+  "mobile.server.transfer.copyNote": "에이전트를 내 다른 서버로 보내요.",
+  "mobile.server.transfer.copyTo": "받을 곳",
+  "mobile.server.transfer.copyNoAgents": "이 서버에는 에이전트가 없어요.",
+  "mobile.server.transfer.copyNotMoved":
+    "에이전트의 채널, 루틴 흐름, 워크플로, 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+  "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
+  "mobile.server.transfer.copyDuplicatesTitle": "중복된 에이전트를 복사할까요?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server}에 이미 같은 이름의 에이전트가 있어요: {names}. 복사하면 각각 에이전트가 하나 더 추가돼요. 사본은 채팅, 파일, 메모리가 따로 있는 별개의 에이전트예요.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "중복 복사",
+  "mobile.server.transfer.copying": "복사하는 중…",
+  "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",
+  "mobile.server.transfer.copied": { other: "에이전트 {count}개를 {server}에 복사했어요." },
+  "mobile.server.transfer.copyAgents": "복사할 에이전트",
+  "mobile.server.transfer.copyNext": "복사한 에이전트는 {server}의 승인 규칙을 사용해요.",
+  "mobile.server.transfer.copyNoServer": "에이전트를 복사하려면 소유자나 관리자로 다른 서버에 연결하세요.",
 } as const satisfies PartialTranslation<typeof source>;

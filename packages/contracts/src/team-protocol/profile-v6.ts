@@ -1,5 +1,3 @@
-// The agent-profile-generation payloads on protocol 6. Drafts and requests keep their v4 shape; only a
-// saved agent is read with the v6 schema, which knows Cursor and Cline.
 import { isDynamicRecord } from "../runtime-values";
 import { decodeProfileV4Draft } from "./profile-v4";
 import { decodeTeamProtocolV6BaseHttpResponse, type TeamProtocolV6BaseJsonObject } from "./v6-base";

@@ -1,14 +1,3 @@
-// Frozen optional custom-provider-harness-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list, add and remove the host's custom endpoints, as `providers-v1` does, and each
-// endpoint in a response also names the harness that runs it on the host: `opencode` or `pi`. A save
-// names no harness: the host runs a new endpoint on OpenCode and keeps the harness of an endpoint it
-// has. A member cannot use any route; `requireAdmin` on the host is the only gate.
-//
-// Secrets are write-only, as in `providers-v1`: an endpoint key and a header value travel only in a
-// request body, towards the host, and a response says only whether an endpoint has a key. Widening
-// any of it needs a second capability string.
 import {
   adminRoute,
   boolean,

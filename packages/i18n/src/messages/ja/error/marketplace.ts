@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/marketplace";
 
 export const messages = {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "ローカルのタイムゾーンが無効です。",
   "error.marketplace.installedAgentMissing": "インストール済みのエージェントはもう存在しません。",
   "error.marketplace.differentListing":

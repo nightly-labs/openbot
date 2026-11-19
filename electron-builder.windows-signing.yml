@@ -1,16 +1,7 @@
-# Release-only overlay for `bun run dist:win --config electron-builder.windows-signing.yml`. Only the
-# tag build of `.github/workflows/release.yml` uses it, after it logs in to Azure through the
-# `release` environment. Local and dry-run Windows builds have no Azure access and stay unsigned.
 extends: ./electron-builder.yml
-# A failed signature stops the build instead of publishing an unsigned installer.
 forceCodeSigning: true
 win:
-  # electron-builder signs OpenBot.exe, every .exe it copies from extraResources (the remote desktop
-  # runtime, the Computer Use driver), the NSIS installer and its uninstaller. With no `signExts`,
-  # it does not sign the .node and .dll files of the voice runtime.
   azureSignOptions:
-    # electron-builder writes this name to app-update.yml. An installed signed build accepts only
-    # an update whose certificate has this CN, so a change here stops its auto-updates.
     publisherName: SYNTHETIFY LABS SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ
     endpoint: https://eus.codesigning.azure.net/
     codeSigningAccountName: synthetifyartifactsign

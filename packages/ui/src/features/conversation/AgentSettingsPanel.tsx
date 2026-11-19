@@ -1,9 +1,12 @@
 import type { ExpressionId } from "@norbert_bodziony/bloub";
-import { agentProviderDescriptor, agentProviderName, foreignProvider } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderDescriptor,
+  agentProviderName,
+  agentSteersTurns,
+  foreignProvider,
+} from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
-  AGENT_TASK_LIMIT_DEFAULT,
-  AGENT_TASK_LIMIT_MAX,
   type AgentBackupModels,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -37,6 +40,7 @@ import {
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
   widensAgentPermission,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -118,6 +122,14 @@ import { AgentChatColorRow } from "../settings/ChatColorSetting";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
+import {
+  AGENT_SETTING_LINK_ROWS,
+  AGENT_SETTINGS_PAGE_TITLE,
+  type AgentSettingReveal,
+  type AgentSettingsPage,
+  revealSettingRow,
+  waitForSettingRow,
+} from "./agent-setting-links";
 import { BackupModelsPage } from "./BackupModels";
 
 export interface AgentRuntimeSettings {
@@ -126,7 +138,6 @@ export interface AgentRuntimeSettings {
   reasoningEffort: AgentReasoningEffort;
 }
 
-/** A model choice can also move the agent to another account of its provider. */
 export type AgentRuntimeSettingsPatch =
   | (AgentRuntimeSettings & Pick<UpdateAgentInput, "providerAccountId">)
   | Pick<AgentRuntimeSettings, "reasoningEffort">;
@@ -137,63 +148,40 @@ export interface AgentSettingsPanelProps {
   agentStatus: AgentStatus;
   modelOptions: ClientAgentModelOption[];
   working: boolean;
-  /** Unknown while a remote host has not sent it; the level then shows as if it were on. */
   autoApprove?: boolean | undefined;
-  /** Writes the Permissions level. Without it, the level is read-only. */
   onUpdatePermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
-  /** Computer Use is local-only too, and no remote host administers it yet. */
   computerUseEditable?: boolean;
-  /** Local scripts can be changed locally or through the host's administrator route. */
   automationEditable?: boolean;
-  /** Whether the agent can start a new chat. Local-only: the Team API does not carry it. */
   newChatEditable?: boolean;
-  /** Whether the agent shows its plan before a long task. Local-only: the Team API does not carry it. */
   quickAcknowledgementEditable?: boolean;
-  /** Fast mode, as the model picker of the chat header shows it. */
   fastMode?: boolean | undefined;
-  /** With `fastMode`, the Ultrafast tier in place of Fast. */
   ultrafast?: boolean | undefined;
-  /** Without it, the model picker shows no Speed control. The picker shows it only for a model with a fast tier. */
   onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
-  /** The browser profile of the agent's tabs. Left out when the host cannot change it. */
   browserProfiles?: AgentBrowserProfileOptions | undefined;
-  /** The user's own notification level for the agent. Left out when the server cannot keep it. */
   notificationLevel?: AgentNotificationLevelOptions | undefined;
-  /** The busy-message setting can be changed locally or through the host's administrator route. */
   busyMessageModeEditable?: boolean;
-  /** Whether the busy-message default belongs to a joined server's host, not to this app. */
   busyMessageDefaultIsHost?: boolean;
-  /** Tasks run only on this computer: the Team API has no task route. */
-  taskLimitEditable?: boolean;
-  /** Backup models are local-only too: the Team API does not carry them. */
   backupModelsEditable?: boolean;
-  /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
   folders?: AgentFolderCalls | undefined;
-  /** Whether a usage limit holds this model and account now, for the backup models page. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
-  /** Whether a provider error holds this model and account now, for the backup models page. */
   providerFailed?: ((choice: AgentModelChoice) => boolean) | undefined;
-  /** The app or host default an agent without its own busy-message setting follows. */
   defaultBusyMessageMode?: BusyMessageMode | undefined;
-  /** The account defaults an agent without its own value follows. Absent for a remote agent. */
   agentDefaults?: AgentDefaults | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
-  /** The caller supplies providers available on the selected host. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
-  /** Opens the provider settings from the model picker. */
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
   maxWidth: () => number;
   onClose: () => void;
   width: number;
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
-  /** Application-owned navigation and detail surfaces, in the existing panel layout. */
+  preferredWidth?: (() => number) | undefined;
+  reveal?: AgentSettingReveal | null | undefined;
   links?: JSX.Element;
   detailOpen?: boolean;
   children?: JSX.Element;
@@ -204,45 +192,22 @@ export interface AgentSettingsPanelProps {
     updates: AgentRuntimeSettingsPatch,
   ) => Promise<boolean>;
   onSetAgentAvatar: (agentId: string, image: AvatarImageInput | null) => Promise<void>;
-  /**
-   * Shows a failed save that the panel cannot show, because it closed or shows a different agent
-   * before the save ended. Without it, that failure shows nowhere.
-   */
   onUnshownSaveError?: ((message: string) => void) | undefined;
-  /**
-   * Starts a new chat with the agent after the user confirms. The agent forgets the messages before
-   * it and keeps its setup. Left out when the host cannot do it.
-   */
   onStartNewChat?: (() => Promise<void>) | undefined;
-  /**
-   * Deletes the messages of the agent's own chat after the user confirms, and the agent forgets them.
-   * Left out when the host cannot do it.
-   */
   onDeleteHistory?: (() => Promise<void>) | undefined;
 }
 
 export interface AgentBrowserProfileOptions {
-  /** The named profiles of the computer that runs the agent. Undefined while they load. */
   profiles: readonly BrowserProfileSelectProfile[] | undefined;
-  /**
-   * The agent's choice, as its host gives it. The summary of an agent on a joined server does not
-   * carry it; absent, the panel reads it from the agent.
-   */
   current?: AgentBrowserProfile | undefined;
-  /** Saves the choice. The host closes the agent's open tabs. */
   onChange: (agentId: string, profile: AgentBrowserProfile) => Promise<void>;
-  /** Makes a named profile and returns its id. */
   onCreate: (name: string) => Promise<string>;
-  /** Opens the profiles in the settings of the computer that runs the agent. */
   onManage: (trigger: HTMLElement) => void;
 }
 
 export interface AgentNotificationLevelOptions {
-  /** The level that the user chose for the agent. Null follows the server level. */
   current: ServerNotificationLevel | null;
-  /** The level of the server. It applies while `current` is null. */
   serverLevel: ServerNotificationLevel;
-  /** Opens the notification settings, the one place where the user changes the level. */
   onOpen: (trigger: HTMLElement) => void;
 }
 
@@ -256,20 +221,6 @@ function choiceBrowserProfile(choice: BrowserProfileChoice): AgentBrowserProfile
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
 
-/**
- * The pages behind the root list. The root edits the agent's face, name, title and instructions
- * in place, as the mobile app does, and shows one row for each page.
- */
-type AgentSettingsPage = "permissions" | "folders" | "backup-models" | "advanced";
-
-const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
-  permissions: "agentSettings.permissions.title",
-  folders: "agentSettings.folders.title",
-  "backup-models": "agentSettings.backupModels.title",
-  advanced: "agentSettings.advanced.title",
-};
-
-/** The three free-text fields of the panel, each with a flag for edits made since the last save. */
 interface AgentTextFields {
   description: string;
   name: string;
@@ -284,11 +235,6 @@ interface AvatarEditor {
   uploadBusy: boolean;
 }
 
-/**
- * Everything the panel is editing for the agent it currently shows. `fields` and `dirty` stay
- * parallel records so the props sync can write every field the user has not touched; `runtime` is
- * one record because the three settings are sent, and rolled back, together.
- */
 interface AgentSettingsDraft {
   avatar: AvatarEditor;
   dirty: Record<keyof AgentTextFields, boolean>;
@@ -299,17 +245,11 @@ interface AgentSettingsDraft {
   allowNewChat: boolean;
   quickAcknowledgement: boolean;
   browserProfile: BrowserProfileChoice;
-  /** `default` follows the app setting. */
   busyMessage: BusyMessageChoice;
-  /** `default` is `AGENT_TASK_LIMIT_DEFAULT`. */
-  taskLimit: TaskLimitChoice;
-  /** Null asks first, with no saved order. */
   backupModels: AgentBackupModels | null;
-  /** A level that gives the agent more freedom waits here for the confirmation. */
   confirmingPermission: AgentPermissionLevel | null;
   runtime: AgentRuntimeSettings;
   saveError: string | null;
-  /** The code of the failure behind `saveError`. */
   saveErrorReference: string | null;
 }
 
@@ -321,7 +261,7 @@ interface TextSaveRequest {
 }
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
-  const { t, errorMessage, format } = useText();
+  const { t, errorMessage } = useText();
   const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
   const [deleteHistoryOpen, setDeleteHistoryOpen] = createSignal(false);
@@ -342,7 +282,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     quickAcknowledgement: false,
     browserProfile: "shared",
     busyMessage: "default",
-    taskLimit: "default",
     backupModels: null,
     confirmingPermission: null,
     runtime: untrack(() => ({ ...props.runtimeSettings })),
@@ -351,7 +290,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   });
   const avatarUrl = () => props.agent.avatarUrl ?? null;
   const [page, setPage] = createSignal<AgentSettingsPage | null>(null);
-  // The root row that opened the closed page takes the focus back when the root shows again.
   let returnFocusPage: AgentSettingsPage | null = null;
 
   function pageRowRef(target: AgentSettingsPage) {
@@ -364,10 +302,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
 
   let pageRoot: HTMLDivElement | undefined;
 
-  /**
-   * The row that opened the page is gone, so the focus moves to the first control of the page.
-   * A page with no control, such as read-only permissions, gives the focus to the back button.
-   */
   function openPage(target: AgentSettingsPage): void {
     setPage(target);
     queueMicrotask(() =>
@@ -379,6 +313,26 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     );
   }
 
+  createEffect(
+    () => props.reveal,
+    (reveal) => {
+      if (!reveal) return;
+      const row = AGENT_SETTING_LINK_ROWS[reveal.settingId];
+      const pageShown = untrack(page) === row.page;
+      setPage(row.page);
+      if (untrack(() => props.detailOpen)) return;
+      const root = pageRoot;
+      if (!root) return;
+      if (!row.match) {
+        if (row.page) openPage(row.page);
+        return;
+      }
+      const label = t(row.match);
+      if (pageShown && revealSettingRow(root, label)) return;
+      return waitForSettingRow(root, () => untrack(page) !== row.page || revealSettingRow(root, label));
+    },
+  );
+
   function closePage(): void {
     returnFocusPage = page();
     setPage(null);
@@ -389,9 +343,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return calls ? { agentId: props.agent.id, agentName: props.agent.name, calls } : undefined;
   }
   const agentFolders = createAgentFolders(folderSource);
-  // Each activity of the agent gives a new agent object, so the list loads again only when the
-  // agent, its saved or excluded folders or the page change. The page opening reads which folders
-  // are gone.
   const folderLoadKey = createMemo(() =>
     props.folders
       ? [
@@ -411,10 +362,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     (source) => agentFolders.load(source),
   );
 
-  /**
-   * The access label when the agent can change all files: the folders then do not apply. They still
-   * apply to a provider whose own file tools reach only its folders.
-   */
   function wideAccess(): string | null {
     const provider = knownProvider();
     if (provider !== undefined && agentProviderDescriptor(provider).foldersInFullAccess) return null;
@@ -439,7 +386,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     });
   }
 
-  /** Leaving the workspace warns about reach; reaching Full access warns that the agent stops asking. */
   function widenDescription(): string {
     const reach = draft.permission === "workspace" ? `${t("agentSettings.fullAccess.description")} ` : "";
     return draft.confirmingPermission === "ask"
@@ -447,7 +393,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       : `${reach}${t("agentSettings.fullAccess.noApproval")}`;
   }
 
-  /** The message under the form: every save path clears it first and reports its failure through it. */
   function setSaveError(message: string | null, cause?: unknown): void {
     setDraft((state) => {
       state.saveError = message;
@@ -455,13 +400,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     });
   }
 
-  /** The agent's provider when this build does not know it: its runtime rows cannot change. */
   const agentForeignProvider = () => foreignProvider(props.agent.provider);
-  /** The provider whose capabilities apply. A foreign agent leaves `draft.runtime.provider` stale. */
   const knownProvider = () => (agentForeignProvider() === undefined ? draft.runtime.provider : undefined);
-  /** The shape, eyes and automatic colour that the saved seed draws. */
   const avatarFace = createMemo(() => bloubAvatarProfile(draft.avatar.seed, null));
-  /** Plush or flat. The saved seed says which, so every app that knows styles draws the same one. */
   const avatarStyle = createMemo(() => avatarStyleForSeed(draft.avatar.seed));
   const avatarResetSeed = createMemo(() => avatarDefaultSeed(props.agent.id, avatarStyle()));
   const avatarColorSelected = (choice: AvatarColorChoice) =>
@@ -471,8 +412,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   let avatarFileInput: HTMLInputElement | undefined;
   let lastSignature: string | undefined;
   let lastAgentId: string | undefined;
-  // Instructions save while the field remains focused. One queue also keeps blur, panel-close and
-  // agent-change saves ordered, so an older completion cannot declare a newer draft clean.
   let instructionsSaveTimer: ReturnType<typeof setTimeout> | undefined;
   let activeTextSave: TextSaveRequest | null = null;
   let disposed = false;
@@ -499,7 +438,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agentQuickAcknowledgementEnabled(agent, agentDefaults())),
           browserProfile,
           agent.busyMessageMode ?? "default",
-          String(agent.taskLimit ?? "default"),
           JSON.stringify(agent.backupModels ?? null),
           runtimeSettings.provider,
           runtimeSettings.model,
@@ -515,8 +453,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         if (signature === lastSignature) return;
         const agentChanged = agent.id !== lastAgentId;
         if (agentChanged && lastAgentId) flushDirtyTextFields(lastAgentId);
-        // A field the user has edited keeps its draft, unless this is a different agent, whose values
-        // replace the panel wholesale. Read before the write, so a fresh agent clears the flags here.
         const keep = {
           description: !agentChanged && draft.dirty.description,
           name: !agentChanged && draft.dirty.name,
@@ -544,7 +480,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
           state.browserProfile = browserProfile;
           state.busyMessage = agent.busyMessageMode ?? "default";
-          state.taskLimit = taskLimitChoice(agent.taskLimit);
           state.backupModels = agent.backupModels ?? null;
           if (agentChanged) state.confirmingPermission = null;
           state.runtime.provider = runtimeSettings.provider;
@@ -571,8 +506,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   });
 
   onCleanup(() => {
-    // First, so the saves below do not read `props.agent`: the parent's <Show> that holds it is
-    // already closed and throws on the read, which lost an edit closed with Escape (#6205).
     disposed = true;
     if (lastAgentId) flushDirtyTextFields(lastAgentId);
   });
@@ -591,7 +524,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  /** Shows a failed save under the form, or outside the panel when the form shows something else now. */
   function reportSaveError(agentId: string, error: unknown, fallback = t("agentSettings.saveFailed")): void {
     const message = errorMessage(error, fallback);
     if (!disposed && props.agent.id === agentId) setSaveError(message, error);
@@ -632,7 +564,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   function queueTextSave(request: TextSaveRequest): void {
-    // Instructions over the limit stay in the field, unsaved, until the user shortens them.
     if (request.field === "description" && instructionsTooLong(request.storedValue)) return;
     if (
       activeTextSave?.agentId === request.agentId &&
@@ -705,7 +636,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  // The blur that a closing panel causes comes after its cleanup, which saved the field already.
   function saveName(): void {
     if (disposed) return;
     const value = draft.fields.name.trim() || t("agent.setup.nameFallback");
@@ -770,11 +700,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  /**
-   * Saves a generated face. The automatic colour comes from the seed, so a face on the automatic colour
-   * that the new seed would colour differently keeps `color` as a chosen one. Back on the agent's own
-   * seed, a hue that only kept the colour of that seed is automatic again.
-   */
   async function selectGeneratedAvatar(seed: string, color: string): Promise<void> {
     const seedColor = bloubAvatarProfile(seed, null).color;
     let hue: AvatarHue | null | undefined;
@@ -794,7 +719,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     await saveAgentPatch(hue === undefined ? { avatarSeed: seed } : { avatarSeed: seed, avatarHue: hue });
   }
 
-  /** Draws the chosen shape, eyes or style, and keeps the rest of the face. */
   async function selectAvatarFace(change: {
     shape?: SupportedAvatarSilhouetteId;
     expression?: ExpressionId;
@@ -803,7 +727,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     const current = avatarFace();
     const face = { shape: change.shape ?? current.shape, expression: change.expression ?? current.expression };
     const style = change.style ?? avatarStyle();
-    // The agent's own plush face is its ID, so Plush after Flat saves the seed that the agent had.
     const own = bloubAvatarProfile(props.agent.id, null);
     const seed =
       style === "plush" && own.shape === face.shape && own.expression === face.expression
@@ -820,15 +743,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   ): Promise<void> {
     const option = findModelOption(props.modelOptions, props.agentStatus.providers, nextProvider, nextModel);
     if (!option) return;
-    // A plain copy, not `snapshot`: a snapshot of an unmodified subtree is the store's own object,
-    // which the write below would mutate, leaving nothing to roll back to.
     const previous: AgentRuntimeSettings = {
       model: draft.runtime.model,
       provider: draft.runtime.provider,
       reasoningEffort: draft.runtime.reasoningEffort,
     };
     const agentId = props.agent.id;
-    // An effort chosen on the model's tab before the model, else the agent's effort when the model has it.
     const preferred = preferredEffort ?? previous.reasoningEffort;
     const settings: AgentRuntimeSettings = {
       model: nextModel,
@@ -842,7 +762,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     });
     const updates = accountId === undefined ? settings : { ...settings, providerAccountId: accountId };
     if (await saveRuntimeSettings(settings, updates, agentId)) return;
-    // Roll back only what this call wrote: another agent, or a later pick, owns the panel now.
     if (props.agent.id !== agentId || !sameRuntimeSettings(draft.runtime, settings)) return;
     setDraft((state) => {
       state.runtime.provider = previous.provider;
@@ -892,7 +811,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  /** "Server default (All activity)" while the agent follows the server, else the level of the agent. */
   const notificationLevelLabel = (options: AgentNotificationLevelOptions) =>
     options.current === null
       ? t("agentSettings.notificationLevel.server", { level: t(SERVER_NOTIFICATION_LEVEL_LABELS[options.serverLevel]) })
@@ -912,21 +830,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  async function saveTaskLimit(next: TaskLimitChoice): Promise<void> {
-    const agentId = props.agent.id;
-    const previous = draft.taskLimit;
-    setDraft((state) => {
-      state.taskLimit = next;
-    });
-    if (await saveAgentPatch({ taskLimit: next === "default" ? null : Number(next) }, agentId)) return;
-    if (!disposed && props.agent.id === agentId && draft.taskLimit === next) {
-      setDraft((state) => {
-        state.taskLimit = previous;
-      });
-    }
-  }
-
-  /** The store wraps the saved value in a proxy, so a newer save is told apart by its number. */
   let backupModelsSave = 0;
   async function saveBackupModels(next: AgentBackupModels | null): Promise<void> {
     const agentId = props.agent.id;
@@ -943,7 +846,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  /** The agent's own model: the one it went back to, while a usage limit holds it on a backup. */
   const ownModel = (): AgentModelChoice =>
     props.agent.usageLimitReturn ?? {
       provider: draft.runtime.provider,
@@ -975,18 +877,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return (
       provider !== undefined &&
       (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
-      agentProviderDescriptor(provider).steer !== "native"
+      !agentSteersTurns({ provider, model: draft.runtime.model }, props.modelOptions)
     );
   };
-
-  const oneTurnAtATime = () => {
-    const provider = knownProvider();
-    return provider !== undefined && !agentProviderDescriptor(provider).concurrentTurns;
-  };
-  const taskLimitLabel = (choice: TaskLimitChoice) =>
-    choice === "default"
-      ? t("agentSettings.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
-      : format.number(Number(choice));
 
   async function saveComputerUse(next: boolean): Promise<void> {
     const agentId = props.agent.id;
@@ -1067,6 +960,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={props.width}
       maxWidth={props.maxWidth}
       onResize={props.onResize}
+      preferredWidth={props.preferredWidth}
     >
       <Show when={!props.detailOpen}>
         <Show
@@ -1084,7 +978,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         >
           {(current) => (
             <SettingsPanelHeader
-              title={t(PAGE_TITLE[current()])}
+              title={t(AGENT_SETTINGS_PAGE_TITLE[current()])}
               onBack={closePage}
               backLabel={t("agentSettings.backToSettings")}
               onClose={props.onClose}
@@ -1405,6 +1299,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
                   providerAccountId={agentNextProviderAccountId(props.agent)}
+                  workspaceOnly={workspaceAccessEnforced(props.agent)}
                   onChange={(nextModel, provider, accountId, effort) =>
                     void selectModel(nextModel, provider, accountId, effort)
                   }
@@ -1428,7 +1323,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   />
                 </SettingsLinkGroup>
               </Show>
-              {/* Keyed, so a popup that is open when the agent changes saves to the agent it opened for. */}
               <Show when={props.agent.id} keyed>
                 {(agentId) => (
                   <AgentChatColorRow
@@ -1489,8 +1383,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     value={draft.permission}
                     onChange={(next) => {
                       if (!next || next === draft.permission) return;
-                      // More freedom is the move that needs the warning. Less freedom is never
-                      // something a user needs protecting from, so it is written straight away.
                       if (widensAgentPermission(draft.permission, next)) {
                         setDraft((state) => {
                           state.confirmingPermission = next;
@@ -1612,32 +1504,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     <SelectContent />
                   </Select>
                 </Show>
-                <Show when={props.taskLimitEditable}>
-                  <Select<TaskLimitChoice>
-                    class="agent-settings-runtime-select"
-                    options={[...TASK_LIMIT_CHOICES]}
-                    value={oneTurnAtATime() ? "1" : draft.taskLimit}
-                    disabled={oneTurnAtATime()}
-                    onChange={(next) => {
-                      if (!next || next === draft.taskLimit) return;
-                      void saveTaskLimit(next);
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>{taskLimitLabel(item.item.rawValue)}</SelectItem>
-                    )}
-                  >
-                    <SelectTrigger
-                      class="agent-settings-runtime-row"
-                      aria-label={t("agentSettings.runtime.taskLimitLabel")}
-                    >
-                      <span class="agent-settings-runtime-label">{t("agentSettings.runtime.taskLimit")}</span>
-                      <SelectValue<TaskLimitChoice>>
-                        {(state) => taskLimitLabel(state.selectedOption() ?? "default")}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent />
-                  </Select>
-                </Show>
                 <Show when={props.browserProfiles}>
                   {(options) => (
                     <BrowserProfileSelect
@@ -1662,11 +1528,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   {t("agentSettings.busyMessage.steerUnsupported", {
                     provider: agentProviderName(draft.runtime.provider),
                   })}
-                </Text>
-              </Show>
-              <Show when={props.taskLimitEditable && oneTurnAtATime()}>
-                <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
-                  {t("agentSettings.taskLimit.oneTurn", { provider: agentProviderName(draft.runtime.provider) })}
                 </Text>
               </Show>
               <Show when={props.onStartNewChat}>
@@ -1816,7 +1677,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   );
 }
 
-/** Lets a long path wrap after a slash instead of inside a folder name. */
 export function breakablePath(path: string) {
   return path.split("/").map((part, index) =>
     index === 0 ? (
@@ -1830,24 +1690,12 @@ export function breakablePath(path: string) {
   );
 }
 
-/** True when the panel still shows exactly the settings a save was issued for. */
 function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRuntimeSettings): boolean {
   return (
     current.provider === settings.provider &&
     current.model === settings.model &&
     current.reasoningEffort === settings.reasoningEffort
   );
-}
-
-/** `default`, then each limit as text, because a select keys its options by value. */
-type TaskLimitChoice = "default" | `${number}`;
-const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
-  "default",
-  ...Array.from({ length: AGENT_TASK_LIMIT_MAX }, (_, index): TaskLimitChoice => `${index + 1}`),
-];
-
-function taskLimitChoice(limit: number | undefined): TaskLimitChoice {
-  return limit === undefined ? "default" : `${limit}`;
 }
 
 const BUSY_MESSAGE_CHOICES = ["default", "queue", "steer"] as const;
@@ -1874,7 +1722,6 @@ const ACCESS_LABEL = {
   full: "agentSettings.access.full",
 } as const satisfies Record<AgentPermissionLevel, AppTextKey>;
 
-/** Another shape and other eyes, never the ones the face has now. */
 function randomAvatarFace(current: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId }): {
   shape: SupportedAvatarSilhouetteId;
   expression: ExpressionId;

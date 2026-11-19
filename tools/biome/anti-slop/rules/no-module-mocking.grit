@@ -2,13 +2,6 @@ language js(typescript)
 
 // scope: global
 
-// A good default, not an absolute. The backend is on dependency injection, so a
-// fake that implements the real interface is almost always available and is a
-// better test. The exception is a module that reaches the outside world at
-// import time and offers no seam to inject: `electron`, `electron-updater`, and
-// the `node:` built-ins. Those specifiers are allowed. Everything else is a
-// warning rather than an error, because whether a seam exists is a judgement
-// about the code under test that a pattern cannot make.
 `$framework.$method($args)` as $call where {
   $framework <: or { `vi`, `jest` },
   $method <: or { `doMock`, `mock`, `unstable_mockModule` },

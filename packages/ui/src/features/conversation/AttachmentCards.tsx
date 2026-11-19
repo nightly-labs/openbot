@@ -17,45 +17,34 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { attachmentReferenceTone } from "./AttachmentReference";
 import { MediaFilePreview } from "./MediaFilePreview";
+import type { VideoStageMenu } from "./VideoStage";
 
-/**
- * Reads attachments that have no `previewUrl`: the browser client gets none. Absent (desktop), a card
- * shows only what its `previewUrl` gives.
- */
 export interface AttachmentMediaSource {
-  /** The loaded URL of an attachment. Reactive. */
   url(attachmentId: string): string | undefined;
-  /** Loads the file for inline display. Resolves false when it cannot show inline. */
-  load(attachment: AttachmentSummary): Promise<boolean>;
-  /** An image up to this size loads when its card shows. */
+  load(attachment: AttachmentSummary, limit?: "thumbnail" | "generated"): Promise<boolean>;
   thumbnailLimit: number;
-  /** Audio or video up to this size loads on a click. Above it, the card offers only the download. */
+  generatedImageLimit: number;
   mediaLimit: number;
 }
 
-/** The download of an attachment from a joined server, from the click until the file arrives. */
 export type AttachmentDownloadState = { phase: "downloading"; received: number; total: number } | { phase: "failed" };
 
-/** Shows and controls the downloads of a joined server. Absent, a card shows no download state. */
 export interface AttachmentDownloads {
-  /** The download of an attachment. Reactive. Undefined when none runs and the last one did not fail. */
   state(attachmentId: string): AttachmentDownloadState | undefined;
   stop(attachment: AttachmentSummary): void;
-  /** Repeats the action of the failed download. */
   retry(attachment: AttachmentSummary): void;
 }
+
+const REMOTE_PREVIEW_URL = /^openbot-remote-attachment:/;
 
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   mediaSource?: AttachmentMediaSource | undefined;
   downloads?: AttachmentDownloads | undefined;
-  /** `origin` is the clicked card, for a viewer that zooms out of it. */
   onPreview: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
 }) {
   const { t, format } = useText();
-  // An image whose preview does not load was deleted from the host, or never arrived. The card
-  // keeps its place in the message and says so, instead of an empty frame.
   const [missing, setMissing] = createSignal<ReadonlySet<string>>(new Set());
   const mediaKind = (attachment: AttachmentSummary) =>
     playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name));
@@ -63,6 +52,17 @@ export function AttachmentCards(props: {
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
   const [loadingMedia, setLoadingMedia] = createSignal<ReadonlySet<string>>(new Set());
   const [playRequested, setPlayRequested] = createSignal<ReadonlySet<string>>(new Set());
+  const started = (attachment: AttachmentSummary) => {
+    if (!playRequested().has(attachment.id)) return;
+    setPlayRequested((current) => {
+      const next = new Set(current);
+      next.delete(attachment.id);
+      return next;
+    });
+  };
+  const [unplayable, setUnplayable] = createSignal<ReadonlySet<string>>(new Set());
+  const markUnplayable = (attachment: AttachmentSummary) =>
+    setUnplayable((current) => new Set(current).add(attachment.id));
   const sourceUrl = (attachment: AttachmentSummary) =>
     attachment.previewUrl ? undefined : props.mediaSource?.url(attachment.id);
   const imageUrl = (attachment: AttachmentSummary) => attachment.previewUrl ?? sourceUrl(attachment);
@@ -72,6 +72,11 @@ export function AttachmentCards(props: {
     props.mediaSource !== undefined &&
     attachment.size <= props.mediaSource.mediaLimit &&
     !sourceUrl(attachment);
+  const showsPlayer = (attachment: AttachmentSummary) =>
+    !isMissing(attachment) &&
+    (Boolean(imageUrl(attachment)) || (mediaKind(attachment) === "video" && canLoadMedia(attachment)));
+  const showsVideo = (attachment: AttachmentSummary) =>
+    mediaKind(attachment) === "video" && showsPlayer(attachment) && !unplayable().has(attachment.id);
   const download = (attachment: AttachmentSummary) => props.downloads?.state(attachment.id);
   const downloading = (attachment: AttachmentSummary) => {
     const state = download(attachment);
@@ -90,12 +95,18 @@ export function AttachmentCards(props: {
       });
     return format.fileSize(attachment.size);
   };
+  const mediaPreload = (attachment: AttachmentSummary) => {
+    if (mediaKind(attachment) === "video")
+      return REMOTE_PREVIEW_URL.test(attachment.previewUrl ?? "") ? "none" : "metadata";
+    return attachment.previewUrl ? "none" : "metadata";
+  };
   const loadMedia = async (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     if (!source || loadingMedia().has(attachment.id)) return;
     setLoadingMedia((current) => new Set(current).add(attachment.id));
     try {
       if (await source.load(attachment)) setPlayRequested((current) => new Set(current).add(attachment.id));
+      else markUnplayable(attachment);
     } finally {
       setLoadingMedia((current) => {
         const next = new Set(current);
@@ -117,13 +128,50 @@ export function AttachmentCards(props: {
             attachment.size <= source.thumbnailLimit
           )
             void source.load(attachment);
+          let card: HTMLDivElement | undefined;
+          const videoMenu = (): VideoStageMenu => {
+            const actions = [
+              { label: t("common.download"), onSelect: () => props.onAction(attachment, "download") },
+              { label: t("attachment.openFile"), onSelect: () => props.onAction(attachment, "open") },
+            ];
+            if (canPreviewAttachment(attachment) && card) {
+              const origin = card;
+              actions.unshift({
+                label: t("chat.preview.preview"),
+                onSelect: () => props.onPreview(attachment, origin),
+              });
+            }
+            return {
+              details: [attachment.name, status(attachment)],
+              actions,
+            };
+          };
+          const player = () => (
+            <MediaFilePreview
+              kind={mediaKind(attachment)}
+              src={imageUrl(attachment)}
+              name={attachment.name}
+              class="attachment-media-player"
+              preload={mediaPreload(attachment)}
+              autoplay={playRequested().has(attachment.id)}
+              attachmentId={attachment.id}
+              loading={loadingMedia().has(attachment.id)}
+              onLoad={() => void loadMedia(attachment)}
+              onPlay={() => started(attachment)}
+              onError={() => markUnplayable(attachment)}
+              menu={videoMenu()}
+            />
+          );
           return (
             <div
+              ref={card}
               class="message-attachment"
               data-media={mediaKind(attachment) ?? undefined}
+              data-player={showsVideo(attachment) ? "video" : undefined}
               data-status={isMissing(attachment) ? "missing" : undefined}
               data-download={download(attachment)?.phase}
             >
+              <Show when={showsVideo(attachment)}>{player()}</Show>
               <Button
                 variant="ghost"
                 type="button"
@@ -159,7 +207,6 @@ export function AttachmentCards(props: {
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      // A loaded copy exists, so its error does not mean that the host lost the file.
                       onError={() => {
                         if (attachment.previewUrl) markMissing(attachment);
                       }}
@@ -172,7 +219,7 @@ export function AttachmentCards(props: {
                 </span>
               </Button>
               <Show when={!isMissing(attachment)}>
-                <Show when={canLoadMedia(attachment)}>
+                <Show when={canLoadMedia(attachment) && mediaKind(attachment) === "audio"}>
                   <Button
                     variant="ghost"
                     type="button"
@@ -242,16 +289,7 @@ export function AttachmentCards(props: {
                   </LabelTooltipTrigger>
                 </LabelTooltip>
               </Show>
-              <Show when={(attachment.previewUrl ?? sourceUrl(attachment)) && !isMissing(attachment)}>
-                <MediaFilePreview
-                  kind={mediaKind(attachment)}
-                  src={attachment.previewUrl ?? sourceUrl(attachment) ?? ""}
-                  name={attachment.name}
-                  class="attachment-media-player"
-                  preload={attachment.previewUrl ? "none" : "metadata"}
-                  autoplay={playRequested().has(attachment.id)}
-                />
-              </Show>
+              <Show when={showsPlayer(attachment) && !showsVideo(attachment)}>{player()}</Show>
             </div>
           );
         }}
