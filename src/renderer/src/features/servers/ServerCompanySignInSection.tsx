@@ -27,7 +27,6 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show } from "solid-js";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
-/** What the section calls in main. Only the desktop app manages company sign-in. */
 export type CompanySignInCalls = Pick<
   OpenBotDesktopApi["auth"],
   | "getCompanySignIn"
@@ -39,7 +38,6 @@ export type CompanySignInCalls = Pick<
   | "revokeCompanySignInScimToken"
 >;
 
-/** Examples in the empty fields: an Entra ID issuer and a domain. They are not prose. */
 const ISSUER_PLACEHOLDER = "https://login.microsoftonline.com/<tenant>/v2.0";
 const DOMAIN_PLACEHOLDER = "example.com";
 
@@ -60,7 +58,6 @@ interface CompanySignInPanel {
   loadError: string | null;
   dialogOpen: boolean;
   confirm: "remove" | "revoke" | null;
-  /** A new SCIM token. The account service keeps only its hash, so it shows once. */
   newToken: string | null;
 }
 
@@ -83,12 +80,6 @@ function issuerHost(issuer: string): string {
   }
 }
 
-/**
- * Company sign-in in Members: one card with single sign-on and user sync, and a dialog for the
- * provider values. Only the owner of a published server sees it. Where the app cannot manage it
- * (the browser client), the card shows only the single sign-on row with no status, and Set up tells
- * the owner to use the desktop app.
- */
 export function createServerCompanySignInSection(
   host: ServerSettingsSectionHost,
   calls: () => CompanySignInCalls | undefined,

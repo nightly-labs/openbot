@@ -1,5 +1,3 @@
-// OpenBot servers that the account server runs for the signed-in account.
-
 import {
   type CreateHostedServerInput,
   type DeleteHostedServerInput,

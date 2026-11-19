@@ -9,7 +9,6 @@ export interface UpdateStatusPresentation {
   busy: boolean;
   detail: string;
   supported: boolean;
-  /** The host installs updates for every tenant: status stays visible, actions stay disabled. */
   managed: boolean;
 }
 
@@ -39,9 +38,6 @@ export function presentUpdateStatus(
       actionLabel = "update.action.restarting";
       break;
     case "error":
-      // A failed download is retried in place rather than sending the user back through a check. A
-      // failed install is not retryable: shutdown preparation has already run, so the message asks
-      // for a relaunch and the action falls back to checking.
       if (status.errorCode === "download_failed") actionLabel = "update.action.retryDownload";
       break;
   }

@@ -1,12 +1,3 @@
-// Runs the real `devin` provider driver over a fake `devin acp` (`provider-fakes/agents/devin-steer.ts`)
-// to check that a steered message goes into the running turn through a second `session/prompt`.
-// Devin CLI reports the version "0.0.0-dev", so the steer is gated on its `cognition.ai/midTurnPrompts`
-// capability. When the run ends, Devin answers each open prompt with the same usage, so the turn must
-// report that usage once. Cases: one steer, two steers in a row, a steer whose prompt gets a run of its
-// own, a steer for a turn that is not the running one, a steer after the turn ended, a steer while a
-// permission card is open, and a CLI without the capability. Each refused steer must send nothing to
-// the agent and must not stop the running turn, so the message can wait in the queue.
-// `bun run test:devin-steer`. Writes .openbot-build/devin-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,9 +21,7 @@ interface LogEntry {
 interface Finished {
   reply: string;
   status: string | null;
-  /** The `turn/started` notifications of the thread while the turn ran. */
   started: number;
-  /** The input tokens of each `openbot/usage` notification of the turn. */
   usage: (number | null)[];
 }
 
@@ -70,7 +59,6 @@ async function open(
 
 const prompts = async (log: string) => (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "prompt");
 
-/** Waits until the fake logs a prompt with this text, or fails after 10 s. */
 async function waitForPrompt(log: string, text: string): Promise<void> {
   const deadline = Date.now() + 10_000;
   while (!(await prompts(log)).some((entry) => entry.text === text)) {
@@ -84,7 +72,6 @@ interface RunningTurn {
   done: Promise<Finished>;
 }
 
-/** Starts a turn with this text. A `work` turn stays open with one tool call until a steer ends it. */
 async function startTurn(client: AgentClient, thread: string, log: string, text: string): Promise<RunningTurn> {
   let reply = "";
   let started = 0;
@@ -128,7 +115,6 @@ async function startTurn(client: AgentClient, thread: string, log: string, text:
   return { id, done };
 }
 
-/** Steers the turn with this text. Answers the turn id that the client reports. */
 function steer(client: AgentClient, thread: string, turnId: string, text: string): Promise<string | null> {
   return runCauseEffect(
     client.request(
@@ -155,7 +141,6 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
 
 try {
   const { client, log } = await open("native", {});
-  /** The permission request that the test holds open, and how to answer it. */
   let heldApproval: (() => void) | undefined;
   let approvalAsked: () => void = () => undefined;
   const approval = new Promise<void>((asked) => {
@@ -172,7 +157,6 @@ try {
   client.start();
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn: one turn, no stop, and the run's usage reported once.
   const turn = await startTurn(client, thread, log, "work");
   assert.equal(await steer(client, thread, turn.id, "use the other branch"), turn.id);
   const steered = await turn.done;
@@ -192,7 +176,6 @@ try {
   assert.equal(cancelSent, false, "The steer must not cancel the turn.");
   report.steered = { turnId: turn.id, ...steered, prompts: steeredPrompts, cancelSent };
 
-  // Two steers in a row: the turn ends with the run, and its usage is reported once.
   const twiceTurn = await startTurn(client, thread, log, "work");
   const beforeTwice = (await prompts(log)).length - 1;
   assert.equal(await steer(client, thread, twiceTurn.id, "more context"), twiceTurn.id);
@@ -210,7 +193,6 @@ try {
   );
   report.twice = { ...twice, prompts: twicePrompts };
 
-  // A steer whose prompt gets a run of its own: each run reports its usage.
   const separateTurn = await startTurn(client, thread, log, "work");
   assert.equal(await steer(client, thread, separateTurn.id, "separate run"), separateTurn.id);
   const separateRuns = await separateTurn.done;
@@ -220,7 +202,6 @@ try {
   assert.deepEqual(separateRuns.usage, [300, 400]);
   report.separateRuns = separateRuns;
 
-  // A steer for a turn that is not the running one is refused before it reaches the agent.
   const third = await startTurn(client, thread, log, "work");
   const beforeWrong = (await prompts(log)).length;
   const wrongTurn = await refusal(steer(client, thread, "another-turn", "late"));
@@ -229,13 +210,11 @@ try {
   await steer(client, thread, third.id, "end");
   await third.done;
 
-  // After the turn ended, a second prompt would start a turn of its own.
   const beforeAfter = (await prompts(log)).length;
   const afterTurn = await refusal(steer(client, thread, third.id, "too late"));
   assert.equal((await prompts(log)).length, beforeAfter);
   report.afterTurn = { refused: afterTurn, prompts: (await prompts(log)).length - beforeAfter };
 
-  // A new prompt would close an open permission card, so the steer waits in the queue.
   const asking = await startTurn(client, thread, log, "ask");
   await Promise.race([
     approval,
@@ -257,8 +236,6 @@ try {
     status: asked.status,
   };
 
-  // A Devin CLI without `cognition.ai/midTurnPrompts` can cancel the open prompt on a second one,
-  // so the steer is refused.
   const old = await open("no-capability", { FAKE_MID_TURN: "0" });
   old.client.start();
   const oldThread = await startThread(old.client, { cwd: root });

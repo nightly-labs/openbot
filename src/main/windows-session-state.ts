@@ -5,7 +5,6 @@ import type * as Koffi from "koffi";
 const logger = createOpenBotLogger("windows-session-state");
 const requireModule = createRequire(import.meta.url);
 
-// wtsapi32.h: WTS_CURRENT_SESSION, WTS_INFO_CLASS.WTSConnectState and WTS_CONNECTSTATE_CLASS.WTSDisconnected.
 const WTS_CURRENT_SESSION = 0xffff_ffff;
 const WTS_CONNECT_STATE = 8;
 const WTS_DISCONNECTED = 4;
@@ -26,7 +25,6 @@ let wtsApi: WtsApi | null = null;
 
 function loadWtsApi(): WtsApi {
   if (wtsApi) return wtsApi;
-  // Loaded on first use, so that only a Windows host loads the FFI.
   const koffi: typeof Koffi = requireModule("koffi");
   const library = koffi.load("wtsapi32.dll");
   wtsApi = {
@@ -39,12 +37,6 @@ function loadWtsApi(): WtsApi {
   return wtsApi;
 }
 
-/**
- * Whether the Windows session of this process is disconnected from its screen, for example after a
- * Windows Remote Desktop window closed. Windows then gives the session no display, so Sunshine, which
- * runs in this session, cannot capture it. When the state cannot be read, this returns false and the
- * start continues as before.
- */
 export function windowsSessionDisconnected(): boolean {
   if (process.platform !== "win32") return false;
   try {

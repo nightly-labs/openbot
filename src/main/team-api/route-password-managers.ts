@@ -25,7 +25,6 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PASSWORD_MANAGERS_ROUTES));
 const ERROR_LIMIT = 2_000;
 
-/** The wire status of `password-managers-v1`, cut to the codec's bounds. A longer sign-in page is left out. */
 function wireStatus(status: PasswordManagerStatus): PasswordManagerStatus {
   return {
     ...status,
@@ -55,13 +54,6 @@ function connectMethod(body: DynamicRecord): PasswordManagerConnectMethod {
   throw new HttpError(400, sourceText("error.connector.passwordManagerMethod"));
 }
 
-/**
- * The password managers of this host, which an owner or administrator connects from their own
- * computer or phone. Frozen by `password-managers-v1`.
- *
- * An access key or an extra password arrives once, in the connect body; no answer carries it.
- * `requireAdmin` runs on every route.
- */
 export async function routePasswordManagers(
   context: TeamApiRequestContext,
   managers: TeamApiPasswordManagers | undefined,
@@ -71,7 +63,6 @@ export async function routePasswordManagers(
   if (!managers || !capabilities.has(PASSWORD_MANAGERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `password-managers-v1` codec.
   const body = await readJson(request);
   if (url.pathname === PASSWORD_MANAGERS_ROUTES.list) {
     return json(200, { managers: managers.list().slice(0, PASSWORD_MANAGERS_LIMIT).map(wireStatus) });

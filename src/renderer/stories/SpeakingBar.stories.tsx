@@ -29,5 +29,4 @@ type Story = StoryObj<typeof meta>;
 
 export const Speaking: Story = {};
 
-/** The first part is synthesized; the voice has not started yet. */
 export const Starting: Story = { args: { levels: new Array(24).fill(0) } };

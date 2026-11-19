@@ -18,21 +18,8 @@ import { hasPluginLogo, PluginLogo } from "../plugins/PluginLogo";
 import { LandingIcon } from "./LandingIcon";
 import { useSiteChrome } from "./SiteText";
 
-// The contents of one header section. The desktop menu and the mobile sheet draw
-// the same component, and differ only in the frame around it.
-//
-// The small artwork is the CSS approximation of the article gradient, not the
-// shader: a menu can show a dozen of these at once, and a WebGL context each would
-// spend the browser's whole budget on a panel that is open for a second. Only the
-// featured card moves, and only while the panel is on screen.
-
 export interface SiteNavigationPanelProps {
   section: SiteNavigationSection;
-  /**
-   * Whether the featured artwork animates. The frame sets this only while the
-   * reader can see the panel, because the animation holds a WebGL context and the
-   * browser drops the oldest one past a small number.
-   */
   live: boolean;
 }
 
@@ -96,8 +83,6 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
             params={{ slug: article().slug }}
             style={{ "--site-panel-art": artwork(article().title) }}
           >
-            {/* The shader's host paints the same CSS gradient until its canvas has
-                drawn, so the card never shows an empty frame. */}
             <Show when={props.live} fallback={<span class="site-panel-feature-art" aria-hidden="true" />}>
               <ArticleGradient title={article().title} mode="live" class="site-panel-feature-art" />
             </Show>
@@ -185,7 +170,6 @@ function ResourcePanelBody(props: { section: ResourceNavigationSection }) {
   );
 }
 
-// Named accessors, not conditionals in props: a conditional prop moves the SSR hydration keys.
 function ResourceRow(props: { link: ResourceLink }) {
   const href = () => ("href" in props.link ? props.link.href : undefined);
   const route = () => ("to" in props.link ? props.link.to : undefined);
@@ -209,7 +193,6 @@ function ResourceRow(props: { link: ResourceLink }) {
   );
 }
 
-// An icon sits on the same gradient as a plugin's mark. The Brand row shows the app icon itself.
 function ResourceRowContents(props: { link: ResourceLink }) {
   const chrome = useSiteChrome();
   const text = () => chrome().text.resources[props.link.id];

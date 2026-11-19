@@ -142,7 +142,6 @@ function QuestionnaireChoices(props: ComponentProps<"div">): JSX.Element {
 export interface QuestionnaireChoiceProps extends Omit<ComponentProps<"label">, "onChange"> {
   checked: boolean;
   disabled?: boolean;
-  /** A checkbox that toggles, not a radio. */
   multiple?: boolean;
   name: string;
   value: string;
@@ -168,7 +167,6 @@ function QuestionnaireChoice(props: QuestionnaireChoiceProps): JSX.Element {
         checked={props.checked}
         disabled={props.disabled}
         onClick={() => {
-          // A checked radio sends no change event, so a second click picks it again.
           if (!props.multiple && props.checked) props.onChange(props.value);
         }}
         onChange={() => props.onChange(props.value)}

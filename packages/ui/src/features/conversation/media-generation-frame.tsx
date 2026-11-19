@@ -4,7 +4,6 @@ import { For } from "solid-js";
 
 export type MediaGenerationStatus = "generating" | "completed" | "failed" | "interrupted";
 
-/** The dots and the moving glow that fill the frame while a model makes the image or the video. */
 export function MediaGenerationCanvas() {
   return (
     <div class="image-generation-canvas image-generation-canvas-visible" aria-hidden="true">
@@ -14,7 +13,6 @@ export function MediaGenerationCanvas() {
   );
 }
 
-/** The mark of a frame whose image or video did not arrive. */
 export function MediaGenerationFailure() {
   return (
     <div class="image-generation-canvas image-generation-canvas-visible image-generation-canvas-failed">
@@ -23,7 +21,6 @@ export function MediaGenerationFailure() {
   );
 }
 
-/** Short values such as the length and the size, with a dot between them. */
 export function MediaGenerationSpecs(props: { values: readonly (string | undefined)[]; class: string }) {
   const values = () => props.values.filter((value): value is string => Boolean(value));
   return (
@@ -33,7 +30,6 @@ export function MediaGenerationSpecs(props: { values: readonly (string | undefin
   );
 }
 
-/** The frame of a result before its real size is known. */
 export function mediaRatioValue(
   aspectRatio: ImageGenerationAspectRatio,
   kind: "image" | "video",
@@ -47,5 +43,4 @@ export function mediaRatioValue(
   return "1 / 1";
 }
 
-/** A failed frame is low, so the reason under it stays near the prompt. */
 export const FAILED_MEDIA_RATIO = "3 / 1";

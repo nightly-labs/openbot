@@ -5,10 +5,8 @@ import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
 import { quitShortcutHintAgents, watchQuitShortcutHint } from "../../quit-shortcut-hint";
 
-/** More faces than this make the pill wide, and the names already list every agent. */
 const MAX_AVATARS = 3;
 
-/** How to quit, with the agents that the quit stops. With no agent at work, only how to quit. */
 export function QuitShortcutHintView(props: { agents: ClientAgentSummary[] }) {
   const { t } = useText();
   return (
@@ -37,12 +35,6 @@ export function QuitShortcutHintView(props: { agents: ClientAgentSummary[] }) {
   );
 }
 
-/**
- * On a Mac, while an agent works, one press of `Cmd + Q` does not quit. Main reads the key before the
- * page does and tells this window when to show which agents work and how to quit: hold the keys, or
- * press them twice. With no agent at work, one press quits and no hint shows, unless the user guards
- * every quit. The user can also turn the guard off.
- */
 export function QuitShortcutHint() {
   onSettled(watchQuitShortcutHint);
   return <Show when={quitShortcutHintAgents()}>{(agents) => <QuitShortcutHintView agents={agents()} />}</Show>;

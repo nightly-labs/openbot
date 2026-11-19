@@ -133,6 +133,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "No se pudieron eliminar todos los datos del agente. Intenta eliminarlo de nuevo.",
   "error.agent.deleteFolderInUse":
     "El trabajo de otro agente todavía usa la carpeta de este agente. Vuelve a eliminarlo cuando ese trabajo termine o después de reiniciar OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "El trabajo de otro agente todavía usa la carpeta de este agente. OpenBot elimina este agente cuando ese trabajo termine.",
   "error.agent.duplicationBusy": "Este agente ya se está duplicando.",
   "error.agent.waitBeforeDuplicate": "Espera a que el agente termine y vacía su cola antes de duplicarlo.",
   "error.agent.saveOtherAgent": "Este guardado pertenece a otro agente.",
@@ -196,6 +198,8 @@ export const messages = {
     "La región no está dentro de una sola pantalla. Usa puntos del escritorio dentro de los límites de una pantalla de list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot no tiene el permiso de grabación de pantalla. Pide al usuario que abra Ajustes del Sistema > Privacidad y seguridad > Grabación de pantalla y audio del sistema, active OpenBot y después cierre OpenBot y vuelva a abrirlo.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot todavía no tiene el permiso de grabación de pantalla, así que no puede listar las ventanas. Para capturar una pantalla, llama a capture_screen con target screen. El usuario aprueba primero la captura y después macOS puede pedirle el permiso.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows devolvió una imagen vacía. Pide al usuario que desbloquee el equipo y cierre el contenido protegido. Una directiva de la organización también puede impedir la captura de pantalla.",
   "error.agent.screenCaptureFailed": "La captura de pantalla falló. Inténtalo de nuevo.",

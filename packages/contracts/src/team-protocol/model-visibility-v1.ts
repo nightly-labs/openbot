@@ -1,13 +1,3 @@
-// Frozen optional model-visibility-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can read every model that one provider of the host lists, and set which of them the model
-// picker of that server shows. The host then leaves the other models out of the model list that it
-// gives to clients, but keeps each model that an agent of the server uses. Agents, tools and
-// automations still reach every model. The settings and update routes are for an owner or admin;
-// `requireAdmin` on the host is the only gate. `shown: null` resets a provider to the host's default.
-// Every member reads the listing route: for each model of the released model list that the picker
-// labels New or folds under Older models, its listing. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,

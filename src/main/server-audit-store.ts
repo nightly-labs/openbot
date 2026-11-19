@@ -23,24 +23,17 @@ export const SERVER_AUDIT_FILE = "openbot-server-audit-v1.json";
 
 const logger = createOpenBotLogger("server-audit");
 
-/** The name that the log keeps for a member: the display name, else the username. */
 export function memberAuditName(member: Pick<TeamMemberSummary, "id" | "name" | "username">): ServerAuditName {
   return serverAuditName(member.id, member.name?.trim() || member.username);
 }
 
 type AuditMember = Pick<TeamMemberSummary, "id" | "name" | "username" | "role" | "disabled" | "createdAt">;
 
-/** One change, and when it happened when that is not now. */
 export interface TimedServerAuditChange {
   change: ServerAuditChange;
   at?: Date;
 }
 
-/**
- * The member changes from one list of members to the next. A member is present when the list has
- * them and they are not disabled; the owner never changes. A new member joined when their
- * membership was made; a member who comes back joined now.
- */
 export function memberAuditChanges(
   before: readonly AuditMember[],
   after: readonly AuditMember[],
@@ -71,7 +64,6 @@ export function memberAuditChanges(
   return changes;
 }
 
-/** Names from the members and agents of now. An unknown ID keeps the ID as its name. */
 export function serverAuditNames(
   members: readonly Pick<TeamMemberSummary, "id" | "name" | "username">[],
   agents: readonly Pick<AgentSummary, "id" | "name">[],
@@ -84,16 +76,13 @@ export function serverAuditNames(
   };
 }
 
-/** The entries of one server that decode. An entry that does not, or of a kind this build does not know, is left out. */
 function decodeEntries(value: unknown): ServerAuditEntry[] {
   if (!Array.isArray(value)) return [];
   const entries: ServerAuditEntry[] = [];
   for (const entry of value.slice(0, SERVER_AUDIT_ENTRY_LIMIT)) {
     try {
       entries.push(...decodeServerAuditLog({ entries: [entry] }).entries);
-    } catch {
-      // One damaged entry does not empty the log of its server.
-    }
+    } catch {}
   }
   return entries;
 }
@@ -105,15 +94,6 @@ function decodeServers(parsed: unknown): Map<string, ServerAuditEntry[]> | null 
   return servers;
 }
 
-/**
- * The changes to the members, roles and agent access of each server that this computer hosts, by
- * server ID, newest first. A preference file beside the roles file: it needs no migration, and an
- * older build ignores it. Each server keeps its newest `SERVER_AUDIT_ENTRY_LIMIT` entries.
- *
- * A missing or damaged file reads as an empty log, and an entry that does not decode is left out;
- * the next change writes the file again without them. The log records
- * what happened; a failed write never stops the change itself, so `record` only logs a failure.
- */
 export class ServerAuditStore {
   readonly #path: string;
   #servers = new Map<string, ServerAuditEntry[]>();
@@ -136,10 +116,6 @@ export class ServerAuditStore {
     });
   }
 
-  /**
-   * Records the changes from one set of roles to the next. `names` is read only when something
-   * changed, so the caller can pass the lists of now without a cost on each save.
-   */
   recordAgentAccess(
     serverId: string,
     actor: ServerAuditName | null,
@@ -147,7 +123,6 @@ export class ServerAuditStore {
     after: AgentAccessRoles,
     names: () => ServerAuditNames,
   ): Effect.Effect<void> {
-    // The roles are saved already, so a failure to name the changes only logs.
     return Effect.try(() => agentAccessAuditChanges(before, after, names()).map((change) => ({ change }))).pipe(
       Effect.flatMap((changes) => this.record(serverId, actor, changes)),
       Effect.catch((error) =>
@@ -160,10 +135,6 @@ export class ServerAuditStore {
     return { entries: structuredClone(this.#servers.get(serverId) ?? []) };
   }
 
-  /**
-   * Adds `changes` in the order that they apply, so the first one is the oldest. A change happened
-   * now unless it names when, such as when a member joined.
-   */
   record(
     serverId: string,
     actor: ServerAuditName | null,
@@ -179,7 +150,6 @@ export class ServerAuditStore {
         Effect.uninterruptible(
           Effect.gen({ self: this }, function* () {
             const entries = [...added, ...(this.#servers.get(serverId) ?? [])]
-              // A join can be older than changes that this host recorded earlier.
               .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
               .slice(0, SERVER_AUDIT_ENTRY_LIMIT);
             const servers = new Map(this.#servers);

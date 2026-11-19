@@ -19,9 +19,6 @@ const ContactForm = Schema.Struct({
   message: Schema.String,
 });
 
-// Each message spends the hourly quota of the mailbox that also sends sign-in codes, so one total
-// limit stops a flood from different addresses before it blocks sign-in. The D1 counter of sign-in is
-// exact in all Cloudflare locations. Its retention deletes a window 15 minutes after it starts.
 const RATE_WINDOW_MS = 15 * 60_000;
 const SENDER_LIMIT = 3;
 const TOTAL_LIMIT = 15;
@@ -76,7 +73,6 @@ export const sendContactMessage = Effect.fn("ContactMessage.send")(function* (
     );
 });
 
-/** One line of text, or `null` when it is empty. `undefined` when it is too long or has a line break. */
 function optionalLine(value: string | undefined, limit: number): string | null | undefined {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return null;

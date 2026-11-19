@@ -1,10 +1,3 @@
-/**
- * Workflows: the canvas over the preview mock, and the nodes one component at a time, each in its
- * empty and filled states. Press a node to select it and show its toolbar. Drag from a port to a port
- * of the other side, in either direction, to connect two nodes, or press the two ports one after the
- * other. A run in these stories uses the preview mock, not a provider.
- */
-
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -41,7 +34,6 @@ const TASK = "Check competitor sites, changelogs and launch posts since yesterda
 const RESULT = AGENT_RESULT;
 const AGENT = STORY_SEED.agentId;
 
-/** The story catalogs with a ChatGPT sign-in that the user did not do. */
 const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
   ...STORY_CATALOGS,
   status: {
@@ -55,7 +47,6 @@ const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
 const meta = {
   title: "Workflows",
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
-  // One Toaster for the page, as the app has at its root. A canvas that opens again keeps it.
   decorators: [
     (Story) => (
       <>
@@ -69,12 +60,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Competitor watch has every node type, so its stories offer every node kind. */
 export const Example: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch()]} features={STORY_ALL_FEATURES} />,
 };
 
-/** Two other people of the team work on the same canvas: their cursors move, and they select nodes. */
 export const ExampleWithCollaborators: Story = {
   name: "Example with collaborators",
   render: () => {
@@ -89,7 +78,6 @@ export const ExampleWithCollaborators: Story = {
   },
 };
 
-/** The canvas in the desktop window, where the Routines page shows its board today. */
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
@@ -100,22 +88,16 @@ export const ExampleAfterRun: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch("done")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** The last run failed at the summary. Retry on it runs the summary and the steps after it again. */
 export const RunWithFailedStep: Story = {
   name: "Run with a failed step",
   render: () => <WorkflowStory workflows={[competitorWatch("failed")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** A run stops at the approval until you decide. The condition of the preview always answers yes. */
 export const BranchAndApproval: Story = {
   name: "Branch and approval",
   render: () => <WorkflowStory workflows={[newCompetitorAlert()]} />,
 };
 
-/**
- * A GitHub trigger that answers new comments. Two runs are open, one for each issue, and a second
- * comment on one issue waits. The run bar lists the open runs; the Events row lists what GitHub sent.
- */
 export const GitHubRuns: Story = {
   name: "GitHub runs",
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
@@ -130,7 +112,6 @@ export const EmptyCanvas: Story = {
   ),
 };
 
-/** Three pictures in one group, each connected to the image step: the group draws one line with a count. */
 function moodboardGroup(folded: boolean): StoryWorkflow {
   const open = { group: "story-moodboard", groupName: "Moodboard" };
   const group = folded ? { ...open, groupFolded: true } : open;
@@ -164,15 +145,10 @@ function moodboardGroup(folded: boolean): StoryWorkflow {
   };
 }
 
-/**
- * A group: a frame with a name and one port. Select nodes and press Group (⌘G) to make one. Press the
- * frame to select the group, and Collapse in its toolbar to show it as a stack card.
- */
 export const Groups: Story = {
   render: () => <WorkflowStory workflows={[moodboardGroup(false)]} features={STORY_ALL_FEATURES} />,
 };
 
-/** A collapsed group: a stack card with the pictures of its members. Double-click it to open it. */
 export const GroupsCollapsed: Story = {
   name: "Groups, collapsed",
   render: () => <WorkflowStory workflows={[moodboardGroup(true)]} features={STORY_ALL_FEATURES} />,
@@ -231,10 +207,6 @@ export const Llm: Story = {
   ),
 };
 
-/**
- * ChatGPT is not connected. A new LLM step takes a Claude model, and its list has no ChatGPT tab. The
- * agent step keeps ChatGPT, because its agent runs on it.
- */
 export const LlmChatGptNotConnected: Story = {
   name: "LLM, ChatGPT not connected",
   render: () => (
@@ -260,7 +232,6 @@ export const ImageStory: Story = {
   ),
 };
 
-/** A live Higgsfield video model that makes each second from 3 to 15, as the host reads a duration range. */
 const RANGE_VIDEO_MODEL = {
   id: "higgsfield-kling3_0_story",
   provider: "higgsfield",
@@ -275,10 +246,6 @@ const RANGE_VIDEO_MODEL = {
   resolutions: ["720p", "1080p"],
 } as const satisfies WorkflowCatalogs["imageModels"][number];
 
-/**
- * Video steps on a model with more lengths than the Length menu lists: one on a length of the list,
- * and one on Custom, whose seconds chip takes any length of the model.
- */
 export const VideoCustomLength: Story = {
   name: "Video, custom length",
   render: () => (
@@ -296,10 +263,6 @@ export const VideoCustomLength: Story = {
   ),
 };
 
-/**
- * An image step with more results than the list under it fits. The list opens on the newest result,
- * and the arrows scroll it to the result on view.
- */
 export const ImageManyResults: Story = {
   name: "Image, many results",
   render: () => (
@@ -318,7 +281,38 @@ export const ImageManyResults: Story = {
   ),
 };
 
-/** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
+const TWO_HIGGSFIELD_ACCOUNTS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels?.map((model) =>
+    model.provider === "higgsfield"
+      ? {
+          ...model,
+          accounts: [
+            { id: "default", label: "Higgsfield", email: null, state: "connected", message: null },
+            { id: "a1b2c3d4", label: "Higgsfield 2", email: null, state: "connected", message: null },
+          ],
+        }
+      : model,
+  ),
+};
+
+export const ImageTwoHiggsfieldAccounts: Story = {
+  name: "Image, two Higgsfield accounts",
+  render: () => {
+    const model = TWO_HIGGSFIELD_ACCOUNTS.imageModels?.find((entry) => entry.provider === "higgsfield")?.id ?? "";
+    return (
+      <NodeGallery
+        selected="second"
+        catalogs={TWO_HIGGSFIELD_ACCOUNTS}
+        fields={{ first: { model, account: "" }, second: { model, account: "a1b2c3d4" } }}
+      >
+        <ImageNode id="first" prompt="Hero image for the Atlas comparison page" />
+        <ImageNode id="second" prompt="Hero image for the Atlas comparison page" />
+      </NodeGallery>
+    );
+  },
+};
+
 function cutOutPicture(): string {
   const canvas = document.createElement("canvas");
   canvas.width = 480;

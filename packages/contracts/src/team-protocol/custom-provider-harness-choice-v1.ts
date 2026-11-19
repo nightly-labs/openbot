@@ -1,19 +1,3 @@
-// Frozen optional custom-provider-harness-choice-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can choose the harness that runs each of the host's custom endpoints, `opencode` or `pi`,
-// as on the host's own computer. Its routes do what those of `custom-provider-edit-v1` do, and a save
-// and an update also name the harness:
-//
-// - a save runs the endpoint on the harness that it names;
-// - an update moves the endpoint to the harness that it names, and agents on a kept model move with
-//   it, as an edit on the host's own computer does;
-// - all other rules are those of `custom-provider-edit-v1`: a request with no `apiKey` keeps the
-//   saved key, a header with a `null` value keeps its saved value, and the host keeps the settings
-//   of each model id that it keeps.
-//
-// A member cannot use any route; `requireAdmin` on the host is the only gate. Secrets are
-// write-only, as in `custom-provider-edit-v1`. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,

@@ -16,10 +16,6 @@ export function routineScheduleOf(routine: RoutineEditorRecord): RoutineSchedule
   return routine.trigger.schedule;
 }
 
-/**
- * The list row reads the schedule as the chips do. A schedule the chips show only as cron, such
- * as an interval, keeps its own summary: "Every 15 minutes", not the cron text.
- */
 export function routineListSummary(routine: RoutineEditorRecord, text: RoutineText): string {
   if (isEventRoutine(routine) && routine.trigger.kind === "webhook") {
     const eventType = routine.trigger.eventType;
@@ -33,11 +29,6 @@ export function routineListSummary(routine: RoutineEditorRecord, text: RoutineTe
   return routineDraftSummary(draft, text);
 }
 
-/**
- * "Paused by its 8:00 AM run" when a scheduled run of the routine paused it (#10048), else undefined.
- * The time is in the routine's zone, as its schedule is, and the label names that zone when it is not
- * the viewer's zone, as the next-run label does. A run on another day also gives the date.
- */
 export function routinePausedByRunLabel(
   routine: Pick<RoutineFields, "active" | "timezone" | "pausedByRun">,
   text: RoutineText,
@@ -64,7 +55,6 @@ export function localTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
-/** "Warsaw time", only when the routine does not run in the viewer's zone. */
 export function routineTimeZoneLabel(routine: Pick<RoutineFields, "timezone">, text: RoutineText): string | undefined {
   const timeZone = knownTimeZone(routine.timezone);
   if (!timeZone || timeZone === localTimeZone()) return undefined;

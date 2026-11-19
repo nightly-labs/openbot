@@ -1,12 +1,8 @@
-/* The motion of the image viewer. The timings and curves follow the Kobra lightbox. */
-
 const SPRING_STOPS = 48;
 
-/** A `linear()` easing that samples a damped spring. `frequency` is the undamped rate in rad/s. */
 function springEasing(duration: number, damping: number, frequency: number): string {
   const stops = Array.from({ length: SPRING_STOPS + 1 }, (_, stop) => {
     const progress = stop / SPRING_STOPS;
-    // The last stop lands on the target, so the element does not jump when the animation ends.
     const value = stop === SPRING_STOPS ? 1 : springValue((progress * duration) / 1000, damping, frequency);
     return `${value.toFixed(4)} ${(progress * 100).toFixed(2)}%`;
   });
@@ -23,7 +19,6 @@ function springValue(seconds: number, damping: number, frequency: number): numbe
   );
 }
 
-/* The image grows out of its thumbnail with a small overshoot, and goes back without one. */
 export const ZOOM_IN: KeyframeAnimationOptions = { duration: 450, easing: springEasing(450, 0.78, 21) };
 export const ZOOM_OUT_DURATION = 190;
 export const ZOOM_OUT: KeyframeAnimationOptions = {
@@ -32,7 +27,6 @@ export const ZOOM_OUT: KeyframeAnimationOptions = {
   fill: "forwards",
 };
 export const IMAGE_FADE_IN: KeyframeAnimationOptions = { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)" };
-/* The image stays on the thumbnail after it lands, then fades out over it. */
 const IMAGE_FADE_OUT_DURATION = 260;
 export const IMAGE_FADE_OUT: KeyframeAnimationOptions = {
   duration: IMAGE_FADE_OUT_DURATION,
@@ -75,7 +69,6 @@ interface TileShift {
   delay: number;
 }
 
-/** A thumbnail moves away from the one that opened, a little more when it is further away. */
 function tileShift(from: DOMRect, tile: DOMRect): TileShift {
   const x = tile.left + tile.width / 2 - (from.left + from.width / 2);
   const y = tile.top + tile.height / 2 - (from.top + from.height / 2);
@@ -104,15 +97,9 @@ function tileKeyframes(shift: TileShift) {
 
 interface TileState {
   animations: Animation[];
-  /** Set on a thumbnail that moved out of the way; unset on the one whose image the viewer shows. */
   shift?: TileShift;
 }
 
-/**
- * While the viewer is open, the thumbnail of the image it shows is hidden and the other thumbnails
- * of the message move out of the way. The thumbnail keeps its layout box, so the viewer can still
- * close into it.
- */
 export function createTileMotion() {
   const tiles = new Map<HTMLElement, TileState>();
   const settle = (tile: HTMLElement) => {
@@ -144,13 +131,11 @@ export function createTileMotion() {
         animations: [tile.animate(fade, timing(RECEDE_FADE)), tile.animate(move, timing(RECEDE_MOVE))],
       });
     },
-    /** Shows a hidden thumbnail again after `delay`, when the image lands on it. */
     restore(tile: HTMLElement, delay: number) {
       if (!tiles.has(tile)) return;
       settle(tile);
       tile.animate([{ opacity: 0 }, { opacity: 1 }], { duration: delay, easing: "steps(1)" });
     },
-    /** Brings every thumbnail back. The animations run on after the viewer unmounts. */
     returnAll() {
       for (const [tile, { shift }] of [...tiles]) {
         settle(tile);

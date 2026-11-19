@@ -399,6 +399,8 @@ export const messages = {
   "error.backend.vaultItemNotAllowed":
     "Solo il proprietario del server o un amministratore può aggiungere un elemento al Vault.",
   "error.backend.vaultItemSaving": "L'elemento del Vault è già in salvataggio.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot non è riuscito a leggere la chiave API. Inserisci una chiave di massimo 8.000 caratteri e scegli chi può usarla.",
   "error.backend.authRequestInactive": "Questa richiesta di autenticazione sicura non è più attiva.",
   "error.backend.secureAuthUnavailable": "L'autenticazione sicura non è disponibile.",
   "error.backend.browserUrlRequired": "L'URL del browser è obbligatorio.",

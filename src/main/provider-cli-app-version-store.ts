@@ -1,10 +1,6 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { PreferenceStore } from "./preference-file";
 
-/**
- * The app version that last started the provider CLI update checks. A different version, or none,
- * is an app upgrade: the first check then updates the managed provider CLIs with no offer (#3164).
- */
 export type ProviderCliAppVersionStore = PreferenceStore<ProviderCliAppVersion>;
 
 interface ProviderCliAppVersion {

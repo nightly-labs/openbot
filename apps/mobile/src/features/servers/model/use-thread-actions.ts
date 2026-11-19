@@ -2,7 +2,7 @@ import type { AgentTask, AgentTasksSnapshot } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -28,10 +28,8 @@ const CONTROL_TEXT = {
   },
 } as const satisfies Record<ControlAction, { label: MobileTextKey; error: MobileTextKey; icon: string }>;
 
-/** A turn runs or waits in the thread. As on desktop, the person stops it before a delete. */
 const threadBusy = (task: AgentTask) => task.state === "running" || task.state === "queued";
 
-/** As on desktop: a running or waiting thread can stop, another open thread can archive, and an archived one can restore. */
 function controlAction(task: AgentTask): ControlAction {
   if (threadBusy(task)) return "stop";
   return task.state === "closed" ? "reopen" : "close";
@@ -40,21 +38,14 @@ function controlAction(task: AgentTask): ControlAction {
 const isThreadAction = (id: string): id is ThreadAction =>
   id === "stop" || id === "close" || id === "reopen" || id === "rename" || id === "delete";
 
-/**
- * The actions of a thread, for its ⋯ menu and the long press on its row: stop, archive or restore,
- * and rename and delete on a host with `agent-threads-v1`. A delete asks first, because it removes
- * the thread for good. `onDeleted` runs after the host deleted the thread.
- */
 export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask) => void) {
   const { t } = useText();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  // Only what the menu needs, so a change elsewhere in the workspace does not render the thread list again.
   const { controlAgentTask, deleteAgentThread } = useMobileWorkspaceActions();
   const [acting, setActing] = useState<ReadonlySet<string>>(() => new Set());
   const editable = useMobileWorkspaceSelector((workspace) => workspace.canEditThreads(serverId));
 
-  // The threads with a request on the way. The ref answers at once; the state draws the menu.
   const pending = useRef(new Set<string>());
   const track = useCallback(async (task: AgentTask, error: MobileTextKey, run: () => Promise<void>) => {
     if (pending.current.has(task.id)) return false;
@@ -91,60 +82,66 @@ export function useThreadActions(serverId: string, onDeleted?: (task: AgentTask)
     [track, deleteAgentThread, serverId, queryClient, queryScope, onDeleted],
   );
 
-  function menu(task: AgentTask): MenuAction[] {
-    const control = controlAction(task);
-    const busy = acting.has(task.id);
-    return [
-      {
-        id: control,
-        title: t(CONTROL_TEXT[control].label),
-        image: CONTROL_TEXT[control].icon,
-        attributes: { disabled: busy, destructive: control === "stop" },
-      },
-      ...(editable
-        ? [
-            {
-              id: "edit",
-              title: "",
-              displayInline: true,
-              subactions: [
-                {
-                  id: "rename",
-                  title: t("mobile.chat.threads.rename"),
-                  image: "pencil",
-                  attributes: { disabled: busy },
-                },
-                {
-                  id: "delete",
-                  title: t("mobile.chat.threads.delete.action"),
-                  image: "trash",
-                  attributes: { disabled: busy || threadBusy(task), destructive: true },
-                },
-              ],
-            } satisfies MenuAction,
-          ]
-        : []),
-    ];
-  }
+  const menu = useCallback(
+    (task: AgentTask): MenuAction[] => {
+      const control = controlAction(task);
+      const busy = acting.has(task.id);
+      return [
+        {
+          id: control,
+          title: t(CONTROL_TEXT[control].label),
+          image: CONTROL_TEXT[control].icon,
+          attributes: { disabled: busy, destructive: control === "stop" },
+        },
+        ...(editable
+          ? [
+              {
+                id: "edit",
+                title: "",
+                displayInline: true,
+                subactions: [
+                  {
+                    id: "rename",
+                    title: t("mobile.chat.threads.rename"),
+                    image: "pencil",
+                    attributes: { disabled: busy },
+                  },
+                  {
+                    id: "delete",
+                    title: t("mobile.chat.threads.delete.action"),
+                    image: "trash",
+                    attributes: { disabled: busy || threadBusy(task), destructive: true },
+                  },
+                ],
+              } satisfies MenuAction,
+            ]
+          : []),
+      ];
+    },
+    [acting, editable, t],
+  );
 
-  function run(task: AgentTask, id: string) {
-    if (!isThreadAction(id)) return;
-    if (id === "rename") {
-      router.push({ pathname: "/thread-rename", params: { serverId, agentId: task.agentId, taskId: task.id } });
-      return;
-    }
-    void haptics.impact("light");
-    if (id === "delete") {
-      Alert.alert(t("mobile.chat.threads.delete.title"), t("mobile.chat.threads.delete.body"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("mobile.chat.threads.delete.action"), style: "destructive", onPress: () => void remove(task) },
-      ]);
-      return;
-    }
-    void track(task, CONTROL_TEXT[id].error, () =>
-      controlAgentTask(id, { agentId: task.agentId, taskId: task.id }, serverId),
-    );
-  }
+  const run = useCallback(
+    (task: AgentTask, id: string) => {
+      if (!isThreadAction(id)) return;
+      if (id === "rename") {
+        router.push({ pathname: "/thread-rename", params: { serverId, agentId: task.agentId, taskId: task.id } });
+        return;
+      }
+      void haptics.impact("light");
+      if (id === "delete") {
+        Alert.alert(t("mobile.chat.threads.delete.title"), t("mobile.chat.threads.delete.body"), [
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("mobile.chat.threads.delete.action"), style: "destructive", onPress: () => void remove(task) },
+        ]);
+        return;
+      }
+      void track(task, CONTROL_TEXT[id].error, () =>
+        controlAgentTask(id, { agentId: task.agentId, taskId: task.id }, serverId),
+      );
+    },
+    [track, remove, controlAgentTask, serverId, t],
+  );
 
-  return { menu, run, acting: (task: AgentTask) => acting.has(task.id) };
+  return useMemo(() => ({ menu, run, acting: (task: AgentTask) => acting.has(task.id) }), [menu, run, acting]);
 }

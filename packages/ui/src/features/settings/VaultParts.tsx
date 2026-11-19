@@ -15,28 +15,19 @@ import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { DangerZone, type IntegrationStatus, UNKNOWN_STATUS } from "./IntegrationLayout";
 
-/*
- * The parts that the password vault pages (1Password, Bitwarden) share. Their setup is different, but
- * the status, the failure, the secret form, the shared vault and Disconnect look the same on both.
- */
-
-/** One state of a vault connection, as its page header and every list of connectors show it. */
 export interface VaultStatus {
   status: IntegrationStatus;
   label: AppTextKey;
 }
 
-/** The header status: not known after a failed read, else the entry of the vault's status table. */
 export function vaultHeader(statusError: string | null | undefined, status: VaultStatus): VaultStatus {
   return statusError ? UNKNOWN_STATUS : status;
 }
 
-/** The last action that failed. With the state not known, the read error shows instead. */
 export function vaultFailure(title: string, statusError: string | null | undefined, error: string | null) {
   return statusError || !error ? null : { title, message: error };
 }
 
-/** Disconnect, after a confirmation, while the vault is connected and its state is known. */
 export function VaultDangerZone(props: {
   show: boolean;
   title: string;
@@ -59,17 +50,12 @@ export function VaultDangerZone(props: {
   );
 }
 
-/**
- * One secret, such as a token or a session key, with its label and the button that sends it. The field
- * clears when the secret is sent, so the page keeps no copy. The form sends nothing while `busy`.
- */
 export function VaultSecretForm(props: {
   label: string;
   placeholder?: string | undefined;
   submitLabel: string;
   busy: boolean;
   onSubmit: (secret: string) => void;
-  /** Shows Cancel next to the submit button while true. */
   cancelVisible?: boolean | undefined;
   onCancel?: (() => void) | undefined;
 }) {
@@ -111,7 +97,6 @@ export function VaultSecretForm(props: {
   );
 }
 
-/** The vaults or folders that OpenBot reads, as one card of `VaultRow`s and notes. */
 export function SharedVaultSection(props: { title: string; description: string; children: JSX.Element }) {
   return (
     <SettingsSection title={props.title} description={props.description}>
@@ -120,7 +105,6 @@ export function SharedVaultSection(props: { title: string; description: string; 
   );
 }
 
-/** One vault, folder or server: its name, and what is known about it. */
 export function VaultRow(props: { title: string; description?: string | undefined }) {
   return (
     <Item class="settings-modal-row">

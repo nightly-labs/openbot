@@ -26,6 +26,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturar la pantalla principal y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureChannel":
     "La imagen aparece en el canal {channel}, y cada miembro de este servidor que lee el canal puede verla.",
+  "status.agent.screenCapturePermissionNext":
+    "Después, macOS puede pedirte que permitas a OpenBot la grabación de pantalla.",
   "status.agent.screenCaptureDisplay": "Capturar la pantalla {name} y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureWindow": "Capturar la ventana {name} y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureRegion":
@@ -110,6 +112,7 @@ export const messages = {
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.mcpToolCall": "Ejecutar la herramienta {tool} del servidor MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Cerrado por un mensaje nuevo",
+  "status.agent.finishCheckContinues": "La solicitud aún no está terminada. El agente continúa ({current} de {limit}).",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
   "status.agent.planStopped": "El agente se detuvo con pasos pendientes en su plan. Envía un mensaje para continuar.",

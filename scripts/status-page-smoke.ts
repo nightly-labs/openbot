@@ -1,16 +1,3 @@
-// Smoke test of the public status page (`apps/status`).
-//   bun scripts/status-page-smoke.ts [--browser-executable=<path>] [--skip-live]
-// 1. Runs `update.ts --dry-run` against a local fake of the 5 probes: a bootstrap run, two failed
-//    Marketplace runs, then healthy runs. It checks the planned issue writes, the state and the
-//    daily minutes, and that only maintainer issues and comments reach the page.
-// 2. Runs `notify.ts` against a local receiver: bootstrap, signed deliveries in the 3 formats, event
-//    filters, a paused and a removed subscription, retries to their end, the test event, and no URL
-//    token or secret in the output.
-// 3. Runs one `--dry-run` against the live services and GitHub. It writes nothing remote.
-// 4. Builds the page, serves it with the files of step 1, and checks it in Chrome: the banner, the
-//    5 rows, the 30 and 90 day views, an incident that opens, plain-text updates, no console errors,
-//    and no axe-core violations, at 1440 and 390 px.
-// Writes .openbot-build/status-page/report.json and the screenshots beside it.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -44,9 +31,6 @@ const listen = (server: Server) =>
     }),
   );
 
-// 1. Update runs against a fake service -------------------------------------------
-
-/** Services whose probe answers 503. */
 const failing = new Set<string>();
 const probeServer = createServer((request, response) => {
   const path = request.url ?? "/";
@@ -82,7 +66,6 @@ interface FixtureComment {
   created_at: string;
 }
 
-/** The fields of a GitHub issue that `update.ts` reads; `comment_list` replaces the comment API. */
 interface FixtureIssue {
   number: number;
   title: string;
@@ -207,7 +190,6 @@ const readJson = <T>(path: string): T => {
   return value;
 };
 
-/** The child gets no GitHub token, so even a mistake in `--dry-run` cannot write an issue. */
 const childEnv = () => {
   const env = { ...process.env };
   delete env.GITHUB_TOKEN;
@@ -252,7 +234,6 @@ const record = (name: string, report: RunReport) => {
   return service;
 };
 
-// A run with no history and no --bootstrap must stop and write nothing.
 await assert.rejects(update("no-history", "2026-10-16T09:55:00Z"), "A run without history must fail.");
 assert.equal(existsSync(STATE), false, "A failed run wrote a state file.");
 
@@ -291,7 +272,6 @@ assert.deepEqual(
 );
 assert.equal(service.openIssue, null);
 
-// 30 minutes without a run: the check covers at most 15 of them.
 report = await update("late", "2026-10-16T10:50:00Z");
 service = record("late", report);
 const today = service.days.at(-1);
@@ -305,7 +285,6 @@ assert.deepEqual(today, {
 const accounts = readJson<{ services: Record<string, ServiceStateJson> }>(STATE).services.accounts;
 assert.equal(accounts?.days.at(-1)?.failedMinutes, 0);
 
-// An issue event only reads the issues again: anyone can start one, so it must not count a run.
 failing.add("marketplace");
 const stateBefore = readFileSync(STATE, "utf8");
 report = await update("incidents-only", "2026-10-16T10:52:00Z", ["--incidents-only"]);
@@ -339,9 +318,6 @@ assert.match(feed, /&lt;b&gt;Installed&lt;\/b&gt;/, "The feed escapes update tex
 assert.equal(feed.match(/<entry>/g)?.length, 5);
 logger.info("Update runs: passed.");
 
-// 2. Status webhooks against a local receiver ------------------------------------------
-
-/** What each subscription answers. `flaky` fails its first 2 tries. */
 const RECEIVER_TOKEN = randomBytes(16).toString("hex");
 const flakyFailures = { left: 2 };
 interface Received {
@@ -412,7 +388,6 @@ interface NotifyStateJson {
 
 const NOTIFY_STATE = resolve(WORK, "notify.json");
 const NOTIFY_SUMMARY = resolve(WORK, "notify-summary.md");
-/** The stdout and stderr of each run, scanned for secrets at the end. */
 const notifyOutput: string[] = [];
 
 const SERVICE_LIST = ["accounts", "connections", "hosted", "updates", "marketplace"];
@@ -478,7 +453,6 @@ const signIn = incident({
   ],
 });
 
-/** The stdout and stderr of a child that failed. */
 const childOutput = (error: unknown) =>
   error instanceof Error
     ? ["stdout" in error ? error.stdout : "", "stderr" in error ? error.stderr : ""]
@@ -539,7 +513,6 @@ const bySubscription = (list: Received[]) => {
   return groups;
 };
 
-/** Checks the signature as a receiver must: HMAC-SHA256 of `<timestamp>.<delivery>.<body>`, in constant time. */
 function verify(item: Received, secret: string) {
   const timestamp = item.headers["x-openbot-timestamp"] ?? "";
   assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 300, "The timestamp is not the send time.");
@@ -562,11 +535,9 @@ const STATUS_B = statusFile(
   [signIn, maintenance(), links([identified, investigating])],
 );
 
-// No state and no --bootstrap must stop: it would send every current event again.
 await assert.rejects(notify("no-state", STATUS_A, "2026-10-16T10:41:00Z"), "A run without state must fail.");
 assert.equal(existsSync(NOTIFY_STATE), false, "A failed run wrote a state file.");
 
-// A bad secret stops the run and names the field, not the value.
 const badUrl = `http://example.com/hook/${RECEIVER_TOKEN}`;
 for (const [label, hooks] of [
   ["http", [{ id: "team", url: badUrl, secret: SECRETS.team }]],
@@ -595,7 +566,6 @@ await assert.rejects(
   "--bootstrap with a state file must fail.",
 );
 
-// New update on 201, new incident 203, maintenance 202 starts, Marketplace goes down.
 notified = await notify("events", STATUS_B, "2026-10-16T12:05:30Z");
 assert.deepEqual(
   notified.found.filter((id) => !id.startsWith("incident.created:201") && !id.startsWith("maintenance.scheduled")),
@@ -605,7 +575,6 @@ assert.deepEqual(
     `maintenance.updated:202:${scheduled.at}:scheduled`,
     "maintenance.started:202",
     "incident.created:203",
-    // Its first update is in incident.created, so it is not sent alone.
     "incident.updated:203:2026-10-16T12:01:00Z:investigating",
     "service.changed:marketplace:2026-10-16T12:05:00Z",
   ],
@@ -675,7 +644,6 @@ assert.deepEqual(
   "A failed delivery waits 5 minutes. A redirect is a failure.",
 );
 
-// The same status again, and an older one from an issue event: no new event, no early retry.
 notified = await notify("repeat", STATUS_B, "2026-10-16T12:06:00Z");
 assert.deepEqual(take(), []);
 assert.deepEqual(notified.queued, []);
@@ -683,7 +651,6 @@ notified = await notify("older", statusFile("2026-10-16T11:00:00Z", [], STATUS_B
 assert.deepEqual(take(), [], "An older status.json sent a service change.");
 assert.equal(notifyState().checkedAt, "2026-10-16T12:05:00Z");
 
-// A removed subscription loses its waiting deliveries. Then the retries run to their end.
 const hooksLeft = HOOKS.filter((hook) => hook.id !== "redirect");
 notified = await notify("removed", STATUS_B, "2026-10-16T12:08:00Z", { hooks: hooksLeft });
 assert.deepEqual(
@@ -706,8 +673,6 @@ for (let round = 0; notifyState().outbox.length > 0; round++) {
 const retried = bySubscription(take());
 assert.equal(retried.flaky?.length, 2, "flaky is delivered on its third try.");
 assert.equal(retried.dead?.length, 7, "dead is tried 8 times in total.");
-// The retry clock passes the end of the maintenance window (12:30), so it completes here. A redirect
-// to team would add incident.created.
 assert.deepEqual(retried.team, ["maintenance.completed"], "A redirect reached another subscription.");
 assert.deepEqual(retried.discord, ["maintenance.completed"]);
 assert.deepEqual(
@@ -729,7 +694,6 @@ assert.deepEqual(
 );
 assert.match(readFileSync(NOTIFY_SUMMARY, "utf8"), /\| dead \| incident\.created \| 8 \| HTTP 500\. No more tries \|/);
 
-// 201 is resolved, 202 is complete and Marketplace is back.
 const STATUS_C = statusFile(
   "2026-10-17T00:00:00Z",
   [],
@@ -759,7 +723,6 @@ const resolved = JSON.parse(
 );
 assert.equal(resolved.incident.update.stage, "resolved", "The resolved event does not carry the final update.");
 
-// The test event goes to each active subscription, with or without a filter.
 notified = await notify("test", STATUS_C, "2026-10-17T00:01:00Z", { hooks: hooksLeft, extra: ["--test"] });
 got = take();
 assert.deepEqual(Object.keys(bySubscription(got)).sort(), ["dead", "discord", "flaky", "ops", "slack", "team"]);
@@ -769,7 +732,6 @@ assert.ok(teamTest);
 verify(teamTest, SECRETS.team);
 assert.ok(!Object.keys(notifyState().seen).some((id) => id.startsWith("test:")), "A test event is in the seen list.");
 
-// In GitHub Actions the script masks each URL and secret before anything else.
 await notify("actions", STATUS_C, "2026-10-17T00:02:00Z", { hooks: hooksLeft, actions: true });
 const actionsOutput = notifyOutput.pop() ?? "";
 const masks = actionsOutput.split("\n").filter((line) => line.startsWith("::add-mask::"));
@@ -785,9 +747,6 @@ assert.ok(
     .every((line) => line.startsWith("::add-mask::") || !leakValues.some((value) => line.includes(value))),
   "A secret is in the GitHub Actions log outside an add-mask command.",
 );
-// An incident that opens again sends no old "Resolved" update. An open incident that leaves the page
-// (closed as not planned) and a maintenance that is closed before its start send one event, after 2
-// runs without them. The first update of an incident that opened with none is sent when it comes.
 const resolvedUpdate = { at: "2026-10-16T13:00:00Z", stage: "resolved", body: "This incident is resolved." };
 const reopened = links([resolvedUpdate, identified, investigating]);
 const later = incident({
@@ -866,8 +825,6 @@ const webhooks = { tries, summary: readFileSync(NOTIFY_SUMMARY, "utf8") };
 writeFileSync(resolve(OUT, "webhook-summary.md"), webhooks.summary);
 logger.info("Status webhooks: passed.");
 
-// 3. One read-only run against the live services ----------------------------------------
-
 let live: RunReport["outcomes"] | null = null;
 if (!skipLive) {
   const liveDir = resolve(WORK, "live");
@@ -893,8 +850,6 @@ if (!skipLive) {
     logger.info(`Live ${id}: ${outcome.result}${outcome.reason ? ` (${outcome.reason})` : ""}`);
   }
 }
-
-// 4. The built page in Chrome ---------------------------------------------------------
 
 await run("bun", ["run", "build"], { cwd: APP });
 const PAGES = resolve(WORK, "pages");
@@ -923,7 +878,6 @@ const pageServer = createServer((request, response) => {
 });
 const pagePort = await listen(pageServer);
 
-// axe-core comes with the Storybook accessibility add-on.
 const AXE = new URL(import.meta.resolve("axe-core/axe.min.js")).pathname;
 
 interface AxeViolation {
@@ -937,7 +891,6 @@ declare global {
   }
 }
 
-/** The page reads the clock: 40 minutes after the last run, so the checks are late. */
 const PAGE_NOW = new Date("2026-10-16T11:30:00Z");
 
 const browser = await chromium.launch(
@@ -960,7 +913,6 @@ try {
     await page.goto(`http://127.0.0.1:${pagePort}/`);
     const banner = page.getByRole("region", { name: "Current status" });
     await banner.getByRole("heading").waitFor();
-    // Incident 101 is open, and the run at 10:50 is 40 minutes old.
     assert.equal(await banner.getByRole("heading").textContent(), "1 of 5 services affected");
     assert.match((await banner.textContent()) ?? "", /Checks are late/);
 
@@ -973,7 +925,6 @@ try {
     assert.match((await bars.first().getAttribute("aria-label")) ?? "", /in the last 30 days/);
     assert.equal(await page.getByRole("button", { name: "30 days" }).getAttribute("aria-pressed"), "true");
 
-    // The active incident shows its update as text, not as markup.
     const notice = page.getByRole("article").filter({ hasText: "Marketplace pages load slowly" });
     assert.equal(await notice.locator("b").count(), 0);
     assert.match((await notice.textContent()) ?? "", /<b>Installed<\/b>/);

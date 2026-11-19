@@ -1,41 +1,3 @@
-// Checks the workflows-v1 Team API grant. A real `TeamApiServer` runs on loopback with the real team,
-// agent, mailbox, sidebar, roles and workflow stores on a temporary profile. The owner sets agent
-// levels; a member signs in as a current desktop client does. Each request and answer goes through the
-// frozen codec. The host must hide a workflow that names a closed agent (but show the owner one whose
-// agent was deleted), refuse a run without the chat level and a change, rename or delete without the
-// manage level, keep the messaging place of an output to an owner or admin, keep the webhook URL and
-// secret from a member, clip step texts, drop the step of an agent that is hidden now and refuse its
-// retry, hide a
-// workflow of a local-only provider, refuse a workflow too large for one frame, and tell the member's
-// event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
-// protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
-// advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
-// into an OpenBot channel. A member puts that output in a canvas group, but a change of its settings
-// still needs an owner. The codec carries kinds and statuses that this app does not know, and
-// the client shows a workflow with such a node read-only; a member reads the graph of an old version.
-// The host advertises `workflows-media-v1` to a protocol 9 peer, and a member keeps an uploaded PNG
-// as a picture of the host; a GIF, a used draft and a client without the capability are refused.
-// The host advertises `workflows-media-account-v1` to a protocol 9 peer. An image step whose account
-// the host does not have fails with "account not found" in the real agent service, and never makes the
-// file on another account; a step with no account reaches the media maker with the own sign-in.
-// The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
-// or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
-// with the ask of its provider; a video and a step without the field do not.
-// The host advertises `workflows-media-size-v1` to a protocol 9 peer. An image step with `aspect`
-// "custom" asks the model for the nearest aspect ratio and keeps the file that the host cropped to its
-// width and height; a failed crop keeps the model's file, and a video or a side out of range is not cropped.
-// An image step with `aspect` "4:5" or "5:4" asks the model for that ratio; a video model without them gets
-// its first ratio.
-// An image step with no description runs from its text input; with no description, no text and no
-// picture it fails with "mediaEmptyRequest" and never reaches the media maker.
-// The host advertises `workflows-media-catalog-v1` to a protocol 9 peer. A member reads the live models
-// of the signed-in services and the price of a step's choices; a bad price request is refused. A step
-// with a model that only the live list has reaches the media maker with its id at the service.
-// Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
-// status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
-// Run: `bun scripts/workflow-team-api-e2e.ts`.
-// Writes .openbot-build/workflow-team-api-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -46,6 +8,7 @@ import {
   WORKFLOW_GROUP_FIELDS,
   type WorkflowDetail,
   type WorkflowGraph,
+  type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaPriceRequest,
   type WorkflowNode,
@@ -59,9 +22,10 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { teamCapabilitiesForProtocol, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -75,6 +39,11 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CODECS,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -118,21 +87,14 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
-/** As the app answers: true while an enabled Sunra row of the host is signed in. */
 let sunraSignedIn = false;
-/** As the app answers: true while an enabled Higgsfield row of the host is signed in. */
 let higgsfieldSignedIn = false;
-/** The account of each media request, in order. Null is the provider's own sign-in. */
+let serviceAccounts: WorkflowMediaAccountCredits[] = [];
 const mediaAccounts: (string | null)[] = [];
-/** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
 const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
-/** The model id at the provider and the catalog id of each media request, in order. */
 const mediaModels: { model: string; catalogId: string }[] = [];
-/** The length in seconds that each media request asks for, in order. */
 const mediaDurations: number[] = [];
-/** Each price request that reached the host's price read, in order. */
 const priceRequests: WorkflowMediaPriceRequest[] = [];
-/** A Higgsfield model that only the live list has, as the host's catalog read gives it after the sign-in. */
 const LIVE_MODEL: WorkflowMediaCatalogModel = {
   id: "higgsfield-kling3_0_e2e",
   provider: "higgsfield",
@@ -141,13 +103,11 @@ const LIVE_MODEL: WorkflowMediaCatalogModel = {
   maker: "Kuaishou",
   kinds: ["video"],
   aspects: ["16:9", "9:16", "1:1"],
-  // Each second from 3 to 15, as the host reads a duration range: more lengths than the short list shows.
   durations: Array.from({ length: 13 }, (_, index) => index + 3),
   resolutions: ["720p", "1080p"],
   transparent: false,
 };
 const LIVE_PRICE = 22.5;
-/** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
 const HOST_VERSION = "0.0.0-e2e";
@@ -158,7 +118,6 @@ const WEBHOOK_URL = "https://relay.example.test/hooks/e2e";
 const SECRET = "whsec-e2e-not-a-real-secret";
 const LONG_ANSWER = "a".repeat(40_000);
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "workflow-team-api-electron-boundary",
   setup(build) {
@@ -208,7 +167,6 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -217,7 +175,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -234,7 +191,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -318,10 +274,8 @@ interface Host {
 
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
-/** The agent whose deliveries fail, so its step keeps an error. */
 let failingAgent = "";
 
-/** Starts the host on the profile, as the app does at each launch, with stand-ins for agent turns. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -330,7 +284,6 @@ async function startHost(): Promise<Host> {
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
@@ -360,35 +313,31 @@ async function startHost(): Promise<Host> {
         }),
       stopDelivery: () => Effect.void,
       generateText: () => Effect.fail({ message: "No model step runs in this check." }),
-      // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
-      // The app crops the file with Electron's image decoder, which this check does not load. The stand-in
-      // keeps a new file id, as the app does.
       sizePicture: (attachmentId, size) => {
         sizeRequests.push({ attachmentId, ...size });
         return sizeFails
           ? Effect.fail({ message: "The e2e crop failed." })
           : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
       },
-      mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
-      // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
-      // quota after the sign-in. No Sunra or Higgsfield call is made.
+      mediaProviders: () => ({
+        sunra: sunraSignedIn,
+        higgsfield: higgsfieldSignedIn,
+        accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+      }),
       mediaCredits: () =>
         Effect.succeed({
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
+          accounts: serviceAccounts,
         }),
-      // As the app answers: the live Higgsfield list after the sign-in. No Sunra or Higgsfield call is made.
       mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
       mediaPrice: (request) =>
         Effect.sync(() => {
           priceRequests.push(request);
           return { credits: higgsfieldSignedIn && request.model === LIVE_MODEL.id ? LIVE_PRICE : null };
         }),
-      // A step with an account goes to the real agent service, which must refuse an account that this
-      // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
-      // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
         mediaModels.push({ model: request.model, catalogId: request.catalogId });
@@ -406,10 +355,8 @@ async function startHost(): Promise<Host> {
         );
       },
       notify: () => {},
-      // No messaging connection exists here, so an output to a place fails with its sentence.
       connectionOn: () => false,
       post: () => Effect.succeed({ posted: true as const }),
-      // As the app does: an agent event, so the member's socket hears it.
       changed: (workflowId) => agents.notifyWorkflowsChanged(workflowId),
       rearm: () => {},
       timezone: () => "UTC",
@@ -426,7 +373,6 @@ async function startHost(): Promise<Host> {
     agentAccess: access,
     workflows: {
       ...workflows,
-      // The relay gives a webhook trigger its URL; here each one gets a fixed URL.
       get: (workflowId) =>
         workflows.get(workflowId).pipe(
           Effect.map(
@@ -440,7 +386,6 @@ async function startHost(): Promise<Host> {
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
     },
-    // The chats of Telegram and Slack nodes (`workflows-chats-v1`); no messaging driver runs here.
     admin: {
       routineResults: {
         options: () => Effect.succeed([]),
@@ -468,7 +413,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a desktop client. `capabilities` is what the client advertises. */
 async function call(
   method: string,
   path: string,
@@ -479,7 +423,7 @@ async function call(
     Accept: "application/json",
     [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
+    ...teamCapabilityHeaders(protocol, input.capabilities ?? teamCapabilitiesForProtocol(protocol)),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -492,7 +436,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A workflows request through the frozen codec, in both directions. */
 async function wire(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = WORKFLOWS_CODECS.get(path);
   assert.ok(codec, `No workflows-v1 codec for ${path}.`);
@@ -501,11 +444,9 @@ async function wire(path: string, token: string, body: unknown): Promise<{ statu
   return { status: response.status, body: codec.response(response.status, response.body) };
 }
 
-/** A 1 by 1 PNG and a 1 by 1 GIF. */
 const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const GIF_BASE64 = "R0lGODlhAQABAAAAACw=";
 
-/** Sends a file as an attachment draft, as a client does before it uses the file, and answers the draft id. */
 async function sendDraft(
   token: string,
   name: string,
@@ -523,7 +464,6 @@ async function sendDraft(
   return text(record(JSON.parse(body), "draft").id, "draft id");
 }
 
-/** The headers of a protocol 9 client with all current capabilities, for a request that `call` cannot send. */
 function v9Headers(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
@@ -533,7 +473,6 @@ function v9Headers(token: string): Record<string, string> {
   };
 }
 
-/** The refusals that these checks expect. */
 type RefusalKey =
   | "error.workflow.missing"
   | "error.workflow.versionMissing"
@@ -544,7 +483,6 @@ type RefusalKey =
   | "error.workflow.runMissing"
   | "error.team.adminRequired";
 
-/** A request that must answer `status` with the sentence of `key`. */
 async function refused(path: string, token: string, body: unknown, status: number, key: RefusalKey) {
   const response = await wire(path, token, body);
   assert.equal(response.status, status, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
@@ -552,7 +490,6 @@ async function refused(path: string, token: string, body: unknown, status: numbe
   return response.status;
 }
 
-/** What a client makes of a 200 answer that a host sends: the frozen codec, then `decode`. */
 function answer<T>(path: string, body: unknown, decode: (value: unknown) => T): T {
   const codec = WORKFLOWS_CODECS.get(path);
   assert.ok(codec, `No workflows-v1 codec for ${path}.`);
@@ -572,7 +509,6 @@ async function login(credentials: { username: string; password: string }): Promi
 }
 
 let accessRevision = 0;
-/** Sets the Everyone level of each agent, as the owner does in the roles settings. */
 async function setLevels(ownerToken: string, everyone: AgentAccessChange["everyone"]) {
   const codec = AGENT_ACCESS_CODECS.get(AGENT_ACCESS_ROUTES.set);
   assert.ok(codec);
@@ -583,7 +519,6 @@ async function setLevels(ownerToken: string, everyone: AgentAccessChange["everyo
   accessRevision += 1;
 }
 
-/** Opens a member's event socket that declares workflows-v1, and waits for its first snapshot. */
 async function openEvents(token: string): Promise<WebSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -608,7 +543,6 @@ async function openEvents(token: string): Promise<WebSocket> {
   return socket;
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -632,7 +566,6 @@ const agentNode = (id: string, agentId: string): WorkflowNode => ({
   fields: { agentId, text: "Say hello." },
 });
 const promptNode: WorkflowNode = { id: "prompt", kind: "prompt", at: at(0), fields: { text: "Start." } };
-/** A prompt into one agent step. */
 const agentGraph = (agentId: string): WorkflowGraph => ({
   nodes: [promptNode, agentNode("agent", agentId)],
   edges: [{ id: "edge", from: "prompt", to: "agent", type: "text" }],
@@ -650,7 +583,6 @@ const withOutput = (graph: WorkflowGraph, output: WorkflowNode): WorkflowGraph =
   edges: [...graph.edges, { id: "edge-output", from: "agent", to: output.id, type: "text" }],
 });
 
-/** Makes a workflow on the host, as the owner does on the computer that runs the server. */
 async function hostWorkflow(title: string, graph: WorkflowGraph): Promise<{ id: string; revision: number }> {
   const { workflows } = current();
   const created = await runCauseEffect(workflows.create({ title }));
@@ -661,7 +593,6 @@ async function hostWorkflow(title: string, graph: WorkflowGraph): Promise<{ id: 
   return { id: created.summary.id, revision: saved.revision };
 }
 
-/** Moves runs until the step of `nodeId` in the run ends. */
 async function settled(runId: string, nodeId: string) {
   const { workflows } = current();
   for (;;) {
@@ -886,7 +817,6 @@ try {
       403,
       "error.team.adminRequired",
     );
-    // The member moves a node; the output and its place stay as they are.
     const kept: WorkflowGraph = {
       ...posting,
       nodes: posting.nodes.map((node) => ({ ...node, at: { x: node.at.x, y: 40 } })),
@@ -1028,7 +958,6 @@ try {
     const restored = await hostWorkflow("Restore", agentGraph(closed));
     const [version] = await runCauseEffect(current().workflows.versions(restored.id));
     assert.ok(version, "The first save made no version.");
-    // Within five minutes of the version, so the open graph makes no second version.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: restored.id,
@@ -1062,7 +991,6 @@ try {
     const closedWorkflow = await hostWorkflow("Versions closed", agentGraph(closed));
     const [closedVersion] = await runCauseEffect(current().workflows.versions(closedWorkflow.id));
     assert.ok(closedVersion);
-    // The owner takes the closed agent out; its old version still names it.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: closedWorkflow.id,
@@ -1172,7 +1100,6 @@ try {
       decodeRemoteWorkflowRunDetail,
     );
     assert.deepEqual([run.run.source, run.run.status, run.steps[0]?.status], ["manual", "stopped", "stopped"]);
-    // A name that is not a short lowercase id is still malformed.
     assert.throws(() => answer(WORKFLOWS_ROUTES.get, { ...detail, revision: -1 }, decodeRemoteWorkflowDetail));
     assert.throws(() =>
       answer(
@@ -1181,7 +1108,6 @@ try {
         decodeRemoteWorkflowRunDetail,
       ),
     );
-    // This host does not know the kind, so its save refuses it after the codec passes it.
     const target = await hostWorkflow("Newer save", { nodes: [promptNode], edges: [], strokes: [] });
     const save = await wire(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
       workflowId: target.id,
@@ -1237,7 +1163,6 @@ try {
     const ended = await settled(run.id, "agent");
     assert.equal(ended.status, "failed");
     assert.ok(ended.error);
-    // The owner takes the agent out of the workflow and then closes it.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: workflow.id,
@@ -1262,7 +1187,6 @@ try {
     assert.equal(ownerStep.error, ended.error, "The owner lost the step error.");
     const page = await ok(WORKFLOWS_ROUTES.runs, member, { workflowId: workflow.id, limit: 10 });
     assert.deepEqual(nodesOf(record(list(page.runs, "runs")[0], "run")), ["prompt"]);
-    // The current graph has no agent now, but a retry runs the old run's graph and its agent.
     const retry = await refused(
       WORKFLOWS_ROUTES.retryStep,
       member,
@@ -1288,7 +1212,6 @@ try {
       text(record(row, "summary").title, "title"),
     );
     assert.ok(!titles.includes("Local model"), "The member list has a workflow of a local-only provider.");
-    // A local-only provider crosses to no peer, so the owner on another computer gets 404 as well.
     const remoteOwner = await refused(
       WORKFLOWS_ROUTES.get,
       ownerToken,
@@ -1482,7 +1405,6 @@ try {
       assert.ok(codec, "No workflows-higgsfield-v1 codec for providers.");
       const creditsCodec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
       assert.ok(creditsCodec, "No workflows-higgsfield-v1 codec for credits.");
-      // The raw body, so that a field of another media service in the answer fails the check.
       const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
         call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V9, capabilities });
       const read = async () => {
@@ -1499,7 +1421,6 @@ try {
         creditsCodec.response(response.status, response.body);
         return response.body;
       };
-      // Sunra is still signed in from the step before; Higgsfield is not.
       assert.equal(sunraSignedIn, true);
       higgsfieldSignedIn = false;
       const signedOut = await read();
@@ -1511,7 +1432,6 @@ try {
       assert.deepEqual(signedIn, { higgsfield: true });
       const creditsSignedIn = await credits();
       assert.deepEqual(creditsSignedIn, { higgsfield: { available: 42, quota: null } });
-      // The frozen Sunra routes keep their `{ sunra }` answer while Higgsfield is signed in too.
       const sunraProviders = await raw(WORKFLOWS_SUNRA_ROUTES.providers);
       assert.deepEqual(sunraProviders.body, { sunra: true });
       const sunraCredits = await raw(WORKFLOWS_SUNRA_ROUTES.credits);
@@ -1554,7 +1474,6 @@ try {
       });
       const run = async (account: string) => {
         const workflow = await hostWorkflow(`Image ${account || "own"}`, imageGraph(account));
-        // The graph crosses the wire as the host keeps it: the account field stays.
         const detail = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: workflow.id });
         const image = list(record(detail.graph, "graph").nodes, "nodes")
           .map((node) => record(node, "node"))
@@ -1773,12 +1692,9 @@ try {
         const priceSignedIn = await price(ask);
         assert.deepEqual(priceSignedIn, { credits: LIVE_PRICE });
         assert.deepEqual(priceRequests.slice(before), [ask], "the request reached the host's price read unchanged");
-        // A bad request is refused before it reaches the price read.
         const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
         assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
         assert.equal(priceRequests.length, before + 1);
-        // A step with the live model reaches the media maker with its id at Higgsfield, its catalog id and
-        // a custom length that the short list of the canvas does not show.
         assert.ok(!workflowVideoLengthChoices(LIVE_MODEL.durations).includes(7), "7 s is a custom length");
         const beforeModels = mediaModels.length;
         const workflow = await hostWorkflow("Live Higgsfield model", {
@@ -1826,6 +1742,104 @@ try {
           old: old.status,
         };
       } finally {
+        higgsfieldSignedIn = false;
+      }
+    },
+  );
+
+  await step(
+    "service accounts: the host advertises workflows-media-service-account-v1 to a protocol 10 peer; a member reads each account and its credits; a step on a missing account fails and never falls back",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const read = async (route: string) => {
+        const codec = WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS.get(route);
+        assert.ok(codec, `No workflows-media-service-account-v1 codec for ${route}.`);
+        codec.request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const imageGraph = (account: string): WorkflowGraph => ({
+        nodes: [
+          promptNode,
+          {
+            id: "image",
+            kind: "image",
+            at: at(300),
+            fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 5, resolution: "720p", account },
+          },
+        ],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      });
+      const run = async (account: string) => {
+        const workflow = await hostWorkflow(`Higgsfield ${account || "first"}`, imageGraph(account));
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        return settled(text(record(started.run, "run").id, "run id"), "image");
+      };
+      higgsfieldSignedIn = true;
+      try {
+        serviceAccounts = [];
+        const none = { accounts: await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts) };
+        assert.deepEqual(none.accounts, { accounts: [] });
+        serviceAccounts = [
+          { provider: "sunra", id: "sunra-row", name: null, credits: { available: 120, quota: 500 } },
+          { provider: "higgsfield", id: "higgsfield-row", name: null, credits: { available: 42, quota: null } },
+          { provider: "higgsfield", id: "higgsfield-row-2", name: "Higgsfield 2", credits: null },
+        ];
+        const accounts = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts);
+        assert.deepEqual(accounts, {
+          accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+        });
+        const credits = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits);
+        assert.deepEqual(credits, { accounts: serviceAccounts });
+        const legacy = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.deepEqual(legacy.body, { higgsfield: { available: 42, quota: null } });
+        const old = await raw(
+          WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        const before = mediaAccounts.length;
+        const missing = await run("higgsfield-row-2");
+        assert.equal(missing.status, "failed");
+        assert.equal(
+          missing.error,
+          sourceText("error.provider.accountNotFound", { provider: "Higgsfield" }),
+          JSON.stringify(missing.error),
+        );
+        const first = await run("");
+        assert.equal(first.status, "done", JSON.stringify(first.error));
+        assert.deepEqual(mediaAccounts.slice(before), ["higgsfield-row-2", null]);
+        return {
+          none: none.accounts,
+          accounts,
+          credits,
+          legacy: legacy.body,
+          old: old.status,
+          missing: missing.error,
+          first: first.status,
+        };
+      } finally {
+        serviceAccounts = [];
         higgsfieldSignedIn = false;
       }
     },

@@ -1,19 +1,3 @@
-// End-to-end check of the resource handling of agent processes on a server (docs/docker.md#cpu-and-memory-of-the-instances):
-//
-// - `resources/agent-runtime/cpu-limit.cjs` makes os.cpus() follow the CPU limit of a container, for
-//   CommonJS and for ESM imports, in a real Node 24 container with `--cpus 2`.
-// - `ServerMemory` from src/main/server-memory.ts runs as "main" in a Bun container with a 1 GiB
-//   memory limit and no swap, behind docker-init as PID 1, as OpenBot runs behind tini. It must give
-//   marked agent processes nice 10 and an OOM value of 500, also after they leave its tree; leave an
-//   unmarked orphan (as Xvfb is) and itself alone; and when a marked detached job fills the memory,
-//   stop the job's largest leaf with SIGTERM before the kernel OOM killer acts, so the shell of the
-//   job still runs its next command, which reports exit status 143.
-//
-//   bun scripts/instance-resource-guard-e2e.ts
-//
-// It needs Docker and network access for the images. The report is
-// `.openbot-build/instance-resource-guard-e2e/report.json`.
-
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { getPriority } from "node:os";
@@ -34,7 +18,6 @@ interface CheckResult {
 
 const results: CheckResult[] = [];
 
-/** A line that `report` printed in the guard container. */
 function isCheckResult(value: unknown): value is CheckResult {
   return (
     typeof value === "object" &&
@@ -127,7 +110,6 @@ async function outside(): Promise<void> {
   if (results.some((result) => !result.ok)) process.exitCode = 1;
 }
 
-/** One check, as a JSON line for `outside`. */
 function report(name: string, ok: boolean, detail: string): void {
   process.stdout.write(`${JSON.stringify({ name, ok, detail })}\n`);
 }
@@ -139,7 +121,6 @@ async function procValue(pid: number, file: string): Promise<string | null> {
   );
 }
 
-/** Field 4 of /proc/<pid>/stat. */
 function parentOf(stat: string | null): string | undefined {
   return stat?.slice(stat.lastIndexOf(")") + 2).split(" ")[1];
 }
@@ -152,7 +133,6 @@ function nice(pid: number): number | null {
   }
 }
 
-/** The pid of the only process with this command line, or null. */
 async function findProcess(command: string): Promise<number | null> {
   const { readdir } = await import("node:fs/promises");
   for (const entry of await readdir("/proc")) {
@@ -163,7 +143,6 @@ async function findProcess(command: string): Promise<number | null> {
   return null;
 }
 
-/** Starts a shell command whose job leaves this process's tree when the shell ends. */
 function detach(command: string, marked: boolean): ChildProcess {
   const { AGENT_PROCESS_VARIABLE } = serverMemoryModule;
   return spawn("sh", ["-c", `nohup sh -c '${command}' >/dev/null 2>&1 &`], {
@@ -192,14 +171,11 @@ async function inside(): Promise<void> {
     onError: (message) => process.stderr.write(`${message}\n`),
     onAgentProcessStopped: (agentProcess) => stopped.push(agentProcess),
   });
-  // Xvfb starts before main, so it is never main's descendant. The unmarked orphan here leaves the
-  // tree before the first tick for the same reason.
   detach("exec sleep 3602", false);
   const unmarked = await until("the unmarked orphan", async () => {
     const pid = await findProcess("sleep 3602");
     return pid !== null && parentOf(await procValue(pid, "stat")) === "1" ? pid : null;
   });
-  // The pass runs on each tick. A tick every 100 ms keeps ahead of the memory job below.
   let ticking = true;
   const ticks = (async () => {
     while (ticking) {
@@ -240,9 +216,6 @@ async function inside(): Promise<void> {
       `nice ${nice(process.pid)}, OOM ${await procValue(process.pid, "oom_score_adj")}`,
     );
 
-    // A detached job whose leaf, `tail`, holds all it reads: about 50 MB a second, until it is stopped.
-    // The guard stops only a process that runs for 5 s, and the limit is reached after about 13 s.
-    // The shell then writes the exit status, as a routine wake-up command reports it.
     detach(`(while :; do head -c 20000000 /dev/zero || exit; sleep 0.4; done) | tail; echo "$?" > ${WAKE_FILE}`, true);
     const status = await until(
       "the wake-up file",

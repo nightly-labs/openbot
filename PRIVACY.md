@@ -255,7 +255,11 @@ it gets on your account and sends it to OpenPanel with your account ID. To remov
 browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
 with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
 you pay on the web, the web client sends the code to the account service, which gives it to Stripe
-for that Checkout page. It is not sent to analytics. When you choose a language on the website, it saves
+for that Checkout page. It is not sent to analytics. When you open an invite link (an openbot.run
+address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
+When you sign in on the web, the web client sends the code to the account service and removes it from
+`localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -445,6 +449,17 @@ The service stores:
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
+- invite links: the invite code of each account that opened Invite friends, and for each account that
+  signed up with an invite link or an invite code, the account that invited
+  it and the time. When an invited account pays, the service compares the Stripe card fingerprints of
+  the two accounts. It does not keep them; when they match, it keeps only the time when it ended the
+  invite. For each paid
+  invoice of an invited account, the service keeps the Stripe invoice ID, the two account IDs, the
+  amount without tax, the credit that it gave in Stripe and the Stripe balance transaction ID, and
+  for a refund or a lost dispute, the credit that it took back. The account that invited sees the
+  first name and the initial of the last name of each invited account, the day it joined, whether
+  it pays now, has no plan or stopped paying, and the credit that the invited account gave it, which is
+  10% of what the invited account paid. It never sees an email or a plan of an invited account. Deleting either account removes these rows.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -551,7 +566,7 @@ account service stores a hash of the token of that request and the time of the l
 no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
-delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
+delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
 its reference to `pool-free`.
 
@@ -1845,8 +1860,8 @@ Gemini agents stay on this computer: OpenBot does not show them to team members.
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
 and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
 `daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
-operating system and processor type. They contain no conversation, file, or model data. With an API key
+The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
+and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.
 

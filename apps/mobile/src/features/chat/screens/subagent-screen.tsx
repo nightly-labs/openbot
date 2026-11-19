@@ -38,15 +38,10 @@ const STEP_ICONS: Record<ConversationSubagentStepKind, LucideIcon> = {
 
 const NO_SUBAGENTS: readonly ConversationSubagent[] = [];
 
-/** The subagents of one `subagents` message. */
 function useSubagents(agentId: string, messageId: string): readonly ConversationSubagent[] {
   return useConversationMessage(agentId, messageId)?.subagents ?? NO_SUBAGENTS;
 }
 
-/**
- * The first page of the sheet: the progress and the time of the subagents of one turn, and a row for
- * each subagent with its latest step or answer. A row opens the details of its subagent.
- */
 export function SubagentsScreen() {
   const colors = useSubagentColors();
   const params = useLocalSearchParams<{ agentId: string; serverId?: string; messageId: string }>();
@@ -88,10 +83,6 @@ export function SubagentsScreen() {
   );
 }
 
-/**
- * One subagent of a turn: its task, its state and all of its steps, as the desktop side panel shows
- * them.
- */
 export function SubagentScreen() {
   const text = useText();
   const { t } = text;
@@ -101,7 +92,6 @@ export function SubagentScreen() {
   const serverId = firstParam(params.serverId);
   const messageId = firstParam(params.messageId) ?? "";
   const subagentId = firstParam(params.subagentId) ?? "";
-  // Two servers can hold an agent with the same id, so the server picks the one of this chat.
   const agentName = useMobileWorkspaceSelector(
     (current) =>
       current.agents.find(

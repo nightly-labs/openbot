@@ -50,7 +50,6 @@ export const DEVELOPMENT_SEED_MANIFEST_FILE = "openbot-dev-seed-v1.json";
 const logger = createOpenBotLogger("seed-dev-state");
 
 const TEAM_FILE = "openbot-team-server-v2.json";
-/** Read only, exactly as the app reads it: the file a build without accounts owns. */
 const LEGACY_TEAM_FILE = "openbot-team-server-v1.json";
 const SETUP_FILE = "openbot-setup-v2.json";
 const SEED_VERSION = 1;
@@ -59,44 +58,23 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const CHANNEL_LAUNCH_ROOM = "channel-launch-room";
 const CHANNEL_BETA_FEEDBACK = "channel-beta-feedback";
-/**
- * The reader id `HostService.channelActor` uses while no account is signed in. The signed-in reader
- * adopts these cursors through `ChannelStore.adoptReads`, so the seeded read state follows it.
- */
 const LOCAL_MEMBER_ID = "local";
-/** The provider, model and effort every seeded agent shares. Not per-agent data: one answer. */
 export interface SeededAgentModel {
   provider: AgentProviderId;
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
 }
 
-/**
- * What the seeded agents run on: Claude Haiku while Claude Code is signed in, and OpenCode's free
- * DeepSeek otherwise, never Codex.
- *
- * The app asks the CLI it spawns. A seed has no provider runtime, so it asks the same binary
- * directly, and reads anything that fails -- nothing downloaded yet, no sign-in, a command that
- * moved -- as "signed out". The free model needs no sign-in, so it is not checked: the app
- * downloads its OpenCode when the first agent starts.
- */
 async function seededAgentModel(appDataRoot: string): Promise<SeededAgentModel> {
   return (await claudeSignedIn(appDataRoot)) ? DEVELOPMENT_CLAUDE_DEFAULT : DEVELOPMENT_FREE_DEFAULT;
 }
 
-/**
- * Whether Claude Code is signed in on the default account, the one a new dev profile uses.
- * `claude auth status` exits 1 when signed out, which `execFileSync` throws.
- */
 async function claudeSignedIn(appDataRoot: string): Promise<boolean> {
   try {
     const cli = await runCauseEffect(resolveClaudeCli({ bundledExecutable: managedClaudeExecutable(appDataRoot) }));
     const status = execFileSync(cli.executable, ["auth", "status", "--json"], {
       encoding: "utf8",
       timeout: 15_000,
-      // The flag the app spawns a managed CLI with. A managed binary that updates itself while a
-      // profile is seeded stops being the exact version the app verifies, and the app downloads it
-      // again on the next start.
       env: { ...process.env, ...(cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {}) },
     });
     return z.object({ loggedIn: z.literal(true) }).safeParse(JSON.parse(status)).success;
@@ -105,13 +83,6 @@ async function claudeSignedIn(appDataRoot: string): Promise<boolean> {
   }
 }
 
-/**
- * Where the app's own Claude Code is: the runtime store this computer shares, which is where a CLI
- * the user downloaded in OpenBot is the only copy there is.
- *
- * The store, not the status: the manager is read for the path it computes, and nothing here creates
- * a directory, downloads, or collects an old version.
- */
 function managedClaudeExecutable(appDataRoot: string): string | null {
   const runtimes = new ProviderRuntimeManager({
     root: providerRuntimeRoot({ appData: appDataRoot, userDataOverride: "" }),
@@ -189,12 +160,7 @@ export interface DevelopmentSeedOptions {
   dryRun?: boolean;
   ifMissing?: boolean;
   instanceId?: string | null;
-  /**
-   * What the seeded agents run on. Left out, it is resolved from this computer's OpenCode CLI,
-   * which is what makes it an option: a test pins the answer instead of asking the machine.
-   */
   agentModel?: SeededAgentModel;
-  /** Generated agents, histories, channels and images on top of the showcase, for benchmarks. */
   scale?: SeedScale | undefined;
 }
 
@@ -202,7 +168,6 @@ export interface DevelopmentSeedSummary {
   targetProfile: string;
   dryRun: boolean;
   profileActive: boolean;
-  /** The model every seeded agent runs on, which a dry run reports before anything is written. */
   agentModel: AgentModelId;
   agents: number;
   conversations: number;
@@ -329,7 +294,6 @@ export async function isDevelopmentProfileActive(
   profilePath: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<boolean> {
-  // Chromium on Windows has no `SingletonLock`. It holds `lockfile` open while it runs.
   if (platform === "win32") {
     try {
       await lstat(join(profilePath, "lockfile"));
@@ -399,9 +363,6 @@ async function buildSeedProfile(
       transferDirectories,
     });
     await seedTeam(profilePath, agentStore, clock);
-    // No model beside the provider, and the built-in provider: a seeded profile records no choice
-    // of the developer's, which is what lets the app apply its own development default to an agent
-    // created later. `AgentService` decides that one against the live catalog; this script cannot.
     await runCauseEffect(
       writeSetupState(join(profilePath, SETUP_FILE), {
         preferredProvider: DEFAULT_AGENT_PROVIDER,
@@ -467,7 +428,6 @@ function seedMemories(agentStore: AgentStore): void {
   }
 }
 
-/** Not a ciphertext of any secret: the app cannot decrypt it, so the webhook stays closed until regenerated. */
 const SEED_WEBHOOK_SECRET_PLACEHOLDER = Buffer.from("openbot-dev-seed: regenerate this secret").toString("base64");
 
 async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock: SeedClock): Promise<void> {
@@ -530,9 +490,6 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock
     now,
   );
 
-  // One routine that a webhook starts, so the canvas and the routine settings show a webhook. The app
-  // keeps the signing secret encrypted with Electron's safe storage, which this script cannot reach,
-  // so the seed stores a placeholder: requests answer 503 until the secret is regenerated in the app.
   routines.saveRecord(
     "launch",
     undefined,
@@ -551,9 +508,6 @@ async function seedRoutines(agentStore: AgentStore, mailbox: MailboxStore, clock
     now,
   );
 
-  // Each run holds its own `scheduledFor`, but the request it delivers carries the mailbox clock,
-  // which is the moment the seed runs. So two runs of one routine would render as one instruction
-  // repeated at one time. Two routines keep the scheduled and the manual run apart in the thread.
   await seedRoutineRun(routines, mailbox, morningBrief, "scheduled", clock.at(26 * HOUR), "succeeded");
   await seedRoutineRun(routines, mailbox, fridayReview, "manual", clock.at(2 * HOUR), "succeeded");
   await seedRoutineRun(
@@ -615,8 +569,6 @@ async function seedAgents(agentStore: AgentStore, agentModel: SeededAgentModel):
         name: fixture.name,
         title: fixture.title,
         description: fixture.description,
-        // The provider travels with the model: a record left on the built-in provider while its
-        // model belongs to another one names a model that provider cannot run.
         provider: agentModel.provider,
         model: agentModel.model,
         reasoningEffort: agentModel.reasoningEffort,
@@ -674,13 +626,10 @@ const spreadsheetNumberFormatCases: { id: string; value: number; format: string 
 
 const escapeXmlAttribute = (value: string): string => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 
-/** A one-sheet workbook with a Case column and a styled Value column. */
 function caseWorkbookXlsx(input: {
   sheetName: string;
   date1904: boolean;
-  /** Format codes for the custom IDs 164 and up. */
   formats: string[];
-  /** The numFmtId of each cell style. */
   styles: number[];
   cases: { id: string; value: number; style: number }[];
 }): Uint8Array {
@@ -722,7 +671,6 @@ function spreadsheetDatesXlsx(system: "1900" | "1904"): Uint8Array {
   if (!workbook) throw new Error("Missing spreadsheet date fixture.");
   return caseWorkbookXlsx({
     sheetName: `Dates ${workbook.system}`,
-    // No workbookPr in the 1900 fixture: Excel uses that system by default.
     date1904: workbook.system === "1904",
     formats: [],
     styles: [0, 14, 22, 21],
@@ -1122,9 +1070,6 @@ async function seedConversations(
       { seedVersion: SEED_VERSION },
       `dev-seed:conversation:${agentId}`,
     );
-    // The app writes the preview from the user's last request with its references expanded
-    // (`agent-service.ts`), never from a reply. A hand-written line contradicts the transcript
-    // beside it as soon as the transcript changes.
     const request = [...messages].reverse().find((entry) => entry.author === "user" && entry.text.trim());
     if (request)
       await runCauseEffect(
@@ -1154,8 +1099,6 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
     await runCauseEffect(mailbox.markTerminal(delivery.id, "completed"));
   }
 
-  // A teammate passing information on without asking for an answer: the state the marker reads as
-  // "Informed" for the sender and "Update from" for the recipient.
   const notice = await runCauseEffect(
     mailbox.enqueue({
       sender: { kind: "agent", agentId: "builder" },
@@ -1186,11 +1129,6 @@ async function seedAgentExchanges(mailbox: MailboxStore): Promise<void> {
   await runCauseEffect(mailbox.markTerminal(failedDelivery.id, "failed", "The primary source was not available."));
 }
 
-/**
- * The two channels the app cannot show without them: a working room with a delegated run, and one
- * archived room behind the sidebar toggle. No seeded task is `queued` and no seeded routine run is
- * open, so the channel service recovers this state at startup without starting a provider turn.
- */
 async function seedChannels(
   agentStore: AgentStore,
   mailbox: MailboxStore,
@@ -1226,8 +1164,6 @@ async function seedLaunchRoom(
     {},
     "dev-seed:channel-launch-room",
   );
-  // The execution threads come first: a file an agent generates in a channel belongs to the shared
-  // transcript, so it has to be owned by the channel thread rather than by the agent's own chat.
   for (const agentId of ["chief", "research", "builder"]) store.context(channelId, agentId);
   const launchThread = store.context(channelId, "launch").threadId;
   const draft = await runCauseEffect(
@@ -1257,8 +1193,6 @@ async function seedLaunchRoom(
   );
   transferDirectories.push(`generated/${draft.id}`);
 
-  // The routine exists before the message it fired: the author id of a routine request carries the
-  // routine id, the way `ChannelService` writes it for a `request` command.
   const routines = new ChannelRoutineStore(store.database);
   const timezone = seedTimezone();
   const standup = routines.create(
@@ -1411,14 +1345,11 @@ async function seedLaunchRoom(
     }),
   ];
   store.update(created, { messages, tasks }, "dev-seed:channel-launch-room:transcript");
-  // Two messages the user did not write stay unread, so the sidebar count and the unread divider
-  // both have something to show.
   store.markRead(channelId, LOCAL_MEMBER_ID, 6, "dev-seed:channel-launch-room:read");
 
   const standupRun = routines.createRun(standup, standup.trigger.id, "scheduled", clock.at(26 * HOUR));
   routines.attachRequest(standupRun.id, requestStandup);
   routines.updateRunStatus(standupRun.id, "succeeded");
-  // A fire that never reached the channel: the run holds the error and no request message.
   const blockedRun = routines.createRun(standup, null, "test", clock.at(4 * HOUR));
   routines.updateRunStatus(blockedRun.id, "failed", "Every member was busy when the routine fired.");
 
@@ -1433,7 +1364,6 @@ async function seedLaunchRoom(
   );
 }
 
-/** Finished work behind the sidebar's archived toggle, which is empty without it. */
 function seedBetaFeedbackChannel(store: ChannelStore, agents: Map<string, AgentSummary>, clock: SeedClock): void {
   const channelId = CHANNEL_BETA_FEEDBACK;
   const created = store.update(
@@ -1508,15 +1438,9 @@ interface SeedChannelMessage {
   turnId?: string;
   replyToMessageId?: string;
   attachments?: AttachmentSummary[];
-  /** The member a routing receipt names, which makes the row a channel activity marker. */
   assignedAgentId?: string;
 }
 
-/**
- * The same message shape `ChannelService` writes: a member request is a `user` message, a lead
- * dispatch or a handoff is a `system` message, and a reported result is an `assistant` message
- * with the turn that produced it.
- */
 function channelMessage(channelId: string, clock: SeedClock, input: SeedChannelMessage): ChannelMessage {
   return {
     id: input.id,
@@ -1610,7 +1534,6 @@ async function seedTeam(profilePath: string, agentStore: AgentStore, clock: Seed
   const ownerSession = await runCauseEffect(team.loginWithAccount(owner));
   await runCauseEffect(team.setEnabledOnLaunch(teamIdentity.serverId, true));
 
-  // The owner and Alice leave the third seat of the default limit to the dev test client.
   const [alice] = joined;
   if (!alice) throw new Error("The development team members could not be created.");
   const chat = new TeamChatStore(agentStore.database);
@@ -1703,11 +1626,6 @@ async function cleanupStagedSeed(
   ]);
 }
 
-/**
- * Every seeded record is dated backwards from the run. A fixed date would put the whole showcase
- * weeks before the routine runs, which the schedulers date from the real clock, and would make the
- * date separators and the sidebar order read wrong on the day a developer seeds.
- */
 interface SeedClock {
   now: Date;
   at(millisecondsAgo: number): string;

@@ -19,25 +19,13 @@ import { type StoredStateFailure, storedSync } from "../stored-state-effects";
 export interface MessagePinsOptions {
   store: AgentStore;
   tasks: AgentTasks;
-  /** A pin of the agent changed, so each client reads the list again. */
   changed: (agentId: string) => void;
 }
 
-/** Why the agent's own pin or unpin did not change the list. */
 export type AgentPinRefusal = MessagePinRefused["reason"] | "pinned-by-person" | "not-pinnable-chat";
 
-/** The most messages that a quote finds, so a short quote does not read the whole thread. */
 const QUOTE_MATCH_LIMIT = 20;
 
-/**
- * Owns the pinned messages of an agent's own chat and of its side threads. A person pins from the
- * menu of a message; the agent pins with its `pin_message` tool, and it cannot unpin the pin of a
- * person. A pin names a shown message of the thread, and the list reads each message from the
- * database, so a pin shows a message that the open chat has not loaded, also one of an archived
- * thread. The list of an agent covers all its chats, so a client finds a pin in another thread.
- *
- * It never imports the agent service facade.
- */
 export class MessagePins {
   readonly #store: AgentStore;
   readonly #tasks: AgentTasks;
@@ -49,7 +37,6 @@ export class MessagePins {
     this.#changed = options.changed;
   }
 
-  /** The pins of all chats of the agent, the newest first. An agent that does not exist has none. */
   list(agentId: string): PinnedMessagesSnapshot {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return { agentId, pins: [] };
@@ -74,7 +61,6 @@ export class MessagePins {
     return { agentId, pins: pins.map((pin) => pinnedMessage(pin, thread(pin.threadId))) };
   }
 
-  /** A person pins or unpins one shown message, and answers the pins after the change. */
   readonly set = Effect.fn("MessagePins.set")(function* (
     this: MessagePins,
     input: SetMessagePinnedInput,
@@ -84,19 +70,12 @@ export class MessagePins {
       const threadId = this.#threadId(input.agentId, input.taskId);
       return threadId ? this.#write(input.agentId, threadId, input.messageId, input.pinned, pinner) : "not-found";
     });
-    // Only the agent's own pin gets these reasons; the narrowing keeps the public ones.
     if (refusal === "pinned-by-person" || refusal === "not-pinnable-chat")
       return yield* new MessagePinRefused({ reason: "not-found" });
     if (refusal) return yield* new MessagePinRefused({ reason: refusal });
     return yield* storedSync(() => this.list(input.agentId));
   }, Effect.uninterruptible);
 
-  /**
-   * The newest shown message of the agent's chat or side thread whose text contains `quote`, or null.
-   * The `pin_message` tool names a message with it, as the agent does not see message ids. It skips
-   * `exclude`: the user's request that quotes the message also contains the quote. For an unpin it
-   * takes the newest pinned match, so an unpinned newer copy of the text does not hide the pin.
-   */
   findByQuote(
     agentId: string,
     threadId: string,
@@ -117,7 +96,6 @@ export class MessagePins {
     );
   }
 
-  /** The agent pins or unpins one shown message of the chat that it works in. */
   readonly setByAgent = Effect.fn("MessagePins.setByAgent")(function* (
     this: MessagePins,
     input: { agentId: string; threadId: string; messageId: string; pinned: boolean },
@@ -137,7 +115,6 @@ export class MessagePins {
     return { refused: null, snapshot: yield* storedSync(() => this.list(input.agentId)) };
   }, Effect.uninterruptible);
 
-  /** A message, the history of a chat or a side thread was deleted, and its pins with it. */
   messagesDeleted(agentId: string): void {
     this.#changed(agentId);
   }
@@ -153,7 +130,6 @@ export class MessagePins {
     const current = database.threadMessagePinner(threadId, messageId);
     if (!pinned) {
       if (!current) return null;
-      // The agent keeps the pins that a person made.
       if (pinner.kind === "agent" && current.kind === "person") return "pinned-by-person";
       database.unpinThreadMessage(threadId, messageId);
       this.#changed(agentId);
@@ -168,16 +144,13 @@ export class MessagePins {
     return null;
   }
 
-  /** The thread of the agent's own chat or of one of its side threads, or null when there is none. */
   #threadId(agentId: string, taskId: string | undefined): string | null {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return null;
     if (taskId === undefined) return agent.threadId ?? null;
-    // An archived thread keeps its messages and its pins.
     return this.#tasks.has(agent.id, taskId) ? this.#tasks.require(agent.id, taskId).threadId : null;
   }
 
-  /** The agent's own chat or one of its side threads. A channel or a linked messaging chat keeps no pins. */
   #pinnableThread(agentId: string, threadId: string): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return false;
@@ -187,7 +160,6 @@ export class MessagePins {
   }
 }
 
-/** A finished message that a person or the agent wrote. A message that streams can still change. */
 function canPin(message: ConversationMessage): boolean {
   return message.author !== "system" && message.status !== "streaming";
 }

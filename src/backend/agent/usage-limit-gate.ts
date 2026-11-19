@@ -6,41 +6,28 @@ import type { AgentStore } from "../agent-store";
 import { causeHelpers } from "../effect-boundary";
 import { agentProviderAccount as accountOf, providerForAgent } from "./thread-items";
 
-/** A provider client's report that the plan refused this turn, with the reset in epoch seconds when it gave one. */
 export const USAGE_LIMIT_METHOD = "openbot/usageLimit";
 
-/**
- * How often a limit is read again before its reset. The provider can end it early, as when a reset
- * credit is spent outside OpenBot. A usage read is one request, not a turn.
- */
 const USAGE_LIMIT_RECHECK_MS = 15 * 60_000;
 
-/** Time after the reported reset before work starts again, so the provider's clock has passed it too. */
 const RESET_GRACE_MS = 30_000;
 
-/**
- * How long a model that failed a turn with a provider error is passed over, so an agent on a backup
- * does not go back to a model that still fails at once. An error that names a later reset, such as
- * a spent Gemini quota, holds the model until that reset (#4583).
- */
 const PROVIDER_FAILURE_HOLD_MS = 10 * 60_000;
 
-/** The longest delay `setTimeout` keeps. A longer wait is armed again when it fires. */
 const MAX_TIMER_MS = 2_147_483_647;
+
+const RETURN_READ_TIMEOUT_MS = 10_000;
 
 export interface UsageLimitHooks {
   emit(event: AgentEvent): void;
   emitRuntimeSnapshot(): void;
   scheduleDrain(agentId: string): void;
-  /** The account's usage reading for this model, or null when it gives none. A null account is the provider's own sign-in. */
   readUsage(
     provider: AgentProvider,
     model: string,
     accountId: string | null,
   ): Effect.Effect<AccountUsage | null, UsageReadFailed>;
-  /** The agents a limit now holds, each time a refused turn reports it. Must not wait for their queues. */
   held(agentIds: readonly string[]): Effect.Effect<void>;
-  /** A limit ended, after its agents' drains were scheduled. Must not wait for the work it starts. */
   released(limit: UsageLimitKey): Effect.Effect<void>;
 }
 
@@ -51,66 +38,39 @@ export interface UsageLimitGateOptions {
 
 export interface UsageLimitKey {
   provider: AgentProvider;
-  /** The provider account after the first, or null for the provider's own sign-in. */
   accountId: string | null;
   model: string;
 }
 
 interface ProviderFailure extends UsageLimitKey {
-  /** Epoch milliseconds when the hold ends. */
   endsAt: number;
-  /** A spent balance that names no reset: no wait gives it back. */
   spent: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 
 interface UsageLimit extends UsageLimitKey {
-  /** Epoch seconds, or null while the provider has not said. */
   resetsAt: number | null;
-  /**
-   * The reset came from a usage reading, not from the refusal. The provider can end such a limit
-   * before it, as when a reset credit is spent in the Codex app, so it is read again.
-   */
   resetFromUsage: boolean;
-  /**
-   * A reading ended a limit before the reset that a refusal named, and a turn was refused again before
-   * that reset: the reading does not show this limit, as a limit of one model can be. It waits for the reset.
-   */
   readBlind: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
-/**
- * The plan limits of the provider accounts, and the queues they hold.
- *
- * Owns one entry per provider account and model whose last turn the plan refused. While an entry exists, no
- * agent on that provider and model starts a turn: its messages and routine runs stay queued instead
- * of failing one by one. A model is part of the key because a weekly window can cover one model
- * family only; an account-wide window costs each other model one refused, requeued turn.
- *
- * The entry ends at the reported reset, after a usage read that finds no spent window, or when a
- * turn on that provider and model completes. A refusal that names its reset is read again too, unless
- * a reading already ended it once and the next turn was refused. It is kept in memory only: after a
- * restart the first refused turn closes the gate again. A message from the user lets its agent try one turn before
- * that: the user can have signed the provider in to another account, or bought more usage, and no
- * reading shows that before the reset.
- *
- * It also owns the models that failed a turn with a provider error. They hold no queue: they only
- * move agents set to switch without asking to a backup, and keep them there for a while.
- */
+interface ReturnHold {
+  spent: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
 export class UsageLimitGate {
   readonly #store: AgentStore;
   readonly #hooks: UsageLimitHooks;
   readonly #limits = new Map<string, UsageLimit>();
-  /** Owns the usage reads and the timer runs, so `dispose` stops them. */
   #scope = Scope.makeUnsafe();
-  /** Providers the user was told about in this limit, so a limit that closes again is not announced twice. */
   readonly #announced = new Set<AgentProvider>();
   readonly #failures = new Map<string, ProviderFailure>();
-  /** The agents that may start one turn while a limit or a provider error holds their model, with its key. */
   readonly #tries = new Map<string, string>();
-  /** The limits that a reading ended before the reset a refusal named, with that reset in epoch seconds. */
   readonly #readReleased = new Map<string, number>();
+  readonly #seen = new Set<string>();
+  readonly #returnHolds = new Map<string, ReturnHold>();
 
   constructor(options: UsageLimitGateOptions) {
     this.#store = options.store;
@@ -122,11 +82,6 @@ export class UsageLimitGate {
     return !agent || !this.#limits.has(limitKey(providerForAgent(agent), accountOf(agent), agent.model));
   }
 
-  /**
-   * The user sent this agent a message while a limit holds it, so the agent may start one turn. The
-   * try ends when that turn starts: a refused turn queues its messages again, and a completed one
-   * ends the limit.
-   */
   retry(agentId: string): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
@@ -134,18 +89,11 @@ export class UsageLimitGate {
     if (this.#limits.has(key)) this.#tries.set(agentId, key);
   }
 
-  /**
-   * A person or an agent chose this model for the agent while a provider error passes over it, so
-   * one turn tries it before the agent moves to a backup again (#11992). A change that is queued
-   * until the agent is idle keeps the try until it applies. The try ends when a turn starts, when
-   * the model fails again, or when the hold ends.
-   */
   chosen(agentId: string, limit: UsageLimitKey): void {
     const key = limitKey(limit.provider, limit.accountId, limit.model);
     if (this.#failures.has(key) && !this.#limits.has(key)) this.#tries.set(agentId, key);
   }
 
-  /** Whether a provider error passes over the agent's model, with no try that the model was chosen for. */
   passesOver(agentId: string): boolean {
     const agent = this.#agent(agentId);
     if (!agent) return false;
@@ -153,7 +101,6 @@ export class UsageLimitGate {
     return this.#failures.has(key) && this.#tries.get(agentId) !== key;
   }
 
-  /** Whether the agent may start a turn that holds its model, because the user sent it a message or chose it. */
   mayTry(agentId: string): boolean {
     const agent = this.#agent(agentId);
     return (
@@ -162,46 +109,45 @@ export class UsageLimitGate {
     );
   }
 
-  /**
-   * A turn of this agent starts, so a try that let it start ends. A try for a queued model change is
-   * kept: the turn runs on the model that the agent leaves.
-   */
   tryStarted(agentId: string): void {
     const agent = this.#agent(agentId);
     if (!agent || this.#tries.get(agentId) === limitKey(providerForAgent(agent), accountOf(agent), agent.model))
       this.#tries.delete(agentId);
   }
 
-  /** Whether a limit holds this provider account and model. */
   isLimited(limit: UsageLimitKey): boolean {
-    return this.#limits.has(limitKey(limit.provider, limit.accountId, limit.model));
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
+    return this.#limits.has(key) || this.#returnHolds.get(key)?.spent === true;
   }
 
-  /**
-   * The provider account and model that `failed` would hold for this agent's turn on `model`, as one
-   * key. Null when the agent no longer exists.
-   */
+  returnPending(limit: UsageLimitKey): boolean {
+    return this.#returnHolds.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === false;
+  }
+
+  returnConfirmed(limit: UsageLimitKey): boolean {
+    const key = limitKey(limit.provider, limit.accountId, limit.model);
+    if (this.#seen.has(key)) return true;
+    if (!this.#returnHolds.has(key)) {
+      const hold: ReturnHold = { spent: false, timer: null };
+      this.#returnHolds.set(key, hold);
+      this.#readReturn(key, limit, hold);
+    }
+    return false;
+  }
+
   failureKey(agentId: string, model: string | null = null): string | null {
     const agent = this.#agent(agentId);
     return agent ? limitKey(providerForAgent(agent), accountOf(agent), model ?? agent.model) : null;
   }
 
-  /** Whether a provider error passes over this provider account and model. */
   isFailed(limit: UsageLimitKey): boolean {
     return this.#failures.has(limitKey(limit.provider, limit.accountId, limit.model));
   }
 
-  /** Whether the provider error that passes over this provider account and model was a spent balance. */
   isSpent(limit: UsageLimitKey): boolean {
     return this.#failures.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === true;
   }
 
-  /**
-   * A provider error failed a turn of this agent on `model`, the agent's current model when null.
-   * The model is passed over until the hold ends or a turn on it completes. Then the agents that
-   * left it go back. `resetDelayMs` is the wait until the reset that the error names, when it names one.
-   * `spent` marks a spent balance that names no reset.
-   */
   failed(agentId: string, model: string | null = null, resetDelayMs: number | null = null, spent = false): void {
     const agent = this.#agent(agentId);
     if (!agent) return;
@@ -209,12 +155,10 @@ export class UsageLimitGate {
     const accountId = accountOf(agent);
     const turnModel = model ?? agent.model;
     const key = limitKey(provider, accountId, turnModel);
-    // A try ends when its turn starts. This also ends it for a turn that started some other way, so a
-    // model that failed again never gets a second try.
+    const dropped = this.#forgetReturnHold(key);
     if (this.#tries.get(agentId) === key) this.#tries.delete(agentId);
     const previous = this.#failures.get(key);
     if (previous) clearTimeout(previous.timer);
-    // A later error with no reset, such as from another agent on the same model, keeps the named reset.
     const hold = Math.max(PROVIDER_FAILURE_HOLD_MS, (resetDelayMs ?? 0) + RESET_GRACE_MS);
     const endsAt = Math.max(previous?.endsAt ?? 0, Date.now() + hold);
     this.#failures.set(key, {
@@ -222,14 +166,13 @@ export class UsageLimitGate {
       accountId,
       model: turnModel,
       endsAt,
-      // A later error of another kind does not end a spent balance that is still held.
       spent: spent || previous?.spent === true,
       timer: this.#armFailure(key, endsAt),
     });
+    if (dropped) this.#wakeReturning(key);
     this.#hooks.emitRuntimeSnapshot();
   }
 
-  /** Releases the failure at `endsAt`. A wait longer than `MAX_TIMER_MS` is armed again when it fires. */
   #armFailure(key: string, endsAt: number): ReturnType<typeof setTimeout> {
     return setTimeout(
       () => {
@@ -241,7 +184,6 @@ export class UsageLimitGate {
     );
   }
 
-  /** The agents whose queue a limit holds, for the runtime snapshot. */
   limitedAgents(): NonNullable<AgentRuntimeSnapshot["usageLimits"]> {
     return this.#store.list().flatMap((agent) => {
       const limit = this.#limits.get(limitKey(providerForAgent(agent), accountOf(agent), agent.model));
@@ -249,7 +191,6 @@ export class UsageLimitGate {
     });
   }
 
-  /** Each provider account and model that a limit holds, for the runtime snapshot. */
   limitedModels(): NonNullable<AgentRuntimeSnapshot["usageLimitedModels"]> {
     return [...this.#limits.values()].slice(0, INPUT_LIMITS.agents).map((limit) => ({
       provider: limit.provider,
@@ -258,7 +199,6 @@ export class UsageLimitGate {
     }));
   }
 
-  /** Each provider account and model that a provider error holds, for the runtime snapshot. */
   failedModels(): NonNullable<AgentRuntimeSnapshot["failedModels"]> {
     return [...this.#failures.values()].slice(0, INPUT_LIMITS.agents).map((failure) => ({
       provider: failure.provider,
@@ -267,10 +207,6 @@ export class UsageLimitGate {
     }));
   }
 
-  /**
-   * The plan refused a turn of this agent. `resetsAt` is in epoch seconds. `model` is the one the
-   * turn ran on; the agent's current model when null.
-   */
   readonly reached = Effect.fn("UsageLimitGate.reached")(function* (
     this: UsageLimitGate,
     agentId: string,
@@ -283,6 +219,7 @@ export class UsageLimitGate {
     const turnModel = model ?? agent.model;
     const accountId = accountOf(agent);
     const key = limitKey(provider, accountId, turnModel);
+    const dropped = this.#forgetReturnHold(key);
     const limit = this.#limits.get(key) ?? {
       provider,
       accountId,
@@ -292,7 +229,6 @@ export class UsageLimitGate {
       readBlind: false,
       timer: null,
     };
-    // A reset already past would release the queue at once into the same refusal.
     const future = (value: number | null) => (value !== null && value * 1_000 > Date.now() ? value : null);
     const named = future(resetsAt);
     limit.resetsAt = named ?? future(limit.resetsAt);
@@ -300,17 +236,16 @@ export class UsageLimitGate {
     const readReleased = this.#readReleased.get(key);
     this.#readReleased.delete(key);
     if (named !== null && readReleased !== undefined && readReleased * 1_000 > Date.now()) limit.readBlind = true;
-    // With no reset known, only a reading can end the limit.
     else if (limit.resetsAt === null) limit.readBlind = false;
     this.#limits.set(key, limit);
     this.#arm(key, limit);
+    if (dropped) this.#wakeReturning(key);
     yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
     this.#hooks.emitRuntimeSnapshot();
     if (limit.resetsAt !== null) {
       this.#announce(agentId, limit);
       return;
     }
-    // A provider that names no reset in its refusal usually reports it in its usage reading.
     yield* this.#readReset(key, limit).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -321,7 +256,6 @@ export class UsageLimitGate {
     );
   }).bind(this);
 
-  /** A turn of this agent completed on `model`, so its provider and model take turns again. */
   readonly completed = Effect.fn("UsageLimitGate.completed")(function* (
     this: UsageLimitGate,
     agentId: string,
@@ -332,15 +266,13 @@ export class UsageLimitGate {
     const provider = providerForAgent(agent);
     const key = limitKey(provider, accountOf(agent), model ?? agent.model);
     this.#readReleased.delete(key);
+    if (this.#forgetReturnHold(key))
+      yield* this.#hooks.released({ provider, accountId: accountOf(agent), model: model ?? agent.model });
     if (this.#limits.has(key)) yield* this.#release(key);
     if (this.#failures.has(key)) yield* this.#releaseFailure(key);
     if (![...this.#limits.values()].some((limit) => limit.provider === provider)) this.#announced.delete(provider);
   }).bind(this);
 
-  /**
-   * The user spent a usage reset credit of a provider account, so each limit of that account ends now
-   * and its agents take turns again. A null account is the provider's own sign-in.
-   */
   readonly accountReset = Effect.fn("UsageLimitGate.accountReset")(function* (
     this: UsageLimitGate,
     provider: AgentProvider,
@@ -348,6 +280,9 @@ export class UsageLimitGate {
   ) {
     const account = limitKey(provider, accountId, "");
     for (const key of [...this.#readReleased.keys()]) if (key.startsWith(account)) this.#readReleased.delete(key);
+    for (const key of [...this.#returnHolds.keys()])
+      if (key.startsWith(account) && this.#forgetReturnHold(key))
+        yield* this.#hooks.released({ provider, accountId, model: key.slice(account.length) });
     for (const [key, limit] of [...this.#limits])
       if (limit.provider === provider && limit.accountId === accountId) yield* this.#release(key, true);
   }).bind(this);
@@ -359,6 +294,9 @@ export class UsageLimitGate {
     this.#failures.clear();
     this.#tries.clear();
     this.#readReleased.clear();
+    for (const hold of this.#returnHolds.values()) if (hold.timer) clearTimeout(hold.timer);
+    this.#returnHolds.clear();
+    this.#seen.clear();
     this.#announced.clear();
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -402,12 +340,9 @@ export class UsageLimitGate {
       this.#arm(key, limit);
       return;
     }
-    // A reading that still shows a spent window gives the reset, and one that shows none lets one turn
-    // try. With no reset known, no reading lets one turn try too; a known reset waits for it.
     const known = limit.resetsAt;
     const named = limit.resetFromUsage ? null : known;
     const resetsAt = yield* this.#readReset(key, limit);
-    // A refusal during the reading armed the timer again.
     if (this.#limits.get(key) !== limit || limit.timer !== null || typeof resetsAt === "number") return;
     if (resetsAt === null || known === null) {
       if (named !== null) this.#readReleased.set(key, named);
@@ -415,10 +350,6 @@ export class UsageLimitGate {
     } else this.#arm(key, limit);
   });
 
-  /**
-   * Reads the reset of the spent window into `limit` and arms it. Null when the reading shows none,
-   * undefined when there is no reading, it fails, or it has no window.
-   */
   readonly #readReset = Effect.fn("UsageLimitGate.readReset")(function* (
     this: UsageLimitGate,
     key: string,
@@ -429,13 +360,10 @@ export class UsageLimitGate {
       .readUsage(limit.provider, limit.model, limit.accountId)
       .pipe(Effect.catch(() => Effect.succeed(null)));
     if (this.#limits.get(key) !== limit) return null;
-    // A reset that a refusal named while the reading ran stays.
     if (limit.resetsAt !== null && !limit.resetFromUsage && limit.resetsAt !== named) return limit.resetsAt;
-    // A provider that does not run, or a reading that does not cover the model, has no window.
     if (!usage?.limits.some((reading) => reading.primary || reading.secondary)) return undefined;
     const resetsAt = spentWindowReset(usage);
     if (resetsAt === null) return null;
-    // A spent window keeps the reset that the refusal named.
     if (named !== null) {
       this.#arm(key, limit);
       return named;
@@ -448,11 +376,6 @@ export class UsageLimitGate {
     return resetsAt;
   });
 
-  /**
-   * Ends a limit. At the reset the provider reported, the limit is over, so the next one is announced
-   * again. A probe of a limit with no known reset keeps the announcement: the next refused turn may
-   * only close the same limit again.
-   */
   readonly #release = Effect.fn("UsageLimitGate.release")(function* (this: UsageLimitGate, key: string, reset = false) {
     const limit = this.#limits.get(key);
     if (!limit) return;
@@ -477,6 +400,55 @@ export class UsageLimitGate {
     yield* this.#hooks.released({ provider: failure.provider, accountId: failure.accountId, model: failure.model });
   });
 
+  #readReturn(key: string, limit: UsageLimitKey, hold: ReturnHold): void {
+    Effect.runFork(this.#confirmReturn(key, limit, hold).pipe(Effect.forkIn(this.#scope)));
+  }
+
+  readonly #confirmReturn = Effect.fn("UsageLimitGate.confirmReturn")(function* (
+    this: UsageLimitGate,
+    key: string,
+    limit: UsageLimitKey,
+    hold: ReturnHold,
+  ) {
+    hold.timer = null;
+    const usage = yield* this.#hooks.readUsage(limit.provider, limit.model, limit.accountId).pipe(
+      Effect.timeoutOrElse({ duration: RETURN_READ_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+      Effect.catch(() => Effect.succeed(null)),
+    );
+    if (this.#returnHolds.get(key) !== hold) return;
+    const resetsAt = usage ? spentWindowReset(usage) : null;
+    if (resetsAt !== null) {
+      const waited = !hold.spent;
+      hold.spent = true;
+      const untilReset = resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
+      hold.timer = setTimeout(
+        () => this.#readReturn(key, limit, hold),
+        Math.max(0, Math.min(untilReset, USAGE_LIMIT_RECHECK_MS)),
+      );
+      if (waited) this.#wakeReturning(key);
+      return;
+    }
+    this.#forgetReturnHold(key);
+    yield* this.#hooks.released({ provider: limit.provider, accountId: limit.accountId, model: limit.model });
+  });
+
+  #forgetReturnHold(key: string): boolean {
+    this.#seen.add(key);
+    const hold = this.#returnHolds.get(key);
+    if (!hold) return false;
+    if (hold.timer) clearTimeout(hold.timer);
+    this.#returnHolds.delete(key);
+    return true;
+  }
+
+  #wakeReturning(key: string): void {
+    for (const agent of this.#store.list()) {
+      const returnTo = agent.usageLimitReturn;
+      if (returnTo && limitKey(returnTo.provider, accountOf(returnTo), returnTo.model) === key)
+        this.#hooks.scheduleDrain(agent.id);
+    }
+  }
+
   #heldAgents(limit: UsageLimit) {
     return this.#store
       .list()
@@ -493,7 +465,6 @@ function limitKey(provider: AgentProvider, accountId: string | null, model: stri
   return `${provider}\u0000${accountId ?? ""}\u0000${model}`;
 }
 
-/** The latest future reset among the spent windows of a reading, in epoch seconds. */
 function spentWindowReset(usage: AccountUsage): number | null {
   const now = Date.now() / 1_000;
   let latest: number | null = null;

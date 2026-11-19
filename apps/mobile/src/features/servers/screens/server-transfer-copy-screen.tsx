@@ -22,13 +22,6 @@ import { useText } from "@/shared/lib/text";
 
 type Phase = "idle" | "exporting" | "sending" | "applying";
 
-/**
- * Server settings › Transfer › Copy to another server. The phone downloads the chosen agents of this
- * server with their workspace files and server settings, and without chats. It keeps only the
- * settings of those agents, their routine flows and workflows (`copiedTransferUpload`), then sends that
- * file to the other server and applies all of its agents. It uses the routes of an export and an import, so a
- * host needs no new route. The desktop does the same in main (`instanceTransfer.copy`).
- */
 export function ServerTransferCopyScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -44,8 +37,6 @@ export function ServerTransferCopyScreen() {
   const available = canTransferServer(serverId);
   const targets = servers.filter((server) => server.id !== serverId && canTransferServer(server.id));
   const [chosenTarget, setChosenTarget] = useState<string | null>(null);
-  // The first other server until the user chooses one. When the chosen server goes offline, no server
-  // is chosen: the copy does not go to a server that the user did not choose.
   const target =
     chosenTarget === null ? (targets[0] ?? null) : (targets.find((server) => server.id === chosenTarget) ?? null);
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
@@ -54,7 +45,6 @@ export function ServerTransferCopyScreen() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ server: string; value: RemoteInstanceTransferResult } | null>(null);
 
-  // The agents of both servers are read again each time the page opens.
   const source = useQuery({
     queryKey: queryKeys.instanceTransferSummary(queryScope, serverId),
     enabled: available,
@@ -72,9 +62,7 @@ export function ServerTransferCopyScreen() {
     queryFn: () => loadInstanceTransferSummary(target?.id ?? ""),
   });
 
-  // A token that the destination keeps when the page closes before the apply is released.
   const closed = useRef(false);
-  // A second tap before the next render does not start a second copy.
   const running = useRef(false);
   useEffect(() => {
     closed.current = false;
@@ -128,7 +116,6 @@ export function ServerTransferCopyScreen() {
   const busy = phase !== "idle";
   const selected = data.agents.filter((agent) => !excluded.has(agent.id));
   const usedNames = new Set(destination.data?.agents.map((agent) => agent.name.toLowerCase()) ?? []);
-  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
   const readingDestination = destination.isPending && destination.fetchStatus !== "idle";
 
   async function copy(to: { id: string; name: string }) {
@@ -139,7 +126,6 @@ export function ServerTransferCopyScreen() {
     setProgress(null);
     let token: string | null = null;
     try {
-      // `instance-transfer-v1` sends the file with no warnings.
       const upload = copiedTransferUpload(
         await downloadInstanceTransfer(
           { agentIds: selected.map((agent) => agent.id), includeFiles: true, includeSettings: true },
@@ -158,10 +144,7 @@ export function ServerTransferCopyScreen() {
         { token, keys: preview.agents.map((agent) => agent.key), includeSettings: true },
         to.id,
       );
-      // The host releases the token and the staged file when the apply starts. A failed apply can stop
-      // before the host gets it, so the discard below runs then.
       token = null;
-      // The stage can drop files and agents. Show why, as an import does.
       const warnings = [...new Set([...preview.warnings, ...done.warnings])].slice(0, AGENT_IMPORT_LIMITS.warnings);
       setResult({ server: to.name, value: { ...done, warnings } });
       void haptics.notification("success");
@@ -189,7 +172,6 @@ export function ServerTransferCopyScreen() {
         : phase === "applying"
           ? t("mobile.server.transfer.copying")
           : t("mobile.server.transfer.copySubmit", { count: selected.length });
-  // An agent whose name is already on the destination is copied as a second, separate agent: the user accepts that first.
   const confirmAndCopy = (to: { id: string; name: string }) => {
     const duplicates = selected.filter((agent) => usedNames.has(agent.name.toLowerCase()));
     if (duplicates.length === 0) return void copy(to);

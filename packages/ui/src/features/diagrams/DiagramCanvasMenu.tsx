@@ -1,9 +1,3 @@
-/**
- * The canvas's right-click menu. It adds an agent at the spot the user clicked: one that is not on
- * the canvas yet, from a submenu that shows each with its face, or a new one, which the canvas then
- * asks for in a small card at the same spot.
- */
-
 import { ChevronRight, ContextMenu, Plus, UserRound } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import type { AgentProfile } from "../../data";

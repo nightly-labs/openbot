@@ -33,10 +33,6 @@ export interface MatchupPageProps {
   matchup: MatchupComparison;
 }
 
-// Two products that OpenBot runs, against each other. The page is neutral: neither
-// side is recommended and neither column is lit. After the table come the benchmark
-// numbers, when there are any, and then one section says what the page is for: you
-// do not have to choose, because OpenBot runs both.
 export function MatchupPage(props: MatchupPageProps) {
   const sideA = (): SideProps => ({ side: "a", ...props.matchup.products[0] });
   const sideB = (): SideProps => ({ side: "b", ...props.matchup.products[1] });
@@ -45,10 +41,7 @@ export function MatchupPage(props: MatchupPageProps) {
   const topics = () => props.matchup.rows.length;
   const isCompared = (plan: OpenBotPlan) =>
     props.matchup.products.some((product) => product.provider === plan.provider);
-  // The plans of the two products first, then the rest in their usual order.
   const plans = () => [...OPENBOT_PLANS.filter(isCompared), ...OPENBOT_PLANS.filter((plan) => !isCompared(plan))];
-  // The provider page of each product, which says how to set it up in OpenBot. The link uses the
-  // page's name, which is the provider's name in OpenBot: Antigravity runs as Gemini.
   const setups = () =>
     props.matchup.products.flatMap((product) => {
       const slug = providerPageSlug(product.provider);

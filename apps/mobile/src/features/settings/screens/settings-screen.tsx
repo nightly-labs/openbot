@@ -15,7 +15,6 @@ import Shield from "lucide-react-native/icons/shield";
 import SquareMenu from "lucide-react-native/icons/square-menu";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import WandSparkles from "lucide-react-native/icons/wand-sparkles";
-import { useEffect } from "react";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -25,22 +24,16 @@ import { useBillingState } from "@/features/settings/model/billing";
 import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
-import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
+import { useRefreshedMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
   const { t } = useText();
-  // Only an owner or admin of a server with `agent-defaults-v1` can change the agent defaults.
   const managesAgents = useMobileWorkspaceSelector((workspace) => agentDefaultsServers(workspace).length > 0);
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
-  // Billing shows only while the cloudServers feature flag is on and the account server has billing.
-  // With the flag off, Settings has no Billing row, also for an account that has hosted servers.
   const apiUrl = session?.apiUrl ?? "";
-  const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
-  useEffect(() => {
-    if (apiUrl) void refreshMobileFeatures(apiUrl);
-  }, [apiUrl]);
+  const cloudServersOn = useRefreshedMobileFeature(apiUrl, "cloudServers");
   const billing = useBillingState(cloudServersOn);
   const showsBilling = cloudServersOn && billing.data?.available !== false;
   const planCount = billing.data?.servers.length;
@@ -100,14 +93,12 @@ export function SettingsScreen() {
         <SettingsRow leading={<RowIcon icon={Mic} />} onPress={() => router.push("/settings/voice")}>
           <Typography.Paragraph>{t("mobile.settings.voice.title")}</Typography.Paragraph>
         </SettingsRow>
-        {/* On iOS the screen also has the Live Activities, which exist only there. */}
         <SettingsRow leading={<RowIcon icon={Bell} />} onPress={() => router.push("/settings/notifications")}>
           <Typography.Paragraph>{t("mobile.settings.notifications.title")}</Typography.Paragraph>
         </SettingsRow>
         <SettingsRow leading={<RowIcon icon={SquareMenu} />} onPress={() => router.push("/settings/quick-actions")}>
           <Typography.Paragraph>{t("mobile.settings.quickActions.title")}</Typography.Paragraph>
         </SettingsRow>
-        {/* The shortcuts need the Shortcuts app of iOS 26. */}
         {shortcutsSupported ? (
           <SettingsRow leading={<RowIcon icon={Layers2} />} onPress={() => router.push("/settings/shortcuts")}>
             <Typography.Paragraph>{t("mobile.settings.shortcuts.title")}</Typography.Paragraph>
