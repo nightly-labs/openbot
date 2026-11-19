@@ -34,6 +34,7 @@ export interface AgentClient {
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;

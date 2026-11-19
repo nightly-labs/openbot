@@ -302,6 +302,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     yield* this.request("thread/archive", { threadId }, decodeRecordResponse);
   });
 
+  readonly newestTurnId = Effect.fn("CodexAppServer.newestTurnId")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    const page = yield* this.request(
+      "thread/turns/list",
+      { threadId, limit: 1, sortDirection: "desc", itemsView: "notLoaded" },
+      decodeTurnHistoryPage,
+    );
+    return page.data[0]?.id ?? null;
+  });
+
   readonly nameThread = Effect.fn("CodexAppServer.nameThread")(function* (
     this: CodexAppServerClient,
     threadId: string,
