@@ -355,7 +355,9 @@ changed, on this computer and on a joined host.
   posts to a messaging place.
 - `WorkflowTriggers` (`workflow-triggers.ts`) gives schedule triggers to the routine timer as an
   extra due source. An occurrence is skipped while the workflow has an open run, and missed
-  occurrences become one run. A webhook trigger has a route of its own owner kind (`workflow`); see
+  occurrences become one run. A schedule trigger gives the next steps the run time in UTC and in
+  the time zone of the trigger, the same "Local time of this run" line that a routine prompt has.
+  A manual run of a schedule trigger gives its start time. A webhook trigger has a route of its own owner kind (`workflow`); see
   [Route lifecycle](events.md#route-lifecycle).
 - A GitHub trigger starts a run for each event of the OpenBot GitHub App that matches it
   (`github-matching.ts`); see [Workflow GitHub triggers](events.md#workflow-github-triggers). A

@@ -1661,6 +1661,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
+        staleTurnSettlement: (agentId, threadId, turnId) =>
+          this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
@@ -3553,6 +3555,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       logger.warn("A task turn that no provider runs held the agent. It ends as interrupted.", { agentId, turnId });
       yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
     }
+  });
+
+  #turnRunsNowhere(agentId: string, turnId: string): boolean {
+    return (
+      !this.#stopping &&
+      this.#turn.hasEnded(turnId) &&
+      this.#turn.turnStartedAt(turnId) === null &&
+      !this.#turn.isCompleting(turnId) &&
+      this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
+      this.#mailbox.startingDeliveriesForAgent(agentId).length === 0 &&
+      this.#turn.workingCodexChildren(agentId, turnId).length === 0
+    );
+  }
+
+  readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
+    this: AgentService,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+  ) {
+    if (!this.#turnRunsNowhere(agentId, turnId)) return;
+    logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
+      agentId,
+      turnId,
+    });
+    yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
   });
 
   readonly #applyAgentUpdate = Effect.fn("AgentService.updateAgent")(function* (
