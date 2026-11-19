@@ -151,6 +151,7 @@ import {
   AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREAD_REQUESTS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -1783,7 +1784,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     throw new AgentThreadLimitError();
   },
   renameTask: unused("renameTask"),
-  deleteTask: unused("deleteTask"),
+  deleteTask: (input) => Effect.sync(() => record("deleteTask", input)),
   listTaskReads: unused("listTaskReads"),
   markTaskRead: unused("markTaskRead"),
   branchTask: unused("branchTask"),
@@ -6759,6 +6760,27 @@ try {
       "a refused key change gives the owner 409 with the reason, not a host fault",
       errorIs(refusedRotate, 409, sourceText("error.host.keyRotationRefused")),
       summary(refusedRotate),
+    );
+  }
+
+  {
+    const target = { agentId: "agent-ada", taskId: "task-1" };
+    const unsupported = await call("POST", AGENT_THREADS_ROUTES.delete, { token: bobToken, json: target });
+    check(
+      "the thread delete route without agent-threads-v1 gets 400 threadRemoteUnsupported, and deletes nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("deleteTask").length === 0,
+      summary(unsupported),
+    );
+    const deleted = await call("POST", AGENT_THREADS_ROUTES.delete, {
+      token: bobToken,
+      json: target,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREADS_CAPABILITY],
+    });
+    check(
+      "a member deletes a side thread from the sidebar of a joined server: the host deletes that thread of that agent",
+      deleted.status === 200 && isDeepStrictEqual(callsOf("deleteTask"), [[target]]),
+      [summary(deleted), callsOf("deleteTask")],
     );
   }
 

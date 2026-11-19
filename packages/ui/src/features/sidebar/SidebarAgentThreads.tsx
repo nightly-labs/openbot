@@ -1,9 +1,10 @@
-import { Button, ChevronDown, MessageCirclePlus, Popover } from "@openbot/ui";
+import { Archive, Button, ChevronDown, ContextMenu, MessageCirclePlus, Popover, Trash2 } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
 import { ThreadStatusText, ThreadTabIcon } from "../conversation/threads/ThreadStatusMark";
 import { ThreadTitle } from "../conversation/threads/ThreadTitle";
-import type { ThreadItem } from "../conversation/threads/thread-types";
+import { type ThreadItem, threadBusy } from "../conversation/threads/thread-types";
 import { sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 import type { SidebarAgentThreads as SidebarAgentThreadsModel } from "./sidebar-types";
@@ -23,10 +24,77 @@ function shownThreads(threads: readonly ThreadItem[], openId: string | undefined
   return [...latest.slice(0, limit - 1), open];
 }
 
-function ThreadRow(props: { thread: ThreadItem; current: boolean; index: number; onOpen: () => void }) {
+function ThreadRowItem(props: {
+  model: SidebarAgentThreadsModel;
+  agentId: string;
+  thread: ThreadItem;
+  class?: string | undefined;
+  index?: number | undefined;
+  onMenuChange?: ((open: boolean) => void) | undefined;
+  children: JSX.Element;
+}) {
+  const { t } = useText();
+  const busy = () => threadBusy(props.thread.status);
+  const style = () => (props.index === undefined ? undefined : { "--sidebar-thread-index": props.index });
+  return (
+    <Show
+      when={props.model.onArchive || props.model.onDelete}
+      fallback={
+        <li class={props.class} style={style()}>
+          {props.children}
+        </li>
+      }
+    >
+      <ContextMenu.Root modal={false} onOpenChange={(open) => props.onMenuChange?.(open)}>
+        <ContextMenu.Trigger as="li" class={props.class} style={style()}>
+          {props.children}
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content class="agent-context-menu" aria-label={t("conversation.threads.actions")}>
+            <Show when={props.model.onArchive}>
+              {(archive) => (
+                <ContextMenu.Item disabled={busy()} onSelect={() => archive()(props.agentId, props.thread.id)}>
+                  <Archive class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("conversation.threads.archive")}</span>
+                </ContextMenu.Item>
+              )}
+            </Show>
+            <Show when={props.model.onDelete}>
+              {(remove) => (
+                <ContextMenu.Item
+                  class="ui-action-menu-danger"
+                  disabled={busy() || props.thread.status.kind === "queued"}
+                  onSelect={() => remove()(props.agentId, props.thread.id)}
+                >
+                  <Trash2 class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("common.delete")}</span>
+                </ContextMenu.Item>
+              )}
+            </Show>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+    </Show>
+  );
+}
+
+function ThreadRow(props: {
+  model: SidebarAgentThreadsModel;
+  agentId: string;
+  thread: ThreadItem;
+  current: boolean;
+  index: number;
+  onOpen: () => void;
+}) {
   const { format } = useText();
   return (
-    <li class="sidebar-thread-item" style={{ "--sidebar-thread-index": props.index }}>
+    <ThreadRowItem
+      model={props.model}
+      agentId={props.agentId}
+      thread={props.thread}
+      class="sidebar-thread-item"
+      index={props.index}
+    >
       <Button
         variant="ghost"
         class="sidebar-thread-row"
@@ -40,7 +108,7 @@ function ThreadRow(props: { thread: ThreadItem; current: boolean; index: number;
         <ThreadStatusText status={props.thread.status} unread={props.thread.unread} />
         <span class="sidebar-thread-time">{sidebarMessageTime(props.thread.updatedAt, format)}</span>
       </Button>
-    </li>
+    </ThreadRowItem>
   );
 }
 
@@ -65,6 +133,8 @@ function InlineThreads(props: {
           <For each={shown()} keyed={(thread) => thread.id}>
             {(thread, index) => (
               <ThreadRow
+                model={props.model}
+                agentId={props.agentId}
                 thread={thread()}
                 current={props.model.openId(props.agentId) === thread().id}
                 index={index()}
@@ -109,9 +179,16 @@ function ThreadCard(props: {
   onClose: () => void;
 }) {
   const { format, t } = useText();
+  const [rowMenuOpen, setRowMenuOpen] = createSignal(false);
+  let content: HTMLElement | undefined;
   const pick = (action: () => void) => {
     props.onClose();
     action();
+  };
+  const rowMenuChange = (open: boolean) => {
+    setRowMenuOpen(open);
+    if (open) props.onKeep();
+    else if (!content?.matches(":hover")) props.onLeave();
   };
   return (
     <Popover.Root
@@ -126,12 +203,20 @@ function ThreadCard(props: {
     >
       <Popover.Portal>
         <Popover.Content
+          ref={(element: HTMLElement) => {
+            content = element;
+          }}
           class="ui-action-menu sidebar-threads-card"
           aria-label={t("sidebar.threads.label", { name: props.agentName })}
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
+          onInteractOutside={(event) => {
+            if (rowMenuOpen()) event.preventDefault();
+          }}
           onPointerEnter={props.onKeep}
-          onPointerLeave={props.onLeave}
+          onPointerLeave={() => {
+            if (!rowMenuOpen()) props.onLeave();
+          }}
         >
           <Show when={props.model.onNew}>
             {(onNew) => (
@@ -150,7 +235,12 @@ function ThreadCard(props: {
           <ul class="sidebar-threads-card-list">
             <For each={props.threads} keyed={(thread) => thread.id}>
               {(thread) => (
-                <li>
+                <ThreadRowItem
+                  model={props.model}
+                  agentId={props.agentId}
+                  thread={thread()}
+                  onMenuChange={rowMenuChange}
+                >
                   <Button
                     variant="ghost"
                     class="sidebar-threads-card-row"
@@ -164,7 +254,7 @@ function ThreadCard(props: {
                     <ThreadStatusText status={thread().status} unread={thread().unread} />
                     <span class="sidebar-threads-card-time">{sidebarMessageTime(thread().updatedAt, format)}</span>
                   </Button>
-                </li>
+                </ThreadRowItem>
               )}
             </For>
           </ul>
