@@ -226,6 +226,8 @@ export const messages = defineMessages("error.provider", {
     'The endpoint "{provider}" refused the request. Its API key or headers can be wrong, or its account cannot use this model. Check them in Server settings → Providers, or choose another model. Then try again.',
   "error.provider.customEndpointKeyMissing":
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
+  "error.provider.customEndpointEffortRefused":
+    'The endpoint "{provider}" refused the reasoning effort of this model. In Server settings → Providers, edit "{provider}". Under Efforts, keep only the efforts that this model accepts, or select No reasoning. Then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
@@ -254,6 +256,10 @@ export const messages = defineMessages("error.provider", {
     "This model is not available to you. Select a different model for this agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "The model's reply was longer than its output limit three times, so the turn stopped. Choose a lower effort or another model, then send your message again.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "The model's reply was longer than its output limit three times, so the turn stopped. In Settings, open Custom provider, click Edit on this endpoint, and set a larger Max output for this model. Or choose a lower effort or another model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeModelNotServed":
@@ -278,6 +284,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
+  "error.provider.channelNoAnswer":
+    "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

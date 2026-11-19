@@ -879,10 +879,17 @@ the MCP server tools (`src/backend/agent/mcp-tools.ts`, issue #2673). Each chang
 approval of `AttentionRegistry.awaitToolApproval`, which states that every agent on the server gets
 the tools. Full access answers it, as for other built-in tool approvals. `save_mcp_server` connects
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
-server that needs an OAuth sign-in or a key is saved. The tools never take or return a header or
-environment value, and show an address without its query: the user enters a key with Edit on the
-server's page in Marketplace, Apps. An edit keeps the row's headers and environment, and an edit that would send them to another
-transport, origin, command, arguments or folder is refused. The approval masks known secrets in the command line and names
+server that needs an OAuth sign-in or a key is saved. `save_mcp_server` takes the headers of an http
+server that the user gave in the conversation, such as `Authorization: Bearer <token>`: each one sets or
+replaces the header of that name, and an empty value removes it. OpenBot registers the value of each
+header with a secret name before it parses the call, so logs mask it, and a failure masks every new
+value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
+key that the local user wrote in the request of the task, and elsewhere only a person's message. The
+approval names the headers that change. The tools never take an environment value and
+never return a header or environment value, and show an address without its query. The user can also
+enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
+and environment, and an edit that would send them to another transport, origin, command, arguments or
+folder is refused; headers that the same edit replaces do not count. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
 the conversation. Its Sign in opens the row's page in Marketplace, Apps, and starts the row's normal sign-in,
 so a joined server signs in through its relay (`sign-in-relay-v1`). A host without the relay shows no
@@ -934,10 +941,17 @@ of the turn, also with no backup model. A backup model then runs the turn again,
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
 the same model (#8503, #8406). So
-does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+does the turn of an external chat conversation, such as WhatsApp (#8573).
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
-so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
-nothing. A second empty run, or an empty turn from the person, shows the error.
+so the conversation gets no "Stopped." before the answer. A channel task's empty turn runs once more
+in its session too, from any sender, also a person: the channel keeps the task's assignment
+(`ChannelService.keepForRetry`), as `requeueForLimit` keeps it for a backup, but with no limit rule,
+so a routine set to skip at a limit keeps its run. Only a turn of one request runs again this way.
+When a backup model would take the turn in the agent's own chat, the run again is on that backup.
+Before, the task stopped until the person clicked Continue (#11425). The turn did no step, so it
+repeats nothing. A second empty run, or an empty turn from the person outside a channel, shows the
+error. A Codex channel task shows `error.provider.channelNoAnswer`, which names Continue and Reassign
+on its card.
 A turn that a failed sign-in or a provider that does not answer ended after work started continues
 on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
 to switch without asking (#8406).

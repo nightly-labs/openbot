@@ -1,6 +1,6 @@
 export const TERMS_ROUTE = "/terms";
 
-export const TERMS_UPDATED_AT = "2026-10-29";
+export const TERMS_UPDATED_AT = "2026-11-19";
 
 export const TERMS_META = {
   title: "OpenBot Terms & Conditions",

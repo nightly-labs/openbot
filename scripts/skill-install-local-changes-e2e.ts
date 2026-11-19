@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import { zipSync } from "fflate";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
@@ -177,6 +178,59 @@ await scenario("G Copies at the new revision and at another saved revision insta
   const after = await installedState(context);
   assert.equal(after, "installed@3");
   return { revise, after };
+});
+
+async function writePythonCaches(directory: string, bytecode: string): Promise<void> {
+  await mkdir(join(directory, "__pycache__"), { recursive: true });
+  await writeFile(join(directory, "__pycache__/helper.cpython-312.pyc"), bytecode);
+  await mkdir(join(directory, ".pytest_cache/v/cache"), { recursive: true });
+  await writeFile(join(directory, ".pytest_cache/v/cache/lastfailed"), "{}\n");
+}
+
+await scenario("H Python cache folders are not a local change, and a save leaves them out", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await writePythonCaches(join(context.workspace, folder, context.slug), "bytecode");
+  const before = await installedState(context);
+  assert.equal(before, "installed@1");
+  await writePythonCaches(join(context.workspace, "source"), "bytecode");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@2");
+  const files = (await Effect.runPromise(context.library.get(context.skillId))).files.join(",");
+  assert.equal(files, "SKILL.md");
+  return { before, revise, after, files };
+});
+
+await scenario("I Python cache files that an older save kept do not block the next revision", async (context) => {
+  const encoder = new TextEncoder();
+  const older = zipSync({
+    "SKILL.md": encoder.encode(skillMarkdown("First.", "Revision 2.")),
+    "__pycache__/helper.cpython-312.pyc": encoder.encode("bytecode"),
+  });
+  await Effect.runPromise(context.library.reviseFromBundle(context.skillId, 1, older));
+  const install = await failure(context.tools.install({ agentId: AGENT_ID, skillId: context.skillId, revision: 2 }));
+  assert.equal(install, null);
+  await writeCopies(context, "__pycache__/helper.cpython-312.pyc", "bytecode that Python wrote again");
+  const before = await installedState(context);
+  assert.equal(before, "installed@2");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 3."));
+  const revise = await reviseFrom(context, 2, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@3");
+  return { install, before, revise, after };
+});
+
+await scenario("J An edit next to Python cache folders still refuses", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await writePythonCaches(join(context.workspace, folder, context.slug), "bytecode");
+  await writeCopies(context, "notes.md", "An edit that is not saved.\n");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.ok(revise?.includes(REFUSED), "The edit stops the install.");
+  return { revise };
 });
 
 await mkdir(".openbot-build", { recursive: true });

@@ -86,8 +86,7 @@ export function writeComposerDraftsOnChange(owner: ComposerDraftOwner): void {
         owner.unsentTexts(),
       ] as const,
     () => {
-      clearTimeout(timer);
-      timer = setTimeout(write, WRITE_DELAY_MS);
+      timer ??= setTimeout(write, WRITE_DELAY_MS);
     },
     { defer: true },
   );

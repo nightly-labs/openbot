@@ -190,6 +190,7 @@ export function ConversationTimeline() {
     reactToMessage,
     renderedAgentActivity,
     activeStepActivity,
+    activeTurnOutputShown,
     providerOffline,
     providerSilentMinutes,
     agentProviderName,
@@ -1732,6 +1733,7 @@ export function ConversationTimeline() {
                       stepsOpenByDefault={showAgentSteps()}
                       waitingFor={waitingProviderName()}
                       plain={plainActivity()}
+                      outputShown={activeTurnOutputShown()}
                       activity={activeStepActivity()}
                     />
                   )}
