@@ -5011,8 +5011,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
     const fields = elicitationFieldQuestions(params, "ACP");
     const choices = new Set(fields.filter(({ options }) => options?.length).map(({ id }) => id));
+    const required = new Set(getArray(getRecord(params, "requestedSchema"), "required").filter(isString));
     const questions = fields.filter(
-      ({ id }) => !(id.endsWith("_custom") && choices.has(id.slice(0, -"_custom".length))),
+      ({ id }) => required.has(id) || !(id.endsWith("_custom") && choices.has(id.slice(0, -"_custom".length))),
     );
     if (questions.length === 0) {
       questions.push({
