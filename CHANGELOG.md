@@ -108,6 +108,12 @@ All notable changes to OpenBot will be documented here. The project follows
 - On a hosted server with less than 7 GB of memory, such as a Starter server, the browser can have up
   to 5 open tabs in each chat. Before, it could have up to 25, which used too much memory. The server
   must also be on the new version.
+- After "New chat", an agent can still find the earlier messages of the chat when you ask about them.
+  Before, the agent could not search or read the messages above the divider. Each new message still
+  sends less, because the agent reads the old messages only when it needs them. To make an agent
+  forget a chat, use "Delete history".
+- While an agent searches its past chats, the chat now shows "Searching its past chats…". Before, it
+  showed "Searching for current information…", as for a web search.
 
 ### Fixed
 
