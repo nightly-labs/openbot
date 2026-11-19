@@ -26,8 +26,9 @@ function isAscii(value: string): boolean {
 /**
  * The Windows 8.3 spelling of an existing path, for a program that reads paths in a narrow code page.
  * The Windows build of Sunshine cannot open a UTF-8 path with a character outside ASCII, for example an
- * accented letter in the name of the Windows user folder. The path is returned unchanged on other platforms, when it is already
- * ASCII, and when Windows has no ASCII short name for it (short names can be off for a drive).
+ * accented letter in the name of the Windows user folder. The path is returned unchanged on other
+ * platforms, when it is already ASCII, and when Windows has no ASCII short name for it (short names can
+ * be off for a drive).
  */
 export function windowsShortPath(path: string): string {
   if (process.platform !== "win32" || isAscii(path)) return path;
