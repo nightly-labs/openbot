@@ -176,9 +176,9 @@ exact corresponding source for both GPL components with every binary release. A 
 a binary, license, source manifest, checksum, platform signature, or notarization result is missing.
 
 Use this source build only to make or reproduce a runtime version. The
-`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64, macOS x64, Windows x64 and Linux x64
+`.github/workflows/remote-desktop-runtime.yml` workflow builds macOS ARM64, macOS x64, Windows x64, Linux x64 and Linux ARM64
 when the recipe or a pinned input changes. It publishes an immutable GitHub prerelease named
-`remote-desktop-runtime-<input-digest>`. The prerelease contains the four deterministic archives, SPDX
+`remote-desktop-runtime-<input-digest>`. The prerelease contains five deterministic archives, SPDX
 SBOMs, build provenance, and `remote-desktop-runtime-manifest.json`. It is not an OpenBot application
 update and it must never contain `latest.yml`.
 
@@ -259,7 +259,9 @@ Boost.Locale has no ICU backend, and the runtime carries `lib/libminiupnpc.so.17
 licence, because Ubuntu 26.04 has only `libminiupnpc21`. Sunshine finds it through its RUNPATH
 `$ORIGIN/lib`. The build job checks with `ldd` that each executable finds all its libraries on
 Ubuntu 26.04.
-Linux arm64 builds only for local development and has no release artifact.
+Linux arm64 uses the same X11 capture and software encoding options as Linux x64. It builds on a
+native Ubuntu 24.04 ARM64 runner and publishes `remote-desktop-runtime-linux-arm64.tar.gz`.
+Verify pairing and streaming under Xvfb before including it in an application release.
 
 ## Pin the Gemini CLI
 
@@ -682,8 +684,8 @@ check, download, or restart reports an actionable error and can be retried in pl
 
 The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
 npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. Each Linux
-AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships no remote desktop
-runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
+AppImage carries the runtime of its architecture, including the remote desktop runtime on arm64.
+The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
 each, and keeps the verified files in `runtimes/parakeet-tdt-0.6b-v3-int8` in the user data directory
 for later offline use. The Whisper large-v3 turbo model (an int8 encoder and a full-precision

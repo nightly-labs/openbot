@@ -139,24 +139,17 @@ for (const [path, name] of [
     throw new Error(`The ${name} host must import nothing but node: builtins.`);
   }
 }
-// The remote desktop runtime is built for x64 only, and only for this platform.
-if (architecture === "x64") {
-  await Promise.all(
-    ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
-      access(resolve(resourcesPath, "remote-desktop-runtime/linux/x64", name)),
-    ),
-  );
-  await Promise.all(
-    ["darwin", "win32"].map((name) =>
-      assertAbsent(resolve(resourcesPath, "remote-desktop-runtime", name), "Only this platform's runtime ships"),
-    ),
-  );
-} else {
-  await assertAbsent(
-    resolve(resourcesPath, "remote-desktop-runtime"),
-    "Remote desktop is not available on Linux arm64",
-  );
-}
+// Both Linux releases carry a Sunshine/Moonlight runtime for their own architecture.
+await Promise.all(
+  ["sunshine", "web-server", "streamer", "static/stream.html"].map((name) =>
+    access(resolve(resourcesPath, "remote-desktop-runtime/linux", architecture, name)),
+  ),
+);
+await Promise.all(
+  ["darwin", "win32"].map((name) =>
+    assertAbsent(resolve(resourcesPath, "remote-desktop-runtime", name), "Only this platform's runtime ships"),
+  ),
+);
 
 // Providers and the tunnel are downloaded on demand, exactly as on macOS and Windows.
 await Promise.all(
