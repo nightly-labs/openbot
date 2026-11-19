@@ -1,13 +1,3 @@
-// Runs the real `pi` provider driver and the real Pi binary against a fake OpenAI-compatible server,
-// to check that a custom endpoint saved with "Runs on: Pi" runs through Pi, and that an endpoint that
-// runs on OpenCode stays out of Pi. Pi reads `$` and a leading `!` in a key or a header as an
-// environment reference or a shell command, so the key and the header must arrive literally. The
-// key and the header value must not reach the extension file or an error message. A saved output
-// limit must reach the request as the model's budget (#4234). A model with saved efforts must list
-// exactly those efforts and send the effort of the turn; a model with none must not reason (#4154).
-// A model saved with image input must send an attached image to the endpoint; a text-only model
-// must not (#5332).
-// `PI_CLI=<pi> bun run test:custom-provider-pi`. Writes .openbot-build/custom-provider-pi-harness/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -31,12 +21,9 @@ const REPLY = "pong from the fake endpoint";
 const KEY = "!sk-e2e-$HOME-literal";
 const HEADER_VALUE = "team-$PATH";
 const FAILING_MODEL = "fake-broken";
-/** #4154: an endpoint that accepts None, Low and Max for this model, and no other effort. */
 const EFFORT_MODEL = "fake-thinker";
 const SAVED_EFFORTS = ["none", "low", "max"] as const;
-/** #5332: a vision model behind the endpoint, saved with image input. */
 const VISION_MODEL = "fake-vision";
-/** A 1×1 PNG. */
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
@@ -47,11 +34,8 @@ interface Request {
   authorization: string | null;
   header: string | null;
   model: string | null;
-  /** `max_completion_tokens` or `max_tokens`, whichever Pi sent. */
   budget: number | null;
-  /** The `reasoning_effort` that the request sent, or null. */
   reasoningEffort: string | null;
-  /** The `image_url` content parts of the request's messages. */
   images: number;
 }
 
@@ -59,7 +43,6 @@ interface Report {
   passed: boolean;
   piVersion?: string;
   models?: string[];
-  /** The efforts that OpenBot listed for each model. */
   efforts?: Record<string, string[]>;
   requests: Request[];
   reply?: string;
@@ -79,7 +62,6 @@ function header(request: IncomingMessage, name: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** The model that a chat completion request names, and the output budget that it asks for. */
 async function requestedModel(
   request: IncomingMessage,
 ): Promise<Pick<Request, "model" | "budget" | "reasoningEffort" | "images">> {
@@ -95,7 +77,6 @@ async function requestedModel(
   return { model: getString(value, "model"), budget, reasoningEffort: getString(value, "reasoning_effort"), images };
 }
 
-/** One server-sent event of a streamed chat completion: the reply text, or the end of the reply. */
 function chunk(model: string, content: string | null): string {
   const choice = content
     ? { index: 0, delta: { role: "assistant", content }, finish_reason: null }
@@ -111,7 +92,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
     const authorization = header(request, "authorization");
     report.requests.push({ path: request.url ?? "", authorization, header: header(request, "x-e2e"), ...sent });
     if (model === FAILING_MODEL) {
-      // A server that names the key it refused. Pi passes the body on, so OpenBot must redact it.
       response.writeHead(401, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: { message: `Key refused: ${authorization}`, type: "invalid_key" } }));
       return;
@@ -126,7 +106,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
   });
 });
 
-/** The text of every file in the extension folders that Pi got. */
 async function extensionFiles(directory: string): Promise<{ names: string[]; text: string }> {
   const names: string[] = [];
   let text = "";
@@ -146,7 +125,6 @@ try {
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
   const baseUrl = `http://127.0.0.1:${address.port}/v1`;
 
-  // Pi must not read the developer's own providers and keys.
   const agentDirectory = join(root, "agent");
   await mkdir(agentDirectory, { recursive: true });
   await writeFile(join(agentDirectory, "settings.json"), "{}\n");
@@ -166,7 +144,6 @@ try {
       { id: "fake-coder", name: "Fake coder", contextWindow: 32_768, maxOutput: 12_000 },
       { id: FAILING_MODEL, name: "Fake broken" },
       { id: EFFORT_MODEL, name: "Fake thinker", reasoningEfforts: [...SAVED_EFFORTS] },
-      // `pdf` is saved too: Pi cannot send a PDF, so it must ignore it.
       { id: VISION_MODEL, name: "Fake vision", inputs: ["image", "pdf"] },
     ],
     harness: "pi",
@@ -182,7 +159,6 @@ try {
   };
   const source = () => [onPi, onOpenCode];
 
-  // OpenCode gets only its own endpoint.
   const layer = openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, customProvidersOn(source, "opencode"), null);
   report.openCodeEndpoints = Object.keys(
     getRecord(JSON.parse(layer.OPENCODE_CONFIG_CONTENT ?? "{}"), "provider") ?? {},
@@ -256,7 +232,6 @@ try {
     assert.equal(last?.reasoningEffort, effort, `Pi must send the effort ${effort}.`);
   }
 
-  // #5332: an attached image reaches a model saved with image input, and not a text-only model.
   const image = join(workspace, "pixel.png");
   await writeFile(image, PNG);
   const visionTurn = await runTurn(client, thread, {
@@ -282,7 +257,6 @@ try {
     assert.equal(request.images, 0, "Pi must not send an image to a text-only model.");
   }
 
-  // A refused request: the error reaches the user, but not the key.
   const failure = await runTurn(client, thread, {
     model: `spark-e2e/${FAILING_MODEL}`,
     text: "Fail.",
@@ -312,7 +286,6 @@ try {
   server.close();
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
-  // The report holds the fake key and the fake header only; neither is a real secret.
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${report.passed ? "passed" : "failed"}: ${join(OUT, "report.json")}\n`);
 }

@@ -28,7 +28,6 @@ import { CATEGORY_LABELS } from "./marketplace-listing";
 import type { MarketplaceModel } from "./marketplace-model";
 import { createDetail, type MarketplaceScope } from "./marketplace-view";
 
-/** Made by OpenBot; made by another user and reviewed by OpenBot; or shared before its first review. */
 type Trust = "verified" | "reviewed" | "pending";
 
 function trustOf(agent: MarketplaceAgentSummary | MarketplaceAgentDetail): Trust {
@@ -36,13 +35,11 @@ function trustOf(agent: MarketplaceAgentSummary | MarketplaceAgentDetail): Trust
   return agent.verified === true ? "verified" : "reviewed";
 }
 
-/** The line under the page header. The longer text adds the warning, which shows only before the add. */
 const TRUST_TEXT = {
   reviewed: { added: "marketplace.agents.trust.reviewed", add: "marketplace.agents.trust.reviewedBeforeAdd" },
   pending: { added: "marketplace.agents.trust.pending", add: "marketplace.agents.trust.pendingBeforeAdd" },
 } as const satisfies Record<Exclude<Trust, "verified">, { added: AppTextKey; add: AppTextKey }>;
 
-/** The status on the page header, as a skill's: not added, added, or a newer version. */
 function useAgentStatus(model: () => MarketplaceModel) {
   const { t } = useText();
   return (listing: MarketplaceAgentSummary): { status: IntegrationStatus; label: string } => {
@@ -53,10 +50,6 @@ function useAgentStatus(model: () => MarketplaceModel) {
   };
 }
 
-/**
- * "Add agent"; after it, "Open chat", and "Update" before it for a newer version. A member, who can add
- * no agent, sees no action.
- */
 function AgentPageActions(props: { model: MarketplaceModel; listing: MarketplaceAgentSummary; add: () => void }) {
   const { t } = useText();
   const state = () => props.model.agentState(props.listing);
@@ -87,10 +80,8 @@ function AgentPageActions(props: { model: MarketplaceModel; listing: Marketplace
   );
 }
 
-/** One skill of the agent. The row opens the skill page; the icon comes from the skill's listing. */
 function AgentSkillRow(props: { scope: MarketplaceScope; skill: MarketplaceAgentDetail["skills"][number] }) {
   const { t } = useText();
-  // No error of its own: without a listing the row keeps the skill's name and version.
   const listing = createDetail(() => props.scope.model.skillListing(props.skill.skillId));
   return (
     <Item class="settings-modal-row integrations-hub-row">
@@ -126,7 +117,6 @@ function AgentSkillRow(props: { scope: MarketplaceScope; skill: MarketplaceAgent
   );
 }
 
-/** One routine: when it runs. A routine that the agent brings turned off says so. */
 function AgentRoutineRow(props: { routine: MarketplaceAgentDetail["routines"][number] }) {
   const { t } = useText();
   const line = () =>
@@ -149,7 +139,6 @@ function AgentRoutineRow(props: { routine: MarketplaceAgentDetail["routines"][nu
   );
 }
 
-/** What the agent does, who made it, where it comes from, its category, version and date. */
 function AgentInformation(props: { agent: MarketplaceAgentSummary | MarketplaceAgentDetail }) {
   const { t, format } = useText();
   const source = () => {
@@ -177,7 +166,6 @@ function AgentInformation(props: { agent: MarketplaceAgentSummary | MarketplaceA
           <Text as="p" variant="body-sm">
             {props.agent.description}
           </Text>
-          {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row. */}
           <dl class="marketplace-props marketplace-info">
             <For each={facts()} keyed={(fact) => fact.label}>
               {(fact) => (
@@ -202,7 +190,6 @@ function AgentInformation(props: { agent: MarketplaceAgentSummary | MarketplaceA
   );
 }
 
-/** Who made the agent and whether OpenBot reviewed it, for an agent without the shield. */
 function TrustLine(props: { model: MarketplaceModel; agent: MarketplaceAgentSummary | MarketplaceAgentDetail }) {
   const { t } = useText();
   const trust = (): Exclude<Trust, "verified"> | undefined => {
@@ -227,12 +214,6 @@ function TrustLine(props: { model: MarketplaceModel; agent: MarketplaceAgentSumm
   );
 }
 
-/**
- * The agent page on the app page layout, as the skill page: the avatar, name, shield, status, role and
- * creator, the trust line, then the skills that open their pages, the routines, and the information.
- * `detail`: the listing a Marketplace link loaded, which can wait for its first review; the page shows
- * it and does not read the catalog again.
- */
 export function MarketplaceAgentPage(props: {
   scope: MarketplaceScope;
   listing: MarketplaceAgentSummary;

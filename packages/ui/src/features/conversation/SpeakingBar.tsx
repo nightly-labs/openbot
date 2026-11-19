@@ -7,14 +7,11 @@ import { useText } from "@openbot/ui/text";
 
 export interface SpeakingBarProps {
   agent: AgentProfile;
-  /** The part of the reply that plays now. */
   caption: string;
-  /** The loudness of the voice, oldest first, from 0 to 1. */
   levels: readonly number[];
   onStop: () => void;
 }
 
-/** Above the composer while a reply is read aloud: the agent, its voice, the part that plays now, and Stop. */
 export function SpeakingBar(props: SpeakingBarProps) {
   const { t } = useText();
   return (

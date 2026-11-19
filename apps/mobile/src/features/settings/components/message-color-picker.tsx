@@ -45,13 +45,8 @@ function colorOf({ hue, saturation, lightness }: Hsl): AvatarColor {
 
 const first = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
 
-/**
- * Android: hue, saturation and lightness sliders. `@expo/ui` has no color picker for Compose. The
- * color is saved when the finger lifts.
- */
 export function MessageColorPicker({ value, disabled, onChange }: MessageColorPickerProps) {
   const { t, format } = useText();
-  // The sliders keep their own values during a drag: a round trip through hex moves a grey's hue.
   const [draft, setDraft] = useState<Hsl | null>(null);
   const shown = draft ?? hslOf(value);
   const channels = [
@@ -84,7 +79,6 @@ export function MessageColorPicker({ value, disabled, onChange }: MessageColorPi
               const changed = { ...shown, [channel.key]: first(next) };
               const saved = hslOf(value);
               setDraft(null);
-              // A tap with no move keeps the saved color, which a round trip through HSL can move by one step.
               if (
                 changed.hue === saved.hue &&
                 changed.saturation === saved.saturation &&

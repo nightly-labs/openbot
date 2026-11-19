@@ -4,13 +4,8 @@ import { useMotionPreferences } from "@/features/settings/model/motion";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 
-/**
- * How the first-run flow moves. Reduce Motion keeps the fades, which carry the change of step, and
- * drops movement. Settings → Animations off removes both.
- */
 export type OnboardingMotion = "full" | "fade" | "none";
 
-/** The strong ease-out of `SPLASH_EASE_OUT`, for Reanimated CSS animations, which take `cubicBezier`. */
 export const EASE_OUT_CSS = cubicBezier(0.23, 1, 0.32, 1);
 
 export function useOnboardingMotion(): OnboardingMotion {
@@ -20,32 +15,22 @@ export function useOnboardingMotion(): OnboardingMotion {
   return reduced ? "fade" : "full";
 }
 
-// A step comes in from the side it is on: forward from the right, back from the left. The step
-// that leaves is quicker than the step that arrives, so the two never fight for attention.
 const STEP_SHIFT = 28;
 const STEP_ENTER_MS = 300;
 const STEP_EXIT_MS = 160;
-// Parts of a step arrive one after another.
 export const STAGGER_MS = 50;
-// A small thing pops in over this time, after its delay.
 const POP_MS = 240;
 
-/**
- * When a glass surface appears. Glass does not draw under a parent with no opacity, and a step
- * fades in, so a glass surface never fades itself: it waits until its step is in and its own turn
- * comes, then its glass forms and its content fades in together (see `useGlassEntrance`).
- */
 export function glassAfter(entranceDelay: number): number {
   return Math.max(STEP_ENTER_MS + 20, entranceDelay);
 }
 
-/** The entrance of a step part. `direction` is 1 going forward and -1 going back. */
-export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
+function slideInEntering(motion: OnboardingMotion, offset: number, duration: number, delay: number) {
   if (motion === "none") return undefined;
-  const shift = motion === "full" ? STEP_SHIFT * direction : 0;
+  const shift = motion === "full" ? offset : 0;
   return () => {
     "worklet";
-    const timing = { duration: STEP_ENTER_MS, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
+    const timing = { duration, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
     return {
       initialValues: { opacity: 0, transform: [{ translateX: shift }] },
       animations: {
@@ -56,7 +41,10 @@ export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay 
   };
 }
 
-/** The exit of a step: it moves a little towards the side it goes to. */
+export function stepEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
+  return slideInEntering(motion, STEP_SHIFT * direction, STEP_ENTER_MS, delay);
+}
+
 export function stepExiting(motion: OnboardingMotion, direction: 1 | -1) {
   if (motion === "none") return undefined;
   const shift = motion === "full" ? -STEP_SHIFT * 0.6 * direction : 0;
@@ -73,7 +61,6 @@ export function stepExiting(motion: OnboardingMotion, direction: 1 | -1) {
   };
 }
 
-/** A small thing that pops in: a chip, a row, a bubble. It never starts from nothing. */
 export function popEntering(motion: OnboardingMotion, delay = 0) {
   if (motion === "none") return undefined;
   const full = motion === "full";
@@ -93,10 +80,6 @@ export function popEntering(motion: OnboardingMotion, delay = 0) {
   };
 }
 
-/**
- * A label or a line of text that changes in place: the old one fades out, and the new one fades
- * in as the old one is nearly gone, so two never show at full strength together. No movement.
- */
 export function swapEntering(motion: OnboardingMotion) {
   if (motion === "none") return undefined;
   return () => {
@@ -127,10 +110,6 @@ export function swapExiting(motion: OnboardingMotion) {
   };
 }
 
-/**
- * A glass control that appears in place. It grows from a little smaller and does not fade: glass
- * does not draw under a parent with no opacity.
- */
 export function growEntering(motion: OnboardingMotion) {
   if (motion !== "full") return undefined;
   return () => {
@@ -146,10 +125,6 @@ export function growEntering(motion: OnboardingMotion) {
   };
 }
 
-/**
- * A character that comes onto a stage from the side: it flies in from `fromX`, grows to its size
- * and settles with a little overshoot, as a body with weight does.
- */
 export function arriveEntering(motion: OnboardingMotion, fromX: number, delay: number) {
   if (motion === "none") return undefined;
   const full = motion === "full";
@@ -173,10 +148,6 @@ export function arriveEntering(motion: OnboardingMotion, fromX: number, delay: n
   };
 }
 
-/**
- * The character that the hero hands over to: hidden while the hero flies onto it, then there at
- * once, under the hero, which fades off it. With Reduce Motion the hero does not fly; it fades in.
- */
 export function handOffEntering(motion: OnboardingMotion, landsAt: number) {
   if (motion !== "full") return arriveEntering(motion, 0, 40);
   return () => {
@@ -189,27 +160,10 @@ export function handOffEntering(motion: OnboardingMotion, landsAt: number) {
   };
 }
 
-/**
- * A text that changes with a swipe: the new one slides in from the side the user swipes towards
- * and fades in. `direction` is 1 when the next choice is to the right. Reduce Motion fades only.
- */
 export function slideSwapEntering(motion: OnboardingMotion, direction: 1 | -1, delay = 0) {
-  if (motion === "none") return undefined;
-  const shift = motion === "full" ? 24 * direction : 0;
-  return () => {
-    "worklet";
-    const timing = { duration: 280, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
-    return {
-      initialValues: { opacity: 0, transform: [{ translateX: shift }] },
-      animations: {
-        opacity: withDelay(delay, withTiming(1, timing), ReduceMotion.Never),
-        transform: [{ translateX: withDelay(delay, withTiming(0, timing), ReduceMotion.Never) }],
-      },
-    };
-  };
+  return slideInEntering(motion, 24 * direction, 280, delay);
 }
 
-/** The old text of a swipe leaves quicker than the new one comes, shrinking a little as it fades. */
 export function slideSwapExiting(motion: OnboardingMotion) {
   if (motion === "none") return undefined;
   const full = motion === "full";

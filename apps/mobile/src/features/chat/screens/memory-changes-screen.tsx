@@ -36,10 +36,6 @@ function actionColor(action: ConversationMemoryChangeAction, colors: SubagentCol
   return colors.muted;
 }
 
-/**
- * The memory changes of one turn: what the agent saved, updated and forgot, and what another thread
- * changed first.
- */
 export function MemoryChangesScreen() {
   const text = useText();
   const { t } = text;
@@ -48,7 +44,6 @@ export function MemoryChangesScreen() {
   const agentId = firstParam(params.agentId) ?? "";
   const messageId = firstParam(params.messageId) ?? "";
   const changes = useConversationMessage(agentId, messageId)?.memoryChanges ?? NO_CHANGES;
-  // One turn can change the same memory twice in the same way, so the key counts each repeat.
   const seen = new Map<string, number>();
   const keys = changes.map((change) => {
     const base = `${change.memoryId}:${change.action}`;

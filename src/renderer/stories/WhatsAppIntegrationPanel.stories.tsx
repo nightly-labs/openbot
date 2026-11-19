@@ -105,20 +105,16 @@ const args = (connections: MessagingConnection[], accounts: WhatsAppAccount[], l
   onAnswerRequest: fn(),
 });
 
-/** No number yet: the warning, and Link WhatsApp opens the dialog. */
 export const NotSetUp: Story = { args: args([], []) };
 
-/** A personal number with two allowed senders, and a number only for OpenBot with two requests. */
 export const Linked: Story = { args: args([number(), DEDICATED_NUMBER], [PERSONAL, DEDICATED]) };
 
-/** A number is linked, and no agent answers yet. */
 export const NoOrchestrator: Story = {
   args: args([number({ orchestratorAgentId: null })], [{ ...PERSONAL, allowedSenders: [] }]),
 };
 
 export const Paused: Story = { args: args([number({ enabled: false, state: "paused" })], [PERSONAL]) };
 
-/** WhatsApp removed the linked device, such as after 14 days with the computer off: Link again. */
 export const LoggedOut: Story = { args: args([number({ state: "invalid_token" })], [PERSONAL]) };
 
 type DialogStory = StoryObj<typeof WhatsAppLinkDialog>;
@@ -149,25 +145,20 @@ const dialogArgs = (
 
 const renderDialog = (props: Parameters<typeof WhatsAppLinkDialog>[0]) => <WhatsAppLinkDialog {...props} />;
 
-/** Step 1: what the number is, and how the phone links. */
 export const LinkChoose: DialogStory = { render: renderDialog, args: dialogArgs(WHATSAPP_LINK_IDLE) };
 
-/** The phone scans the QR code. */
 export const LinkingQr: DialogStory = { render: renderDialog, args: dialogArgs(LINK_QR) };
 
-/** The phone types the pairing code. */
 export const LinkingCode: DialogStory = {
   render: renderDialog,
   args: dialogArgs({ ...LINK_QR, qr: null, code: "K7Q2ZPMX" }),
 };
 
-/** The phone did not link in time. */
 export const LinkFailed: DialogStory = {
   render: renderDialog,
   args: dialogArgs({ ...LINK_QR, status: "failed", qr: null, error: "timeout" }),
 };
 
-/** Step 2: the number is linked, and the WhatsApp Orchestrator is added next. */
 export const AddOrchestrator: DialogStory = {
   render: renderDialog,
   args: dialogArgs({ status: "linked", qr: null, code: null, workspaceId: "447700900123", error: null }, [
@@ -175,7 +166,6 @@ export const AddOrchestrator: DialogStory = {
   ]),
 };
 
-/** Done: the number has the WhatsApp Orchestrator. */
 export const LinkDone: DialogStory = {
   render: renderDialog,
   args: dialogArgs(WHATSAPP_LINK_IDLE, [number()], "agent"),

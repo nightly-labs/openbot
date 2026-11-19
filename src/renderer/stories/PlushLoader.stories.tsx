@@ -15,10 +15,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A panel that loads. */
 export const Panel: Story = {};
 
-/** Beside the caption of a step in another app. Without a label, the loader is decoration. */
 export const Inline: Story = {
   render: () => (
     <div class="foundation-story-row">
@@ -28,5 +26,4 @@ export const Inline: Story = {
   ),
 };
 
-/** The balls under the plush, as on the history load screen. */
 export const Stack: Story = { args: { size: 132, layout: "stack" } };

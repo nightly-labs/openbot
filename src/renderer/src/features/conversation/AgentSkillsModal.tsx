@@ -26,10 +26,6 @@ import { SkillPreview } from "../../components/SkillPreview";
 import { type AgentSkillCalls, agentSkillCalls, type SkillCatalogCalls, skillsPort } from "../../skills-port";
 import { LocalSkillsLibrary } from "./LocalSkillsLibrary";
 
-/**
- * `mutable`: an agent on this computer. `host`: an agent on a joined server where this account is an
- * owner or admin; the host installs and removes, and its local skills library stays on the host.
- */
 export type AgentSkillsMode = "mutable" | "host" | "readonly" | "hidden";
 
 interface AgentSkillsModalProps {
@@ -40,20 +36,15 @@ interface AgentSkillsModalProps {
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
   skillsMode?: AgentSkillsMode;
-  /** The joined server that runs the agent. Read in `host` mode only. */
   serverId?: string | undefined;
-  /** Replaces the desktop calls, for a client that reaches the host another way. */
   calls?: AgentSkillCalls | undefined;
-  /** `null`: no marketplace catalog, so the list and details show only what the host sends. */
   catalog?: SkillCatalogCalls | null | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
-  /** Reads a file in the agent workspace on the host, where a joined server keeps each skill's SKILL.md. */
   previewWorkspaceFile?: ((path: string) => Promise<FilePreview>) | undefined;
   onAddFromMarketplace?: ((agentId: string) => void) | undefined;
 }
 
-/** What the detail page shows: a marketplace or library entry, or the SKILL.md on the host. */
 export type SkillDetail = Pick<
   MarketplaceSkillDetail,
   "id" | "name" | "description" | "iconUrl" | "instructions" | "examplePrompt" | "version"
@@ -87,14 +78,12 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   let confirmationTrigger: HTMLButtonElement | undefined;
   const skillsMode = () => props.skillsMode ?? "mutable";
   const mutable = () => skillsMode() === "mutable" || skillsMode() === "host";
-  /** The local skills library is on this computer, so only its own agents can use it. */
   const localLibrary = () => skillsMode() === "mutable";
   const calls = () => props.calls ?? agentSkillCalls(skillsMode() === "host" ? props.serverId : undefined);
   const catalogCalls = () => (props.catalog === undefined ? skillsPort().skills : props.catalog);
   const assignmentCount = createMemo(() => assignedSkillCount(skills()));
   const atCap = createMemo(() => assignmentCount() >= INPUT_LIMITS.agentSkills);
   const canAdd = createMemo(() => mutable() && !atCap() && props.onAddFromMarketplace !== undefined && !loading());
-  /** A folder skill problem is English text from main. */
   const problemText = (skill: InstalledSkill) => (skill.problem === undefined ? undefined : sourceText(skill.problem));
   const selectedSkill = createMemo(() => {
     const id = selectedId();
@@ -130,13 +119,10 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     } catch (caught) {
       if (request === listRequest) setError(errorMessage(caught, t("skill.loadFailed")));
     } finally {
-      // The latest request ends the wait, also when it replaced a first load that showed it.
       if (request === listRequest) setLoading(false);
     }
   }
 
-  // The agent object is new after each activity of the agent, and an effect runs again for an equal
-  // value. The memos keep an open skill until the agent or the request changes.
   const agentId = createMemo(() => props.agentId);
   const selectionRequest = createMemo(() => props.selectionRequest);
   createEffect(
@@ -155,13 +141,11 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     },
   );
 
-  // A change made on another device, in the chat or in another window shows while the dialog is open.
   createEffect(
     () => [props.open, props.agentId, calls()] as const,
     ([open, agentId, current]) => {
       if (!open || !current.onChanged) return;
       return current.onChanged((changedId) => {
-        // During the first load, load in full again, so the skill the dialog was opened for still opens.
         if (changedId === agentId) void loadSkills(untrack(loading));
       });
     },
@@ -201,7 +185,6 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
     setDetailLoading(false);
   }
 
-  /** A joined server's skill shows the SKILL.md on the host, which is also right for a skill changed there. */
   function detailCall(skill: InstalledSkill): (() => Promise<SkillDetail>) | null {
     const catalogPort = catalogCalls();
     const local = skill.skillId.startsWith("local-skill-");
@@ -638,9 +621,6 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                               }
                                             : undefined
                                         }
-                                        // The conditions on `onTry` above, in the same order: a
-                                        // save in flight reads as an unavailable composer without
-                                        // this, which names the wrong cause.
                                         unavailableReason={
                                           !mutable()
                                             ? t("skill.unavailable.readOnly")
@@ -723,18 +703,12 @@ function SkillMoreMenu(props: {
   );
 }
 
-/** Where the host keeps the skill's SKILL.md, relative to the agent workspace, in the order to read. */
 function hostSkillPaths(skill: InstalledSkill): string[] {
   if (isFolderSkill(skill)) return [`${skill.location}/SKILL.md`];
   if (!isSkillEnabled(skill)) return [`.openbot/skills-disabled/${skill.slug}/SKILL.md`];
-  // The host writes a copy to each managed skill folder.
   return [".agents/skills", ".claude/skills"].map((folder) => `${folder}/${skill.slug}/SKILL.md`);
 }
 
-/**
- * The SKILL.md on the host. A marketplace entry adds its icon and example prompt, and shows in its
- * place when the host cannot send the file.
- */
 async function hostSkillDetail(
   skill: InstalledSkill,
   readHostFile: (path: string) => Promise<FilePreview>,

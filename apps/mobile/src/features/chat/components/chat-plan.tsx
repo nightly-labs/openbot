@@ -29,15 +29,10 @@ import { useKeptOpen } from "./use-kept-open";
 
 type PlanMessage = Extract<ChatMessage, { kind: "plan" }>;
 
-/** The glyph size and ring of the desktop task list (`TaskList.tsx`), so both read the same. */
 const GLYPH = 16;
 const RING_RADIUS = 7.25;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
-/**
- * The motion of the desktop task list (`task-list.css`). The open is slower than the close: rows
- * settle in one after another, and leave together. The stagger stops after the eighth row.
- */
 const OPEN_MS = 320;
 const CLOSE_MS = 200;
 const STAGGER_MS = 28;
@@ -129,7 +124,6 @@ function DoneMark({ colors }: { colors: PlanColors }) {
   );
 }
 
-/** A dotted ring while pending, a turning arc while active, a disc with a check when done. */
 function StepMark({ state, colors }: { state: ChatPlanStepState; colors: PlanColors }) {
   if (state === "active") return <SpinningArc colors={colors} />;
   if (state === "done") return <DoneMark colors={colors} />;
@@ -140,7 +134,6 @@ function StepMark({ state, colors }: { state: ChatPlanStepState; colors: PlanCol
   );
 }
 
-/** The share of done steps as a ring, or the done mark when every step is done. */
 function SummaryMark({ done, total, colors }: { done: number; total: number; colors: PlanColors }) {
   const share = done / Math.max(total, 1);
   const progress = useSharedValue(share);
@@ -166,11 +159,6 @@ function SummaryMark({ done, total, colors }: { done: number; total: number; col
   );
 }
 
-/** The mobile form of the desktop task list: a card whose header opens or closes the steps. */
-/**
- * One step. Its entrance follows the panel: each row starts a little after the one above it while
- * the panel opens, and all rows leave together while it closes.
- */
 function PlanStep({
   step,
   index,
@@ -218,21 +206,13 @@ function PlanStep({
   );
 }
 
-/**
- * The mobile form of the desktop task list: a card whose header opens or closes the steps.
- *
- * The panel animates its real height, as the desktop grid row does, so the chat list lays out the
- * row on each frame and the messages below move with the card instead of jumping over it.
- */
 export function ChatPlan({ message }: { message: PlanMessage }) {
   const { t } = useText();
   const colors = usePlanColors();
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useKeptOpen(`plan:${message.id}`, true);
-  // A list that the reader closed mounts closed when its row scrolls back into view.
   const openness = useSharedValue(open ? 1 : 0);
   const opening = useSharedValue(open);
-  // -1 until the steps are measured: an open panel keeps its natural height until then.
   const contentHeight = useSharedValue(-1);
   useEffect(() => {
     opening.set(open);
@@ -246,7 +226,6 @@ export function ChatPlan({ message }: { message: PlanMessage }) {
   }, [open, opening, openness]);
   const panelStyle = useAnimatedStyle(() => {
     const height = contentHeight.get();
-    // A panel that mounts closed has no height before its steps are measured.
     if (height < 0) return openness.get() === 0 ? { height: 0 } : {};
     return { height: height * openness.get() };
   });
@@ -254,10 +233,8 @@ export function ChatPlan({ message }: { message: PlanMessage }) {
   const done = message.steps.filter((step) => step.state === "done").length;
   const active = message.steps.find((step) => step.state === "active");
   const title = message.stopped ? t("mobile.chat.plan.stopped") : (message.heading ?? t("mobile.chat.plan.title"));
-  // A closed list names the running step, so the work stays visible.
   const headerText = !open && active ? active.text : title;
   return (
-    // The title that the card mounts with does not enter; a title that a toggle changes does.
     <LayoutAnimationConfig skipEntering>
       <View
         className="w-full self-stretch overflow-hidden rounded-[14px] border"

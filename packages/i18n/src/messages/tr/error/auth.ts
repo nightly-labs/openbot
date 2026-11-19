@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/auth";
 
 export const messages = {
-  // OpenBot hesap servisinden gelen hatalar.
   "error.auth.serviceUnavailable":
     "OpenBot hesap hizmetine ulaşamadı. API'nin çalıştığını kontrol edin, ardından tekrar deneyin.",
   "error.auth.sessionTimeout":

@@ -77,8 +77,6 @@ export function LandingIcon(props: LandingIconProps) {
           <path d="M7 17 17 7" />
           <path d="M7 7h10v10" />
         </Match>
-        {/* What kind of thing a row on a plugin page is: an app, or a skill. The pair is the
-            one the desktop app already uses for the same two lists. */}
         <Match when={props.name === "puzzle"}>
           <path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z" />
         </Match>
@@ -86,8 +84,6 @@ export function LandingIcon(props: LandingIconProps) {
           <rect width="7" height="7" x="14" y="3" rx="1" />
           <path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3" />
         </Match>
-        {/* The topics of a comparison table, one per row. Drawn after the Lucide set the
-            desktop app uses, which is not a dependency of this site. */}
         <Match when={props.name === "laptop"}>
           <rect width="18" height="12" x="3" y="4" rx="2" />
           <path d="M2 20h20" />

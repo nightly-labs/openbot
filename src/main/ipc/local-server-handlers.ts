@@ -1,5 +1,3 @@
-// Servers that the desktop app starts on this computer. See `../local-servers/local-servers.ts`.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { LocalServers } from "../local-servers/local-servers";
@@ -7,7 +5,6 @@ import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { requireString } from "./validation";
 
 export interface LocalServerIpcDependencies {
-  /** Null in a local server, in server mode and on a hosted server. */
   localServers: LocalServers | null;
 }
 

@@ -1,17 +1,3 @@
-// Checks that a Codex subagent's own work shows as steps of its card. Runs the real agent service on a
-// temporary profile with a fake Codex app-server. In a turn, the fake:
-// 1. starts a subagent with a `spawnAgent` collab tool call that names the child thread `child-1`,
-// 2. sends items of the child thread (a command, a thought, a message) and an item of an unknown thread,
-// 3. ends the subagent with a `wait` call whose `agentsStates` holds its report,
-// 4. sends one more child item, which the ended subagent does not take.
-// The stored `<turn>:subagents` message must hold the child's steps in order and the report.
-// Before the subagent ends, Codex asks for MCP tool consent from its subagent threads (#8188): from
-// `child-1`, from `child-2` that a `subAgentActivity` item names, from an unknown thread, and from
-// `child-2` after it ended. The two running subagents must get a card in the parent chat and turn,
-// and the answer "Allow once"; the others are declined.
-// The same four threads call the `openbot` tool `read_agent` (#8657). The two running subagents must
-// get the parent agent; the unknown thread and the ended subagent get an error.
-// `bun run test:codex-subagent-steps`. Writes .openbot-build/codex-subagent-steps-e2e/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,7 +16,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -58,7 +43,6 @@ const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n")
 const step = (ms) => new Promise((done) => setTimeout(done, ms));
 const answers = new Map();
 let consents = 0;
-// Codex asks before a tool of an MCP server runs, from the thread of the agent that calls the tool.
 const consent = (threadId, turnId) =>
   new Promise((done) => {
     const id = "consent-" + ++consents;
@@ -68,7 +52,6 @@ const consent = (threadId, turnId) =>
       _meta: { codex_approval_kind: "mcp_tool_call", persist: ["always"] } } });
   }).then((result) => (result && result.action) || "error");
 let toolCalls = 0;
-// A subagent has the parent's dynamic tools, and calls them from its own thread.
 const readAgent = (threadId, turnId) =>
   new Promise((done) => {
     const id = "tool-" + ++toolCalls;
@@ -221,7 +204,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -299,11 +281,9 @@ try {
   report.consentCards = consentCards;
   report.declineNotices = declineNotices;
   const expectedConsents = { v1: "accept", v2: "accept", unknown: "decline", ended: "decline" };
-  // A running subagent's OpenBot tool call runs as the parent agent (#8657).
   const readersText = snapshot.messages.find((message) => message.text.startsWith("Readers: "))?.text ?? "";
   report.readers = readersText ? JSON.parse(readersText.slice("Readers: ".length)) : {};
   const expectedReaders = { v1: agent.id, v2: agent.id, unknown: "error", ended: "error" };
-  // A subagent's card shows in the parent chat, in the parent turn.
   const cardsInParent =
     consentCards.length === 2 &&
     consentCards.every(

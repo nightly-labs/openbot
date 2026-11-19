@@ -7,18 +7,10 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 
-/** The chat whose messages the reader deletes: an agent chat, one task of the agent, or a channel. */
 export type MessageDeleteChat =
   | { kind: "agent"; agentId: string; taskId?: string }
   | { kind: "channel"; channelId: string };
 
-/**
- * Delete in the message sheet, as on desktop (`message-delete-v1`). Every member deletes the messages
- * that they sent. An owner or admin deletes any message; in an agent chat, `manage` on the agent
- * does too. The host checks it again. `deleteMessage` is unset on an offline host, on a host without
- * the capability, and for a member who can only view the agent. After a delete, the message leaves
- * the loaded chat at once. The host also sends its change events, so the other members' chats change.
- */
 export function useMessageDelete(serverId: string, chat: MessageDeleteChat) {
   const { deleteMessage: remove, channelStore } = useMobileWorkspaceActions();
   const conversationStore = useMobileWorkspaceSelector((workspace) => workspace.conversationStore);

@@ -38,58 +38,42 @@ import { createEffect, createStore, createUniqueId, For, onCleanup, onSettled, S
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
-/** The microphone of the Tasks composer. The page shows it; the app records and transcribes. */
 export interface TasksVoice {
   phase: VoicePhase;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The words the recording heard so far. */
   liveText: string;
-  /** The download progress of the voice model, in percent, while the phase is "preparing". */
   modelProgress: number | null;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
-  /** True while another message box on the page records. */
   blocked?: boolean | undefined;
 }
 
-/** The task of the last start, in the line under the composer. */
 interface TasksTook {
   task: AgentTask;
-  /** True while the start waits: Undo cancels it, and the agent can change. */
   pending: boolean;
 }
 
 interface TasksPageProps {
   hostName: string;
   onBack?: (() => void) | undefined;
-  /** In the app window, the header has no Back button and no server name. */
   frame?: PageHeaderFrame | undefined;
   agents: AgentProfile[];
-  /** The tasks of all agents, also a start that waits. */
   tasks: readonly AgentTask[];
-  /** Whether the task lists of all agents loaded. Only then does a page with no task show how tasks work. */
   loaded?: boolean | undefined;
-  /** The agent of the next task. */
   agentId: string;
   onAgentChange: (agentId: string) => void;
   draft: string;
   onDraftChange: (text: string) => void;
-  /** The files of the next task. The text names each one where it was added. */
   files?: readonly DraftAttachment[] | undefined;
-  /** The files in the thumbnail row: each image, and each other file that the text no longer names. */
   rowFiles?: readonly DraftAttachment[] | undefined;
-  /** The pasted images that still import, with their local previews. */
   pendingImages?: readonly ComposerPendingImage[] | undefined;
   onRemoveFile?: ((attachment: DraftAttachment) => void) | undefined;
-  /** Receives pasted files and long text pastes, as `ComposerEditor` says. Without it, a file paste does nothing here. */
   onPasteFiles?:
     | ((files: File[], selection: ComposerSelection, text?: string) => Promise<ComposerPasteResult | undefined>)
     | undefined;
-  /** Each change moves the focus to the composer. */
   focusRequest: number;
-  /** The text of a start that failed. The draft is back in the composer. */
   startError: string | null;
   onDismissStartError: () => void;
   onStart: () => void;
@@ -99,36 +83,23 @@ interface TasksPageProps {
   onUndo: () => void;
   onOpenTook: () => void;
   onDismissTook: () => void;
-  /** The task in the side panel. */
   selectedId: string | null;
   onSelect: (taskId: string | null) => void;
-  /** The conversation of one task, for the side panel. */
   panel: (taskId: string) => JSX.Element;
-  /** The width of the side panel that the user chose, in pixels. A narrow page shows it narrower. */
   sideWidth: number;
-  /** Each move of the side panel edge. */
   onSideResize: (width: number) => void;
-  /** The width at the end of a move, to keep for the next visit. */
   onSideResizeEnd: (width: number) => void;
-  /** What the task's running turn waits for from the person: an approval, or an answer in the chat. */
   waitOf?: ((task: AgentTask) => AgentTaskWait) | undefined;
-  /** The user's send shortcut for the composer. */
   sendShortcut?: SendShortcut | undefined;
-  /** The window draws the macOS window controls over the image viewer's top start corner. */
   macWindowControls?: boolean | undefined;
 }
 
-/**
- * The composer of the Tasks page: the conversation composer, and the agent selector in its toolbar.
- * Enter starts the task and Shift+Enter adds a line. The microphone dictates the task, as in a chat.
- */
 function TasksComposer(props: TasksPageProps) {
   const { t } = useText();
   const phase = (): VoicePhase => props.voice?.phase ?? "idle";
   const busy = () => phase() === "requesting" || phase() === "preparing" || phase() === "transcribing";
   const draftRows = createComposerRowsResize();
   const hasRow = () => (props.rowFiles?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0;
-  // A start of files only names them, so it has a title too.
   const canStart = () =>
     phase() === "recording" ||
     (phase() === "idle" && (plainTaskTitle(props.draft) !== "" || (props.files?.length ?? 0) > 0));
@@ -163,7 +134,6 @@ function TasksComposer(props: TasksPageProps) {
       <form
         ref={draftRows.form}
         class="composer"
-        // One row, as the chat input. With files, the file row is above the text and the agent is under it.
         data-compact={hasRow() ? undefined : ""}
         data-has-attachments={hasRow() ? "" : undefined}
         onSubmit={(event) => {
@@ -247,7 +217,6 @@ function TasksComposer(props: TasksPageProps) {
   );
 }
 
-/** The line under the composer after a start: the agent that took the task, Undo, and Open. */
 function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
   const { t } = useText();
   const agent = () => agentOf(props.agents, props.took.task.agentId);
@@ -294,7 +263,6 @@ function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
   );
 }
 
-/** One task in the list: its mark, title and state, and the face of its agent at the end. */
 function TaskRow(props: {
   task: AgentTask;
   agent: AgentProfile | undefined;
@@ -339,7 +307,6 @@ const SECTION_TITLE = {
   closed: "conversation.threads.archived",
 } as const satisfies Record<TasksSectionId, AppTextKey>;
 
-/** The tasks by what they need, each section with its heading. The archived tasks are faded. */
 function TasksList(props: TasksPageProps) {
   const { t } = useText();
   const ids = createUniqueId();
@@ -399,18 +366,12 @@ function TasksList(props: TasksPageProps) {
   );
 }
 
-/** The close transition is 200ms; this ends a close whose `transitionend` does not come. */
 const SIDE_CLOSE_FALLBACK_MS = 300;
 
 export const TASKS_SIDE_DEFAULT = 420;
 export const TASKS_SIDE_MIN = 320;
-/** What the list keeps for itself, however far the side panel is dragged. */
 const TASKS_LIST_MIN = 320;
 
-/**
- * The task panel at the right of the page. It makes the list narrower; it does not cover it. The
- * panel slides in from the right and out again, so it stays shown until its close ends.
- */
 function TasksSidePanel(props: {
   tasks: readonly AgentTask[];
   taskId: string | null;
@@ -425,11 +386,9 @@ function TasksSidePanel(props: {
   const [view, setView] = createStore<{
     shownId: string | null;
     closing: boolean;
-    /** The width of the page, once measured. A narrow page makes the panel narrower, not the saved width. */
     pageWidth: number | null;
   }>({ shownId: untrack(() => props.taskId), closing: false, pageWidth: null });
   let side: HTMLDivElement | undefined;
-  /** The list keeps its minimum; a page too narrow for both keeps the panel minimum. */
   const maxFor = (page: number | null | undefined) =>
     page == null ? Number.POSITIVE_INFINITY : Math.max(TASKS_SIDE_MIN, page - TASKS_LIST_MIN);
   const width = () => Math.round(Math.min(maxFor(view.pageWidth), Math.max(TASKS_SIDE_MIN, props.width)));
@@ -465,7 +424,6 @@ function TasksSidePanel(props: {
     const id = view.shownId;
     return id && props.tasks.some((task) => task.id === id) ? id : null;
   };
-  /* The first task of an open slides in with the panel; only a change to a different task fades in. */
   let contentId: string | null = null;
   return (
     <Show when={shown()}>
@@ -473,8 +431,6 @@ function TasksSidePanel(props: {
         onCleanup(() => {
           contentId = null;
         });
-        // Escape closes the panel, as on the settings page: on the document and after the delegated
-        // handlers, so a control that handles Escape keeps it. An open popup or another text field also keeps it.
         onSettled(() => {
           const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
@@ -522,7 +478,6 @@ function TasksSidePanel(props: {
                 })
               }
             />
-            {/* The panel clips its content while it opens and closes; the edge handle stays outside the clip. */}
             <div class="tasks-page-side-clip">
               <For each={[taskId()]} keyed={(id) => id}>
                 {(id) => {
@@ -544,15 +499,9 @@ function TasksSidePanel(props: {
   );
 }
 
-/**
- * The Tasks page of a server, on desktop and on the web: one calm column for the tasks of all agents.
- * The composer is at the top, with the agent selector. Below it, the tasks by what they need. A start
- * can be undone for a few seconds. A task opens in the panel beside the list.
- */
 export function TasksPage(props: TasksPageProps) {
   const { t } = useText();
   const headingId = createUniqueId();
-  // The first start adds a task that waits, so the page shows the list as soon as the user sends.
   const empty = () => props.loaded === true && props.tasks.length === 0;
   return (
     <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>

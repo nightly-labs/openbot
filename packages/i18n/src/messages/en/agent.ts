@@ -20,7 +20,6 @@ export const messages = defineMessages("agent", {
   "agent.setup.creating": "Creating agent…",
   "agent.setup.create": "Create agent",
   "agent.setup.suggestions": "Suggestions",
-  // Suggested agents. Selecting one copies its name and purpose into the new agent.
   "agent.setup.suggestion.label": "{name}. {description}",
   "agent.setup.suggestion.inboxHelper.name": "Inbox Helper",
   "agent.setup.suggestion.inboxHelper.description": "Drafts replies and keeps follow-ups from slipping.",
@@ -91,7 +90,6 @@ export const messages = defineMessages("agent", {
   "agent.error.provider": "Provider error",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} error",
-  // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "Red",
   "agent.color.orange": "Orange",
   "agent.color.yellow": "Yellow",

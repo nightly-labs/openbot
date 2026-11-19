@@ -45,11 +45,9 @@ import { UPLOAD_BLUR_RADIUS, useUploadReveal } from "./upload-progress";
 const TILE_RADIUS = 10;
 const CARD_WIDTH = 196;
 const CARD_HEIGHT = 252;
-// Room around the front card for the cards that show behind it.
 const SPREAD = 20;
 const LIFT = 14;
 const ACTION_ICON_INSET = 11;
-// Settles without passing its place: a position past the next card would start the next throw.
 const STACK_SPRING = { damping: 30, stiffness: 260, mass: 1, overshootClamping: true } as const;
 const SETTLE_SPRING = { damping: 26, stiffness: 320, mass: 1 } as const;
 
@@ -59,11 +57,6 @@ interface StackMotion {
   direction: SharedValue<number>;
 }
 
-/**
- * The images of one message as a stack of cards. A tap opens the conversation's viewer on
- * the front card; a sideways swipe sends it to the back. The count under the stack opens all the
- * images on a screen of their own.
- */
 export function ChatImageGallery({
   attachments,
   uploads,
@@ -71,10 +64,8 @@ export function ChatImageGallery({
   alignment,
 }: {
   attachments: readonly AttachmentSummary[];
-  /** The sent fraction of each image, from 0 to 1, while the message that carries them is sending. */
   uploads?: readonly (number | undefined)[];
   serverId: string;
-  /** The side of the chat the message is on. The count sits on that side, as the actions do. */
   alignment: "left" | "right";
 }) {
   const { t } = useText();
@@ -84,22 +75,16 @@ export function ChatImageGallery({
   const cardWidth = Math.min(CARD_WIDTH, Math.min(MAX_FRAME_WIDTH, width - 80) - SPREAD * 2);
   const count = attachments.length;
   const keys = attachments.map((attachment) => attachment.id);
-  // A stack at the end fans out as the mirror image of one at the start, and a card that a screen
-  // reader moves swings toward the open side of the chat. The alignment is the side in the layout, so
-  // a right-to-left layout puts it on the other side of the screen.
   const mirror = (alignment === "right" ? -1 : 1) * END_X;
   const viewer = useChatImageSource(null, 0);
   const hiddenSource = viewer.hiddenSource;
   const position = useSharedValue(0);
   const dragX = useSharedValue(0);
   const direction = useSharedValue(-1);
-  // Where the position comes to rest, so a finger that stops a moving stack lands it there.
   const target = useSharedValue(0);
   const motion: StackMotion = { position, dragX, direction };
-  // React hears the front card only to name it to a screen reader and to open it.
   const [front, setFront] = useState(0);
   const retries = useRef(new Map<number, () => boolean>());
-  // Images the phone is still sending are only on the phone, so the viewer and the gallery screen wait for the host.
   const sent = attachments.every(isViewableImage);
 
   function openSlot(slot: number) {
@@ -108,12 +93,10 @@ export function ChatImageGallery({
     viewer.open?.(attachment);
   }
 
-  // A card that goes to the back is a physical move, so it gets an impact, not a selection tick.
   function tick() {
     void haptics.impact("light");
   }
 
-  /** Sends the front card to the back, from `progress` of the way, at `velocity`. */
   function throwFront(side: number, progress: number, velocity: number) {
     "worklet";
     const base = Math.round(position.get());
@@ -132,7 +115,6 @@ export function ChatImageGallery({
     scheduleOnRN(tick);
   }
 
-  /** Brings the back card to the front: the throw played backwards. */
   function bringBack() {
     "worklet";
     const previous = Math.round(position.get()) - 1;
@@ -149,8 +131,6 @@ export function ChatImageGallery({
     scheduleOnRN(tick);
   }
 
-  // The viewer may page to another image of this message. That card comes to the front behind it,
-  // so the picture flies back to the card that is in front, and the stack shows what was seen last.
   useAnimatedReaction(
     () => hiddenSource.get(),
     (key) => {
@@ -172,7 +152,6 @@ export function ChatImageGallery({
     .activeOffsetX([-12, 12])
     .failOffsetY([-12, 12])
     .onStart(() => {
-      // A card still on its way to the back lands first, so the finger takes the new front card.
       if (Math.abs(position.get() - target.get()) > 0.001) {
         cancelAnimation(position);
         position.set(target.get());
@@ -244,8 +223,6 @@ export function ChatImageGallery({
         disabled={!sent}
         hitSlop={8}
         className={`flex-row items-center gap-1 ${alignment === "right" ? "self-end" : "self-start"}`}
-        // The count keeps the inset of an 18-point action icon centred in its 40-point button, on
-        // the side of the message, so the stacks of the two sides are mirror images.
         style={({ pressed }) => ({
           opacity: pressed ? 0.55 : 1,
           paddingLeft: alignment === "right" ? 0 : ACTION_ICON_INSET,
@@ -266,7 +243,6 @@ export function ChatImageGallery({
   );
 }
 
-/** One card of the stack. Its pose comes from the stack's position on the UI thread. */
 function StackCard({
   attachment,
   serverId,
@@ -286,7 +262,6 @@ function StackCard({
   count: number;
   width: number;
   reduced: boolean;
-  /** 1 for a stack on the left of the chat, -1 for one on the right. */
   mirror: number;
   motion: StackMotion;
   retries: Map<number, () => boolean>;
@@ -297,9 +272,7 @@ function StackCard({
   const [imageFailed, setImageFailed] = useState(false);
   const source = useChatImageSource(isViewableImage(attachment) ? attachment.id : null, FRAME_RADIUS);
   const failed = Boolean(query.error) || imageFailed;
-  // As on a single image: the card is blurred while it uploads and comes into focus as it leaves the phone.
   const { shownUpload, revealStyle } = useUploadReveal(upload);
-  // A tap on a card that failed loads it again instead of opening the viewer.
   useEffect(() => {
     retries.set(slot, () => {
       if (!failed) return false;
@@ -317,7 +290,6 @@ function StackCard({
     const depth = stackDepth(slot, position, count);
     const pose = stackPose(depth, count, width, motion.direction.get(), !reduced, mirror);
     const drag = depth < 0.001 || depth > count - 0.001 ? dragPose(motion.dragX.get(), width) : { x: 0, rotate: 0 };
-    // The whole card hides while the viewer holds its picture, its shadow too.
     const hidden = source.hiddenSource.get() === attachment.id;
     return {
       opacity: hidden ? 0 : pose.opacity,
@@ -395,10 +367,6 @@ function StackCard({
   );
 }
 
-/**
- * One image of the gallery screen's grid. A tap opens the screen's viewer on it, and a failed
- * image loads again.
- */
 export function ChatGalleryTile({
   attachment,
   serverId,
@@ -408,7 +376,6 @@ export function ChatGalleryTile({
   attachment: AttachmentSummary;
   serverId: string;
   tile: GalleryTile;
-  /** Opens the menu of the tile. The native context menu does not cancel the tap without it. */
   onLongPress?: () => void;
 }) {
   const { t } = useText();
@@ -437,7 +404,6 @@ export function ChatGalleryTile({
         source.hiddenStyle,
       ]}
     >
-      {/* A plain pressable, so every layer fills the tile exactly. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
@@ -446,7 +412,6 @@ export function ChatGalleryTile({
             : t("mobile.chat.attachment.preview", { name: attachment.name })
         }
         accessibilityState={{ disabled: pending || (!uri && !failed), busy: !failed && !loaded }}
-        // A tile with a menu keeps its long press while the image loads; only the tap waits for it.
         disabled={!onLongPress && (pending || (!uri && !failed))}
         onPress={() => {
           if (pending || (!uri && !failed)) return;
@@ -477,7 +442,6 @@ export function ChatGalleryTile({
               onLoad={({ source: decoded }) => {
                 setLoaded(true);
                 if (decoded.width <= 0 || decoded.height <= 0) return;
-                // The decoder has the final word on the shape, which the viewer opens the image in.
                 const size = { width: decoded.width, height: decoded.height };
                 if (dimensions && sameShape(dimensions, size)) return;
                 rememberImageDimensions(attachment.id, size);

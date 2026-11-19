@@ -1,6 +1,3 @@
-// Run against an existing Storybook with installed Chrome:
-// bun scripts/code-language-e2e.ts --storybook=http://localhost:6006 --phase=before
-// Each phase keeps its own report and screenshots under .openbot-build/code-language-e2e/.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -149,7 +146,6 @@ async function main() {
         const expectedText = story.surrounding
           ? ["Before the code.", ...story.lines, story.label, "After the code."]
           : [...story.lines, story.label];
-        // Check each item even if another item is absent or the component throws.
         result.observations = await Promise.all([
           ...expectedText.map((text) => observe(storyPage.getByText(text, { exact: true }), text)),
           observe(page.getByRole("button", { name: t("chat.code.copy"), exact: true }), "Copy"),
@@ -168,7 +164,6 @@ async function main() {
           } catch (error) {
             result.errors.push(`Animation completion: ${errorText(error)}`);
           }
-          // Keep screenshot evidence even when rendering or animation completion fails.
           try {
             const filename = `${story.id}.png`;
             await page.screenshot({ path: resolve(out, filename), fullPage: true, timeout: 15_000 });

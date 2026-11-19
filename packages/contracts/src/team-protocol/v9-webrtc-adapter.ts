@@ -1,7 +1,3 @@
-// The protocol 9 WebRTC frames: the protocol 8 ones, a compatibility response with up to 256
-// capabilities, and an agent create request that can carry the `operationId` of
-// agent-create-operation-v1. A protocol 9 client reads every host with it: a host that is older sends
-// at most 128 capabilities, and a client sends `operationId` only to a host that advertises it.
 import { isDynamicRecord } from "../runtime-values";
 import { TEAM_API_ROUTES } from "../team-api-routes";
 import { decodeAgentCreateOperation } from "./agent-create-operation-v1";

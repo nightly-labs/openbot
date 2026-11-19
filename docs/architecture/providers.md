@@ -983,8 +983,10 @@ Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
 (`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
 Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
 `retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent is `antigravity/<version> <os>/<arch>`, and it sends the "Gemini Models" group only
-to the desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). 
+unless the User-Agent names Antigravity, and it sends the "Gemini Models" group only to the desktop app's
+version, not to the CLI's, so the User-Agent names the desktop version (#7215). It is the desktop app's own
+form, `antigravity/hub/<version> (aidev_client; os_type=<os>; arch=<arch>; cl=<build>)`: with
+`antigravity/<version> <os>/<arch>`, Pro plans got no "Gemini 4 Argon" group (#10934). 
 `loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
 that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
 "spent" reading would hold Gemini turns. OpenBot does not refresh the token: it

@@ -1,13 +1,3 @@
-// Checks the `update_agents` tool of issue #2835 on the real SQLite agent store: a coordinator gives
-// several agents one setting in one call and reads the result for each agent. One agent that has a
-// turn refuses a provider change the way AgentService does, an unknown id and a request to widen
-// access fail for that agent only, and the other agents are still changed. A model that is not listed
-// fails the whole call. Each call goes through `handleUpdateAgentsTool`, as the tool router sends it,
-// and a failed call becomes the correctable tool failure of the router. No provider, account or
-// network is started.
-// Run: `bun scripts/agent-update-agents-e2e.ts`.
-// Writes .openbot-build/agent-update-agents-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -88,9 +78,7 @@ try {
     listModels: () => models,
     agentModels: () => models,
     providerAccounts: () => undefined,
-    // No provider rows: each listed model can run.
     providerStatuses: () => [],
-    // The tool mock refuses a model change while the agent has a turn, so the call reports that agent.
     updateAgent: (input: UpdateAgentInput, initiatingAgentId: string) =>
       busyAgentIds.has(input.agentId) && input.model !== undefined
         ? Effect.fail(new ToolOperationFailed({ cause: new Error(sourceText("error.agent.waitBeforeProviderChange")) }))
@@ -101,7 +89,6 @@ try {
     redactMcp: (text: string) => text,
   };
 
-  /** One `update_agents` call from the coordinator, answered as the tool router answers it. */
   const call = async (args: unknown): Promise<{ success: boolean; value: DynamicRecord }> => {
     const response = await Effect.runPromise(
       handleUpdateAgentsTool(
@@ -228,7 +215,6 @@ try {
       assert.equal(typeof refusal.value.error, "string");
     }
     assert.match(String(refusals.repeated.value.error), /each agent id once/);
-    // The refusal lists the fields that update_agents takes, never the field that the call sent (#10024).
     const unknownField = String(refusals.unknownField.value.error);
     assert.match(unknownField, /^Remove unsupported profile fields\. update_agents takes only: /);
     assert.ok(

@@ -9,6 +9,8 @@ export const messages = {
   "error.update.installFailed": "تعذّر تثبيت التحديث. أغلق OpenBot وأعد فتحه، ثم حاول مرة أخرى.",
   "error.update.notInstalled": "لم تُثبِّت إعادة التشغيل الأخيرة التحديث. أعد التشغيل للمحاولة مرة أخرى.",
   "error.update.downloadFailed": "تعذّر تنزيل التحديث. حاول مرة أخرى.",
+  "error.update.signatureNotConfirmed":
+    "تعذّر على OpenBot التحقق من التحديث. حاول مرة أخرى. إذا استمر هذا الخطأ، نزّل OpenBot من openbot.run/download.",
   "error.update.checkFailed": "تعذّر التحقق من وجود تحديثات. حاول مرة أخرى.",
   "error.update.checkStalled": "توقف التحقق من التحديثات عن الاستجابة. حاول مرة أخرى.",
   "error.update.checkOffline": "تعذّر الوصول إلى خدمة التحديث. تحقق من اتصالك بالإنترنت، ثم حاول مرة أخرى.",

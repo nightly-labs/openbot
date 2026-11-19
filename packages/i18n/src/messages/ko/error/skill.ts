@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "스킬 패키지에는 심볼릭 링크를 포함할 수 없어요.",
   "error.skill.expandedTooLarge": "압축을 푼 스킬은 10MB보다 작아야 해요.",
   "error.skill.irregularEntry": "스킬 패키지에는 일반 파일과 폴더만 포함할 수 있어요.",

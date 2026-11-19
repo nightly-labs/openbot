@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Arrêté.",
   "status.messaging.stop": "Arrêter",
   "status.messaging.approvalTitle": "OpenBot demande une approbation pour continuer.",
+  "status.messaging.approvalTitleTeammate": "Le coéquipier {agent} demande une approbation pour continuer.",
   "status.messaging.approvalCommand": "Exécuter une commande",
   "status.messaging.approvalFileChange": "Modifier des fichiers",
   "status.messaging.approvalPermissions": "Obtenir plus d’autorisations",

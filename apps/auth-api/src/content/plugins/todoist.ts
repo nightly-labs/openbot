@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Todoist here is taken from todoist.com and Doist's todoist-mcp
-// repository. Each page used is in `sources`. Check the sources again, and move `checkedAt`,
-// whenever this file changes.
-
 export const TODOIST_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

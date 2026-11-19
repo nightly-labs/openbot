@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} は有効な JSON ではありません。",
   "error.import.notAgentExport": "{manifest} は OpenBot のエージェントのエクスポートではありません。",
   "error.import.newerExportSkill":

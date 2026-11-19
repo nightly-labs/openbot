@@ -75,7 +75,6 @@ export function useSubagentColors(): SubagentColors {
   };
 }
 
-/** The time now, again each second while `running`. */
 export function useSubagentClock(running: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -103,7 +102,6 @@ export function Spinner({ color, size }: { color: string; size: number }) {
   );
 }
 
-/** The state of one subagent, in the icons and colors of desktop. */
 export function SubagentStatusIcon({
   status,
   colors,
@@ -131,7 +129,6 @@ export function SubagentRow({
   now: number;
   colors: SubagentColors;
   first: boolean;
-  /** How many lines of the latest step or answer show. */
   lines: number;
   onOpen: (() => void) | undefined;
 }) {
@@ -154,7 +151,6 @@ export function SubagentRow({
           : undefined
       }
       className="py-3 pl-3.5 pr-3"
-      // A list row: the pressed row darkens, as an iOS table cell does.
       style={({ pressed }) => ({ backgroundColor: pressed ? colors.pressed : "transparent" })}
     >
       {first ? null : (
@@ -172,7 +168,6 @@ export function SubagentRow({
         >
           {subagent.title}
         </Typography.Paragraph>
-        {/* The time and the arrow sit together on the title line, as the detail text of an iOS row. */}
         <View className="flex-row items-center gap-0.5">
           <Typography.Paragraph type="body-sm" style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}>
             {subagentDuration(subagentElapsedMs(subagent, now), text)}
@@ -191,7 +186,6 @@ export function SubagentRow({
   );
 }
 
-/** The title, the progress and the time of the subagents of one turn. */
 export function useSubagentGroupSummary(subagents: readonly ConversationSubagent[]) {
   const text = useText();
   const { t } = text;
@@ -214,21 +208,15 @@ export function useSubagentGroupSummary(subagents: readonly ConversationSubagent
   return { title, progress, elapsed, now, running, failed };
 }
 
-/**
- * The subagents that the agent started in one turn, in one line: their count, their progress and
- * their time. The line opens the sheet with each subagent and its details.
- */
 export function ChatSubagents({
   message,
   onOpen,
 }: {
   message: SubagentsMessage;
-  /** Absent where no sheet can show the subagents. */
   onOpen: ((messageId: string) => void) | undefined;
 }) {
   const colors = useActivityColors();
   const { title, progress, elapsed, running, failed } = useSubagentGroupSummary(message.subagents);
-  // The kind icon, or the state while subagents run or after one fails.
   const icon =
     running > 0 ? (
       <Spinner color={colors.running} size={ACTIVITY_ICON_SIZE} />

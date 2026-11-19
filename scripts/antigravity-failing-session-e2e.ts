@@ -1,13 +1,3 @@
-// Checks that OpenBot opens a new Antigravity session after the same session fails two turns in a row
-// (#10284), and keeps the session after one failure. Runs the real agent service on a temporary
-// profile with a fake Antigravity CLI 1.5.4. A prompt with `FAIL` gets the CLI's stream timeout as a
-// JSON-RPC error; other prompts answer. A new session's first prompt holds the conversation so far,
-// with the failed messages, so a prompt with `PELICAN` (the first message) answers.
-// Checks:
-//   1. One failed turn, then a completed turn: both on the first session.
-//   2. Two failed turns in a row: both on the first session, and each shows its error.
-//   3. The next message: a new session, which gets the conversation so far, and it answers.
-// `bun run test:antigravity-failing-session`. Writes .openbot-build/antigravity-failing-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -25,9 +15,7 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
-// Bun's `os.homedir()` does not follow HOME. Keep the Gemini home off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
@@ -39,7 +27,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity CLI that logs the session of each prompt and fails a prompt with `FAIL` only. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -119,7 +106,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -161,7 +147,6 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends `text`, waits for its end, and records the sessions of its prompts. */
 async function send(agentId: string, text: string): Promise<Step> {
   const before = prompts().length;
   const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));

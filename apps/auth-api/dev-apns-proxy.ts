@@ -2,15 +2,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { connect } from "node:http2";
 import type { Plugin } from "vite";
 
-/**
- * Local development only. Apple Push Notification service accepts HTTP/2 only, and the local
- * Worker runtime on macOS cannot open an HTTP/2 request. So the development server, which runs in
- * Node, forwards the Worker's Live Activity request to Apple. The Worker still checks the host,
- * the limit, and the payload, and signs the Apple token: only the last connection differs.
- *
- * The path is `/__dev/apns/<sandbox|production>/3/device/<token>`. Only this computer can call it.
- * It logs nothing: the request has a push token and an Apple provider token.
- */
 export const DEVELOPMENT_APNS_PATH = "/__dev/apns";
 
 const APPLE_HOSTS = {
@@ -57,7 +48,6 @@ async function forward(request: IncomingMessage, response: ServerResponse): Prom
     response.setHeader("content-type", "application/json");
     response.end(result.body);
   } catch {
-    // The Worker reads 502 as "Apple did not accept the update now".
     response.statusCode = 502;
     response.end();
   }

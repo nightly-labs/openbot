@@ -1,18 +1,3 @@
-// Transcribes spoken English with the real transcription service, sherpa-onnx addon and local
-// dictation models, without the app window. Each model downloads to the directory the dev app uses,
-// with the pinned checksums. macOS `say` speaks the samples in Samantha, a voice that every Mac has;
-// the default voice can be a novelty voice that no model understands. A model that takes a fixed
-// language also gets German (Anna) and Polish (Ewa) samples with that language selected.
-//
-// The host runs in Electron as Node through `child_process.fork`, as in `voice-speech-smoke.ts`.
-// A Bun parent and an Electron child share only JSON messages, so the PCM bytes go as an array of
-// numbers, and a listener that runs before the host's listener makes them a `Uint8Array` again.
-//
-// Writes `report.json` to `.openbot-build/voice-transcription-smoke/`.
-// Run `bun run voice:prepare-runtime` first. macOS only.
-//
-//   bun scripts/voice-transcription-smoke.ts [model id...]   (default: parakeet-unified-en-0.6b)
-
 import { execFileSync, fork } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,7 +31,6 @@ const RESOURCES_ROOT = resolve(".openbot-build/voice");
 const OUTPUT = resolve(".openbot-build/voice-transcription-smoke");
 const HOST = resolve("src/main/voice-transcription-host.ts");
 const ELECTRON = resolve("node_modules/electron/dist/Electron.app/Contents/MacOS/Electron");
-/** The same directories as the dev app in `application-services.ts`. */
 const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "parakeet-tdt-0.6b-v3": join(RESOURCES_ROOT, "model"),
   "parakeet-unified-en-0.6b": join(RESOURCES_ROOT, PARAKEET_UNIFIED_MODEL_DIRECTORY),
@@ -54,18 +38,12 @@ const MODEL_DIRECTORIES: Record<LocalVoiceModelId, string> = {
   "whisper-turbo": join(RESOURCES_ROOT, WHISPER_TURBO_MODEL_DIRECTORY),
   "cohere-transcribe-03-2026": join(RESOURCES_ROOT, COHERE_TRANSCRIBE_MODEL_DIRECTORY),
 };
-/** Synthetic speech is clear, so a model that works gets nearly every word. */
 const MAXIMUM_WORD_ERROR_RATE = 0.15;
-/** Makes the JSON array of `pcm` a `Uint8Array` before the host checks the request. */
 const PCM_FROM_JSON = `data:text/javascript,process.prependListener("message",(m)=>{if(m&&typeof m==="object"&&Array.isArray(m.pcm))m.pcm=Uint8Array.from(m.pcm)});`;
 const FAILURES: readonly VoiceTranscriptionFailure[] = ["runtime-unavailable", "model-load-failed", "inference-failed"];
 
 const logger = createOpenBotLogger("voice-transcription-smoke");
 
-/**
- * Each sample starts with a short word: a model that loses the first word fails here. The English
- * samples use automatic, so a model with its own languages must fall back to English.
- */
 const SAMPLES: readonly { name: string; text: string; voice: string; language: VoiceLanguage }[] = [
   {
     name: "settings",
@@ -139,7 +117,6 @@ function responseFromJson(message: unknown): VoiceTranscriptionResponse {
   return { id: message.id, text: message.text };
 }
 
-/** Speaks the text with macOS `say` and answers the canonical 44-byte WAV that dictation sends. */
 async function spokenWav(text: string, voice: string, directory: string): Promise<Uint8Array> {
   const path = join(directory, "sample.wav");
   execFileSync("say", ["-v", voice, "-o", path, "--data-format=LEI16@16000", "--channels=1", text]);
@@ -187,7 +164,6 @@ function words(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Word-level edit distance divided by the number of expected words. */
 function wordErrorRate(expected: string, actual: string): number {
   const reference = words(expected);
   const hypothesis = words(actual);
@@ -214,7 +190,6 @@ async function main(): Promise<void> {
     resourcesRoot: RESOURCES_ROOT,
     modelDirectories: MODEL_DIRECTORIES,
     preferences: new VoicePreferenceStore(join(temporary, "voice-preference.json")),
-    // Cloud dictation is not used: the key stores are never loaded and nothing is encrypted.
     apiKeys: {
       elevenlabs: new VoiceApiKeyStore({
         path: join(temporary, "voice-api-key.json"),
@@ -231,7 +206,6 @@ async function main(): Promise<void> {
   const results: unknown[] = [];
   let failed = false;
   try {
-    // A sample is spoken only when a requested model uses it, so an English run needs no German or Polish voice.
     const audio = new Map<string, Uint8Array>();
     for (const modelId of modelIds.filter(isLocalVoiceModelId)) {
       const supportsLanguage = VOICE_MODELS.find((model) => model.id === modelId)?.supportsLanguage === true;

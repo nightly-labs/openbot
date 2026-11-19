@@ -15,31 +15,18 @@ import { isDynamicRecord, isString } from "./runtime-values";
 export interface HostAnalyticsInput extends Omit<AgentAnalyticsInput, "agentId"> {
   agentId?: string | undefined;
 }
-// Only the host report carries the per-agent split and the daily-by-provider grid: on an
-// agent-scoped report the agent array would be one row restating the totals, and adding
-// either to AgentAnalytics would drag the agent codec and the mobile screen along.
 export interface HostAnalytics extends Omit<AgentAnalytics, "agentId"> {
   agentId?: string | undefined;
   agents: AnalyticsAgent[];
   providerDaily: AnalyticsProviderDay[];
-  /**
-   * The skills the agents loaded in the range, most tokens first. Only the local host sends it: the
-   * frozen Team API host analytics wire has no skills, so a remote report has none.
-   */
   skills?: AnalyticsSkill[] | undefined;
 }
-/** The loads of one skill in a report. */
 export interface AnalyticsSkill {
-  /** The skill's folder name. */
   skill: string;
   loads: number;
-  /** The estimated tokens that the loads added to the context. Loads of a skill file that was not found add none. */
   tokens: number;
-  /** The tokens priced as input of each turn's model. Null when no load has a price. */
   estimatedCostUsd: number | null;
-  /** The number of agents that loaded it. */
   agents: number;
-  /** Its part of the tokens of all skill loads in the report. */
   share: number;
 }
 const SKILL_NAME_LIMIT = 128;

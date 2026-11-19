@@ -1,17 +1,4 @@
 import {
-  HOST_MEMBER_UPDATE_CAPABILITY,
-  memberUpdateRoute,
-} from "@openbot/contracts/team-protocol/host-member-update-v1";
-import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
-import { Effect, Result } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// The server name, logo, timezone, agent memory limit, memory review, prompt cache time, model list
-// and app update of one server's host. On a joined server the request goes to the host. Identity,
-// timezone, memory limit, memory review, prompt cache time, model list, settings, cancellation, and
-// forced restarts require an owner or admin.
-// Ordinary members can check and request an idle update through host-member-update-v1.
-
-import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
   type AgentProviderRef,
@@ -92,9 +79,14 @@ import {
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import {
+  HOST_MEMBER_UPDATE_CAPABILITY,
+  memberUpdateRoute,
+} from "@openbot/contracts/team-protocol/host-member-update-v1";
+import {
   HOST_PERSONALITY_CAPABILITY,
   HOST_PERSONALITY_ROUTES,
 } from "@openbot/contracts/team-protocol/host-personality-v1";
+import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import {
@@ -123,6 +115,7 @@ import {
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Result } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
@@ -138,6 +131,7 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { ServerAuditStore } from "../server-audit-store";
 import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
@@ -183,17 +177,13 @@ interface HostAdminIpcDependencies {
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
-  /** The server ID of this computer's host, when it has one. Roles are stored by it. */
   localServerId: () => string | undefined;
   localAgentIds: () => string[];
-  /** The owner member of this computer's host, who makes each local change, for the audit log. */
   localOwner: () => ServerAuditName | null;
 }
 
-// The user of this computer owns its server, so the roles give them every agent.
 export const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
 
-/** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
 type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | HostUpdateSettingsChange;
 
 export function hostAdminIpcHandlers({
@@ -325,7 +315,6 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.agentAccessUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeAgentAccessSnapshot, { method: "POST", body }));
   }
-  // This computer updates from Settings. The renderer shows the tab for a joined server only.
   const localUpdate = (): never => {
     throw new Error(sourceText("error.team.hostUpdateUnsupported"));
   };
@@ -343,7 +332,6 @@ export function hostAdminIpcHandlers({
         remote: async (input, serverId) => {
           const { appearance, ...identity } = input;
           const changesIdentity = identity.serverName !== undefined || identity.logo !== undefined;
-          // Both gates first, so a change that the host cannot take in full sends nothing.
           if (changesIdentity && !remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
             throw new Error(sourceText("error.host.identityLocalOnly"));
           if (appearance !== undefined && !remoteServers.supportsCapability(serverId, HOST_APPEARANCE_CAPABILITY))
@@ -363,16 +351,12 @@ export function hostAdminIpcHandlers({
                 body: { appearance },
               }),
             );
-            // The host also sends `host-appearance`; this shows the change before that event arrives.
             if (!changesIdentity) return runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
             await runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
           }
-          // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
         },
       }),
-      // Local: this app has nothing that starts it again after a quit. The renderer shows the action only
-      // for a joined server whose host has `host-restart-v1`.
       restartHost: scopedQueryHandler({
         local: () => {
           throw new Error(sourceText("error.team.hostRestartUnsupported"));
@@ -389,7 +373,6 @@ export function hostAdminIpcHandlers({
         local: async () => {
           await runCauseEffect(host.rotateIdentityKey());
         },
-        // Owner only: the host refuses an admin or a member with 403.
         remote: async (serverId) => {
           if (!remoteServers.supportsCapability(serverId, HOST_KEY_ROTATION_CAPABILITY))
             throw new Error(sourceText("error.team.hostKeyRotationUnsupported"));
@@ -399,9 +382,6 @@ export function hostAdminIpcHandlers({
               body: {},
             }),
           );
-          // The answer does not make the new key trusted. The directory carries the handover that the
-          // previous key signed, and this read follows it. The key is changed, so a failed read is not
-          // a failure of the change: the next read follows it.
           await runCauseEffect(remoteServers.refreshIdentity(serverId)).catch(() => undefined);
         },
       }),
@@ -465,7 +445,6 @@ export function hostAdminIpcHandlers({
         local: (input) => runCauseEffect(hostTurnLimits.set(input)),
         remote: (input, serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.update, input),
       }),
-      // A host before host-personality-v1 uses the classic prompt.
       getPersonality: scopedQueryHandler({
         local: () => serverPersonality.get(),
         remote: async (serverId) =>
@@ -485,7 +464,6 @@ export function hostAdminIpcHandlers({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),
         remote: (serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote limit is any positive count.
       setAgentMemoryLimit: scopedHandler(parseMemoryLimitCount, {
         local: async (limit) =>
           hostAgentMemoryLimit(await runCauseEffect(agentMemoryLimit.set(parseAgentMemoryLimitPreference({ limit })))),
@@ -495,7 +473,6 @@ export function hostAdminIpcHandlers({
         local: () => hostMemoryReview(memoryReview.get()),
         remote: (serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote value is any count; 0 is off.
       setMemoryReview: scopedHandler(parseMemoryReviewCount, {
         local: async (interval) =>
           hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
@@ -505,7 +482,6 @@ export function hostAdminIpcHandlers({
         local: () => hostSkillLearning(skillLearning.get()),
         remote: (serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.settings, {}),
       }),
-      // The host checks the value against its own choices, so a remote value is any short text.
       setSkillLearning: scopedHandler(parseSkillLearningText, {
         local: async (mode) => {
           if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
@@ -525,7 +501,6 @@ export function hostAdminIpcHandlers({
         local: () => machineAlerts.alerts(),
         remote: (serverId) => remoteMachineAlerts(serverId, MACHINE_RESOURCES_ROUTES.alerts, {}),
       }),
-      // The host checks the member, so a remote change is checked only for its shape here.
       setMachineAlerts: scopedHandler(decodeMachineAlertSettings, {
         local: (settings) => {
           if (!machineAlerts.canBeResponsible(settings.responsibleMemberId))
@@ -586,7 +561,6 @@ export function hostAdminIpcHandlers({
       setAgentAccess: scopedHandler(parseAgentAccessChange, {
         local: async (change) => {
           const serverId = localAccessServerId();
-          // The local owner sees every agent of this host.
           const shown = new Set(localAgentIds());
           const saved = await Effect.runPromise(
             Effect.result(agentAccess.set(serverId, change, shown, shown, localOwner())),
@@ -600,7 +574,6 @@ export function hostAdminIpcHandlers({
         remote: (change, serverId) => remoteAccess(serverId, AGENT_ACCESS_ROUTES.set, change),
       }),
       getAuditLog: scopedQueryHandler({
-        // A computer that does not host a server has no changes to show.
         local: (): ServerAuditLog => {
           const serverId = localServerId();
           return serverId ? serverAudit.read(serverId) : { entries: [] };
@@ -648,7 +621,6 @@ function parseProviderEnvironmentProvider(value: unknown): ProviderEnvironmentPr
   return value;
 }
 
-/** The renderer's change. A value can be a secret: no error here quotes one. */
 function parseProviderEnvironmentUpdate(value: unknown): ProviderEnvironmentUpdate {
   if (
     !isObject(value) ||

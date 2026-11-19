@@ -12,10 +12,6 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(WHATSAPP_STATUS_REACTIONS_ROUTES));
 
-/**
- * Whether this host puts its status reactions on the person's message in a WhatsApp chat, for each
- * number that it linked. Frozen by `whatsapp-status-reactions-v1`. `requireAdmin` runs on both routes.
- */
 export async function routeWhatsAppStatusReactions(
   context: TeamApiRequestContext,
   connectors: TeamApiConnectors | undefined,
@@ -25,7 +21,6 @@ export async function routeWhatsAppStatusReactions(
   if (!connectors || !capabilities.has(WHATSAPP_STATUS_REACTIONS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `whatsapp-status-reactions-v1` codec.
   const body = await readJson(request);
   const { messaging } = connectors;
   if (url.pathname === WHATSAPP_STATUS_REACTIONS_ROUTES.list)

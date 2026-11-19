@@ -8,12 +8,6 @@ import { LocalSkillFailure, type LocalSkillLibrary } from "./local-skill-library
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
 import { readSkillArchive, SKILL_FRONTMATTER, skillZippable } from "./skill-package";
 
-/**
- * Saves the skills that a memory review learns in the local library, as `create_skill` and
- * `revise_skill` do, and installs the new revision for the agent. Other agents keep their copies.
- * When the install fails, the revision is withdrawn, so the review asks the user instead and the
- * library does not keep a skill that no agent has.
- */
 export function localSkillLearner(skills: SkillMarketplaceService): SkillLearner {
   const library = skills.requireLocalLibrary();
   return {
@@ -55,7 +49,6 @@ function newBundle(draft: Extract<LearnedSkillDraft, { action: "create" }>) {
   }));
 }
 
-/** The current bundle with the new description and instructions. Its other files and keys stay. */
 function revisedBundle(library: LocalSkillLibrary, draft: Extract<LearnedSkillDraft, { action: "update" }>) {
   return Effect.gen(function* () {
     const bytes = yield* library.bundle(draft.skillId, draft.expectedRevision);
@@ -73,7 +66,6 @@ function revisedBundle(library: LocalSkillLibrary, draft: Extract<LearnedSkillDr
 }
 
 function skillMarkdown(metadata: DynamicRecord, instructions: string): Uint8Array {
-  // `stringify` quotes a value that YAML would read in another way, such as a colon in the description.
   return new TextEncoder().encode(`---\n${stringifyYaml(metadata)}---\n\n${instructions.trim()}\n`);
 }
 

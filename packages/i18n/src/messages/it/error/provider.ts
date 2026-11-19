@@ -239,6 +239,8 @@ export const messages = {
     'L\'endpoint "{provider}" ha rifiutato la richiesta. La sua chiave API o le sue intestazioni potrebbero essere errate, oppure il suo account non può usare questo modello. Controllale in Impostazioni server → Provider o scegli un altro modello. Poi riprova.',
   "error.provider.customEndpointKeyMissing":
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointEffortRefused":
+    'L\'endpoint "{provider}" ha rifiutato l\'impegno di ragionamento di questo modello. In Impostazioni server → Provider, modifica "{provider}". In Impegno, lascia solo i livelli che questo modello accetta, oppure seleziona Nessun ragionamento. Poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeKeyRefused":
@@ -292,6 +294,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",
+  "error.provider.channelNoAnswer":
+    "{provider} ha terminato il turno senza risposta. Nel canale, fai clic su Continua per eseguire di nuovo l'attività, o su Riassegna per darla a un altro membro.",
   "error.provider.chatgptPageFailed": "OpenBot non è riuscito ad aprire la pagina di connessione di ChatGPT.",
   "error.provider.noneReady": "Nessun provider di agenti è pronto.",
   "error.provider.claudeTurnActive": "Attendi il turno attivo di Claude prima di aggiornare il suo contesto.",
@@ -399,7 +403,7 @@ export const messages = {
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexAudioRefused":
-    "Il modello non ha accettato l'audio in questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Riprova.",
+    "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo piccola. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooLarge":

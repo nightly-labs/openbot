@@ -1,11 +1,3 @@
-// Runs the real `acp` provider driver over fake custom agents (`provider-fakes/agents/custom-agent-steer.ts`)
-// to check that a message sent while a custom agent works goes into its running turn (#4977).
-// The agent reports the `_session/steering` request in `initialize`, as OpenCode 2.3.0 does (#8231).
-// Cases: the model catalog marks each model of an agent that steers and only those; a steer goes into
-// the running turn; a steer that the agent answers with `promptRequired` is refused; an agent without
-// the request refuses the steer and does not get the request. A refused steer must not stop the running
-// turn, so the message can wait in the queue.
-// `bun run test:custom-agent-steer`. Writes .openbot-build/custom-agent-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,7 +16,6 @@ import { installFakeAgent, readJsonl, startThread, stopClients, xorCipher } from
 const OUT = resolve(import.meta.dirname, "../.openbot-build/custom-agent-steer-e2e");
 const TURN_TIMEOUT_MS = 20_000;
 type AgentId = "steering" | "idle" | "plain";
-/** Each fake agent and its env: one steers, one answers `promptRequired`, one has no request. */
 const AGENTS: readonly { id: AgentId; env: { name: string; value: string }[] }[] = [
   { id: "steering", env: [] },
   { id: "idle", env: [{ name: "FAKE_NEVER_RUNNING", value: "1" }] },
@@ -52,7 +43,6 @@ const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 const logOf = (agent: AgentId) => join(root, `${agent}.jsonl`);
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -63,11 +53,9 @@ async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, ti
 
 interface RunningTurn {
   id: string;
-  /** The reply text and the `turn/completed` status. */
   done: Promise<{ reply: string; status: string | null }>;
 }
 
-/** Starts a `work` turn, which stays open with one tool call until the agent gets a steer. */
 async function startWork(client: AgentClient, thread: string, log: string): Promise<RunningTurn> {
   let reply = "";
   let listener: ((notification: AppServerNotification) => void) | undefined;
@@ -99,7 +87,6 @@ async function startWork(client: AgentClient, thread: string, log: string): Prom
   return { id, done };
 }
 
-/** Steers the turn with this text. Answers the turn id that the client reports. */
 function steer(client: AgentClient, thread: string, turnId: string, text: string): Promise<string | null> {
   return runCauseEffect(
     client.request(
@@ -160,7 +147,6 @@ try {
   clients.push(client);
   client.start();
 
-  // The catalog marks the models of the agents with the request, and the composer and the host read it.
   const catalog = new ModelCatalog({
     client: () => client,
     isSignedOut: () => false,
@@ -183,7 +169,6 @@ try {
   assert.equal(steers("steering"), true, "The model of an agent with the request must steer.");
   assert.equal(steers("idle"), true, "The model of an agent with the request must steer.");
   assert.equal(steers("plain"), false, "The model of an agent without the request must not steer.");
-  // The agent process reports steering, so a saved model that its list no longer has still steers.
   assert.equal(
     agentSteersTurns({ provider: "acp", model: "steering/removed" }, models),
     true,
@@ -198,7 +183,6 @@ try {
   const open = (agent: AgentId) =>
     startThread(client, { model: modelOf(agent).id, cwd: workspace, runtimeWorkspaceRoots: [workspace] });
 
-  // A steer goes into the running turn and does not start or stop a turn.
   {
     const log = logOf("steering");
     const thread = await open("steering");
@@ -223,7 +207,6 @@ try {
     report.steered = { turnId: turn.id, reply: finished.reply, status: finished.status, steering };
   }
 
-  // The agent ran no turn when the steer arrived. It did not keep the message, so the steer is refused.
   {
     const log = logOf("idle");
     const thread = await open("idle");
@@ -237,7 +220,6 @@ try {
     report.promptRequired = { refused, status: finished.status, reply: finished.reply, cancelSent };
   }
 
-  // An agent that does not report the request does not get it. The turn goes on.
   {
     const log = logOf("plain");
     const thread = await open("plain");
