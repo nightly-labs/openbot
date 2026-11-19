@@ -92,7 +92,7 @@ export function isAllowedMainUrl(value: string): boolean {
 }
 
 /**
- * The embedded browser grants two page permissions. The first is writing plain, sanitized content
+ * The embedded browser grants three page permissions. The first is writing plain, sanitized content
  * to the clipboard. Chromium only asks for it behind a user gesture, which is what a page's own
  * "copy link" button is, and refusing it left such a button silently doing nothing. Reading the
  * clipboard stays refused -- a page must never see what the user copied elsewhere -- and so does
@@ -102,9 +102,15 @@ export function isAllowedMainUrl(value: string): boolean {
  * cookies. Chrome grants the Storage Access API in that state, and a refusal made
  * `requestStorageAccess()` fail in a frame such as a Google picker (#8298).
  * `top-level-storage-access` stays refused: Chrome grants it only in a Related Website Set.
+ *
+ * The third is `fullscreen`, for the full-screen button of a video or a slide deck. Electron sends
+ * no answer to a refused request, so `requestFullscreen()` stayed pending and the button did
+ * nothing (#9099). Each view that uses this policy sets `disableHtmlFullscreenWindowResize`: the
+ * page fills its own view, and the window does not change, so a page cannot cover the screen.
+ * Escape ends it before the tab's `before-input-event`, so that Escape does not also collapse the panel.
  */
 export function isAllowedBrowserPermission(permission: string): boolean {
-  return permission === "clipboard-sanitized-write" || permission === "storage-access";
+  return permission === "clipboard-sanitized-write" || permission === "storage-access" || permission === "fullscreen";
 }
 
 /**
