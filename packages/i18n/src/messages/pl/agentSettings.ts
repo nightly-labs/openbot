@@ -276,6 +276,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
   "agentSettings.browserProfile.manage": "Zarządzaj",
+  "agentSettings.browserProfile.movedNote":
+    "Logowania do witryn zostają w starym profilu. Agent musi ponownie zalogować się na tych witrynach.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Cały proces {provider} działa w piaskownicy, więc zapis poza tymi folderami się nie powiedzie. Dostępne tylko w macOS.",
 } as const satisfies PartialTranslation<typeof source>;

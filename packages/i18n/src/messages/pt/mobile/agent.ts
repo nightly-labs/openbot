@@ -405,6 +405,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gerenciar perfis",
   "mobile.agent.browserProfile.footer":
     "Cada perfil guarda seus próprios logins e cookies. Uma alteração fecha as abas abertas do agente.",
+  "mobile.agent.browserProfile.movedNote":
+    "Os logins nos sites ficam no perfil antigo. O agente precisa entrar nesses sites novamente.",
   "mobile.agent.browserProfile.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador do agente.",
   "mobile.agent.planCard.label": "Mostrar o plano antes de tarefas longas",
   "mobile.agent.planCard.footer":
