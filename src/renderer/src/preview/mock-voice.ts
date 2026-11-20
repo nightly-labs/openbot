@@ -179,7 +179,7 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
     },
     getSettings: async () => ({ ...clone(settings), saved }),
     setSettings: async (next) => {
-      settings = clone(next);
+      settings = { modelId: next.modelId, language: next.language };
       saved = true;
       return clone(settings);
     },
