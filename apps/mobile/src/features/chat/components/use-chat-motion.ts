@@ -14,7 +14,6 @@ import {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
 import { chatContentIsVisible } from "../model/chat-layout";
 
 export const CHAT_ROW_GAP = 10;
@@ -25,8 +24,10 @@ const FOCUS_PLACE_TOLERANCE = 1;
 function afterLayout(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
-const ANDROID_PLACE_FRAMES = 2;
-const ANDROID_PLACE_TIMEOUT_MS = 250;
+/** The chat takes the latest message this many frames after the last row has its size. */
+const OPEN_PLACE_FRAMES = 2;
+/** The longest wait before the chat takes the latest message, also without a measured row. */
+const OPEN_PLACE_TIMEOUT_MS = 350;
 const OPENING_FOLLOW_MS = 600;
 
 type AnchorReadyInfo = Parameters<NonNullable<AnchoredEndSpaceConfig["onReady"]>>[0];
@@ -120,6 +121,9 @@ export function useChatMotion(
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
   const pending = useRef<{ baseline: string | null; first: boolean; fromLatest: boolean } | null>(null);
+  const [pendingSend, setPendingSend] = useState(false);
+  const pendingSendRef = useRef(false);
+  const sendBaselineId = useRef<string | null>(null);
   const followLatest = useRef(true);
   const [keyboardLiftBehavior, setKeyboardLiftBehavior] = useState<"whenAtEnd" | "never">("whenAtEnd");
   const [latestGeneration, setLatestGeneration] = useState(0);
@@ -148,6 +152,15 @@ export function useChatMotion(
     setHistoryVisible(true);
   }, [revealed]);
   const onListReady = useCallback((withRows: boolean) => setPlacedWithRows(withRows), []);
+  // Legend List can call `onReady` once while the list is empty. When rows come in later it may
+  // not call it again, and `placedWithRows === false` leaves the history hidden until the reader scrolls.
+  useEffect(() => {
+    if (!hasRows) {
+      if (placedWithRows !== null) setPlacedWithRows(null);
+      return;
+    }
+    if (placedWithRows === false) setPlacedWithRows(null);
+  }, [hasRows, placedWithRows]);
 
   useLayoutEffect(() => {
     if (holdOpening) heldOpening.current = true;
@@ -157,8 +170,10 @@ export function useChatMotion(
     if (held) void (listRef.current?.scrollToEnd({ animated: false }) ?? Promise.resolve()).then(reveal, reveal);
     else reveal();
   }, [listPlaced, ready, holdOpening, reveal]);
+  // The list can wait for a native end scroll before it calls `onReady`, and long chats measure slowly.
+  // Once the last row has its size, or after a short deadline, the chat takes the end itself.
   useEffect(() => {
-    if (!isAndroid || shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
+    if (shown.current || !hasRows || placedWithRows === true || !ready || holdOpening) return;
     const started = Date.now();
     let measuredFrames = 0;
     let frame = requestAnimationFrame(function place() {
@@ -166,7 +181,9 @@ export function useChatMotion(
       const state = list?.getState();
       const last = state ? state.data.length - 1 : -1;
       if (state && last >= 0 && state.sizeAtIndex(last) > 0) measuredFrames += 1;
-      if (list && (measuredFrames > ANDROID_PLACE_FRAMES || Date.now() - started >= ANDROID_PLACE_TIMEOUT_MS)) {
+      if (list && (measuredFrames > OPEN_PLACE_FRAMES || Date.now() - started >= OPEN_PLACE_TIMEOUT_MS)) {
+        // The list calls `onReady` when this ends its wait. The end of the scroll places the list
+        // also if it had no wait left to end.
         void list.scrollToEnd({ animated: false }).then(() => setPlacedWithRows(true));
         return;
       }
@@ -196,6 +213,22 @@ export function useChatMotion(
     },
     [],
   );
+  useLayoutEffect(() => {
+    if (!pendingSend) return;
+    const baseline = sendBaselineId.current;
+    if (!baseline || lastUserId === null || lastUserId === baseline) return;
+    let inner: number | null = null;
+    const frame = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        pendingSendRef.current = false;
+        setPendingSend(false);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (inner !== null) cancelAnimationFrame(inner);
+    };
+  }, [lastUserId, pendingSend]);
 
   const onViewportLayout = useCallback(
     (event: Pick<LayoutChangeEvent, "nativeEvent">) => {
@@ -225,10 +258,16 @@ export function useChatMotion(
       const list = listRef.current;
       if (!send || !list || info.anchorKey === undefined || info.anchorKey === send.baseline) return;
       pending.current = null;
+      const maintainedEnd = pendingSendRef.current;
+      pendingSendRef.current = false;
+      setPendingSend(false);
       reveal();
-      const animated = !send.first && send.fromLatest && !reducedMotion;
+      const skipEndScroll = maintainedEnd && !send.first && send.fromLatest;
+      const animated = !skipEndScroll && !send.first && send.fromLatest && !reducedMotion;
       if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
-      if (animated) {
+      if (skipEndScroll) {
+        sendScrollFrame.current = null;
+      } else if (animated) {
         sendScrollFrame.current = requestAnimationFrame(() => {
           sendScrollFrame.current = requestAnimationFrame(() => {
             sendScrollFrame.current = null;
@@ -306,7 +345,12 @@ export function useChatMotion(
     setKeyboardLiftBehavior("whenAtEnd");
     const baseline = current.current.lastUserId;
     const first = baseline === null;
+    sendBaselineId.current = baseline;
     pending.current = { baseline, first, fromLatest: atLatestNow.current };
+    if (!first) {
+      pendingSendRef.current = true;
+      setPendingSend(true);
+    }
     if (first) {
       firstOpacity.set(0);
       responseOpacity.set(0);
@@ -315,6 +359,8 @@ export function useChatMotion(
   }, [firstOpacity, responseOpacity]);
   const cancelSend = useCallback(() => {
     pending.current = null;
+    pendingSendRef.current = false;
+    setPendingSend(false);
     if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
     sendScrollFrame.current = null;
     cancelAnimation(firstOffset);
@@ -413,10 +459,17 @@ export function useChatMotion(
       keyboardHeight,
       keyboardProgress,
       keyboardLiftBehavior,
+      /**
+       * The list keeps the latest message in view. A composer-backed question pins the end while the agent
+       * writes; secret and Vault cards do not. An opening chat and an explicit pin keep the end until the
+       * reader drags. After the first send in a chat, a short send window uses maintainScrollAtEnd so the
+       * new bubble does not jump before the anchor settles.
+       */
       followsEnd:
         (requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd") ||
         (openingFollow && !holdOpening) ||
-        pinnedToLatest,
+        pinnedToLatest ||
+        (pendingSend && keyboardLiftBehavior === "whenAtEnd"),
       scrollOffset,
       dragging,
       atEnd,
@@ -453,6 +506,7 @@ export function useChatMotion(
       requiredInputId,
       openingFollow,
       pinnedToLatest,
+      pendingSend,
       scrollOffset,
       dragging,
       atEnd,
