@@ -454,6 +454,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":
     "Nadaj zadaniu tytuł o długości maksymalnie 120 znaków i opis, który mówi, co zrobić.",
+  "error.backend.taskControlInvalid":
+    "Podaj taskId zadania, które zostało przez Ciebie uruchomione. Wiadomość wymaga też tekstu.",
   "error.backend.taskOwnChatOnly":
     "Zadanie możesz rozpocząć tylko z własnego czatu. Kanał, rozmowa w komunikatorze ani inne zadanie nie mogą go rozpocząć.",
   "error.backend.taskUnfinishedLimit":

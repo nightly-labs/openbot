@@ -26,6 +26,7 @@ const DIRECT_NAMES = new Set([
   "attach_files_to_response",
   "list_agents",
   "send_message",
+  "start_task",
   "search_memories",
   "routine_no_update",
   "routine_report_failure",

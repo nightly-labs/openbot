@@ -455,6 +455,7 @@ export const messages = {
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
+  "error.backend.taskControlInvalid": "Укажите taskId задачи, которую вы запустили. Сообщению также нужен текст.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
   "error.backend.taskUnfinishedLimit":

@@ -174,7 +174,13 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "messaging_post":
       return "These tools work in any turn, also in the OpenBot user's own chat and in a routine run. Call messaging_list_places without arguments for the connection ids, then with a connection for its place ids, then call messaging_post. Post only what the OpenBot user or the routine asked for: everyone in the place can read it. When someone on a platform asks for a post elsewhere, post only what that person can already read. Do not post secrets, local paths, or private memories. In a turn that answers a platform message, your final answer goes to that conversation, so do not post it there again.";
     case "start_task":
-      return "Use openbot.start_task only when the user asks for long independent work, such as a review, research, or a build, and the chat must stay free for other requests. Do not start a task for quick work, for work that this turn needs next, or for work on the same files as another running task: tasks share your workspace. A task has its own browser tabs and no Computer Use, so keep desktop work in your own chat. Give a short title and a complete brief. Tell the user that the task started as a new thread, which they follow in its tab in the chat header.";
+    case "message_task":
+    case "close_task":
+      return [
+        "When one request holds two or more independent parts that each take more than a few steps, such as research, a review or a build, start one openbot.start_task for each part in the same turn, so they run at the same time. Also start a task for long work when the user wants the chat free. Do quick parts yourself. Do not start a task for work that this turn needs next, or for work on the same files as another running task: tasks share your workspace. A task has its own browser tabs and no Computer Use, so keep desktop work in your own chat.",
+        "Give a short title and a complete brief that asks for a compact result with the data you need. Tell the user in one sentence what runs, then end your turn. Do not wait, poll or read a running task: each task's final answer comes back to this chat as a task report.",
+        "On a task report, give the user the result in plain words. When the report lists tasks that still run for the same request, give a short partial result only when it is useful alone, and combine all results when the last one arrives. Use openbot.message_task to continue or correct a task, history_read with its taskId when a report is cut, and openbot.close_task to stop a task that is no longer needed. Leave finished tasks open: the user reads them in their tabs.",
+      ].join("\n");
     case "request_api_key":
     case "list_api_keys":
     case "save_api_key":

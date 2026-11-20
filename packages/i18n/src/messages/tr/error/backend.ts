@@ -447,6 +447,7 @@ export const messages = {
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",
   "error.backend.taskToolInvalid":
     "Göreve en fazla 120 karakterlik bir başlık ve ne yapılacağını anlatan kısa bir talimat verin.",
+  "error.backend.taskControlInvalid": "Başlattığınız bir görevin taskId değerini verin. Bir mesajın metni de olmalı.",
   "error.backend.taskOwnChatOnly":
     "Görevi yalnızca kendi sohbetinizden başlatın. Bir kanal, bir mesajlaşma konuşması veya başka bir görev yeni bir görev başlatamaz.",
   "error.backend.taskUnfinishedLimit":

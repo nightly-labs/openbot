@@ -464,6 +464,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",
+  "error.backend.taskControlInvalid": "Give the taskId of a task that you started. A message also needs text.",
   "error.backend.taskOwnChatOnly":
     "Start a task only from your own chat. A channel, a messaging conversation or another task cannot start one.",
   "error.backend.taskUnfinishedLimit":

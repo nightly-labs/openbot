@@ -470,6 +470,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
   "error.backend.taskToolInvalid":
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
+  "error.backend.taskControlInvalid":
+    "Geef de taskId van een taak die je hebt gestart. Een bericht heeft ook tekst nodig.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
   "error.backend.taskUnfinishedLimit":

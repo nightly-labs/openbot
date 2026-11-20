@@ -467,6 +467,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",
   "error.backend.taskToolInvalid":
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
+  "error.backend.taskControlInvalid":
+    "Indica il taskId di un'attività che hai avviato. Un messaggio richiede anche un testo.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
   "error.backend.taskUnfinishedLimit":

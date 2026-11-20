@@ -467,6 +467,7 @@ export const messages = {
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
+  "error.backend.taskControlInvalid": "開始したタスクの taskId を指定してください。メッセージにはテキストも必要です。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
   "error.backend.taskUnfinishedLimit":

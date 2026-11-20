@@ -485,6 +485,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",
   "error.backend.taskToolInvalid":
     "Gib der Aufgabe einen Titel mit höchstens 120 Zeichen und eine kurze Beschreibung, was zu tun ist.",
+  "error.backend.taskControlInvalid":
+    "Gib die taskId einer Aufgabe an, die du gestartet hast. Eine Nachricht braucht auch Text.",
   "error.backend.taskOwnChatOnly":
     "Starte eine Aufgabe nur aus deinem eigenen Chat. Ein Kanal, eine Messaging-Unterhaltung oder eine andere Aufgabe kann keine starten.",
   "error.backend.taskUnfinishedLimit":

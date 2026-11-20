@@ -406,6 +406,7 @@ export const messages = {
   "error.backend.threadMoveRefused": "只有你单独发给该助手的消息才能在新话题中运行。",
   "error.backend.taskTitleRequired": "请给任务起一个简短的标题。",
   "error.backend.taskToolInvalid": "标题不超过 120 个字符，并写明要做什么。",
+  "error.backend.taskControlInvalid": "请提供你启动的任务的 taskId。消息还需要文本。",
   "error.backend.taskOwnChatOnly": "只能在自己的对话中启动任务。频道、消息对话或其他任务都无法启动任务。",
   "error.backend.taskUnfinishedLimit": "该助手已有 {count} 个未完成的任务。请等其中一个结束后再启动新任务。",
   "error.backend.taskOpenLimitReached": "该助手有 {count} 个未关闭的任务。请关闭一个任务，再启动或打开其他任务。",

@@ -438,6 +438,7 @@ export const messages = {
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",
+  "error.backend.taskControlInvalid": "시작한 작업의 taskId를 지정하세요. 메시지에는 텍스트도 필요해요.",
   "error.backend.taskOwnChatOnly":
     "작업은 자신의 채팅에서만 시작할 수 있어요. 채널, 메시징 대화, 다른 작업에서는 시작할 수 없어요.",
   "error.backend.taskUnfinishedLimit":

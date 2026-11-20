@@ -430,6 +430,7 @@ export const messages = {
   "error.backend.threadMoveRefused": "רק הודעה ששלחת לסוכן הזה לבדו יכולה לרוץ בשרשור חדש.",
   "error.backend.taskTitleRequired": "יש לתת למשימה כותרת קצרה.",
   "error.backend.taskToolInvalid": "יש לתת למשימה כותרת של עד 120 תווים ותקציר שאומר מה לעשות.",
+  "error.backend.taskControlInvalid": "יש לציין taskId של משימה שהתחלת. הודעה צריכה גם טקסט.",
   "error.backend.taskOwnChatOnly":
     "יש להתחיל משימה רק מהצ'אט שלך. ערוץ, שיחת הודעות או משימה אחרת אינם יכולים להתחיל משימה.",
   "error.backend.taskUnfinishedLimit":
