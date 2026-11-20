@@ -6502,7 +6502,8 @@ try {
       call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
     const antigravityGroups = (body: unknown) =>
       isDynamicRecord(body) && Array.isArray(body.limits)
-        ? body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "antigravity")?.groups
+        ? (body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "antigravity") ?? { groups: "no limit" })
+            .groups
         : "no limits";
     const grouped = await read(teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES));
     const plain = await read(
