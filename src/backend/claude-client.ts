@@ -966,42 +966,45 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const stateDirectory = this.#stateDirectory;
     const settingsFile =
       Object.keys(signInSettings).length > 0 && stateDirectory
-        ? yield* writeClaudeFlagSettings(stateDirectory, "probe", signInSettings).pipe(
-            Effect.catch((error) =>
-              Effect.sync(() => {
-                queryLogger.warn("Claude checks its models and usage without the sign-in settings.", {
-                  error: error.cause,
-                });
-                return null;
-              }),
+        ? yield* Effect.acquireRelease(
+            writeClaudeFlagSettings(stateDirectory, "probe", signInSettings).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => {
+                  queryLogger.warn("Claude checks its models and usage without the sign-in settings.", {
+                    error: error.cause,
+                  });
+                  return null;
+                }),
+              ),
             ),
+            removeClaudeQueryFile,
           )
         : null;
     const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
-      settingSources: claudeSettingSources({ profileGeneration: false, workspaceOnly: false }, userSetup),
+      settingSources: userSetup ? ["user", "project", "local"] : [],
       ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
       strictMcpConfig: true,
       persistSession: false,
       env: withClaudeClientLabels({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }),
     };
-    return { options, settingsFile };
+    return options;
   });
 
   readonly #listModelsEffect = Effect.fn("ClaudeAgentClient.listModels")(function* (
     this: ClaudeAgentClient,
-    timeoutMs?: number,
-  ): Effect.fn.Return<unknown[], ProviderClientOperationError> {
-    const probe = yield* this.#probeOptionsEffect();
+    timeoutMs: number | undefined,
+  ): Effect.fn.Return<unknown[], ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: probe.options,
+        options,
       }),
-    ).pipe(Effect.tapError(() => removeClaudeQueryFile(probe.settingsFile)));
+    );
     return yield* Effect.gen({ self: this }, function* () {
       const discovery = providerCall(() => claudeQuery.supportedModels());
       const discovered = yield* timeoutMs === undefined
@@ -1055,24 +1058,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           input.close();
           claudeQuery.close();
-        }).pipe(Effect.andThen(removeClaudeQueryFile(probe.settingsFile))),
+        }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readUsageEffect = Effect.fn("ClaudeAgentClient.readUsage")(function* (
     this: ClaudeAgentClient,
     model: string | null,
     timeoutMs: number,
-  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError> {
-    const probe = yield* this.#probeOptionsEffect();
+  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: probe.options,
+        options,
       }),
-    ).pipe(Effect.tapError(() => removeClaudeQueryFile(probe.settingsFile)));
+    );
     return yield* Effect.gen({ self: this }, function* () {
       const readUsage = claudeQuery.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
       if (!readUsage) return { rateLimits: null, rateLimitsByLimitId: null };
@@ -1092,10 +1095,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           input.close();
           claudeQuery.close();
-        }).pipe(Effect.andThen(removeClaudeQueryFile(probe.settingsFile))),
+        }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
