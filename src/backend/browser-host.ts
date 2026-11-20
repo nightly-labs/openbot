@@ -483,7 +483,8 @@ function drivenByAgent(state: BrowserControlState, tab: BrowserHostTab): boolean
 const THIS_CHAT = "this chat";
 const NO_CHAT = "none";
 const OTHER_CHAT_TABS_NOTE =
-  'A tab whose chat is not "this chat" belongs to another chat of this agent, and this chat can use it. When otherChatWorking is true, that chat uses the tab now: do not navigate, type in, or close it. Open a new tab instead, or wait.';
+  'A tab whose chat is not "this chat" belongs to another chat of this agent, and this chat can use it. When otherChatWorking is true, another chat used the tab in the last 2 minutes and can still work in it: do not navigate, type in, or close it. Open a new tab instead, or wait.';
+const OTHER_CHAT_WORKING_MS = 120_000;
 
 type ToolTab = BrowserTab & { chat: string; otherChatWorking?: true };
 
@@ -2647,18 +2648,29 @@ export class BrowserHost {
     otherChatTabs?: number;
     note?: string;
   } {
-    const otherChatSessions = this.getControlState().sessions.filter((session) => session.threadId !== params.threadId);
-    const tabs = this.listTabs()
-      .filter((tab) => this.#canUseToolTab(params, tab))
+    const chatOf = this.#cachedAgentChat();
+    const otherChatTabIds = new Set(
+      this.getControlState()
+        .sessions.filter((session) => session.threadId !== params.threadId)
+        .map((session) => session.tabId),
+    );
+    const now = Date.now();
+    const allTabs = this.listTabs();
+    const tabs = allTabs
+      .filter((tab) => this.#canUseToolTab(params, tab, chatOf))
       .map((tab): ToolTab => {
-        const engine = this.#tabs.get(tab.id)?.engine;
+        const hostTab = this.#tabs.get(tab.id);
+        const engine = hostTab?.engine;
         const scrubbed = engine ? { ...tab, title: engine.scrubText(tab.title), url: engine.scrubText(tab.url) } : tab;
-        const working = otherChatSessions.some(
-          (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
-        );
+        const lastChat = hostTab?.lastToolChat;
+        const working =
+          otherChatTabIds.has(tab.id) ||
+          (lastChat !== undefined &&
+            lastChat.threadId !== params.threadId &&
+            now - lastChat.at < OTHER_CHAT_WORKING_MS);
         return {
           ...scrubbed,
-          chat: this.#tabChat(params, tab),
+          chat: this.#tabChat(params, tab, chatOf),
           ...(working ? { otherChatWorking: true as const } : {}),
         };
       });
@@ -2669,7 +2681,7 @@ export class BrowserHost {
     const otherChatTabs =
       ownerAgentId === null
         ? 0
-        : this.listTabs().filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab))
+        : allTabs.filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab, chatOf))
             .length;
     const notes = [
       ...(tabs.some((tab) => tab.chat !== THIS_CHAT && tab.chat !== NO_CHAT) ? [OTHER_CHAT_TABS_NOTE] : []),
@@ -2687,11 +2699,26 @@ export class BrowserHost {
     };
   }
 
-  #tabChat(params: DynamicToolCallParams, tab: BrowserTab): string {
+  #cachedAgentChat(): (threadId: string) => BrowserAgentChat | null {
+    const known = new Map<string, BrowserAgentChat | null>();
+    return (threadId) => {
+      const cached = known.get(threadId);
+      if (cached !== undefined) return cached;
+      const chat = this.#agentChat(threadId);
+      known.set(threadId, chat);
+      return chat;
+    };
+  }
+
+  #tabChat(
+    params: DynamicToolCallParams,
+    tab: BrowserTab,
+    chatOf: (threadId: string) => BrowserAgentChat | null,
+  ): string {
     if (tab.ownerThreadId === params.threadId) return THIS_CHAT;
     if (tab.ownerThreadId === null) return NO_CHAT;
-    const owner = this.#agentChat(tab.ownerThreadId);
-    if (owner === null || owner.agentId !== tab.ownerAgentId) return "a channel or an external conversation";
+    const owner = chatOf(tab.ownerThreadId);
+    if (owner === null || owner.agentId !== tab.ownerAgentId) return "another conversation";
     if (owner.sideThread === null) return "main chat";
     return `side thread ${JSON.stringify(owner.sideThread.title)} (taskId ${owner.sideThread.taskId})`;
   }
@@ -4161,7 +4188,9 @@ export class BrowserHost {
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
-    const engine = this.#tabs.get(tabId)?.engine;
+    const hostTab = this.#tabs.get(tabId);
+    if (hostTab) hostTab.lastToolChat = { threadId: params.threadId, at: Date.now() };
+    const engine = hostTab?.engine;
     const dialog = engine?.dialog;
     if (!dialog || dialogTool) return;
     if (engine?.dialogOwnedBy({ threadId: params.threadId, turnId: params.turnId }))
@@ -4176,12 +4205,14 @@ export class BrowserHost {
   #canUseToolTab(
     params: DynamicToolCallParams,
     tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
+    chatOf: (threadId: string) => BrowserAgentChat | null = this.#agentChat,
   ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    if (this.#agentChat(params.threadId)?.agentId === ownerAgentId) return true;
-    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
+    if ((tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId)) return true;
+    if (chatOf(params.threadId)?.agentId !== ownerAgentId) return false;
+    return tab.ownerThreadId === null || chatOf(tab.ownerThreadId)?.agentId === ownerAgentId;
   }
 
   #notePageClosedTab(tab: BrowserHostTab): void {

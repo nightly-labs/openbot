@@ -1182,9 +1182,9 @@ export class AttentionRegistry {
     if (!this.#browser.toolCanUseTab({ ...params, threadId: publicThreadId, ownerAgentId: agentId }, tabId))
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
     const held = this.#heldTakeoverResults.get(tabId);
-    if (held) {
+    if (held?.threadId === threadId) {
       this.#heldTakeoverResults.delete(tabId);
-      if (held.threadId === threadId && held.turnId === turnId) return held.result;
+      if (held.turnId === turnId) return held.result;
     }
     const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
     if (waiting) {

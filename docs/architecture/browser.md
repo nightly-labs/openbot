@@ -116,11 +116,13 @@ the extension list for a host without it.
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
-The main chat and each side thread of an agent can use every tab of that agent. `list_tabs` and
-`status` give each tab its `chat` (`this chat`, `main chat`, a side thread with its title and
-`taskId`, a channel or an external conversation, or `none`) and `otherChatWorking` while another
-chat drives it, so the agent does not change a page that another chat uses. A channel or messaging
-thread uses only its own tabs and the tabs that a person tags with @ in it (`sharedThreadIds`).
+The main chat and each side thread of an agent can use the tabs that the main chat, a side thread
+of that agent, or no chat opened. `list_tabs` and `status` give each tab its `chat` (`this chat`,
+`main chat`, a side thread with its title and `taskId`, `another conversation`, or `none`). They
+set `otherChatWorking` when another chat has a browser call on the tab or used it in the last 2
+minutes. It is a hint to the agent, not a lock. A channel or messaging thread uses only its own
+tabs, and its tabs stay out of the other chats. Any chat also uses the tabs that a person tags
+with @ in it (`sharedThreadIds`).
 `request_takeover`, `submit_secret` and `list_logins` use the same check (`toolCanUseTab`).
 Targeted typing checks that the target still holds focus before the End key, the text, and the
 Enter key. A page focus or input handler that moves focus stops it with an error that says if the
