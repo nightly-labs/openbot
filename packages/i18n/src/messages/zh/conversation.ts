@@ -108,6 +108,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "等待中。这台电脑能同时运行的轮次取决于内存。",
   "conversation.threads.hold.agentBusy": "正在等待该助手的其他工作结束。",
   "conversation.threads.hold.oneTurn": "等待中。该助手的服务商一次只运行一轮。",
+  "conversation.threads.hold.signIn": "等待中。该助手的服务商需要登录。",
   "conversation.sidePanel.closePanel": "关闭面板",
   "conversation.threads.view.failedBody": "服务商没有给出原因，发一条消息可以重试。",
   "conversation.threads.deleteUndo.action": "撤销",

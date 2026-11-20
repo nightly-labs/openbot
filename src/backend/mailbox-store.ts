@@ -1864,11 +1864,15 @@ export class MailboxStore {
           candidate.messageId === request.id &&
           candidate.recipientAgentId !== answeredBy &&
           isActiveDelivery(candidate),
-      ) && !this.#laterTurnEnded(delivery, messages)
+      ) && !this.#turnAfterRequestEnded(delivery, request, messages)
     );
   }
 
-  #laterTurnEnded(held: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): boolean {
+  #turnAfterRequestEnded(
+    held: StoredDelivery,
+    request: StoredMessage,
+    messages?: ReadonlyMap<string, StoredMessage>,
+  ): boolean {
     const lane = this.#laneOf(held, messages);
     return this.#state.deliveries.some(
       (candidate) =>
@@ -1876,7 +1880,7 @@ export class MailboxStore {
         candidate.turnId !== null &&
         candidate.steeredAt === undefined &&
         !isActiveDelivery(candidate) &&
-        candidate.createdAt > held.createdAt &&
+        candidate.createdAt > request.createdAt &&
         this.#laneOf(candidate, messages) === lane,
     );
   }
@@ -2234,6 +2238,22 @@ export class MailboxStore {
     );
   }
 
+  repeatsHandledReply(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const messages = this.#messagesById();
+    const reply = messages.get(delivery.messageId);
+    if (!reply || !isAnswer(reply)) return false;
+    const deliveries = this.#deliveriesFor(delivery.recipientAgentId);
+    const position = deliveries.indexOf(delivery);
+    if (position <= 0) return false;
+    return deliveries.slice(0, position).some((earlier) => {
+      if (earlier.status !== "completed" || earlier.turnId === null || earlier.turnId === delivery.turnId) return false;
+      const answer = messages.get(earlier.messageId);
+      return answer !== undefined && isAnswer(answer) && sameAnswer(answer, reply);
+    });
+  }
+
   hasSentResultFor(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!delivery?.turnId) return false;
@@ -2248,6 +2268,7 @@ export class MailboxStore {
     taskOpen: (taskId: string) => boolean,
     agentExists: (agentId: string) => boolean,
     recovered = false,
+    temporary = false,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
@@ -2282,11 +2303,13 @@ export class MailboxStore {
             ? "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended before the teammate answered."
             : "Result: OpenBot note, not written by this teammate: the teammate's turn stopped when OpenBot or its provider restarted, before the teammate answered. Part of the work can be done.",
         "Evidence: none",
-        outcome === "failed"
-          ? "Unblock: The user must fix the cause, then ask for the request again."
-          : steered
-            ? "Unblock: Send the request again if you still need the result."
-            : "Unblock: Check what the teammate already did, then send the request again if you still need the result.",
+        outcome === "failed" && temporary
+          ? "Unblock: The failure can be temporary. Send the request again one time if you still need the result. If it fails again, tell the user."
+          : outcome === "failed"
+            ? "Unblock: The user must fix the cause, then ask for the request again."
+            : steered
+              ? "Unblock: Send the request again if you still need the result."
+              : "Unblock: Check what the teammate already did, then send the request again if you still need the result.",
       ].join("\n"),
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
@@ -3929,4 +3952,17 @@ function isAnswer(
   message: StoredMessage,
 ): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
   return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
+}
+
+function sameAnswer(
+  first: StoredMessage & { sender: { kind: "agent"; agentId: string } },
+  second: StoredMessage & { sender: { kind: "agent"; agentId: string } },
+): boolean {
+  const files = (message: StoredMessage) => message.attachments.map((attachment) => attachment.sha256).join("\n");
+  return (
+    first.sender.agentId === second.sender.agentId &&
+    first.replyToMessageId === second.replyToMessageId &&
+    first.text.trim() === second.text.trim() &&
+    files(first) === files(second)
+  );
 }

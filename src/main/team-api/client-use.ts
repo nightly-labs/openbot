@@ -6,6 +6,7 @@ import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colo
 import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
+import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import {
   AGENT_MEMORIES_PAGE_ROUTE,
@@ -18,9 +19,17 @@ import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-p
 import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_BRANCHES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { AGENT_THREAD_QUEUE_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REQUESTS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_USAGE_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
+import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
@@ -67,6 +76,7 @@ import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routi
 import { ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import { SIDEBAR_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -86,6 +96,7 @@ import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/wo
 import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import { WORKFLOWS_STEP_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
 const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
@@ -174,6 +185,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+  WORKFLOWS_STEP_SETTINGS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,
@@ -202,6 +214,18 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   USAGE_CREDITS_ROUTES.list,
   FOCUS_USE_ROUTES.ping,
   COMPUTER_ACTIVITY_ROUTES.report,
+  AGENT_USAGE_LIMIT_ROUTES.list,
+  AGENT_HIDDEN_ROUTES.read,
+  SIDEBAR_FOLDERS_ROUTES.read,
+  AGENT_TASKS_ROUTES.list,
+  AGENT_TASKS_ROUTES.read,
+  AGENT_THREAD_READS_ROUTES.list,
+  AGENT_THREAD_READS_ROUTES.mark,
+  AGENT_THREAD_BRANCHES_ROUTES.list,
+  AGENT_THREAD_REQUESTS_ROUTES.list,
+  AGENT_THREAD_QUEUE_ROUTES.list,
+  BROWSER_USER_CONTROL_ROUTES.state,
+  BROWSER_PAGE_STATE_ROUTES.state,
 ]);
 
 const PASSIVE_PATTERNS: readonly RegExp[] = [

@@ -30,6 +30,7 @@ import {
   powerSaveBlocker,
   protocol,
   screen,
+  session,
   shell,
   systemPreferences,
 } from "electron";
@@ -114,7 +115,6 @@ import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers"
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { referralIpcHandlers } from "./ipc/referral-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
-import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { routineResultIpcHandlers } from "./ipc/routine-result-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -150,7 +150,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
-import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
 import { flushMainLog, startMainLog } from "./provider-log";
@@ -510,6 +510,7 @@ const windowHolder = createMainWindowHolder();
 const {
   closeChatNotifications,
   forwardAgentEvent,
+  withdrawSettledNotifications,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
   forwardUpdateStatus,
@@ -535,9 +536,11 @@ const {
   forwardAttachmentDownload,
   forwardAttachmentImportProgress,
   forwardInstanceTransferUploadProgress,
+  forwardOwnerTransfersChanged,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   getChatWindows: () => windows.getChatWindows(),
+  chatWindowTarget: (window) => windows.chatWindowTarget(window),
   getAgentService: () => services?.service ?? null,
   getHostService: () => services?.host ?? null,
   getHostAnalytics: () => services?.analytics ?? null,
@@ -795,7 +798,6 @@ function registerIpcHandlers({
   trace,
   resourceMonitor,
   startup,
-  routineFlows,
   workflows,
   workflowGitHub,
   crm,
@@ -831,6 +833,7 @@ function registerIpcHandlers({
       appVariant,
       analyticsCaptureUrl,
       analyticsInstallId,
+      dynamicIslandAvailable: dynamicIsland.available,
       getMainWindow: getDialogParent,
       isMainWindow: (sender) => {
         const window = windowHolder.current;
@@ -878,7 +881,7 @@ function registerIpcHandlers({
       remoteServers,
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
-    ...accountIpcHandlers({ centralAuth, host }),
+    ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
@@ -952,6 +955,7 @@ function registerIpcHandlers({
     ...teamIpcHandlers({
       host,
       localServers,
+      ownerTransfers: centralAuth,
       remoteDesktop,
       remoteServers,
       takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
@@ -965,7 +969,6 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
-    ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
     ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
@@ -1064,7 +1067,7 @@ function registerIpcHandlers({
       messageLinks: new MessageLinkRelay({
         remoteServers,
         relay: signInRelayClient,
-        openUrl: (url) => openHttpLink(url, openLink),
+        openUrl: (url) => openMessageLink(url, openLink),
       }),
       openExternal: openLink,
       modelVisibility,
@@ -1581,9 +1584,11 @@ if (!hasSingleInstanceLock) {
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
+      remoteServers.on("directoryInvalidated", forwardOwnerTransfersChanged);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });
+      remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
@@ -1968,6 +1973,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position:", toLogValue(error)),
     );
+    session.defaultSession.flushStorageData();
     hideWindowsForQuit();
     services?.dynamicIsland.destroy();
     services?.agentDock.destroy();

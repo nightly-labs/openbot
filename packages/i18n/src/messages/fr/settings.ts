@@ -60,6 +60,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
   "settings.chatBackdrop.snowfall": "Chute de neige",
   "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.coast": "Côte néon",
   "settings.chatBackdrop.upload": "Importer une image…",
   "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
   "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
@@ -619,6 +620,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Forfait terminé",
   "settings.hostedServers.state.creating": "Création",
   "settings.hostedServers.state.starting": "Démarrage",
+  "settings.hostedServers.state.restoring": "Restauration des données",
   "settings.hostedServers.state.running": "En marche",
   "settings.hostedServers.state.stopping": "Arrêt en cours",
   "settings.hostedServers.state.stopped": "Arrêté",
@@ -629,6 +631,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",
   "settings.hostedServers.planEndedDescription":
     "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées. Renouvelez le forfait pour le démarrer.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées jusqu’au {date}. Renouvelez le forfait avant cette date pour le démarrer.",
   "settings.hostedServers.pay": "Ouvrir la page de paiement",
   "settings.hostedServers.payLabel": "Ouvrir la page de paiement de {name}",
   "settings.hostedServers.renew": "Renouveler le forfait",

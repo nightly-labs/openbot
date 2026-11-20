@@ -57,6 +57,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "レトロな夕焼け",
   "settings.chatBackdrop.snowfall": "雪",
   "settings.chatBackdrop.fireflies": "ホタル",
+  "settings.chatBackdrop.coast": "ネオンの海岸",
   "settings.chatBackdrop.upload": "画像をアップロード…",
   "settings.chatBackdrop.uploadRefused": "20 MB 以下の PNG、JPEG、GIF、WebP、または AVIF 画像を使ってください。",
   "settings.chatBackdrop.saveFailed": "背景を保存できませんでした。",
@@ -602,6 +603,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "プラン終了",
   "settings.hostedServers.state.creating": "作成中",
   "settings.hostedServers.state.starting": "起動中",
+  "settings.hostedServers.state.restoring": "データを復元中",
   "settings.hostedServers.state.running": "実行中",
   "settings.hostedServers.state.stopping": "停止中",
   "settings.hostedServers.state.stopped": "停止済み",
@@ -612,6 +614,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Stripe がお支払いを確認すると、セットアップが始まります。",
   "settings.hostedServers.planEndedDescription":
     "プランが終了したため、サーバーは停止しました。データは残ります。起動するにはプランを更新してください。",
+  "settings.hostedServers.planEndedKeptUntil":
+    "プランが終了したため、サーバーは停止しました。データは{date}まで残ります。起動するには、それまでにプランを更新してください。",
   "settings.hostedServers.pay": "支払いページを開く",
   "settings.hostedServers.payLabel": "{name} の支払いページを開く",
   "settings.hostedServers.renew": "プランを更新",

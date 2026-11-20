@@ -20,6 +20,7 @@ import {
   type WorkflowRunDetail,
   type WorkflowRunSource,
   type WorkflowStep,
+  type WorkflowStepSettings,
   type WorkflowSummary,
   type WorkflowTriggerState,
   type WorkflowVersion,
@@ -277,7 +278,35 @@ export function mockWorkflows(
     timers.delete(step.id);
     Object.assign(step, { endedAt: stamp(), ...patch });
   };
-  const addStep = (workflowId: string, runId: string | null, node: WorkflowNode, input: string) => {
+  const recorded = new Map<string, WorkflowStepSettings>();
+  const doneSteps = (workflowId: string) => {
+    const latest = new Map<string, WorkflowStep>();
+    for (const step of steps.values())
+      if (step.workflowId === workflowId && step.status === "done") latest.set(step.nodeId, step);
+    return latest;
+  };
+  const recordOf = (
+    graph: WorkflowGraph,
+    node: WorkflowNode,
+    latest: ReadonlyMap<string, WorkflowStep>,
+  ): WorkflowStepSettings => ({
+    settings: Object.fromEntries(Object.entries(node.fields).filter(([name]) => name !== "label")),
+    sources: graph.edges
+      .filter((edge) => edge.to === node.id)
+      .map((edge) => {
+        const from = graph.nodes.find((candidate) => candidate.id === edge.from);
+        const fileId = from?.kind === "asset" && typeof from.fields.fileId === "string" ? from.fields.fileId : null;
+        return { from: edge.from, type: edge.type, stepId: latest.get(edge.from)?.id ?? null, attachmentId: fileId };
+      })
+      .filter((source) => source.stepId !== null || source.attachmentId !== null),
+  });
+  const addStep = (
+    workflowId: string,
+    runId: string | null,
+    node: WorkflowNode,
+    input: string,
+    settings: WorkflowStepSettings,
+  ) => {
     const attempt = [...steps.values()].filter((step) => step.runId === runId && step.nodeId === node.id).length + 1;
     const step: WorkflowStep = {
       id: crypto.randomUUID(),
@@ -295,6 +324,7 @@ export function mockWorkflows(
     };
     steps.set(step.id, step);
     stepInputs.set(step.id, input);
+    recorded.set(step.id, settings);
     if (node.kind === "approval") {
       step.status = "approval";
       return step;
@@ -346,14 +376,14 @@ export function mockWorkflows(
         const inputs = inputsOf(graph, node.id, latest);
         if (before.length > 0 && inputs.length === 0) {
           if (!current) {
-            const skipped = addStep(run.workflowId, runId, node, "");
+            const skipped = addStep(run.workflowId, runId, node, "", recordOf(graph, node, latest));
             clearTimeout(timers.get(skipped.id));
             end(skipped, { status: "skipped" });
             started = true;
           }
           continue;
         }
-        addStep(run.workflowId, runId, node, inputs.join("\n\n"));
+        addStep(run.workflowId, runId, node, inputs.join("\n\n"), recordOf(graph, node, latest));
         started = true;
       }
       if (!started) break;
@@ -493,7 +523,8 @@ export function mockWorkflows(
     startRun: async (input) => beginRun(input, "manual"),
     runStep: async (input) => {
       const node = nodeOf(input.workflowId, input.nodeId);
-      const step = addStep(input.workflowId, null, node, "");
+      const graph = record(input.workflowId).detail.graph;
+      const step = addStep(input.workflowId, null, node, "", recordOf(graph, node, doneSteps(input.workflowId)));
       emit(input.workflowId);
       return structuredClone(step);
     },
@@ -523,7 +554,15 @@ export function mockWorkflows(
         entry.run.status = "running";
         entry.run.endedAt = null;
       }
-      const step = addStep(failed.workflowId, failed.runId, node, stepInputs.get(failed.id) ?? "");
+      const graph = entry?.graph ?? record(failed.workflowId).detail.graph;
+      const latest = entry ? latestOf(entry.run.id) : doneSteps(failed.workflowId);
+      const step = addStep(
+        failed.workflowId,
+        failed.runId,
+        node,
+        stepInputs.get(failed.id) ?? "",
+        recordOf(graph, node, latest),
+      );
       if (entry) advance(entry.run.id);
       emit(failed.workflowId);
       return structuredClone(step);
@@ -562,6 +601,8 @@ export function mockWorkflows(
       };
     },
     run: async (runId) => runDetail(runId),
+    stepSettings: async (stepId) =>
+      structuredClone(recorded.get(stepOf(stepId).id) ?? { settings: null, sources: null }),
     rotateWebhookSecret: async (input) => {
       const { detail } = record(input.workflowId);
       webhooks.add(`${input.workflowId}/${input.nodeId}`);

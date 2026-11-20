@@ -170,7 +170,9 @@ export function ToolAction(props: {
   keys?: readonly string[];
   tone?: "danger";
   pressed?: boolean;
+  expanded?: boolean;
   icon: JSX.Element;
+  ref?: (element: HTMLButtonElement) => void;
   onClick: () => void;
   onAim?: (aimed: boolean) => void;
 }) {
@@ -183,6 +185,9 @@ export function ToolAction(props: {
         class="wfn-tool-action"
         aria-label={props.label ?? props.text}
         aria-pressed={props.pressed === undefined ? undefined : props.pressed ? "true" : "false"}
+        aria-haspopup={props.expanded === undefined ? undefined : "dialog"}
+        aria-expanded={props.expanded === undefined ? undefined : props.expanded ? "true" : "false"}
+        ref={(element: HTMLButtonElement) => props.ref?.(element)}
         data-tone={props.tone}
         onPointerEnter={() => props.onAim?.(true)}
         onPointerLeave={() => props.onAim?.(false)}
@@ -650,7 +655,7 @@ export function Field(props: { class?: string; children: JSX.Element }) {
   return <div class={`wfn-field ${props.class ?? ""}`}>{props.children}</div>;
 }
 
-function resultName(t: AppTranslate, result: WfnResult): string {
+export function resultName(t: AppTranslate, result: WfnResult): string {
   if (result.run === undefined)
     return result.failed ? t("workflow.node.result.stepFailed") : t("workflow.node.result.step");
   return result.failed

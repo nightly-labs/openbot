@@ -40,6 +40,10 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
+import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
@@ -78,6 +82,7 @@ import {
   decodeRemoteWorkflowSaveResult,
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
+  decodeRemoteWorkflowStepSettings,
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
@@ -187,6 +192,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       decide: (input) => post(WORKFLOWS_ROUTES.decide, empty, input),
       runs: (input) => post(WORKFLOWS_ROUTES.runs, decodeRemoteWorkflowRunPage, input),
       run: (runId) => post(WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
+      stepSettings: async (stepId) => {
+        if (!has(WORKFLOWS_STEP_SETTINGS_CAPABILITY)) throw tooOld();
+        return post(WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
+      },
       rotateWebhookSecret: (input) => post(WORKFLOWS_ROUTES.rotateWebhookSecret, decodeRemoteWorkflowSecret, input),
       githubCatalog: () => postGitHub(WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
       githubOptions: (input) => postGitHub(WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, input),
@@ -333,6 +342,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
+    stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;

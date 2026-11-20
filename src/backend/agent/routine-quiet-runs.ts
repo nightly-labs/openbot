@@ -5,9 +5,11 @@ import {
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
   type ConversationSnapshot,
+  type ConversationTurnTrace,
   type QueueDelivery,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type RoutineRun,
+  routineQuietStepsItemId,
 } from "@openbot/contracts/ipc";
 import { bridgedToolName, getString, type ThreadItem } from "../protocol";
 
@@ -100,6 +102,24 @@ export function settleQuietRoutineTurn(
     }
   }
   return !reported;
+}
+
+export function quietRunStepsMessage(
+  turnId: string,
+  trace: ConversationTurnTrace,
+  noUpdateSteps: ReadonlySet<string> = new Set(),
+): ConversationMessage | null {
+  if (!trace.steps.some((step) => step.kind === "tool" && step.text?.trim() && !noUpdateSteps.has(step.id)))
+    return null;
+  return {
+    id: routineQuietStepsItemId(turnId),
+    turnId,
+    author: "assistant",
+    itemType: "commentary",
+    text: "",
+    createdAt: trace.startedAt,
+    status: "completed",
+  };
 }
 
 export function quietNarration(provider: AgentProviderRef | undefined): (message: ConversationMessage) => boolean {

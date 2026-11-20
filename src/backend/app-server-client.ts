@@ -302,6 +302,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     yield* this.request("thread/archive", { threadId }, decodeRecordResponse);
   });
 
+  readonly newestTurnId = Effect.fn("CodexAppServer.newestTurnId")(function* (
+    this: CodexAppServerClient,
+    threadId: string,
+  ) {
+    const page = yield* this.request(
+      "thread/turns/list",
+      { threadId, limit: 1, sortDirection: "desc", itemsView: "notLoaded" },
+      decodeTurnHistoryPage,
+    );
+    return page.data[0]?.id ?? null;
+  });
+
   readonly nameThread = Effect.fn("CodexAppServer.nameThread")(function* (
     this: CodexAppServerClient,
     threadId: string,
@@ -488,6 +500,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       if (isRecord(turn) && isString(turn.id)) this.#liveTurns.add(JSON.stringify([params.threadId, turn.id]));
     } else if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
     else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
+    else if (method === "thread/revert") this.#turnContext.resend(params.threadId);
   }
 
   #observeTurnContext(method: string, params: unknown): void {

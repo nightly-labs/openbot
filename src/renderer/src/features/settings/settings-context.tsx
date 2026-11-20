@@ -23,6 +23,7 @@ import {
 } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readRestoreLastWorkspace, writeRestoreLastWorkspace } from "../../restore-workspace-preference";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -133,6 +134,7 @@ const Settings = createSimpleContext({
         ...DEFAULT_GENERAL_SETTINGS,
         taskSound: readTaskSound(),
         sendShortcut: readSendShortcutMode(),
+        restoreLastWorkspace: readRestoreLastWorkspace(),
         showAgentSteps: readShowAgentSteps(),
         compactMessageActions: readCompactMessageActions(),
         soundFeedback: isActionSoundEnabled(),
@@ -247,6 +249,9 @@ const Settings = createSimpleContext({
       }
       if (previous.showAgentSteps !== value.showAgentSteps) {
         setShowAgentSteps(value.showAgentSteps);
+      }
+      if (previous.restoreLastWorkspace !== value.restoreLastWorkspace) {
+        writeRestoreLastWorkspace(value.restoreLastWorkspace);
       }
       if (previous.compactMessageActions !== value.compactMessageActions) {
         setCompactMessageActions(value.compactMessageActions);

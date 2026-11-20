@@ -56,6 +56,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "שקיעה רטרו",
   "settings.chatBackdrop.snowfall": "שלג יורד",
   "settings.chatBackdrop.fireflies": "גחליליות",
+  "settings.chatBackdrop.coast": "חוף ניאון",
   "settings.chatBackdrop.upload": "העלאת תמונה…",
   "settings.chatBackdrop.uploadRefused": "יש להשתמש בתמונת PNG,‏ JPEG,‏ GIF,‏ WebP או AVIF בגודל של עד 20 MB.",
   "settings.chatBackdrop.saveFailed": "הרקע לא נשמר.",
@@ -590,6 +591,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "התוכנית הסתיימה",
   "settings.hostedServers.state.creating": "נוצר",
   "settings.hostedServers.state.starting": "מתחיל",
+  "settings.hostedServers.state.restoring": "משחזר נתונים",
   "settings.hostedServers.state.running": "פועל",
   "settings.hostedServers.state.stopping": "נעצר",
   "settings.hostedServers.state.stopped": "נעצר",
@@ -600,6 +602,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "ההגדרה מתחילה כש-Stripe מאשר את התשלום.",
   "settings.hostedServers.planEndedDescription":
     "התוכנית הסתיימה ולכן השרת נעצר. הנתונים שלו נשמרים. יש לחדש את התוכנית כדי להפעיל אותו.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "התוכנית הסתיימה ולכן השרת נעצר. הנתונים שלו נשמרים עד {date}. יש לחדש את התוכנית לפני כן כדי להפעיל אותו.",
   "settings.hostedServers.pay": "פתיחת עמוד התשלום",
   "settings.hostedServers.payLabel": "פתיחת עמוד התשלום עבור {name}",
   "settings.hostedServers.renew": "חידוש התוכנית",

@@ -537,13 +537,22 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-After an app upgrade, main updates the managed CLIs with no offer (#3164).
-`openbot-provider-cli-app-version-v1.json` in `userData` keeps the app version that last started the
-update checks. A different or missing version calls `startUpdateChecks({ updateInstalled: true })`.
-Until the first check starts the downloads, `getStatus` does not offer the CLIs that it will update. That check then starts the
-download of each managed CLI that has a newer version, before it sends its status, so the renderer
-announces no offer. A CLI the user installed, an explicit path and an off provider keep the normal
-offer path. The renderer shows a notification for such an update only when it fails, with a Retry.
+Main updates the managed CLIs with no offer. After `startUpdateChecks`, each check (at start and
+then each hour) starts the download of each managed CLI that has a newer version, before it sends its
+status, so the renderer announces no offer. `providerUseChanged` does the same at once, for a provider
+that is turned on or that stops using a CLI the user installed. When a check runs at that time, it starts
+them after the check, so the download gets the latest version. Until a check starts the downloads,
+`getStatus` does not offer the CLIs that it will update. A CLI the user installed, an explicit path and
+an off provider keep the normal offer path. A failed update stays in `download-error` and is not started
+again by itself. A cancelled update is not started again for the same version until the app restarts,
+and stays offered. The decline is kept in memory only. The
+download waits for idle agents through `updateRuntime`. The renderer shows a notification for such an
+update only when it fails, with a Retry.
+
+Provider settings show "Update all" in the Connected header when one or more providers that are on
+have an offer. It calls `onUpdateProvider` for each of them, so it uses the same local or Team API path
+as the Update button of one provider. The mobile server providers screen has the same action. Both leave out installer providers
+such as Hermes.
 
 `ProvidersProvider` starts the shared renderer runtime store for the active server. The store
 announces each provider that gains an offer as one notification, from an effect over both the
@@ -1411,6 +1420,15 @@ Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session mak
 and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
 `HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
 session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes before 0.22.1 keeps one MCP server of each name for its whole process, so in one shared
+process each session's `openbot` call went out with the bearer token of the first session. OpenBot
+then ran it as that session's agent, and a message to that agent was refused as a message to
+itself (#13120). Hermes 0.22.1 gives each session its own servers (`GatewayACPAgent`). Both Hermes
+flavors set `sessionProcessesBefore: "0.22.1"`: when `initialize` reports an older `agentInfo.version`,
+each session runs in a Hermes process of its own, as for Mistral. Hermes keeps its sessions in
+`state.db`, so an idle session closes with its process and loads again in a new one. A version that
+`isVersion` does not read keeps the shared process. `bun run test:hermes-session-processes` checks
+both versions with a fake `hermes` agent.
 Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API

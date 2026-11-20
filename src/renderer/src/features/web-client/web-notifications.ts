@@ -1,9 +1,15 @@
-import type { AgentEvent, ClientAgentSummary, ServerNotificationLevel } from "@openbot/contracts/ipc";
+import type {
+  AgentEvent,
+  AgentRuntimeSnapshot,
+  ClientAgentSummary,
+  ServerNotificationLevel,
+} from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import {
   type AgentNotificationChannel,
   notificationForAgentEvent,
   notificationRequestKey,
+  settledRequestKeys,
 } from "@openbot/team-client/agent-notifications";
 import type { ChannelNotificationContent } from "@openbot/team-client/channel-notifications";
 
@@ -106,13 +112,21 @@ export function closeWebChatNotifications(hostId: string, chat: WebNotificationC
 const requestNotifications = new Map<string, Notification>();
 const REQUEST_NOTIFICATION_LIMIT = 50;
 
+function withdrawRequestNotification(key: string): void {
+  const notification = requestNotifications.get(key);
+  if (!notification) return;
+  requestNotifications.delete(key);
+  notification.close();
+}
+
 export function withdrawWebAgentNotification(hostId: string, event: AgentEvent): void {
   if (event.type !== "agent-input-resolved" && event.type !== "browser-takeover-resolved") return;
   const key = notificationRequestKey(hostId, event);
-  const notification = key && requestNotifications.get(key);
-  if (!key || !notification) return;
-  requestNotifications.delete(key);
-  notification.close();
+  if (key) withdrawRequestNotification(key);
+}
+
+export function withdrawSettledWebAgentNotifications(hostId: string, snapshot: AgentRuntimeSnapshot): void {
+  for (const key of settledRequestKeys(hostId, snapshot, requestNotifications.keys())) withdrawRequestNotification(key);
 }
 
 export function showWebAgentNotification(options: {

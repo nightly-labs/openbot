@@ -1,5 +1,6 @@
 import {
   isWorkflowDetail,
+  isWorkflowFields,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
@@ -13,6 +14,7 @@ import {
   isWorkflowRunPage,
   isWorkflowSaveResult,
   isWorkflowStep,
+  isWorkflowStepSource,
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
@@ -37,6 +39,7 @@ import {
   type WorkflowMediaPrice,
   type WorkflowMediaProviders,
   type WorkflowMediaServiceAccount,
+  type WorkflowStepSettings,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -135,6 +138,23 @@ export const decodeRemoteWorkflowRunDetail = mapped(
 );
 export const decodeRemoteWorkflowRunPage = mapped(runPage, guardedDecoder(isWorkflowRunPage, "remote workflow runs"));
 export const decodeRemoteWorkflowStep = mapped(step, guardedDecoder(isWorkflowStep, "remote workflow step"));
+export function decodeRemoteWorkflowStepSettings(value: unknown): WorkflowStepSettings {
+  if (
+    !isDynamicRecord(value) ||
+    !(value.settings === null || isWorkflowFields(value.settings)) ||
+    !(value.sources === null || Array.isArray(value.sources))
+  )
+    throw new Error("Invalid remote workflow step settings.");
+  return {
+    settings: value.settings,
+    sources:
+      value.sources === null
+        ? null
+        : value.sources
+            .filter(isWorkflowStepSource)
+            .map(({ from, type, stepId, attachmentId }) => ({ from, type, stepId, attachmentId })),
+  };
+}
 export const decodeRemoteWorkflowSecret = guardedDecoder(isWorkflowWebhookSecret, "remote workflow webhook secret");
 const decodeVersionGraph = guardedDecoder(isWorkflowGraph, "remote workflow version");
 const decodeWorkflowSummaries = guardedListDecoder(isWorkflowSummary, "remote workflow list");

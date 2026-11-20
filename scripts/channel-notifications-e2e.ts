@@ -222,6 +222,7 @@ const userData = join(root, "user-data");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -441,6 +442,7 @@ try {
   const forwarders = createRendererForwarders({
     getMainWindow: () => mainWindow,
     getChatWindows: () => [],
+    chatWindowTarget: () => null,
     getAgentService: () => agents ?? null,
     getHostService: () => host,
     getHostAnalytics: () => null,

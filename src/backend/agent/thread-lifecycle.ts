@@ -52,6 +52,7 @@ import {
 import { decodeRecordResponse, decodeThreadResponse, getRecord, getString, type ResponseDecoder } from "../protocol";
 import { TimeoutError, withTimeout } from "../with-timeout";
 import type { AgentMemories } from "./agent-memories";
+import { CodexArchiveRetries } from "./codex-archive-retries";
 import { readCodexMcpConfig } from "./codex-mcp-config";
 import { type CodexPromptSettings, codexPromptSettings } from "./codex-prompt-settings";
 import type { ContextCompaction } from "./context-compaction";
@@ -194,6 +195,7 @@ export class ThreadLifecycle {
   readonly #pendingHandoffs = new Map<string, string>();
   readonly #givenTurnContext = new Map<string, string>();
   readonly #handoffWrites = Semaphore.makeUnsafe(1);
+  readonly #archiveRetries: CodexArchiveRetries;
   readonly #pendingRuntimeRefreshes = new Set<string>();
   readonly #mcpRuntimeRefreshes = new Set<string>();
   readonly #pendingStarts = new Map<string, number>();
@@ -207,6 +209,10 @@ export class ThreadLifecycle {
     this.#memories = options.memories;
     this.#compaction = options.compaction;
     this.#hooks = options.hooks;
+    this.#archiveRetries = new CodexArchiveRetries({
+      path: () => join(this.#store.database.userDataPath, "provider-archive-retries.json"),
+      logFailure: (provider, error) => this.#hooks.logReleaseFailure(provider, error),
+    });
     this.#mcpServers = options.mcpServers ?? (() => []);
     this.#mcpToolRuntimes = options.mcpToolRuntimes;
     this.#mcpEndpoint = options.mcpEndpoint;
@@ -716,6 +722,7 @@ export class ThreadLifecycle {
     this.#conversation.markThreadLoaded(externalThreadId, client);
     this.#conversation.ensureSnapshot(agent.id, publicThreadId);
     yield* this.#nameSession(client, externalThreadId, agent, null);
+    yield* this.#archiveRetries.retry(client);
     if (replaced) yield* this.#archiveSession(client, replaced.externalSessionId);
     return externalThreadId;
   });
@@ -725,12 +732,7 @@ export class ThreadLifecycle {
     client: AgentClient,
     externalThreadId: string,
   ) {
-    if (!client.archiveThread) return;
-    yield* client
-      .archiveThread(externalThreadId)
-      .pipe(
-        Effect.catch((failure) => Effect.sync(() => this.#hooks.logReleaseFailure(client.provider, failure.cause))),
-      );
+    yield* this.#archiveRetries.archive(client, externalThreadId);
   }, Effect.uninterruptible);
 
   readonly #nameSession = Effect.fn("ThreadLifecycle.nameSession")(function* (
@@ -984,7 +986,7 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#runsBesideOwnChat(agent, publicThreadId) &&
+      this.#conversation.isTaskThread(publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
     );
@@ -1021,7 +1023,8 @@ export class ThreadLifecycle {
   }
 
   #channelToolsParam(client: AgentClient, publicThreadId: string): { channelTools?: true } {
-    return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
+    return (client.provider === "claude" || client.provider === "grok") &&
+      this.#conversation.channelForThread(publicThreadId) !== null
       ? { channelTools: true }
       : {};
   }
@@ -1161,7 +1164,7 @@ export class ThreadLifecycle {
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
               client.provider === "antigravity"
               ? mcpServers
-                  .filter((config) => mcpFallbackRunsServer(config, agent) && config.id !== COMPUTER_USE_MCP_SERVER_ID)
+                  .filter((config) => mcpFallbackRunsServer(config, agent))
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
@@ -1294,6 +1297,7 @@ export class ThreadLifecycle {
     this.#rememberTurnContext(client, externalThreadId, givenContext);
     this.#conversation.markThreadLoaded(externalThreadId, client);
     yield* this.#nameSession(client, externalThreadId, agent, getString(getRecord(response, "thread"), "name"));
+    yield* this.#archiveRetries.retry(client);
   }).bind(this);
 
   readonly dropRefusedProviderSession = Effect.fn("ThreadLifecycle.dropRefusedProviderSession")(function* (

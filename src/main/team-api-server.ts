@@ -167,6 +167,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
@@ -193,6 +194,7 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
@@ -228,6 +230,7 @@ import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/messag
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -236,7 +239,7 @@ import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
-import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
@@ -291,6 +294,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
@@ -1366,11 +1370,12 @@ export class TeamApiServer {
         error instanceof McpServerError ||
         error instanceof AnalyticsInputError ||
         error instanceof AgentMemorySelectionError ||
-        error instanceof AgentThreadLimitError;
+        error instanceof AgentThreadLimitError ||
+        error instanceof AgentSettingsRefused;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError
           ? error.status
-          : error instanceof AgentThreadLimitError
+          : error instanceof AgentThreadLimitError || error instanceof AgentSettingsRefused
             ? 409
             : expected
               ? 400
@@ -1535,8 +1540,10 @@ export class TeamApiServer {
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
         backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+        usageGroups: capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
+        queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -1763,7 +1770,7 @@ export class TeamApiServer {
                         snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
                       }
                     : event.type === "agent-tasks-changed"
-                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot) }
+                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot, connection.capabilities) }
                       : event,
                   { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
                 );
@@ -2347,8 +2354,10 @@ export class TeamApiServer {
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+      usageGroups: route.capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
       queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
+      queueHoldSignIn: route.capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
     };
     const visibleValue =
       status < 400 && route.hiddenAgentIds
@@ -2717,6 +2726,7 @@ export class TeamApiServer {
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
+        if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
         if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
         if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
         if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
@@ -2765,6 +2775,7 @@ export class TeamApiServer {
         if (capability === WORKFLOWS_MEDIA_CATALOG_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY) return this.#options.workflows !== undefined;
+        if (capability === WORKFLOWS_STEP_SETTINGS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_AGENT_FILES_CAPABILITY) return this.#options.workflows !== undefined;
         if (capability === WORKFLOWS_CHATS_CAPABILITY)
@@ -2916,6 +2927,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -2927,6 +2939,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
+  QUEUE_HOLD_SIGN_IN_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

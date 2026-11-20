@@ -399,6 +399,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gestisci profili",
   "mobile.agent.browserProfile.footer":
     "Ogni profilo ha i propri accessi e cookie. Una modifica chiude le schede aperte dell'agente.",
+  "mobile.agent.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot non è riuscito a modificare il profilo del browser dell'agente.",
   "mobile.agent.planCard.label": "Mostra il piano prima delle attività lunghe",
   "mobile.agent.planCard.footer":

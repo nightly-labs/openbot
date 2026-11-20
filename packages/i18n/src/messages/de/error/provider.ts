@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
     "{provider} hat die OpenBot-Tools nicht geladen, daher kann dieser Agent sie nicht nutzen und seine Teammitglieder nicht erreichen. Eine Team-Richtlinie von {provider} kann lokale MCP-Server blockieren. Bitte deinen Team-Admin, sie zu erlauben, und versuche es dann erneut.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} hat diese Nachricht ohne die OpenBot-Tools ausgeführt. Der Agent konnte daher seine Teammitglieder nicht erreichen, den Browser nicht nutzen und keine Dateien anhängen. Versuche es erneut.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} konnte den MCP-Server {name} nicht starten, daher wurde die Antwort beendet. Dieser Server ist in deinen eigenen {provider}-Einstellungen, nicht in OpenBot. Entferne oder repariere ihn dort und starte dann einen neuen Chat.",
   "error.provider.endpointsReadOnly":
@@ -346,6 +348,8 @@ export const messages = {
     "Gemini hat diese Anfrage abgelehnt und keinen Grund genannt. Ein Element im Chatverlauf kann die Ursache sein, zum Beispiel ein Bild, das der Agent geöffnet hat. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini konnte den gespeicherten Verlauf dieses Chats nicht lesen. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
+  "error.provider.acpTurnStuck":
+    "{provider} hat seinen vorherigen Durchgang nicht beendet und diese Nachricht deshalb nicht angenommen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -417,6 +421,10 @@ export const messages = {
     "Codex konnte diesen Chat nicht fortsetzen, da ein Element in seinem gespeicherten Verlauf fehlt. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.codexRequestRefused":
     "{provider} hat die Anfrage für diesen Chat abgelehnt und keinen Grund genannt. Das kann in einem langen Chat mit vielen Bildern passieren. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Der Agent sieht diese Nachricht jetzt nicht mehr, daher hält sie deine nächsten Nachrichten nicht auf. Sende deine Anfrage erneut mit anderen Worten.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Wenn {provider} auch deine nächsten Nachrichten blockiert, starte einen neuen Chat.",
   "error.provider.codexAudioRefused":
     "Dieses Modell kann kein Audio anhören, darum hat es den Ton in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Um fortzufahren, sende deine Anfrage erneut und bitte den Agenten, ohne den Ton zu arbeiten. Um Ton zu prüfen, wähle im Modellmenü des Agenten ein Modell, das Audio anhören kann.",
   "error.provider.imageTooSmall":

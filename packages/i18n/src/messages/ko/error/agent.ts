@@ -52,6 +52,12 @@ export const messages = {
   "error.agent.modelUnavailable": "선택한 에이전트 모델을 사용할 수 없어요.",
   "error.agent.modelProviderNotConnected":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 연결되어 있지 않아요.',
+  "error.agent.modelProviderSignInRequired":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 로그인해야 해요. {provider}에 로그인한 후 다시 시도하세요.',
+  "error.agent.modelProviderNotInstalled":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}이(가) 설치되어 있지 않아요.',
+  "error.agent.modelProviderOutdated":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}을(를) 업데이트해야 해요.',
   "error.agent.modelListEmpty":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요. 마지막 오류: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -121,6 +127,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
   "error.agent.deleteFolderInUse":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
+  "error.agent.deleteFolderLocked":
+    "다른 프로그램(예: 에이전트가 시작한 프로그램)이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 프로그램을 닫거나 이 에이전트가 실행되는 컴퓨터를 다시 시작한 뒤에 에이전트를 다시 삭제해 주세요.",
   "error.agent.deleteWhenFolderFree":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나면 OpenBot이 이 에이전트를 삭제해요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",

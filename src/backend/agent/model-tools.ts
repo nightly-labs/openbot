@@ -76,8 +76,26 @@ export function requireRunnableProvider(
 ): void {
   if (providerCanRun(model.provider, statuses)) return;
   throw new AgentSettingsRefused(
-    sourceText("error.agent.modelProviderNotConnected", { model: model.id, provider: providerLabel(model.provider) }),
+    providerNotReadyText(
+      model.id,
+      providerLabel(model.provider),
+      statuses.find((row) => row.id === model.provider),
+    ),
   );
+}
+
+export function providerNotReadyText(model: string, provider: string, row: ProviderStatusRow | undefined): string {
+  if (row?.off) return sourceText("error.agent.modelProviderNotConnected", { model, provider });
+  switch (row?.state) {
+    case "sign-in-required":
+      return sourceText("error.agent.modelProviderSignInRequired", { model, provider });
+    case "not-installed":
+      return sourceText("error.agent.modelProviderNotInstalled", { model, provider });
+    case "outdated":
+      return sourceText("error.agent.modelProviderOutdated", { model, provider });
+    default:
+      return sourceText("error.agent.modelProviderNotConnected", { model, provider });
+  }
 }
 
 export function requireRunnableChange(

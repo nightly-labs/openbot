@@ -57,6 +57,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
   "error.agent.modelProviderNotConnected":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas connecté.",
+  "error.agent.modelProviderSignInRequired":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} demande une connexion. Connectez-vous à {provider}, puis réessayez.",
+  "error.agent.modelProviderNotInstalled":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas installé.",
+  "error.agent.modelProviderOutdated":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} doit être mis à jour.",
   "error.agent.modelListEmpty":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’a listé aucun modèle. Dernière erreur : {detail}",
   "error.agent.modelListEmptyNoError":
@@ -137,6 +143,8 @@ export const messages = {
     "Les données de l’agent n’ont pas pu être entièrement supprimées. Relancez la suppression de l’agent.",
   "error.agent.deleteFolderInUse":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. Supprimez à nouveau cet agent quand ce travail se termine, ou après avoir redémarré OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Un autre programme utilise encore le dossier de cet agent, par exemple un programme que l’agent a lancé. Fermez ce programme ou redémarrez l’ordinateur sur lequel cet agent fonctionne, puis supprimez à nouveau l’agent.",
   "error.agent.deleteWhenFolderFree":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. OpenBot supprime cet agent quand ce travail se termine.",
   "error.agent.duplicationBusy": "Cet agent est déjà en cours de duplication.",

@@ -71,10 +71,12 @@ import { OPENBOT_BROWSER_NAMESPACE } from "./browser-tools";
 import { CHANNEL_TOOL_DEFINITIONS } from "./channel-tools";
 import { claudeContextCategories } from "./claude-context-categories";
 import {
+  CLAUDE_NO_RESPONSE_TEXT,
   type ClaudeHistoryOptions,
   claudeHistoryFromMessages,
   claudeHistoryReader,
   claudeTaskTurnId,
+  isClaudeNoResponsePlaceholder,
 } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
 import {
@@ -461,6 +463,7 @@ interface ClaudeStreamMessage {
   error_status?: unknown;
   no_response?: unknown;
   fast_mode_disabled_reason?: unknown;
+  mcp_servers?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -468,6 +471,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   supportedModels(): Promise<ModelInfo[]>;
   getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
   initializationResult?(): Promise<unknown>;
+  mcpServerStatus?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
@@ -701,6 +705,34 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  readonly #reportFailedMcpServers = Effect.fnUntraced(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    message: ClaudeStreamMessage,
+  ) {
+    const failed = failedClaudeMcpServers(message.mcp_servers);
+    if (failed.length === 0) return;
+    const query = runtime.query;
+    yield* Effect.forkIn(
+      providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
+        Effect.timeout("2 seconds"),
+        Effect.orElseSucceed(() => null),
+        Effect.flatMap((rows) =>
+          Effect.sync(() => {
+            for (const name of failed) {
+              const row = Array.isArray(rows) ? rows.find((item) => getString(item, "name") === name) : undefined;
+              this.emit("notification", {
+                method: "mcpServer/startupStatus/updated",
+                params: { name, status: "failed", error: getString(row, "error") ?? "" },
+              });
+            }
+          }),
+        ),
+      ),
+      this.#scope,
+    );
+  });
+
   #emitBackgroundWork(runtime: ThreadRuntime): void {
     this.emit("notification", {
       method: "openbot/background-work",
@@ -921,27 +953,58 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  #probeOptions(): Options {
-    return {
+  #configDirectory(): string {
+    return this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  }
+
+  readonly #probeOptionsEffect = Effect.fn("ClaudeAgentClient.probeOptions")(function* (this: ClaudeAgentClient) {
+    const userSetup = this.#userSetup();
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(
+          claudeSignInSettings(yield* readClaudeSettingsFile(join(this.#configDirectory(), "settings.json"))),
+          this.#agentEnvironment?.(),
+        );
+    const stateDirectory = this.#stateDirectory;
+    const settingsFile =
+      Object.keys(signInSettings).length > 0 && stateDirectory
+        ? yield* Effect.acquireRelease(
+            writeClaudeFlagSettings(stateDirectory, "probe", signInSettings).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => {
+                  queryLogger.warn("Claude checks its models and usage without the sign-in settings.", {
+                    error: error.cause,
+                  });
+                  return null;
+                }),
+              ),
+            ),
+            removeClaudeQueryFile,
+          )
+        : null;
+    const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
-      settingSources: ["user", "project", "local"],
+      settingSources: userSetup ? ["user", "project", "local"] : [],
+      ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
       strictMcpConfig: true,
       persistSession: false,
       env: withClaudeClientLabels({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }),
     };
-  }
+    return options;
+  });
 
   readonly #listModelsEffect = Effect.fn("ClaudeAgentClient.listModels")(function* (
     this: ClaudeAgentClient,
-    timeoutMs?: number,
-  ): Effect.fn.Return<unknown[], ProviderClientOperationError> {
+    timeoutMs: number | undefined,
+  ): Effect.fn.Return<unknown[], ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options,
       }),
     );
     return yield* Effect.gen({ self: this }, function* () {
@@ -1000,18 +1063,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readUsageEffect = Effect.fn("ClaudeAgentClient.readUsage")(function* (
     this: ClaudeAgentClient,
     model: string | null,
     timeoutMs: number,
-  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError> {
+  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options,
       }),
     );
     return yield* Effect.gen({ self: this }, function* () {
@@ -1036,7 +1100,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
@@ -1230,8 +1294,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
-    const configDirectory =
-      this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    const configDirectory = this.#configDirectory();
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
       usable?.flatMap((server) => (server.url ? [server.config.name] : [])) ?? [],
@@ -1729,6 +1792,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (runtime.resumedUsage && id && model && isRecord(message.message))
         runtime.requestUsage.set(id, { model, usage: message.message.usage });
     }
+    if (message.type === "system" && message.subtype === "init") yield* this.#reportFailedMcpServers(runtime, message);
     if (message.type === "system" && message.subtype === "status") {
       const status =
         message.status === "compacting"
@@ -1780,7 +1844,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.backgroundTasks = Array.isArray(message.tasks)
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
-      if (before > 0 !== runtime.backgroundTasks > 0) this.#emitBackgroundWork(runtime);
+      if (before > 0 !== runtime.backgroundTasks > 0 || runtime.backgroundTasks > before)
+        this.#emitBackgroundWork(runtime);
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
         else if (before > 0 && runtime.backgroundTasks === 0) {
@@ -1897,7 +1962,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (message.type === "assistant") {
-      if (message.parent_tool_use_id !== null || !message.uuid) return;
+      if (message.parent_tool_use_id !== null || !message.uuid || isClaudeNoResponsePlaceholder(message.message))
+        return;
       const turn = this.#outputTurn(runtime);
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
@@ -2092,7 +2158,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
-      if (!turn.seenText && fallback && !apiError) this.#bufferText(runtime, fallback);
+      if (!turn.seenText && fallback && fallback !== CLAUDE_NO_RESPONSE_TEXT && !apiError)
+        this.#bufferText(runtime, fallback);
     }
     const status = interrupted ? "interrupted" : message.subtype === "success" && !apiError ? "completed" : "failed";
     yield* this.#completeTurn(runtime, status, errors.length > 0 ? errors.join("\n") : apiError ? fallback : null);
@@ -2491,7 +2558,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         currentThinking = null;
         currentAnswer = null;
       } else if (message.type === "assistant") {
-        if (skippingCompaction) continue;
+        if (skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
         const thinking = messageThinking(message.message);
         const endsStep = messageToolCalls(message.message).length > 0;
         if (!thinking && !text && !endsStep) continue;
@@ -3222,6 +3289,14 @@ function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet
     message.is_error !== true &&
     !message.result
   );
+}
+
+function failedClaudeMcpServers(servers: unknown): string[] {
+  if (!Array.isArray(servers)) return [];
+  return servers.flatMap((server) => {
+    const name = getString(server, "name");
+    return name && getString(server, "status") === "failed" ? [name] : [];
+  });
 }
 
 function isUuid(value: string): value is UUID {

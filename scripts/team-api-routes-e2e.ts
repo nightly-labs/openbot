@@ -17,6 +17,7 @@ import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AccountUsageLimit,
   AGENT_PROVIDERS,
   type AgentEvent,
   type AgentModelId,
@@ -25,6 +26,7 @@ import {
   type AgentStatus,
   type AgentSummary,
   type AgentTask,
+  type AgentTaskHold,
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
@@ -47,6 +49,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isAccountUsage,
   isQueueSnapshot,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
@@ -224,6 +227,7 @@ import {
   AGENT_HIDDEN_WORK_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -362,7 +366,7 @@ import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/con
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
-import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
@@ -408,6 +412,10 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
+import {
+  decodeTeamProtocolV8BaseCurrentEvent,
+  encodeTeamProtocolV8BaseCurrentEvent,
+} from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
@@ -441,6 +449,7 @@ import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { planLimitRows } from "@openbot/team-client/plan-limits";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
@@ -812,6 +821,23 @@ function activeQueue(agentId: string): QueueSnapshot {
 }
 
 let queueSnapshotHold: { agentId: string; hold: QueueHold } | null = null;
+
+let groupedUsageLimit: AccountUsageLimit | null = null;
+
+const ANTIGRAVITY_GROUPS = [
+  {
+    name: "Gemini Models",
+    models: ["gemini-3-pro"],
+    primary: { usedPercent: 28, windowDurationMins: 10_080, resetsAt: 1_900_000_000 },
+    secondary: null,
+  },
+  {
+    name: "Claude and GPT models",
+    models: ["claude-sonnet-4-6", "gpt-oss-120b"],
+    primary: { usedPercent: 66, windowDurationMins: 300, resetsAt: 1_890_000_000 },
+    secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: 1_900_000_000 },
+  },
+];
 
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
@@ -1301,6 +1327,7 @@ const fakeAgents: TeamApiAgents = {
         { id: "codex", primary: null, secondary: SPENT_WEEK, creditsAvailable: true },
         { id: "claude", primary: null, secondary: SPENT_WEEK },
         { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
+        ...(groupedUsageLimit ? [groupedUsageLimit] : []),
       ],
     }),
   getAnalytics: unused("getAnalytics"),
@@ -1619,6 +1646,7 @@ const fakeAgents: TeamApiAgents = {
 };
 
 let longThreadQueue = false;
+let queuedTaskHold: AgentTaskHold | null = null;
 const fakeAgentTasks: TeamApiAgentTasks = {
   listAgents: () => agents,
   listTasks: (agentId) => {
@@ -1631,7 +1659,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       title: id,
       state: queue.length > 0 ? "queued" : "idle",
       outcome: null,
-      hold: null,
+      hold: queue.length > 0 ? queuedTaskHold : null,
       activeTurnId: null,
       progress: null,
       error: null,
@@ -1952,7 +1980,7 @@ const fakeCipher = {
 const createBitwardenHost = () =>
   new BitwardenConnectorService({
     runCli: fakeBitwardenCli,
-    findCli: async () => "/fixture/bw",
+    findCli: () => Effect.succeed({ executable: "/fixture/bw" }),
     host: {
       store: new BitwardenConnectorStore(bitwardenFile, fakeCipher),
       dataDirectory: bitwardenData,
@@ -3561,6 +3589,7 @@ try {
       ["error.agent.deletionBusy", 409],
       ["error.agent.deleteWhenFolderFree", 409],
       ["error.agent.deleteIncomplete", 500],
+      ["error.agent.deleteFolderLocked", 500],
     ] as const) {
       deleteFailure = sourceText(key);
       const loggedBefore = logged.length;
@@ -6460,7 +6489,102 @@ try {
       isQueueSnapshot(unknown) && unknown.hold === undefined,
       unknown,
     );
+    const signInHold = { reason: "sign-in", provider: "codex" } as const;
+    queueSnapshotHold = { agentId: "agent-ada", hold: signInHold };
+    const signIn = await read(withHold);
+    const signInDecoded =
+      signIn.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, signIn.body) : null;
+    check(
+      "a client with queue-hold-sign-in-v1 reads that the queue waits for provider sign-in, and its decoder keeps it",
+      TEAM_CURRENT_CAPABILITIES.includes(QUEUE_HOLD_SIGN_IN_CAPABILITY) &&
+        signIn.status === 200 &&
+        isDeepStrictEqual(field(signIn.body, "hold"), signInHold) &&
+        isQueueSnapshot(signInDecoded) &&
+        isDeepStrictEqual(signInDecoded.hold, signInHold),
+      [summary(signIn), signInDecoded],
+    );
+    const restartOnly = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== QUEUE_HOLD_SIGN_IN_CAPABILITY),
+      ),
+    );
+    const signInOlder = await read(undefined, TEAM_PROTOCOL_V9);
+    check(
+      "a client with only queue-hold-v1, and a protocol 9 client, do not get the sign-in hold that their decoder does not know",
+      restartOnly.status === 200 &&
+        field(restartOnly.body, "hold") === undefined &&
+        isDeepStrictEqual(field(restartOnly.body, "deliveries"), field(signIn.body, "deliveries")) &&
+        signInOlder.status === 200 &&
+        field(signInOlder.body, "hold") === undefined,
+      [summary(restartOnly), summary(signInOlder)],
+    );
     queueSnapshotHold = null;
+  }
+
+  {
+    const path = TEAM_API_ROUTES.agents.usage;
+    groupedUsageLimit = {
+      id: "antigravity",
+      primary: ANTIGRAVITY_GROUPS[0]?.primary ?? null,
+      secondary: null,
+      groups: ANTIGRAVITY_GROUPS,
+    };
+    const read = (headers?: Record<string, string>, protocol: number = TEAM_PROTOCOL_V10) =>
+      call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
+    const antigravityGroups = (body: unknown) =>
+      isDynamicRecord(body) && Array.isArray(body.limits)
+        ? (body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "antigravity") ?? { groups: "no limit" })
+            .groups
+        : "no limits";
+    const grouped = await read(teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES));
+    const plain = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_USAGE_GROUPS_CAPABILITY),
+      ),
+    );
+    const older = await read(undefined, TEAM_PROTOCOL_V9);
+    const decoded =
+      grouped.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, grouped.body) : null;
+    const listed = isAccountUsage(decoded)
+      ? planLimitRows(decoded)
+          .find((row) => row.provider === "antigravity")
+          ?.listedWindows.map((window) => [window.group?.name ?? null, window.durationMins, window.remainingPercent])
+      : null;
+    check(
+      "a client with usage-groups-v1 reads each Antigravity model pool, and the phone lists every pool window",
+      grouped.status === 200 &&
+        isDeepStrictEqual(antigravityGroups(grouped.body), ANTIGRAVITY_GROUPS) &&
+        isDeepStrictEqual(listed, [
+          ["Gemini Models", 10_080, 72],
+          ["Claude and GPT models", 300, 34],
+          ["Claude and GPT models", 10_080, 60],
+        ]),
+      [summary(grouped), listed],
+    );
+    check(
+      "a client without usage-groups-v1, and a protocol 9 client, read the usage without the pools, as before",
+      plain.status === 200 &&
+        antigravityGroups(plain.body) === undefined &&
+        older.status === 200 &&
+        antigravityGroups(older.body) === undefined,
+      [summary(plain), summary(older)],
+    );
+    const usage = { limits: [groupedUsageLimit] };
+    const eventWith = encodeTeamProtocolV8BaseCurrentEvent({ type: "usage-changed", usage }, { usageGroups: true });
+    const eventWithout = encodeTeamProtocolV8BaseCurrentEvent({ type: "usage-changed", usage });
+    const decodedEvent = eventWith ? decodeTeamProtocolV8BaseCurrentEvent(JSON.parse(eventWith)) : null;
+    check(
+      "a usage-changed event keeps the pools only for a client with usage-groups-v1, and its decoder keeps them",
+      decodedEvent?.kind === "known" &&
+        decodedEvent.event.type === "usage-changed" &&
+        isDeepStrictEqual(decodedEvent.event.usage.limits[0]?.groups, ANTIGRAVITY_GROUPS) &&
+        eventWithout !== null &&
+        antigravityGroups(JSON.parse(eventWithout).usage) === undefined,
+      [decodedEvent, eventWithout],
+    );
+    groupedUsageLimit = null;
   }
 
   {
@@ -12965,6 +13089,29 @@ try {
         field(tasks.body, "tasks", 1, "id") === "task-idle" &&
         field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
       [summary(listed), summary(tasks)],
+    );
+    queuedTaskHold = "sign-in";
+    const olderHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    const signInHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+      json: listBody,
+    });
+    queuedTaskHold = null;
+    check(
+      "a task that waits for provider sign-in shows the sign-in hold only to a client that knows it",
+      olderHold.status === 200 &&
+        field(olderHold.body, "tasks", 0, "id") === "task-queued" &&
+        field(olderHold.body, "tasks", 0, "hold") === "agent-busy" &&
+        signInHold.status === 200 &&
+        field(signInHold.body, "tasks", 0, "hold") === "sign-in",
+      [summary(olderHold), summary(signInHold)],
     );
   }
 

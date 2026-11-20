@@ -1,12 +1,22 @@
-import type { ContextEntry } from "../messaging-types";
+import { createOpenBotLogger } from "@openbot/logging";
+import { type MessagingHistoryStore, matchesHistoryFilter, type ThreadedEntry } from "../messaging-history-store";
+import type { ContextEntry, HistoryFilter } from "../messaging-types";
+
+const logger = createOpenBotLogger("telegram");
 
 const RECENT_MESSAGES = 200;
 const THREAD_ENTRIES = 2_000;
 const PRECEDING_MESSAGES = 10;
 const PRECEDING_WINDOW_MS = 15 * 60_000;
 
-interface RecentMessage extends ContextEntry {
-  threadKey: string;
+export interface TelegramMessage extends ThreadedEntry {
+  authorId: string;
+}
+
+export interface TelegramArchive {
+  connectionId: string;
+  chatId: string;
+  store: MessagingHistoryStore;
 }
 
 export class TelegramChatState {
@@ -14,7 +24,8 @@ export class TelegramChatState {
   botUsername: string;
   readonly #names = new Map<string, string>();
   readonly #threads = new Map<number, string>();
-  readonly #recent: RecentMessage[] = [];
+  readonly #recent: ThreadedEntry[] = [];
+  #archive: TelegramArchive | null = null;
 
   constructor(title: string, botUsername: string) {
     this.title = title;
@@ -42,11 +53,41 @@ export class TelegramChatState {
     }
   }
 
-  rememberMessage(message: RecentMessage): void {
-    if (this.#recent.some((entry) => entry.id === message.id)) return;
+  attach(archive: TelegramArchive): void {
+    this.#archive = archive;
+    const saved = archived("restore", () =>
+      archive.store.latest(archive.connectionId, archive.chatId, RECENT_MESSAGES),
+    );
+    if (!saved) return;
+    this.#recent.length = 0;
+    for (const message of saved) {
+      this.#keep(message);
+      this.rememberThread(Number(message.id), message.threadKey);
+    }
+  }
+
+  rememberMessage({ authorId, ...message }: TelegramMessage): void {
+    if (!this.#keep(message)) return;
+    const archive = this.#archive;
+    if (archive)
+      archived("save", () =>
+        archive.store.save(
+          archive.connectionId,
+          archive.chatId,
+          message.threadKey,
+          authorId,
+          message,
+          new Date().toISOString(),
+        ),
+      );
+  }
+
+  #keep(message: ThreadedEntry): boolean {
+    if (this.#recent.some((entry) => entry.id === message.id)) return false;
     this.#recent.push(message);
     this.#recent.sort((left, right) => Number(left.id) - Number(right.id));
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
+    return true;
   }
 
   history(threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
@@ -73,11 +114,36 @@ export class TelegramChatState {
       .map(({ threadKey: _threadKey, ...entry }) => entry);
   }
 
-  recent(threadKey: string | null, limit: number): ContextEntry[] {
+  get searchesHistory(): boolean {
+    return this.#archive !== null;
+  }
+
+  recent(threadKey: string | null, limit: number, filter: HistoryFilter = {}): ContextEntry[] {
+    const archive = this.#archive;
+    const saved =
+      archive &&
+      archived("restore", () => archive.store.recent(archive.connectionId, archive.chatId, threadKey, limit, filter));
+    if (saved) return saved;
     return this.#recent
-      .filter((entry) => threadKey === null || entry.threadKey === threadKey)
+      .filter((entry) => (threadKey === null || entry.threadKey === threadKey) && matchesHistoryFilter(entry, filter))
       .slice(-limit)
       .map(({ threadKey: _threadKey, ...entry }) => entry);
+  }
+}
+
+const ARCHIVE_FAILURES = {
+  restore: "The saved Telegram messages could not be read.",
+  save: "A Telegram message could not be saved.",
+} as const;
+
+function archived<T>(action: keyof typeof ARCHIVE_FAILURES, operation: () => T): T | null {
+  try {
+    return operation();
+  } catch (cause) {
+    logger.warn(ARCHIVE_FAILURES[action], {
+      cause: cause instanceof Error ? cause.name : "unknown",
+    });
+    return null;
   }
 }
 

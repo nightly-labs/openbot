@@ -11,6 +11,7 @@ import {
   type WorkflowMediaProvider,
   type WorkflowMediaSpecs,
   type WorkflowNode,
+  type WorkflowStepSource,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
@@ -193,6 +194,41 @@ export function agentFileInputs(
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const files = graph.edges.flatMap((edge) => (edge.to === nodeId ? edgeFile(nodes.get(edge.from), latest) : []));
   return [...new Set(files.map((file) => file.attachmentId))];
+}
+
+export interface StepRecord {
+  settings: WorkflowFields;
+  sources: WorkflowStepSource[];
+}
+
+export function stepRecord(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): StepRecord {
+  const nodes = new Map(graph.nodes.map((item) => [item.id, item]));
+  const sources = graph.edges.flatMap((edge) => {
+    if (edge.to !== node.id) return [];
+    const source = latest.get(edge.from);
+    const stepId = source && edgeActive(edge, source) ? source.id : null;
+    const attachmentId = edgeFile(nodes.get(edge.from), latest)[0]?.attachmentId ?? null;
+    return stepId === null && attachmentId === null ? [] : [{ from: edge.from, type: edge.type, stepId, attachmentId }];
+  });
+  return { settings: runtimeFields(node), sources };
+}
+
+export function usedMediaSettings(
+  kind: WorkflowMediaKind,
+  model: WorkflowMediaModel,
+  specs: WorkflowMediaSpecs,
+): WorkflowFields {
+  return {
+    model: model.id,
+    ...(specs.size ? {} : { aspect: specs.aspect }),
+    ...(kind === "image" && model.transparent ? { background: specs.transparent ? "transparent" : "solid" } : {}),
+    ...(specs.resolution ? { resolution: specs.resolution } : {}),
+    ...(kind === "video" ? { duration: specs.duration } : {}),
+  };
 }
 
 function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, StoredWorkflowStep>): MediaInput[] {

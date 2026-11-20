@@ -28,7 +28,7 @@ export function WorkflowsPage(props: { serverId: string }) {
       when={supported() ? props.serverId : null}
       keyed
       fallback={
-        <main class="window-page diagram-view diagram-flows-notice">
+        <main class="window-page workflows-notice">
           <Show when={!checking()}>
             <p>{t("error.workflow.serverTooOld")}</p>
           </Show>

@@ -294,6 +294,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "يحتفظ كل ملف تعريف بعمليات تسجيل الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة لدى الوكيل.",
   "agentSettings.browserProfile.manage": "إدارة",
+  "agentSettings.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "تعمل عملية {provider} كاملةً في بيئة معزولة، لذا تفشل الكتابة خارجها. متاح على macOS فقط.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -48,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
   "error.agent.modelUnavailable": "所选的助手模型不可用。",
   "error.agent.modelProviderNotConnected": "所选的助手模型“{model}”不可用：{provider} 未连接。",
+  "error.agent.modelProviderSignInRequired":
+    "所选的助手模型“{model}”不可用：{provider} 需要登录。请登录 {provider} 后重试。",
+  "error.agent.modelProviderNotInstalled": "所选的助手模型“{model}”不可用：{provider} 未安装。",
+  "error.agent.modelProviderOutdated": "所选的助手模型“{model}”不可用：{provider} 需要更新。",
   "error.agent.modelListEmpty": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。上次错误：{detail}",
   "error.agent.modelListEmptyNoError": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。",
   "error.agent.modelNotInProviderList": "所选的助手模型“{model}”不可用：{provider} 未列出该模型。",
@@ -108,6 +112,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteFolderLocked":
+    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启运行此助手的电脑，然后再次删除此助手。",
   "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",

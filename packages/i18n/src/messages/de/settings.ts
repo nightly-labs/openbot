@@ -59,6 +59,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro-Sonnenuntergang",
   "settings.chatBackdrop.snowfall": "Schneefall",
   "settings.chatBackdrop.fireflies": "Glühwürmchen",
+  "settings.chatBackdrop.coast": "Neonküste",
   "settings.chatBackdrop.upload": "Bild hochladen…",
   "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
   "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",
@@ -616,6 +617,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Tarif abgelaufen",
   "settings.hostedServers.state.creating": "Wird erstellt",
   "settings.hostedServers.state.starting": "Wird gestartet",
+  "settings.hostedServers.state.restoring": "Wiederherstellung",
   "settings.hostedServers.state.running": "Läuft",
   "settings.hostedServers.state.stopping": "Wird gestoppt",
   "settings.hostedServers.state.stopped": "Gestoppt",
@@ -626,6 +628,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Die Einrichtung beginnt, sobald Stripe die Zahlung bestätigt.",
   "settings.hostedServers.planEndedDescription":
     "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben erhalten. Verlängere den Tarif, um ihn zu starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben bis zum {date} erhalten. Verlängere den Tarif vorher, um ihn zu starten.",
   "settings.hostedServers.pay": "Zahlungsseite öffnen",
   "settings.hostedServers.payLabel": "Zahlungsseite für {name} öffnen",
   "settings.hostedServers.renew": "Tarif verlängern",

@@ -335,8 +335,16 @@ export function Dpa() {
         <li>
           The Controller acknowledges and authorises the engagement of Dedale AI, Corp. (operating as Boat) as a
           Sub-processor for the provision of Hosted Server Services. Boat provides the cloud infrastructure used to host
-          OpenBot server environments and store and Process associated Customer Data. Any additions or replacements of
-          Sub-processors shall be subject to the requirements set out in paragraph 4 above.
+          OpenBot server environments and store and Process associated Customer Data. The Controller also acknowledges
+          and authorises the engagement of Leaseweb Netherlands B.V. and Leaseweb USA, Inc. (together, "Leaseweb") as
+          Sub-processors for the provision of Hosted Server Services. Leaseweb provides the virtual servers in the
+          Netherlands and in the United States that host OpenBot server environments and store and Process associated
+          Customer Data. The Controller also acknowledges and authorises the engagement of Backblaze, Inc. as a
+          Sub-processor for the provision of Hosted Server Services. Where a Hosted Server subscription ends without a
+          refund, Backblaze stores an encrypted archive of the associated Customer Data in its European Union region
+          until the archive is deleted in accordance with § 11. The archive is encrypted before it is transferred to
+          Backblaze, and Backblaze does not receive the key. Any additions or replacements of Sub-processors shall be
+          subject to the requirements set out in paragraph 4 above.
         </li>
       </ol>
 
@@ -364,7 +372,7 @@ export function Dpa() {
           Upon termination of the Agreement or completion of the relevant Processing activities, the Processor shall, at
           the Controller's choice, return or delete all Personal Data Processed on behalf of the Controller and delete
           any existing copies, unless applicable European Union or Member State law requires continued storage. Where a
-          Hosted Server subscription expires without renewal, the associated Customer Data shall be retained for 30
+          Hosted Server subscription expires without renewal, the associated Customer Data shall be retained for 14
           days, unless the Controller requests its earlier deletion. If the subscription is not renewed or reactivated
           within this period, the associated Customer Data shall be deleted.
         </li>

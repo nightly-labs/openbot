@@ -8,7 +8,12 @@ import type {
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_DOCK_LIMITS, AGENT_DOCK_SIZE_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import {
+  AGENT_DOCK_LIMITS,
+  AGENT_DOCK_SIZE_LIMITS,
+  IPC_ENDPOINTS,
+  sameAgentDockDisplayBounds,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
@@ -55,6 +60,7 @@ interface DockWindow {
   rendererId: number;
   displayId: number;
   shape?: AgentDockInputRect[];
+  interactive?: boolean;
   keyboard?: boolean;
 }
 
@@ -164,8 +170,8 @@ export class AgentDockWindowController {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     const { window } = entry;
-    if (this.#options.windowKind !== "x11")
-      letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
+    entry.interactive = input.interactive;
+    if (this.#options.windowKind !== "x11") this.#letPointerThrough(entry);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !entry.keyboard && !window.isFocused()) {
@@ -186,7 +192,15 @@ export class AgentDockWindowController {
     if (!entry.shape) return;
     const rects = entry.shape.map((rect) => zoomedRect(rect, this.#zoom()));
     if (this.#options.windowKind === "x11") entry.window.setShape(rects);
-    else this.#options.pointerForwarding?.setZone(entry.window, rects);
+    if (this.#options.windowKind !== "tool") return;
+    if (rects.length > 0) entry.window.setShape(rects);
+    this.#letPointerThrough(entry);
+    if (rects.length === 0) entry.window.setShape([]);
+  }
+
+  #letPointerThrough(entry: DockWindow): void {
+    const fixedRegion = this.#options.windowKind === "tool" && (entry.shape?.length ?? 0) > 0;
+    letPointerThrough(this.#options.pointerForwarding, entry.window, !fixedRegion && entry.interactive !== true);
   }
 
   drag(rendererId: number, phase: AgentDockDragPhase): void {
@@ -214,7 +228,11 @@ export class AgentDockWindowController {
     const offset = this.#offsets.get(entry.displayId);
     const main = this.#options.getMainWindow();
     if (offset !== undefined && main && !main.isDestroyed()) {
-      sendToRenderer(main, IPC_ENDPOINTS.agentDock.moved, { displayId: entry.displayId, offset });
+      sendToRenderer(main, IPC_ENDPOINTS.agentDock.moved, {
+        displayId: entry.displayId,
+        offset,
+        ...(display && { bounds: display.bounds }),
+      });
     }
   }
 
@@ -229,12 +247,17 @@ export class AgentDockWindowController {
   }
 
   #boundsFor(display: Display): Rectangle {
-    return agentDockWindowBounds(
-      display,
-      this.#presentation?.edge ?? "right",
-      this.#offsets.get(display.id) ?? 0.5,
-      this.#zoom(),
+    return agentDockWindowBounds(display, this.#presentation?.edge ?? "right", this.#offsetFor(display), this.#zoom());
+  }
+
+  #offsetFor(display: Display): number {
+    const saved = this.#offsets.get(display.id);
+    if (saved !== undefined) return saved;
+    const connected = new Set(this.#options.screen.getAllDisplays().map(({ id }) => id));
+    const renamed = (this.#presentation?.offsets ?? []).findLast(
+      (item) => !connected.has(item.displayId) && sameAgentDockDisplayBounds(item.bounds, display.bounds),
     );
+    return renamed?.offset ?? 0.5;
   }
 
   #zoom(): number {

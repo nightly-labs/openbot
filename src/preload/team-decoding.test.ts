@@ -249,6 +249,11 @@ describe("team decoders", () => {
       decodeServer,
       { ...remoteServer, hostedSleep: "waking", hostedStart: { step: "provider_limit", startedAt: 1 } },
     ],
+    [
+      "server with a hosted restore",
+      decodeServer,
+      { ...remoteServer, hostedSleep: "waking", hostedStart: { step: "restore", startedAt: 1 } },
+    ],
     ["server with no hosted start", decodeServer, { ...remoteServer, hostedStart: null }],
     ["server on this computer", decodeServer, { ...remoteServer, thisComputer: true }],
     ["hosted server with plan storage", decodeServer, { ...remoteServer, hosted: true, storageGb: 50 }],

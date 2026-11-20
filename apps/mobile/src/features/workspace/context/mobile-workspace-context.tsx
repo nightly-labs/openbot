@@ -61,6 +61,7 @@ import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/m
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "@openbot/contracts/team-protocol/phone-feedback-v1";
@@ -172,6 +173,7 @@ import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
+import { OwnerTransferPrompts } from "@/features/workspace/components/owner-transfer-prompts";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
@@ -402,6 +404,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
+  const [directoryLoads, setDirectoryLoads] = useState(0);
   const serversRef = useRef(servers);
   serversRef.current = servers;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -667,6 +670,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           directoryLoaded.current = true;
           installHosts(hosts);
           setServerDirectoryState("ready");
+          setDirectoryLoads((count) => count + 1);
         }),
       ),
     [directory, installHosts],
@@ -875,7 +879,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
-      cachedSummaries.current.set(serverId, summaries);
+      cachedSummaries.current.set(serverId, replaceEqualDeep(cachedSummaries.current.get(serverId), summaries));
       setAgents((current) => {
         const previous = new Map(
           current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
@@ -902,9 +906,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, items: readonly SidebarPin[], change = pinChanges.current.get(serverId) ?? 0) => {
       if ((pinChanges.current.get(serverId) ?? 0) !== change) return;
       try {
-        const next = withHostSidebarPins(preferenceStore.read(serverId), items);
-        preferenceStore.write(serverId, next);
-        setPreferences((current) => ({ ...current, [serverId]: next }));
+        const saved = preferenceStore.read(serverId);
+        const next = withHostSidebarPins(saved, items);
+        if (replaceEqualDeep(saved, next) !== saved) preferenceStore.write(serverId, next);
+        setPreferences((current) => {
+          const value = replaceEqualDeep(current[serverId], next);
+          return value === current[serverId] ? current : { ...current, [serverId]: value };
+        });
       } catch {}
     },
     [preferenceStore],
@@ -1174,7 +1182,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
       context.stage = "preferences";
       const saved = preferenceStore.read(serverId);
-      setPreferences((current) => ({ ...current, [serverId]: saved }));
+      setPreferences((current) => {
+        const value = replaceEqualDeep(current[serverId], saved);
+        return value === current[serverId] ? current : { ...current, [serverId]: value };
+      });
       context.stage = "connection";
       const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
@@ -1188,7 +1199,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!context.isCurrent()) return;
         loadOpenChats(
           serverId,
-          agentsRef.current.filter((agent) => agent.serverId === serverId).map((agent) => agent.id),
+          agentsRef.current
+            .filter((agent) => agent.serverId === serverId && conversationStore.missedLatest(agent.id))
+            .map((agent) => agent.id),
           client,
           context,
         );
@@ -2432,6 +2445,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRotateServerKey: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
+        canTransferOwnership: (serverId) => {
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return server?.role === "owner" && server.hosted !== true && administers(serverId, OWNER_TRANSFER_CAPABILITY);
+        },
         canCreateLocalServers: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
@@ -2617,6 +2634,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             serversReady={serverDirectoryState === "ready"}
             agents={directoryAgents}
             preferences={visiblePreferences}
+          />
+          <OwnerTransferPrompts
+            directory={directory}
+            revision={directoryLoads}
+            active={foreground}
+            onAccepted={refreshMemberships}
           />
           <NotificationAvatarSync
             servers={servers}

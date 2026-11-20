@@ -17,6 +17,7 @@ import {
   type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
+  type WorkflowStepSettings,
   type WorkflowTriggerType,
 } from "@openbot/contracts/ipc";
 import { providerOffersModels } from "../../components/provider-model-options";
@@ -103,6 +104,7 @@ export interface WorkflowCatalogs {
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
+  stepSettings?: ((stepId: string) => Promise<WorkflowStepSettings>) | undefined;
   files: readonly StoredFileRow[];
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
   mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;

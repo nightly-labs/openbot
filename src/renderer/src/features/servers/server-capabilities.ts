@@ -109,8 +109,6 @@ export function serverSupportsCapability(
       capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
-      capability === "routine-flows-v1" ||
-      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
@@ -161,6 +159,7 @@ export function serverSupportsCapability(
       capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
+      capability === "owner-transfer-v1" ||
       capability === "provider-detection-v1") &&
     server?.kind === "remote"
   ) {

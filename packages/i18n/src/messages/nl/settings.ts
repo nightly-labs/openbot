@@ -58,6 +58,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro zonsondergang",
   "settings.chatBackdrop.snowfall": "Sneeuwval",
   "settings.chatBackdrop.fireflies": "Vuurvliegjes",
+  "settings.chatBackdrop.coast": "Neonkust",
   "settings.chatBackdrop.upload": "Afbeelding uploaden…",
   "settings.chatBackdrop.uploadRefused": "Gebruik een PNG-, JPEG-, GIF-, WebP- of AVIF-afbeelding van maximaal 20 MB.",
   "settings.chatBackdrop.saveFailed": "De achtergrond is niet opgeslagen.",
@@ -606,6 +607,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Abonnement beëindigd",
   "settings.hostedServers.state.creating": "Wordt gemaakt",
   "settings.hostedServers.state.starting": "Wordt gestart",
+  "settings.hostedServers.state.restoring": "Gegevens herstellen",
   "settings.hostedServers.state.running": "Actief",
   "settings.hostedServers.state.stopping": "Wordt gestopt",
   "settings.hostedServers.state.stopped": "Gestopt",
@@ -616,6 +618,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "De installatie begint wanneer Stripe de betaling bevestigt.",
   "settings.hostedServers.planEndedDescription":
     "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard. Verleng het abonnement om hem te starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard tot {date}. Verleng het abonnement vóór die datum om hem te starten.",
   "settings.hostedServers.pay": "Open betaalpagina",
   "settings.hostedServers.payLabel": "Open betaalpagina voor {name}",
   "settings.hostedServers.renew": "Verleng abonnement",

@@ -7,6 +7,7 @@ import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "
 import type {
   AgentEvent,
   AgentImportPreview,
+  AgentRuntimeSnapshot,
   AttachmentDownloadProgress,
   AttachmentImportProgress,
   AvatarImageInput,
@@ -207,6 +208,7 @@ interface RemoteServerEvents {
   directoryInvalidated: [];
   changed: [servers: ServerSummary[]];
   agent: [serverId: string, event: AgentEvent, bufferedLive?: boolean];
+  receivedRuntimeSnapshot: [serverId: string, snapshot: AgentRuntimeSnapshot];
   presence: [serverId: string, snapshot: TeamPresenceSnapshot];
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
@@ -405,6 +407,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#refresh = new RemoteEventRefresh({
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       hasServer: (serverId) => this.#store.has(serverId),
+      onReceivedRuntimeSnapshot: (serverId, snapshot) => this.emit("receivedRuntimeSnapshot", serverId, snapshot),
       onMemberChatColors: (serverId) => {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },

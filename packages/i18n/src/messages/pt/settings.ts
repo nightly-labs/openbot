@@ -59,6 +59,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Pôr do sol retrô",
   "settings.chatBackdrop.snowfall": "Neve caindo",
   "settings.chatBackdrop.fireflies": "Vaga-lumes",
+  "settings.chatBackdrop.coast": "Costa neon",
   "settings.chatBackdrop.upload": "Enviar imagem…",
   "settings.chatBackdrop.uploadRefused": "Use uma imagem PNG, JPEG, GIF, WebP ou AVIF de até 20 MB.",
   "settings.chatBackdrop.saveFailed": "O fundo não foi salvo.",
@@ -607,6 +608,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plano encerrado",
   "settings.hostedServers.state.creating": "Criando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando dados",
   "settings.hostedServers.state.running": "Em execução",
   "settings.hostedServers.state.stopping": "Parando",
   "settings.hostedServers.state.stopped": "Parado",
@@ -617,6 +619,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "A configuração começa quando a Stripe confirma o pagamento.",
   "settings.hostedServers.planEndedDescription":
     "O plano terminou, então o servidor parou. Seus dados são mantidos. Renove o plano para iniciá-lo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "O plano terminou, então o servidor parou. Seus dados são mantidos até {date}. Renove o plano antes disso para iniciá-lo.",
   "settings.hostedServers.pay": "Abrir página de pagamento",
   "settings.hostedServers.payLabel": "Abrir página de pagamento de {name}",
   "settings.hostedServers.renew": "Renovar plano",

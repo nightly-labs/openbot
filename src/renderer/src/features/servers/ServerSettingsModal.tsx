@@ -92,6 +92,7 @@ import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { createServerMemorySection } from "./ServerMemorySection";
+import { createServerOwnerTransferSection, type OwnerTransferCalls } from "./ServerOwnerTransferSection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
@@ -122,6 +123,7 @@ export interface ServerSettingsModalProps {
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   companySignIn?: CompanySignInCalls | undefined;
+  ownerTransfer?: OwnerTransferCalls | undefined;
   onDownloadDesktopApp?: (() => void) | undefined;
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -249,6 +251,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.companySignIn.title",
     "server.companySignIn.sso",
     "server.companySignIn.scim",
+    "server.ownerTransfer.title",
   ],
   storage: ["settings.backgroundProcesses.title"],
   experimental: ["server.settings.experimentalCrm"],
@@ -485,6 +488,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     () => props.onDownloadDesktopApp,
     () => props.open && section() === "members",
   );
+  const ownerTransfer = createServerOwnerTransferSection(
+    host,
+    () => props.ownerTransfer,
+    () => props.open && section() === "members",
+  );
   const hostedSites = createSettingsHostedSitesStore(
     {
       get open() {
@@ -536,6 +544,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         general.resetForServer();
         members.resetForServer();
         companySignIn.resetForServer();
+        ownerTransfer.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
         agents.resetForServer();
@@ -792,6 +801,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
           <companySignIn.Panel />
+          <ownerTransfer.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">
@@ -958,6 +968,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       </SettingsDialogShell>
 
       <members.ConfirmDialogs />
+      <ownerTransfer.Dialogs />
       <general.LeaveDialog />
       <general.RotateKeyDialog />
     </Tabs.Root>

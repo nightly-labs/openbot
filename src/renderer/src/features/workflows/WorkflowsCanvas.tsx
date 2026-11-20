@@ -182,6 +182,9 @@ export function WorkflowsCanvas(props: {
     get agentFiles() {
       return props.host.agentFilesSupported();
     },
+    get stepSettings() {
+      return props.host.stepSettingsSupported() ? props.host.workflows.stepSettings : undefined;
+    },
     get media() {
       return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
     },

@@ -24,6 +24,12 @@ export interface BillingEntitlement {
   hosted: boolean;
 }
 
+export function subscriptionPaysForOwnerSql(subscription: string, owner: string): string {
+  return `(${subscription}.user_id = ${owner} OR EXISTS(SELECT 1 FROM remote_owner_transfers paid_transfer
+    WHERE paid_transfer.host_id = ${subscription}.server_id AND paid_transfer.from_user_id = ${subscription}.user_id
+      AND paid_transfer.status = 'accepted'))`;
+}
+
 export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(function* (
   database: D1Database,
   serverId: string,
@@ -35,7 +41,7 @@ export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(fu
         .prepare(
           `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
          FROM billing_subscriptions s
-       LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+       LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
        LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
        WHERE s.server_id = ? AND s.status IN ${ENTITLED_STATUSES_SQL}
          AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)
@@ -138,7 +144,7 @@ export const accountLicense = Effect.fn("Billing.accountLicense")(function* (
 export function serverPlanEntitledSql(server: string, owner: string): string {
   const plans = BILLING_PLANS.map((plan) => `'${plan.id}'`).join(", ");
   return `EXISTS (SELECT 1 FROM billing_subscriptions b
-    WHERE b.server_id = ${server} AND b.user_id = ${owner} AND b.plan IN (${plans})
+    WHERE b.server_id = ${server} AND ${subscriptionPaysForOwnerSql("b", owner)} AND b.plan IN (${plans})
       AND (b.status IN ('active', 'trialing') OR (b.status = 'past_due' AND b.current_period_end > ?)))`;
 }
 

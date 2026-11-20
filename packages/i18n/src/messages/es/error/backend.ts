@@ -309,6 +309,8 @@ export const messages = {
     "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no está disponible ahora. Espera unos minutos y luego inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} no pudo conectar con el servidor MCP {name}. Abre {name} en Marketplace, Apps, y comprueba que su dirección es correcta y que el servidor está en marcha. Luego inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} no pudo obtener las herramientas de GitHub, porque GitHub no respondió. Abre GitHub en Marketplace, Apps, y vuelve a conectarlo si te lo pide. Luego inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":

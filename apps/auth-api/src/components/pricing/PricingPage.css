@@ -35,6 +35,15 @@
   min-width: 240px;
 }
 
+.pricing-page:is(:lang(ar), :lang(he)) :is(.pricing-enterprise h2, .order-form-badge, .order-form-half h2) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.pricing-page:is(:lang(ar), :lang(he)) .order-form-badge {
+  font-family: var(--openbot-font-sans);
+}
+
 .pricing-page .pricing-cta[data-disabled],
 .pricing-page .pricing-cta[data-disabled]:hover {
   background: var(--openbot-surface-light);

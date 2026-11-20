@@ -138,6 +138,8 @@ export interface HostedServerSummary {
   createdAt: string;
   updatedAt: string;
   storageGb?: number;
+  restoring?: boolean;
+  dataKeptUntil?: number | null;
 }
 
 export interface HostedServerStatus {
@@ -145,6 +147,7 @@ export interface HostedServerStatus {
   state: HostedServerState;
   error: HostedServerError | null;
   sleeping: boolean;
+  restoring?: boolean;
 }
 
 export interface HostedServerList {
@@ -206,7 +209,13 @@ export function parseHostedServerSummary(value: unknown): HostedServerSummary | 
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     ...(isStorageGb(value.storageGb) ? { storageGb: value.storageGb } : {}),
+    ...(value.restoring === true ? { restoring: true } : {}),
+    ...(isTimestamp(value.dataKeptUntil) ? { dataKeptUntil: value.dataKeptUntil } : {}),
   };
+}
+
+function isTimestamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
 export function parseHostedServerStatus(value: unknown): HostedServerStatus | null {
@@ -222,7 +231,13 @@ export function parseHostedServerStatus(value: unknown): HostedServerStatus | nu
   const state: HostedServerState = isHostedServerState(value.state) ? value.state : "error";
   const error: HostedServerError | null =
     state !== value.state ? "provider_error" : isOneOf(HOSTED_SERVER_ERRORS, value.error) ? value.error : null;
-  return { serverId: value.serverId, state, error, sleeping: value.sleeping };
+  return {
+    serverId: value.serverId,
+    state,
+    error,
+    sleeping: value.sleeping,
+    ...(value.restoring === true ? { restoring: true } : {}),
+  };
 }
 
 export function parseHostedServerList(value: unknown): HostedServerList | null {

@@ -10,6 +10,14 @@ import {
   selfHostedApiOrigin,
 } from "@openbot/contracts/invite-links";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
+import {
+  type AcceptedOwnerTransfer,
+  decodeAcceptedOwnerTransfer,
+  decodeIncomingOwnerTransfers,
+  decodeOwnerTransfer,
+  decodePendingOwnerTransfer,
+  type OwnerTransfer,
+} from "@openbot/contracts/owner-transfer";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
@@ -356,6 +364,53 @@ export class RemoteTeamDirectoryClient {
           method: "DELETE",
         },
       );
+    });
+  }
+
+  pendingOwnerTransfer(hostId: string): Effect.Effect<OwnerTransfer | null, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnerTransfer | null, DirectoryFailure> {
+      const value = yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`);
+      return yield* directoryDecode(() => decodePendingOwnerTransfer(value));
+    });
+  }
+
+  startOwnerTransfer(hostId: string, email: string): Effect.Effect<OwnerTransfer, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnerTransfer, DirectoryFailure> {
+      const value = yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`, {
+        method: "POST",
+        body: { email },
+      });
+      return yield* directoryDecode(() => decodeOwnerTransfer(value));
+    });
+  }
+
+  cancelOwnerTransfer(hostId: string): Effect.Effect<void, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, DirectoryFailure> {
+      yield* this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`, { method: "DELETE" });
+    });
+  }
+
+  incomingOwnerTransfers(): Effect.Effect<OwnerTransfer[], DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<OwnerTransfer[], DirectoryFailure> {
+      const value = yield* this.#request("/v2/remote/owner-transfers/");
+      return yield* directoryDecode(() => decodeIncomingOwnerTransfers(value));
+    });
+  }
+
+  acceptOwnerTransfer(transferId: string): Effect.Effect<AcceptedOwnerTransfer, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<AcceptedOwnerTransfer, DirectoryFailure> {
+      const value = yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/accept`, {
+        method: "POST",
+      });
+      return yield* directoryDecode(() => decodeAcceptedOwnerTransfer(value));
+    });
+  }
+
+  declineOwnerTransfer(transferId: string): Effect.Effect<void, DirectoryFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, DirectoryFailure> {
+      yield* this.#request(`/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/decline`, {
+        method: "POST",
+      });
     });
   }
 

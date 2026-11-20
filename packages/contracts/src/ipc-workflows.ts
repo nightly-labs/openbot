@@ -697,6 +697,75 @@ export interface WorkflowStep {
   endedAt: string | null;
 }
 
+export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly string[]>> = {
+  trigger: [
+    "trigger",
+    "timezone",
+    "repositories",
+    "event",
+    "filters",
+    "labels",
+    "titleText",
+    "branch",
+    "connectionId",
+    "placeId",
+    "roles",
+    "text",
+  ],
+  agent: ["agentId", "task"],
+  llm: ["provider", "model", "effort", "prompt", "system"],
+  condition: ["rule", "provider", "model", "effort"],
+  approval: ["question"],
+  output: [
+    "target",
+    "connectionId",
+    "placeId",
+    "channelId",
+    "repository",
+    "item",
+    "action",
+    "labels",
+    "labelsFrom",
+    "person",
+    "reason",
+    "title",
+    "emoji",
+  ],
+  prompt: ["text"],
+  text: ["text"],
+  note: ["text"],
+  shape: ["text"],
+  asset: ["fileId"],
+  image: [
+    "media",
+    "model",
+    "account",
+    "prompt",
+    "aspect",
+    "width",
+    "height",
+    "background",
+    "duration",
+    "resolution",
+    "firstFrame",
+    "lastFrame",
+    "voice",
+    "options",
+  ],
+};
+
+export interface WorkflowStepSource {
+  from: string;
+  type: WorkflowPortType;
+  stepId: string | null;
+  attachmentId: string | null;
+}
+
+export interface WorkflowStepSettings {
+  settings: WorkflowFields | null;
+  sources: WorkflowStepSource[] | null;
+}
+
 export interface WorkflowRunDetail {
   run: WorkflowRun;
   steps: WorkflowStep[];
@@ -964,6 +1033,28 @@ export function isWorkflowStep(value: unknown): value is WorkflowStep {
     isNullableString(value.error) &&
     isNullableString(value.startedAt) &&
     isNullableString(value.endedAt)
+  );
+}
+
+export function isWorkflowFields(value: unknown): value is WorkflowFields {
+  return isFields(value);
+}
+
+export function isWorkflowStepSource(value: unknown): value is WorkflowStepSource {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.from) &&
+    isOneOf(WORKFLOW_PORT_TYPES, value.type) &&
+    (value.stepId === null || isIdentifier(value.stepId)) &&
+    (value.attachmentId === null || isIdentifier(value.attachmentId))
+  );
+}
+
+export function isWorkflowStepSettings(value: unknown): value is WorkflowStepSettings {
+  return (
+    isDynamicRecord(value) &&
+    (value.settings === null || isWorkflowFields(value.settings)) &&
+    (value.sources === null || (Array.isArray(value.sources) && value.sources.every(isWorkflowStepSource)))
   );
 }
 

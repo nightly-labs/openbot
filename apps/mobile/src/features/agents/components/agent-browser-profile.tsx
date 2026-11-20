@@ -71,6 +71,7 @@ export function AgentBrowserProfileScreen() {
   const list = useServerBrowserProfiles(serverId);
   const [pending, setPending] = useState<AgentBrowserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [moved, setMoved] = useState(false);
   const current = agentProfile.query.data;
   const profiles = list.profiles;
   if (!agentProfile.available || !current || !profiles)
@@ -98,6 +99,7 @@ export function AgentBrowserProfileScreen() {
       .choose(next)
       .then(() => {
         void haptics.notification("success");
+        setMoved(true);
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
@@ -144,6 +146,11 @@ export function AgentBrowserProfileScreen() {
           );
         })}
       </SettingsSection>
+      {moved ? (
+        <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="px-4 text-warning-text">
+          {t("mobile.agent.browserProfile.movedNote")}
+        </Typography.Paragraph>
+      ) : null}
       <SettingsSection>
         {profiles.length < BROWSER_PROFILE_LIMIT ? (
           <SettingsRow

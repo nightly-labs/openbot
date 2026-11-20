@@ -7,7 +7,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
-import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
 import { HelpMenu } from "@openbot/ui/features/updates/HelpMenu";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
@@ -145,6 +144,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
     agentFilesSupported: () => true,
+    stepSettingsSupported: () => true,
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,
@@ -181,18 +181,17 @@ export function WorkflowStory(props: {
 const usageRows = accountUsageProviderRows(null);
 
 function WorkflowAppWindow(props: { children: JSX.Element }) {
-  const [page, setPage] = createSignal<PageRailPage | null>("routines");
-  const [view, setView] = createSignal<SidebarView>("routines");
+  const [page, setPage] = createSignal<PageRailPage | null>("workflows");
   return (
     <div class="app-window wfn-app">
       <PageRail
         hidden={false}
         current={page()}
-        pinned={["routines", "workflows", "usage"]}
+        pinned={["workflows", "usage"]}
         onPinChange={fn()}
         usageRows={usageRows}
         onAgents={() => setPage("agents")}
-        onRoutines={() => setPage("routines")}
+        onWorkflows={() => setPage("workflows")}
         onSchedule={() => setPage("schedule")}
         onUsage={() => setPage("usage")}
         onMarketplace={fn()}
@@ -247,8 +246,6 @@ function WorkflowAppWindow(props: { children: JSX.Element }) {
           channels={[]}
           onSelectChannel={fn()}
           onCreateChannel={fn()}
-          view={view()}
-          onViewChange={setView}
         />
         <div class="window-page wfn-app-pane">{props.children}</div>
       </div>

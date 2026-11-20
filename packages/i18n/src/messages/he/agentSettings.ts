@@ -242,6 +242,7 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
   "agentSettings.browserProfile.manage": "ניהול",
+  "agentSettings.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "כל התהליך של {provider} פועל בארגז חול, ולכן כתיבה בחוץ נכשלת. זמין רק ב-macOS.",
 } as const satisfies PartialTranslation<typeof source>;

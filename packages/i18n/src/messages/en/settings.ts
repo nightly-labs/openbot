@@ -55,6 +55,7 @@ export const messages = defineMessages("settings", {
   "settings.chatBackdrop.sunset": "Retro sunset",
   "settings.chatBackdrop.snowfall": "Snowfall",
   "settings.chatBackdrop.fireflies": "Fireflies",
+  "settings.chatBackdrop.coast": "Neon coast",
   "settings.chatBackdrop.upload": "Upload image…",
   "settings.chatBackdrop.uploadRefused": "Use a PNG, JPEG, GIF, WebP or AVIF image of 20 MB or less.",
   "settings.chatBackdrop.saveFailed": "The backdrop was not saved.",
@@ -594,6 +595,7 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.state.planEnded": "Plan ended",
   "settings.hostedServers.state.creating": "Creating",
   "settings.hostedServers.state.starting": "Starting",
+  "settings.hostedServers.state.restoring": "Restoring data",
   "settings.hostedServers.state.running": "Running",
   "settings.hostedServers.state.stopping": "Stopping",
   "settings.hostedServers.state.stopped": "Stopped",
@@ -604,6 +606,8 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.paymentDescription": "The setup starts when Stripe confirms the payment.",
   "settings.hostedServers.planEndedDescription":
     "The plan ended, so the server stopped. Its data stays. Renew the plan to start it.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "The plan ended, so the server stopped. Its data is kept until {date}. Renew the plan before then to start it.",
   "settings.hostedServers.pay": "Open payment page",
   "settings.hostedServers.payLabel": "Open payment page for {name}",
   "settings.hostedServers.renew": "Renew plan",

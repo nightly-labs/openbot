@@ -5,8 +5,10 @@ browser data, and team data stay on the computer that runs OpenBot. The one exce
 encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
 The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
-configuration, memberships, invitations, logical sessions, and the account's product analytics
-answer.
+configuration, memberships, invitations, ownership transfers, logical sessions, and the account's
+product analytics answer. An ownership transfer keeps the server, the email that the owner entered
+and the two accounts, also after it ends, so that a server plan of the earlier owner still counts
+for the server.
 
 The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
 and attachment data travel through the existing encrypted host connection, not through the
@@ -92,8 +94,8 @@ profile of your account ID, as the apps do at sign-in. It does this also when pr
 off on your devices, so that the paid account is not anonymous in the sales data. The email is not
 copied into the events.
 
-For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
+For each email that the account service sends from its mailbox (a sign-in code, an invitation, an
+ownership transfer, a contact message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -218,7 +220,8 @@ without account credentials. The phone sends no request to a plugin vendor until
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
-counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+connection step times, the kind of connection path (direct or relayed, and UDP, TCP or TLS), whether
+the phone uses a VPN or a proxy app (never its name or an address), counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
 Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
@@ -569,7 +572,21 @@ find the server in the Leaseweb portal, the operator gives it a reference in Lea
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
 delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
-its reference to `pool-free`.
+its reference to `pool`.
+
+When the plan of a server on a virtual server ends with no refund, an operator moves the server's
+disk into an archive, so that the virtual server can take a new server. This occurs within a day
+after the plan ends, or 3 to 4 days after it when the last payment failed. The virtual server
+encrypts the archive with a new key before it sends it, and sends it straight to
+[Backblaze B2](https://www.backblaze.com) in the EU (the Netherlands), also from a virtual server in the United States. Backblaze
+stores the encrypted archive and has no key to read it. When Backblaze has all of the archive, the
+operator reinstalls the virtual server, which erases its disk. The account service stores the
+archive key, encrypted with a key that only the account service has, and the server ID, size,
+checksum and Backblaze name of the archive, with its times. When you renew the plan, the server
+gets its data back from the archive. The operator deletes the archive and the key within a day
+after 14 days from the end of the plan, after you delete the server or your account, or after the
+plan is cancelled with a refund. Backblaze deletes each archive by itself 16 days after it was
+made. The account service keeps the other values of the archive with the server record.
 
 ## Central data retention
 
@@ -1185,6 +1202,11 @@ Network traffic can also occur when:
 - the local Claude Agent SDK connects to Anthropic through Claude CLI;
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
+- a user clicks a web link in a chat of the desktop app or the web client, and it opens in the
+  system browser or a new browser tab. OpenBot adds `utm_source=openbot` to the address, so the
+  site can see that the visit came from OpenBot. It adds nothing else. It does not change a link that already has a `utm_source`,
+  a link to a local or private address, or a link with sign-in or signature values such as `state`,
+  `code`, `token` or `X-Amz-Signature`;
 - a locally installed Codex plugin connects to its service;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
@@ -1637,18 +1659,19 @@ short-lived signed addresses, in transit only.
   database holds the chat name and IDs, which agent is the Telegram Orchestrator, and one row per
   conversation that an agent answers. The messages of that conversation are kept as a conversation
   of that agent, with the Telegram name of each author, and files people send are kept with the
-  agent's attachments. The names of authors and the last messages of a chat are also kept in memory
-  for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
-  Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
-  memories; deleting an agent removes its conversations.
+  agent's attachments. The names of authors are also kept in memory for context, until OpenBot
+  quits. The messages of the chat that OpenBot sees, also those that do not address it, are kept in
+  the database for 90 days after they arrive, with the names of their files, so that an agent can
+  read them after a restart. Workspace memories are kept for each chat, as for Slack.
+  Disconnect makes the bot leave the chat, unlinks it, deletes the saved messages and keeps the
+  conversations and the workspace memories; deleting an agent removes its conversations.
 - **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
   agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
-  run instead; see [Workflows](#workflows). The other messages of a group stay in the
-  computer's memory until OpenBot quits, and an agent can read the last of them with its history
-  tool, as for Slack.
+  run instead; see [Workflows](#workflows). The other messages of a group are saved on the
+  host as above, and an agent can read the last of them with its history tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.

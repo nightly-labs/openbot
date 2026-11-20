@@ -44,8 +44,6 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
@@ -60,10 +58,8 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -95,6 +91,7 @@ import {
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -188,11 +185,6 @@ import {
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_MODEL_SOURCE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-model-source-v1";
-import {
-  ROUTINE_FLOW_STOP_CAPABILITY,
-  ROUTINE_FLOW_STOP_ROUTES,
-} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   decodeServerSafeModeReason,
@@ -265,10 +257,7 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  type TeamRoutineFlowsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
-  teamRoutineFlowsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -324,6 +313,15 @@ type WebMessageDelete =
 
 type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
 
+interface WebOwnerTransfers {
+  pending(hostId: string): Promise<OwnerTransfer | null>;
+  start(hostId: string, email: string): Promise<OwnerTransfer>;
+  cancel(hostId: string): Promise<void>;
+  incoming(): Promise<OwnerTransfer[]>;
+  accept(transferId: string): Promise<AcceptedOwnerTransfer>;
+  decline(transferId: string): Promise<void>;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   hosts?: WebHostConnections;
@@ -351,6 +349,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
@@ -398,9 +397,6 @@ export interface WebWorkspaceRuntime {
   sharedFile(path: string): Promise<WebFile>;
   workspaceFile(agentId: string, path: string): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  routineFlows?: TeamRoutineFlowsApi;
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
   listAgentColors?: () => Promise<AgentColors>;
@@ -960,20 +956,6 @@ export function createWebWorkspaceRuntime(
       });
     return listed;
   }
-  async function routineFlowsRequest<T>(
-    method: string,
-    path: string,
-    decode: (value: unknown) => T,
-    body?: TeamProtocolV2Json,
-  ): Promise<T> {
-    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
-    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
-    return teamApi(method, path, decode, body);
-  }
-  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -1291,6 +1273,14 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    ownerTransfers: {
+      pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
+      start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
+      cancel: (hostId) => runTeamEffect(directory.cancelOwnerTransfer(hostId)),
+      incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
+      accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
+      decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+    },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
         method: "DELETE",
@@ -1585,9 +1575,6 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    routineFlows,
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),

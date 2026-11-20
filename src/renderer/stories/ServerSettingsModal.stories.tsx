@@ -10,13 +10,16 @@ import {
   parseBrowserProxyAddress,
   type ServerAuditEntry,
 } from "@openbot/contracts/ipc";
+import type { OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { sourceText } from "@openbot/i18n/source";
 import { Toaster } from "@openbot/ui";
 import { createSignal, createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { ServerBrowserProfilesOptions } from "../src/features/browser/ServerBrowserProfilesPanel";
+import { OwnerTransferPrompt } from "../src/features/servers/OwnerTransferPrompt";
 import type { ServerAuditOptions } from "../src/features/servers/ServerAuditSection";
+import type { OwnerTransferCalls } from "../src/features/servers/ServerOwnerTransferSection";
 import type { ServerAgentAccessOptions } from "../src/features/servers/ServerRolesSection";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import {
@@ -619,4 +622,73 @@ export const MembersEmpty: Story = {
     members: STORY_PRESENCE.members.filter((member) => member.role === "owner"),
     invites: [],
   },
+};
+
+const STORY_OWNER_TRANSFER: OwnerTransfer = {
+  transferId: "transfer-story",
+  hostId: remoteServer.id,
+  hostName: remoteServer.name,
+  fromEmail: "person@example.com",
+  fromName: "Norbert",
+  toEmail: "ada@example.com",
+  createdAt: Date.parse("2026-11-19T10:00:00.000Z"),
+  expiresAt: Date.parse("2026-11-26T10:00:00.000Z"),
+};
+
+function storyOwnerTransfer(pending: OwnerTransfer | null): OwnerTransferCalls {
+  let transfer = pending;
+  return {
+    getOwnerTransfer: async () => transfer,
+    startOwnerTransfer: async (email) => {
+      transfer = { ...STORY_OWNER_TRANSFER, toEmail: email };
+      return transfer;
+    },
+    cancelOwnerTransfer: async () => {
+      transfer = null;
+    },
+  };
+}
+
+export const OwnerTransferStart: Story = {
+  args: {
+    server: { ...remoteServer, role: "owner" },
+    hostStatus: null,
+    initialSection: "members",
+    ownerTransfer: storyOwnerTransfer(null),
+  },
+};
+
+export const OwnerTransferPending: Story = {
+  args: {
+    server: { ...remoteServer, role: "owner" },
+    hostStatus: null,
+    initialSection: "members",
+    ownerTransfer: storyOwnerTransfer(STORY_OWNER_TRANSFER),
+  },
+};
+
+export const OwnerTransferPendingForAdministrator: Story = {
+  args: {
+    server: { ...remoteServer, role: "admin" },
+    hostStatus: null,
+    initialSection: "members",
+    ownerTransfer: storyOwnerTransfer(STORY_OWNER_TRANSFER),
+  },
+};
+
+export const OwnerTransferIncoming: Story = {
+  render: () => (
+    <>
+      <OwnerTransferPrompt
+        calls={{
+          list: async () => [STORY_OWNER_TRANSFER],
+          accept: async () => ({ hostId: STORY_OWNER_TRANSFER.hostId, hostName: STORY_OWNER_TRANSFER.hostName }),
+          decline: async () => undefined,
+        }}
+        reloadKey={0}
+        onAccepted={fn()}
+      />
+      <Toaster />
+    </>
+  ),
 };

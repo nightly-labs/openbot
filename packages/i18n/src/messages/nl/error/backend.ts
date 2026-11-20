@@ -307,6 +307,8 @@ export const messages = {
     "{provider} kon de MCP-server {name} niet starten, omdat de server nu niet beschikbaar is. Wacht een paar minuten en begin dan een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} kon de MCP-server {name} niet bereiken. Open {name} in Marktplaats, Apps, en controleer of het adres klopt en of de server draait. Begin daarna een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} kon de GitHub-tools niet ophalen, omdat GitHub niet antwoordde. Open GitHub in Marktplaats, Apps, en verbind het opnieuw als daarom wordt gevraagd. Begin daarna een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":

@@ -1,0 +1,3 @@
+### Fixed
+
+- A Gemini (Antigravity) agent now continues a long task when Google refuses its sign-in token after the agent did some steps. The Gemini server gets a new token by itself, so OpenBot runs the turn one more time on the same model and gives it the steps that it already did. Before, the task stopped with "Google did not accept the Gemini sign-in" and you had to send your message again. When the error comes again, the agent that sent the request now gets a note to send it again one time, and it does not mark the work as blocked. A joined server must also be on the new version for its agents to get this fix.

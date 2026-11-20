@@ -210,6 +210,10 @@ export const messages = {
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
   "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",
+  "error.remote.ownerTransferSelf": "Bu sunucunun sahibi zaten sizsiniz. Yeni sahibin e-posta adresini girin.",
+  "error.remote.ownerTransferHosted": "OpenBot'un barındırdığı bir sunucunun sahibi değiştirilemez.",
+  "error.remote.ownerTransferInvalid":
+    "Bu sahiplik devri artık geçerli değil. Sahibinden yeniden göndermesini isteyin.",
   "error.remote.channelsUnsupported": "Kanalları kullanmak için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",

@@ -40,6 +40,7 @@ import {
   type WorkflowRunsInput,
   type WorkflowSaveResult,
   type WorkflowStep,
+  type WorkflowStepSettings,
   type WorkflowSummary,
   type WorkflowVersion,
   type WorkflowVersionInput,
@@ -111,6 +112,7 @@ import {
 } from "./telegram-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
+import { nodeTimezone } from "./workflow-graph";
 import {
   isOpenStep,
   publicRun,
@@ -122,7 +124,12 @@ import {
   type WorkflowStepEnd,
 } from "./workflow-run-store";
 import { type WorkflowStore, WorkflowStoreError } from "./workflow-store";
-import { prepareWorkflowSchedules, type ScheduledWorkflowStart, workflowWebhookPayload } from "./workflow-triggers";
+import {
+  prepareWorkflowSchedules,
+  type ScheduledWorkflowStart,
+  workflowScheduleOutput,
+  workflowWebhookPayload,
+} from "./workflow-triggers";
 import {
   agentFileInputs,
   agentHandoffText,
@@ -142,7 +149,9 @@ import {
   nextActions,
   runScope,
   soloInputs,
+  stepRecord,
   unsupportedNode,
+  usedMediaSettings,
 } from "./workflow-walk";
 
 const logger = createOpenBotLogger("workflows");
@@ -177,6 +186,12 @@ interface WorkflowTextRequest {
 }
 
 const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+interface WorkflowTextChoice {
+  provider: AgentProvider;
+  model: string;
+  effort: AgentReasoningEffort;
+}
 
 interface WorkflowMediaRequest {
   kind: WorkflowMediaKind;
@@ -223,6 +238,9 @@ export interface WorkflowsDependencies {
   filePath?: (attachmentId: string) => Effect.Effect<string | null, { readonly cause: unknown }>;
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   generateText(request: WorkflowTextRequest): Effect.Effect<string, { readonly message: string }>;
+  chooseTextModel?: (
+    request: Omit<WorkflowTextRequest, "prompt">,
+  ) => Effect.Effect<WorkflowTextChoice, { readonly message: string }>;
   generateMedia?: (request: WorkflowMediaRequest) => Effect.Effect<string, { readonly message: string }>;
   sizePicture?: (attachmentId: string, size: WorkflowMediaSize) => Effect.Effect<string, { readonly message: string }>;
   keepPicture?: (
@@ -333,6 +351,7 @@ interface WorkflowsShape {
   decide(input: DecideWorkflowStepInput): Effect.Effect<void, WorkflowFailed>;
   runs(input: WorkflowRunsInput): Effect.Effect<WorkflowRunPage, WorkflowFailed>;
   run(runId: string): Effect.Effect<WorkflowRunDetail, WorkflowFailed>;
+  stepSettings(stepId: string): Effect.Effect<WorkflowStepSettings, WorkflowFailed>;
   workflowOf(ref: { runId: string } | { stepId: string }): Effect.Effect<WorkflowRunScope | null, WorkflowFailed>;
   sweep(): Effect.Effect<void>;
   notice(event: AgentEvent): Effect.Effect<void>;
@@ -491,7 +510,15 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
               images: images.success,
             };
-            const result = yield* generationLock.withPermit(dependencies.generateText(request)).pipe(Effect.result);
+            const chosen = Effect.gen(function* () {
+              if (!dependencies.chooseTextModel) return request;
+              const choice = yield* dependencies.chooseTextModel(request);
+              runs.recordUsedSettings(step.id, { ...choice });
+              return { ...request, ...choice };
+            });
+            const result = yield* generationLock
+              .withPermit(Effect.flatMap(chosen, (ready) => dependencies.generateText(ready)))
+              .pipe(Effect.result);
             if (Result.isFailure(result)) {
               settle(step, { status: "failed", error: result.failure.message });
             } else if (!condition) {
@@ -546,6 +573,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               : [];
             const model = workflowMediaModel(node.fields, live);
             const specs = workflowMediaSpecs(node.fields, kind, model);
+            if (model && !empty && generateMedia)
+              runs.recordUsedSettings(step.id, usedMediaSettings(kind, model, specs));
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model
@@ -943,6 +972,15 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return runs.step(step.id)?.status !== "running";
         });
 
+        const triggerOutput = (node: WorkflowNode, run: StoredWorkflowRun | null): string => {
+          if (run?.payload) return run.payload;
+          if (!run || node.fields.trigger !== "schedule") return "";
+          return workflowScheduleOutput(
+            run.scheduledFor ?? run.startedAt,
+            nodeTimezone(node) ?? dependencies.timezone(),
+          );
+        };
+
         const execute = Effect.fn("Workflows.execute")(function* (
           step: StoredWorkflowStep,
           node: WorkflowNode,
@@ -954,7 +992,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
           switch (node.kind) {
             case "trigger":
-              settle(step, { status: "done", output: run?.payload ?? "" });
+              settle(step, { status: "done", output: triggerOutput(node, run) });
               return;
             case "prompt":
               settle(step, { status: "done", output: fieldText(node, "text") });
@@ -1103,6 +1141,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     agentId: nodeAgentId(node),
                     status: action.action === "skip" ? "skipped" : "running",
                     input: action.action === "skip" ? "" : stepInput(node, run.workflowId, action.inputs),
+                    ...(action.action === "run" ? stepRecord(run.graph, node, latest) : {}),
                   },
                   now(),
                 );
@@ -1306,6 +1345,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                       agentId: earlier.agentId,
                       status: "done",
                       input: earlier.input,
+                      settings: earlier.settings,
+                      sources: earlier.sources,
                       output: earlier.output,
                       branch: earlier.branch,
                     },
@@ -1761,7 +1802,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const node = detail.graph.nodes.find((candidate) => candidate.id === input.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (unsupportedNode(node)) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
-              const inputs = soloInputs(detail.graph, node.id, runs.latestDone(input.workflowId));
+              const answered = runs.latestDone(input.workflowId);
+              const inputs = soloInputs(detail.graph, node.id, answered);
               const step = yield* attempt(() =>
                 runs.addStep(
                   {
@@ -1773,6 +1815,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     agentId: nodeAgentId(node),
                     status: "running",
                     input: stepInput(node, input.workflowId, inputs),
+                    ...stepRecord(detail.graph, node, answered),
                   },
                   now(),
                 ),
@@ -1828,6 +1871,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 run?.graph.nodes.find((candidate) => candidate.id === failed.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (run && runs.reopenRun(run.id, now())) changed(run.workflowId);
+              const graph = run?.graph ?? current;
+              const latest = run ? latestSteps(run.id) : runs.latestDone(failed.workflowId);
               const step = yield* attempt(() =>
                 runs.addStep(
                   {
@@ -1840,16 +1885,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     status: "running",
                     input:
                       node.kind === "agent"
-                        ? stepInput(
-                            node,
-                            failed.workflowId,
-                            soloInputs(
-                              run?.graph ?? current,
-                              failed.nodeId,
-                              run ? latestSteps(run.id) : runs.latestDone(failed.workflowId),
-                            ),
-                          )
+                        ? stepInput(node, failed.workflowId, soloInputs(graph, failed.nodeId, latest))
                         : failed.input,
+                    ...stepRecord(graph, node, latest),
                   },
                   now(),
                 ),
@@ -1889,6 +1927,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const found = runs.run(runId);
           if (!found) return yield* refuse("missing", sourceText("error.workflow.runMissing"));
           return yield* attempt(() => runDetail(found));
+        });
+
+        const stepSettings = Effect.fn("Workflows.stepSettings")(function* (stepId: string) {
+          const step = yield* attempt(() => runs.step(stepId));
+          if (!step) return yield* refuse("missing", sourceText("error.workflow.stepMissing"));
+          return { settings: step.settings, sources: step.sources && [...step.sources] };
         });
 
         const versionGraph = Effect.fn("Workflows.versionGraph")(function* (input: WorkflowVersionInput) {
@@ -1944,6 +1988,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           decide,
           runs: runPage,
           run,
+          stepSettings,
           workflowOf,
           sweep,
           notice,
