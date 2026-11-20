@@ -76,7 +76,7 @@ function isEffortOption(option: SessionConfigOption, categories: readonly string
 }
 
 export class AcpConfiguration {
-  #processModel: { connection: ClientSideConnection; value: string } | null = null;
+  #processModel: { connection: ClientSideConnection; value: string; params: Map<string, string> } | null = null;
   #modelSetsInFlight = 0;
   #modelSetsOverlapped = false;
   #modelSetTimedOut: ClientSideConnection | null = null;
@@ -207,7 +207,15 @@ export class AcpConfiguration {
     const listed = availableModels(probe).length > 0 && !grouped;
     const withoutEfforts =
       !!option && listed && !this.options.processWideModel && listsModelsWithoutEfforts(probe, option);
-    if (!option || (listed && !withoutEfforts)) return yield* providerSync(() => models);
+    const cursorParameterEfforts =
+      this.options.provider === "cursor" &&
+      option !== undefined &&
+      listed &&
+      !thoughtLevelOption(probe.configOptions ?? []) &&
+      !selectValues(option).every((entry) => modelIdFixesReasoning(entry.value));
+    if (!option || (listed && !withoutEfforts && !cursorParameterEfforts)) {
+      return yield* providerSync(() => speedVariants(models, probe.configOptions ?? []));
+    }
     const opening = grouped ? (listedCurrentModel(probe) ?? option.currentValue) : option.currentValue;
     const sweepEnd = Math.min(Date.now() + MODEL_REASONING_PROBE_BUDGET_MS, deadline - MODEL_REASONING_CLEANUP_MS);
     const startedAt = performance.now();
@@ -217,23 +225,58 @@ export class AcpConfiguration {
     if (this.#answeredEfforts?.connection !== connection) this.#answeredEfforts = { connection, models: new Map() };
     const answeredEfforts = this.#answeredEfforts.models;
     this.#processModel = null;
+    const listedValues = selectValues(option).map((entry) => entry.value);
     for (const model of models) {
-      const response = yield* this.#requestBeforeEffect(
-        () => connection.setSessionConfigOption({ sessionId: probe.sessionId, configId: option.id, value: model.id }),
+      const resolved = resolveListedModel(model.id, listedValues);
+      const modelOptionValue = resolved?.base ?? model.id;
+      type ConfigOptionResponse = { configOptions: SessionConfigOption[] };
+      let probeResponse: ConfigOptionResponse | null = yield* this.#requestBeforeEffect<ConfigOptionResponse>(
+        () =>
+          connection.setSessionConfigOption({
+            sessionId: probe.sessionId,
+            configId: option.id,
+            value: modelOptionValue,
+          }),
         Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
         "session/set_config_option",
       );
+      if (probeResponse && resolved && resolved.params.size > 0) {
+        for (const [configId, value] of resolved.params) {
+          if (configId === "reasoning" || configId === "effort") continue;
+          const parameterOption: SessionConfigOption | undefined = probeResponse.configOptions.find(
+            (candidate) => candidate.id === configId,
+          );
+          if (!parameterOption) continue;
+          const nextResponse: ConfigOptionResponse | null = yield* this.#requestBeforeEffect<ConfigOptionResponse>(
+            () =>
+              parameterOption.type === "boolean"
+                ? connection.setSessionConfigOption({
+                    sessionId: probe.sessionId,
+                    configId,
+                    value: value === "true",
+                    type: "boolean",
+                  })
+                : connection.setSessionConfigOption({ sessionId: probe.sessionId, configId, value }),
+            Math.min(sweepEnd, Date.now() + MODEL_REASONING_PROBE_TIMEOUT_MS),
+            "session/set_config_option",
+          );
+          if (!nextResponse) break;
+          probeResponse = nextResponse;
+        }
+      }
+      const response = probeResponse;
       if (response) {
-        selected = model.id;
+        selected = modelOptionValue;
         answered += 1;
       }
       const efforts = response
         ? reasoningFromConfig(response.configOptions, this.#effortCategories)
         : answeredEfforts.get(model.id);
       if (response && efforts) answeredEfforts.set(model.id, efforts);
-      probed.push(
-        efforts ? { ...model, ...efforts } : withoutEfforts ? model : { ...model, reasoningEffortConfigurable: true },
-      );
+      const options = response?.configOptions ?? (withoutEfforts ? probe.configOptions : undefined) ?? [];
+      if (efforts) probed.push(...expandSpeed({ ...model, ...efforts }, options));
+      else if (withoutEfforts) probed.push(...expandSpeed(model, options));
+      else probed.push({ ...model, reasoningEffortConfigurable: true });
     }
     if (selected !== opening) {
       yield* this.#requestBeforeEffect(
@@ -266,8 +309,20 @@ export class AcpConfiguration {
     models: AcpModel[],
     requireModel = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const modelOption = thread.configOptions.find(
+      (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
+        candidate.category === "model" && candidate.type === "select",
+    );
+    const resolved =
+      model && modelOption
+        ? resolveListedModel(
+            model,
+            selectValues(modelOption).map((entry) => entry.value),
+          )
+        : null;
+    const modelValue = resolved?.base ?? model;
     for (const [category, value] of [
-      ["model", model],
+      ["model", modelValue],
       ["thought_level", effort],
     ] as const) {
       if (!value) continue;
@@ -279,7 +334,7 @@ export class AcpConfiguration {
             yield* this.#timed("session/set_model", () =>
               this.#connection(thread).request("session/set_model", {
                 sessionId: thread.id,
-                modelId: thread.currentModelId,
+                modelId: resolved?.base ?? thread.currentModelId,
                 _meta: { reasoningEffort: currentModel.reasoningEffortWireValues.get(effort) ?? effort },
               }),
             );
@@ -387,7 +442,7 @@ export class AcpConfiguration {
       const processWide = category === "model" && this.options.processWideModel === true;
       if (processWide) {
         if (this.#processModel?.connection === connection && this.#processModel.value === selected) {
-          thread.currentModelId = selected;
+          thread.currentModelId = model ?? selected;
           thread.configOptions = thread.configOptions.map((entry) =>
             entry === option ? { ...option, currentValue: selected } : entry,
           );
@@ -409,7 +464,7 @@ export class AcpConfiguration {
             Effect.tap(() =>
               Effect.sync(() => {
                 if (!this.#modelSetsOverlapped && this.#modelSetTimedOut !== connection) {
-                  this.#processModel = { connection, value: selected };
+                  this.#processModel = { connection, value: selected, params: new Map() };
                 }
               }),
             ),
@@ -432,8 +487,76 @@ export class AcpConfiguration {
           )
         : yield* this.#confirmingSet(thread, option.id, request);
       thread.configOptions = response.configOptions;
-      if (category === "model") thread.currentModelId = selected;
+      if (category === "model") thread.currentModelId = model ?? selected;
     }
+    if (resolved) {
+      for (const [id, value] of resolved.params) {
+        if (id === "reasoning" || id === "effort") continue;
+        yield* this.#applyModelParameter(thread, id, value);
+      }
+    }
+    yield* this.#applyCursorReasoningParameter(thread, model, effort, models);
+  });
+
+  readonly #applyCursorReasoningParameter = Effect.fn("AcpConfiguration.applyCursorReasoningParameter")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+    model: string | null,
+    effort: string | null,
+    models: AcpModel[],
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (this.options.provider !== "cursor" || !model || !effort) return;
+    if (thoughtLevelOption(thread.configOptions)) return;
+    const row = models.find((candidate) => candidate.id === model);
+    if (!row?.reasoningEffortConfigurable) return;
+    const listed = listedEffort(effort, (level) => row.reasoningEffortWireValues.has(level));
+    const wire = listed ? row.reasoningEffortWireValues.get(listed) : undefined;
+    if (!wire) return;
+    yield* this.#applyModelParameter(thread, "reasoning", wire);
+    yield* this.#applyModelParameter(thread, "effort", wire);
+  });
+
+  #rememberParameter(connection: ClientSideConnection, configId: string, value: string): void {
+    if (this.options.processWideModel !== true || this.#processModel?.connection !== connection) return;
+    this.#processModel.params.set(configId, value);
+  }
+
+  readonly #applyModelParameter = Effect.fn("AcpConfiguration.applyModelParameter")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+    configId: string,
+    value: string,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const option = thread.configOptions.find((candidate) => candidate.id === configId);
+    if (!option) return;
+    const connection = yield* providerSync(() => this.#connection(thread));
+    const applied =
+      this.options.processWideModel === true && this.#processModel?.connection === connection
+        ? this.#processModel.params.get(configId)
+        : undefined;
+    if (option.type === "boolean") {
+      const flag = value === "true";
+      if (applied !== undefined ? applied === value : option.currentValue === flag) return;
+      const response = yield* this.#timed("session/set_config_option", () =>
+        this.#connection(thread).setSessionConfigOption({
+          sessionId: thread.id,
+          configId,
+          value: flag,
+          type: "boolean",
+        }),
+      );
+      thread.configOptions = response.configOptions;
+      this.#rememberParameter(connection, configId, value);
+      return;
+    }
+    if (option.type !== "select") return;
+    if (!selectValues(option).some((entry) => entry.value === value)) return;
+    if (applied !== undefined ? applied === value : option.currentValue === value) return;
+    const response = yield* this.#timed("session/set_config_option", () =>
+      this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
+    );
+    thread.configOptions = response.configOptions;
+    this.#rememberParameter(connection, configId, value);
   });
 
   readonly set = Effect.fn("AcpConfiguration.set")(function* (
@@ -531,7 +654,15 @@ function isAdditionalSetting(option: SessionConfigOption, effortCategories: read
   const category = option.category?.toLowerCase();
   if (
     [category, option.id.toLowerCase()].some(
-      (value) => value === "model" || value === "thought_level" || value === "mode",
+      (value) =>
+        value === "model" ||
+        value === "thought_level" ||
+        value === "mode" ||
+        value === "fast" ||
+        value === "context" ||
+        value === "thinking" ||
+        value === "reasoning" ||
+        value === "effort",
     )
   )
     return false;
@@ -643,6 +774,15 @@ function modelsFromConfig(options: SessionConfigOption[], effortCategories: read
   }));
 }
 
+function selectOption(
+  options: readonly SessionConfigOption[],
+  match: (option: SessionConfigOption) => boolean,
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return options.find(
+    (option): option is Extract<SessionConfigOption, { type: "select" }> => option.type === "select" && match(option),
+  );
+}
+
 function reasoningFromConfig(
   options: SessionConfigOption[],
   effortCategories: readonly string[],
@@ -650,17 +790,20 @@ function reasoningFromConfig(
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
 > {
-  const thought = options.find((option) => isEffortOption(option, effortCategories));
+  const selected =
+    thoughtLevelOption(options) ??
+    selectOption(options, (option) => isEffortOption(option, effortCategories)) ??
+    selectOption(options, (option) => option.id === "reasoning") ??
+    selectOption(options, (option) => option.id === "effort");
   const wireValues = reasoningEffortWireValues(
-    thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
+    selected ? selectValues(selected).map((option) => option.value) : ["medium"],
   );
   const supported = [...wireValues.keys()];
-  const currentEffort =
-    thought && thought.type === "select" ? (normalizeEffort(thought.currentValue) ?? "medium") : "medium";
+  const currentEffort = selected ? (normalizeEffort(selected.currentValue) ?? "medium") : "medium";
   return {
     defaultReasoningEffort: supported.includes(currentEffort) ? currentEffort : (supported[0] ?? "medium"),
     supportedReasoningEfforts: supported.length > 0 ? supported : ["medium"],
-    reasoningEffortConfigurable: thought?.type === "select" && supported.length > 0,
+    reasoningEffortConfigurable: selected !== undefined && supported.length > 0,
     reasoningEffortWireValues: wireValues.size > 0 ? wireValues : new Map([["medium", "medium"]]),
   };
 }
@@ -692,6 +835,20 @@ function groupedModelOption(response: SessionSetupResponse): Extract<SessionConf
   const values = new Set(selectValues(option).map((entry) => entry.value));
   const ids = new Set(listed.map((model) => model.id));
   return values.size === ids.size && [...values].every((value) => ids.has(value)) ? null : option;
+}
+
+function thoughtLevelOption(
+  options: readonly SessionConfigOption[],
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return options.find(
+    (option): option is Extract<SessionConfigOption, { type: "select" }> =>
+      option.type === "select" && option.category === "thought_level",
+  );
+}
+
+function modelIdFixesReasoning(id: string): boolean {
+  const params = parseModelParameters(id)?.params;
+  return params?.has("reasoning") === true || params?.has("effort") === true;
 }
 
 function listsModelsWithoutEfforts(
@@ -757,6 +914,76 @@ function availableModels(response: SessionSetupResponse): Array<{
 
 function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) {
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
+}
+
+const SPEED_PARAMETER_ORDER = ["context", "thinking", "fast"] as const;
+
+function speedVariants(models: readonly AcpModel[], options: readonly SessionConfigOption[]): AcpModel[] {
+  return models.flatMap((model) => expandSpeed(model, options));
+}
+
+function expandSpeed(model: AcpModel, options: readonly SessionConfigOption[]): AcpModel[] {
+  const fast = parameterValues(options, "fast");
+  if (!fast.includes("true") || !fast.includes("false")) return [model];
+  const choices = SPEED_PARAMETER_ORDER.flatMap((id) => {
+    const values = parameterValues(options, id);
+    return values.length > 1 ? [{ id, values }] : [];
+  });
+  const parsed = parseModelParameters(model.id);
+  const base = parsed?.base ?? model.id;
+  const kept = new Map(parsed?.params ?? []);
+  kept.delete("reasoning");
+  kept.delete("effort");
+  let rows = [kept];
+  for (const choice of choices) {
+    rows = rows.flatMap((row) => choice.values.map((value) => new Map(row).set(choice.id, value)));
+  }
+  const seen = new Set<string>();
+  return rows.flatMap((params) => {
+    const id = formatModelParameters(base, params);
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ ...model, id }];
+  });
+}
+
+function parameterValues(options: readonly SessionConfigOption[], id: string): string[] {
+  const option = options.find((candidate) => candidate.id === id);
+  if (!option) return [];
+  if (option.type === "boolean") return ["false", "true"];
+  if (option.type !== "select") return [];
+  return [...new Set(selectValues(option).map((entry) => entry.value))];
+}
+
+function parseModelParameters(value: string): { base: string; params: Map<string, string> } | null {
+  const open = value.indexOf("[");
+  if (open <= 0 || !value.endsWith("]")) return null;
+  const params = new Map<string, string>();
+  for (const pair of value.slice(open + 1, -1).split(",")) {
+    if (!pair) continue;
+    const separator = pair.indexOf("=");
+    if (separator <= 0) return null;
+    params.set(pair.slice(0, separator), pair.slice(separator + 1));
+  }
+  return { base: value.slice(0, open), params };
+}
+
+function formatModelParameters(base: string, params: ReadonlyMap<string, string>): string {
+  const parts = SPEED_PARAMETER_ORDER.flatMap((key) => {
+    const value = params.get(key);
+    return value === undefined ? [] : [`${key}=${value}`];
+  });
+  return parts.length > 0 ? `${base}[${parts.join(",")}]` : base;
+}
+
+function resolveListedModel(
+  value: string,
+  listed: readonly string[],
+): { base: string; params: Map<string, string> } | null {
+  if (listed.includes(value)) return { base: value, params: new Map() };
+  const parsed = parseModelParameters(value);
+  if (!parsed || !listed.includes(parsed.base)) return null;
+  return parsed;
 }
 
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
