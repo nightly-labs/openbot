@@ -831,7 +831,7 @@ export function LibraryPage(props: LibraryPageProps) {
   }
 
   function stripUrl(image: AttachmentSummary): string | null {
-    const file = files().find((candidate) => candidate.id === image.id);
+    const file = fileById().get(image.id);
     return file ? pictureUrl(file) : image.previewUrl;
   }
 

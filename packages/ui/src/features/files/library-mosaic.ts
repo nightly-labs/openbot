@@ -2,9 +2,8 @@ import { onCleanup } from "solid-js";
 
 const TILE_ROWS = "--library-tile-rows";
 
-function fitTile(tile: HTMLElement, height: number): void {
-  const gap = Number.parseFloat(getComputedStyle(tile).marginBottom) || 0;
-  tile.style.setProperty(TILE_ROWS, String(Math.max(1, Math.ceil(height + gap))));
+function tileGap(tile: Element): number {
+  return Number.parseFloat(getComputedStyle(tile).marginBottom) || 0;
 }
 
 export function createLibraryMosaic() {
@@ -12,9 +11,13 @@ export function createLibraryMosaic() {
     typeof ResizeObserver === "undefined"
       ? undefined
       : new ResizeObserver((entries) => {
+          const first = entries[0];
+          if (!first) return;
+          const gap = tileGap(first.target);
           for (const entry of entries) {
             if (!(entry.target instanceof HTMLElement)) continue;
-            fitTile(entry.target, entry.borderBoxSize[0]?.blockSize ?? entry.target.offsetHeight);
+            const height = entry.borderBoxSize[0]?.blockSize ?? entry.target.offsetHeight;
+            entry.target.style.setProperty(TILE_ROWS, String(Math.max(1, Math.ceil(height + gap))));
           }
         });
   onCleanup(() => sized?.disconnect());

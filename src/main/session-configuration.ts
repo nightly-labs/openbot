@@ -8,7 +8,6 @@ import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
-import type { AttachmentPreviews, PreviewFile } from "./attachment-previews";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
@@ -62,37 +61,25 @@ export interface AttachmentProtocolDependencies {
   mailbox: MailboxStore;
   agents: AgentService;
   remoteServers: RemoteServerManager;
-  attachmentPreviews: AttachmentPreviews;
 }
 
 function asksForPreview(url: URL): boolean {
   return url.searchParams.get("preview") === "1";
 }
 
-export function configureAttachmentProtocol({
-  mailbox,
-  agents,
-  remoteServers,
-  attachmentPreviews,
-}: AttachmentProtocolDependencies): void {
+export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
   const logger = createOpenBotLogger("attachment-protocol");
-  const shownFile = async (url: URL, id: string, attachment: PreviewFile): Promise<PreviewFile> => {
-    if (!asksForPreview(url) || !attachment.mimeType.startsWith("image/")) return attachment;
-    const preview = await runCauseEffect(attachmentPreviews.stored(id, attachment));
-    return preview ?? attachment;
-  };
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
     try {
       const url = new URL(request.url);
       const id = url.pathname.split("/").filter(Boolean).at(-1);
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
-      if (!id || !attachment) return new Response("Not found", { status: 404 });
-      const shown = await shownFile(url, id, attachment);
+      if (!attachment) return new Response("Not found", { status: 404 });
       return await runCauseEffect(
         fileResponse(
-          shown.path,
+          attachment.path,
           {
-            "Content-Type": shown.mimeType,
+            "Content-Type": attachment.mimeType,
             "Cache-Control": "no-store",
             ...attachmentCorsHeaders(request.headers.get("Origin")),
             ...attachmentDocumentHeaders(attachment.mimeType),
