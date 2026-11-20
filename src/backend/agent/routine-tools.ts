@@ -122,6 +122,20 @@ export interface OpenBotToolResponse {
   contentItems: Array<{ type: "inputText"; text: string }>;
 }
 
+const ROUTINE_LIST_INSTRUCTION_PREVIEW = 1_000;
+
+export function routineListInstruction(instruction: string) {
+  if (instruction.length <= ROUTINE_LIST_INSTRUCTION_PREVIEW) return { instruction };
+  const end = /[\uD800-\uDBFF]/.test(instruction.charAt(ROUTINE_LIST_INSTRUCTION_PREVIEW - 1))
+    ? ROUTINE_LIST_INSTRUCTION_PREVIEW - 1
+    : ROUTINE_LIST_INSTRUCTION_PREVIEW;
+  return {
+    instruction: instruction.slice(0, end),
+    instructionTruncated: true,
+    instructionLength: instruction.length,
+  } as const;
+}
+
 export function openBotToolResult(value: unknown): OpenBotToolResponse {
   return {
     success: true,

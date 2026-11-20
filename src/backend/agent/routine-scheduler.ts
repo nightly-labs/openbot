@@ -59,6 +59,7 @@ import {
   type OpenBotToolResponse,
   openBotToolFailure,
   openBotToolResult,
+  routineListInstruction,
   routineToolAgentId,
   routineToolArguments,
   routineToolPolicies,
@@ -593,15 +594,30 @@ export class RoutineScheduler implements RoutineDueSource {
     requestedByPerson: () => boolean,
   ) {
     if (params.tool === "list_routines") {
-      const args = routineToolArguments(params.arguments, ["agentId"]);
+      const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
       const agentId = this.#toolAgentId(args, senderAgentId);
+      const onlyId =
+        args.routineId === undefined
+          ? null
+          : this.#requireToolRoutine(
+              agentId,
+              routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
+            ).id;
+      const shown = (routine: { id: string }) => onlyId === null || routine.id === onlyId;
       return openBotToolResult({
-        routines: this.list(agentId).map((routine) => ({ ...routine, lastRun: this.#lastRun(agentId, routine.id) })),
+        routines: this.list(agentId)
+          .filter(shown)
+          .map((routine) => ({
+            ...routine,
+            ...(onlyId === null ? routineListInstruction(routine.instruction) : {}),
+            lastRun: this.#lastRun(agentId, routine.id),
+          })),
         webhookRoutines: this.#routines.listRecords(agentId).flatMap((routine) =>
-          routine.trigger.kind === "webhook"
+          routine.trigger.kind === "webhook" && shown(routine)
             ? [
                 {
                   ...webhookRoutineSummary({ ...routine, trigger: routine.trigger }),
+                  ...(onlyId === null ? {} : { instruction: routine.instruction }),
                   lastRun: this.#lastRun(agentId, routine.id),
                 },
               ]
