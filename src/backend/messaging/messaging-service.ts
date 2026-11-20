@@ -1399,17 +1399,18 @@ export class MessagingService {
       Effect.succeed(staging),
       () =>
         Effect.gen({ self: this }, function* () {
-          const gave = (messageId: string) =>
-            Boolean(existing) &&
+          const delivered = (messageId: string) =>
             this.#threads.received(`messaging:${live.record.connectionId}:${message.platformChannelId}:${messageId}`);
+          const gave = (messageId: string) => Boolean(existing) && delivered(messageId);
           const quoted =
             quote?.messageId && !gave(quote.messageId)
               ? (quote.files ?? []).map((file) => ({ file, label: `${quote.authorName}: ${file.name}` }))
               : [];
+          const hasOwnFiles = message.files.length > 0 || quoted.length > 0;
           const earlierFiles = [
             ...quoted,
-            ...earlier
-              .filter((entry) => !gave(entry.id))
+            ...(hasOwnFiles ? [] : earlier)
+              .filter((entry) => !delivered(entry.id))
               .toReversed()
               .flatMap((entry) =>
                 (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
