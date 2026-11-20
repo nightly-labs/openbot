@@ -620,7 +620,6 @@ export const messages = {
   "mobile.settings.invite.admit": "دخول صديق واحد",
   "mobile.settings.invite.tearHint": "اقطع على طول الخط",
   "mobile.settings.invite.copy": "نسخ الرابط",
-  "mobile.settings.invite.share": "مشاركة رابط الدعوة",
   "mobile.settings.invite.stub": "قسيمة التذكرة مع رابط دعوتك",
   "mobile.settings.invite.stubHint": "اقطعها لمشاركة رابط دعوتك.",
   "mobile.settings.invite.shareMessage": "انضم إليّ في OpenBot واحصل على خصم {percent} على خطتك:",

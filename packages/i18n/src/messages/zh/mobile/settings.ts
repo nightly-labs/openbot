@@ -563,7 +563,6 @@ export const messages = {
   "mobile.settings.invite.admit": "好友一位",
   "mobile.settings.invite.tearHint": "沿虚线撕下",
   "mobile.settings.invite.copy": "复制链接",
-  "mobile.settings.invite.share": "分享邀请链接",
   "mobile.settings.invite.stub": "带有邀请链接的票根",
   "mobile.settings.invite.stubHint": "撕下票根以分享邀请链接。",
   "mobile.settings.invite.shareMessage": "和我一起使用 OpenBot，套餐立享 {percent} 折扣：",

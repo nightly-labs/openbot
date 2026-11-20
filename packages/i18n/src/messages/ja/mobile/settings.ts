@@ -596,7 +596,6 @@ export const messages = {
   "mobile.settings.invite.admit": "友だち1名様",
   "mobile.settings.invite.tearHint": "線に沿って切り取る",
   "mobile.settings.invite.copy": "リンクをコピー",
-  "mobile.settings.invite.share": "招待リンクを共有",
   "mobile.settings.invite.stub": "招待リンク付きの半券",
   "mobile.settings.invite.stubHint": "切り取って招待リンクを共有します。",
   "mobile.settings.invite.shareMessage": "OpenBot に参加すると、プランが {percent} オフになります：",

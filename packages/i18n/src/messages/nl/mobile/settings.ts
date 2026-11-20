@@ -467,7 +467,6 @@ export const messages = {
   "mobile.settings.invite.admit": "Toegang voor één vriend",
   "mobile.settings.invite.tearHint": "Scheur langs de lijn",
   "mobile.settings.invite.copy": "Link kopiëren",
-  "mobile.settings.invite.share": "Uitnodigingslink delen",
   "mobile.settings.invite.stub": "Strookje met je uitnodigingslink",
   "mobile.settings.invite.stubHint": "Scheur het af om je uitnodigingslink te delen.",
   "mobile.settings.invite.shareMessage": "Doe mee met OpenBot en krijg {percent} korting op je abonnement:",

@@ -593,7 +593,6 @@ export const messages = {
   "mobile.settings.invite.admit": "Bir arkadaş için giriş",
   "mobile.settings.invite.tearHint": "Çizgi boyunca kopar",
   "mobile.settings.invite.copy": "Bağlantıyı kopyala",
-  "mobile.settings.invite.share": "Davet bağlantısını paylaş",
   "mobile.settings.invite.stub": "Davet bağlantılı bilet koçanı",
   "mobile.settings.invite.stubHint": "Davet bağlantını paylaşmak için kopar.",
   "mobile.settings.invite.shareMessage": "OpenBot'a katıl, planında {percent} indirim kazan:",

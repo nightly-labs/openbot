@@ -586,7 +586,6 @@ export const messages = {
   "mobile.settings.invite.admit": "כניסה לחבר אחד",
   "mobile.settings.invite.tearHint": "תלשו לאורך הקו",
   "mobile.settings.invite.copy": "העתקת קישור",
-  "mobile.settings.invite.share": "שיתוף קישור הזמנה",
   "mobile.settings.invite.stub": "ספח כרטיס עם קישור ההזמנה שלכם",
   "mobile.settings.invite.stubHint": "תלשו אותו כדי לשתף את קישור ההזמנה.",
   "mobile.settings.invite.shareMessage": "הצטרפו אליי ל-OpenBot וקבלו {percent} הנחה על התוכנית:",

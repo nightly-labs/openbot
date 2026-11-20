@@ -584,7 +584,6 @@ export const messages = {
   "mobile.settings.invite.admit": "친구 1명 입장",
   "mobile.settings.invite.tearHint": "점선을 따라 뜯기",
   "mobile.settings.invite.copy": "링크 복사",
-  "mobile.settings.invite.share": "초대 링크 공유",
   "mobile.settings.invite.stub": "초대 링크가 있는 티켓 쿠폰",
   "mobile.settings.invite.stubHint": "뜯어서 초대 링크를 공유하세요.",
   "mobile.settings.invite.shareMessage": "OpenBot에 함께하고 요금제 {percent} 할인을 받으세요:",

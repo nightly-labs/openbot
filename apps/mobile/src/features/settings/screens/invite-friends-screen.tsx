@@ -1,30 +1,38 @@
 import { REFERRAL_SHARE_PERCENT } from "@openbot/contracts/referral";
 import { Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
-import Share2 from "lucide-react-native/icons/share-2";
-import { Share, StyleSheet, View } from "react-native";
+import Copy from "lucide-react-native/icons/copy";
+import { Share, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { INVITE_NIGHT, InviteTicket } from "@/features/settings/components/invite-ticket";
+import { InviteTicket } from "@/features/settings/components/invite-ticket";
+import { STUB_COLORS } from "@/features/settings/model/invite-stub-texture";
 import { useReferralState } from "@/features/settings/model/referrals";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
-import { headerFontOptions } from "@/shared/lib/app-font";
 import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-const ON_NIGHT = "#ffffff";
-const ON_NIGHT_MUTED = "rgba(255,255,255,0.65)";
 const EMPTY_LINK = "—";
-const titleFont = "headerTitleStyle" in headerFontOptions ? headerFontOptions.headerTitleStyle : {};
-const NIGHT_HEADER = {
-  headerTintColor: ON_NIGHT,
-  headerTitleStyle: { ...titleFont, color: ON_NIGHT },
-  ...(isAndroid ? { headerStyle: { backgroundColor: INVITE_NIGHT } } : {}),
+const CONTENT_WIDTH = { width: "100%", maxWidth: 340 } as const;
+const GLOW_LAYER = { position: "absolute", top: -160, left: -16, right: -16, height: 620 } as const;
+
+interface InviteGlow {
+  inner: string;
+  innerOpacity: number;
+  outer: string;
+  outerOpacity: number;
+  ticketShadow: number;
+}
+
+const INVITE_GLOWS: Record<"light" | "dark", InviteGlow> = {
+  dark: { inner: "#9d6bff", innerOpacity: 0.5, outer: "#5b2bb8", outerOpacity: 0.2, ticketShadow: 0 },
+  light: { inner: "#b48cff", innerOpacity: 0.36, outer: "#c9b3ff", outerOpacity: 0.18, ticketShadow: 0.16 },
 };
 
 function linkLabel(link: string): string {
@@ -39,7 +47,10 @@ export function InviteFriendsScreen() {
   const link = state?.available ? state.link : null;
   const percent = format.number(REFERRAL_SHARE_PERCENT / 100, { style: "percent" });
   const fromName = session ? (mobileUserName(session.user).split(" ")[0] ?? "") : "";
-  const shareLabel = t("mobile.settings.invite.share");
+  const { theme } = useUniwind();
+  const mode = theme === "dark" ? "dark" : "light";
+  const glow = INVITE_GLOWS[mode];
+  const sheet = String(useCSSVariable("--openbot-bg-sheet"));
 
   async function share(): Promise<void> {
     if (!link) return;
@@ -53,50 +64,32 @@ export function InviteFriendsScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: INVITE_NIGHT }}>
-      <Stack.Screen options={NIGHT_HEADER} />
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="right"
-          glass
-          icon={Share2}
-          accessibilityLabel={shareLabel}
-          disabled={!link}
-          onPress={() => void share()}
-        />
-      ) : (
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            icon="square.and.arrow.up"
-            accessibilityLabel={shareLabel}
-            disabled={!link}
-            onPress={() => void share()}
-          />
-        </Stack.Toolbar>
-      )}
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          <RadialGradient id="invite-glow" cx="50%" cy="8%" r="75%">
-            <Stop offset="0" stopColor="#9d6bff" stopOpacity={0.55} />
-            <Stop offset="0.45" stopColor="#5b2bb8" stopOpacity={0.22} />
-            <Stop offset="1" stopColor={INVITE_NIGHT} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#invite-glow)" />
-      </Svg>
-      <SheetScrollView
-        className="bg-transparent"
-        scrollEdgeEffect={false}
-        androidNativeHeader
-        contentContainerClassName="items-center gap-6 px-6 pb-safe-offset-8 pt-5"
-      >
-        <View className="items-center gap-1.5">
-          <Typography weight="bold" align="center" style={{ color: ON_NIGHT, fontSize: 28, letterSpacing: -0.6 }}>
+    <>
+      <InviteCopyAction
+        disabled={!link}
+        label={t("mobile.settings.invite.copy")}
+        onCopy={() => {
+          if (link) copyWithHaptic(link);
+        }}
+      />
+      <SheetScrollView contentContainerClassName="items-center gap-7 px-4 pb-safe-offset-5 pt-5">
+        <Svg style={GLOW_LAYER} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="invite-glow" cx="50%" cy="26%" r="60%">
+              <Stop offset="0" stopColor={glow.inner} stopOpacity={glow.innerOpacity} />
+              <Stop offset="0.45" stopColor={glow.outer} stopOpacity={glow.outerOpacity} />
+              <Stop offset="1" stopColor={sheet} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#invite-glow)" />
+        </Svg>
+        <View className="items-center gap-1.5" style={CONTENT_WIDTH}>
+          <Typography.Heading type="h3" align="center">
             {t("mobile.settings.invite.heading")}
-          </Typography>
-          <Typography align="center" style={{ color: ON_NIGHT_MUTED, fontSize: 15 }}>
+          </Typography.Heading>
+          <Typography.Paragraph type="body-sm" align="center" className="text-grouped-secondary">
             {t("mobile.settings.invite.subtitle")}
-          </Typography>
+          </Typography.Paragraph>
         </View>
         <InviteTicket
           linkLabel={link ? linkLabel(link) : referral.isPending ? t("mobile.settings.invite.loading") : EMPTY_LINK}
@@ -104,26 +97,26 @@ export function InviteFriendsScreen() {
           friendPerk={t("mobile.settings.invite.perk.friendValue", { percent })}
           youPerk={t("mobile.settings.invite.perk.youValue", { percent })}
           ready={link !== null}
-          onCopy={() => {
-            if (link) copyWithHaptic(link);
-          }}
           onTear={share}
+          surface={sheet}
+          shadowOpacity={glow.ticketShadow}
+          stub={STUB_COLORS[mode]}
         />
         {referral.isError ? (
-          <View className="w-full items-center gap-3" style={{ maxWidth: 340 }}>
-            <Typography align="center" style={{ color: ON_NIGHT_MUTED, fontSize: 14 }}>
+          <View className="items-center gap-3" style={CONTENT_WIDTH}>
+            <Typography.Paragraph type="body-sm" align="center" className="text-grouped-secondary">
               {t("mobile.settings.invite.loadFailed")}
-            </Typography>
+            </Typography.Paragraph>
             <Button size="sm" variant="secondary" onPress={() => void referral.refetch()}>
               <Button.Label>{t("common.retry")}</Button.Label>
             </Button>
           </View>
         ) : state && !state.available ? (
-          <Typography align="center" style={{ color: ON_NIGHT_MUTED, fontSize: 14, maxWidth: 340 }}>
+          <Typography.Paragraph type="body-sm" align="center" className="text-grouped-secondary" style={CONTENT_WIDTH}>
             {t("mobile.settings.invite.unavailable")}
-          </Typography>
+          </Typography.Paragraph>
         ) : (
-          <View className="w-full gap-2" style={{ maxWidth: 340 }}>
+          <View className="gap-2" style={CONTENT_WIDTH}>
             <PerkLine
               value={t("mobile.settings.invite.perk.friendValue", { percent })}
               text={t("mobile.settings.invite.perk.friendDetail")}
@@ -135,17 +128,39 @@ export function InviteFriendsScreen() {
           </View>
         )}
       </SheetScrollView>
-    </View>
+    </>
+  );
+}
+
+function InviteCopyAction({ disabled, label, onCopy }: { disabled: boolean; label: string; onCopy: () => void }) {
+  if (isAndroid) {
+    return (
+      <AndroidHeaderButton
+        placement="right"
+        glass
+        icon={Copy}
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPress={onCopy}
+      />
+    );
+  }
+  return (
+    <Stack.Toolbar placement="right">
+      <Stack.Toolbar.Button icon="doc.on.doc" accessibilityLabel={label} disabled={disabled} onPress={onCopy} />
+    </Stack.Toolbar>
   );
 }
 
 function PerkLine({ value, text }: { value: string; text: string }) {
   return (
     <View className="flex-row items-baseline gap-3">
-      <Typography weight="bold" style={{ color: ON_NIGHT, fontSize: 14, minWidth: 86 }}>
+      <Typography.Paragraph type="body-sm" weight="semibold" style={{ minWidth: 86 }}>
         {value}
-      </Typography>
-      <Typography style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, flex: 1 }}>{text}</Typography>
+      </Typography.Paragraph>
+      <Typography.Paragraph type="body-sm" className="flex-1 text-grouped-secondary">
+        {text}
+      </Typography.Paragraph>
     </View>
   );
 }

@@ -593,7 +593,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.invite.admit": "Admit one friend",
   "mobile.settings.invite.tearHint": "Tear along the line",
   "mobile.settings.invite.copy": "Copy link",
-  "mobile.settings.invite.share": "Share invite link",
   "mobile.settings.invite.stub": "Ticket stub with your invite link",
   "mobile.settings.invite.stubHint": "Tear it off to share your invite link.",
   "mobile.settings.invite.shareMessage": "Join me on OpenBot and get {percent} off your plan:",

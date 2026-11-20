@@ -605,7 +605,6 @@ export const messages = {
   "mobile.settings.invite.admit": "Entrada para un amigo",
   "mobile.settings.invite.tearHint": "Rasga por la línea",
   "mobile.settings.invite.copy": "Copiar enlace",
-  "mobile.settings.invite.share": "Compartir enlace de invitación",
   "mobile.settings.invite.stub": "Talón con tu enlace de invitación",
   "mobile.settings.invite.stubHint": "Rásgalo para compartir tu enlace de invitación.",
   "mobile.settings.invite.shareMessage": "Únete a OpenBot y consigue un {percent} de descuento en tu plan:",

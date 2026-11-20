@@ -622,7 +622,6 @@ export const messages = {
   "mobile.settings.invite.admit": "Вход для одного друга",
   "mobile.settings.invite.tearHint": "Оторвите по линии",
   "mobile.settings.invite.copy": "Скопировать ссылку",
-  "mobile.settings.invite.share": "Поделиться ссылкой",
   "mobile.settings.invite.stub": "Корешок билета с вашей ссылкой",
   "mobile.settings.invite.stubHint": "Оторвите его, чтобы поделиться ссылкой-приглашением.",
   "mobile.settings.invite.shareMessage": "Присоединяйтесь к OpenBot и получите скидку {percent} на тариф:",
