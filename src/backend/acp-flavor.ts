@@ -132,6 +132,7 @@ export interface AcpFlavor {
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
   mcpConnectLimitMs?: number;
+  mcpListLimit?: { ms: number; since: string };
   relayStdioMcpServers?: true | "unconfined";
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   mcpServerName?(name: string): string;
