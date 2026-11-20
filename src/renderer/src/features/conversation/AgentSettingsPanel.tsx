@@ -709,6 +709,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           selectionRequest={props.skillSelectionRequest}
           agentId={props.agent.id}
           agentName={props.agent.name}
+          agentProvider={props.agent.provider}
           open={draft.skills.open}
           skillsMode={skillsMode()}
           serverId={props.skillsServerId}

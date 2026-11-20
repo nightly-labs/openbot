@@ -732,7 +732,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               skillsMode={agentSkillsMode(props.server, props.runtime)}
               skillsServerId={props.server?.id}
               previewWorkspaceFile={(path) =>
-                conversationRuntime(props).agent.previewWorkspaceFile({ agentId: agent().id, path })
+                conversationRuntime(props).agent.previewWorkspaceFile({ agentId: agent().id, path, exactPath: true })
               }
               tablesVisible={
                 (!props.runtime || props.runtime.admin !== undefined) &&
