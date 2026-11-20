@@ -103,6 +103,7 @@ const report: { steps: Step[]; passed: boolean; error?: string } = { steps: [], 
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,

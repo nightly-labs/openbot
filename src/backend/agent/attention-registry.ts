@@ -205,7 +205,7 @@ const MCP_TOOL_CONSENT_UNANSWERABLE = {
 
 const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
 const TAKEOVER_TAB_OF_OTHER_CHAT =
-  "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
+  "This chat cannot use this tab. Open the page in this chat with open, then call this tool with the new tabId.";
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const NO_LOGIN_FOR_SITE =
@@ -433,6 +433,7 @@ export interface RoutineAttention {
 export interface AttentionBrowserHost {
   prepareSecret?(params: DynamicToolCallParams): Effect.Effect<PreparedBrowserSecret, BrowserOperationError>;
   listTabs(): BrowserTab[];
+  toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean;
   beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
   endTakeover(tabId: string, completed?: boolean): void;
   takeoverSignInArrived?(tabId: string): boolean;
@@ -1178,7 +1179,7 @@ export class AttentionRegistry {
     const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab || (tab.ownerAgentId !== agentId && tab.ownerThreadId !== publicThreadId))
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
-    if (tab.ownerThreadId !== publicThreadId || tab.ownerAgentId !== agentId)
+    if (!this.#browser.toolCanUseTab({ ...params, threadId: publicThreadId, ownerAgentId: agentId }, tabId))
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
     const held = this.#heldTakeoverResults.get(tabId);
     if (held) {
@@ -1639,7 +1640,7 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid login list request.") });
     const { tabId } = call.args;
     const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
-    if (!tab || tab.ownerAgentId !== params.ownerAgentId || tab.ownerThreadId !== params.threadId)
+    if (!tab || tab.ownerAgentId !== params.ownerAgentId || !this.#browser.toolCanUseTab(params, tabId))
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     const listed = yield* Effect.result(
       this.#passwordVault
@@ -2232,7 +2233,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another agent or a channel can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
         namedCard("agent-script"),
       );
     const withCode = pending.secret.withCode;
