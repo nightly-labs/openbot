@@ -104,7 +104,10 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
         nav.reset();
         if (app) nav.go({ kind: "app", id: app });
       }
-      if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
+      if (app?.startsWith("custom:")) return;
+      const id = untrack(() => props.mcpSignInRequest);
+      if (app && id) queueMicrotask(() => controller.signInPluginServer(id));
+      untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 
