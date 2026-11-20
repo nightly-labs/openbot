@@ -30,7 +30,7 @@ export function ChannelChatScreen() {
 }
 
 function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const leaveChat = useLeaveChat();
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
@@ -48,8 +48,14 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
     () =>
-      projectChannelMessages(page?.messages ?? [], page?.tasks ?? [], server?.membershipId ?? null, progressUpdates),
-    [page?.messages, page?.tasks, server?.membershipId, progressUpdates],
+      projectChannelMessages(
+        page?.messages ?? [],
+        page?.tasks ?? [],
+        server?.membershipId ?? null,
+        sourceText,
+        progressUpdates,
+      ),
+    [page?.messages, page?.tasks, server?.membershipId, sourceText, progressUpdates],
   );
   const threadIds = useMemo(
     () => (summary?.threads?.length ? new Set(summary.threads.map((thread) => thread.threadId)) : null),

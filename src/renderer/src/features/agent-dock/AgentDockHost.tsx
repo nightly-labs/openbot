@@ -179,7 +179,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const auth = useAuth();
   const { activeServer } = useServers();
   const { browserTabs } = useBrowserTabs();
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const preference = useAgentDockPreference();
   const seatRefs = createMemo(
     () =>
@@ -354,7 +354,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return withStepAnswers(
-      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks, sourceText).map(asOwn),
       new Set(channelWorkingTurns(page, new Set())),
       (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
     );

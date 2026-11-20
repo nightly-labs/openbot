@@ -52,10 +52,17 @@ function channelRoutineRow(row: AgentMessage, entry: ChannelMessage, tasks: read
   };
 }
 
+function localizedCoordinatorEntry(entry: ChannelMessage, localize: (text: string) => string): ChannelMessage {
+  if (entry.author.kind !== "coordinator") return entry;
+  return { ...entry, message: { ...entry.message, text: localize(entry.message.text) } };
+}
+
 export function channelConversationRows(
-  entries: readonly ChannelMessage[],
+  sourceEntries: readonly ChannelMessage[],
   tasks: readonly ChannelTask[],
+  localize: (text: string) => string,
 ): AgentMessage[] {
+  const entries = sourceEntries.map((entry) => localizedCoordinatorEntry(entry, localize));
   const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,
