@@ -571,6 +571,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Ajan seç",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot kilitli",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot’u aç",
+  "mobile.settings.shortcuts.card.message": "Mesaj gönder: {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Mesaj: {name}",
   "mobile.settings.shortcuts.footer":
     "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz. Open Agent bu ajanın sohbetini açar.",
   "mobile.settings.shortcuts.send.sent": "Gönderildi",

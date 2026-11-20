@@ -589,6 +589,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Agent wählen",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot ist gesperrt",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot öffnen",
+  "mobile.settings.shortcuts.card.message": "{name} eine Nachricht senden",
+  "mobile.settings.shortcuts.card.messagePrompt": "Nachricht an {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht. Open Agent öffnet seinen Chat.",
   "mobile.settings.shortcuts.send.sent": "Gesendet",
