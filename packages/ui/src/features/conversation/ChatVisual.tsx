@@ -72,6 +72,7 @@ interface ChatVisualProps {
   onOpenLink: (url: string) => void;
   onMessage?: ((text: string) => void) | undefined;
   onContext?: ((text: string) => void) | undefined;
+  onUse?: (() => void) | undefined;
   isAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
   onQuote?: ((text: string) => void) | undefined;
   onOpenInSidePanel?: (() => void) | undefined;
@@ -231,6 +232,10 @@ function VisualFrame(props: ChatVisualProps) {
     if (event.target === box) exitFullscreen();
   };
 
+  const onWindowBlur = () => {
+    if (frame && document.activeElement === frame) props.onUse?.();
+  };
+
   let quoteLayer: HTMLDivElement | undefined;
   const onPointerDown = (event: PointerEvent) => {
     if (!(event.target instanceof Node && quoteLayer?.contains(event.target))) dismiss();
@@ -241,12 +246,14 @@ function VisualFrame(props: ChatVisualProps) {
     window.addEventListener("message", onMessage);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("blur", onWindowBlur);
     box?.addEventListener("toggle", onToggle);
     box?.addEventListener("click", onBoxClick);
     return () => {
       window.removeEventListener("message", onMessage);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("blur", onWindowBlur);
       releaseSelectionAction(dismiss);
       box?.removeEventListener("toggle", onToggle);
       box?.removeEventListener("click", onBoxClick);

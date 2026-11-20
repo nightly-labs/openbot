@@ -73,6 +73,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const [atHistoryBoundary, setAtHistoryBoundary] = createSignal(false);
   const [unreadDividerVisible, setUnreadDividerVisible] = createSignal(false);
   const [newMessageCount, setNewMessageCount] = createSignal(0);
+  const [usedPageIds, setUsedPageIds] = createSignal<ReadonlySet<string>>(new Set());
   let unreadVisibilityFrame: number | undefined;
   let firstRenderedIndex = 0;
   let newMessages: NewMessageTally = { count: 0, anchorId: undefined };
@@ -324,6 +325,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
         talliedConversationIdentity = identity;
         newMessages = anchorNewMessages(rows);
         setNewMessageCount(0);
+        setUsedPageIds(new Set<string>());
         return;
       }
       newMessages = tallyNewMessages(newMessages, rows, deps.sticky.getStickToLatest());
@@ -345,6 +347,18 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     },
   );
 
+  function keepPageDrawn(messageId: string): void {
+    if (untrack(usedPageIds).has(messageId)) return;
+    setUsedPageIds((ids) => new Set([...ids, messageId]));
+  }
+  const usedPageIndexes = createMemo(
+    () => {
+      const indexes = timelineIndexById();
+      return [...usedPageIds()].flatMap((id) => indexes.get(id) ?? []);
+    },
+    { equals: (left, right) => left.length === right.length && left.every((index, at) => index === right[at]) },
+  );
+
   const rowEstimate = untrack(() => deps.props.channel) ? 84 : 128;
   const messageVirtualizer = createChatVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: () => timelineMessages().length,
@@ -361,6 +375,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       return `${first ? rowKey(first) : ""}:${last ? rowKey(last) : ""}`;
     },
     scrollMargin: virtualScrollMargin,
+    keptIndexes: usedPageIndexes,
     stickToLatest: deps.sticky.getStickToLatest,
     followLatest: deps.sticky.followLatest,
     onChange: (instance) => {
@@ -499,6 +514,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     toggleAgentMessage,
     updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     updateScrollFade,
     updateVirtualScrollMargin,
