@@ -951,29 +951,57 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  #probeOptions(): Options {
-    return {
+  #configDirectory(): string {
+    return this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  }
+
+  readonly #probeOptionsEffect = Effect.fn("ClaudeAgentClient.probeOptions")(function* (this: ClaudeAgentClient) {
+    const userSetup = this.#userSetup();
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(
+          claudeSignInSettings(yield* readClaudeSettingsFile(join(this.#configDirectory(), "settings.json"))),
+          this.#agentEnvironment?.(),
+        );
+    const stateDirectory = this.#stateDirectory;
+    const settingsFile =
+      Object.keys(signInSettings).length > 0 && stateDirectory
+        ? yield* writeClaudeFlagSettings(stateDirectory, "probe", signInSettings).pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                queryLogger.warn("Claude checks its models and usage without the sign-in settings.", {
+                  error: error.cause,
+                });
+                return null;
+              }),
+            ),
+          )
+        : null;
+    const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
-      settingSources: ["user", "project", "local"],
+      settingSources: claudeSettingSources({ profileGeneration: false, workspaceOnly: false }, userSetup),
+      ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
       strictMcpConfig: true,
       persistSession: false,
       env: withClaudeClientLabels({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }),
     };
-  }
+    return { options, settingsFile };
+  });
 
   readonly #listModelsEffect = Effect.fn("ClaudeAgentClient.listModels")(function* (
     this: ClaudeAgentClient,
     timeoutMs?: number,
   ): Effect.fn.Return<unknown[], ProviderClientOperationError> {
+    const probe = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options: probe.options,
       }),
-    );
+    ).pipe(Effect.tapError(() => removeClaudeQueryFile(probe.settingsFile)));
     return yield* Effect.gen({ self: this }, function* () {
       const discovery = providerCall(() => claudeQuery.supportedModels());
       const discovered = yield* timeoutMs === undefined
@@ -1027,7 +1055,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           input.close();
           claudeQuery.close();
-        }),
+        }).pipe(Effect.andThen(removeClaudeQueryFile(probe.settingsFile))),
       ),
     );
   });
@@ -1037,13 +1065,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     model: string | null,
     timeoutMs: number,
   ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError> {
+    const probe = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options: probe.options,
       }),
-    );
+    ).pipe(Effect.tapError(() => removeClaudeQueryFile(probe.settingsFile)));
     return yield* Effect.gen({ self: this }, function* () {
       const readUsage = claudeQuery.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
       if (!readUsage) return { rateLimits: null, rateLimitsByLimitId: null };
@@ -1063,7 +1092,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         Effect.sync(() => {
           input.close();
           claudeQuery.close();
-        }),
+        }).pipe(Effect.andThen(removeClaudeQueryFile(probe.settingsFile))),
       ),
     );
   });
@@ -1260,8 +1289,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
-    const configDirectory =
-      this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    const configDirectory = this.#configDirectory();
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
       usable?.flatMap((server) => (server.url ? [server.config.name] : [])) ?? [],
