@@ -5,7 +5,11 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isKeyOnlyProvider,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
@@ -2500,7 +2504,10 @@ export async function createApplicationServices({
   };
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
-    const agentProviders = hostedServer === null ? null : new Set(service.listAgents().map((agent) => agent.provider));
+    const agentProviders =
+      hostedServer === null
+        ? null
+        : new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider)));
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
