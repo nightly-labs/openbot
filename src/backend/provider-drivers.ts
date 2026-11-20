@@ -46,6 +46,7 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
   type AgentCliInfo,
+  ANTIGRAVITY_UPDATE_ENV,
   antigravityTakesStateFolders,
   COPILOT_ENV,
   cliPathEnvironment,
@@ -271,7 +272,7 @@ function antigravitySettingsUnreadable(appDataDir: string): boolean {
   }
 }
 
-const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
+const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot", ...ANTIGRAVITY_UPDATE_ENV };
 
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
