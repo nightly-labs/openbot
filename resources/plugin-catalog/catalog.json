@@ -993,12 +993,6 @@
       "detailSha256": "8951a0bc9f83d041328bc927dedac2c8bf64b7b6786d56959194e7eb0f8e8eba"
     },
     {
-      "slug": "meta-ads",
-      "version": "1.0.0",
-      "featured": false,
-      "detailSha256": "dd8c768ccd143fccd0b971fbd1ca25c30d324cc141e056eeaa60f725d51c3d32"
-    },
-    {
       "slug": "metricool",
       "version": "1.0.0",
       "featured": false,

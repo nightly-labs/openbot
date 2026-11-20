@@ -5696,41 +5696,6 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
-    slug: "meta-ads",
-    name: "Meta Ads",
-    tagline: "Facebook and Instagram ad campaigns",
-    description:
-      "Meta Ads lets agents read campaign, ad set, and ad performance and draft changes to campaigns in the ad accounts the user can manage. Each user signs in to their own Meta account through the browser.",
-    category: "data-analytics",
-    creatorName: "Meta",
-    version: "1.0.0",
-    prompts: [
-      {
-        id: "prompt-performance",
-        text: "How did my campaigns perform last week? Show spend, results, and cost per result.",
-      },
-      { id: "prompt-underperform", text: "Which ad sets have the highest cost per result this month?" },
-      { id: "prompt-draft-ad", text: "Draft three headline and primary text options for a new spring sale ad." },
-    ],
-    websiteUrl: "https://www.facebook.com/business",
-    privacyPolicyUrl: "https://www.facebook.com/privacy/policy/",
-    termsUrl: "https://www.facebook.com/legal/terms",
-    featured: false,
-    apps: [
-      {
-        id: "app-meta-ads-mcp",
-        name: "Meta Ads",
-        description: "Campaign reporting and campaign management, over Meta's MCP server with browser sign-in.",
-        server: {
-          name: "meta-ads",
-          transport: "http",
-          url: "https://mcp.facebook.com/ads",
-          auth: [{ id: "meta-ads-oauth", kind: "link", label: "Sign in" }],
-        },
-      },
-    ],
-  },
-  {
     slug: "metricool",
     name: "Metricool",
     tagline: "Social media analytics and planning",
