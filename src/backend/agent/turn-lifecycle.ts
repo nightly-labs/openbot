@@ -610,7 +610,7 @@ export class TurnLifecycle {
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
         const failover = this.#failoverTurns.get(turnId);
         this.#failoverTurns.delete(turnId);
-        if (failover) this.#showFailoverError(turn.agentId, turn.threadId, failover, this.#limitedTurns.has(turnId));
+        if (failover) this.#showFailoverError(turn.agentId, turn.threadId, failover);
         else if (compactionFailure) this.#showFailoverError(turn.agentId, turn.threadId, compactionFailure);
         this.#showKeptSafetyBlock(turn.agentId, turnId);
         continue;
@@ -843,9 +843,9 @@ export class TurnLifecycle {
     this.#turnCauses.set(turnId, context.causeCode);
   }
 
-  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError, limited = false): void {
+  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError, showQuiet = false): void {
     const taskId = this.#taskForThread(agentId, threadId);
-    if (taskId === null && !(failover.quiet && limited)) {
+    if (taskId === null && (!failover.quiet || showQuiet)) {
       this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
       return;
     }
@@ -1523,7 +1523,8 @@ export class TurnLifecycle {
             !this.#limitedTurns.has(errorTurnId) &&
             this.#mayHoldError(agentId, errorTurnId, causeCode)
           ) {
-            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true });
+            const link = accountLink(params);
+            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true, ...(link ? { link } : {}) });
             return;
           }
           const held = planLimit || (errorTurnId !== null && this.#limitedTurns.has(errorTurnId));
@@ -1531,8 +1532,15 @@ export class TurnLifecycle {
             !held && notification.method === "error" && agentId && threadId
               ? this.#taskForThread(agentId, threadId)
               : null;
-          if (taskId === null && !held && notification.method === "error") {
-            this.#hooks.emitError("agent_error", message, agentId ?? undefined, context, accountLink(params));
+          if (
+            taskId === null &&
+            !held &&
+            notification.method === "error" &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId)
+          ) {
+            this.#hooks.emitError("agent_error", message, agentId, context, accountLink(params));
             return;
           }
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
@@ -2117,7 +2125,7 @@ export class TurnLifecycle {
         ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
       )
         this.#markFailed(agentId, model, failover);
-      if (failover) this.#showFailoverError(agentId, threadId, failover, limited);
+      if (failover) this.#showFailoverError(agentId, threadId, failover, status === "failed" && !limited);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
       else if (compactionFailure && status === "failed" && !failover)
