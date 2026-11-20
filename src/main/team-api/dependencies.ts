@@ -266,6 +266,8 @@ export type TeamApiProviderAccounts = Pick<
   | "models"
   | "pools"
   | "setPool"
+  | "liveVoiceAccount"
+  | "setLiveVoiceAccount"
   | "usage"
   | "startSignIn"
   | "signInStatus"

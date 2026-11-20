@@ -2689,7 +2689,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.providerError !== null ||
       turn.sdkFailureAt !== null ||
       this.#flavor.sdkHarness?.answerIsFailure.test(turn.text) === true;
-    if (!this.#flavor.wakesAfterPromptEnds || !this.#steersByPrompt || turn.stopped || failed) return "";
+    if (!this.#flavor.wakesAfterPromptEnds || !this.#steersByPrompt || turn.stopped || turn.quietNoUpdate || failed)
+      return "";
     return [...turn.toolItems.values()]
       .filter(
         (item) =>

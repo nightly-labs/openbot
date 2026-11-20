@@ -484,6 +484,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Serwery",
   "mobile.settings.voice.gptLive.serversFooter":
     "Dotknij serwera, który wymaga logowania, aby połączyć Codex z kontem ChatGPT. Logowanie serwera widzi tylko właściciel lub administrator.",
+  "mobile.settings.voice.gptLive.account": "Konto głosu na żywo GPT",
   "mobile.settings.voice.gptLive.status.ready": "Gotowe",
   "mobile.settings.voice.gptLive.status.supported": "Obsługiwane",
   "mobile.settings.voice.gptLive.status.offline": "Offline",

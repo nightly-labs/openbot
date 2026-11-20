@@ -32,6 +32,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex en el servidor no pudo iniciar la voz en directo. Pide a su propietario que actualice Codex en ese ordenador e inicie sesión con ChatGPT, y vuelve a intentarlo.",
   "error.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",
+  "error.voice.live.chooseAccount":
+    "Esta cuenta de ChatGPT no puede usar la voz en directo. En Ajustes → Voz, elige una cuenta cuyo plan incluya voz.",
   "error.voice.live.unavailable":
     "OpenAI no pudo iniciar la voz en directo. El problema es de OpenAI. Inténtalo de nuevo más tarde.",
   "error.voice.live.refused":

@@ -732,6 +732,10 @@ export const messages = {
   "settings.voice.talkKey.refused": "Voeg nog een toets toe",
   "settings.voice.talkKey.reset": "Herstellen",
   "settings.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "settings.voice.live.account": "Account",
+  "settings.voice.live.accountAutomatic": "Automatisch",
+  "settings.voice.live.accountDescription":
+    "Het ChatGPT-account dat live spraak gebruikt. Kies een account waarvan het abonnement spraak bevat.",
   "settings.transfer.title": "Verplaats deze server naar een andere computer",
   "settings.transfer.lede": "Je agents, hun vaardigheden, routines, herinneringen en bestanden gaan in één bestand.",
   "settings.transfer.flow.label": "Hoe een overdracht werkt",

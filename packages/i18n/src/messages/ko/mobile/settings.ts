@@ -452,6 +452,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "서버",
   "mobile.settings.voice.gptLive.serversFooter":
     "로그인이 필요한 서버를 탭하면 Codex를 ChatGPT 계정에 연결할 수 있습니다. 서버의 로그인은 소유자나 관리자만 볼 수 있습니다.",
+  "mobile.settings.voice.gptLive.account": "GPT 라이브 음성 계정",
   "mobile.settings.voice.gptLive.status.ready": "준비됨",
   "mobile.settings.voice.gptLive.status.supported": "지원됨",
   "mobile.settings.voice.gptLive.status.offline": "오프라인",

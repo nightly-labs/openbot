@@ -117,6 +117,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "./library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "./live-voice-account-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MAC_APPS_LIMIT_CAPABILITY } from "./mac-apps-limit-v1";
@@ -780,6 +781,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
   [PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY, V10],
   [PENDING_PROMPTS_CAPABILITY, V10],
+  [LIVE_VOICE_ACCOUNT_CAPABILITY, V10],
   [SIDE_QUESTION_THREADS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

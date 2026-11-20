@@ -467,6 +467,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Servidores",
   "mobile.settings.voice.gptLive.serversFooter":
     "Toque num servidor que precisa de login para conectar o Codex a uma conta do ChatGPT. Só um proprietário ou administrador vê o login de um servidor.",
+  "mobile.settings.voice.gptLive.account": "Conta da voz ao vivo do GPT",
   "mobile.settings.voice.gptLive.status.ready": "Pronto",
   "mobile.settings.voice.gptLive.status.supported": "Compatível",
   "mobile.settings.voice.gptLive.status.offline": "Offline",

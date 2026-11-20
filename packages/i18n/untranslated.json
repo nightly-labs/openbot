@@ -3101,6 +3101,7 @@
   "mobile.settings.voice.engine.supertonicMissing": ["nl"],
   "mobile.settings.voice.engine.supertonicReady": ["nl"],
   "mobile.settings.voice.engine.title": ["nl"],
+  "mobile.settings.voice.gptLive.account": ["nl"],
   "mobile.settings.voice.gptLive.automatic": ["nl"],
   "mobile.settings.voice.gptLive.choiceFooter": ["nl"],
   "mobile.settings.voice.gptLive.footer": ["nl"],

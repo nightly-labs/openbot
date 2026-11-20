@@ -60,6 +60,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -135,6 +136,7 @@ import {
   setHostPromptCacheTtl,
   setHostProviderDefault,
   setHostProviderEnvironment,
+  setLiveVoiceAccount,
   setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
@@ -425,10 +427,20 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     accounts: has(PROVIDER_ACCOUNTS_CAPABILITY)
       ? {
           list: (): Promise<HostProviderAccounts> =>
-            runTeamRequest(listProviderAccountsWithModels(request, false, has(PROVIDER_ACCOUNT_POOL_CAPABILITY))),
+            runTeamRequest(
+              listProviderAccountsWithModels(
+                request,
+                false,
+                has(PROVIDER_ACCOUNT_POOL_CAPABILITY),
+                has(LIVE_VOICE_ACCOUNT_CAPABILITY),
+              ),
+            ),
           setPool: has(PROVIDER_ACCOUNT_POOL_CAPABILITY)
             ? (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]): Promise<void> =>
                 runTeamRequest(setProviderAccountPool(request, { provider, enabled, leftOut: [...leftOut] }))
+            : null,
+          setLiveVoiceAccount: has(LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? (accountId: string | null): Promise<void> => runTeamRequest(setLiveVoiceAccount(request, { accountId }))
             : null,
           rename: (provider: AgentProviderId, accountId: string, label: string | null): Promise<void> =>
             runTeamRequest(renameProviderAccount(request, { provider, accountId, label })),

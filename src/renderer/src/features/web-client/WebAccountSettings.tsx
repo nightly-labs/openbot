@@ -37,7 +37,7 @@ import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSele
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
 import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { setChatBubbleStyle, useChatBubbleStyle } from "../../chat-bubble-style-preference";
@@ -48,6 +48,7 @@ import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
+import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "../settings/LiveVoiceAccountRow";
 import { MotionSwitches } from "../settings/MotionSwitches";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
@@ -85,6 +86,7 @@ export interface WebAccountSettingsProps {
   page: SettingsPagePlacement | undefined;
   account: CentralAuthUser;
   calls: WebAccountCalls;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   language: AppLanguage;
   onChangeLanguage: (language: AppLanguage) => void;
   appearance: AppAppearance;
@@ -356,6 +358,11 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 label={t("settings.voice.speech.codexLive.title")}
                 description={t("settings.voice.speech.codexLive.serverDescription")}
               />
+              <Show when={props.liveVoiceAccount}>
+                {(choice) => (
+                  <LiveVoiceAccountRow choice={choice()} disabled={!webLiveVoice()} selectMount={modalElement} />
+                )}
+              </Show>
             </ItemGroup>
           </SettingsSection>
           <SettingsSection title={t("settings.analytics.title")}>
