@@ -285,6 +285,7 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       referralCoupon: (userId) => this.#referral.couponFor(userId),
+      keptReferralCoupon: (subscriptionId) => this.#referral.keptCoupon(subscriptionId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
@@ -331,6 +332,9 @@ export class BillingService {
 
   readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
     this.#referral.credit(userId);
+
+  readonly releaseReferralCredit = (): Effect.Effect<number, BillingError | BillingOperationError> =>
+    this.#referral.releaseDue();
 
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (

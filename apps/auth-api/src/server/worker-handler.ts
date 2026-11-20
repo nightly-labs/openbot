@@ -3,6 +3,7 @@ import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src
 import { createAccountAnalytics } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
+import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { runApiEffect } from "./effect-runtime";
@@ -121,11 +122,12 @@ export function createWorkerHandler(
             ),
             Effect.exit(tickSalesAnalytics(bindings, now)),
             Effect.exit(tickHostedPool(bindings, now)),
+            Effect.exit(tickReferralCredit(bindings)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit]),
+          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]) =>
+            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]),
           ),
         ),
       );
@@ -171,6 +173,18 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
   console.info("Sales analytics delivery completed.", result);
   yield* payments;
   yield* snapshot;
+});
+
+const tickReferralCredit = Effect.fn("ReferralCredit.tick")(function* (bindings: SalesBindings) {
+  const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
+  if (!secretKey) return;
+  const billing = new BillingService({
+    database: bindings.DB,
+    secretKey,
+    webhookSecret: null,
+    fetch: (input, init) => fetch(input, init),
+  });
+  yield* billing.releaseReferralCredit();
 });
 
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
