@@ -48,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "فشل إعداد الوكيل وتعذّرت إزالة الوكيل غير المكتمل.",
   "error.agent.modelUnavailable": "نموذج الوكيل المحدد غير متاح.",
   "error.agent.modelProviderNotConnected": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير متصل.",
+  "error.agent.modelProviderSignInRequired":
+    "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تسجيل الدخول. سجّل الدخول إلى {provider} ثم حاول مرة أخرى.",
+  "error.agent.modelProviderNotInstalled": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير مثبّت.",
+  "error.agent.modelProviderOutdated": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تحديث.",
   "error.agent.modelListEmpty":
     "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج. آخر خطأ: {detail}",
   "error.agent.modelListEmptyNoError": "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج.",

@@ -294,6 +294,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
@@ -1369,11 +1370,12 @@ export class TeamApiServer {
         error instanceof McpServerError ||
         error instanceof AnalyticsInputError ||
         error instanceof AgentMemorySelectionError ||
-        error instanceof AgentThreadLimitError;
+        error instanceof AgentThreadLimitError ||
+        error instanceof AgentSettingsRefused;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError
           ? error.status
-          : error instanceof AgentThreadLimitError
+          : error instanceof AgentThreadLimitError || error instanceof AgentSettingsRefused
             ? 409
             : expected
               ? 400
