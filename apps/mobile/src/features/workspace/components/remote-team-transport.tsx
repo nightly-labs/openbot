@@ -451,7 +451,18 @@ export const RemoteTeamTransport = memo(
         latest.current.props.onDiagnostic?.(step, detail);
       },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
+        const { onTeamEvent } = latest.current.props;
+        let failure: { error: unknown } | null = null;
+        for (const event of events) {
+          try {
+            onTeamEvent(hostId, event);
+          } catch (error) {
+            failure ??= { error };
+          }
+        }
+        if (failure) throw failure.error;
+      },
     }));
 
     return (

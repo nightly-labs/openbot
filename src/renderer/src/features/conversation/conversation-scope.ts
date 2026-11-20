@@ -95,10 +95,6 @@ function builtInBrowserPage(url: string): boolean {
   return (page?.protocol === "http:" || page?.protocol === "https:") && relayableSignInLink(url) === null;
 }
 
-function followConversationBottom(element: HTMLDivElement): void {
-  element.scrollTop = element.scrollHeight - element.clientHeight;
-}
-
 const CHAT_GLIDE_TIME_CONSTANT_MS = 70;
 const CHAT_GLIDE_MAX_STEP_MS = 34;
 const CHAT_PUSH_DURATION_MS = 280;
@@ -107,6 +103,7 @@ const CHAT_GLIDE_OPEN_DELAY_MS = 600;
 const MEDIA_SETTLE_MS = 150;
 const MEDIA_LAYOUT_EVENTS = ["load", "error", "loadedmetadata"] as const;
 const SENT_MESSAGE_PIN_MS = 400;
+const WAITING_QUESTION_CARD = '.question-prompt-bubble:not([data-state="done"])';
 
 export function createConversationViewScope(props: ConversationProps) {
   const controller = useConversationController();
@@ -1243,6 +1240,23 @@ export function createConversationViewScope(props: ConversationProps) {
     stopChatGlides();
     sentMessagePinUntil = performance.now() + SENT_MESSAGE_PIN_MS;
   }
+  function requiredInteractionScrollTop(element: HTMLDivElement): number | undefined {
+    const card = requiredInteractionElement;
+    if (!card?.matches(WAITING_QUESTION_CARD) || !element.contains(card)) return undefined;
+    const style = getComputedStyle(card);
+    const slideOffset = new DOMMatrixReadOnly(style.transform).m42;
+    const cardTop = card.getBoundingClientRect().top - slideOffset - element.getBoundingClientRect().top;
+    return Math.max(0, Math.round(element.scrollTop + cardTop - Number.parseFloat(style.scrollMarginTop)));
+  }
+  function latestScrollTop(element: HTMLDivElement): number {
+    const bottom = element.scrollHeight - element.clientHeight;
+    const cardTop = requiredInteractionScrollTop(element);
+    if (cardTop === undefined || element.scrollTop > cardTop + 1) return bottom;
+    return Math.min(bottom, cardTop);
+  }
+  function followConversationBottom(element: HTMLDivElement): void {
+    element.scrollTop = latestScrollTop(element);
+  }
   function glideConversationBottom(element: HTMLDivElement): void {
     if (performance.now() < sentMessagePinUntil) {
       stopChatGlides();
@@ -1251,7 +1265,7 @@ export function createConversationViewScope(props: ConversationProps) {
     }
     if (pushConversationBottom(element)) return;
     if (chatGlideFrame !== undefined && !followAtOnce()) return;
-    const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
+    const distance = latestScrollTop(element) - element.scrollTop;
     if (distance <= 1 || distance > element.clientHeight || followAtOnce() || prefersReducedMotion()) {
       stopChatGlides();
       followConversationBottom(element);
@@ -1262,7 +1276,7 @@ export function createConversationViewScope(props: ConversationProps) {
       const elapsed = Math.min(CHAT_GLIDE_MAX_STEP_MS, Math.max(0, now - last));
       last = now;
       const current = element.scrollTop;
-      const left = element.scrollHeight - element.clientHeight - current;
+      const left = latestScrollTop(element) - current;
       if (left <= 0.5) {
         if (left > 0) followConversationBottom(element);
         chatGlideFrame = undefined;
@@ -1278,7 +1292,7 @@ export function createConversationViewScope(props: ConversationProps) {
     const list = virtualRoot;
     if (props.responseStyle !== "natural" || !list) return false;
     if (!agentActivitySlot?.querySelector(".agent-activity-entry")) return false;
-    const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
+    const distance = latestScrollTop(element) - element.scrollTop;
     if (distance <= 1 || distance > element.clientHeight || followAtOnce() || prefersReducedMotion()) return false;
     stopChatGlides();
     const before = element.scrollTop;
@@ -1309,7 +1323,7 @@ export function createConversationViewScope(props: ConversationProps) {
     return now < chatGlideAfter || now < mediaSettleUntil;
   }
   function followJumps(element: HTMLDivElement): boolean {
-    return followAtOnce() || element.scrollHeight - element.clientHeight - element.scrollTop > element.clientHeight;
+    return followAtOnce() || latestScrollTop(element) - element.scrollTop > element.clientHeight;
   }
   let mediaSettleUntil = 0;
   function mediaLoaded(): void {

@@ -219,9 +219,10 @@ adapters drop this event, so a remote client gets no notification for a turn in 
 A routine thread is a side thread, but its runs keep Computer Use when the agent has it on: a
 scheduled run that drives a desktop app has no person to continue the step in the chat. The
 routine thread and the chat of one agent can then drive the screen at the same time, as two agents
-can. Its runs also keep the tools of the chat that side threads do not have:
-`OpenBotToolRouter` does not count a routine thread as an execution thread, so a run can call
-`await_event` and `start_task`.
+can. A channel thread keeps Computer Use too (see [channels](channels-and-messaging.md)). Only
+`start_task` tasks and branches run without it. The runs of a routine thread also keep the tools of
+the chat that side threads do not have: `OpenBotToolRouter` does not count a routine thread as an
+execution thread, so a run can call `await_event` and `start_task`.
 
 A routine run (in its thread, or in the agent's own chat) does not resume a provider session.
 `DrainScheduler.startDelivery` starts a new session for each run with
