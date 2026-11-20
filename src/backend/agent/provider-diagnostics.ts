@@ -144,6 +144,12 @@ export function isRustLogBelowErrorDiagnostic(message: string): boolean {
   return RUST_LOG_RECORD.test(message);
 }
 
+const PI_WARNING_RECORD = /^Warning: /u;
+
+export function isPiWarningDiagnostic(message: string): boolean {
+  return PI_WARNING_RECORD.test(message);
+}
+
 export const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
 
 export function isUsageLimitDiagnostic(message: string): boolean {

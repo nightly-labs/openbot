@@ -614,7 +614,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",
   "mobile.agent.home.noChatOpenBody": "יש לבחור צ'אט ברשימה.",
   "mobile.agent.home.chatListWidth": "רוחב רשימת הצ'אטים",
-  "mobile.agent.home.serverTitle": "{name}, פתיחת שרתים",
   "mobile.agent.home.waiting": "ממתין לחיבור",
   "mobile.agent.home.waitingBody": "רשימת הסוכנים תיטען כשהשרת הזה יתחבר.",
   "mobile.agent.home.noAgents": "אין סוכנים בשרת הזה",

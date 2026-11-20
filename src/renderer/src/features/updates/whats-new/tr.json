@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, iş akışı adım ayarları, Bu adımdan çalıştır, sahiplik devri, Tümünü güncelle düğmesi ve ajanlarla ilgili birçok düzeltme yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanla Bas konuş ile konuşun. Konuşurken konuşma düğmesini veya konuşma tuşunu basılı tutun. Bıraktığınızda OpenBot söylediklerinizi gönderir. Tuşu Ayarlar > Ses bölümünden değiştirin.",
+          "Bir iş akışını tek bir adımdan yeniden başlatın. Adım menüsünde Bu adımdan çalıştır seçin. Önceki adımlar yanıtlarını korur ve yeniden çalışmaz.",
+          "Bir iş akışı adımının sonucunu oluşturan ayarları ve girdileri görün. Adımda Ayarlar'ı seçin, sonra aynı şekilde yeniden çalıştırmak için Bu ayarları kullan'ı seçin.",
+          "Sunucunuzu başka bir OpenBot hesabına devredin. Sunucu ayarları > Üyeler bölümünde yeni sahibin e-postasını girin. Yeni sahip kabul ettiğinde sunucu el değiştirir.",
+          "Tüm sağlayıcıları aynı anda güncelleyin. Ayarlar > Sağlayıcılar, bir veya daha fazla sağlayıcının güncellemesi olduğunda Tümünü güncelle düğmesini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot, indirdiği sağlayıcı CLI'lerini yeni sürüm varsa her saat günceller. Güncelleme ajanlar boşta olana kadar bekler.",
+          "Bir ajanın her ileti dizisi, ana sohbetin veya o ajanın başka bir ileti dizisinin açtığı tarayıcı sekmelerini kullanabilir.",
+          "Rutinler sekmesi kenar çubuğundan kaldırıldı. Rutinler yine çalışır. Bunları ajan ayarlarında, Zamanlama sayfasında ve Sunucu ayarları > Rutinler bölümünde yönetin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "İndirilmiş bir güncelleme için yeniden başlatma artık ajanlar boşta olana kadar bekler; \"Yeniden başlatmayı iptal et\" seçeneği vardır. Önceden OpenBot hemen kapanır ve ajanın görevini durdururdu.",
+          "Bir ajan, yeniden başlatmadan ya da kullanım sınırından sonra artık \"Çalışıyor\" durumunda, iletileri beklerken kalmaz. Durdurulan tur Kesildi olarak gösterilir ve bekleyen iletiler başlar.",
+          "Çok sayıda ajanı ve bağlı cihazı olan meşgul bir sunucu artık bellek sorunu yaşamaz ve bir sonraki turu seçerken donmaz.",
+          "Bir duraklamadan sonra gönderdiğiniz ileti, Claude oturum açıkken artık \"Gönderilmedi\" ve \"Devam etmek için Claude sağlayıcısını bağlayın.\" durumunda kalmaz.",
+          "Kimsenin kullanmadığı ajan tarayıcı sekmeleri 2 dakika sonra işlemciyi kullanmayı bırakır."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

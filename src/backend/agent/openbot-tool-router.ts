@@ -218,7 +218,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -2363,13 +2363,15 @@ export class OpenBotToolRouter {
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
-        const found = matches.length > 0 || serverPlaces.length > 0;
+        const chatPlaces = searchChatPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0 || chatPlaces.length > 0;
         const apps =
           "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
           status: found ? "matches" : "not_found",
           matches,
           ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          ...(chatPlaces.length > 0 ? { chatPlaces } : {}),
           next: found
             ? [
                 matches.length > 0
@@ -2377,6 +2379,9 @@ export class OpenBotToolRouter {
                   : "",
                 serverPlaces.length > 0
                   ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                chatPlaces.length > 0
+                  ? "A chat place is a feature of the chat itself, with no id and no card: when it fits, tell the user in words where it is and what it does."
                   : "",
                 apps,
                 "When none fits, try other English words once, then say that you found no setting for it.",

@@ -670,7 +670,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Чат не открыт",
   "mobile.agent.home.noChatOpenBody": "Выберите чат в списке.",
   "mobile.agent.home.chatListWidth": "Ширина списка чатов",
-  "mobile.agent.home.serverTitle": "{name}, открыть серверы",
   "mobile.agent.home.waiting": "Ожидание подключения",
   "mobile.agent.home.waitingBody": "Список агентов загрузится, когда сервер подключится.",
   "mobile.agent.home.noAgents": "На этом сервере нет агентов",
