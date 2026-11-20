@@ -704,6 +704,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
   readonly mcpToolsFixedAtStart = (): boolean => this.#flavor.mcpToolsFixedAtStart === true;
   readonly catalogAsMcpTools = (): boolean => this.#flavor.catalogAsMcpTools === true;
+  readonly directMcpTools = (model: string | null): boolean =>
+    this.#flavor.directToolsMode !== undefined && this.options.customEndpoint?.(model)?.directTools === true;
   /** The memories and section-mates go with the prompts, so a memory change sends no instructions again. */
   readonly turnContext = true;
   readonly #turnContext = new TurnContext();
@@ -848,6 +850,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null,
       effortCategories: options.flavor.effortCategories,
+      directToolsMode: options.flavor.directToolsMode
+        ? { id: options.flavor.directToolsMode, wanted: (modelId) => this.directMcpTools(modelId) }
+        : undefined,
     });
   }
 

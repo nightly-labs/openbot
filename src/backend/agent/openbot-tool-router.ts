@@ -1138,8 +1138,13 @@ export class OpenBotToolRouter {
    */
   #deferredMcpNote(client: AgentClient, threadId: string): string | null {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
-    if (client.provider === "opencode")
+    if (client.provider === "opencode") {
+      // With direct tools, the MCP tools are in the model's tool list, and there is no execute (#12058).
+      const agentId = this.#conversation.agentForThread(threadId);
+      const model = this.#hooks.listAgents().find((agent) => agent.id === agentId)?.model;
+      if (model && client.directMcpTools?.(model)) return null;
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
+    }
     // The servers that tool_call runs for this agent (`#userMcpTool`), so the note never names a call
     // that always fails.
     if (client.provider === "antigravity") {

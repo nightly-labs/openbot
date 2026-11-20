@@ -107,6 +107,8 @@ export interface AcpConfigurationOptions {
    * with one `model-switched` message for each model that the sweep selected (#8816).
    */
   deletesSessions?: () => boolean;
+  /** `AcpFlavor.directToolsMode`, and whether a session on a model runs in it. */
+  directToolsMode?: { readonly id: string; readonly wanted: (modelId: string | null) => boolean } | undefined;
 }
 
 /** The categories of an agent's effort option when its flavor names none. */
@@ -138,6 +140,8 @@ export class AcpConfiguration {
    * can still apply later, so the option's value is not trusted, and it is sent until a set succeeds.
    */
   readonly #unconfirmedSets = new WeakMap<AcpConfigurationState, Set<string>>();
+  /** The session's own mode before it changed to the direct-tools mode. */
+  readonly #modesBeforeDirect = new WeakMap<AcpConfigurationState, string>();
   /** The probe session that discovery resumes on this connection (`keepProbeSession`). */
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
@@ -558,6 +562,49 @@ export class AcpConfiguration {
       thread.configOptions = response.configOptions;
       if (category === "model") thread.currentModelId = selected;
     }
+    yield* this.#applyDirectToolsMode(thread);
+  });
+
+  /**
+   * Puts a session on a model that needs direct tools in `AcpFlavor.directToolsMode`, and gives a
+   * session on another model its own mode back (#12058). The mode follows the session's model, so a
+   * model change in a chat changes it too.
+   */
+  readonly #applyDirectToolsMode = Effect.fn("AcpConfiguration.applyDirectToolsMode")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const direct = this.options.directToolsMode;
+    const option = thread.configOptions.find(
+      (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
+        candidate.category === "mode" && candidate.type === "select",
+    );
+    if (!direct || !option) return;
+    const values = selectValues(option).map((entry) => entry.value);
+    if (!values.includes(direct.id)) return;
+    const current = option.currentValue;
+    const wanted = direct.wanted(thread.currentModelId)
+      ? direct.id
+      : current === direct.id
+        ? (this.#modesBeforeDirect.get(thread) ?? values.find((value) => value !== direct.id))
+        : current;
+    if (!wanted || wanted === current) return;
+    if (wanted === direct.id) this.#modesBeforeDirect.set(thread, current);
+    // A refused change keeps the session's mode, as before this mode existed; the turn still runs.
+    const response = yield* this.#setConfigOption(thread, option.id, wanted, () =>
+      this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId: option.id, value: wanted }),
+    ).pipe(
+      Effect.catch(() =>
+        Effect.sync(() => {
+          logger.warn("An agent did not change the session mode for direct tools.", {
+            provider: this.options.provider,
+            mode: wanted,
+          });
+          return null;
+        }),
+      ),
+    );
+    if (response) thread.configOptions = response.configOptions;
   });
 
   readonly set = Effect.fn("AcpConfiguration.set")(function* (

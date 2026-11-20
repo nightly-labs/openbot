@@ -121,7 +121,7 @@ type OpenCodePermissionLayer = Readonly<Record<string, "allow" | "ask" | "deny">
 
 /** The config layer OpenBot owns on `OPENCODE_CONFIG_CONTENT`. The user's own file is untouched. */
 interface OpenCodeConfig {
-  readonly agent?: { readonly title: { readonly disable: true } };
+  readonly agent?: typeof OPENCODE_AGENTS;
   readonly permission?: OpenCodePermissionLayer;
   readonly provider?: Readonly<Record<string, OpenCodeProviderEntry | OpenCodeKeyEntry>>;
   readonly providers?: Readonly<Record<string, OpenCodeNativeProviderEntry>>;
@@ -138,6 +138,35 @@ export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider" | "pr
  * `agent` by key, so the user's own agents stay: `opencode debug agents` lost only "Title".
  */
 const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
+
+/**
+ * The OpenCode agent mode of a session on a model that writes calls to OpenBot's tools as text.
+ * OpenCode 2.2.5 gives MCP tools to the model only as JavaScript in its `execute` tool (Code Mode). A
+ * small model on a local OpenAI-compatible server, such as Qwen on llama.cpp, wrote
+ * `<tool_call><function=tools.openbot.ask_user>` as reply text, so no question card showed (#12058).
+ * When an agent denies `execute`, OpenCode gives every tool directly (`Tool.snapshot` in
+ * `packages/core/src/tool.ts`), as `<server>_<tool>`. A config agent is listed as an ACP session mode,
+ * and the other agents and sessions keep Code Mode.
+ */
+export const OPENCODE_DIRECT_TOOLS_MODE = "openbot-direct";
+
+const OPENCODE_AGENTS = {
+  ...OPENCODE_TITLE_OFF,
+  [OPENCODE_DIRECT_TOOLS_MODE]: {
+    mode: "primary",
+    description: "OpenBot: every tool as a direct tool, for a model on a custom endpoint.",
+    permission: { execute: "deny" },
+  },
+} as const;
+
+/**
+ * Whether the sessions on this endpoint's models run in {@link OPENCODE_DIRECT_TOOLS_MODE}: only an
+ * endpoint on the OpenAI-compatible adapter, where local servers are. An endpoint on Anthropic's,
+ * OpenAI's or Azure's own API serves large models that use Code Mode, and keeps it.
+ */
+export function openCodeDirectTools(provider: CustomProviderConfig): boolean {
+  return providerEntry(provider).npm === OPENCODE_COMPATIBLE_NPM;
+}
 
 /**
  * Profile generation runs a throwaway OpenCode session for a one-shot prompt, so it must not be able
@@ -393,7 +422,7 @@ function mergeOpenCodeConfig(
   const native = nativeProviderEntries(providers);
   return {
     ...base,
-    agent: OPENCODE_TITLE_OFF,
+    agent: OPENCODE_AGENTS,
     ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
     ...(native ? { providers: native } : {}),
   };

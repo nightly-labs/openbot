@@ -70,6 +70,11 @@ export interface AgentClient {
    * `catalogAsMcpTools`). Optional, because the other providers do not hide OpenBot's tools.
    */
   readonly catalogAsMcpTools?: (model: string) => boolean;
+  /**
+   * True when a session on `model` gives every MCP tool directly, not only in the provider's code tool
+   * (`AcpFlavor` `directToolsMode`). Optional, because only OpenCode puts MCP tools in a code tool.
+   */
+  readonly directMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   /**

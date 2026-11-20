@@ -1526,7 +1526,8 @@ export class ThreadLifecycle {
       deferredMcpServers:
         client.provider === "codex"
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
-          : client.provider === "opencode"
+          : // With direct tools, OpenCode lists every MCP tool in the request (#12058).
+            client.provider === "opencode" && client.directMcpTools?.(agent.model) !== true
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
               // tools of the saved rows through tool_call, so only the rows that it can run are listed.
@@ -1542,6 +1543,7 @@ export class ThreadLifecycle {
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
+      directMcpTools: client.directMcpTools?.(agent.model) === true,
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

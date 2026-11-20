@@ -86,6 +86,7 @@ import {
   OPENCODE_AGENT_CONFIG,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
+  openCodeDirectTools,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
@@ -1277,6 +1278,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                 name: endpoint.name,
                 hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
                 stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+                directTools: openCodeDirectTools(endpoint),
               }
             : null;
         },

@@ -196,6 +196,11 @@ export interface DeveloperInstructionOptions {
    * `catalogAsMcpTools`). Its tool_call refused `openbot.channel_result` (#9312).
    */
   catalogAsMcpTools?: boolean;
+  /**
+   * OpenCode gives the session every MCP tool directly, as `<server>_<tool>`, and has no `execute`
+   * (`AcpFlavor` `directToolsMode`, #12058).
+   */
+  directMcpTools?: boolean;
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
   instructionsFileName?: AgentInstructionFileName;
   /**
@@ -559,15 +564,21 @@ export function developerInstructions(
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
           // Code Mode reads a ``` fence as a call on the empty string "", so each fenced program failed
           // with "The called value is not a function" at line 1, col 1, and the model sent it again (#11641).
+          // A small model on a custom endpoint wrote `<tool_call><function=tools.openbot.ask_user>` as
+          // text, so OpenCode gives that session the tools directly, with no execute (#12058).
           agent.provider === "opencode"
-          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again.${
+          ? `${
+              options.directMcpTools
+                ? ' Your openbot and openbot_browser tools are direct tools named <server>_<tool>, such as openbot_ask_user for openbot.ask_user. Call them as tools, never in code or as text. Run each other tool with openbot_tool_call, such as {"name":"openbot.create_agent","arguments":{…}}.'
+                : ' In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a ``` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again.'
+            }${
               // A JavaScript string drops a single backslash, so `"C:\Users\…"` reached the
               // attachment check as `C:Users…` and was not found (#8635). OpenCode refuses a PowerShell
               // command with a curly quote or an en or em dash before it runs, as `invalid-structure`;
               // the agent sent the same text again and again (#9211).
-              process.platform === "win32"
-                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash. In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as $([char]0x2013) inside double quotes, or read the text from a file."
-                : ""
+              process.platform !== "win32"
+                ? ""
+                : `${options.directMcpTools ? "" : " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash."} In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as $([char]0x2013) inside double quotes, or read the text from a file.`
             }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
             // `use_tool`, as `server__tool`. A model that did not find openbot.send_message in its

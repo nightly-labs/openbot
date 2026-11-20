@@ -40,6 +40,8 @@ export interface AcpCustomEndpoint {
   readonly hasCredentials: boolean;
   /** How long a turn on this endpoint may send nothing before it fails. The agent's own limit when absent. */
   readonly stallMs?: number;
+  /** A session on this endpoint's models runs in the flavor's `directToolsMode`. */
+  readonly directTools?: boolean;
 }
 
 /** An MCP server that the agent could not start for one session, as `AcpFlavor.mcpServerFailure` reads it. */
@@ -411,6 +413,11 @@ export interface AcpFlavor {
    * tool_call with the agent's search, and the agent's tool_call refused `openbot.channel_result` (#9312).
    */
   catalogAsMcpTools?: true;
+  /**
+   * The session mode in which the agent gives every MCP tool directly, not only in its code tool. A
+   * session on a model whose custom endpoint has `directTools` runs in it (#12058).
+   */
+  directToolsMode?: string;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /**

@@ -1,8 +1,9 @@
 // Checks that an OpenCode agent still does its work with the rules of `opencode-agent-defaults.ts`.
 // Runs the real `opencode` provider driver and the real OpenCode binary against a fake model on
 // loopback (`opencode-agent-harness.ts`), with the OpenBot tools of a real agent. In one turn the model
-// calls `write`, `read`, `edit`, `shell`, `glob`, `grep`, a `general` subagent, and `execute` with the
-// OpenBot `ask_user` tool, which the Code Mode catalog does not show. Then a second process starts
+// calls `write`, `read`, `edit`, `shell`, `glob`, `grep`, a `general` subagent, and OpenBot's `ask_user`.
+// On a custom OpenAI-compatible endpoint, OpenCode gives every tool directly (#12058), so `ask_user` is
+// `openbot_ask_user` and an OpenCode tool is `opencode_<name>`. Then a second process starts
 // with the user's own rules: a global config with the catch-all `"*": "allow"`, a pattern that allows
 // `opencode_read_mcp_resource` and a pattern that allows the `report` skill, and a project rule that
 // allows `question`. The user's rules must win, and OpenBot's other rules must stay.
@@ -15,7 +16,6 @@ import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { getArray, getRecord, getString, isRecord } from "../src/backend/protocol";
 import {
-  codeModeCatalog,
   type Json,
   listedSkills,
   type ModelAnswer,
@@ -39,13 +39,14 @@ interface StepReport {
 interface Report {
   passed: boolean;
   openCodeVersion?: string;
-  firstRequest?: { tools: string[]; skills: string[]; catalog: ReturnType<typeof codeModeCatalog> };
+  /** `catalog`: the names after `opencode_` in the function tools. */
+  firstRequest?: { tools: string[]; skills: string[]; catalog: string[] };
   steps: StepReport[];
   hostRequests: string[];
   openbotToolCalls: string[];
   subagentRequests: number;
   file?: string;
-  userRules?: { tools: string[]; skills: string[]; catalog: ReturnType<typeof codeModeCatalog>; defaults: Json };
+  userRules?: { tools: string[]; skills: string[]; catalog: string[]; defaults: Json };
   error?: string;
 }
 
@@ -65,13 +66,13 @@ const steps: ModelAnswer[] = [
     tool: "subagent",
     arguments: { agent: "general", description: "Check the file", prompt: `${SUBAGENT_MARKER}: reply with done.` },
   },
-  {
-    tool: "execute",
-    arguments: {
-      code: 'return await tools.openbot.ask_user({ questions: [{ id: "color", question: "Which color?" }] });',
-    },
-  },
+  { tool: "openbot_ask_user", arguments: { questions: [{ id: "color", question: "Which color?" }] } },
 ];
+
+/** The OpenCode tools of a request, by the names after `opencode_`. */
+function openCodeTools(request: ModelRequest): string[] {
+  return request.tools.flatMap((tool) => (tool.startsWith("opencode_") ? [tool.slice("opencode_".length)] : []));
+}
 
 /** The text of the last tool result in a request. */
 function lastToolResult(request: ModelRequest): string {
@@ -142,16 +143,16 @@ try {
 
   const first = harness.requests.find((request) => request.tools.length > 0);
   assert.ok(first, "OpenCode sent no request with tools.");
-  const catalog = codeModeCatalog(first.system);
+  const catalog = openCodeTools(first);
   report.firstRequest = { tools: [...first.tools].sort(), skills: listedSkills(first.system), catalog };
   assert.ok(!first.tools.includes("question"), "The request still offers the question tool.");
   for (const skill of ["report", "opencode"])
     assert.ok(!report.firstRequest.skills.includes(skill), `The request still lists the ${skill} skill.`);
   for (const tool of ["list_mcp_resources", "read_mcp_resource"])
-    assert.ok(!catalog.opencode.includes(tool), `The catalog still lists ${tool}.`);
-  for (const tool of ["write", "read", "edit", "shell", "glob", "grep", "subagent", "skill", "webfetch", "execute"])
+    assert.ok(!catalog.includes(tool), `The request still offers ${tool}.`);
+  for (const tool of ["write", "read", "edit", "shell", "glob", "grep", "subagent", "skill", "webfetch"])
     assert.ok(first.tools.includes(tool), `The request does not offer ${tool}.`);
-  assert.ok(catalog.opencode.includes("models"), "The catalog lost opencode.models.");
+  assert.ok(catalog.includes("models"), "The request lost opencode_models.");
 
   assert.deepEqual(
     report.steps.map((step) => step.tool),
@@ -169,7 +170,10 @@ try {
   assert.ok(report.subagentRequests > 0, "The subagent sent no request.");
   assert.match(result("subagent"), /done/u);
   assert.deepEqual(report.openbotToolCalls, ["openbot.ask_user"]);
-  assert.ok(result("execute").includes(ANSWER), `execute did not return the answer: ${result("execute")}`);
+  assert.ok(
+    result("openbot_ask_user").includes(ANSWER),
+    `openbot_ask_user did not return the answer: ${result("openbot_ask_user")}`,
+  );
   await runCauseEffect(client.stop());
 
   // Part 2: the user's own rules win.
@@ -192,20 +196,20 @@ try {
   report.userRules = {
     tools: [...userRequest.tools].sort(),
     skills: listedSkills(userRequest.system),
-    catalog: codeModeCatalog(userRequest.system),
+    catalog: openCodeTools(userRequest),
     defaults,
   };
   assert.ok(userRequest.tools.includes("question"), "The project rule did not bring back the question tool.");
   assert.ok(report.userRules.skills.includes("report"), "The global pattern did not keep the report skill.");
   assert.ok(
-    report.userRules.catalog.opencode.includes("read_mcp_resource"),
-    "The global pattern did not keep opencode.read_mcp_resource.",
+    report.userRules.catalog.includes("read_mcp_resource"),
+    "The global pattern did not keep opencode_read_mcp_resource.",
   );
   // The catch-all `"*"` does not count as a choice about these rules.
   assert.ok(!report.userRules.skills.includes("opencode"), "OpenBot's rule for the opencode skill is gone.");
   assert.ok(
-    !report.userRules.catalog.opencode.includes("list_mcp_resources"),
-    "The catalog lists list_mcp_resources again.",
+    !report.userRules.catalog.includes("list_mcp_resources"),
+    "The request offers opencode_list_mcp_resources again.",
   );
   report.passed = true;
 } catch (error) {

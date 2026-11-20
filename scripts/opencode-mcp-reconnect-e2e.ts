@@ -1,5 +1,5 @@
 // Runs the real `opencode` provider driver and the real OpenCode binary against a fake
-// OpenAI-compatible model that calls OpenBot's tool through Code Mode. OpenBot's MCP bridge answers
+// OpenAI-compatible model that calls OpenBot's tool, a direct tool on such an endpoint (#12058). OpenBot's MCP bridge answers
 // the first connection after 35 s, as a busy host can. OpenCode 2.3.0 gives a server 30 s, continues
 // without it, and does not connect again while the settings stay the same, so a team agent had no
 // OpenBot tools for hours (#10749). OpenBot must open the session again with a new token: the first
@@ -37,7 +37,7 @@ interface Report {
   delayedConnects: number;
   diagnostics: string[];
   toolCalls: string[];
-  /** What the model got back from each `execute` call, in order. */
+  /** What the model got back from each call of OpenBot's tool, in order. */
   toolResults: string[];
   replies: string[];
   error?: string;
@@ -104,12 +104,11 @@ const model = createServer((request, response) => {
       sse(response, { role: "assistant", content: `result ${lastContent}` }, "stop");
       return;
     }
-    if (!tools.includes("execute")) {
+    if (!tools.includes("openbot_whoami")) {
       sse(response, { role: "assistant", content: "Title" }, "stop");
       return;
     }
     calls += 1;
-    const code = "return await tools.openbot.whoami({})";
     sse(
       response,
       {
@@ -119,7 +118,7 @@ const model = createServer((request, response) => {
             index: 0,
             id: `call_${calls}`,
             type: "function",
-            function: { name: "execute", arguments: JSON.stringify({ code }) },
+            function: { name: "openbot_whoami", arguments: "{}" },
           },
         ],
       },
@@ -168,6 +167,21 @@ async function startThread(client: AgentClient, cwd: string): Promise<string> {
   const id = getString(getRecord(response, "thread"), "id");
   if (!id) throw new Error("thread/start answers no thread id.");
   return id;
+}
+
+/**
+ * Runs turns until the chat called OpenBot's tool. OpenCode adds a server's direct tools to its
+ * registry a few milliseconds after it lists them, and a turn of the fake model can come first.
+ */
+async function callWhoami(client: AgentClient, threadId: string): Promise<void> {
+  const calls = report.toolResults.length;
+  const deadline = Date.now() + 60_000;
+  while (report.toolResults.length === calls) {
+    assert.ok(Date.now() < deadline, "The chat never got OpenBot's tool.");
+    const turn = await runTurn(client, threadId, { text: "Call whoami.", timeoutMs: 120_000 });
+    report.replies.push(turn.reply);
+    assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
+  }
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-mcp-reconnect-"));
@@ -224,9 +238,7 @@ try {
 
   // The first chat's server connects too late for OpenCode.
   const first = await startThread(client, workspace);
-  const firstTurn = await runTurn(client, first, { text: "Call whoami.", timeoutMs: 120_000 });
-  report.replies.push(firstTurn.reply);
-  assert.equal(firstTurn.error, null, `The first turn failed: ${firstTurn.error}`);
+  await callWhoami(client, first);
   assert.equal(report.delayedConnects, 1, "The bridge must delay the first connection.");
   assert.ok(
     report.toolResults[0]?.includes(`thread=${first}`),
@@ -235,9 +247,7 @@ try {
 
   // A second chat of the same folder shares the server.
   const second = await startThread(client, workspace);
-  const secondTurn = await runTurn(client, second, { text: "Call whoami.", timeoutMs: 120_000 });
-  report.replies.push(secondTurn.reply);
-  assert.equal(secondTurn.error, null, `The second turn failed: ${secondTurn.error}`);
+  await callWhoami(client, second);
   assert.ok(
     report.toolResults[1]?.includes(`thread=${second}`),
     `The second chat must reach its tool: ${report.toolResults[1]}`,

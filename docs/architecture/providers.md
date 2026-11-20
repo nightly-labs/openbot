@@ -657,9 +657,26 @@ catalog shows 14 of 16 OpenBot tools, not 13, and `search` still finds the other
 a one-reply request goes from 5,987 to 5,288 o200k tokens (−11.7%), and a read-then-reply task from
 12,130 to 10,732. `bun run bench:opencode-prompt-settings` runs the real driver and CLI against a fake
 model on loopback in temporary XDG folders and reports the tokens, tools, skills and catalog of each
-variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. `bun run smoke:opencode-agent`
-runs one agent turn with the core tools, a subagent and an OpenBot tool through `execute`, then checks
-that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+variant in `.openbot-build/opencode-prompt-settings-bench/report.json`. These counts are from Code
+Mode; the bench's fake endpoint now runs in the direct-tools mode below. `bun run smoke:opencode-agent`
+runs one agent turn with the core tools, a subagent and the direct OpenBot tool `openbot_ask_user`, then
+checks that global and project rules of the user win, in `.openbot-build/opencode-agent-smoke/report.json`.
+
+Code Mode gives MCP tools to the model only as JavaScript in `execute`. A small model on a local
+OpenAI-compatible server, such as Qwen on llama.cpp, wrote `<tool_call><function=tools.openbot.ask_user>`
+as reply text, and no question card showed (#12058). So `OPENCODE_CONFIG_CONTENT` also defines the agent
+`openbot-direct` (`OPENCODE_DIRECT_TOOLS_MODE`), which denies `execute`; OpenCode then gives every tool
+directly, as `<server>_<tool>`. OpenCode lists a config agent as an ACP session mode, and
+`AcpConfiguration` selects it for a session on a model of a custom endpoint on the OpenAI-compatible
+adapter (`openCodeDirectTools`), after each model set. A session on another model gets its own mode back.
+The instructions and the tool-search note follow the same check (`AgentClient.directMcpTools`). An
+endpoint on Anthropic's, OpenAI's or Azure's own API, and OpenCode's built-in models, keep Code Mode. The
+cost: a request carries the full schemas of OpenBot's 19 visible tools (about 3.9k tokens, where the Code
+Mode catalog is capped at about 2k) and of the user's MCP tools, and `search(...)` is not available.
+OpenCode adds a server's tools to its registry a few milliseconds after it lists them, so the first
+request of the first chat of a directory can come without OpenBot's tools; Code Mode hides this, because
+`execute` finds a tool when its code runs. `scripts/opencode-direct-tools-e2e.ts` checks the mode, the
+tool list, a direct call and the mode change on a model change.
 
 Grok `agent stdio` ignores `--tools` and `--disallowed-tools`, so only environment and `config.toml`
 switches remove a Grok feature. At each spawn, `grok-client.ts` turns off four features that an

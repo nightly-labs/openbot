@@ -1,17 +1,19 @@
 // Runs the real `opencode` provider driver and the real OpenCode binary against a fake
-// OpenAI-compatible server (`opencode-agent-harness.ts`), to check the Code Mode catalog that each
-// request carries. OpenBot denies OpenCode's `session_*` and `worktree_*` tools: OpenBot names its own
+// OpenAI-compatible server (`opencode-agent-harness.ts`), to check the OpenCode tools that each
+// request carries. A session on such an endpoint gets them as direct tools, named `opencode_<name>`
+// (`OPENCODE_DIRECT_TOOLS_MODE`, #12058); a denied tool is left out of the Code Mode catalog in the
+// same way. OpenBot denies OpenCode's `session_*` and `worktree_*` tools: OpenBot names its own
 // chats, and `session_move` would move the session out of the agent's workspace. `worktree_remove`
 // stays, because OpenCode checks it with the `edit` permission. OpenBot's MCP servers serve no
 // resources, so `opencode-agent-defaults.ts` also denies the two MCP resource tools. The user's own
-// config denies `opencode_models`, so the catalog also shows that OpenCode keeps the user's rules
+// config denies `opencode_models`, so the list also shows that OpenCode keeps the user's rules
 // beside OpenBot's.
 // `OPENCODE_CLI=<opencode> bun scripts/opencode-tool-trim-e2e.ts`.
 // Writes .openbot-build/opencode-tool-trim-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { codeModeCatalog, OPENCODE_MODEL, startOpenCodeHarness } from "./opencode-agent-harness";
+import { OPENCODE_MODEL, startOpenCodeHarness } from "./opencode-agent-harness";
 import { runTurn, startThread } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-tool-trim-e2e");
@@ -30,7 +32,7 @@ const USER_DENIED = "models";
 
 interface Request {
   bytes: number;
-  /** The names after `tools.opencode.` in the system prompt. */
+  /** The names after `opencode_` in the request's function tools. */
   catalog: string[];
 }
 
@@ -61,7 +63,7 @@ try {
     .filter((request) => request.tools.length > 0)
     .map((request) => ({
       bytes: JSON.stringify(request.body).length,
-      catalog: codeModeCatalog(request.system).opencode,
+      catalog: request.tools.flatMap((tool) => (tool.startsWith("opencode_") ? [tool.slice("opencode_".length)] : [])),
     }));
   assert.ok(report.requests.length > 0, "OpenCode sent no request with tools.");
   for (const { catalog } of report.requests) {

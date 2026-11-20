@@ -10,6 +10,7 @@ import {
   isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
+import { OPENCODE_DIRECT_TOOLS_MODE } from "./opencode-config";
 import { isRecord } from "./protocol";
 
 /**
@@ -271,6 +272,7 @@ function openCodeFailureCause(error: unknown): CauseCode | null {
 }
 
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
+  directToolsMode: OPENCODE_DIRECT_TOOLS_MODE,
   // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
   // invalid params and the ID in data.sessionId. OpenCode also refuses each resume of a session that
   // it made in another directory, with data.cwd (#7622): the agent's workspace moved. The agent must
