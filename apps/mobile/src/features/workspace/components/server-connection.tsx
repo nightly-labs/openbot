@@ -10,12 +10,14 @@ import {
 import {
   REMOTE_PEER_LOST_AFTER_MS,
   type RemoteTeamConnectionUpdate,
+  type RemoteTeamDiagnostic,
   type RemoteTeamEvent,
 } from "@openbot/team-client/remote-peer";
 import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
 import { subscribeNetworkMoves } from "@/shared/lib/network-path";
@@ -81,7 +83,7 @@ export const ServerConnection = memo(function ServerConnection({
   const activeRef = useRef(active);
   activeRef.current = active;
   const generation = useRef(0);
-  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics));
+  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics, phoneVpn));
   const membershipRefreshPending = useRef(false);
   const inactiveSince = useRef<number | null>(null);
   const lastStatus = useRef<{ status: RemoteRecoveryStatus; failure: RemoteConnectionFailure | null } | null>(null);
@@ -127,6 +129,10 @@ export const ServerConnection = memo(function ServerConnection({
       else networkMoved.current = true;
     });
   }, [client, hostId]);
+  const handleDiagnostic = useCallback(
+    (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => analytics.diagnostic(step, detail),
+    [analytics],
+  );
   const lostAfterMs = useRef(REMOTE_PEER_LOST_AFTER_MS);
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
@@ -271,6 +277,7 @@ export const ServerConnection = memo(function ServerConnection({
       onNetworkRestored={handleNetworkRestored}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={handleConnectionUpdate}
+      onDiagnostic={handleDiagnostic}
     />
   );
 });

@@ -2,7 +2,6 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { appPort } from "../../app-port";
-import { useLayout } from "../../layout";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
@@ -35,7 +34,6 @@ export function TasksPanel(props: TasksPanelProps) {
   const tabs = useAgentThreads();
   const { selectAgent } = useNavigation();
   const platform = usePlatform();
-  const layout = useLayout();
 
   const attachmentFiles = createAttachmentDownloads({
     serverId: () => props.serverId,
@@ -69,7 +67,6 @@ export function TasksPanel(props: TasksPanelProps) {
       waitsForAnswer={(task) => pendingPrompts()[attentionKey(task.agentId, task.threadId)] !== undefined}
       onOpenInChat={(task) => {
         tabs.open(task.agentId, task.id);
-        layout.setSidebarView("agents");
         selectAgent(task.agentId);
       }}
       sendShortcut={deviceSendShortcut(platform.appInfo()?.platform)}

@@ -228,6 +228,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "In attesa. L'host esegue tanti turni quanti ne consente la sua memoria.",
   "mobile.server.threads.hold.agentBusy": "In attesa che finisca altro lavoro di questo agente.",
   "mobile.server.threads.hold.oneTurn": "In attesa. Il provider di questo agente esegue un turno alla volta.",
+  "mobile.server.threads.hold.signIn": "In attesa. Il provider di questo agente richiede l’accesso.",
   "mobile.server.threads.offline": "Connettiti a questo server per vedere i suoi thread.",
   "mobile.server.threads.loading": "Caricamento dei thread…",
   "mobile.server.threads.loadFailed": "Impossibile caricare i thread di alcuni agenti.",
@@ -1689,4 +1690,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Impossibile accettare il trasferimento",
   "mobile.server.ownerTransfer.declineFailed": "Impossibile rifiutare il trasferimento",
   "mobile.server.ownerTransfer.tryAgain": "Riprova più tardi.",
+  "mobile.server.providers.updateAll": "Aggiorna tutti",
+  "mobile.server.providers.updateAllFailed": "Alcuni aggiornamenti non sono partiti. Riprova.",
 } as const satisfies PartialTranslation<typeof source>;

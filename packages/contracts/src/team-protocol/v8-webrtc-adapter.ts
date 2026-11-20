@@ -56,6 +56,7 @@ export function encodeTeamProtocolV8WebRtcHttpResponse(
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ) {
   if (status === 204) return {};
@@ -88,6 +89,7 @@ export function createTeamProtocolV8Event(
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

@@ -141,23 +141,14 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     if (!open && wasOpen) alertCards.refresh();
   });
 
-  const channelsListed = () => channels.supported() && layout.sidebarView() !== "routines";
+  const channelsListed = () => channels.supported();
   const sidebarChannels = () =>
-    !channels.state.listed &&
-    layout.sidebarView() !== "routines" &&
-    (!serverScope.loaded() || channels.supported()) &&
-    serverScope.frameChannels().length > 0
+    !channels.state.listed && (!serverScope.loaded() || channels.supported()) && serverScope.frameChannels().length > 0
       ? serverScope.frameChannels()
       : channelsListed()
         ? channels.state.channels
         : [];
   const visibleChannels = createMemo(() => sidebarChannels().filter((channel) => !channel.archived));
-  createEffect(
-    () => layout.sidebarView() === "routines" && channels.state.selectedId !== null,
-    (channelOpenInRoutines) => {
-      if (channelOpenInRoutines) layout.setSidebarView("agents");
-    },
-  );
 
   const { agentStates: sidebarAgentStates, agentMoods } = createAgentActivity();
 
@@ -206,7 +197,6 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
-        view={layout.sidebarView()}
         serverName={activeServer()?.name ?? t("sidebar.topbar.localServer")}
         onOpenServerSettings={(trigger) => {
           const server = activeServer();

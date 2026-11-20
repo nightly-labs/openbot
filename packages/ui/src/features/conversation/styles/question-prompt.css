@@ -1,6 +1,7 @@
 .question-prompt-bubble.ui-bubble {
   width: min(540px, 100%);
   max-width: 100%;
+  scroll-margin-top: var(--openbot-space-2);
 }
 
 .question-prompt-with-author {

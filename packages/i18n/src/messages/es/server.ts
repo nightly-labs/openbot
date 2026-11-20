@@ -227,6 +227,24 @@ export const messages = {
   "server.rail.delete": "Eliminar servidor",
   "server.rail.hide": "Ocultar servidor",
   "server.rail.showLocal": "Mostrar {name}",
+  "server.plan.daysLeft": {
+    one: "{count} día",
+    other: "{count} días",
+  },
+  "server.plan.ended": "Plan finalizado",
+  "server.plan.status": "plan finalizado, se elimina el {date}",
+  "server.plan.deletedOn": "Se elimina el {date}",
+  "server.plan.dialogTitle": "No dejes ir a tus agentes",
+  "server.plan.dialogDescription":
+    "{name} se detuvo porque no se pagó su plan. El {date}, OpenBot elimina sus agentes con todos sus chats y archivos.",
+  "server.plan.dialogDaysLeft": {
+    one: "Queda {count} día",
+    other: "Quedan {count} días",
+  },
+  "server.plan.later": "Más tarde",
+  "server.plan.keepAgents": "Conservar agentes",
+  "server.plan.ownerRenews":
+    "Los agentes de {name} no están disponibles hasta que el propietario del servidor renueve el plan.",
   "server.select.failedTitle": "No se pudo seleccionar el servidor",
   "server.select.failedDescription": "No se pudo cambiar de servidor. Inténtalo de nuevo.",
   "server.select.openAgentFailed": "No se pudo abrir {name}. Búscalo en la barra lateral.",

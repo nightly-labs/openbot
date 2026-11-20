@@ -115,6 +115,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "قيد الانتظار. يشغّل هذا الحاسوب أكبر عدد من الأدوار تسمح به ذاكرته.",
   "conversation.threads.hold.agentBusy": "بانتظار انتهاء أعمال أخرى لهذا الوكيل.",
   "conversation.threads.hold.oneTurn": "قيد الانتظار. يشغّل مزوّد هذا الوكيل دورًا واحدًا في كل مرة.",
+  "conversation.threads.hold.signIn": "قيد الانتظار. يحتاج مزوّد هذا الوكيل إلى تسجيل الدخول.",
   "conversation.sidePanel.closePanel": "إغلاق اللوحة",
   "conversation.threads.view.failedBody": "لم يذكر المزوّد سببًا. أرسل رسالة لإعادة المحاولة.",
   "conversation.threads.deleteUndo.action": "تراجع",

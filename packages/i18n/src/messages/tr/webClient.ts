@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Oturum açma yanıtı geçersiz.",
   "webClient.pane.navigation": "Çalışma alanı gezintisi",
   "webClient.pane.chat": "Sohbet",
-  "webClient.pane.routines": "Rutinler",
   "webClient.pane.workspace": "Çalışma alanı",
   "webClient.phoneApp.title": "OpenBot uygulamasını kullanın",
   "webClient.phoneApp.description": "Telefonda OpenBot en iyi uygulamada çalışır. Aynı e-posta ile giriş yapın.",

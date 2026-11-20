@@ -316,7 +316,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "转交密钥",
   "routine.webhook.giveSecretFailed": "无法将签名密钥转交给 {name}。",
   "routine.webhook.secretGiven": "{name} 已获得新的签名密钥。",
-  "routine.webhook.statusFailed": "无法检查主机是否已连接到中继。",
   "routine.webhook.stepDone": "完成",
   "routine.webhook.stepUrl": "把端点复制到发送方服务",
   "routine.webhook.stepUrlHint": "发送方发出 POST 请求，JSON 正文不超过 64 KiB。",

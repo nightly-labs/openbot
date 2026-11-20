@@ -879,7 +879,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const knownIds = serverAgentIds.current.get(serverId) ?? new Set<string>();
       for (const agent of summaries) knownIds.add(agent.id);
       serverAgentIds.current.set(serverId, knownIds);
-      cachedSummaries.current.set(serverId, summaries);
+      cachedSummaries.current.set(serverId, replaceEqualDeep(cachedSummaries.current.get(serverId), summaries));
       setAgents((current) => {
         const previous = new Map(
           current.filter((agent) => agent.serverId === serverId).map((agent) => [agent.id, agent]),
@@ -906,9 +906,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     (serverId: string, items: readonly SidebarPin[], change = pinChanges.current.get(serverId) ?? 0) => {
       if ((pinChanges.current.get(serverId) ?? 0) !== change) return;
       try {
-        const next = withHostSidebarPins(preferenceStore.read(serverId), items);
-        preferenceStore.write(serverId, next);
-        setPreferences((current) => ({ ...current, [serverId]: next }));
+        const saved = preferenceStore.read(serverId);
+        const next = withHostSidebarPins(saved, items);
+        if (replaceEqualDeep(saved, next) !== saved) preferenceStore.write(serverId, next);
+        setPreferences((current) => {
+          const value = replaceEqualDeep(current[serverId], next);
+          return value === current[serverId] ? current : { ...current, [serverId]: value };
+        });
       } catch {}
     },
     [preferenceStore],
@@ -1178,7 +1182,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     async (serverId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext) => {
       context.stage = "preferences";
       const saved = preferenceStore.read(serverId);
-      setPreferences((current) => ({ ...current, [serverId]: saved }));
+      setPreferences((current) => {
+        const value = replaceEqualDeep(current[serverId], saved);
+        return value === current[serverId] ? current : { ...current, [serverId]: value };
+      });
       context.stage = "connection";
       const { kept } = await client.connect(serverId, publicKey);
       if (!context.isCurrent()) return;
@@ -1192,7 +1199,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         if (!context.isCurrent()) return;
         loadOpenChats(
           serverId,
-          agentsRef.current.filter((agent) => agent.serverId === serverId).map((agent) => agent.id),
+          agentsRef.current
+            .filter((agent) => agent.serverId === serverId && conversationStore.missedLatest(agent.id))
+            .map((agent) => agent.id),
           client,
           context,
         );

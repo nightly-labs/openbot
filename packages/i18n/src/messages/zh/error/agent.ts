@@ -48,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
   "error.agent.modelUnavailable": "所选的助手模型不可用。",
   "error.agent.modelProviderNotConnected": "所选的助手模型“{model}”不可用：{provider} 未连接。",
+  "error.agent.modelProviderSignInRequired":
+    "所选的助手模型“{model}”不可用：{provider} 需要登录。请登录 {provider} 后重试。",
+  "error.agent.modelProviderNotInstalled": "所选的助手模型“{model}”不可用：{provider} 未安装。",
+  "error.agent.modelProviderOutdated": "所选的助手模型“{model}”不可用：{provider} 需要更新。",
   "error.agent.modelListEmpty": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。上次错误：{detail}",
   "error.agent.modelListEmptyNoError": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。",
   "error.agent.modelNotInProviderList": "所选的助手模型“{model}”不可用：{provider} 未列出该模型。",

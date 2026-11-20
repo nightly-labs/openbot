@@ -26,6 +26,7 @@ import {
   type AgentStatus,
   type AgentSummary,
   type AgentTask,
+  type AgentTaskHold,
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
@@ -365,7 +366,7 @@ import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/con
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
-import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
@@ -1645,6 +1646,7 @@ const fakeAgents: TeamApiAgents = {
 };
 
 let longThreadQueue = false;
+let queuedTaskHold: AgentTaskHold | null = null;
 const fakeAgentTasks: TeamApiAgentTasks = {
   listAgents: () => agents,
   listTasks: (agentId) => {
@@ -1657,7 +1659,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       title: id,
       state: queue.length > 0 ? "queued" : "idle",
       outcome: null,
-      hold: null,
+      hold: queue.length > 0 ? queuedTaskHold : null,
       activeTurnId: null,
       progress: null,
       error: null,
@@ -6486,6 +6488,36 @@ try {
       "a client ignores a hold reason from a newer host that it does not know",
       isQueueSnapshot(unknown) && unknown.hold === undefined,
       unknown,
+    );
+    const signInHold = { reason: "sign-in", provider: "codex" } as const;
+    queueSnapshotHold = { agentId: "agent-ada", hold: signInHold };
+    const signIn = await read(withHold);
+    const signInDecoded =
+      signIn.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, signIn.body) : null;
+    check(
+      "a client with queue-hold-sign-in-v1 reads that the queue waits for provider sign-in, and its decoder keeps it",
+      TEAM_CURRENT_CAPABILITIES.includes(QUEUE_HOLD_SIGN_IN_CAPABILITY) &&
+        signIn.status === 200 &&
+        isDeepStrictEqual(field(signIn.body, "hold"), signInHold) &&
+        isQueueSnapshot(signInDecoded) &&
+        isDeepStrictEqual(signInDecoded.hold, signInHold),
+      [summary(signIn), signInDecoded],
+    );
+    const restartOnly = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== QUEUE_HOLD_SIGN_IN_CAPABILITY),
+      ),
+    );
+    const signInOlder = await read(undefined, TEAM_PROTOCOL_V9);
+    check(
+      "a client with only queue-hold-v1, and a protocol 9 client, do not get the sign-in hold that their decoder does not know",
+      restartOnly.status === 200 &&
+        field(restartOnly.body, "hold") === undefined &&
+        isDeepStrictEqual(field(restartOnly.body, "deliveries"), field(signIn.body, "deliveries")) &&
+        signInOlder.status === 200 &&
+        field(signInOlder.body, "hold") === undefined,
+      [summary(restartOnly), summary(signInOlder)],
     );
     queueSnapshotHold = null;
   }
@@ -13057,6 +13089,29 @@ try {
         field(tasks.body, "tasks", 1, "id") === "task-idle" &&
         field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
       [summary(listed), summary(tasks)],
+    );
+    queuedTaskHold = "sign-in";
+    const olderHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    const signInHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+      json: listBody,
+    });
+    queuedTaskHold = null;
+    check(
+      "a task that waits for provider sign-in shows the sign-in hold only to a client that knows it",
+      olderHold.status === 200 &&
+        field(olderHold.body, "tasks", 0, "id") === "task-queued" &&
+        field(olderHold.body, "tasks", 0, "hold") === "agent-busy" &&
+        signInHold.status === 200 &&
+        field(signInHold.body, "tasks", 0, "hold") === "sign-in",
+      [summary(olderHold), summary(signInHold)],
     );
   }
 

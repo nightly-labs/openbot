@@ -220,7 +220,8 @@ without account credentials. The phone sends no request to a plugin vendor until
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
-counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+connection step times, the kind of connection path (direct or relayed, and UDP, TCP or TLS), whether
+the phone uses a VPN or a proxy app (never its name or an address), counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
 Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.

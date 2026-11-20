@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "登录响应无效。",
   "webClient.pane.navigation": "工作区导航",
   "webClient.pane.chat": "对话",
-  "webClient.pane.routines": "自动化任务",
   "webClient.pane.workspace": "工作区",
   "webClient.phoneApp.title": "使用 OpenBot 应用",
   "webClient.phoneApp.description": "在手机上，OpenBot 在应用中效果最好。请使用同一邮箱登录。",
