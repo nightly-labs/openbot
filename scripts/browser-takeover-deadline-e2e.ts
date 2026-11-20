@@ -512,6 +512,29 @@ try {
     return releasedAnswers.at(-1);
   });
 
+  await step("a late password answer tells the agent that the Vault did not save it", async () => {
+    await callOn(limited, "submit_secret", "turn-limit-11");
+    limited.clearForTurn(THREAD, "turn-limit-11", true);
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    const late = releasedAnswers.length;
+    await runCauseEffect(
+      limited.respondToBrowserSecret({
+        requestId,
+        agentId: AGENT,
+        decision: "submit",
+        secret: SECRET,
+        saveToVault: true,
+      }),
+    );
+    assert.equal(releasedAnswers.length, late + 1, "the late answer did not reach the agent once");
+    const answer = releasedAnswers.at(-1) ?? "";
+    assert.match(answer, /^I finished the browser takeover/);
+    assert.match(answer, /The password was not saved: no Vault is available\./);
+    assert.doesNotMatch(answer, new RegExp(SECRET), "the late answer has the secret");
+    return answer;
+  });
+
   await step("a call in a later turn waits on the released card and gets its result", async () => {
     await callOn(limited, "request_takeover", "turn-limit-3");
     limited.clearForTurn(THREAD, "turn-limit-3", true);

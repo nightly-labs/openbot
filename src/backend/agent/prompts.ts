@@ -613,6 +613,35 @@ const TAKEOVER_SIGN_IN_MISSING_NEXT =
 const TAKEOVER_USER_CANCELLED_NEXT =
   "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
 
+function browserTakeoverNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+) {
+  return {
+    ...(vault ? { vault } : {}),
+    ...(vaultSkipped ? { vaultSkipped } : {}),
+    ...(signInMissing ? { signIn: "not-received" } : {}),
+    ...(secureInputFailed === undefined
+      ? {}
+      : {
+          secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
+        }),
+  };
+}
+
+export function browserTakeoverLateNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+): string {
+  const notes = browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed);
+  if (Object.keys(notes).length === 0) return "";
+  return JSON.stringify(signInMissing ? { ...notes, next: TAKEOVER_SIGN_IN_MISSING_NEXT } : notes);
+}
+
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
@@ -628,14 +657,7 @@ export function browserTakeoverResult(
         type: "inputText",
         text: JSON.stringify({
           status: decision === "complete" ? "completed" : "cancelled",
-          ...(vault ? { vault } : {}),
-          ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(signInMissing ? { signIn: "not-received" } : {}),
-          ...(secureInputFailed === undefined
-            ? {}
-            : {
-                secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
-              }),
+          ...browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed),
           ...(decision === "complete"
             ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
             : userCancelled

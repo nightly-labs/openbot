@@ -102,6 +102,7 @@ import {
   approvalPermissions,
   browserTakeoverError,
   browserTakeoverExpiredResult,
+  browserTakeoverLateNotes,
   browserTakeoverReleasedResult,
   browserTakeoverResult,
   browserTakeoverWaitingResult,
@@ -2439,22 +2440,29 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    if (pending.released && (decision === "complete" || pending.personCancelled))
+    const vaultNote = vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined);
+    if (pending.released && (decision === "complete" || pending.personCancelled)) {
+      const lateText = sourceText(
+        decision === "complete" ? "status.agent.takeoverLateCompleted" : "status.agent.takeoverLateCancelled",
+        { tabId: pending.request.tabId },
+      );
+      const lateNotes = browserTakeoverLateNotes(
+        vaultNote,
+        pending.vaultSkipped,
+        signInMissing,
+        pending.secureInputFailed,
+      );
       this.#sendLateAnswer(
         pending.request.agentId,
         pending.released,
-        sourceText(
-          decision === "complete" ? "status.agent.takeoverLateCompleted" : "status.agent.takeoverLateCancelled",
-          {
-            tabId: pending.request.tabId,
-          },
-        ),
+        lateNotes ? `${lateText}\n${lateNotes}` : lateText,
         undefined,
       );
+    }
     pending.resolve(
       browserTakeoverResult(
         decision,
-        vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined),
+        vaultNote,
         pending.vaultSkipped,
         signInMissing,
         pending.personCancelled === true,
