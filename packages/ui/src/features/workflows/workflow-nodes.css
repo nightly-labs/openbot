@@ -1911,8 +1911,9 @@ fieldset.wfn-picker-group {
 
 .wfn-result-live-avatar {
   flex: none;
-  width: var(--openbot-icon-lg);
-  height: var(--openbot-icon-lg);
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-block: calc((var(--openbot-leading-sm) - var(--openbot-icon-md)) / 2);
 }
 
 .wfn-result-live-lines {
