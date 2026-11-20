@@ -295,6 +295,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { devinSignInPageRelayed } from "../backend/acp-sign-in";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
@@ -2610,7 +2611,7 @@ export class TeamApiServer {
           return (
             this.#options.mcpServers !== undefined &&
             this.#options.signInRelay !== undefined &&
-            process.platform === "linux"
+            devinSignInPageRelayed()
           );
         if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
           return (

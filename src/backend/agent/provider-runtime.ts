@@ -41,7 +41,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
-import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
+import { devinSignInPageRelayed, googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import {
   type AgentClient,
   AgentProcessExitError,
@@ -1573,7 +1573,7 @@ export class ProviderRuntime implements ProviderPort {
               ...(provider === "antigravity" && googleSignInByOpenBot(onHost)
                 ? { openSignInPage: { site: "google", open: openExternal } }
                 : {}),
-              ...(provider === "devin" && onHost && process.platform === "linux"
+              ...(provider === "devin" && onHost && devinSignInPageRelayed()
                 ? { openSignInPage: { site: "devin", open: openExternal } }
                 : {}),
             }).pipe(

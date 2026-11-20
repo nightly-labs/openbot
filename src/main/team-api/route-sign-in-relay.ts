@@ -14,6 +14,7 @@ import {
   SIGN_IN_RELAY_ROUTES,
 } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { devinSignInPageRelayed } from "../../backend/acp-sign-in";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { MCP_OAUTH_REDIRECT_URL } from "../deep-link-router";
 import { parseTestMcpServer } from "../ipc/mcp-inputs";
@@ -52,7 +53,7 @@ export async function routeSignInRelay(
     );
   }
   if (method === "POST" && url.pathname === PROVIDER_SIGN_IN_RELAY_V2_ROUTES.start) {
-    if (!relay || !capabilities.has(PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY))
+    if (!relay || !devinSignInPageRelayed() || !capabilities.has(PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
     requireAdmin(member);
     const body = await readJson(request);

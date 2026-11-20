@@ -260,6 +260,10 @@ const GOOGLE_SIGN_IN_PATHS = new Set(["/o/oauth2/auth", "/o/oauth2/v2/auth"]);
 
 export type SignInPageSite = "google" | "devin";
 
+export function devinSignInPageRelayed(): boolean {
+  return process.platform === "linux";
+}
+
 const SIGN_IN_PAGES: Record<SignInPageSite, (url: URL) => boolean> = {
   google: (url) => url.origin === "https://accounts.google.com" && GOOGLE_SIGN_IN_PATHS.has(url.pathname),
   devin: (url) => url.origin === "https://app.devin.ai",
