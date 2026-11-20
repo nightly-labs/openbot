@@ -204,6 +204,12 @@ export function download(url: string, name: string) {
   link.click();
 }
 
+export function downloadMedia(board: WfnBoard, attachmentId: string, url: string | null | undefined, name: string) {
+  const save = board.catalogs().download;
+  if (save) void save(attachmentId).catch(() => undefined);
+  else if (url) download(url, name);
+}
+
 export function NodeToolbar(props: {
   id: string;
   name: string;

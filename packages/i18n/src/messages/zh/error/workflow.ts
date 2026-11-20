@@ -29,6 +29,7 @@ export const messages = {
   "error.workflow.mediaFailed": "模型无法生成图片或视频，请再次运行该步骤。",
   "error.workflow.pictureMissing": "服务器上已没有这张图片，请重新发送。",
   "error.workflow.pictureType": "请使用 PNG、JPEG 或 WebP 图片。",
+  "error.workflow.assetType": "请使用 PNG、JPEG 或 WebP 图片，或 MP4、MOV 视频。",
   "error.workflow.mediaInputMissing": "前一步的图片不可用，请再次运行该步骤。",
   "error.workflow.mediaEmptyRequest": "请写一段描述，或先运行前面的步骤，让文本或图片传进来。",
   "error.workflow.mediaInputNotImage": "此步骤只接收图片，不接收视频。请删除来自视频的连接。",

@@ -63,6 +63,7 @@ import {
   WORKFLOWS_MEDIA_CODECS,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import { WORKFLOWS_MEDIA_VIDEO_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-video-v1";
 import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CODECS,
@@ -507,6 +508,7 @@ async function wire(path: string, token: string, body: unknown): Promise<{ statu
 
 const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const GIF_BASE64 = "R0lGODlhAQABAAAAACw=";
+const MP4_BASE64 = "AAAAGGZ0eXBpc29tAAAAAGlzb21tcDQxAAAACGZyZWU=";
 
 async function sendDraft(
   token: string,
@@ -1330,7 +1332,7 @@ try {
   });
 
   await step(
-    "media: a member keeps an uploaded PNG as a picture of the host; a GIF, a used draft and an old client are refused",
+    "media: a member keeps an uploaded PNG and MP4 on the host; a GIF, a used draft and an old client are refused",
     async () => {
       const capabilities = async (protocol: number) =>
         list(
@@ -1339,6 +1341,8 @@ try {
         );
       assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CAPABILITY));
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_VIDEO_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_VIDEO_CAPABILITY));
       const codec = WORKFLOWS_MEDIA_CODECS.get(WORKFLOWS_MEDIA_ROUTES.keepPicture);
       assert.ok(codec, "No workflows-media-v1 codec for keep-picture.");
       const keep = async (draftId: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
@@ -1369,7 +1373,17 @@ try {
 
       const gif = await keep(gifDraft);
       assert.notEqual(gif.status, 200, JSON.stringify(gif.body));
-      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.pictureType")), JSON.stringify(gif.body));
+      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.assetType")), JSON.stringify(gif.body));
+
+      const mp4 = Uint8Array.from(Buffer.from(MP4_BASE64, "base64"));
+      const video = await keep(await sendDraft(member, "clip.mp4", "video/mp4", mp4));
+      assert.equal(video.status, 200, JSON.stringify(video.body));
+      const videoId = text(record(video.body, "keep-picture").fileId, "fileId");
+      const videoFile = await fetch(`http://127.0.0.1:${current().port}${TEAM_API_ROUTES.attachment(videoId)}`, {
+        headers: v9Headers(member),
+      });
+      assert.equal(videoFile.status, 200, `The kept video returned ${videoFile.status}.`);
+      assert.deepEqual(new Uint8Array(await videoFile.arrayBuffer()), mp4, "The kept video has other bytes.");
 
       const kept = await keep(pngDraft);
       assert.equal(kept.status, 200, JSON.stringify(kept.body));
@@ -1387,7 +1401,14 @@ try {
         JSON.stringify(used.body).includes(sourceText("error.workflow.pictureMissing")),
         JSON.stringify(used.body),
       );
-      return { old: old.status, gif: gif.status, kept: kept.status, file: file.status, used: used.status };
+      return {
+        old: old.status,
+        gif: gif.status,
+        video: video.status,
+        kept: kept.status,
+        file: file.status,
+        used: used.status,
+      };
     },
   );
 

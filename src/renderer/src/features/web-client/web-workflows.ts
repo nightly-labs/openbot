@@ -39,6 +39,7 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import { WORKFLOWS_MEDIA_VIDEO_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-video-v1";
 import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
@@ -94,7 +95,7 @@ import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { createSignal } from "solid-js";
 import type { GitHubConnectorPort } from "../connectors/github-connector-port";
-import { checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
+import { assetTypes, checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
 import { openWebLink } from "./web-attachments";
 
 export interface WebWorkflowHostOptions {
@@ -128,6 +129,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const chatsSupported = () => placesSupported() && has(WORKFLOWS_CHATS_CAPABILITY);
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
+  const uploadTypes = () => assetTypes(has(WORKFLOWS_MEDIA_VIDEO_CAPABILITY));
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
   const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
   options.onReconnect(() => setUnloaded(new Set()));
@@ -311,11 +313,11 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     async pictures() {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY) || !has(STORAGE_CAPABILITY)) return [];
       const usage = await run((request) => getStorageUsage(request, { scope: "host" }));
-      return libraryPictures(usage).map((file) => ({ ...file, previewUrl: null }));
+      return libraryPictures(usage, uploadTypes()).map((file) => ({ ...file, previewUrl: null }));
     },
     async uploadPicture(file) {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
-      checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+      checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES, uploadTypes());
       const bytes = new Uint8Array(await file.arrayBuffer());
       const request = options.request();
       const draft = await runTeamEffect(
@@ -343,6 +345,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
     stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
+    assetTypes: uploadTypes,
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;

@@ -20,7 +20,7 @@ import {
   useElapsed,
   useMediaStep,
 } from "./workflow-media-step";
-import { download, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
+import { downloadMedia, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 import { StepSettingsAction } from "./workflow-step-settings";
 
@@ -171,7 +171,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   text={t("workflow.node.toolbar.download")}
                   label={text("download")}
                   icon={<Download />}
-                  onClick={() => download(url(), fileName())}
+                  onClick={() => downloadMedia(board, shownValue() ?? "", url(), fileName())}
                 />
               )}
             </Show>
@@ -307,7 +307,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              const result = board.results(props.id).find((entry) => entry.id === attachment.id);
+              const value = result ? resultValue(result) : undefined;
+              if (value) downloadMedia(board, value, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

@@ -32,6 +32,7 @@ export const messages = {
   "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
   "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
   "error.workflow.pictureType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP.",
+  "error.workflow.assetType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP, או בסרטון MP4 או MOV.",
   "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
   "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
   "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",

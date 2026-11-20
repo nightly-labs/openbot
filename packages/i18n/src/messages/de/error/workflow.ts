@@ -39,6 +39,7 @@ export const messages = {
   "error.workflow.mediaFailed": "Das Modell konnte das Bild oder Video nicht erstellen. Führe den Schritt erneut aus.",
   "error.workflow.pictureMissing": "Das Bild ist nicht mehr auf dem Server. Sende es erneut.",
   "error.workflow.pictureType": "Verwende ein PNG-, JPEG- oder WebP-Bild.",
+  "error.workflow.assetType": "Verwende ein PNG-, JPEG- oder WebP-Bild oder ein MP4- oder MOV-Video.",
   "error.workflow.mediaInputMissing":
     "Ein Bild aus einem vorherigen Schritt ist nicht verfügbar. Führe diesen Schritt erneut aus.",
   "error.workflow.mediaEmptyRequest":

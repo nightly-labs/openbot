@@ -109,6 +109,8 @@ export interface WorkflowCatalogs {
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
   mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
   upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
+  uploadTypes?: ReadonlySet<string> | undefined;
+  download?: ((attachmentId: string) => Promise<void>) | undefined;
   self?: string | undefined;
 }
 

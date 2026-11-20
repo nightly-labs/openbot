@@ -191,7 +191,7 @@ export function WorkflowsCanvas(props: {
     },
     get files() {
       return workflows.pictures().map((file) =>
-        file.previewUrl
+        file.previewUrl || file.previewKind !== "image"
           ? file
           : {
               ...file,
@@ -203,6 +203,12 @@ export function WorkflowsCanvas(props: {
     },
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
+    },
+    get uploadTypes() {
+      return props.host.assetTypes();
+    },
+    get download() {
+      return workflows.downloadMedia;
     },
     get self() {
       return props.self;

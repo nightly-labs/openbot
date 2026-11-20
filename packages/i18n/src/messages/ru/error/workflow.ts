@@ -36,6 +36,7 @@ export const messages = {
   "error.workflow.mediaFailed": "Модели не удалось создать изображение или видео. Запустите шаг снова.",
   "error.workflow.pictureMissing": "Изображения больше нет на сервере. Отправьте его снова.",
   "error.workflow.pictureType": "Используйте изображение PNG, JPEG или WebP.",
+  "error.workflow.assetType": "Используйте изображение PNG, JPEG или WebP либо видео MP4 или MOV.",
   "error.workflow.mediaInputMissing": "Изображение из предыдущего шага недоступно. Запустите этот шаг снова.",
   "error.workflow.mediaEmptyRequest":
     "Напишите описание или запустите предыдущие шаги, чтобы пришёл текст или изображение.",

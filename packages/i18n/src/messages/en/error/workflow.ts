@@ -33,6 +33,7 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
+  "error.workflow.assetType": "Use a PNG, JPEG or WebP picture, or an MP4 or MOV video.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
   "error.workflow.mediaEmptyRequest":
     "Write a description, or run the steps before this one so that a text or a picture comes in.",

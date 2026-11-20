@@ -252,6 +252,11 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
 ];
 
 export const WORKFLOW_PICTURE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp"]);
+export const WORKFLOW_ASSET_VIDEO_TYPES: ReadonlySet<string> = new Set(["video/mp4", "video/quicktime"]);
+export const WORKFLOW_ASSET_TYPES: ReadonlySet<string> = new Set([
+  ...WORKFLOW_PICTURE_TYPES,
+  ...WORKFLOW_ASSET_VIDEO_TYPES,
+]);
 
 export const WORKFLOW_VIDEO_DURATIONS = [6, 10] as const;
 export const WORKFLOW_VIDEO_RESOLUTIONS = ["480p", "720p"] as const;

@@ -1,4 +1,5 @@
-import { type StoredFileRow, WORKFLOW_PICTURE_TYPES } from "@openbot/contracts/ipc";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { type StoredFileRow, WORKFLOW_ASSET_VIDEO_TYPES, WORKFLOW_PICTURE_TYPES } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
@@ -7,7 +8,15 @@ import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
-import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
+import {
+  asString,
+  downloadMedia,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useField,
+  useLocked,
+} from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
 type AssetFilter = "recent" | "images" | "files";
@@ -20,22 +29,23 @@ const ASSET_FILTERS: readonly { value: AssetFilter; label: AppTextKey }[] = [
 
 const libraryFiles = (board: WfnBoard) => [...board.uploads(), ...board.catalogs().files];
 
-const PICTURE_ACCEPT = [...WORKFLOW_PICTURE_TYPES].join(",");
-
 const draggedFiles = (event: DragEvent) =>
   event.dataTransfer?.types.includes("Files") ? [...event.dataTransfer.files] : [];
 
-function hostPicture(board: WfnBoard, id: string, name: string): StoredFileRow | undefined {
-  const url = board.catalogs().media?.(id, "image");
-  if (!url) return undefined;
+function hostFile(board: WfnBoard, id: string, name: string): StoredFileRow | undefined {
+  const media = board.catalogs().media;
+  const videoType = attachmentMimeTypeForName(name);
+  const video = WORKFLOW_ASSET_VIDEO_TYPES.has(videoType);
+  const url = video ? null : media?.(id, "image");
+  if (!media || (!video && !url)) return undefined;
   return {
     id,
     name,
     size: 0,
-    kind: "image",
-    mimeType: "image/png",
-    previewKind: "image",
-    previewUrl: url,
+    kind: video ? "file" : "image",
+    mimeType: video ? videoType : "image/png",
+    previewKind: video ? "none" : "image",
+    previewUrl: url ?? null,
     source: "generated",
     agentId: null,
     conversation: null,
@@ -68,7 +78,7 @@ function findFile(board: WfnBoard, fileId: string, name: string): StoredFileRow 
   return (
     (fileId ? files.find((candidate) => candidate.id === fileId) : undefined) ??
     (name ? files.find((candidate) => candidate.name === name) : undefined) ??
-    (fileId ? hostPicture(board, fileId, name) : undefined)
+    (fileId ? hostFile(board, fileId, name) : undefined)
   );
 }
 
@@ -246,7 +256,9 @@ function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) 
         }}
         class="sr-only"
         type="file"
-        accept={board.catalogs().upload ? PICTURE_ACCEPT : undefined}
+        accept={
+          board.catalogs().upload ? [...(board.catalogs().uploadTypes ?? WORKFLOW_PICTURE_TYPES)].join(",") : undefined
+        }
         tabindex={-1}
         aria-label={t("workflow.asset.upload")}
         onChange={(event) => {
@@ -388,15 +400,13 @@ export function AssetNode(props: { id: string; file?: string }) {
             </Show>
             <Show when={file()}>
               {(current) => (
-                <Show when={current().previewUrl}>
-                  {(url) => (
-                    <ToolAction
-                      text={t("workflow.node.toolbar.download")}
-                      label={t("workflow.asset.download")}
-                      icon={<Download />}
-                      onClick={() => download(url(), current().name)}
-                    />
-                  )}
+                <Show when={board.catalogs().download || current().previewUrl}>
+                  <ToolAction
+                    text={t("workflow.node.toolbar.download")}
+                    label={t("workflow.asset.download")}
+                    icon={<Download />}
+                    onClick={() => downloadMedia(board, current().id, current().previewUrl, current().name)}
+                  />
                 </Show>
               )}
             </Show>
@@ -438,7 +448,9 @@ export function AssetNode(props: { id: string; file?: string }) {
                       <AssetThumb file={current()} />
                       <span class="wfn-asset-text">
                         <span class="wfn-asset-name">{current().name}</span>
-                        <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
+                        <Show when={current().size > 0}>
+                          <span class="wfn-asset-meta">{format.fileSize(current().size)}</span>
+                        </Show>
                       </span>
                     </span>
                   }
@@ -473,7 +485,7 @@ export function AssetNode(props: { id: string; file?: string }) {
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              downloadMedia(board, attachment.id, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

@@ -1,4 +1,5 @@
 import {
+  WORKFLOW_ASSET_TYPES,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_TRIGGER_TYPES,
@@ -145,6 +146,7 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaSizeSupported: () => true,
     agentFilesSupported: () => true,
     stepSettingsSupported: () => true,
+    assetTypes: () => WORKFLOW_ASSET_TYPES,
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,

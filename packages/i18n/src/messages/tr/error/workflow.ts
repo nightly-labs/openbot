@@ -35,6 +35,7 @@ export const messages = {
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
+  "error.workflow.assetType": "PNG, JPEG veya WebP görseli ya da MP4 veya MOV videosu kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",
   "error.workflow.mediaEmptyRequest":
     "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
