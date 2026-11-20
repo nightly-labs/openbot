@@ -307,6 +307,25 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       !retiredTexts.includes("Part B 21") &&
       compactedRows(retiredSessionId) === 2;
 
+    const retiredAcpSessionId = "retired-acp-session";
+    const retiredAcpFirst = await runImport(retiredAcpSessionId, "opencode", [
+      { ...turn("retired-acp-turn", 22), recordsOnly: true },
+    ]);
+    database.connection
+      .prepare("UPDATE provider_history_imports SET updated_at = ? WHERE session_id = ?")
+      .run("2000-01-01T00:00:00.000Z", retiredAcpSessionId);
+    const retiredAcpStarts: { turns: number; state: string | undefined }[] = [];
+    while (
+      retiredAcpStarts.length < 5 &&
+      retiredSessionNeedsHistoryRead(database.providerHistoryImport(retiredAcpSessionId), retiredAt)
+    ) {
+      const result = await runImport(retiredAcpSessionId, "opencode", []);
+      retiredAcpStarts.push({ turns: result.turns, state: database.providerHistoryImport(retiredAcpSessionId)?.state });
+    }
+    const retiredAcpReadOnce =
+      retiredAcpFirst.turns === 1 &&
+      JSON.stringify(retiredAcpStarts) === JSON.stringify([{ turns: 0, state: "complete" }]);
+
     const legacyHistory = [turn("legacy-turn-1", 15), turn("legacy-turn-2", 16)];
     const legacyFirst = await runImport("legacy-session", "codex", legacyHistory);
     const restoreFull = database.connection.prepare(
@@ -512,6 +531,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         lateSplitEditImportsFullTurnNextRead: lateImportedFullTurn,
         staleHashDroppedAfterFullRead: staleFirst.turns === 1 && staleCompacted && staleDropped,
         retiredSessionWaitingTurnImportsOnNextStart: retiredWaitingTurnImports,
+        retiredSessionWithEmptyReadIsReadOnce: retiredAcpReadOnce,
         existingRowsWereFull: legacyFirst.turns === 2 && legacyFullBefore,
         noCompactionBelowSchema64: belowMarkerKeptFull,
         existingImportedRowsCompacted:
