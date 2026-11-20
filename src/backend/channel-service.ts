@@ -2152,21 +2152,32 @@ export class ChannelService {
     agentId: string,
   ): Effect.fn.Return<void, ChannelOperationError> {
     if (this.#stopped) return;
-    for (const channelId of yield* channelSync(() => this.store.ids())) {
-      let settled = false;
-      for (const assignment of (yield* channelSync(() => this.store.assignments(channelId))).filter(activeAssignment)) {
-        if (assignment.agentId !== agentId || !assignment.deliveryId) continue;
-        const context = this.mailbox.getDelivery(assignment.deliveryId);
-        if (!context || ["queued", "starting", "running"].includes(context.delivery.status)) continue;
-        const task = (yield* channelSync(() => this.store.tasks(channelId))).find(
-          (item) => item.id === assignment.taskId,
-        );
-        yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
-        settled = true;
+    const release = this.#releaseHeldAgents([agentId]).pipe(
+      Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))),
+    );
+    yield* Effect.gen({ self: this }, function* () {
+      for (const channelId of yield* channelSync(() => this.store.ids())) {
+        if (this.#deletedChannels.has(channelId)) continue;
+        const assignmentIds = (yield* channelSync(() => this.store.assignments(channelId)))
+          .filter((assignment) => assignment.agentId === agentId && activeAssignment(assignment))
+          .map((assignment) => assignment.id);
+        let settled = false;
+        for (const assignmentId of assignmentIds) {
+          const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
+            (item) => item.id === assignmentId,
+          );
+          if (!assignment?.deliveryId || !activeAssignment(assignment)) continue;
+          const context = this.mailbox.getDelivery(assignment.deliveryId);
+          if (!context || ["queued", "starting", "running"].includes(context.delivery.status)) continue;
+          const task = (yield* channelSync(() => this.store.tasks(channelId))).find(
+            (item) => item.id === assignment.taskId,
+          );
+          yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
+          settled = true;
+        }
+        if (settled) this.publish(channelId);
       }
-      if (settled) this.publish(channelId);
-    }
-    yield* this.#releaseHeldAgents([agentId]);
+    }).pipe(Effect.ensuring(release));
   });
 
   readonly #settleUnrunAssignment = Effect.fn("ChannelService.settleUnrunAssignment")(function* (
