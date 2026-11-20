@@ -3,8 +3,8 @@ import { type AvatarMood, avatarMoodIsBusy, avatarMoodPresentation } from "@open
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { Canvas, Picture } from "@shopify/react-native-skia";
 import { Image } from "expo-image";
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { PixelRatio, View } from "react-native";
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PixelRatio, StyleSheet, View } from "react-native";
 import Animated, {
   convertToRGBA,
   type DerivedValue,
@@ -166,6 +166,10 @@ const PlushAvatar = memo(function PlushAvatar({
   if (animate && !live) setLive(true);
   const { shown, style: popStyle } = usePlushPop(seed, hue, color, transition === "pop" && facesMove);
   const appearance = useConnectionAppearance(disconnected);
+  const settling = live && !wantsMotion && !disconnected;
+  const release = useCallback(() => {
+    if (appearance.get().saturation >= 1) setLive(false);
+  }, [appearance]);
   const appearanceStyle = useAnimatedStyle(() => ({ opacity: appearance.get().opacity }));
   const saturation = useDerivedValue(() => appearance.get().saturation);
   const drawn = size * PLUSH_BODY_SCALE;
@@ -179,6 +183,7 @@ const PlushAvatar = memo(function PlushAvatar({
       size={drawn}
       pixels={pixels}
       saturation={disconnected ? DISCONNECTED_APPEARANCE.saturation : 1}
+      onDisplay={settling ? release : undefined}
     />
   );
   return (
@@ -193,20 +198,23 @@ const PlushAvatar = memo(function PlushAvatar({
           <FlatBreath amount={animate ? avatarMoodPresentation(mood).breathe : 0} size={drawn}>
             {picture}
           </FlatBreath>
-        ) : live ? (
-          <PlushCanvas
-            seed={shown.seed}
-            hue={shown.hue}
-            color={shown.color}
-            mood={mood}
-            size={drawn}
-            pixels={pixels}
-            animate={animate}
-            saturation={saturation}
-            fallback={picture}
-          />
         ) : (
-          picture
+          <>
+            {settling || !live ? <View style={StyleSheet.absoluteFill}>{picture}</View> : null}
+            {live ? (
+              <PlushCanvas
+                seed={shown.seed}
+                hue={shown.hue}
+                color={shown.color}
+                mood={mood}
+                size={drawn}
+                pixels={pixels}
+                animate={animate}
+                saturation={saturation}
+                fallback={picture}
+              />
+            ) : null}
+          </>
         )}
       </Animated.View>
     </Animated.View>
@@ -352,7 +360,8 @@ function PlushPicture({
   pixels,
   saturation,
   crossfade = false,
-}: PlushPictureSpec & { size: number; crossfade?: boolean }) {
+  onDisplay,
+}: PlushPictureSpec & { size: number; crossfade?: boolean; onDisplay?: () => void }) {
   const drawn = usePlushPicture({ seed, hue, color, mood, pixels, saturation });
   const identity = `${seed}|${hue ?? ""}|${color ?? ""}`;
   const last = useRef<{ identity: string; uri: string } | null>(null);
@@ -365,6 +374,7 @@ function PlushPicture({
       recyclingKey={identity}
       cachePolicy="memory"
       transition={crossfade ? 150 : 0}
+      onDisplay={onDisplay}
       style={{ width: size, height: size }}
     />
   );
