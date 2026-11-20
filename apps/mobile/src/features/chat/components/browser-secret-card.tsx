@@ -295,6 +295,7 @@ function SecureComposerBar({
   keyboardType,
   autoComplete,
   maxLength,
+  submitOnly,
   bottomInset,
   liquidGlassAvailable,
   fallbackBackground,
@@ -306,13 +307,14 @@ function SecureComposerBar({
   label: string;
   placeholder?: string | undefined;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText?: ((text: string) => void) | undefined;
   ready: boolean;
   pending: boolean;
   onSubmit: () => void;
   keyboardType: "default" | "number-pad";
   autoComplete: "off" | "one-time-code";
   maxLength: number;
+  submitOnly?: boolean | undefined;
 }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
@@ -335,32 +337,39 @@ function SecureComposerBar({
           overflow: "hidden",
           flexDirection: "row",
           alignItems: "center",
-          paddingLeft: 16,
+          paddingLeft: submitOnly ? 8 : 16,
           paddingRight: 4,
+          justifyContent: submitOnly ? "flex-end" : undefined,
         }}
       >
-        <TextInput
-          nativeID="chat-composer-input"
-          accessibilityLabel={label}
-          placeholder={placeholder ?? label}
-          placeholderTextColor={String(muted)}
-          {...selectionColorProps(foreground)}
-          className="min-w-0 flex-1 font-sans text-foreground"
-          style={{ fontSize: 16 }}
-          secureTextEntry
-          autoCorrect={false}
-          autoCapitalize="none"
-          keyboardType={keyboardType}
-          autoComplete={autoComplete}
-          maxLength={maxLength}
-          value={value}
-          editable={!pending}
-          returnKeyType="send"
-          onSubmitEditing={() => {
-            if (ready) onSubmit();
-          }}
-          onChangeText={onChangeText}
-        />
+        {submitOnly ? (
+          <Typography type="body-sm" className="min-w-0 flex-1 text-text-secondary" numberOfLines={1}>
+            {placeholder ?? label}
+          </Typography>
+        ) : (
+          <TextInput
+            nativeID="chat-composer-input"
+            accessibilityLabel={label}
+            placeholder={placeholder ?? label}
+            placeholderTextColor={String(muted)}
+            {...selectionColorProps(foreground)}
+            className="min-w-0 flex-1 font-sans text-foreground"
+            style={{ fontSize: 16 }}
+            secureTextEntry
+            autoCorrect={false}
+            autoCapitalize="none"
+            keyboardType={keyboardType}
+            autoComplete={autoComplete}
+            maxLength={maxLength}
+            value={value}
+            editable={!pending}
+            returnKeyType="send"
+            onSubmitEditing={() => {
+              if (ready) onSubmit();
+            }}
+            onChangeText={onChangeText}
+          />
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("mobile.chat.browserSecret.submit")}
@@ -391,10 +400,10 @@ export function QuestionSecretComposer({
   const ready = !controller.disabled && Boolean(value.trim());
   return (
     <SecureComposerBar
+      submitOnly
       label={label}
-      placeholder={t("mobile.chat.question.privatePlaceholder")}
+      placeholder={t("mobile.chat.question.secretSendHint")}
       value={value}
-      onChangeText={controller.setDraft}
       ready={ready}
       pending={controller.pending}
       onSubmit={() => {
