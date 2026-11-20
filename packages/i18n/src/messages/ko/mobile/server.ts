@@ -222,6 +222,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "대기 중이에요. 호스트는 메모리가 허용하는 만큼만 턴을 실행해요.",
   "mobile.server.threads.hold.agentBusy": "이 에이전트의 다른 작업이 끝나기를 기다리는 중이에요.",
   "mobile.server.threads.hold.oneTurn": "대기 중이에요. 이 에이전트의 제공자는 한 번에 한 턴만 실행해요.",
+  "mobile.server.threads.hold.signIn": "대기 중이에요. 이 에이전트의 제공자에 로그인해야 해요.",
   "mobile.server.threads.offline": "이 서버에 연결하면 스레드를 볼 수 있어요.",
   "mobile.server.threads.loading": "스레드 불러오는 중…",
   "mobile.server.threads.loadFailed": "일부 에이전트의 스레드를 불러올 수 없어요.",

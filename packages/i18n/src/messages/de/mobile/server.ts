@@ -231,6 +231,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Warten. Der Host führt so viele Durchläufe aus, wie sein Speicher erlaubt.",
   "mobile.server.threads.hold.agentBusy": "Warten, bis andere Arbeit dieses Agenten abgeschlossen ist.",
   "mobile.server.threads.hold.oneTurn": "Warten. Der Anbieter dieses Agenten führt immer nur einen Durchlauf aus.",
+  "mobile.server.threads.hold.signIn": "Warten. Der Anbieter dieses Agenten muss angemeldet werden.",
   "mobile.server.threads.offline": "Verbinde dich mit diesem Server, um seine Threads zu sehen.",
   "mobile.server.threads.loading": "Threads werden geladen…",
   "mobile.server.threads.loadFailed": "Die Threads einiger Agenten konnten nicht geladen werden.",

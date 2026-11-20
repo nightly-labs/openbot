@@ -110,6 +110,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "대기 중이에요. 이 컴퓨터는 메모리가 허용하는 만큼의 턴을 실행해요.",
   "conversation.threads.hold.agentBusy": "이 에이전트의 다른 작업이 끝나기를 기다리는 중이에요.",
   "conversation.threads.hold.oneTurn": "대기 중이에요. 이 에이전트의 제공자는 한 번에 한 턴씩 실행해요.",
+  "conversation.threads.hold.signIn": "대기 중이에요. 이 에이전트의 제공자에 로그인해야 해요.",
   "conversation.sidePanel.closePanel": "패널 닫기",
   "conversation.threads.view.failedBody": "제공자가 이유를 알려 주지 않았어요. 메시지를 보내 다시 시도해 주세요.",
   "conversation.threads.deleteUndo.action": "실행 취소",

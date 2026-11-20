@@ -226,6 +226,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "待機中です。ホストはメモリが許す数のターンを実行します。",
   "mobile.server.threads.hold.agentBusy": "このエージェントの他の作業が終わるのを待っています。",
   "mobile.server.threads.hold.oneTurn": "待機中です。このエージェントのプロバイダーは一度に1ターンずつ実行します。",
+  "mobile.server.threads.hold.signIn": "待機中です。このエージェントのプロバイダーへのサインインが必要です。",
   "mobile.server.threads.offline": "このサーバーに接続するとスレッドが表示されます。",
   "mobile.server.threads.loading": "スレッドを読み込み中…",
   "mobile.server.threads.loadFailed": "一部のエージェントのスレッドを読み込めませんでした。",

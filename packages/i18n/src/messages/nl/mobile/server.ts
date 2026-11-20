@@ -228,6 +228,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Wachtend. De host voert zoveel beurten uit als zijn geheugen toelaat.",
   "mobile.server.threads.hold.agentBusy": "Wacht tot ander werk van deze agent klaar is.",
   "mobile.server.threads.hold.oneTurn": "Wachtend. De aanbieder van deze agent voert één beurt tegelijk uit.",
+  "mobile.server.threads.hold.signIn": "Wachtend. De aanbieder van deze agent moet worden aangemeld.",
   "mobile.server.threads.offline": "Maak verbinding met deze server om de threads te zien.",
   "mobile.server.threads.loading": "Threads laden…",
   "mobile.server.threads.loadFailed": "Kan de threads van sommige agents niet laden.",

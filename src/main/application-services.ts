@@ -3051,6 +3051,7 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
+    signInWaits: service.signInWaits,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3256,7 +3257,7 @@ export async function createApplicationServices({
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
       if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
-      if (!Notification.isSupported()) return false;
+      if (!event || !Notification.isSupported()) return false;
       const local = remoteServers.list().find((server) => server.id === LOCAL_SERVER_ID);
       return desktopShowsAgentEvent(
         event,

@@ -109,6 +109,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "待機中です。このコンピューターはメモリが許す数のターンを実行します。",
   "conversation.threads.hold.agentBusy": "このエージェントの他の作業が終わるのを待っています。",
   "conversation.threads.hold.oneTurn": "待機中です。このエージェントのプロバイダーは一度に1ターンずつ実行します。",
+  "conversation.threads.hold.signIn": "待機中です。このエージェントのプロバイダーへのサインインが必要です。",
   "conversation.sidePanel.closePanel": "パネルを閉じる",
   "conversation.threads.view.failedBody": "プロバイダーから理由が示されませんでした。メッセージを送ると再試行します。",
   "conversation.threads.deleteUndo.action": "元に戻す",
