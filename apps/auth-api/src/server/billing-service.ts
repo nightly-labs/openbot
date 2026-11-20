@@ -26,13 +26,11 @@ import {
   storageTierOf,
 } from "@openbot/contracts/billing";
 import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
-import {
-  type HostedServerCatalog,
-  type HostedServerCatalogPlan,
-  type HostedServerEntryPoint,
-  type HostedServerPlanPrices,
-  type HostedServerSize,
-  hostedServerStorageGb,
+import type {
+  HostedServerCatalog,
+  HostedServerCatalogPlan,
+  HostedServerEntryPoint,
+  HostedServerPlanPrices,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -132,7 +130,6 @@ interface ServerPlanRow {
   current_period_end: number | null;
   cancel_at_period_end: number;
   on_operator_host: number;
-  server_size: HostedServerSize | null;
   storage_tier: number;
 }
 
@@ -783,7 +780,6 @@ export class BillingService {
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
                   hs.operator_host IS NOT NULL AS on_operator_host,
-                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
                   COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
            LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
@@ -1416,7 +1412,7 @@ function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size, storageTier),
+    storageGb: storageTierGb(row.plan, storageTier),
     ...(canBuyStorage(row)
       ? { storageUpgrades: storageUpgrades(row.plan, row.interval, row.currency, storageTier, row.amount, prices) }
       : {}),

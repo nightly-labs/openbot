@@ -32,10 +32,11 @@ that server with no page. The server list sends the limit as
 server list (Settings on desktop, Billing on the web) to delete a server. Each server
 has its own Stripe plan. Its machine comes from the plan: a pool machine of the plan (Starter VPS 1,
 Standard VPS 2, Pro VPS 3), or when none is free, a boat sandbox (`HOSTED_BOAT_PLAN_SIZE`): Starter and
-Standard are `default`, and Pro is `large`. Starter sandboxes from before 2026-11-14 are `small` and keep
-12 GB of storage until a change of plan or billing interval moves them to the new Starter price and to
-`default`. Before the boat claim the row has no machine (`provider_template` is NULL), so the storage that
-the server list and Billing show is the plan storage, not the disk of `size`. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
+Standard are `default`, and Pro is `large`. Starter sandboxes from before 2026-11-14 are `small` until a
+change of plan or billing interval moves them to the new Starter price and to `default`. Each server
+shows the storage of its plan and storage tier (`storageTierGb`), on a VPS and on boat. The disk of a
+boat type can be smaller than the plan storage. A server on boat moves to a VPS, so the plan storage
+does not depend on the machine. Developer decision, 2026-11-20. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
 `HOSTED_PLAN_SIZE`.
 
 ## Parts
@@ -1200,8 +1201,8 @@ A machine of the pool is not the boat image:
   server downloads the CLI of each provider that an agent uses and that is not off. The user
   downloads the CLI of another provider in OpenBot.
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
-- It shows the storage of a moved server (25, 75 and 150 GB). The pricing page shows the same
-  numbers (`storageTierGb(plan, 0)`).
+- It shows the storage of the plan (25, 75 and 150 GB), the same numbers as the pricing page
+  (`storageTierGb`).
 - The clients show no restart action, and the server does not stop when it is not in use.
 
 Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
@@ -1477,15 +1478,14 @@ The VPS is not the same machine as the sandbox:
 - The clients show no restart action for a moved server: the server list of the account service has
   `restartAvailable: false` for it. A client from before this field shows the action and gets the
   refusal of the Worker.
-- A moved server has more storage: 25, 75 and 150 GB for Starter, Standard and Pro
-  (`OPERATOR_HOST_STORAGE_GB`), not the 12, 50 and 100 GB of the plan table. The account service
-  sends the number in the server list, the hosting list and the billing state from the moment of the
-  row `UPDATE`, so the storage meter, the storage alerts, Billing and the plan change offer show it.
-  The host reads it at its start, for the instructions of its agents. The pricing page and the order
-  form show the same numbers since 2026-11-20 (`storageTierGb(plan, 0)`). A server that starts in a
-  boat sandbox when the pool has no free VPS gets less (`HOSTED_BOAT_PLAN_SIZE` disk). A client or a host from
-  before this number shows the plan table. A rollback gives the server the plan table again, so a
-  server that used more on the VPS shows a full disk.
+- Each server has the storage of its plan: 25, 75 and 150 GB for Starter, Standard and Pro
+  (`BILLING_PLANS`, and `storageTierGb` with a storage tier). The account service sends the number in
+  the server list, the hosting list and the billing state, so the storage meter, the storage alerts,
+  Billing and the plan change offer show it. The host reads it at its start, for the instructions of
+  its agents. The pricing page and the order form show the same numbers. Before 2026-11-20 a server in
+  a boat sandbox showed 12, 50 or 100 GB, limited by the disk of its boat type; now it shows the plan
+  storage, also when the boat disk is smaller. A client or a host from before this number shows the
+  plan table.
 - The number is not a limit that the machine enforces. A host with `storage-user-files-v1` measures
   the files of its user (the home folder, `/tmp` and `/var/tmp`) with `du`, and the clients show the
   plan minus that number. A host from before that capability gets the boat count: the clients
@@ -1531,8 +1531,7 @@ reads only the output between two markers that the command writes.
 
 `move` sets `size` to `HOSTED_PLAN_SIZE` (`small` for Starter), so the statement writes the boat type of
 the sandbox again: the `type` that boat shows for the sandbox (`default` for a Starter sandbox from
-2026-11-14 or later, `small` before). Without it, a Starter row on a `default` sandbox shows 12 GB of
-storage and an almost full disk.
+2026-11-14 or later, `small` before).
 
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
@@ -1944,10 +1943,10 @@ These were not tested on boat. Test them before a user gets access:
   must check the key before a user deletes the server;
 - the vCPU, memory and disk of boat `large`;
 - a downgrade that boat refuses with `type_too_small`. The test uses a fake boat;
-- the disk of each size. The root file system showed 69 GB on `small` and on `default`, not the 12 GB
-  and 50 GB of the boat machine table. The limit that `type_too_small` uses is not known. The plans
-  show 12, 50 and 100 GB, which is not more than the machine table. The disk of `large` was not
-  measured, so the 100 GB of Pro is not confirmed;
+- the disk of each size. The root file system showed 69 GB on `small` and on `default`. The boat
+  page lists 51 GB for `small` and `default` and 111 GB for `large`. The limit that `type_too_small`
+  uses is not known. A server on boat shows the plan storage (75 GB for Standard, 150 GB for Pro),
+  which is more than the boat disk; it moves to a VPS;
 - that boat frees the key of a refused create, so a retry of a setup that failed works;
 - the menu path of the Stripe failed-payment setting in [Production](#production), and whether test
   mode and live mode keep separate values;

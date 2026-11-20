@@ -8,6 +8,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  storageTierGb,
   storageTierOf,
 } from "@openbot/contracts/billing";
 import {
@@ -26,7 +27,6 @@ import {
   type HostedServerState,
   type HostedServerStatus,
   type HostedServerSummary,
-  hostedServerStorageGb,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { parseLicenseOrder } from "@openbot/contracts/license";
@@ -3132,12 +3132,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
-    storageGb: hostedServerStorageGb(
-      row.plan,
-      row.operator_host !== null,
-      row.provider_template === null ? null : (row.pending_size ?? row.size),
-      storageTierOf(row.storage_tier),
-    ),
+    storageGb: storageTierGb(row.plan, storageTierOf(row.storage_tier)),
     ...(restoring ? { restoring: true } : {}),
     ...(keptUntil === null ? {} : { dataKeptUntil: keptUntil }),
   };
