@@ -1,10 +1,9 @@
-import { BILLING_PLAN_IDS, storageTierOf } from "@openbot/contracts/billing";
+import { BILLING_PLAN_IDS, storageTierGb, storageTierOf } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
   hostKeyHandoverStatement,
 } from "@openbot/contracts/host-key-handover";
-import { type HostedServerSize, hostedServerStorageGb } from "@openbot/contracts/hosted-servers";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
@@ -182,15 +181,8 @@ function removedAtAfterChange(change: { revoke: boolean; leave: boolean; activat
 
 export type { RemoteMemberRole };
 
-function hostedStorage(
-  plan: string | null,
-  onOperatorHost: boolean,
-  size: HostedServerSize | null,
-  storageTier: number | null,
-): { storageGb: number } | Record<string, never> {
-  return isOneOf(BILLING_PLAN_IDS, plan)
-    ? { storageGb: hostedServerStorageGb(plan, onOperatorHost, size, storageTierOf(storageTier)) }
-    : {};
+function hostedStorage(plan: string | null, storageTier: number | null): { storageGb: number } | Record<string, never> {
+  return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: storageTierGb(plan, storageTierOf(storageTier)) } : {};
 }
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
@@ -891,9 +883,6 @@ export class RemoteControlPlane {
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
            (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
-           (SELECT CASE WHEN s.provider_template IS NULL THEN NULL ELSE COALESCE(s.pending_size, s.size) END
-             FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size,
            (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier
          FROM remote_memberships m
@@ -914,7 +903,6 @@ export class RemoteControlPlane {
             role: RemoteMemberRole;
             hosted_plan: string | null;
             operator_host: string | null;
-            hosted_size: HostedServerSize | null;
             hosted_storage_tier: number | null;
           }>(),
       );
@@ -941,7 +929,7 @@ export class RemoteControlPlane {
               memberLimit: license ? Math.min(limit, license.users) : limit,
               hosted: row.hosted_plan !== null,
               ...(row.operator_host === null ? {} : { restartAvailable: false }),
-              ...hostedStorage(row.hosted_plan, row.operator_host !== null, row.hosted_size, row.hosted_storage_tier),
+              ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
             };
           }),
         { concurrency: "unbounded" },
