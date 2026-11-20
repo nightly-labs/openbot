@@ -1,13 +1,27 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { type StoredFileRow, WORKFLOW_ASSET_VIDEO_TYPES, WORKFLOW_PICTURE_TYPES } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
+import {
+  Button,
+  Download,
+  File,
+  FileInput,
+  Film,
+  Input,
+  Maximize2,
+  Popover,
+  Search,
+  SlidingTabs,
+  Upload,
+} from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
+import { VideoPlayer } from "../conversation/VideoPlayer";
 import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
+import { clock } from "./workflow-media-step";
 import {
   asString,
   downloadMedia,
@@ -97,8 +111,8 @@ const LIBRARY_VIDEO_FRAME_BYTES = 32 * 1024 * 1024;
 
 const isVideoFile = (file: StoredFileRow | undefined) => WORKFLOW_ASSET_VIDEO_TYPES.has(file?.mimeType ?? "");
 
-function videoFrameUrl(board: WfnBoard, file: StoredFileRow, card: boolean): string | undefined {
-  if (!isVideoFile(file) || (!card && file.size > LIBRARY_VIDEO_FRAME_BYTES)) return undefined;
+function videoFrameUrl(board: WfnBoard, file: StoredFileRow): string | undefined {
+  if (!isVideoFile(file) || file.size > LIBRARY_VIDEO_FRAME_BYTES) return undefined;
   return board.catalogs().media?.(file.id, "video") ?? undefined;
 }
 
@@ -115,7 +129,7 @@ function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   const board = useBoard();
   return (
     <Show
-      when={videoFrameUrl(board, props.file, props.card === true)}
+      when={videoFrameUrl(board, props.file)}
       keyed
       fallback={
         <Show
@@ -139,7 +153,7 @@ function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
         </Show>
       }
     >
-      {(src) => <VideoFrame src={src} card={props.card} fallback={<AssetGlyph name={props.file.name} />} />}
+      {(src) => <VideoFrame src={src} fallback={<AssetGlyph name={props.file.name} />} />}
     </Show>
   );
 }
@@ -365,6 +379,11 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
   const isVideo = () => isVideoFile(file());
+  const videoUrl = () => {
+    const current = file();
+    return current && isVideo() ? (board.catalogs().media?.(current.id, "video") ?? undefined) : undefined;
+  };
+  const [video, setVideo] = createStore({ length: 0, ratio: 0 });
   const shape = usePictureShape(() => {
     const current = file();
     return current && isImage() ? (thumbUrl(board, current) ?? undefined) : undefined;
@@ -397,7 +416,13 @@ export function AssetNode(props: { id: string; file?: string }) {
         kind="asset"
         media={isImage() || isVideo()}
         clear={clear()}
-        style={{ "--wfn-aspect": clear() ? String(shape()?.ratio ?? 4 / 3) : "4 / 3" }}
+        style={{
+          "--wfn-aspect": clear()
+            ? String(shape()?.ratio ?? 4 / 3)
+            : isVideo() && video.ratio > 0
+              ? String(Math.min(16 / 9, Math.max(9 / 16, video.ratio)))
+              : "4 / 3",
+        }}
         output={file() ? (isImage() ? "image" : "file") : undefined}
         toolbar={
           <NodeToolbar id={props.id} name={t("workflow.asset.name")} locked={locked()} onLock={setLocked}>
@@ -477,8 +502,19 @@ export function AssetNode(props: { id: string; file?: string }) {
                     </span>
                   }
                 >
-                  <AssetThumb file={current()} card />
-                  <span class="wfn-chip wfn-asset-caption">{current().name}</span>
+                  <Show
+                    when={isImage()}
+                    fallback={
+                      <Show when={!videoUrl()}>
+                        <span class="wfn-media-empty" aria-hidden="true">
+                          <Film />
+                        </span>
+                      </Show>
+                    }
+                  >
+                    <AssetThumb file={current()} card />
+                    <span class="wfn-chip wfn-asset-caption">{current().name}</span>
+                  </Show>
                 </Show>
               )}
             </Show>
@@ -501,6 +537,29 @@ export function AssetNode(props: { id: string; file?: string }) {
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
+        <Show when={videoUrl()}>
+          {(url) => (
+            <>
+              <VideoPlayer
+                src={url()}
+                label={file()?.name ?? ""}
+                fullControls
+                onMetadata={(element) =>
+                  setVideo((state) => {
+                    state.length = element.duration;
+                    state.ratio = element.videoHeight > 0 ? element.videoWidth / element.videoHeight : 0;
+                  })
+                }
+              />
+              <Show when={Number.isFinite(video.length) && video.length > 0}>
+                <span class="wfn-clip-length" aria-hidden="true">
+                  {clock(Math.round(video.length))}
+                </span>
+              </Show>
+              <span class="wfn-chip wfn-asset-caption">{file()?.name}</span>
+            </>
+          )}
+        </Show>
       </NodeShell>
       <Show when={viewer()}>
         {(opening) => (

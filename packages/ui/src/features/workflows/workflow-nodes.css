@@ -623,7 +623,7 @@
   --wfn-overlay-opacity: 0;
 }
 
-.wfn-node:has(.media-generation-player[data-playing]) .wfn-clip-length {
+.wfn-node:has(.media-generation-player[data-playing]) :is(.wfn-clip-length, .wfn-asset-caption) {
   opacity: 0;
   pointer-events: none;
 }
@@ -769,6 +769,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.wfn-card[data-media] > .wfn-asset-caption {
+  pointer-events: none;
 }
 
 .wfn-asset-file {

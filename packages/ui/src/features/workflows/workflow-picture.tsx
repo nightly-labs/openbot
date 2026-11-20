@@ -31,17 +31,14 @@ export function CardPicture(props: {
   );
 }
 
-export function VideoFrame(props: { src: string; card?: boolean | undefined; fallback: JSX.Element }) {
-  const [state, setState] = createSignal<"loading" | "ready" | "failed">("loading");
+export function VideoFrame(props: { src: string; fallback: JSX.Element }) {
+  const [failed, setFailed] = createSignal(false);
   const showFrame = (video: HTMLVideoElement) => {
     const middle = video.duration / 2;
     video.currentTime = Number.isFinite(middle) ? Math.min(VIDEO_FRAME_SECONDS, middle) : VIDEO_FRAME_SECONDS;
   };
   return (
-    <Show when={state() !== "failed"} fallback={props.fallback}>
-      <Show when={props.card && state() === "loading"}>
-        <Skeleton class="wfn-media-loading" />
-      </Show>
+    <Show when={!failed()} fallback={props.fallback}>
       <video
         class="wfn-media"
         src={props.src}
@@ -49,8 +46,7 @@ export function VideoFrame(props: { src: string; card?: boolean | undefined; fal
         playsinline
         preload="metadata"
         onLoadedMetadata={(event) => showFrame(event.currentTarget)}
-        onSeeked={() => setState("ready")}
-        onError={() => setState("failed")}
+        onError={() => setFailed(true)}
       />
     </Show>
   );
