@@ -582,8 +582,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
       if (this.#tasks.has(runtime)) return this.getStatus();
-      if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
-        yield* this.#awaitReleaseCheck(this.#check);
+      if (!(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
+        if (this.#check) yield* this.#awaitReleaseCheck(this.#check);
+        else if (this.#checkTimer && this.#statuses[runtime].version === null)
+          yield* this.#findLatestRelease(runtime, this.#target);
         if (this.#stopping)
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
         if (this.#tasks.has(runtime)) return this.getStatus();
@@ -647,6 +649,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   ): Effect.Effect<void, ProviderRuntimeFailure> {
     return Deferred.await(check).pipe(
       Effect.catch(() => Effect.void),
+      Effect.timeoutOrElse({ duration: RELEASE_CHECK_WAIT_MS, orElse: () => Effect.void }),
+    );
+  }
+  #findLatestRelease(provider: ManagedProviderId, target: RuntimeTarget): Effect.Effect<void> {
+    const lookups = [
+      fetchBlockedVersions(this.#fetch).pipe(
+        Effect.tap((blocked) =>
+          Effect.sync(() => {
+            this.#blocked = blocked;
+          }),
+        ),
+      ),
+      latestRelease(provider, { target, lock: this.#lock, fetch: this.#fetch }).pipe(
+        Effect.tap((release) => Effect.sync(() => this.#latest.set(provider, release))),
+      ),
+    ];
+    return Effect.forEach(lookups, (lookup) => Effect.ignore(lookup), { concurrency: "unbounded", discard: true }).pipe(
       Effect.timeoutOrElse({ duration: RELEASE_CHECK_WAIT_MS, orElse: () => Effect.void }),
     );
   }
