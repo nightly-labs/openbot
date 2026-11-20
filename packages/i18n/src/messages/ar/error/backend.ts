@@ -442,5 +442,6 @@ export const messages = {
     "لدى هذا الوكيل بالفعل {count} مهام غير مكتملة. ابدأ مهمة أخرى عند انتهاء إحداها.",
   "error.backend.taskOpenLimitReached": "لدى هذا الوكيل {count} مهام مفتوحة. أغلق مهمة، ثم ابدأ مهمة أخرى أو افتحها.",
   "error.backend.taskRemoteUnsupported": "المهام متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.taskMessageFailed": "تعذّر على OpenBot إرسال الرسالة إلى المهمة. حاول مرة أخرى لاحقًا.",
   "error.backend.taskStartFailed": "تعذّر على OpenBot بدء المهمة. أنجز العمل في هذا الدور بدلًا من ذلك.",
 } as const satisfies PartialTranslation<typeof source>;

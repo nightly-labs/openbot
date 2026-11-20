@@ -476,6 +476,7 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.taskMessageFailed": "OpenBot non è riuscito a inviare il messaggio all’attività. Riprova più tardi.",
   "error.backend.taskStartFailed":
     "OpenBot non è riuscito ad avviare l'attività. Esegui invece il lavoro in questo turno.",
 } as const satisfies PartialTranslation<typeof source>;

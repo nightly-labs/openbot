@@ -82,7 +82,7 @@ export interface AgentTasksHooks {
   queued(agentId: string): void;
   turnActive(agentId: string, threadId: string): boolean;
   archived(agentId: string, tasks: readonly AgentThreadRecord[]): Effect.Effect<void>;
-  turnAnswer(agentId: string, turnId: string): string | null;
+  turnAnswer(agentId: string, threadId: string, turnId: string): string | null;
   closeTask(agentId: string, taskId: string): Effect.Effect<void, unknown>;
   fork(work: Effect.Effect<void>): void;
 }
@@ -526,6 +526,11 @@ export class AgentTasks implements TaskLanes {
       .update(JSON.stringify([caller.agentId, params.turnId, params.callId]))
       .digest("hex")}`;
     if (this.#mailbox.deliveryForKey(idempotencyKey)) return messagedTaskResult(task, false);
+    const running = task.closedAt === null && !this.#finished(task);
+    if (!running && this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
+      return openBotToolFailure(
+        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
+      );
     if (task.closedAt !== null) {
       if (this.#store.openTaskIds(caller.agentId).length >= INPUT_LIMITS.agentTasks)
         return openBotToolFailure(
@@ -533,7 +538,6 @@ export class AgentTasks implements TaskLanes {
         );
       this.reopen(task);
     }
-    const running = !this.#finished(task);
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
@@ -552,7 +556,7 @@ export class AgentTasks implements TaskLanes {
           }),
         ),
       );
-    if (!queued) return openBotToolFailure(sourceText("error.backend.taskStartFailed"));
+    if (!queued) return openBotToolFailure(sourceText("error.backend.taskMessageFailed"));
     this.changed(caller.agentId);
     this.#hooks.queued(caller.agentId);
     return messagedTaskResult(task, running);
@@ -595,13 +599,12 @@ export class AgentTasks implements TaskLanes {
     if (startedTask) return startedTaskResult(startedTask);
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
-    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
-    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
+    if (this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
       return openBotToolFailure(
         sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
       );
     const finishedByAgent = finished
-      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
+      .filter(isStartedTask)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     const others = open.length - finishedByAgent.length;
     const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
@@ -736,10 +739,10 @@ export class AgentTasks implements TaskLanes {
   }
 
   #reportsTurn(task: AgentThreadRecord, event: AgentTurnCompletedEvent): boolean {
-    if (!isStartedTask(task) || task.closedAt !== null) return false;
+    if (!isStartedTask(task) || task.closedAt !== null || event.origin === "user") return false;
+    if (this.#mailbox.taskBusy(task.agentId, task.taskId)) return false;
     const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
-    if (stopped && this.#userStops.get(task.taskId) !== event.turnId) return false;
-    return this.#mailbox.findDeliveryByTurn(event.turnId)?.delivery.sender.kind !== "user";
+    return !stopped || this.#userStops.get(task.taskId) === event.turnId;
   }
 
   readonly #report = Effect.fn("AgentTasks.report")(function* (
@@ -748,7 +751,7 @@ export class AgentTasks implements TaskLanes {
     event: AgentTurnCompletedEvent,
   ): Effect.fn.Return<void> {
     const task = this.#store.task(ended.taskId) ?? ended;
-    const text = taskReportText(task, event.status, this.#hooks.turnAnswer(task.agentId, event.turnId));
+    const text = taskReportText(task, event.status, this.#hooks.turnAnswer(task.agentId, task.threadId, event.turnId));
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: task.agentId },
@@ -770,6 +773,13 @@ export class AgentTasks implements TaskLanes {
       );
     if (queued) this.#hooks.queued(task.agentId);
   });
+
+  #unfinishedTasks(agentId: string): number {
+    return this.#store
+      .openTaskIds(agentId)
+      .flatMap((taskId) => this.#store.task(taskId) ?? [])
+      .filter((task) => task.routineId === null && !this.#finished(task)).length;
+  }
 
   #finished(task: AgentThreadRecord): boolean {
     return (
@@ -866,7 +876,7 @@ function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
-    note: "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to this chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.",
+    note: "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.",
   });
 }
 
@@ -875,7 +885,7 @@ function messagedTaskResult(task: AgentThreadRecord, running: boolean): OpenBotT
     taskId: task.taskId,
     title: task.title,
     state: running ? "queued after the current turn of the task" : "sent",
-    note: "The task answers in its own conversation, and OpenBot sends that answer to this chat as a task report. Continue with other work or end your turn.",
+    note: "The task answers in its own conversation, and OpenBot sends that answer to your main chat as a task report. Continue with other work or end your turn.",
   });
 }
 

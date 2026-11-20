@@ -703,7 +703,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }
           this.#drain.scheduleDrain(agentId);
         }).bind(this),
-        turnAnswer: (agentId, turnId) => this.#turnAnswer(agentId, turnId),
+        turnAnswer: (agentId, threadId, turnId) => this.#turnAnswer(agentId, turnId, threadId),
         closeTask: (agentId, taskId) => this.closeTask({ agentId, taskId }),
         fork: (work) => {
           Effect.runFork(work.pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
@@ -5782,10 +5782,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   }
 
-  #turnAnswer(agentId: string, turnId: string): string | null {
+  #turnAnswer(agentId: string, turnId: string, threadId?: string): string | null {
     const ofTurn = (messages: readonly ConversationMessage[]) =>
       messages.filter((message) => message.turnId === turnId);
-    const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+    const snapshot = threadId
+      ? this.#conversation.loadedExecutionSnapshot(threadId)
+      : this.#conversation.loadedSnapshot(agentId);
+    const loaded = ofTurn(snapshot?.messages ?? []);
     const messages = loaded.length > 0 ? loaded : this.#store.database.readTurnAssistantMessages(agentId, turnId);
     return messages.findLast(isAnswer)?.text ?? null;
   }

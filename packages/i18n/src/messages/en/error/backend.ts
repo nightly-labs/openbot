@@ -472,5 +472,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.taskOpenLimitReached":
     "This agent has {count} open tasks. Close a task, then start or open another one.",
   "error.backend.taskRemoteUnsupported": "Tasks are only available for agents on this computer.",
+  "error.backend.taskMessageFailed": "OpenBot could not send the message to the task. Try again later.",
   "error.backend.taskStartFailed": "OpenBot could not start the task. Do the work in this turn instead.",
 });

@@ -27,6 +27,8 @@ const DIRECT_NAMES = new Set([
   "list_agents",
   "send_message",
   "start_task",
+  "message_task",
+  "close_task",
   "search_memories",
   "routine_no_update",
   "routine_report_failure",

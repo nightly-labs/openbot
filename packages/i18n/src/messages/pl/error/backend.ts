@@ -463,5 +463,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Liczba otwartych zadań tego agenta: {count}. Zamknij zadanie, a potem rozpocznij lub otwórz inne.",
   "error.backend.taskRemoteUnsupported": "Zadania są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.taskMessageFailed": "OpenBot nie może wysłać wiadomości do zadania. Spróbuj ponownie później.",
   "error.backend.taskStartFailed": "OpenBot nie może rozpocząć zadania. Zamiast tego wykonaj pracę w tej turze.",
 } as const satisfies PartialTranslation<typeof source>;

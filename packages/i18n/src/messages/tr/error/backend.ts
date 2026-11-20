@@ -455,5 +455,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Bu ajanın {count} açık görevi var. Bir görevi kapatın, ardından başka bir görev başlatın veya açın.",
   "error.backend.taskRemoteUnsupported": "Görevler yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.taskMessageFailed": "OpenBot mesajı göreve gönderemedi. Daha sonra yeniden deneyin.",
   "error.backend.taskStartFailed": "OpenBot görevi başlatamadı. Bunun yerine işi bu turda yapın.",
 } as const satisfies PartialTranslation<typeof source>;

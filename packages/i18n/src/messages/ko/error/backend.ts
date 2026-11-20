@@ -446,5 +446,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "이 에이전트에는 열린 작업이 {count}개 있어요. 작업 하나를 닫은 후 다른 작업을 시작하거나 여세요.",
   "error.backend.taskRemoteUnsupported": "작업은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.taskMessageFailed": "OpenBot이 작업에 메시지를 보낼 수 없었어요. 나중에 다시 시도하세요.",
   "error.backend.taskStartFailed": "OpenBot이 작업을 시작할 수 없었어요. 대신 이 턴에서 작업을 처리하세요.",
 } as const satisfies PartialTranslation<typeof source>;

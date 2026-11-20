@@ -479,5 +479,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.taskMessageFailed": "OpenBot kon het bericht niet naar de taak sturen. Probeer het later opnieuw.",
   "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
 } as const satisfies PartialTranslation<typeof source>;

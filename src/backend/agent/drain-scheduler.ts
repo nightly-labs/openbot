@@ -1316,7 +1316,9 @@ export class DrainScheduler {
   }
 
   taskReport(context: DeliveryContext): TaskReportState | null {
-    return context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
+    const { sender, recipientAgentId } = context.delivery;
+    const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
+    return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
   }
 
   answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {
