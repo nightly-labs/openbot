@@ -371,7 +371,8 @@ export function createWebConversationRuntime(
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
-      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
+      previewWorkspaceFile: ({ agentId, path, exactPath }) =>
+        files.previewWorkspace(agentId, path, exactPath ? { exactPath } : {}),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,

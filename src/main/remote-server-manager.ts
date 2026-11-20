@@ -67,7 +67,7 @@ import {
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
@@ -2535,11 +2535,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       workspacePath: string,
       serverId = this.#store.activeServerId,
       maxBytes?: number,
+      exactPath = false,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.workspaceFiles, server.apiUrl);
       url.searchParams.set("botId", agentId);
       url.searchParams.set("path", workspacePath);
+      if (exactPath) url.searchParams.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       const response = yield* this.#client.fetch(server, url);
       return {
         bytes: yield* remoteCall(() => fileResponseBytes(response, maxBytes)),
