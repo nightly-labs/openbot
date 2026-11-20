@@ -104,6 +104,9 @@ export const messages = {
   "composer.voice.recording": "Gravação de voz",
   "composer.voice.limitSoon": "A gravação para em {seconds} segundos.",
   "composer.voice.limitReached": "A gravação parou no limite de 2 minutos. O que você disse está na mensagem.",
+  "composer.voice.languageNotice":
+    "O ditado conhece 25 idiomas europeus, como o inglês. Outros idiomas precisam de um modelo maior ({size}), e o texto aparece depois que você para.",
+  "composer.voice.languageNotice.action": "Falo outro idioma",
   "composer.send.saveQueued": "Salvar mensagem na fila",
   "composer.send.voice": "Enviar mensagem de voz",
   "composer.send.message": "Enviar mensagem",

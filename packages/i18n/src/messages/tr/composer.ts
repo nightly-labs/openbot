@@ -105,6 +105,9 @@ export const messages = {
   "composer.voice.recording": "Ses kaydı",
   "composer.voice.limitSoon": "Kayıt {seconds} saniye içinde duracak.",
   "composer.voice.limitReached": "Kayıt 2 dakika sınırında durdu. Söyledikleriniz mesajda.",
+  "composer.voice.languageNotice":
+    "Dikte, İngilizce gibi 25 Avrupa dilini tanır. Diğer diller daha büyük bir model ({size}) gerektirir ve metin durdurduktan sonra görünür.",
+  "composer.voice.languageNotice.action": "Başka bir dil konuşuyorum",
   "composer.send.saveQueued": "Kuyruktaki mesajı kaydet",
   "composer.send.voice": "Sesli mesaj gönder",
   "composer.send.message": "Mesaj gönder",

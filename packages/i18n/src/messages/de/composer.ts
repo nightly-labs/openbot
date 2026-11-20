@@ -106,6 +106,9 @@ export const messages = {
   "composer.voice.limitSoon": "Die Aufnahme endet in {seconds} Sekunden.",
   "composer.voice.limitReached":
     "Die Aufnahme wurde beim Limit von 2 Minuten beendet. Das Gesagte steht in der Nachricht.",
+  "composer.voice.languageNotice":
+    "Das Diktat kennt 25 europäische Sprachen, zum Beispiel Englisch. Andere Sprachen brauchen ein größeres Modell ({size}), und der Text erscheint erst nach dem Stoppen.",
+  "composer.voice.languageNotice.action": "Ich spreche eine andere Sprache",
   "composer.send.saveQueued": "Nachricht in der Warteschlange speichern",
   "composer.send.voice": "Sprachnachricht senden",
   "composer.send.message": "Nachricht senden",

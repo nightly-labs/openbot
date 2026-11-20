@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/chat-tag-references";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
+  AUTOMATIC_VOICE_LANGUAGE,
   customProviderOfModel,
   isCustomProviderHarness,
   type McpSignInRelayPage,
@@ -82,6 +83,7 @@ import { createThreadComposerActions } from "./stores/thread-composer-actions";
 import { createThreadQueue } from "./stores/thread-queue-edit";
 import { createVoiceConversation } from "./stores/voice-conversation-store";
 import { createVoiceStore } from "./stores/voice-store";
+import { claimVoiceLanguageNotice } from "./voice-language-notice";
 
 const READER_INPUT_WINDOW_MS = 250;
 
@@ -165,6 +167,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setVoiceLevels,
     voiceLimitReached,
     setVoiceLimitReached,
+    voiceLanguageChoice,
+    setVoiceLanguageChoice,
     markingRead,
     setMarkingRead,
     submitting,
@@ -918,6 +922,9 @@ export function createConversationViewScope(props: ConversationProps) {
       setVoiceLimitReached((current) =>
         reached ? target : current?.agentId === target.agentId && current.serverId === target.serverId ? null : current,
       ),
+    offerVoiceLanguageChoice: (target) => {
+      if (claimVoiceLanguageNotice()) setVoiceLanguageChoice(target);
+    },
     hooks: {
       saveEdit: (...args) => actions.saveQueuedMessageEdit(...args),
       submit: (...args) => actions.submitMessage(...args),
@@ -992,6 +999,33 @@ export function createConversationViewScope(props: ConversationProps) {
     );
   };
   const dismissVoiceLimitNotice = () => setVoiceLimitReached(null);
+  const voiceLanguageNotice = () => {
+    const offered = voiceLanguageChoice();
+    return Boolean(
+      offered && offered.agentId === conversationOwnerId(props) && offered.serverId === (props.server?.id ?? "local"),
+    );
+  };
+  const dismissVoiceLanguageNotice = () => setVoiceLanguageChoice(null);
+  const chooseOtherVoiceLanguage = async () => {
+    const target = voiceLanguageChoice();
+    setVoiceLanguageChoice(null);
+    if (!target) return;
+    const voice = conversationRuntime(props).voice;
+    const { t, errorMessage } = currentText();
+    try {
+      await voice.setSettings({ modelId: "whisper-turbo", language: AUTOMATIC_VOICE_LANGUAGE });
+    } catch (error) {
+      setConversationError(target, errorMessage(error, t("settings.voice.saveFailed")));
+      return;
+    }
+    try {
+      const status = await voice.downloadModel({ modelId: "whisper-turbo" });
+      if (status.phase === "error")
+        setConversationError(target, errorMessage(status.message, t("settings.voice.downloadFailed")));
+    } catch (error) {
+      setConversationError(target, errorMessage(error, t("settings.voice.downloadFailed")));
+    }
+  };
   createEffect(
     () => voiceLimitNotice() && !currentDraft().text.trim(),
     (emptied) => {
@@ -2593,6 +2627,9 @@ export function createConversationViewScope(props: ConversationProps) {
     voiceLevels,
     voiceLimitNotice,
     dismissVoiceLimitNotice,
+    voiceLanguageNotice,
+    dismissVoiceLanguageNotice,
+    chooseOtherVoiceLanguage,
     voiceLiveText,
     voicePhase,
     voiceModelProgress,

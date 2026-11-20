@@ -100,6 +100,9 @@ export const messages = {
   "composer.voice.recording": "הקלטת קול",
   "composer.voice.limitSoon": "ההקלטה תיעצר בעוד {seconds} שניות.",
   "composer.voice.limitReached": "ההקלטה נעצרה במגבלה של 2 דקות. מה שנאמר נמצא בהודעה.",
+  "composer.voice.languageNotice":
+    "ההכתבה מכירה 25 שפות אירופיות, כמו אנגלית. שפות אחרות צריכות מודל גדול יותר ({size}), והטקסט מופיע אחרי שעוצרים.",
+  "composer.voice.languageNotice.action": "שפה אחרת",
   "composer.send.saveQueued": "שמירת ההודעה בתור",
   "composer.send.voice": "שליחת הודעה קולית",
   "composer.send.message": "שליחת הודעה",

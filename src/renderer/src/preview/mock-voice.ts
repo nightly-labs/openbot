@@ -57,6 +57,7 @@ const MOCK_SPEECH_SAMPLE_RATE = 44_100;
 export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: MockRuntime) {
   const ready = new Set(options.voiceModelsReady ?? ["parakeet-tdt-0.6b-v3"]);
   let settings: VoiceSettings = clone(options.voiceSettings ?? DEFAULT_VOICE_SETTINGS);
+  let saved = options.voiceSettings !== undefined;
   const statuses = new Map<VoiceModelId, VoiceModelStatus>(
     VOICE_MODEL_IDS.map((modelId) => [
       modelId,
@@ -176,9 +177,10 @@ export function createMockVoice(options: MockVoiceOptions, { emit, schedule }: M
       setStatus({ modelId, phase: "missing", progress: null, message: null });
       return status(modelId);
     },
-    getSettings: async () => clone(settings),
+    getSettings: async () => ({ ...clone(settings), saved }),
     setSettings: async (next) => {
       settings = clone(next);
+      saved = true;
       return clone(settings);
     },
     transcribe: async () => ({ text: "Mock voice transcript" }),

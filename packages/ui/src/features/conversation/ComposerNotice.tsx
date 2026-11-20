@@ -1,6 +1,6 @@
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agent-providers";
 import type { AppFormat } from "@openbot/i18n";
-import { Button, ErrorReference, TriangleAlert } from "@openbot/ui";
+import { Button, ErrorReference, Info, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Show } from "solid-js";
 import { createCodeSignInFallback } from "../../components/createCodeSignInFallback";
@@ -8,7 +8,7 @@ import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 
 export function ComposerNotice(props: {
-  tone?: "warning" | "danger";
+  tone?: "warning" | "danger" | "info";
   title?: string | undefined;
   body: string;
   reference?: string | null | undefined;
@@ -27,7 +27,13 @@ export function ComposerNotice(props: {
           data-conversation-key={props.conversationKey ?? undefined}
           role="status"
         >
-          <NoticeContent title={props.title} body={props.body} reference={props.reference} action={props.action} />
+          <NoticeContent
+            tone={props.tone}
+            title={props.title}
+            body={props.body}
+            reference={props.reference}
+            action={props.action}
+          />
         </div>
       }
     >
@@ -43,7 +49,13 @@ export function ComposerNotice(props: {
             dismiss()();
           }}
         >
-          <NoticeContent title={props.title} body={props.body} reference={props.reference} action={props.action} />
+          <NoticeContent
+            tone={props.tone}
+            title={props.title}
+            body={props.body}
+            reference={props.reference}
+            action={props.action}
+          />
           <Button
             variant="ghost"
             type="button"
@@ -62,6 +74,7 @@ export function ComposerNotice(props: {
 }
 
 function NoticeContent(props: {
+  tone?: "warning" | "danger" | "info" | undefined;
   title?: string | undefined;
   body: string;
   reference?: string | null | undefined;
@@ -69,7 +82,9 @@ function NoticeContent(props: {
 }) {
   return (
     <>
-      <TriangleAlert class="composer-notice-icon" aria-hidden="true" />
+      <Show when={props.tone === "info"} fallback={<TriangleAlert class="composer-notice-icon" aria-hidden="true" />}>
+        <Info class="composer-notice-icon" aria-hidden="true" />
+      </Show>
       <div class="composer-notice-copy">
         <Show when={props.title}>{(title) => <strong>{title()}</strong>}</Show>
         <p>{props.body}</p>
