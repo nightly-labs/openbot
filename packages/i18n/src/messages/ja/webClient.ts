@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "サインインの応答が無効です。",
   "webClient.pane.navigation": "ワークスペースのナビゲーション",
   "webClient.pane.chat": "チャット",
-  "webClient.pane.routines": "ルーティン",
   "webClient.pane.workspace": "ワークスペース",
   "webClient.phoneApp.title": "OpenBot アプリを使う",
   "webClient.phoneApp.description":

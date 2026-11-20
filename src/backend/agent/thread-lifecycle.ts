@@ -986,7 +986,7 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#runsBesideOwnChat(agent, publicThreadId) &&
+      this.#conversation.isTaskThread(publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
     );

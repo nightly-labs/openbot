@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "נדרש קלט שלך.",
   "notification.needsApproval": "נדרש אישור שלך.",
   "notification.needsBrowserStep": "נדרש שתסיים שלב בדפדפן.",
+  "notification.waitsForSignIn": "ממתין להתחברות ל-{provider}.",
   "notification.needsApprovalFor": "נדרש אישור שלך: {action}",
   "notification.finished": "העבודה הסתיימה.",
   "notification.workflowApproval": "שלב ממתין לאישור שלך.",

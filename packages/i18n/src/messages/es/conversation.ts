@@ -111,6 +111,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "En espera. Este equipo ejecuta tantos turnos como permite su memoria.",
   "conversation.threads.hold.agentBusy": "Esperando a que termine otro trabajo de este agente.",
   "conversation.threads.hold.oneTurn": "En espera. El proveedor de este agente ejecuta un turno a la vez.",
+  "conversation.threads.hold.signIn": "En espera. El proveedor de este agente necesita iniciar sesión.",
   "conversation.sidePanel.closePanel": "Cerrar panel",
   "conversation.threads.view.failedBody":
     "El proveedor no dio ningún motivo. Envía un mensaje para intentarlo de nuevo.",

@@ -1,5 +1,9 @@
 import { ProviderLogo } from "@openbot/brand";
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isInstallerProvider,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentModelId,
   type AgentProviderId,
@@ -223,6 +227,46 @@ function isConnected(option: ProviderPickerOption): boolean {
   return !option.off && (option.state === "available" || option.connectionState === "connecting");
 }
 
+function updateOffered(option: ProviderPickerOption): boolean {
+  const runtime = option.runtimeStatus;
+  return (
+    !option.off &&
+    !isInstallerProvider(option.id) &&
+    runtime !== undefined &&
+    providerUpdateAvailable(runtime, option.availableVersion ?? null)
+  );
+}
+
+function UpdateAllButton(props: ProviderSettingsPageProps) {
+  const { t } = useText();
+  const [starting, setStarting] = createSignal(false);
+  const updates = () => props.options.filter(updateOffered);
+  const offered = () => Boolean(props.onUpdateProvider) && updates().length > 0;
+  const updateAll = async () => {
+    const update = props.onUpdateProvider;
+    if (!update) return;
+    setStarting(true);
+    try {
+      await Promise.allSettled(updates().map(async (option) => await update(option.id)));
+    } finally {
+      setStarting(false);
+    }
+  };
+  return (
+    <Show when={offered()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={props.disabled || starting()}
+        onClick={() => void updateAll()}
+      >
+        {t("provider.settings.updateAll")}
+      </Button>
+    </Show>
+  );
+}
+
 function waitingAccounts(option: ProviderPickerOption): number {
   return (option.accounts ?? []).filter((account) => account.state === "signed-out" || account.state === "error")
     .length;
@@ -281,17 +325,20 @@ function ProviderList(props: ProviderSettingsPageProps & { onOpen: (id: PageId) 
       <SettingsSection
         title={t("provider.settings.connected")}
         actions={
-          <label class="server-settings-search">
-            <Search aria-hidden="true" />
-            <span class="sr-only">{t("provider.settings.search")}</span>
-            <Input
-              size="sm"
-              type="search"
-              placeholder={t("provider.settings.search")}
-              value={query()}
-              onValueChange={setQuery}
-            />
-          </label>
+          <>
+            <UpdateAllButton {...props} />
+            <label class="server-settings-search">
+              <Search aria-hidden="true" />
+              <span class="sr-only">{t("provider.settings.search")}</span>
+              <Input
+                size="sm"
+                type="search"
+                placeholder={t("provider.settings.search")}
+                value={query()}
+                onValueChange={setQuery}
+              />
+            </label>
+          </>
         }
       >
         <ItemGroup class="settings-modal-card">
