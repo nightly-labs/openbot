@@ -2238,6 +2238,22 @@ export class MailboxStore {
     );
   }
 
+  repeatsHandledReply(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const messages = this.#messagesById();
+    const reply = messages.get(delivery.messageId);
+    if (!reply || !isAnswer(reply)) return false;
+    const deliveries = this.#deliveriesFor(delivery.recipientAgentId);
+    const position = deliveries.indexOf(delivery);
+    if (position <= 0) return false;
+    return deliveries.slice(0, position).some((earlier) => {
+      if (earlier.status !== "completed" || earlier.turnId === null || earlier.turnId === delivery.turnId) return false;
+      const answer = messages.get(earlier.messageId);
+      return answer !== undefined && isAnswer(answer) && sameAnswer(answer, reply);
+    });
+  }
+
   hasSentResultFor(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!delivery?.turnId) return false;
@@ -3936,4 +3952,17 @@ function isAnswer(
   message: StoredMessage,
 ): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
   return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
+}
+
+function sameAnswer(
+  first: StoredMessage & { sender: { kind: "agent"; agentId: string } },
+  second: StoredMessage & { sender: { kind: "agent"; agentId: string } },
+): boolean {
+  const files = (message: StoredMessage) => message.attachments.map((attachment) => attachment.sha256).join("\n");
+  return (
+    first.sender.agentId === second.sender.agentId &&
+    first.replyToMessageId === second.replyToMessageId &&
+    first.text.trim() === second.text.trim() &&
+    files(first) === files(second)
+  );
 }
