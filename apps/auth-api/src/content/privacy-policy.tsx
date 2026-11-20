@@ -743,7 +743,8 @@ export function PrivacyPolicy() {
       <h2>International Data Transfers</h2>
       <p>
         OpenBot is established in Poland and processes personal data primarily within the European Economic Area (EEA),
-        including data stored on hosted servers located in the European Union.
+        including data stored on hosted servers located in the European Union. A hosted server bought in US dollars or
+        Brazilian reais can be located in the United States.
       </p>
       <p>
         However, the provision of the Services may involve transfers of personal data outside the EEA, particularly

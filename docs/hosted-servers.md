@@ -1764,7 +1764,7 @@ restored or due archive is deleted.
    additional data). The write stops when the server changed, for example by a renewal; `sync` then
    deletes the object and the machine keeps the data.
 4. `sync` sets `operator_host = NULL` only while `desired_state` is still `stopped`, clears the token of
-   the machine, reinstalls it and sets its reference to `pool`. When the reinstall fails, the archive is
+   the machine, sets its reference to `pool` and reinstalls it. When the reinstall fails, the archive is
    complete but the machine still has the data: run `prepare --reinstall` for it.
 5. Each `sync` deletes an archive in B2 and then its key in D1 (`deleted_at`, `wrapped_key = NULL`) when
    `delete_after` (`plan_ended_at` + 14 days) is past, the server is deleted (owner delete, refund
