@@ -852,10 +852,11 @@ export class TurnLifecycle {
     if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
   }
 
-  #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
+  #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
-      source.provider !== "codex" ||
+      (source.provider !== "codex" && source.provider !== "claude") ||
+      this.#waitingThreads.has(threadId) ||
       running === undefined ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
@@ -1315,7 +1316,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        const noAnswer = reported === "completed" && this.#holdCodexNoAnswer(agentId, threadId, turnId, source);
+        const noAnswer = reported === "completed" && this.#holdNoAnswer(agentId, threadId, turnId, source);
         const status =
           ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
             (reported === "interrupted" && this.#quietStops.has(turnId))) &&
