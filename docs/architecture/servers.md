@@ -235,6 +235,12 @@ member. The capability is advertised only to protocol 7
 clients. The desktop on a joined server and the web client show the side question only when the host
 advertises it.
 
+`side-question-threads-v1` (protocol 10) adds an optional `taskId` to the same request. The host then
+answers from the end of that side thread, not from the agent's chat, and answers 409 when the agent has
+no such thread. A host without the capability drops the field and reads the chat, so a client sends
+`taskId` only when the host advertises it. Without it, the desktop and the web client hide the side
+question in a side thread.
+
 ### Live voice
 
 `live-voice-v1` (`team-protocol/live-voice-v1.ts`) lets a member talk to an agent of the host by Codex

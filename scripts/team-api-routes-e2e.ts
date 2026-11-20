@@ -388,7 +388,11 @@ import {
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
-import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
@@ -11788,6 +11792,28 @@ try {
           isDeepStrictEqual(args, [{ agentId: "agent-ada", question: "What does it do?", earlier }]),
         ),
       [summary(first), summary(second)],
+    );
+    const inThread = await call("POST", SIDE_QUESTION_ROUTES.ask, {
+      token: bobToken,
+      capabilities: [...sideCapabilities, SIDE_QUESTION_THREADS_CAPABILITY],
+      json: { agentId: "agent-ada", question: "What did this thread change?", earlier: [], taskId: "task-1" },
+    });
+    const badThread = await call("POST", SIDE_QUESTION_ROUTES.ask, {
+      token: bobToken,
+      capabilities: [...sideCapabilities, SIDE_QUESTION_THREADS_CAPABILITY],
+      json: { agentId: "agent-ada", question: "Which thread?", earlier: [], taskId: "" },
+    });
+    check(
+      "a side question in a side thread gives the host the thread's task id, and an empty task id gets 400",
+      inThread.status === 200 &&
+        callsOf("askSideQuestion").some((args) =>
+          isDeepStrictEqual(args, [
+            { agentId: "agent-ada", question: "What did this thread change?", earlier: [], taskId: "task-1" },
+          ]),
+        ) &&
+        badThread.status === 400 &&
+        callsOf("askSideQuestion").every((args) => !JSON.stringify(args).includes("Which thread?")),
+      [summary(inThread), summary(badThread)],
     );
     const busy = await call("POST", SIDE_QUESTION_ROUTES.ask, {
       token: bobToken,

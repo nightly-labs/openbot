@@ -149,23 +149,19 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  inset-inline-end: var(--openbot-space-1);
+  inset-inline-start: var(--openbot-space-1-5);
   translate: 0 -50%;
 }
 
-.side-panel-header :where(.side-panel-tab[data-selected]) .side-panel-tab-x {
-  opacity: 1;
-}
-
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-close {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-close {
   background: var(--openbot-bg-control-hover);
 }
 
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-icon {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-icon {
   opacity: 0;
 }
 
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-x {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-x {
   opacity: 1;
 }
 
@@ -211,8 +207,8 @@
 }
 
 .side-panel-header .side-panel-tab {
-  flex: 0 1 200px;
-  min-width: min(120px, 100%);
+  flex: 0 1 140px;
+  min-width: min(96px, 100%);
   padding: 0;
   user-select: none;
   transition:
@@ -229,24 +225,12 @@
   display: flex;
   flex: 1;
   align-items: center;
+  justify-content: flex-start;
   align-self: stretch;
   gap: var(--openbot-space-1-5);
-  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
+  padding-inline: calc(var(--openbot-space-1-5) * 2 + var(--openbot-icon-md)) var(--openbot-space-2);
   border-radius: inherit;
   text-align: start;
-}
-
-.side-panel-tab-glyph {
-  display: grid;
-  flex: none;
-  place-items: center;
-  min-width: var(--openbot-icon-md);
-  opacity: 0.7;
-}
-
-.side-panel-tab-glyph svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
 }
 
 .side-panel-header .side-panel-tab-label {
@@ -254,10 +238,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.side-panel-header :where(.side-panel-tab:is([data-selected], :hover, :focus-within)) .side-panel-tab-select {
-  padding-inline-end: calc(var(--openbot-icon-md) + var(--openbot-space-1) * 2);
 }
 
 @media (pointer: coarse) {
@@ -368,12 +348,11 @@
   min-height: var(--openbot-icon-md);
 }
 
-.side-panel-tab:not(:hover, :focus-within) .side-panel-tab-icon:has(.agent-threads-state),
-.side-panel-tab-glyph:has(.agent-threads-state) {
+.side-panel-tab:not(:hover, :has(:focus-visible)) .side-panel-tab-icon:has(.agent-threads-state) {
   opacity: 1;
 }
 
-:is(.side-panel-tab-icon, .side-panel-tab-glyph) .agent-threads-state-icon svg {
+.side-panel-tab-icon .agent-threads-state-icon svg {
   width: 12px;
   height: 12px;
 }

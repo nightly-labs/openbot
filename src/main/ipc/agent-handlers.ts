@@ -164,6 +164,7 @@ import {
   decodeSideQuestionResponse,
   SIDE_QUESTION_CAPABILITY,
   SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import {
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -764,7 +765,11 @@ export function agentIpcHandlers({
       askSideQuestion: scopedHandler(parseAskSideQuestion, {
         local: (input) => runCauseEffect(service.askSideQuestion(input)),
         remote: (input, serverId) => {
-          if (!remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY))
+          if (
+            !remoteServers.supportsCapability(serverId, SIDE_QUESTION_CAPABILITY) ||
+            (input.taskId !== undefined &&
+              !remoteServers.supportsCapability(serverId, SIDE_QUESTION_THREADS_CAPABILITY))
+          )
             throw new Error(sourceText("error.team.sideQuestionUnsupported"));
           return runCauseEffect(
             remoteServers.request(serverId, SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
@@ -773,6 +778,7 @@ export function agentIpcHandlers({
                 agentId: input.agentId,
                 question: input.question,
                 earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+                ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
               },
               timeoutMs: 150_000,
             }),

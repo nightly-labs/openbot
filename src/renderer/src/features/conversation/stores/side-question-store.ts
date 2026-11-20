@@ -1,5 +1,8 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import type { SideQuestionExchange } from "@openbot/ui/features/conversation/SideQuestionPanel";
 import { currentText } from "@openbot/ui/text";
 import type { Store, StoreSetter } from "solid-js";
@@ -28,35 +31,47 @@ export interface SideQuestionStoreDeps {
 export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
   const { questions, setQuestions } = deps;
 
-  const sideQuestionAvailable = () =>
-    deps.props.runtime
-      ? Boolean(deps.props.runtime.askSideQuestion)
-      : serverSupportsCapability(deps.props.server, SIDE_QUESTION_CAPABILITY);
-  const sideQuestion = (): SideQuestionState => {
+  const openTaskId = () => deps.props.threads?.open?.id;
+  const stateKey = (agentId: string, taskId: string | undefined) =>
+    taskId === undefined ? agentId : `${agentId}/${taskId}`;
+  const currentKey = () => {
     const agentId = deps.props.agent?.id;
-    return (agentId && questions[agentId]) || SIDE_QUESTION_EMPTY;
+    return agentId ? stateKey(agentId, openTaskId()) : undefined;
+  };
+  const threadsAvailable = () =>
+    deps.props.runtime
+      ? deps.props.runtime.sideQuestionThreads === true
+      : serverSupportsCapability(deps.props.server, SIDE_QUESTION_THREADS_CAPABILITY);
+  const sideQuestionAvailable = () =>
+    (deps.props.runtime
+      ? Boolean(deps.props.runtime.askSideQuestion)
+      : serverSupportsCapability(deps.props.server, SIDE_QUESTION_CAPABILITY)) &&
+    (openTaskId() === undefined || threadsAvailable());
+  const sideQuestion = (): SideQuestionState => {
+    const key = currentKey();
+    return (key && questions[key]) || SIDE_QUESTION_EMPTY;
   };
   const nextFocusRequest = () => Math.max(0, ...Object.values(questions).map((state) => state.focusRequest)) + 1;
-  function update(agentId: string, change: (state: SideQuestionState) => void) {
+  function update(key: string, change: (state: SideQuestionState) => void) {
     setQuestions((draft) => {
-      draft[agentId] ??= { ...SIDE_QUESTION_EMPTY, exchanges: [] };
-      change(draft[agentId]);
+      draft[key] ??= { ...SIDE_QUESTION_EMPTY, exchanges: [] };
+      change(draft[key]);
     });
   }
 
   function setSideQuestionDraft(text: string) {
-    const agentId = deps.props.agent?.id;
-    if (!agentId) return;
-    update(agentId, (state) => {
+    const key = currentKey();
+    if (!key) return;
+    update(key, (state) => {
       state.draft = text;
     });
   }
 
   function openSideQuestion(text = "") {
-    const agentId = deps.props.agent?.id;
-    if (!agentId || !sideQuestionAvailable()) return;
+    const key = currentKey();
+    if (!key || !sideQuestionAvailable()) return;
     const question = text.trim();
-    update(agentId, (state) => {
+    update(key, (state) => {
       if (question) state.draft = state.draft.trim() ? `${state.draft.trim()}\n${question}` : question;
       state.focusRequest = nextFocusRequest();
     });
@@ -66,7 +81,9 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
   function askSideQuestion(question: string) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
-    const state = questions[agentId] ?? SIDE_QUESTION_EMPTY;
+    const taskId = openTaskId();
+    const key = stateKey(agentId, taskId);
+    const state = questions[key] ?? SIDE_QUESTION_EMPTY;
     if (state.exchanges.at(-1)?.answer === null) return;
     const earlier = state.exchanges.slice(-INPUT_LIMITS.sideQuestionTurns).flatMap((exchange) =>
       exchange.answer === null
@@ -79,20 +96,19 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
           ],
     );
     const id = crypto.randomUUID();
-    update(agentId, (draft) => {
+    update(key, (draft) => {
       draft.exchanges.push({ id, question, askedAt: new Date().toISOString(), answer: null, answeredAt: null });
       draft.draft = "";
       draft.error = null;
     });
     const runtimeAsk = deps.props.runtime?.askSideQuestion;
     const serverId = deps.props.server?.id;
-    const ask = runtimeAsk
-      ? runtimeAsk({ agentId, question, earlier })
-      : conversationPort().agent.askSideQuestion({ agentId, question, earlier }, serverId);
+    const input = { agentId, question, earlier, ...(taskId === undefined ? {} : { taskId }) };
+    const ask = runtimeAsk ? runtimeAsk(input) : conversationPort().agent.askSideQuestion(input, serverId);
     void ask.then(
       (answer) => {
-        if (!questions[agentId]) return;
-        update(agentId, (draft) => {
+        if (!questions[key]) return;
+        update(key, (draft) => {
           const exchange = draft.exchanges.find((item) => item.id === id);
           if (!exchange) return;
           exchange.answer = answer;
@@ -100,8 +116,8 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
         });
       },
       (error) => {
-        if (!questions[agentId]) return;
-        update(agentId, (draft) => {
+        if (!questions[key]) return;
+        update(key, (draft) => {
           if (!draft.exchanges.some((item) => item.id === id)) return;
           draft.exchanges = draft.exchanges.filter((item) => item.id !== id);
           draft.error = errorMessage(error, t("conversation.sideQuestion.error"));
@@ -116,7 +132,7 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
     const agentId = deps.props.agent?.id;
     if (!agentId) return;
     setQuestions((draft) => {
-      delete draft[agentId];
+      for (const key of Object.keys(draft)) if (key === agentId || key.startsWith(`${agentId}/`)) delete draft[key];
     });
   }
 

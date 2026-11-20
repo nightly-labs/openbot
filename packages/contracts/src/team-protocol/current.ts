@@ -183,7 +183,7 @@ import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
-import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_THREADS_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
@@ -420,6 +420,7 @@ export {
   SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_THREADS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
@@ -777,6 +778,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_USAGE_GROUPS_CAPABILITY, V10],
   [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
   [PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY, V10],
+  [SIDE_QUESTION_THREADS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
