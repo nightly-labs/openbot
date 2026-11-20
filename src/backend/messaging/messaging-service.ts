@@ -109,6 +109,7 @@ export interface MessagingCredentials {
 export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Effect.Effect<void, AgentLifecycleFailed>;
+  approvalExecutionThreadId(requestId: string | number): string | undefined;
   onEvent(listener: (event: AgentEvent) => void): () => void;
   createAgentProfile(
     input: Pick<AddMessagingOrchestratorInput, "provider" | "model" | "reasoningEffort"> & {
@@ -2062,7 +2063,9 @@ export class MessagingService {
     this: MessagingService,
     approval: AgentApproval,
   ) {
-    const own = this.#threads.store.linkForThread(approval.threadId);
+    const own = this.#threads.store.linkForThread(
+      this.#agents.approvalExecutionThreadId(approval.requestId) ?? approval.threadId,
+    );
     const request = own ? null : this.#threads.teammateRequest(approval.agentId, approval.turnId);
     const link = own ?? request?.link;
     if (!link) return;

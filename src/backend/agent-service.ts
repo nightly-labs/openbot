@@ -1169,6 +1169,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
       messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),
+      approvalChatThread: (agentId, threadId) =>
+        this.messaging.store.linkForThread(threadId) ? (this.#store.get(agentId)?.threadId ?? threadId) : threadId,
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       emitRuntimeSnapshot: () => this.#emitRuntimeSnapshot(),
@@ -2209,6 +2211,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   pendingApproval(requestId: string | number): AgentApproval | undefined {
     return this.#attention.pendingApproval(requestId);
+  }
+
+  approvalExecutionThreadId(requestId: string | number): string | undefined {
+    return this.#attention.approvalExecutionThreadId(requestId);
   }
 
   pendingPrompts(): AgentRuntimePrompt[] {
