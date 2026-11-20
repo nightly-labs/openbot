@@ -867,6 +867,23 @@ export class ProviderRuntime implements ProviderPort {
     return false;
   }, Effect.uninterruptible).bind(this);
 
+  readonly releaseFolderProcesses = Effect.fn("ProviderRuntime.releaseFolderProcesses")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    folder: string,
+  ) {
+    const client = this.#clients.get(provider);
+    if (!client?.releaseFolderProcesses || this.#hooks.isStopping() || this.#status.phase !== "ready") return null;
+    const kept = yield* client.releaseFolderProcesses(folder);
+    logger.info(
+      kept
+        ? "Kept a provider process that holds a deleted agent's folder, because work uses it."
+        : "Stopped the provider processes that hold a deleted agent's folder.",
+      { provider },
+    );
+    return kept;
+  }, Effect.uninterruptible).bind(this);
+
   keepsSharedProcess(provider: AgentProvider): boolean {
     const client = this.#clients.get(provider);
     return client !== undefined && (client.canReleaseProcess?.() === false || this.#providerInUse(provider));

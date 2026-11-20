@@ -1933,14 +1933,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               try: () => this.#sharedProcessesToRelease(agentId),
               catch: (cause) => new AgentRemovalFailed({ cause }),
             });
+            const folder = this.#store.list().find((agent) => agent.id === agentId)?.workspacePath;
             let kept = false;
-            for (const provider of providers)
-              if (
-                provider !== "opencode" &&
-                provider !== "codex" &&
-                (yield* this.#providers.releaseSharedProcess(provider))
-              )
-                kept = true;
+            for (const provider of providers) {
+              if (provider === "opencode" || provider === "codex") continue;
+              const folderKept = folder ? yield* this.#providers.releaseFolderProcesses(provider, folder) : null;
+              if (folderKept ?? (yield* this.#providers.releaseSharedProcess(provider))) kept = true;
+            }
             return kept;
           }),
         folderHeld: (agentId) => this.#folderHeld(agentId),
