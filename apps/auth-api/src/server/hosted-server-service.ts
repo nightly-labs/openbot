@@ -1291,6 +1291,12 @@ export class HostedServerService {
     );
     if (restored?.meta.changes !== 1) return yield* invalidPoolToken();
     console.info("Hosted server restored from its archive.", { serverId });
+    yield* this.#alertPool(
+      [
+        `♻️ **Restored** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId}`,
+        ...(row.start_requested_at === null ? [] : [elapsedText(now - row.start_requested_at)]),
+      ].join(" · "),
+    );
     yield* this.#recordReady(row, now);
     return { state: "restored" };
   });
@@ -3091,6 +3097,11 @@ export class HostedServerService {
     if (!row) return yield* notFound();
     return row;
   });
+}
+
+function elapsedText(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return seconds < 120 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
 }
 
 function isRestoring(row: HostedServerRow): boolean {
