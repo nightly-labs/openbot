@@ -44,8 +44,6 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
@@ -60,10 +58,8 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -261,7 +257,6 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
@@ -402,8 +397,6 @@ export interface WebWorkspaceRuntime {
   sharedFile(path: string): Promise<WebFile>;
   workspaceFile(agentId: string, path: string): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
   listAgentColors?: () => Promise<AgentColors>;
@@ -963,7 +956,6 @@ export function createWebWorkspaceRuntime(
       });
     return listed;
   }
-  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -1583,8 +1575,6 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),

@@ -119,8 +119,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),
-    updateRoutine: (input) => agent.updateRoutine(input),
-    testRoutine: (input) => agent.testRoutine(input),
     react: (input) => agent.setMessageReaction(input),
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });

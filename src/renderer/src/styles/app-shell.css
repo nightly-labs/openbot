@@ -1303,6 +1303,10 @@ textarea {
   stroke-width: var(--openbot-icon-stroke);
 }
 
+.sidebar-history-button > svg:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .sidebar-history-button:disabled,
 .sidebar-history-button:disabled:hover {
   background: transparent;
