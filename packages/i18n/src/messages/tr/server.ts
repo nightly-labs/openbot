@@ -236,7 +236,7 @@ export const messages = {
   "server.plan.deletedOn": "{date} tarihinde silinecek",
   "server.plan.dialogTitle": "Ajanlarını kaybetme",
   "server.plan.dialogDescription":
-    "{name}, planı ödenmediği için durdu. OpenBot {date} tarihinde ajanlarını tüm sohbetleri ve dosyalarıyla birlikte siler.",
+    "{name}, planı sona erdiği için durdu. OpenBot {date} tarihinde ajanlarını tüm sohbetleri ve dosyalarıyla birlikte siler.",
   "server.plan.dialogDaysLeft": {
     one: "{count} gün kaldı",
     other: "{count} gün kaldı",

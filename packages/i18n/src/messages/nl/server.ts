@@ -245,7 +245,7 @@ export const messages = {
   "server.plan.deletedOn": "Verwijderd op {date}",
   "server.plan.dialogTitle": "Laat je agents niet gaan",
   "server.plan.dialogDescription":
-    "{name} is gestopt omdat het abonnement niet is betaald. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
+    "{name} is gestopt omdat het abonnement is beëindigd. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
   "server.plan.dialogDaysLeft": {
     one: "Nog {count} dag",
     other: "Nog {count} dagen",

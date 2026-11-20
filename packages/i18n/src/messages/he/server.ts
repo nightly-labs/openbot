@@ -248,7 +248,7 @@ export const messages = {
   "server.plan.deletedOn": "יימחק ב-{date}",
   "server.plan.dialogTitle": "אל תיתן לסוכנים שלך ללכת",
   "server.plan.dialogDescription":
-    "{name} נעצר כי התוכנית שלו לא שולמה. ב-{date}, OpenBot ימחק את הסוכנים שלו, עם כל הצ'אטים והקבצים.",
+    "{name} נעצר כי התוכנית שלו הסתיימה. ב-{date}, OpenBot ימחק את הסוכנים שלו, עם כל הצ'אטים והקבצים.",
   "server.plan.dialogDaysLeft": {
     one: "נותר יום אחד",
     two: "נותרו יומיים",
