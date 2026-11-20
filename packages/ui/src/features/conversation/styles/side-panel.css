@@ -241,6 +241,19 @@
   white-space: nowrap;
 }
 
+.side-panel-tab-count.z-badge {
+  min-width: 18px;
+  height: 18px;
+  flex: none;
+  justify-content: center;
+  padding: 0 var(--openbot-space-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.side-panel-launch .side-panel-tab-count.z-badge {
+  margin-inline-start: auto;
+}
+
 .side-panel-hidden-tabs {
   max-width: 320px;
 }

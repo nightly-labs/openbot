@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Badge,
   Button,
   buttonVariants,
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Maximize2,
   MessageCircleQuestionMark,
   MessageSquare,
+  MessagesSquare,
   Minimize2,
   PanelRight,
   Plus,
@@ -43,6 +45,7 @@ function fileValue(key: string): string {
 const SIDE_PANEL_PANES = {
   browser: { label: "conversation.sidePanel.pane.browser", icon: () => <ComputerIcon /> },
   files: { label: "conversation.sidePanel.pane.files", icon: () => <Folder aria-hidden="true" /> },
+  threads: { label: "conversation.sidePanel.pane.threads", icon: () => <MessagesSquare aria-hidden="true" /> },
   settings: { label: "conversation.sidePanel.pane.settings", icon: () => <Settings aria-hidden="true" /> },
   question: {
     label: "conversation.sidePanel.pane.question",
@@ -65,6 +68,21 @@ function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
 
 function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
   return SIDE_PANEL_PANES[props.pane].icon();
+}
+
+function PaneBadge(props: { badge: SidePanelPaneBadge | undefined }) {
+  return (
+    <Show when={props.badge}>
+      {(badge) => (
+        <>
+          <Badge variant="warning-light" class="side-panel-tab-count" aria-hidden="true">
+            {badge().count}
+          </Badge>
+          <span class="sr-only">{badge().label}</span>
+        </>
+      )}
+    </Show>
+  );
 }
 
 function FileTabIcon(props: { file: SidePanelFileTab }): JSX.Element {
@@ -121,10 +139,16 @@ export function SidePanelToggle(props: SidePanelToggleProps) {
   );
 }
 
+export interface SidePanelPaneBadge {
+  count: number;
+  label: string;
+}
+
 export interface SidePanelHeaderProps {
   panes: readonly SidePanelPane[];
   selected: SidePanelPane | null;
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   maximized: boolean;
   settingsLabel?: string | undefined;
   onSelect: (pane: SidePanelPane) => void;
@@ -563,6 +587,7 @@ function SidePanelTabRow(
                     onKeyDown={(event) => onTabKeyDown(event, pane, close)}
                   >
                     <span class="side-panel-tab-label">{label()}</span>
+                    <PaneBadge badge={props.badges?.[pane]} />
                   </Tabs.Trigger>
                   <Button
                     variant="ghost"
@@ -794,6 +819,7 @@ function SidePanelTabRow(
 
 export function SidePanelLauncher(props: {
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   settingsLabel?: string | undefined;
   onOpen: (pane: SidePanelPane) => void;
 }) {
@@ -810,6 +836,7 @@ export function SidePanelLauncher(props: {
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
             {t("conversation.sidePanel.openPane", { name: paneLabel(t, pane, props.settingsLabel) })}
+            <PaneBadge badge={props.badges?.[pane]} />
           </Button>
         )}
       </For>
