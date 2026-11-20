@@ -193,7 +193,7 @@ export interface AgentDockDisplayBounds {
 export interface AgentDockOffset {
   displayId: number;
   offset: number;
-  bounds?: AgentDockDisplayBounds;
+  bounds?: AgentDockDisplayBounds | undefined;
 }
 
 export function sameAgentDockDisplayBounds(
