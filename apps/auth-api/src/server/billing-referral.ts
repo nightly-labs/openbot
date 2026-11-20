@@ -14,6 +14,11 @@ import type { Referrals } from "./referrals";
 import type { StripeClient, StripeEvent, StripeRequestError, StripeTransportError } from "./stripe-client";
 
 const REFERRAL_COUPON_ID = `openbot-invite-${REFERRAL_SHARE_PERCENT}`;
+const FIRST_PAYMENT_COUPON_ID = `openbot-invite-${REFERRAL_SHARE_PERCENT}-first`;
+const PART_DAYS = 30;
+const PART_MS = PART_DAYS * 86_400_000;
+const MAX_PARTS = 12;
+const DUE_REFERRERS_PER_RUN = 50;
 
 const paidInvoiceSchema = Schema.Struct({
   id: Schema.String,
@@ -23,6 +28,18 @@ const paidInvoiceSchema = Schema.Struct({
   total: Schema.optional(Schema.NullOr(Schema.Number)),
   total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  discounts: Schema.optional(Schema.NullOr(Schema.Array(Schema.Unknown))),
+  lines: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        data: Schema.Array(
+          Schema.Struct({
+            period: Schema.optional(Schema.NullOr(Schema.Struct({ start: Schema.Number, end: Schema.Number }))),
+          }),
+        ),
+      }),
+    ),
+  ),
   parent: Schema.Struct({
     subscription_details: Schema.Struct({
       subscription: Schema.Union([Schema.String, Schema.Struct({ id: Schema.String })]),
@@ -30,11 +47,16 @@ const paidInvoiceSchema = Schema.Struct({
   }),
 });
 
+type PaidInvoice = typeof paidInvoiceSchema.Type;
+
 interface CreditRow {
   invoice_id: string;
   referrer_user_id: string;
   referred_user_id: string;
   source_currency: string;
+  source_amount: number;
+  source_invoice_id: string | null;
+  ready_at: number | null;
   currency: string;
   amount: number;
   reversed_amount: number;
@@ -43,7 +65,7 @@ interface CreditRow {
 }
 
 const CREDIT_COLUMNS =
-  "invoice_id, referrer_user_id, referred_user_id, source_currency, currency, amount, reversed_amount, balance_transaction_id, queued_at";
+  "invoice_id, referrer_user_id, referred_user_id, source_currency, source_amount, source_invoice_id, ready_at, currency, amount, reversed_amount, balance_transaction_id, queued_at";
 
 type Failure = BillingError | BillingOperationError;
 
@@ -73,11 +95,12 @@ export class BillingReferral {
     userId: string,
   ): Effect.fn.Return<string | null, Failure> {
     if (!(yield* this.#referrals.isReferred(userId))) return null;
+    if (yield* this.#hasPurchase(userId)) return null;
     return yield* this.#stripe
       .ensureReferralCoupon({
-        id: REFERRAL_COUPON_ID,
+        id: FIRST_PAYMENT_COUPON_ID,
         percentOff: REFERRAL_SHARE_PERCENT,
-        name: `Invite: ${REFERRAL_SHARE_PERCENT}% off`,
+        name: `Invite: ${REFERRAL_SHARE_PERCENT}% off the first payment`,
       })
       .pipe(
         Effect.catch(() =>
@@ -109,20 +132,88 @@ export class BillingReferral {
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null } | null,
     ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
-    if (event.type === "invoice.paid") return yield* this.#creditInvoice(event);
+    if (event.type === "invoice.paid") {
+      const decoded = Schema.decodeUnknownOption(paidInvoiceSchema)(event.data.object);
+      if (Option.isNone(decoded)) return;
+      yield* this.#endFirstPaymentDiscount(decoded.value);
+      return yield* this.#creditInvoice(decoded.value);
+    }
     const reversal = paymentReversal(event);
     if (reversal && payment && (reversal.type === "payment_refunded" || reversal.type === "dispute_lost")) {
       yield* this.#reverse(reversal, payment, ownerId);
     }
   }).bind(this);
 
+  readonly releaseDue = Effect.fn("BillingReferral.releaseDue")(function* (
+    this: BillingReferral,
+  ): Effect.fn.Return<number, Failure> {
+    const due = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT DISTINCT referrer_user_id AS referrer FROM referral_credits
+           WHERE balance_transaction_id IS NULL
+             AND ((released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?1) OR queued_at IS NOT NULL)
+           LIMIT ?2`,
+        )
+        .bind(this.#now(), DUE_REFERRERS_PER_RUN)
+        .all<{ referrer: string }>(),
+    );
+    const referrers = due.results ?? [];
+    let failed = 0;
+    for (const { referrer } of referrers) {
+      const exit = yield* Effect.exit(this.#sendReady(referrer));
+      if (exit._tag === "Failure") failed += 1;
+    }
+    if (failed > 0) console.warn("billing: invite credit parts were released but not sent", { failed });
+    return referrers.length;
+  }).bind(this);
+
+  readonly #hasPurchase = Effect.fn("BillingReferral.hasPurchase")(function* (
+    this: BillingReferral,
+    userId: string,
+  ): Effect.fn.Return<boolean, Failure> {
+    const row = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT 1 AS bought FROM billing_subscriptions
+             WHERE user_id = ?1 AND status NOT IN ('incomplete', 'incomplete_expired')
+           UNION ALL
+           SELECT 1 FROM licenses WHERE user_id = ?1 AND status NOT IN ('incomplete', 'incomplete_expired')
+           UNION ALL
+           SELECT 1 FROM referral_credits WHERE referred_user_id = ?1
+           LIMIT 1`,
+        )
+        .bind(userId)
+        .first<{ bought: number }>(),
+    );
+    return row !== null;
+  }).bind(this);
+
+  readonly #endFirstPaymentDiscount = Effect.fn("BillingReferral.endFirstPaymentDiscount")(function* (
+    this: BillingReferral,
+    invoice: PaidInvoice,
+  ): Effect.fn.Return<void, Failure> {
+    if (invoice.amount_paid <= 0 || (invoice.discounts ?? []).length === 0) return;
+    const referred = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT 1 AS referred FROM billing_customers c
+           JOIN referrals r ON r.referred_user_id = c.user_id
+           WHERE c.stripe_customer_id = ?`,
+        )
+        .bind(invoice.customer)
+        .first<{ referred: number }>(),
+    );
+    if (!referred) return;
+    yield* this.#stripeCall(() =>
+      this.#stripe.removeSubscriptionCoupon(invoiceSubscriptionId(invoice), [FIRST_PAYMENT_COUPON_ID]),
+    );
+  }).bind(this);
+
   readonly #creditInvoice = Effect.fn("BillingReferral.creditInvoice")(function* (
     this: BillingReferral,
-    event: StripeEvent,
+    invoice: PaidInvoice,
   ): Effect.fn.Return<void, Failure> {
-    const decoded = Schema.decodeUnknownOption(paidInvoiceSchema)(event.data.object);
-    if (Option.isNone(decoded)) return;
-    const invoice = decoded.value;
     const sourceCurrency = invoice.currency.toLowerCase();
     if (!isOneOf(BILLING_CURRENCIES, sourceCurrency) || !isBillingAmount(invoice.amount_paid)) return;
     const share = referralShare(withoutTax(invoice.amount_paid, invoice.total, invoice.total_excluding_tax));
@@ -143,23 +234,39 @@ export class BillingReferral {
       );
       if (!pair) return;
       if (pair.blocked_at !== null || (yield* this.#sameCard(pair.referrer, invoice.customer))) {
-        const subscription = invoice.parent.subscription_details.subscription;
-        return yield* this.#block(pair.friend, typeof subscription === "string" ? subscription : subscription.id);
+        return yield* this.#block(pair.friend, invoiceSubscriptionId(invoice));
       }
       const customerId = yield* this.#ensureCustomer({ id: pair.referrer, email: pair.email });
       const customer = yield* this.#stripeCall(() => this.#stripe.getCustomerCredit(customerId));
       const currency: BillingCurrency =
         customer?.currency && isOneOf(BILLING_CURRENCIES, customer.currency) ? customer.currency : sourceCurrency;
-      const amount = convertReferralAmount(share, sourceCurrency, currency);
+      const parts = splitAmount(share, invoiceParts(invoice));
+      const split = parts.length > 1;
+      const now = this.#now();
       yield* billingCall(() =>
-        this.#database
-          .prepare(
-            `INSERT OR IGNORE INTO referral_credits(
-               invoice_id, referrer_user_id, referred_user_id, source_currency, source_amount, currency, amount, created_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(invoice.id, pair.referrer, pair.friend, sourceCurrency, share, currency, amount, this.#now())
-          .run(),
+        this.#database.batch(
+          parts.map((source, index) =>
+            this.#database
+              .prepare(
+                `INSERT OR IGNORE INTO referral_credits(
+                   invoice_id, referrer_user_id, referred_user_id, source_currency, source_amount, currency, amount,
+                   source_invoice_id, ready_at, created_at
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              )
+              .bind(
+                index === 0 ? invoice.id : `${invoice.id}:${index + 1}`,
+                pair.referrer,
+                pair.friend,
+                sourceCurrency,
+                source,
+                currency,
+                convertReferralAmount(source, sourceCurrency, currency),
+                split ? invoice.id : null,
+                split ? now + (index + 1) * PART_MS : null,
+                now,
+              ),
+          ),
+        ),
       );
       row = yield* this.#creditRow(invoice.id);
     }
@@ -168,7 +275,7 @@ export class BillingReferral {
     const progress = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT COUNT(*) AS payments, COUNT(released_at) AS released
+          `SELECT COUNT(DISTINCT COALESCE(source_invoice_id, invoice_id)) AS payments, COUNT(released_at) AS released
            FROM referral_credits WHERE referred_user_id = ?`,
         )
         .bind(friend)
@@ -180,7 +287,10 @@ export class BillingReferral {
     if (released) {
       yield* billingCall(() =>
         this.#database
-          .prepare("UPDATE referral_credits SET released_at = ?2 WHERE referred_user_id = ?1 AND released_at IS NULL")
+          .prepare(
+            `UPDATE referral_credits SET released_at = ?2
+             WHERE referred_user_id = ?1 AND released_at IS NULL AND ready_at IS NULL`,
+          )
           .bind(friend, this.#now())
           .run(),
       );
@@ -211,7 +321,9 @@ export class BillingReferral {
     friend: string,
     subscriptionId: string,
   ): Effect.fn.Return<void, Failure> {
-    yield* this.#stripeCall(() => this.#stripe.removeSubscriptionCoupon(subscriptionId, REFERRAL_COUPON_ID));
+    yield* this.#stripeCall(() =>
+      this.#stripe.removeSubscriptionCoupon(subscriptionId, [REFERRAL_COUPON_ID, FIRST_PAYMENT_COUPON_ID]),
+    );
     const now = this.#now();
     const [blocked] = yield* billingCall(() =>
       this.#database.batch([
@@ -234,6 +346,15 @@ export class BillingReferral {
     this: BillingReferral,
     referrer: string,
   ): Effect.fn.Return<void, Failure> {
+    yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `UPDATE referral_credits SET released_at = ?2
+           WHERE referrer_user_id = ?1 AND released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?2`,
+        )
+        .bind(referrer, this.#now())
+        .run(),
+    );
     yield* this.#followReferrerCurrency(referrer);
     const totals = yield* billingCall(() =>
       this.#database
@@ -370,11 +491,27 @@ export class BillingReferral {
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null },
     ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
-    let credit = yield* this.#creditRow(payment.invoiceId);
     const share = referralShare(withoutTax(reversal.amount, payment.total, payment.totalExcludingTax));
-    if (!credit && share > 0 && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
-      return yield* new BillingOperationError({});
+    const rows = yield* this.#invoiceCredits(payment.invoiceId);
+    if (rows.length === 0) {
+      if (share > 0 && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
+        return yield* new BillingOperationError({});
+      }
+      return;
     }
+    if (rows.some((row) => row.source_invoice_id !== null)) {
+      return yield* this.#reverseParts(reversal, payment.invoiceId, share, rows);
+    }
+    yield* this.#reverseOne(reversal, payment, share);
+  }).bind(this);
+
+  readonly #reverseOne = Effect.fn("BillingReferral.reverseOne")(function* (
+    this: BillingReferral,
+    reversal: PaymentReversal,
+    payment: { invoiceId: string },
+    share: number,
+  ): Effect.fn.Return<void, Failure> {
+    let credit = yield* this.#creditRow(payment.invoiceId);
     if (credit && credit.queued_at !== null && credit.balance_transaction_id === null) {
       yield* this.#send(credit);
       credit = yield* this.#creditRow(payment.invoiceId);
@@ -455,6 +592,162 @@ export class BillingReferral {
     );
   }).bind(this);
 
+  readonly #reverseParts = Effect.fn("BillingReferral.reverseParts")(function* (
+    this: BillingReferral,
+    reversal: PaymentReversal,
+    invoiceId: string,
+    share: number,
+    rows: readonly CreditRow[],
+  ): Effect.fn.Return<void, Failure> {
+    for (const row of rows) if (row.queued_at !== null && row.balance_transaction_id === null) yield* this.#send(row);
+    const parts = yield* this.#invoiceCredits(invoiceId);
+    const prefix = `${reversal.objectId}|`;
+    const decided = yield* this.#partReversals(invoiceId, prefix);
+    let remaining = share - decided.reduce((sum, row) => sum + (row.source_amount ?? 0), 0);
+    const done = new Set(decided.map((row) => row.invoice_id));
+    const order = parts
+      .filter((part) => !done.has(part.invoice_id) && part.balance_transaction_id !== "")
+      .sort(
+        (a, b) =>
+          Number(a.balance_transaction_id !== null) - Number(b.balance_transaction_id !== null) ||
+          (b.ready_at ?? 0) - (a.ready_at ?? 0),
+      );
+    const referrer = parts[0]?.referrer_user_id;
+    let available: Map<string, number> | null = null;
+    const statements: D1PreparedStatement[] = [];
+    const expected: string[] = [];
+    for (const part of order) {
+      if (remaining <= 0) break;
+      const left = part.amount - part.reversed_amount;
+      const leftSource = part.amount > 0 ? Math.floor((part.source_amount * left) / part.amount) : 0;
+      if (left <= 0 || leftSource <= 0) continue;
+      const takeSource = Math.min(remaining, leftSource);
+      let take =
+        takeSource === leftSource ? left : Math.min(left, Math.floor((takeSource * part.amount) / part.source_amount));
+      const sent = part.balance_transaction_id !== null;
+      if (sent) {
+        if (!available) available = yield* this.#availableCredit(referrer);
+        take = Math.min(take, available.get(part.currency) ?? 0);
+        available.set(part.currency, (available.get(part.currency) ?? 0) - take);
+      }
+      remaining -= takeSource;
+      const reversalId = `${prefix}${part.invoice_id}`;
+      expected.push(reversalId);
+      statements.push(
+        sent
+          ? this.#database
+              .prepare(
+                `INSERT OR IGNORE INTO referral_reversals(
+                   reversal_id, invoice_id, amount, source_amount, balance_transaction_id, created_at
+                 ) VALUES (?, ?, ?, ?, ?, ?)`,
+              )
+              .bind(reversalId, part.invoice_id, take, takeSource, take === 0 ? "" : null, this.#now())
+          : this.#database
+              .prepare(
+                `INSERT OR IGNORE INTO referral_reversals(
+                   reversal_id, invoice_id, amount, source_amount, balance_transaction_id, created_at
+                 )
+                 SELECT ?1, ?2, ?3, ?4, '', ?5 WHERE EXISTS (
+                   SELECT 1 FROM referral_credits
+                   WHERE invoice_id = ?2 AND currency = ?6 AND queued_at IS NULL AND balance_transaction_id IS NULL
+                 )`,
+              )
+              .bind(reversalId, part.invoice_id, take, takeSource, this.#now(), part.currency),
+        this.#reversedAmount(part.invoice_id),
+      );
+    }
+    if (statements.length > 0) yield* billingCall(() => this.#database.batch(statements));
+    const recorded = yield* this.#partReversals(invoiceId, prefix);
+    const ids = new Set(recorded.map((row) => row.reversal_id));
+    if (expected.some((id) => !ids.has(id))) return yield* new BillingOperationError({});
+    const customerId = referrer ? yield* this.#customerId(referrer) : null;
+    for (const row of recorded) {
+      if (row.balance_transaction_id !== null || !customerId) continue;
+      const part = parts.find((candidate) => candidate.invoice_id === row.invoice_id);
+      if (!part) continue;
+      const transactionId = yield* this.#stripeCall(() =>
+        this.#stripe.addCustomerBalance(
+          {
+            customerId,
+            amount: row.amount,
+            currency: part.currency,
+            description: "Invite credit taken back: the payment of the friend was refunded",
+          },
+          `openbot-invite-reversal-${row.reversal_id}`,
+        ),
+      );
+      yield* billingCall(() =>
+        this.#database.batch([
+          this.#database
+            .prepare("UPDATE referral_reversals SET balance_transaction_id = ? WHERE reversal_id = ?")
+            .bind(transactionId, row.reversal_id),
+          this.#reversedAmount(row.invoice_id),
+        ]),
+      );
+    }
+  }).bind(this);
+
+  readonly #partReversals = Effect.fn("BillingReferral.partReversals")(function* (
+    this: BillingReferral,
+    invoiceId: string,
+    prefix: string,
+  ): Effect.fn.Return<
+    {
+      reversal_id: string;
+      invoice_id: string;
+      amount: number;
+      source_amount: number | null;
+      balance_transaction_id: string | null;
+    }[],
+    Failure
+  > {
+    const rows = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT reversal_id, invoice_id, amount, source_amount, balance_transaction_id FROM referral_reversals
+           WHERE substr(reversal_id, 1, ?3) = ?2 AND invoice_id IN (
+             SELECT invoice_id FROM referral_credits WHERE invoice_id = ?1 OR source_invoice_id = ?1
+           )
+           ORDER BY reversal_id`,
+        )
+        .bind(invoiceId, prefix, prefix.length)
+        .all<{
+          reversal_id: string;
+          invoice_id: string;
+          amount: number;
+          source_amount: number | null;
+          balance_transaction_id: string | null;
+        }>(),
+    );
+    return rows.results ?? [];
+  }).bind(this);
+
+  readonly #availableCredit = Effect.fn("BillingReferral.availableCredit")(function* (
+    this: BillingReferral,
+    referrer: string | undefined,
+  ): Effect.fn.Return<Map<string, number>, Failure> {
+    const customerId = referrer ? yield* this.#customerId(referrer) : null;
+    if (!customerId) return new Map();
+    const customer = yield* this.#stripeCall(() => this.#stripe.getCustomerCredit(customerId));
+    return new Map(Object.entries(customer?.credit ?? {}));
+  }).bind(this);
+
+  readonly #invoiceCredits = Effect.fn("BillingReferral.invoiceCredits")(function* (
+    this: BillingReferral,
+    invoiceId: string,
+  ): Effect.fn.Return<CreditRow[], Failure> {
+    const rows = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `SELECT ${CREDIT_COLUMNS} FROM referral_credits WHERE invoice_id = ?1 OR source_invoice_id = ?1
+           ORDER BY ready_at, invoice_id`,
+        )
+        .bind(invoiceId)
+        .all<CreditRow>(),
+    );
+    return rows.results ?? [];
+  }).bind(this);
+
   #reversedAmount(invoiceId: string): D1PreparedStatement {
     return this.#database
       .prepare(
@@ -505,4 +798,23 @@ export class BillingReferral {
 
   readonly #stripeCall = <T>(call: () => Effect.Effect<T, StripeRequestError | StripeTransportError>) =>
     stripeRequest(call).pipe(Effect.mapError(stripeFailure));
+}
+
+function invoiceSubscriptionId(invoice: PaidInvoice): string {
+  const subscription = invoice.parent.subscription_details.subscription;
+  return typeof subscription === "string" ? subscription : subscription.id;
+}
+
+function invoiceParts(invoice: PaidInvoice): number {
+  let longest = 0;
+  for (const line of invoice.lines?.data ?? []) {
+    if (line.period) longest = Math.max(longest, line.period.end - line.period.start);
+  }
+  return Math.min(MAX_PARTS, Math.max(1, Math.round((longest * 1_000) / PART_MS)));
+}
+
+function splitAmount(amount: number, parts: number): number[] {
+  const base = Math.floor(amount / parts);
+  const rest = amount - base * parts;
+  return Array.from({ length: parts }, (_, index) => base + (index < rest ? 1 : 0));
 }

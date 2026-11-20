@@ -549,7 +549,6 @@ export class LicenseService {
       const made = listed.find(
         (candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id,
       );
-      const referralCouponId = made || !this.#referralCoupon ? null : yield* this.#referralCoupon(ownerId);
       const license =
         made ??
         (yield* this.#stripeCall(() =>
@@ -565,7 +564,6 @@ export class LicenseService {
                 automaticTax: subscription.automatic_tax?.enabled === true,
                 taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
-                ...(referralCouponId ? { couponId: referralCouponId } : {}),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),

@@ -806,7 +806,7 @@ export class StripeClient {
   readonly removeSubscriptionCoupon = Effect.fn("StripeClient.removeSubscriptionCoupon")(function* (
     this: StripeClient,
     subscriptionId: string,
-    couponId: string,
+    couponIds: readonly string[],
   ): Effect.fn.Return<boolean, StripeRequestError | StripeTransportError> {
     const path = `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`;
     const query = new URLSearchParams({ "expand[]": "discounts" });
@@ -817,7 +817,8 @@ export class StripeClient {
       typeof value === "string" ? value : (value?.id ?? null);
     const keep = discounts
       .filter(
-        (discount) => typeof discount === "string" || idOf(discount.source?.coupon ?? discount.coupon) !== couponId,
+        (discount) =>
+          typeof discount === "string" || !couponIds.includes(idOf(discount.source?.coupon ?? discount.coupon) ?? ""),
       )
       .map((discount) => (typeof discount === "string" ? discount : discount.id));
     if (keep.length === discounts.length) return false;

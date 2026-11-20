@@ -332,6 +332,9 @@ export class BillingService {
   readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
     this.#referral.credit(userId);
 
+  readonly releaseReferralCredit = (): Effect.Effect<number, BillingError | BillingOperationError> =>
+    this.#referral.releaseDue();
+
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (
       this: BillingService,
