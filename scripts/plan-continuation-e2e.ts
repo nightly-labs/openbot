@@ -1039,11 +1039,18 @@ try {
     assert.ok(ran[0]?.text.includes("biome check a.ts b.ts"), "The check reads the tool steps.");
     assert.ok(ran[0]?.text.includes("I fixed a.ts and b.ts."), "The check reads the answer.");
     assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
-    const lines = continuationLines(agent.id);
+    assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
+    const shown = chatMessages(agent.id).flatMap((message) => {
+      if (message.id === id) return ["request"];
+      if (message.itemType === PLAN_CONTINUATION_ITEM_TYPE) return ["line"];
+      return message.text === "I fixed a.ts and b.ts." || message.text === "I fixed c.ts. The lint passes."
+        ? [message.text]
+        : [];
+    });
     assert.deepEqual(
-      lines.map((line) => line.text),
-      ["The request is not finished yet. The agent continues (1 of 3)."],
-      "One finish check line shows.",
+      shown,
+      ["request", "I fixed a.ts and b.ts.", "I fixed c.ts. The lint passes."],
+      "The continuation's answer follows the first answer with no line between them.",
     );
     assert.ok(
       !chatMessages(agent.id).some((message) => message.text?.includes(CHECK_MARKER)),
@@ -1075,7 +1082,7 @@ try {
     );
     assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
     assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
-    assert.equal(continuationLines(agent.id).length, 3);
+    assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
     return { turns: turns.length };
   });
 
