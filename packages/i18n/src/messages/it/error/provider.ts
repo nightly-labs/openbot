@@ -249,6 +249,7 @@ export const messages = {
     "OpenCode Go ha rifiutato la richiesta. Una nuova chiave API non risolve il problema. Il tuo piano OpenCode Go potrebbe non essere attivo, oppure OpenCode Go potrebbe bloccare la tua rete: alcuni servizi bloccano VPN, proxy o alcuni paesi. Verifica che il piano sia attivo in OpenCode Console o disattiva la VPN, poi riprova. Puoi anche scegliere un altro modello.",
   "error.provider.opencodeServiceFailure":
     "OpenCode non ha potuto completare questo turno perché il suo servizio locale è andato in errore. Riprova. Se l'errore continua, riconnetti OpenCode in Impostazioni.",
+  "error.provider.opencodeStillStarting": "OpenCode non ha finito di caricarsi in tempo. OpenBot riproverà.",
   "error.provider.opencodeRateLimited":
     "Il provider del modello ha rifiutato la richiesta per via del limite di richieste. Attendi qualche minuto o scegli un altro modello, poi riprova.\n{detail}",
   "error.provider.opencodeBilling":

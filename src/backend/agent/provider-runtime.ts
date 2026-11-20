@@ -40,7 +40,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
-import { isOpenCodeInternalFailure, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
+import { isOpenCodeInternalFailure, isOpenCodeStarting, OPENCODE_INTERNAL_FAILURE } from "./../acp-flavor-opencode";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import {
   type AgentClient,
@@ -3238,7 +3238,12 @@ export class ProviderRuntime implements ProviderPort {
       const status = this.status().providers?.find((row) => row.id === provider);
       if (status?.message === sourceText("error.provider.codexStateBusy")) return;
       if (status?.message === sourceText("error.provider.realtimeLimitZero")) return;
-      if (status?.message === OPENCODE_INTERNAL_FAILURE && this.#restartTimers.has(provider)) return;
+      if (
+        (status?.message === OPENCODE_INTERNAL_FAILURE ||
+          status?.message === sourceText("error.provider.opencodeStillStarting")) &&
+        this.#restartTimers.has(provider)
+      )
+        return;
       if (status?.version !== cli.version || !["available", "sign-in-required"].includes(status.state)) {
         const message = status?.message;
         return yield* new ProviderOperationFailed({
@@ -3553,8 +3558,10 @@ export class ProviderRuntime implements ProviderPort {
                     ? message
                     : this.#showStartStopped(provider);
               }
-              if (provider === "opencode" && isOpenCodeInternalFailure(failed))
-                this.#retryAfterTimeout(provider, !disposed());
+              if (provider === "opencode" && isOpenCodeInternalFailure(failed)) {
+                const retryMessage = this.#retryAfterTimeout(provider, !disposed());
+                if (isOpenCodeStarting(failed)) return this.#showOpenCodeStillStarting(failure, retryMessage);
+              }
               return message;
             }),
           ),
@@ -3976,6 +3983,16 @@ export class ProviderRuntime implements ProviderPort {
     );
     recordRestartActivity();
   }, Effect.uninterruptible);
+
+  #showOpenCodeStillStarting(failure: Omit<AgentProviderStatus, "id">, retryMessage: string): string {
+    const message = this.#restartTimers.has("opencode")
+      ? sourceText("error.provider.opencodeStillStarting")
+      : retryMessage;
+    this.#setStatus({
+      providers: updateProviderStatus(this.#status.providers, "opencode", { ...failure, message }),
+    });
+    return message;
+  }
 
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
     return sourceText(
