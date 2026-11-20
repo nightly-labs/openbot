@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Sunra here is taken from sunra.ai and the metadata of its MCP server.
-// Each page used is in `sources`. Check the sources again, and move `checkedAt`, whenever this
-// file changes.
-
 export const SUNRA_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

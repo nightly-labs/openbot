@@ -17,27 +17,18 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { formatTimer } from "@/shared/lib/countdown";
 import { useReducedMotion } from "@/shared/lib/motion";
 
-/** A hold this long on the mic opens the voice settings. The tap gives up at 500 ms. */
 export const LONG_PRESS_MS = 400;
 const PRESS_IN = { duration: 100, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
-/** One bar of the wave, the space after it, and the box it moves in. */
 const WAVE_BAR = 3;
 const WAVE_PITCH = 5;
 const WAVE_HEIGHT = 22;
-/** The wave takes one sample of the voice each this many milliseconds, and moves one bar left. */
 const WAVE_SAMPLE_MS = 70;
-/** The samples kept: more than the widest strip has bars. */
 const WAVE_SAMPLES = 120;
-/** The first bars on the left fade in over this many bars, so the oldest speech leaves softly. */
 const WAVE_FADE_BARS = 6;
 
-/**
- * The mic beside the main control. A tap starts dictation hands-free; while dictation listens, the
- * mic turns into Stop, and a tap stops it and keeps the words. The press and the change of glyph run
- * on the UI thread; only the tap itself calls into React.
- */
 export function DictationMic({
   active,
   presence,
@@ -49,20 +40,17 @@ export function DictationMic({
   longPressLabel,
 }: {
   active: boolean;
-  /** 0 with the mic, 1 with Stop. */
   presence: SharedValue<number>;
   enabled: boolean;
   label: string;
   foreground: string;
   onPress: () => void;
-  /** A press and hold on the mic, not on Stop, opens the voice settings. */
   onLongPress: () => void;
   longPressLabel: string;
 }) {
   const reducedMotion = useReducedMotion();
   const danger = String(useThemeColor("danger"));
   const pressed = useSharedValue(0);
-  // The gesture must outlive renders: each word of dictation re-renders the composer.
   const handler = useRef(onPress);
   useEffect(() => {
     handler.current = onPress;
@@ -76,7 +64,6 @@ export function DictationMic({
   const gesture = useMemo(
     () =>
       Gesture.Race(
-        // The hold activates before the tap's 500 ms limit, so it cancels the tap.
         Gesture.LongPress()
           .enabled(enabled && !active)
           .minDuration(LONG_PRESS_MS)
@@ -140,11 +127,6 @@ export function DictationMic({
   );
 }
 
-/**
- * A wave of the user's speech: each bar is the loudest moment of a short slice of time, the newest
- * comes in at the right, and the wave glides left as the user speaks. The sampling and the glide run
- * in a frame callback on the UI thread; React only lays the bars out once for the width.
- */
 function DictationWave({ level, color }: { level: SharedValue<number>; color: string }) {
   const reducedMotion = useReducedMotion();
   const [count, setCount] = useState(0);
@@ -170,12 +152,10 @@ function DictationWave({ level, color }: { level: SharedValue<number>; color: st
   const rowStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: reducedMotion ? 0 : (-WAVE_PITCH * elapsed.get()) / WAVE_SAMPLE_MS }],
   }));
-  // One bar more than fits: it comes in from under the right edge while the wave glides.
   const bars = Math.min(WAVE_SAMPLES, count + 1);
   return (
     <View
       pointerEvents="none"
-      // A wave reads left to right in every language, as a media timeline does.
       style={{ flex: 1, height: WAVE_HEIGHT, overflow: "hidden", direction: "ltr" }}
       onLayout={({ nativeEvent }) => {
         const next = Math.floor(nativeEvent.layout.width / WAVE_PITCH);
@@ -185,7 +165,6 @@ function DictationWave({ level, color }: { level: SharedValue<number>; color: st
       <Animated.View style={[{ flexDirection: "row", alignItems: "center", height: WAVE_HEIGHT }, rowStyle]}>
         {Array.from({ length: bars }, (_, index) => (
           <DictationWaveBar
-            // The bars never reorder: the samples move through them.
             // biome-ignore lint/suspicious/noArrayIndexKey: a fixed slot of the wave, not an item.
             key={index}
             samples={samples}
@@ -210,8 +189,6 @@ function DictationWaveBar({
   opacity: number;
   color: string;
 }) {
-  // The height, not a scale: a scale squashes the round ends into squares. The bar is childless in a
-  // box of fixed size, so its height lays out only itself.
   const style = useAnimatedStyle(() => ({
     height: WAVE_BAR + (WAVE_HEIGHT - WAVE_BAR) * Math.min(1, (samples.get()[sample] ?? 0) * 1.4),
   }));
@@ -227,7 +204,6 @@ function DictationWaveBar({
   );
 }
 
-/** The time since dictation started. Its own component, so the tick re-renders only these digits. */
 function DictationTimer({ color }: { color: string }) {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
@@ -240,12 +216,11 @@ function DictationTimer({ color }: { color: string }) {
       type="body-sm"
       style={{ color, fontVariant: ["tabular-nums"], minWidth: 34 }}
     >
-      {`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
+      {formatTimer(seconds)}
     </Typography.Paragraph>
   );
 }
 
-/** The red dot of a recording. It breathes while the user speaks, and holds still with reduced motion. */
 function RecordingDot({ color }: { color: string }) {
   const reducedMotion = useReducedMotion();
   const pulse = useSharedValue(0);
@@ -258,10 +233,6 @@ function RecordingDot({ color }: { color: string }) {
   return <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }, style]} />;
 }
 
-/**
- * The row under the dictated text, in place of the toolbar: the recording dot, the time, and the wave
- * of the user's speech up to the Stop control.
- */
 export function DictationStrip({
   level,
   presence,
@@ -271,10 +242,8 @@ export function DictationStrip({
 }: {
   level: SharedValue<number>;
   presence: SharedValue<number>;
-  /** The room the controls at the end of the row take. */
   right: number;
   foreground: string;
-  /** The agent's colour. */
   accent: string;
 }) {
   const danger = String(useThemeColor("danger"));

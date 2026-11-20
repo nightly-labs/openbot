@@ -1,5 +1,3 @@
-/* The Vault page of the server settings. */
-
 .vault-panel {
   display: grid;
   gap: var(--openbot-space-6);
@@ -24,14 +22,12 @@
   height: var(--openbot-icon-md);
 }
 
-/* Item logos. A site gets a letter tile: no icon is fetched from it. */
 .vault-letter {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* Card brands sit on light paper, as their artwork expects. */
 .vault-card-logo {
   display: inline-grid;
   flex: none;
@@ -135,7 +131,6 @@
   inset-inline-end: var(--openbot-space-1);
 }
 
-/* The search matches the tab bar beside it: same height, fill and text size, no border until focus. */
 .vault-toolbar .server-settings-search {
   align-self: stretch;
 }
@@ -172,11 +167,13 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.vault-dialog .ui-label {
+  overflow-wrap: anywhere;
 }
 
 .vault-dialog-body {
@@ -187,7 +184,6 @@
   padding: var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-6);
 }
 
-/* The Payment accounts group above the saved cards. */
 .vault-link-accounts {
   display: grid;
   gap: var(--openbot-space-2);
@@ -207,7 +203,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The chat card that asks for a Vault item. The frame is a UiBlockCard (ui-blocks.css). */
 .vault-request {
   max-width: 520px;
 }
@@ -216,8 +211,6 @@
   display: flex;
   flex: none;
 }
-
-/* Two-step codes: the live code of a login and the setup steps of its key. */
 
 .vault-two-step-digits {
   font-family: var(--openbot-font-mono);
@@ -251,7 +244,6 @@
   width: var(--openbot-icon-lg, 20px);
 }
 
-/* The code in a list row sits above the row's hit area, as the ⋯ menu does. */
 .vault-two-step-row-code {
   position: relative;
   z-index: 1;

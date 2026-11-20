@@ -229,6 +229,13 @@ export const messages = {
     "Le secret actuel cesse de fonctionner. L’hôte rejette les requêtes qui l’utilisent.",
   "mobile.agent.webhook.rotateConfirm": "Régénérer",
   "mobile.agent.webhook.rotateFailed": "Impossible de régénérer le secret. Réessayez.",
+  "mobile.agent.webhook.giveToAgent": "Donner le secret de signature à {name}",
+  "mobile.agent.webhook.giveTitle": "Donner un nouveau secret de signature à {name} ?",
+  "mobile.agent.webhook.giveBody":
+    "Le secret actuel cesse de fonctionner. {name} enregistre le nouveau secret comme clé API et peut l’ajouter chez l’expéditeur.",
+  "mobile.agent.webhook.giveConfirm": "Donner",
+  "mobile.agent.webhook.giveFailed": "Impossible de donner le secret de signature à l’agent. Réessayez.",
+  "mobile.agent.webhook.given": "{name} a le nouveau secret de signature.",
   "mobile.agent.webhook.activity": "Activité",
   "mobile.agent.webhook.activityFailed": "Impossible de charger l’activité. Réessayez.",
   "mobile.agent.webhook.activity.ignored": "Ignoré",
@@ -403,6 +410,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gérer les profils",
   "mobile.agent.browserProfile.footer":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur de l’agent.",
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":
@@ -423,10 +432,11 @@ export const messages = {
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour un agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.agent.newChat.title": "Nouvelle discussion",
   "mobile.agent.newChat.starting": "Démarrage de la nouvelle discussion…",
-  "mobile.agent.newChat.footer": "L’agent oublie cette discussion. Sa configuration reste.",
+  "mobile.agent.newChat.footer":
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Sa configuration reste.",
   "mobile.agent.newChat.confirmTitle": "Commencer une nouvelle discussion avec {name} ?",
   "mobile.agent.newChat.confirmBody":
-    "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "mobile.agent.newChat.confirm": "Nouvelle discussion",
   "mobile.agent.newChat.failed": "Impossible de commencer une nouvelle discussion",
   "mobile.agent.newChat.failedBody": "L’hôte n’a pas pu commencer une nouvelle discussion.",

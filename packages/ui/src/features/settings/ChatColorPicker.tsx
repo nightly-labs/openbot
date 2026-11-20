@@ -1,8 +1,3 @@
-/**
- * The chat color picker: the color picker primitive with the 11 chat colors of
- * `@openbot/brand/chat-colors` as presets.
- */
-
 import { CHAT_COLOR_PRESETS as CHAT_COLORS, type ChatColorPresetId } from "@openbot/brand/chat-colors";
 import { type AvatarColor, isAvatarColor } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -17,7 +12,6 @@ export interface ChatColorPreset {
   label: AppTextKey;
 }
 
-/** The color name of each chat color preset hue. */
 export const CHAT_COLOR_PRESET_LABELS = {
   red: "agent.color.red",
   orange: "agent.color.orange",
@@ -37,7 +31,6 @@ export const CHAT_COLOR_PRESETS: readonly ChatColorPreset[] = CHAT_COLORS.map((p
   label: CHAT_COLOR_PRESET_LABELS[preset.id],
 }));
 
-/** Earlier versions offered the agent colors as presets. A saved one keeps its name. */
 const NAMED_CHAT_COLORS: readonly ChatColorPreset[] = [
   ...CHAT_COLOR_PRESETS,
   ...AVATAR_COLOR_CHOICES.flatMap((choice) => {
@@ -46,7 +39,6 @@ const NAMED_CHAT_COLORS: readonly ChatColorPreset[] = [
   }),
 ];
 
-/** The name of a chat color: "None", the name of a preset, or the hex in capitals. */
 export function useChatColorName(): (value: AvatarColor | null) => string {
   const { t } = useText();
   return (value) => {
@@ -57,11 +49,8 @@ export function useChatColorName(): (value: AvatarColor | null) => string {
 }
 
 export interface ChatColorPickerProps {
-  /** Names the panel, for example "Your chat color". */
   label: string;
-  /** The current color, or null for no color. */
   value: AvatarColor | null;
-  /** Live: each drag frame, key, preset and field commit. */
   onChange: (value: AvatarColor | null) => void;
 }
 

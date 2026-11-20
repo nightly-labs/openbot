@@ -1,20 +1,3 @@
-// Checks that OpenBot recovers an Antigravity session whose history Google refuses with the generic
-// 400 "Request contains an invalid argument" (#9593). The CLI keeps the refused item, such as an
-// image that the agent's own tool opened, and sends it on each turn, so each later turn failed the
-// same way. Runs the real agent service on a temporary profile with a fake Antigravity CLI. A prompt
-// with `POISON` makes its session refuse each later prompt, as Antigravity 1.5.9 does: the failure
-// comes as answer text that starts with "\n⚠ ", and the turn ends as a success. A new session's
-// first prompt holds the conversation so far, with `PELICAN` (the first message), and answers.
-// Checks:
-//   1. A refusal before any work: the message runs again one time on a new session, and answers.
-//   2. A refusal after a tool step: the message fails with the refused-history text, and does not
-//      run again, so the tool step does not run two times.
-//   3. The next message: a new session, which gets the conversation so far, and it answers.
-// A prompt with `OVERSIZE` makes its session refuse each later prompt with Google's FAILED_PRECONDITION
-// "The message size exceeds 30.000MB limit", as a session with many images does (#10517):
-//   4. Before any work: the message runs again one time on a new session, and answers.
-//   5. After a tool step: the message fails with the too-large-chat text, not Google's text.
-// `bun run test:antigravity-refused-history`. Writes .openbot-build/antigravity-refused-history-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -33,9 +16,7 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
-// Bun's `os.homedir()` does not follow HOME. Keep the Gemini home off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
@@ -48,11 +29,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * An Antigravity CLI that logs the session of each prompt. A prompt with `POISON` or `OVERSIZE` (and
- * not a new session's first prompt) poisons its session, and a poisoned session answers each prompt
- * with Google's refusal for it. A prompt with `TOOL` runs a tool step first.
- */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -127,6 +103,7 @@ const report: { steps: Step[]; passed: boolean; error?: string } = { steps: [], 
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -145,7 +122,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -187,7 +163,6 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends `text`, waits for its end, and records its prompts. */
 async function send(agentId: string, text: string): Promise<Step> {
   const before = prompts().length;
   const receipt = await runCauseEffect(agents.sendMessage({ agentId, text }));

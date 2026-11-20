@@ -14,12 +14,6 @@ import { sha256 } from "./remote-desktop-runtime-release";
 
 const REPOSITORY = "https://github.com/trycua/cua";
 
-/**
- * Recomputes the `cuaDriver` block of `native-runtime.lock.json` from a published release.
- *
- * Every target is downloaded, because the pin records a digest for each file OpenBot ships and
- * those can only be read out of the archive. Expect around 90 MB of traffic per run.
- */
 export async function pinCuaDriver(
   input: { version: string; fetchImpl?: typeof fetch } = { version: "" },
 ): Promise<CuaDriverLock> {

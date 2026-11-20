@@ -9,12 +9,9 @@ import { CrmStore } from "./crm-store";
 
 export interface CrmDependencies {
   database: OpenBotDatabase;
-  /** Called once after each write, so main can send `crm-changed`. */
   changed: () => void;
   now?: () => Date;
-  /** The payment sources, such as Stripe. Without them a connect is refused. */
   sources?: CrmSourceDependencies;
-  /** The CRM switch. Without it the switch stays off and cannot change. */
   settings?: CrmSettingsStore;
 }
 
@@ -22,7 +19,6 @@ type CrmShape = CrmPeopleOperations & CrmAgentOperations;
 
 export type CrmHandle = CrmShape & { close(): Effect.Effect<void> };
 
-/** A `CrmError` is the user's to read; any other failure of the synchronous SQL is a fault. */
 function attempt<A>(work: () => A): Effect.Effect<A, CrmError> {
   return Effect.try({ try: work, catch: (cause) => cause }).pipe(
     Effect.catch((cause) => (cause instanceof CrmError ? Effect.fail(cause) : Effect.die(cause))),
@@ -54,7 +50,6 @@ class Crm extends Context.Service<Crm, CrmShape>()("openbot/backend/Crm") {
           now,
           enabled: () => settings.get().enabled,
         });
-        /** An agent reads and proposes only while the CRM is on. */
         const agentAttempt = <A>(work: () => A) =>
           settings.get().enabled
             ? attempt(work)
@@ -78,13 +73,11 @@ class Crm extends Context.Service<Crm, CrmShape>()("openbot/backend/Crm") {
           setSettings: Effect.fn("Crm.setSettings")(function* (input) {
             const before = settings.get().enabled;
             const next = yield* settings.set(input);
-            // Every client of an owner or admin reads the switch again, and shows or hides the CRM.
             if (before !== next.enabled) yield* Effect.sync(dependencies.changed);
             return next;
           }),
           apply: Effect.fn("Crm.apply")(function* (change, actor) {
             const result = yield* attempt(() => store.apply(change, actor));
-            // A revision conflict wrote nothing.
             if (result.ok) yield* Effect.sync(dependencies.changed);
             return result;
           }),
@@ -108,7 +101,6 @@ class Crm extends Context.Service<Crm, CrmShape>()("openbot/backend/Crm") {
   }
 }
 
-/** Starts the CRM service on its own runtime. */
 export const createCrm = Effect.fn("createCrm")(function* (dependencies: CrmDependencies) {
   const runtime = ManagedRuntime.make(Crm.layer(dependencies));
   const context = yield* runtime.contextEffect.pipe(

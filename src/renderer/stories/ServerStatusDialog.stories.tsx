@@ -18,13 +18,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The server restarts into an update. */
 export const Updating: Story = {};
 
-/** The server starts after it was stopped. */
 export const Waking: Story = { args: { title: "Starting HuskyTail", phase: "waking" } };
 
-/** The app lost its connection and tries again. */
 export const Reconnecting: Story = {
   args: {
     title: "Reconnecting to HuskyTail",
@@ -34,7 +31,6 @@ export const Reconnecting: Story = {
   },
 };
 
-/** The server did not start. */
 export const StartFailed: Story = {
   args: { title: "HuskyTail did not start in time", phase: "blocked", issue: "start_timeout" },
 };

@@ -24,7 +24,6 @@ export const messages = {
   "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",
   "error.agent.routineScheduleArgumentsInvalid":
     "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "助手正在删除中，无法授予批准。",
   "error.agent.accessLocalOnly": "助手访问权限只能在运行该助手的电脑上更改。",
   "error.agent.duplicateCleanupFailed": "助手复制失败，且无法移除不完整的副本。",
@@ -109,6 +108,9 @@ export const messages = {
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteFolderLocked":
+    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启运行此助手的电脑，然后再次删除此助手。",
+  "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",
@@ -116,7 +118,6 @@ export const messages = {
   "error.agent.storedProfileUnreadable": "某个已保存的助手资料中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
   "error.agent.storedProfileUnreadableId":
     "已保存的助手资料 {id} 中“{field}”的值无法读取，请先更新数据再启动 OpenBot。",
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "队列编辑被拒绝：{reason}",
   "error.agent.computerUseLocalOnly": "Computer Use 只能在运行该助手的电脑上更改。",
   "error.agent.automationLocalOnly": "本地脚本只能在运行该助手的电脑上允许。",
@@ -159,6 +160,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请让用户在“市场 → 应用 → {name}”中输入它的密钥。",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "只有此 OpenBot 的用户可以在与你的聊天中提供 MCP 服务器 {name} 的密钥。请让用户在“市场 → 应用 → {name}”中输入密钥。",
   "error.agent.mcpServerBuiltIn":
     "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
@@ -168,6 +173,8 @@ export const messages = {
     "该区域不在任何单个显示器内，请使用某个显示器范围内的桌面坐标（来自 list_capture_sources）。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot 没有屏幕录制权限。请让用户打开“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”，允许 OpenBot，然后退出并重新打开 OpenBot。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot 还没有屏幕录制权限，因此无法列出窗口。要截取显示器，请以 target screen 调用 capture_screen。用户先批准截取，然后 macOS 可能会向用户请求该权限。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows 返回了空图像。请让用户解锁电脑并关闭受保护的内容；组织策略也可能阻止截屏。",
   "error.agent.screenCaptureFailed": "截屏失败，请重试。",

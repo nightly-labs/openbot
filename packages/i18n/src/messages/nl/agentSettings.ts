@@ -172,11 +172,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",
   "agentSettings.newChat.title": "Nieuwe chat",
-  "agentSettings.newChat.description": "De agent vergeet deze chat. De instellingen blijven.",
+  "agentSettings.newChat.description":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De instellingen blijven.",
   "agentSettings.newChat.button": "Starten",
   "agentSettings.newChat.confirmTitle": "Nieuwe chat met {name} starten?",
   "agentSettings.newChat.confirmDescription":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",
@@ -197,6 +198,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Volledige toegang toestaan",
   "agentSettings.fullAccess.askConfirm": "Eerst vragen gebruiken",
   "agentSettings.links.usage": "Gebruik",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle agents",
   "agentSettings.links.memories": "Herinneringen",
   "agentSettings.links.memoriesCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "agentSettings.links.skills": "Vaardigheden",
@@ -232,6 +235,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Elk profiel bewaart eigen logins en cookies. Een wijziging sluit de open tabbladen van de agent.",
   "agentSettings.browserProfile.manage": "Beheren",
+  "agentSettings.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Het hele proces van {provider} draait in een sandbox, dus schrijven buiten mislukt. Alleen beschikbaar op macOS.",
 } as const satisfies PartialTranslation<typeof source>;

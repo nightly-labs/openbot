@@ -4,10 +4,6 @@ import { MessageDeleteRefused } from "../backend/message-delete";
 
 type MessageDeleteRefusal = MessageDeleteRefused["reason"];
 
-/**
- * A delete of one message that the host refused, as the sentence the user reads. The IPC handlers
- * send it to the renderer as it is; the Team API route gives it the status of its `reason`.
- */
 export class MessageDeleteRefusedError extends Error {
   readonly reason: MessageDeleteRefusal;
 
@@ -23,11 +19,6 @@ export class MessageDeleteRefusedError extends Error {
   }
 }
 
-/**
- * Runs a message delete at a Promise boundary. A refusal rejects with `MessageDeleteRefusedError`;
- * any other failure rejects with the original failure that its typed error wraps, as
- * `runCauseEffect` does.
- */
 export async function runMessageDelete(
   operation: Effect.Effect<void, MessageDeleteRefused | { readonly cause: unknown }>,
 ): Promise<void> {

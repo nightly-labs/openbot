@@ -243,6 +243,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "يتوقف السر الحالي عن العمل. يرفض المضيف الطلبات التي تستخدمه.",
   "mobile.agent.webhook.rotateConfirm": "إعادة الإنشاء",
   "mobile.agent.webhook.rotateFailed": "تعذّرت إعادة إنشاء السر. حاول مرة أخرى.",
+  "mobile.agent.webhook.giveToAgent": "إعطاء سر التوقيع إلى {name}",
+  "mobile.agent.webhook.giveTitle": "هل تريد إعطاء سر توقيع جديد إلى {name}؟",
+  "mobile.agent.webhook.giveBody":
+    "يتوقف السر الحالي عن العمل. يحفظ {name} السر الجديد كمفتاح API ويمكنه إضافته إلى المُرسِل.",
+  "mobile.agent.webhook.giveConfirm": "إعطاء السر",
+  "mobile.agent.webhook.giveFailed": "تعذّر إعطاء سر التوقيع إلى الوكيل. حاول مرة أخرى.",
+  "mobile.agent.webhook.given": "أصبح لدى {name} سر التوقيع الجديد.",
   "mobile.agent.webhook.activity": "النشاط",
   "mobile.agent.webhook.activityFailed": "تعذّر تحميل النشاط. حاول مرة أخرى.",
   "mobile.agent.webhook.activity.ignored": "متجاهَل",
@@ -424,6 +431,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "إدارة ملفات التعريف",
   "mobile.agent.browserProfile.footer":
     "يحتفظ كل ملف تعريف بتسجيلات الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة للوكيل.",
+  "mobile.agent.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.agent.browserProfile.saveFailed": "تعذّر على OpenBot تغيير ملف تعريف المتصفح للوكيل.",
   "mobile.agent.planCard.label": "عرض الخطة قبل المهام الطويلة",
   "mobile.agent.planCard.footer": "قبل مهمة طويلة، يعرض الوكيل خطته. يبدأ بعد 10 ث، أو عندما تضغط «بدء».",
@@ -442,10 +451,10 @@ export const messages = {
     "لا يستطيع هذا الخادم حفظ مستوى إشعاراتك الخاص لوكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "mobile.agent.newChat.title": "دردشة جديدة",
   "mobile.agent.newChat.starting": "جارٍ بدء دردشة جديدة…",
-  "mobile.agent.newChat.footer": "ينسى الوكيل هذه الدردشة. يبقى إعداده.",
+  "mobile.agent.newChat.footer": "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. يبقى إعداده.",
   "mobile.agent.newChat.confirmTitle": "هل تريد بدء دردشة جديدة مع {name}؟",
   "mobile.agent.newChat.confirmBody":
-    "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. لا تتغيّر التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+    "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. لا تتغيّر التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "mobile.agent.newChat.confirm": "بدء دردشة جديدة",
   "mobile.agent.newChat.failed": "تعذّر بدء دردشة جديدة",
   "mobile.agent.newChat.failedBody": "تعذّر على المضيف بدء دردشة جديدة.",

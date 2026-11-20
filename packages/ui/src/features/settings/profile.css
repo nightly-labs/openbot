@@ -1,12 +1,8 @@
-/* The Profile tab of Settings: the header, the year of activity, and its two dialogs. */
-
 .profile-panel {
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-6);
 }
-
-/* ─── Header ─── */
 
 .profile-hero {
   display: flex;
@@ -67,9 +63,6 @@
   margin-inline-start: auto;
 }
 
-/* ─── Cards ─── */
-
-/* The surface of a settings card (`.settings-modal-card`), for content that is not a row list. */
 .profile-card {
   display: flex;
   flex-direction: column;
@@ -80,7 +73,6 @@
   background: var(--openbot-bg-surface);
 }
 
-/* Lists of rows: the rows give the rhythm, as the rows of a settings card do. */
 .profile-card.profile-facts,
 .profile-card.profile-ranking,
 .profile-card.profile-bars {
@@ -174,12 +166,6 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* ─── Bars ─── */
-
-/*
- * The label column is as wide as the longest model name, up to a limit, so every bar starts at the
- * same place. A longer name ends with an ellipsis.
- */
 .profile-bars {
   display: grid;
   grid-template-columns: fit-content(45%) 1fr auto;
@@ -230,8 +216,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* ─── Heatmap ─── */
-
 .profile-heatmap {
   display: flex;
   flex-direction: column;
@@ -241,7 +225,6 @@
 
 .profile-heatmap-months,
 .profile-heatmap-grid {
-  /* A time axis: the weeks run from the oldest on the left in every language. */
   direction: ltr;
   display: grid;
   grid-template-columns: repeat(var(--profile-columns), minmax(0, 1fr));
@@ -295,8 +278,6 @@
   outline-offset: 1px;
 }
 
-/* One label for the whole year. It is fixed to the viewport, so a card that clips its content
-   does not cut it. In a dialog it mounts in the dialog, above the overlay. */
 .profile-heat-tooltip {
   position: fixed;
   z-index: var(--openbot-layer-toast);
@@ -318,8 +299,6 @@
 .profile-heatmap-legend .profile-heat-cell {
   width: var(--openbot-space-3);
 }
-
-/* ─── Dialogs ─── */
 
 .profile-dialog {
   width: min(880px, 100%);
@@ -416,8 +395,6 @@
   height: var(--openbot-space-3);
 }
 
-/* ─── Tiles (last, so that their descendant rules do not override the ones above) ─── */
-
 .profile-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
@@ -460,10 +437,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* ─── Motion ─── */
-
-/* Colour-only hovers stay for every user. Movement is only for users who allow it. */
-
 .profile-tile:hover {
   background: linear-gradient(var(--openbot-hover), var(--openbot-hover)), var(--openbot-bg-surface);
 }
@@ -487,7 +460,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The row under the pointer stays bright; the other rows step back. */
 .profile-ranking:hover li:not(:hover),
 .profile-bars:hover li:not(:hover) {
   opacity: 0.45;
@@ -512,7 +484,6 @@
     transform: translateY(calc(var(--openbot-space-0-5) * -1));
   }
 
-  /* The year fills in as a wave from the oldest week to this week. */
   .profile-heatmap-grid .profile-heat-cell {
     animation: profile-cell-in var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
     animation-delay: calc(var(--profile-col, 0) * var(--openbot-duration-fast) / 15);
@@ -525,7 +496,6 @@
     transform: scale(1.35);
   }
 
-  /* The label fades in once, then glides from day to day. */
   .profile-heat-tooltip {
     animation: profile-tip-in var(--openbot-duration-normal) var(--openbot-ease-out) backwards;
     transition:
@@ -552,7 +522,6 @@
     animation-delay: calc(var(--openbot-duration-overlay) + var(--profile-i, 0) * var(--profile-step) * 2);
   }
 
-  /* The fill starts at the right edge of a right-to-left track, so it grows from there. */
   .profile-bar-fill:dir(rtl) {
     transform-origin: right center;
   }

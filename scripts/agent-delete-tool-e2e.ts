@@ -1,12 +1,3 @@
-// Checks the `delete_agent` tool of issue #7005: an agent deletes other local agents only for a person's
-// message, and only after the owner approves the card, also when the agent has Full access. A routine
-// run, a team member's message, the agent's own id and an unknown id are refused with no card. A
-// member cannot answer the card, a decline keeps the agents, and an accept deletes them and removes
-// them from the sidebar and the Library, while the other agents stay. The card adds the id to a name
-// that another agent also has.
-// Runs the real agent service, tool router, sidebar and Library stores on a temporary profile with a fake Codex
-// app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
-// `bun scripts/agent-delete-tool-e2e.ts`. Writes .openbot-build/agent-delete-tool-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -24,7 +15,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -40,15 +30,9 @@ const { LibraryFoldersStore } = await import("../src/backend/library-folders-sto
 
 const CALL_MARK = "DELETE-CALL";
 const PERSON = { id: "local", name: "Alex" };
-/** A team member, whose app has only what the Team API gives it. */
 const MEMBER = { id: "member-remote", name: "Sam" };
 const REFUSAL = "Only a person's message";
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `DELETE-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
- * through `tool_call`, logs the result, and ends. The last call in the input is the current one. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -60,7 +44,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -99,7 +82,6 @@ const answer = (message) => {
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       return write({
         id,
@@ -153,6 +135,7 @@ interface ToolLog {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -171,7 +154,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -218,7 +200,6 @@ const agents = new AgentService({
   mailbox,
   browser,
   sidebarLayout: sidebar,
-  // The agent view of the store. This test moves no files, so no file has a known agent.
   libraryFolders: {
     getSnapshot: () => library.getSnapshot(),
     placeInPath: (agentId, names, fileIds, context) => library.placeInPath(agentId, names, fileIds, context),
@@ -230,20 +211,17 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
   channelRemotePerson: (personId) => personId === MEMBER.id,
-  // Full access: a deletion must still ask the owner.
   approvalAutomation: {
     autoApproves: () => true,
     set: () => Effect.succeed({ defaultAutoApprove: true, autoApproveOverrides: {} }),
   },
 });
 
-/** The approval cards that the service shows, in order. */
 const approvals: { requestId: string | number; reason: string | null }[] = [];
 agents.on("event", (event) => {
   if (event.type === "approval") approvals.push({ requestId: event.approval.requestId, reason: event.approval.reason });
 });
 
-/** Waits until the agent's chat has no open delivery. */
 function idle(agentId: string) {
   return waitFor("the chat turn to end", () =>
     agents
@@ -252,7 +230,6 @@ function idle(agentId: string) {
   );
 }
 
-/** Logs and returns the tool result of the fake's last call. */
 async function logged(name: string, before: number) {
   const entry = await waitFor(`${name} tool result`, () => toolLogs()[before]);
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
@@ -263,7 +240,6 @@ async function logged(name: string, before: number) {
 const callText = (agentIds: string[]) =>
   `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "delete_agent", agentIds })}ARGS>>`;
 
-/** Sends a message to the agent's own chat that makes the fake call `delete_agent`. */
 async function callFromChat(name: string, agentId: string, agentIds: string[], sender = PERSON) {
   const before = toolLogs().length;
   await runCauseEffect(agents.sendMessage({ agentId, text: callText(agentIds) }, sender));
@@ -272,7 +248,6 @@ async function callFromChat(name: string, agentId: string, agentIds: string[], s
   return result;
 }
 
-/** Runs a routine whose instruction makes the fake call `delete_agent`, as a webhook body could. */
 async function callFromRoutine(name: string, agentId: string, agentIds: string[]) {
   const before = toolLogs().length;
   const routine = agents.createRoutine({
@@ -317,7 +292,6 @@ try {
   const editorA = await profile("Editor A");
   const editorB = await profile("Editor B");
   const keeper = await profile("Keeper");
-  // Another agent with the name of a target: it stays, and the card names the target with its id.
   const twinB = await profile("Editor B");
   const ids = new Set(agents.listAgents().map((agent) => agent.id));
   const folderContext = { agentIds: ids, fileAgent: () => undefined };
@@ -333,7 +307,6 @@ try {
   await runCauseEffect(sidebar.mutate({ type: "assign", agentId: keeper.id, sectionId }, ids));
   const targets = [editorA.id, editorB.id];
 
-  // 1. Calls that must not delete, and must not show a card.
   const fromRoutine = await callFromRoutine("delete from a routine run", chief.id, targets);
   pass(
     "A routine run cannot delete an agent",
@@ -361,7 +334,6 @@ try {
     JSON.stringify(agents.listAgents().map((agent) => agent.name)),
   );
 
-  // 2. A declined card keeps the agents, also with Full access.
   const declinedCall = callFromChat("delete declined", chief.id, targets);
   const declinedCard = await waitFor("the first card", () => approvals[0]);
   await runCauseEffect(agents.respondToApproval({ requestId: declinedCard.requestId, decision: "decline" }));
@@ -377,7 +349,6 @@ try {
     declined.text,
   );
 
-  // 3. Only the owner answers the card. After the owner accepts, both agents are gone.
   const acceptedCall = callFromChat("delete accepted", chief.id, targets);
   const card = await waitFor("the second card", () => approvals[1]);
   const byMember = await Effect.runPromise(

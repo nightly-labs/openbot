@@ -49,7 +49,6 @@ describe("host appearance migration", () => {
   it("accepts the writes and reads of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // Host registration and the logo update of the Worker before: they name no new column.
     database.exec(`
       INSERT INTO remote_hosts(
         host_id, owner_user_id, name, device_public_key, machine_token_hash, auth_epoch, created_at, updated_at
@@ -63,7 +62,6 @@ describe("host appearance migration", () => {
       WHERE remote_hosts.owner_user_id = excluded.owner_user_id;
       UPDATE remote_hosts SET logo_key = 'logo-2', updated_at = 60 WHERE host_id = 'laptop';
     `);
-    // The host list of the Worker before.
     expect(
       database
         .prepare(

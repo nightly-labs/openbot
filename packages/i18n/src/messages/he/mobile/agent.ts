@@ -216,6 +216,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "הסוד הנוכחי יפסיק לפעול. המארח דוחה בקשות שמשתמשות בו.",
   "mobile.agent.webhook.rotateConfirm": "יצירה",
   "mobile.agent.webhook.rotateFailed": "לא ניתן ליצור סוד חדש. יש לנסות שוב.",
+  "mobile.agent.webhook.giveToAgent": "מסירת סוד החתימה ל-{name}",
+  "mobile.agent.webhook.giveTitle": "למסור סוד חתימה חדש ל-{name}?",
+  "mobile.agent.webhook.giveBody":
+    "הסוד הנוכחי יפסיק לפעול. {name} שומר את הסוד החדש כמפתח API ויכול להוסיף אותו לשולח.",
+  "mobile.agent.webhook.giveConfirm": "מסירת הסוד",
+  "mobile.agent.webhook.giveFailed": "לא ניתן למסור את סוד החתימה לסוכן. יש לנסות שוב.",
+  "mobile.agent.webhook.given": "ל-{name} יש את סוד החתימה החדש.",
   "mobile.agent.webhook.activity": "פעילות",
   "mobile.agent.webhook.activityFailed": "לא ניתן לטעון את הפעילות. יש לנסות שוב.",
   "mobile.agent.webhook.activity.ignored": "התעלמות",
@@ -387,6 +394,7 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "ניהול פרופילים",
   "mobile.agent.browserProfile.footer":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.agent.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot לא הצליח לשנות את פרופיל הדפדפן של הסוכן.",
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":
@@ -406,10 +414,10 @@ export const messages = {
     "השרת הזה לא יכול לשמור רמת התראות אישית שלך עבור סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "mobile.agent.newChat.title": "צ'אט חדש",
   "mobile.agent.newChat.starting": "מתחיל צ'אט חדש…",
-  "mobile.agent.newChat.footer": "הסוכן שוכח את הצ'אט הזה. ההגדרות שלו נשארות.",
+  "mobile.agent.newChat.footer": "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההגדרות שלו נשארות.",
   "mobile.agent.newChat.confirmTitle": "להתחיל צ'אט חדש עם {name}?",
   "mobile.agent.newChat.confirmBody":
-    "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההוראות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
+    "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההוראות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "mobile.agent.newChat.confirm": "התחלת צ'אט חדש",
   "mobile.agent.newChat.failed": "לא ניתן להתחיל צ'אט חדש",
   "mobile.agent.newChat.failedBody": "המארח לא הצליח להתחיל צ'אט חדש.",

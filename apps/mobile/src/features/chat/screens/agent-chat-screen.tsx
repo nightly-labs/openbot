@@ -7,6 +7,7 @@ import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MobileChatView } from "@/features/chat/components/agent-chat-view";
+import { firstParam } from "@/features/chat/components/use-conversation-message";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -20,7 +21,6 @@ export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  // `focusAt` changes when a pinned message opens again, so the chat goes to it again.
   const { agentId, messageId, focusAt } = useLocalSearchParams<{
     agentId: string;
     messageId?: string;
@@ -28,16 +28,13 @@ export function AgentChatScreen() {
   }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
-  const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
-  const resolvedMessageId = Array.isArray(messageId) ? messageId[0] : messageId;
-  // Only this agent: a change elsewhere in the workspace does not render the whole chat again. The
-  // chat does not show the agent's latest message preview, so a new message keeps the same agent.
+  const resolvedAgentId = firstParam(agentId);
+  const resolvedMessageId = firstParam(messageId);
   const agent = useMobileWorkspaceSelector(
     (current) => current.agents.find((candidate) => candidate.id === resolvedAgentId),
     sameChatAgent,
   );
   const openedAgentId = agent?.id;
-  // The app icon offers the chats that the user opened last.
   useFocusEffect(
     useCallback(() => {
       if (openedAgentId) noteChatOpened(openedAgentId);
@@ -47,7 +44,6 @@ export function AgentChatScreen() {
   if (agent) {
     return (
       <MobileChatView
-        // A new message, such as the source of a branch, opens the chat again at that message.
         key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}:${focusAt ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}

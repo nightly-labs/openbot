@@ -205,11 +205,11 @@ export const messages = {
     "هذا الاختيار لك وحدك ويُطبَّق على كل أجهزتك. عندما يكون الخادم مكتومًا أو مضبوطًا على «لا شيء»، يبقى هذا الوكيل صامتًا أيضًا.",
 
   "agentSettings.newChat.title": "دردشة جديدة",
-  "agentSettings.newChat.description": "ينسى الوكيل هذه الدردشة. ويبقى إعداده.",
+  "agentSettings.newChat.description": "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. ويبقى إعداده.",
   "agentSettings.newChat.button": "بدء",
   "agentSettings.newChat.confirmTitle": "هل تريد بدء دردشة جديدة مع {name}؟",
   "agentSettings.newChat.confirmDescription":
-    "ينسى الوكيل هذه الدردشة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
+    "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
   "agentSettings.deleteHistory.title": "حذف السجل",
@@ -231,6 +231,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "استخدام «السؤال أولًا»",
 
   "agentSettings.links.usage": "الاستخدام",
+  "agentSettings.links.apps": "التطبيقات",
+  "agentSettings.links.appsScope": "كل الوكلاء",
   "agentSettings.links.memories": "الذكريات",
   "agentSettings.links.memoriesCount": {
     zero: "لا ذكريات محفوظة",
@@ -292,6 +294,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "يحتفظ كل ملف تعريف بعمليات تسجيل الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة لدى الوكيل.",
   "agentSettings.browserProfile.manage": "إدارة",
+  "agentSettings.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "تعمل عملية {provider} كاملةً في بيئة معزولة، لذا تفشل الكتابة خارجها. متاح على macOS فقط.",
 } as const satisfies PartialTranslation<typeof source>;

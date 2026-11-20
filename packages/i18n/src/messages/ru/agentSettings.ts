@@ -199,11 +199,12 @@ export const messages = {
     "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",
 
   "agentSettings.newChat.title": "Новый чат",
-  "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",
+  "agentSettings.newChat.description":
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Настройки сохранятся.",
   "agentSettings.newChat.button": "Начать",
   "agentSettings.newChat.confirmTitle": "Начать новый чат с {name}?",
   "agentSettings.newChat.confirmDescription":
-    "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
   "agentSettings.deleteHistory.title": "Удалить историю",
@@ -226,6 +227,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Сначала спрашивать",
 
   "agentSettings.links.usage": "Использование",
+  "agentSettings.links.apps": "Приложения",
+  "agentSettings.links.appsScope": "Все агенты",
   "agentSettings.links.memories": "Память",
   "agentSettings.links.memoriesCount": {
     one: "Сохранено: {count}",
@@ -282,6 +285,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Каждый профиль хранит свои входы в аккаунты и cookie. Изменение закрывает открытые вкладки агента.",
   "agentSettings.browserProfile.manage": "Настроить",
+  "agentSettings.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Весь процесс {provider} работает в песочнице, поэтому запись за пределами рабочего пространства не удастся. Доступно только в macOS.",
 } as const satisfies PartialTranslation<typeof source>;

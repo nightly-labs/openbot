@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "该主机未关联到 OpenBot 所有者账号。",
   "error.team.ownerEmailRequired": "请用创建该主机时使用的 OpenBot 邮箱登录。",
   "error.team.hostNotConfigured": "团队主机未配置。",
@@ -52,6 +51,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "登录尝试次数过多，请稍后再试。",
   "error.team.clientUpdateRequired": "连接该主机前请先更新该 OpenBot 客户端。",
   "error.team.hostUpdateRequired": "连接前请先更新主机上的 OpenBot。",
+  "error.team.serverSafeMode": "此服务器处于安全模式，因为 OpenBot 无法在其上启动。",
+  "error.team.serverSafeModeNewerDatabase":
+    "此服务器上的 OpenBot {version} 无法打开其数据，因为更新版本的 OpenBot 保存过这些数据。在服务器上安装更新的 OpenBot 版本即可解决。",
+  "error.team.serverSafeModeStartFailed":
+    "此服务器上的 OpenBot {version} 多次启动失败后已停止。在服务器上安装更新的 OpenBot 版本即可解决。",
   "error.team.sidebarLayoutUnavailable": "侧边栏布局不可用。",
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
@@ -114,6 +118,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
   "error.team.hostRestartUnsupported": "当前连接不支持重启服务器。",
+  "error.team.ownerTransferUnsupported": "该服务器不支持转移所有权。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",

@@ -1,12 +1,3 @@
-// Runs the real sales ledger of the account server on a migrated SQLite database, with Stripe invoices
-// and a refund of a server plan and of a license. `processPending` must send the operator one message
-// for each paid invoice line, each failed payment and each refund, with the account email, the product,
-// the amount without VAT and the period, in the form of the purchase messages. A fact that stays pending after a
-// failed FX lookup sends its message one time, in the run that ends it. A first purchase (its `New`
-// message has the same terms), an imported payment and a ledger with no alert send no message.
-//
-// Run: bun run test:billing-sale-alert
-// It writes .openbot-build/billing-sale-alert-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -54,7 +45,6 @@ async function eachPaidInvoiceSendsOneMessage() {
       alerts.push(String(JSON.parse(String(init.body)).content));
       return new Response(null, { status: 204 });
     }
-    // The ECB rates and OpenPanel are not there in this test.
     return new Response(null, { status: 503 });
   };
   const options = { database: sqliteD1(database), clientId: "client", clientSecret: "secret", fetch, now: () => NOW };
@@ -166,7 +156,6 @@ async function eachPaidInvoiceSendsOneMessage() {
       invoice("invoice.paid", "license", {
         subscription: "sub_license",
         currency: "pln",
-        // 23% VAT on top of 480 zł. The message and the revenue count only 480 zł.
         amount_paid: 59040,
         total: 59040,
         total_excluding_tax: 48000,
@@ -204,7 +193,6 @@ async function eachPaidInvoiceSendsOneMessage() {
             id: "re_license",
             status: "succeeded",
             payment_intent: "pi_license",
-            // A quarter of the payment, VAT included.
             amount: 14760,
             currency: "pln",
           },

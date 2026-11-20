@@ -4,8 +4,10 @@ import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
+import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
+import { BrowserWindow, MessageChannelMain, type MessagePortMain, webContents } from "electron";
 import { z } from "zod";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
@@ -15,11 +17,8 @@ interface TeamWebRtcBridgeEvents {
   accountProfileChanged: [peerId: string];
   accountServersChanged: [peerId: string];
   signalReady: [peerId: string];
-  /** The Signal socket of a peer opened. Only the connection trace reads it. */
   signalOpen: [peerId: string];
-  /** Signal holds a client attempt with `waitForHost` until the offline host connects. */
   hostWaiting: [peerId: string];
-  /** A host's own Signal socket closed. `terminal`: the peer does not connect it again. */
   signalClosed: [peerId: string, code: string, terminal: boolean];
   incoming: [
     peerId: string,
@@ -35,18 +34,11 @@ interface TeamWebRtcBridgeEvents {
   ];
   connected: [peerId: string, binding?: { localFingerprint: string; remoteFingerprint: string }];
   disconnected: [peerId: string];
-  /**
-   * A host child peer stopped getting ICE consent answers, as when iOS suspends the phone app. The
-   * peer stays open: the phone can come back on it. `pathRestored` follows when it does.
-   */
   pathLost: [peerId: string];
   pathRestored: [peerId: string];
   data: [peerId: string, channel: TeamWebRtcChannel, data: string | ArrayBuffer];
-  /** The optional `browser-egress-v1` channel of a peer opened. It is not part of `connected`. */
   egressOpen: [peerId: string];
-  /** The egress channel of a peer closed. The connection can still be up. */
   egressClosed: [peerId: string];
-  /** A frame on the egress channel: control as a string, data as binary. */
   egressData: [peerId: string, data: string | ArrayBuffer];
   path: [peerId: string, path: "p2p" | "relay"];
   error: [peerId: string, code: string, message: string, terminal?: boolean];
@@ -59,11 +51,6 @@ interface TeamWebRtcBridgeOptions {
   iceTransportPolicy?: "all" | "relay";
 }
 
-// The envelope the hidden peer window posts back, not the Signal protocol - it is one flat bag
-// because a single `port.on("message")` handler dispatches every reply and event on it, and the
-// discriminated Signal union it carries fragments of has already been decoded on the other side.
-// The schema stays zod and stays strict about it: this is the renderer-to-main trust boundary, and
-// the only thing shared with the wire contract is the shape of what crosses it, tied below.
 const iceServerSchema = z
   .object({
     urls: z.union([z.string(), z.array(z.string())]),
@@ -86,6 +73,11 @@ const bridgeMessageSchema = z
     channel: z.enum(["rpc", "events", "files", "desktop"]).optional(),
     data: z.union([z.string(), z.instanceof(ArrayBuffer)]).optional(),
     path: z.enum(["p2p", "relay"]).optional(),
+    route: z.string().optional(),
+    side: z.enum(["host", "client"]).optional(),
+    url: z.string().optional(),
+    errorCode: z.number().int().optional(),
+    errorText: z.string().optional(),
     code: z.string().optional(),
     message: z.string().optional(),
     terminal: z.boolean().optional(),
@@ -123,7 +115,8 @@ type BridgeCommand =
         | "renew-host-signal"
         | "close"
         | "open-egress"
-        | "close-egress";
+        | "close-egress"
+        | "ping";
       peerId: string;
     }
   | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
@@ -131,6 +124,10 @@ type BridgeCommand =
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
+const LIVENESS_INTERVAL_MS = 30_000;
+const LIVENESS_MISSES = 2;
+
+const logger = createOpenBotLogger("team-webrtc-bridge");
 
 export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   readonly #options: TeamWebRtcBridgeOptions;
@@ -141,6 +138,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   #scope = Scope.makeUnsafe();
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #iceServers = new Map<string, RemoteDesktopIceServer[]>();
+  readonly #peers = new Set<string>();
+  #lostWindow: BrowserWindow | null = null;
 
   constructor(options: TeamWebRtcBridgeOptions = {}) {
     super();
@@ -173,13 +172,10 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     },
   ) {
     yield* this.start();
+    this.#peers.add(input.peerId);
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
   }).bind(this);
 
-  /**
-   * Turns the private network route on or off for a connected host. When it turns on, the bridge
-   * closes every device connection, and each device connects again over a private network only.
-   */
   readonly setPrivateNetwork = Effect.fn("TeamWebRtcBridge.setPrivateNetwork")(function* (
     this: TeamWebRtcBridge,
     peerId: string,
@@ -188,11 +184,6 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     if (this.#port) yield* this.#command({ type: "set-private-network", peerId, privateNetwork });
   }).bind(this);
 
-  /**
-   * Opens the Signal socket of a client peer before its ticket exists. The next `connect` of that
-   * peer sends its hello on this socket when it names the same address. The socket closes if no
-   * `connect` takes it soon. It carries nothing before the hello.
-   */
   readonly prepareSignal = Effect.fn("TeamWebRtcBridge.prepareSignal")(function* (
     this: TeamWebRtcBridge,
     peerId: string,
@@ -203,6 +194,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   }).bind(this);
 
   readonly disconnect = Effect.fn("TeamWebRtcBridge.disconnect")(function* (this: TeamWebRtcBridge, peerId: string) {
+    this.#peers.delete(peerId);
     if (this.#port) yield* this.#command({ type: "disconnect", peerId });
   }).bind(this);
 
@@ -223,17 +215,14 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     yield* this.#command({ type: "send", peerId, channel, data });
   }).bind(this);
 
-  /** A client opens the egress channel on its connection to a host. */
   readonly openEgress = Effect.fn("TeamWebRtcBridge.openEgress")(function* (this: TeamWebRtcBridge, peerId: string) {
     yield* this.#command({ type: "open-egress", peerId });
   }).bind(this);
 
-  /** Closes the egress channel of a peer. The connection stays up. */
   readonly closeEgress = Effect.fn("TeamWebRtcBridge.closeEgress")(function* (this: TeamWebRtcBridge, peerId: string) {
     if (this.#port) yield* this.#command({ type: "close-egress", peerId });
   }).bind(this);
 
-  /** Sends one egress frame. Frames go out in the order of the calls. */
   readonly sendEgress = Effect.fn("TeamWebRtcBridge.sendEgress")(function* (
     this: TeamWebRtcBridge,
     peerId: string,
@@ -246,11 +235,6 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     yield* this.#command({ type: "restart-ice", peerId });
   }).bind(this);
 
-  /**
-   * Opens a new Signal socket for each host peer. Signal closes a socket that does not answer its
-   * pings for 120 seconds, so after a sleep the old socket is gone, but its close did not reach this
-   * computer. The host sends nothing on it for 45 minutes, and no device can reach it until then.
-   */
   readonly renewHostSignal = Effect.fn("TeamWebRtcBridge.renewHostSignal")(function* (this: TeamWebRtcBridge) {
     if (this.#port) yield* this.#command({ type: "renew-host-signal", peerId: "all" });
   }).bind(this);
@@ -280,11 +264,15 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   }, Effect.uninterruptible).bind(this);
 
   #reset(message: string): void {
-    this.#port?.close();
+    const port = this.#port;
     this.#port = null;
+    port?.close();
     this.#window?.destroy();
     this.#window = null;
+    this.#lostWindow?.destroy();
+    this.#lostWindow = null;
     this.#iceServers.clear();
+    this.#peers.clear();
     for (const pending of this.#pending.values()) {
       Deferred.doneUnsafe(pending, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
     }
@@ -306,6 +294,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         }),
     );
     this.#window = window;
+    this.#lostWindow?.destroy();
+    this.#lostWindow = null;
     yield* remoteDecode(() => window.webContents.setWindowOpenHandler(() => ({ action: "deny" })));
     yield* remoteCall(() =>
       this.#options.developmentUrl
@@ -314,14 +304,30 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     );
     const { port1, port2 } = yield* remoteDecode(() => new MessageChannelMain());
     this.#port = port1;
-    const ready = Deferred.makeUnsafe<void>();
+    const ready = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     const listener = (event: { data: unknown }) => {
       const message = bridgeMessageSchema.parse(event.data);
       this.#handleMessage(message);
       if (message.type === "bridge-ready") Deferred.doneUnsafe(ready, Effect.void);
     };
+    const lost = (reason: string) => {
+      if (this.#port !== port1) return;
+      logger.warn(`The Team WebRTC bridge stopped (${reason}). The next connection starts it again.`);
+      const peers = [...this.#peers];
+      this.#ready = null;
+      this.#window = null;
+      this.#reset(sourceText("error.remote.bridgeStopped"));
+      this.#lostWindow = window;
+      Deferred.doneUnsafe(
+        ready,
+        Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeStopped")) })),
+      );
+      if (!this.#stopping) for (const peerId of peers) this.emit("disconnected", peerId);
+    };
     yield* remoteDecode(() => {
       port1.on("message", listener);
+      port1.on("close", () => lost("port closed"));
+      window.webContents.on("render-process-gone", (_event, details) => lost(details.reason));
       port1.start();
     });
     yield* Effect.gen(function* () {
@@ -338,6 +344,44 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         Exit.isFailure(exit) ? remoteDecode(() => port1.off("message", listener)).pipe(Effect.orDie) : Effect.void,
       ),
     );
+    yield* Effect.forkIn(this.#watch(window, port1).pipe(Effect.ignore), this.#scope);
+  });
+
+  readonly #watch = Effect.fn("TeamWebRtcBridge.watch")(function* (
+    this: TeamWebRtcBridge,
+    window: BrowserWindow,
+    port: MessagePortMain,
+  ) {
+    let misses = 0;
+    while (this.#port === port) {
+      yield* Effect.sleep(LIVENESS_INTERVAL_MS);
+      if (this.#port !== port) return;
+      const answered = yield* this.#command({ type: "ping", peerId: "all" }).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (this.#port !== port) return;
+      misses = answered ? 0 : misses + 1;
+      if (misses < LIVENESS_MISSES) continue;
+      const stopped = yield* remoteDecode(() => {
+        if (this.#port !== port || window.webContents.isDestroyed()) return true;
+        const processId = window.webContents.getOSProcessId();
+        const shared = webContents
+          .getAllWebContents()
+          .some(
+            (other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId,
+          );
+        if (shared) return false;
+        logger.warn(
+          `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
+        );
+        window.webContents.forcefullyCrashRenderer();
+        return true;
+      });
+      if (stopped) return;
+      if (misses === LIVENESS_MISSES)
+        logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
+    }
   });
 
   readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
@@ -427,7 +471,15 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "peer-disconnected") this.emit("disconnected", message.peerId);
     else if (message.type === "peer-path-lost") this.emit("pathLost", message.peerId);
     else if (message.type === "peer-path-restored") this.emit("pathRestored", message.peerId);
-    else if (message.type === "ice-path" && message.path) this.emit("path", message.peerId, message.path);
+    else if (message.type === "ice-path" && message.path) {
+      logger.info(
+        `WebRTC ${message.side ?? "unknown"} connection uses ${message.path}: ${knownIceCandidateRoute(message.route)}.`,
+      );
+      this.emit("path", message.peerId, message.path);
+    } else if (message.type === "ice-candidate-error" && message.errorCode !== undefined)
+      logger.warn(
+        `WebRTC ${message.side ?? "unknown"} connection cannot use ${iceServerErrorDetail(message.url ?? "", message.errorCode, message.errorText ?? "")}`,
+      );
     else if (message.type === "ice-servers" && message.iceServers) {
       this.#iceServers.set(message.peerId, message.iceServers);
       this.emit("iceServers", message.peerId, structuredClone(message.iceServers));

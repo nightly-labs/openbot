@@ -1,16 +1,3 @@
-// Checks the place of a message that the user sends while a Claude turn waits on its question. Runs the
-// real agent service on a temporary profile, with the busy-message mode "steer". Claude is the real
-// `ClaudeAgentClient`, which the Claude Agent SDK connects to a stand-in `claude` executable.
-// Like the real CLI, the stand-in starts a turn of its own when its background work ends, and that
-// turn asks with `AskUserQuestion`. A message that comes during the question goes into the request
-// that carries the question's result; a message that comes after that request runs as a turn of its
-// own. Steps:
-// 1. The message reaches the CLI before the question's result, so the waiting turn reads it. Before
-//    this change, the question closed first, the turn ended without the message, and the message ran
-//    as a turn of its own below the turn's last answer: the chat moved it under that answer.
-// 2. The message stays in the waiting turn, and the chat shows it under the question and above the
-//    answer, live and from the stored page. Before this change, it showed above the question.
-// `bun run test:question-steer-order`. Writes .openbot-build/question-steer-order-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -40,10 +27,8 @@ const QUESTION = "Which pet do you like?";
 const MESSAGE = "Please list three launch risks.";
 const ANSWER = "Here are three launch risks.";
 const NO_MESSAGE_ANSWER = "You did not pick a pet. I wait for your new message.";
-/** The question, then the message sent while it waited, then the answer that read the message. */
 const SHOWN_ORDER = [`Question: ${QUESTION}`, MESSAGE, ANSWER];
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.CLAUDE_CONFIG_DIR = claudeConfig;
@@ -56,9 +41,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end. The
-// `ask` file starts a turn of its own that asks one question. It logs each message it reads during the
-// question, and the question's result, in the order they arrive.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -84,21 +66,18 @@ const result = (text) =>
   write(frame({ type: "result", subtype: "success", is_error: false, result: text, uuid: randomUUID(),
     duration_ms: 1, duration_api_ms: 1, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 },
     permission_denials: [] }));
-/** A turn that answers a user message names it in its first stream event, as the CLI does. */
 const answerMessage = (message, text) => {
   write(frame({ type: "stream_event", uuid: randomUUID(), user_message_uuid: message.uuid, user_message_uuids: [message.uuid],
     event: { type: "message_start", message: { id: "msg_" + message.uuid, type: "message", role: "assistant", content: [] } } }));
   assistant([{ type: "text", text }], { user_message_uuid: message.uuid });
   result(text);
 };
-/** The question's request id while the question waits, and the messages that came during it. */
 let question = null;
 let queued = [];
 let asked = false;
 setInterval(() => {
   if (asked || !fs.existsSync(${JSON.stringify(askTrigger)})) return;
   asked = true;
-  // The background work ended: the CLI starts a turn of its own, which asks.
   const toolUseId = "toolu_" + randomUUID().replaceAll("-", "");
   const input = { questions: [{ question: ${JSON.stringify(QUESTION)}, header: "Pet", multiSelect: false,
     options: [{ label: "Cat", description: "Choose Cat" }, { label: "Dog", description: "Choose Dog" }] }] };
@@ -124,7 +103,6 @@ process.stdin.on("data", (chunk) => {
     } else if (message.type === "control_response" && question && message.response?.request_id === question) {
       log("question-result");
       question = null;
-      // The next request carries the question's result and each message that came during it.
       const text = queued.length > 0 ? ${JSON.stringify(ANSWER)} : ${JSON.stringify(NO_MESSAGE_ANSWER)};
       assistant([{ type: "text", text }]);
       result(text);
@@ -134,7 +112,6 @@ process.stdin.on("data", (chunk) => {
         log("message-during-question");
         queued.push(message);
       } else if (JSON.stringify(message.message).includes(${JSON.stringify(MESSAGE)})) {
-        // After the turn's last request, the message runs as a turn of its own.
         log("message-after-question");
         answerMessage(message, ${JSON.stringify(ANSWER)});
       } else answerMessage(message, "Started.");
@@ -151,10 +128,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns, questions and steers go to the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -233,6 +206,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -251,7 +225,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of the stand-in. */
 async function waitFor<T>(
   label: string,
   read: () => Promise<T | null | undefined | false> | T | null | undefined | false,
@@ -311,7 +284,6 @@ try {
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
   await waitFor("the first turn to end", idle);
 
-  // The turn that the CLI starts by itself asks its question.
   writeFileSync(askTrigger, "");
   await waitFor("the question", () => existsSync(asking));
   const questionTurnId = await waitFor(

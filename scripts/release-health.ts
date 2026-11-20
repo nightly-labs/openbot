@@ -7,46 +7,6 @@ import { Schema } from "effect";
 import { connectClickHouse, credentials, type QueryResult, runQuery } from "./openpanel-sql";
 import { readScriptArguments } from "./script-arguments";
 
-// Do the computers that get a new desktop release start it and keep it running as well as the
-// release before it? This is the check before a staged rollout goes to 100% (docs/RELEASING.md).
-//
-// It compares the two releases over the same hours after each GitHub Release was published: the new
-// release from its publish time to now, and the previous release over the same number of hours from
-// its own publish time. It reads production analytics in the OpenPanel ClickHouse with the read-only
-// user (scripts/openpanel-sql.ts) and writes .openbot-build/release-health/report.json.
-//
-// Events (ANALYTICS.md):
-// - system_startup: one start of the main process that loaded its window. `workspace_ready_ms` is a
-//   finished start; `start_kind = updated` is the first start after an update install.
-// - system_unclean_exit: sent at the next start; `previous_app_version` is the release that stopped.
-// - update_action install succeeded: the renderer of the old release handed over to the installer.
-//   It has no target version: after a release is published, an install goes to that release.
-//
-// Groups: darwin, win32 and linux desktops, `server` (host_kind server on any platform), and `all`.
-//
-// Metrics and thresholds. "Worse" stops the rollout; "watch" only shows in the table.
-// - finished starts: desktop starts with a ready workspace, per start. A start that waits at sign-in
-//   or setup also counts as not finished, in both releases. Worse when the share is 3 percentage
-//   points lower and the drop is significant (one-sided z >= 3.09, p < 0.001). Watch at 1.5 points
-//   and z >= 1.645 (p < 0.05). Servers have no workspace in a window, so this metric is desktop only.
-// - crashes: unclean exits of the release in phase `running` (a crash, a force quit or a kill),
-//   without an OS restart and not while asleep, per 100 starts. Worse when 1 more per 100 starts,
-//   1.5 times as many, and z >= 3.09 (Poisson). Watch at 0.5, 1.2 times and z >= 1.645.
-// - startup crashes: the crashes in the first minute of a run. Worse at 0.5 more per 100 starts,
-//   1.5 times and z >= 3.09. Watch at 0.25, 1.2 times and z >= 1.645.
-// - quit hangs: unclean exits in phase `quitting` or `quit_timeout`, per 100 starts. Worse at 3 more,
-//   1.25 times and z >= 3.09. Watch at 1.5, 1.1 times and z >= 1.645.
-// - update arrivals: of the desktop computers that started an update install in the window, the
-//   share that then started the release. A brick shows here first. Worse when 5 points lower and
-//   z >= 3.09, or below 50% with 20 installs or more whatever the previous release did. Watch at
-//   2.5 points and z >= 1.645. Installs in the last 15 minutes of the window do not count yet.
-// - starts, computers, update installs (computers with an `updated` start) and the start time p50
-//   are not judged: they depend on the rollout share and on the hour of the day.
-// A rate needs 200 starts and an arrival share 50 installs in both releases in that group, else the
-// row is "waiting".
-//
-// Exit code: 0 when no row is worse and every metric of group `all` has enough data; 1 when a row is
-// worse; 2 for an error or a wrong argument; 3 when no row is worse but `all` is still waiting.
 const USAGE = `Usage:
   bun scripts/release-health.ts <version | latest> [options]
 Options:
@@ -61,7 +21,6 @@ const REPOSITORY = "nightly-labs/openbot";
 const MAX_WINDOW_HOURS = 72;
 const MIN_STARTS = 200;
 const MIN_INSTALLS = 50;
-/** Installs this close to the end of the window can still be on their way to the new release. */
 const ARRIVAL_MARGIN_MINUTES = 15;
 const BRICK_SHARE = 0.5;
 const BRICK_MIN_INSTALLS = 20;
@@ -76,10 +35,8 @@ const NETWORK_TIMEOUT_MS = 30_000;
 type Status = "worse" | "watch" | "ok" | "waiting" | "info";
 type Unit = "count" | "share" | "per100" | "ms";
 
-/** A judged metric: how much worse counts, in its unit, and how sure the change must be. */
 interface Limit {
   readonly floor: number;
-  /** The ratio new/previous that also counts; 1 for shares, which use the floor only. */
   readonly ratio: number;
   readonly z: number;
 }
@@ -87,7 +44,6 @@ interface Limit {
 interface MetricSpec {
   readonly metric: string;
   readonly unit: Unit;
-  /** True when a lower value is worse. */
   readonly lowerIsWorse: boolean;
   readonly worse: Limit;
   readonly watch: Limit;
@@ -146,7 +102,6 @@ interface Window {
   readonly version: string;
   readonly from: string;
   readonly to: string;
-  /** The end of the install window for arrivals: earlier when a newer release came out before `to`. */
   readonly installsTo: string;
 }
 
@@ -156,7 +111,6 @@ interface Row {
   readonly unit: Unit;
   readonly previous: number | null;
   readonly next: number | null;
-  /** The sample of the metric: starts, or installs for arrivals. */
   readonly previousN: number;
   readonly nextN: number;
   readonly z: number | null;
@@ -175,8 +129,6 @@ interface Report {
   readonly result: "pass" | "worse" | "waiting";
   readonly exitCode: 0 | 1 | 3;
 }
-
-// --- GitHub releases --------------------------------------------------------------------------------
 
 const decodeReleases = Schema.decodeUnknownSync(
   Schema.fromJsonString(
@@ -235,7 +187,6 @@ async function publishedReleases(): Promise<Release[]> {
 interface Pair {
   readonly next: Release;
   readonly previous: Release;
-  /** When the first release newer than `next` was published, if one is. */
   readonly nextFollowedAt: string | undefined;
   readonly previousFollowedAt: string | undefined;
 }
@@ -251,19 +202,15 @@ function pickReleases(releases: readonly Release[], wanted: string, wantedPrevio
   if (compareVersions(previous.version, next.version) >= 0) {
     throw new Error(`--previous must be older than ${next.version}.`);
   }
-  // After a newer release is out, an install goes to that release, so it ends the install window.
   const followedAt = (release: Release) =>
     sorted.findLast((other) => compareVersions(other.version, release.version) > 0)?.publishedAt;
   return { next, previous, nextFollowedAt: followedAt(next), previousFollowedAt: followedAt(previous) };
 }
 
-// --- SQL --------------------------------------------------------------------------------------------
-
 const environment = "properties['environment'] = 'production'";
 const group = "if(properties['host_kind'] = 'server', 'server', properties['platform'])";
 const number = (key: string) => `toFloat64OrNull(properties['${key}'])`;
 
-/** ClickHouse DateTime literal from an ISO time, in whole seconds (the column is UTC). */
 function at(iso: string): string {
   return `toDateTime('${iso.slice(0, 19).replace("T", " ")}', 'UTC')`;
 }
@@ -300,9 +247,6 @@ WHERE name = 'system_unclean_exit' AND ${environment}
   AND (${windows.map((window) => inWindow(window, "properties['previous_app_version']")).join(" OR ")})
 GROUP BY version, grp WITH ROLLUP`;
 
-// One row per computer and target release: the first install it started in the window. It arrived
-// when it sent a start of that release at or after the install. The profile is an account for a user
-// who shares analytics, so "at or after" also keeps another computer of the account from counting.
 const arrivalsSql = (windows: readonly Window[]) => {
   const target = `multiIf(${windows
     .map((window) => `created_at >= ${at(window.from)} AND created_at < ${at(window.installsTo)}, '${window.version}'`)
@@ -337,8 +281,6 @@ LEFT JOIN (
 GROUP BY version, grp WITH ROLLUP`;
 };
 
-// --- Comparison -------------------------------------------------------------------------------------
-
 type ResultRow = QueryResult["data"][number];
 
 function value(row: ResultRow | undefined, column: string): number {
@@ -347,14 +289,12 @@ function value(row: ResultRow | undefined, column: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** The row of a version and group. WITH ROLLUP gives the version total an empty group: `all`. */
 function find(result: QueryResult, version: string, groupName: string): ResultRow | undefined {
   return result.data.find(
     (row) => row.version === version && (groupName === "all" ? row.grp === "" : row.grp === groupName),
   );
 }
 
-/** One-sided two-proportion z: how sure the share fell. */
 function shareDropZ(previous: number, previousN: number, next: number, nextN: number): number {
   const pooled = (previous * previousN + next * nextN) / (previousN + nextN);
   const error = Math.sqrt(pooled * (1 - pooled) * (1 / previousN + 1 / nextN));
@@ -362,7 +302,6 @@ function shareDropZ(previous: number, previousN: number, next: number, nextN: nu
   return (previous - next) / error;
 }
 
-/** One-sided Poisson z for two event counts per start: how sure the rate rose. */
 function rateRiseZ(previousCount: number, previousStarts: number, nextCount: number, nextStarts: number): number {
   const error = Math.sqrt(previousCount / previousStarts ** 2 + nextCount / nextStarts ** 2);
   if (error === 0) return 0;
@@ -389,7 +328,6 @@ function shareRow(
   const next = counts.nextN > 0 ? counts.next / counts.nextN : null;
   const base = { group: groupName, metric: spec.metric, unit: spec.unit, previous, next };
   const sizes = { previousN: counts.previousN, nextN: counts.nextN };
-  // A release that most updating computers do not reach is a brick, whatever the previous release did.
   if (brick && next !== null && counts.nextN >= BRICK_MIN_INSTALLS && next < BRICK_SHARE) {
     return { ...base, ...sizes, z: null, status: "worse" };
   }
@@ -510,7 +448,6 @@ async function buildReport(releases: Pair, requestedHours: number | undefined, n
   let results: { starts: QueryResult; exits: QueryResult; arrivals: QueryResult };
   try {
     const query = (sql: string) => runQuery(connection, { user, password, sql, showIdentifiers: false });
-    // The read-only user may run 2 queries at a time, and a person can be using one.
     const starts = await query(startsSql(both));
     const exits = await query(exitsSql(both));
     const arrivals = await query(arrivalsSql(both));
@@ -540,8 +477,6 @@ async function buildReport(releases: Pair, requestedHours: number | undefined, n
     exitCode: result === "worse" ? 1 : result === "waiting" ? 3 : 0,
   };
 }
-
-// --- Output -----------------------------------------------------------------------------------------
 
 function format(unit: Unit, amount: number | null): string {
   if (amount === null) return "-";
@@ -627,7 +562,6 @@ async function sendDiscord(title: string, description: string): Promise<void> {
       signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
     });
   } catch {
-    // The error text can contain the URL, which holds the webhook token.
     throw new Error("Cannot reach the Discord webhook, or it did not answer in time.");
   }
   if (!response.ok) throw new Error(`The Discord webhook returned HTTP ${response.status}.`);
@@ -645,10 +579,6 @@ function discordText(report: Report): string {
   ].join("\n");
 }
 
-/**
- * The state is in the GitHub Actions cache, which pull requests of this public repository can read.
- * It is an HMAC of the worse rows, keyed by the private webhook URL, so it shows nothing.
- */
 function fingerprint(report: Report): string {
   const rows = report.worse.map((row) => `${row.group}|${row.metric}`).sort();
   return createHmac("sha256", process.env.RELEASE_REGRESSION_WEBHOOK_URL ?? "")
@@ -701,7 +631,6 @@ async function main(): Promise<void> {
     const path = await writeReport(report);
     let sent = false;
     if (discord && report.result !== "worse" && parsed.values.state) {
-      // The release is good again: a later worse result posts again, also with the same rows.
       await mkdir(dirname(parsed.values.state), { recursive: true });
       await writeFile(parsed.values.state, "\n");
     }
@@ -719,7 +648,6 @@ async function main(): Promise<void> {
       }
     }
     if (quiet) {
-      // Public log: the result word only, no numbers.
       process.stdout.write(`Release health: ${report.result}${sent ? "; sent to Discord" : ""}.\n`);
     } else {
       process.stdout.write(`${summary(report)}\n\n${table(report).join("\n")}\n\n${path}\n`);

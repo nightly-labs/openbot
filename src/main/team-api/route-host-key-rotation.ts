@@ -9,10 +9,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireOwner } from "./request-helpers";
 
-/**
- * The owner changes the key of this computer's server from another device. Frozen by
- * `host-key-rotation-v1`. The host signs the handover itself, so no key leaves this computer.
- */
 export async function routeHostKeyRotation(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -27,7 +23,6 @@ export async function routeHostKeyRotation(
   try {
     return json(200, await runCauseEffect(hostKey.rotate()));
   } catch (error) {
-    // A signed-out host or a refused handover is a sentence for the owner, not a host fault.
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }

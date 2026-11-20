@@ -52,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "로그인 시도가 너무 많아요. 나중에 다시 시도해 주세요.",
   "error.team.clientUpdateRequired": "이 호스트에 연결하기 전에 이 OpenBot 클라이언트를 업데이트해 주세요.",
   "error.team.hostUpdateRequired": "연결하기 전에 호스트의 OpenBot을 업데이트해 주세요.",
+  "error.team.serverSafeMode": "이 서버에서 OpenBot이 시작되지 않아 안전 모드로 실행 중입니다.",
+  "error.team.serverSafeModeNewerDatabase":
+    "이 서버의 OpenBot {version}은(는) 데이터를 열 수 없습니다. 더 새로운 OpenBot 버전이 데이터를 저장했기 때문입니다. 서버에 더 새로운 OpenBot 릴리스를 설치하면 해결됩니다.",
+  "error.team.serverSafeModeStartFailed":
+    "이 서버의 OpenBot {version}은(는) 여러 번 시작에 실패한 후 중지되었습니다. 서버에 더 새로운 OpenBot 릴리스를 설치하면 해결됩니다.",
   "error.team.sidebarLayoutUnavailable": "사이드바 레이아웃을 사용할 수 없어요.",
   "error.team.providersUnsupported": "이 연결에서는 제공자 설정을 지원하지 않아요.",
   "error.team.providerNotManaged": "OpenBot은 이 제공자의 CLI를 관리하지 않아요.",
@@ -119,6 +124,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
+  "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
   "error.team.localServersUnsupported": "이 연결은 이 컴퓨터의 서버를 지원하지 않습니다.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",

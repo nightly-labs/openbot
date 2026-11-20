@@ -1,8 +1,3 @@
-// Runs the real account server authorization checks on a migrated SQLite database. Each scenario
-// is one finding of the cloud authorization audit, and it fails if that access comes back.
-//
-// Run: bun run test:cloud-authorization
-// It writes .openbot-build/cloud-authorization-e2e/report.json and exits non-zero on a failure.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -53,7 +48,6 @@ async function ticketKeys() {
   };
 }
 
-/** A host with its owner, on a database with no Signal, and a clock that the scenario moves. */
 async function remoteHost() {
   const database = await migratedDatabase();
   const owner = addUser(database, "owner");
@@ -73,7 +67,6 @@ async function remoteHost() {
   return { database, owner, clock, remote };
 }
 
-/** The error code of a failed operation, or "ok". */
 async function outcome<A, E>(operation: Effect.Effect<A, E>): Promise<string> {
   return Effect.runPromise(
     operation.pipe(
@@ -190,7 +183,6 @@ async function aRoleChangeKeepsANewInviteValid() {
   });
 }
 
-/** The host's auth epoch and its queued epoch events. */
 function hostEpoch(database: DatabaseSync) {
   return {
     authEpoch: Number(
@@ -206,7 +198,6 @@ function hostEpoch(database: DatabaseSync) {
   };
 }
 
-/** Whether a session is open, and how many end events it has. */
 function sessionState(database: DatabaseSync, sessionId: string) {
   return {
     open:
@@ -231,10 +222,6 @@ function openSession(database: DatabaseSync, sessionId: string, userId: string, 
     .run(sessionId, HOST_ID, userId, membershipId(database, userId), now, now + 60 * 60 * 1_000);
 }
 
-/**
- * A new auth epoch makes Signal drop the host and every connected member. A role change ends only
- * the sessions of the member whose role changed; a removal still changes the epoch.
- */
 async function aRoleChangeKeepsTheHostConnected() {
   const { database, owner, clock, remote } = await remoteHost();
   const member = addUser(database, "member");
@@ -277,7 +264,6 @@ async function aRoleChangeKeepsTheHostConnected() {
   );
 }
 
-/** A host with a member who joined with a permanent link. */
 async function hostWithLinkMember() {
   const host = await remoteHost();
   const member = addUser(host.database, "member");
@@ -321,7 +307,6 @@ async function aRepeatedRemovalKeepsANewInviteValid() {
 
 async function aRevokeFromTheOldWorkerCountsAsARemoval() {
   const { database, clock, remote, member, link, id } = await hostWithLinkMember();
-  // The Worker before migration 0036 revokes the member and does not write removed_at.
   database
     .prepare("UPDATE remote_memberships SET status = 'revoked', updated_at = ? WHERE membership_id = ?")
     .run(clock.now, id);
@@ -471,7 +456,6 @@ async function theJwksNeverPublishesAPrivateKey() {
   const database = await migratedDatabase();
   const keys = await ticketKeys();
   const privateJwk = JSON.parse(keys.REMOTE_TICKET_PRIVATE_JWK);
-  // An operator pastes the private key into the public set by mistake.
   const remote = new RemoteControlPlane({
     DB: sqliteD1(database),
     ...keys,
@@ -577,7 +561,6 @@ async function aSiteServesOnlyItsOwnFiles() {
   }
 }
 
-// A client sets `X-Forwarded-For` itself. A new value for each request must not give it a new limit.
 async function aRateLimitIgnoresForwardedFor() {
   const keys: string[] = [];
   const bindings = {
@@ -601,7 +584,6 @@ async function aRateLimitIgnoresForwardedFor() {
   );
   check("a request with no Cloudflare address does not get a new key from X-Forwarded-For", keys[2] === keys[3], keys);
 
-  // One IPv6 subscriber has a full /64. A new address in it must not give it a new limit.
   keys.length = 0;
   for (const address of [
     "2001:db8:1:2::1",

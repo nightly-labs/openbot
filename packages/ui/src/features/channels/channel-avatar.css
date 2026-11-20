@@ -7,33 +7,19 @@
   color: var(--openbot-text-muted);
 }
 .channel-avatar .agent-avatar {
-  /* The optical lift paints a face's drawing like a positioned box. A photo has no drawing, so the
-     face itself is positioned, and each face paints over the one before it in order. */
   position: relative;
   width: var(--openbot-space-8);
   height: var(--openbot-space-8);
   flex-shrink: 0;
   border-radius: var(--openbot-radius-pill);
 }
-/*
- * The cluster holds the members in the square an agent avatar occupies, so a channel row keeps the
- * shape of the agent rows around it. Two measurements set the geometry: the cell pitch, which is
- * how far apart the face centres sit, and the face box. A bloub is drawn about 1.16 times its own
- * box wide, so a face box of 0.54 draws 0.63 of the square: the faces overlap by the
- * difference from the 0.38 pitch, and the pair still ends inside the square. Each face is outlined
- * in the colour of the surface, and a later face is painted over an earlier one, so the outline cuts
- * the face below it. The overflow count takes the last cell and overlaps the face beside it; a
- * count of two digits takes the bottom row. In the sidebar, the ring is the 3.5px ring of the felt
- * badges.
- */
+
 .channel-avatar-cluster {
-  /* A sidebar row sets the size it gives an agent avatar; a cluster outside a row keeps 36px. */
   --channel-avatar-size: var(--agent-row-avatar-size, 36px);
   --channel-avatar-pitch: calc(var(--channel-avatar-size) * 0.38);
   --channel-avatar-face: calc(var(--channel-avatar-size) * 0.54);
   --agent-avatar-outline-width: 2px;
-  /* Chrome rounds an outline width down to whole pixels, so the count draws the whole pixels of the
-     ring as its outline and the rest as a solid ring shadow. */
+
   --channel-avatar-ring-outline: 2px;
 
   display: grid;
@@ -45,24 +31,20 @@
   height: var(--channel-avatar-size);
 }
 .channel-avatar-cluster .agent-avatar {
-  /* The bloub is drawn low in its own box; the lift is the measured share of the box it drops by. */
   --agent-avatar-optical-offset: calc(var(--channel-avatar-face) * -0.14);
 
   width: var(--channel-avatar-face);
   height: var(--channel-avatar-face);
   background: none;
 }
-/* A photo fills its whole box, so it takes the size of the count disc, which matches the faces. */
 .channel-avatar-cluster .agent-avatar-custom {
   --channel-avatar-face: calc(var(--channel-avatar-size) * 0.46);
 }
-/* The row layout overlaps its faces. `:where` keeps the cluster out at no weight, so a surface
-   that sets its own overlap wins. */
+
 .channel-avatar:where(:not(.channel-avatar-cluster)) .agent-avatar + .agent-avatar {
   margin-inline-start: calc(-1 * var(--openbot-space-4));
 }
-/* One member is the channel's whole face. Two sit side by side, and three read as a triangle; a
-   count of two digits takes the third place. */
+
 .channel-avatar-cluster > :only-child {
   --channel-avatar-face: var(--channel-avatar-size);
 
@@ -79,7 +61,6 @@
   --agent-avatar-outline-width: 3.5px;
   --channel-avatar-ring-outline: 3px;
 }
-/* The pinned rail draws the same cluster at the size it gives an agent avatar, with the same ring. */
 .agent-row.sidebar-pinned-row .channel-avatar-cluster {
   --channel-avatar-size: var(--sidebar-pinned-avatar-size, 56px);
 }
@@ -87,19 +68,13 @@
   width: var(--channel-avatar-face);
   height: var(--channel-avatar-face);
 }
-/* The count of the members the cluster does not show: the felt pill of the sidebar unread count,
-   with its cream yarn digits. The count is a bare text node, so it takes the digit styles itself. It
-   paints its own felt colour under the pill. */
+
 .channel-avatar-count {
   --felt-box: calc(var(--channel-avatar-size) * 0.46);
 
-  /* The optical lift translates the face's drawing, which paints it like a positioned box. The
-     count is positioned too, so it paints over the face before it. */
   position: relative;
   display: grid;
-  /* A face's drawing fills about 0.42 of the square; a disc of the face box (0.54) is larger, so it
-     ends past the faces and pulls the cluster off centre. 0.46 matches the faces. Two digits do
-     not fit the disc, so the disc grows into a pill, centred on the bottom row. */
+
   box-sizing: border-box;
   min-width: var(--felt-box);
   height: var(--felt-box);
@@ -111,27 +86,19 @@
   box-shadow: 0 0 0 var(--agent-avatar-outline-width) var(--agent-avatar-outline, transparent);
   background: linear-gradient(to bottom, var(--openbot-felt-plum-top), var(--openbot-felt-plum-bottom));
   color: var(--openbot-felt-cream);
-  /* The count is type, so it takes a step off the type scale rather than a share of the square:
-     the smallest step that stays legible on the disc at both cluster sizes. */
+
   font-size: var(--openbot-text-sm);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
-/* The cream yarn digits of the "+N" count and of the sidebar unread count. The stroke makes the
-   digits fat. */
+
 :is(.channel-avatar-count, .agent-row-unread-count) {
   font-weight: 800;
   paint-order: stroke fill;
   -webkit-text-stroke: 0.7px var(--openbot-felt-cream-stroke);
 }
-/* The felt pill of the "+N" count and of the sidebar unread count (`sidebar-felt-badges.css`): a
-   9-slice of the round lilac ball, so its ends stay round at any width. Each badge sets `--felt-box`,
-   the height of its felt. The art is the left half of the ball and its mirror image, so both ends are
-   the same. The felt is opaque from 0.19 of the slice on all four sides. It goes out by that much past
-   the felt box, and the clip cuts it 0.25px inside the box, on the felt fill. The slice is half of the
-   felt height, so the ends stay round: 2 × slice = box + 2 × 0.19 × slice, thus slice = box / 1.62.
-   The filter darkens the lilac to plum. The badge of a waiting agent is the same felt, dyed amber. */
+
 :is(.channel-avatar-count, .agent-row-agent-status-unread, .agent-row-agent-status-waiting)::before {
   --felt-slice: calc(var(--felt-box) / 1.62);
   --felt-edge: calc(var(--felt-slice) * 0.19);
@@ -149,19 +116,11 @@
   border-image-source: url("../../assets/plush/felt-pill-amber.webp");
   filter: none;
 }
-/* With the 3.5px ring, the count sits 1.5px lower than the cell centre, so its ring meets the faces
-   above it at the same gap as the ring between the faces. */
+
 .sidebar .channel-avatar-cluster .channel-avatar-count {
   translate: 0 1.5px;
 }
-/*
- * The plush faces of a sidebar cluster get the ring of the "+N" count. The ring of the drop shadows
- * copies the soft fur edge, so it shows as a faint, uneven gap. The filters that `SidebarFrame` holds
- * cut each face to a smooth outline of its fur and paint the face on that outline grown by the ring
- * width, in the row colour: a solid, smooth ring, as the outline of the count. A filter cannot read
- * the row colour, so the hover and selected rows take the filter of their own colour. A drop target
- * tints its rows while an agent is dragged; its faces keep the sidebar ring until the drop.
- */
+
 .sidebar .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: url("#sidebar-plush-ring");
 }
@@ -171,13 +130,11 @@
 .sidebar :is(.agent-row:hover, .agent-row-active) .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: url("#sidebar-plush-ring-raised");
 }
-/* With a fine pointer, a hovered row takes the ghost button hover fill (`primitives.css`). */
 @media (hover: hover) and (pointer: fine) and (min-width: 601px) {
   .sidebar .agent-row:hover .channel-avatar-cluster .agent-avatar:has(> .bloub-avatar-svg image) {
     filter: url("#sidebar-plush-ring-hover");
   }
 }
-/* The light theme gives a selected row its own fill, which it keeps on hover (`app-shell.css`). */
 :root[data-openbot-color-scheme="light"]
   .sidebar
   .agent-row-active
@@ -185,7 +142,6 @@
   .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: url("#sidebar-plush-ring-selected");
 }
-/* While an agent is dragged, the hovered row is not filled. */
 .sidebar
   .agent-list[data-sidebar-dragging]
   .agent-row:hover:not(.agent-row-active)
@@ -193,11 +149,7 @@
   .agent-avatar:has(> .bloub-avatar-svg image) {
   filter: url("#sidebar-plush-ring");
 }
-/*
- * A channel picture: an uploaded image, or an icon on the channel colour. It takes the square the
- * faces take. Agents are round, so a channel picture is a rounded square: a channel with a picture
- * does not look like an agent.
- */
+
 .channel-avatar-picture {
   width: var(--channel-avatar-size, var(--openbot-space-8));
   min-width: var(--channel-avatar-size, var(--openbot-space-8));
@@ -222,7 +174,6 @@
   object-fit: cover;
   background: var(--openbot-bg-control);
 }
-/* Biome wants these in rising specificity; later rules win on the elements they share. */
 .channel-icon-grid .channel-picture {
   width: 32px;
   height: 32px;
@@ -245,7 +196,6 @@
   border-radius: var(--openbot-radius-xl);
 }
 
-/* The picture at the top of channel settings. The badge is the one of the agent settings. */
 .channel-picture-trigger {
   --agent-row-avatar-size: 62px;
 
@@ -264,18 +214,15 @@
   filter: brightness(1.08);
 }
 
-/* The editor is the agent avatar editor: the same headings, upload row and colour grid. */
 .channel-picture-editor .avatar-image-upload-preview {
   border-radius: var(--openbot-radius-md);
 }
-/* The agent editor grids load later at the same weight, so the editor scopes these. */
 .channel-picture-editor .channel-icon-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .channel-icon-grid .channel-icon-choice {
   height: 44px;
 }
-/* Eight colours and no automatic one: an icon always has a colour. */
 .channel-picture-editor .channel-icon-color-grid {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }

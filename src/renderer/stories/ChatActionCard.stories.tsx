@@ -3,11 +3,6 @@ import { ChatActionCard, type ChatActionCardProps } from "@openbot/ui/features/c
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/*
- * The shell of a chat record the person can act on. A variant gives the icon, the words and the
- * body, and maps its own states onto `status`. "Routines/Schedule card" is the first variant.
- */
-
 type CardArgs = Omit<ChatActionCardProps, "icon" | "children"> & { body?: string };
 
 const meta = {
@@ -37,7 +32,6 @@ export const Note: Story = {};
 
 export const Busy: Story = { args: { status: { kind: "busy", text: "Saving…" } } };
 
-/** A change made from the card is done. */
 export const Done: Story = {
   args: { status: { kind: "done", text: "Saved" } },
 };
@@ -47,10 +41,8 @@ export const ErrorStatus: Story = {
   args: { status: { kind: "error", text: "Could not save the schedule. Try again." } },
 };
 
-/** The subject no longer exists: the title is struck through and Open is hidden. */
 export const Removed: Story = {
   args: { removed: true, status: { kind: "note", text: "This routine was deleted." } },
 };
 
-/** A variant can be the header and the footer only. */
 export const WithoutBody: Story = { args: { body: undefined } };

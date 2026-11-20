@@ -234,6 +234,13 @@ export const messages = {
     "Mevcut gizli anahtar çalışmayı durdurur. Ana makine onu kullanan istekleri reddeder.",
   "mobile.agent.webhook.rotateConfirm": "Yeniden oluştur",
   "mobile.agent.webhook.rotateFailed": "Gizli anahtar yeniden oluşturulamadı. Tekrar deneyin.",
+  "mobile.agent.webhook.giveToAgent": "İmzalama gizli anahtarını {name} ajanına ver",
+  "mobile.agent.webhook.giveTitle": "{name} ajanına yeni bir imzalama gizli anahtarı verilsin mi?",
+  "mobile.agent.webhook.giveBody":
+    "Mevcut gizli anahtar çalışmayı durdurur. {name} yeni gizli anahtarı API anahtarı olarak kaydeder ve gönderene ekleyebilir.",
+  "mobile.agent.webhook.giveConfirm": "Ver",
+  "mobile.agent.webhook.giveFailed": "İmzalama gizli anahtarı ajana verilemedi. Tekrar deneyin.",
+  "mobile.agent.webhook.given": "{name} yeni imzalama gizli anahtarını aldı.",
   "mobile.agent.webhook.activity": "Etkinlik",
   "mobile.agent.webhook.activityFailed": "Etkinlik yüklenemedi. Tekrar deneyin.",
   "mobile.agent.webhook.activity.ignored": "Yok sayıldı",
@@ -404,6 +411,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profilleri yönet",
   "mobile.agent.browserProfile.footer":
     "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
   "mobile.agent.planCard.footer":
@@ -424,10 +433,11 @@ export const messages = {
     "Bu sunucu bir ajan için kendi bildirim düzeyini saklayamıyor. OpenBot’u onu çalıştıran bilgisayarda güncelle.",
   "mobile.agent.newChat.title": "Yeni sohbet",
   "mobile.agent.newChat.starting": "Yeni sohbet başlatılıyor…",
-  "mobile.agent.newChat.footer": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
+  "mobile.agent.newChat.footer":
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Yapılandırması kalır.",
   "mobile.agent.newChat.confirmTitle": "{name} ile yeni bir sohbet başlatılsın mı?",
   "mobile.agent.newChat.confirmBody":
-    "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "mobile.agent.newChat.confirm": "Yeni sohbet başlat",
   "mobile.agent.newChat.failed": "Yeni bir sohbet başlatılamadı",
   "mobile.agent.newChat.failedBody": "Ana makine yeni bir sohbet başlatamadı.",

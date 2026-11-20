@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Actualiza OpenBot en {name}",
   "server.compatibility.unsafeDataTitle": "El host devolvió datos no seguros",
   "server.compatibility.cannotConnectTitle": "No se puede conectar con {name}",
+  "server.compatibility.safeModeTitle": "{name} no se inicia",
   "server.compatibility.updateClientDescription":
     "Esta aplicación solo admite protocolos anteriores a los del host. Actualiza esta aplicación y vuelve a intentarlo.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,7 @@ export const messages = {
   "server.local.create": "Crear servidor",
   "server.local.creating": "Creando servidor…",
   "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.createFailedRetry": "Algo salió mal. Inténtalo de nuevo. Si vuelve a fallar, reinicia OpenBot.",
   "server.local.limitReached":
     "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
   "server.local.deleteConfirmTitle": "¿Eliminar {name}?",
@@ -166,6 +168,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "Copiando OpenBot a la máquina",
   "server.hosted.detail.create.key": "Añadiendo una clave de inicio de sesión de un solo uso",
   "server.hosted.detail.start.boot": "Encendiendo la máquina",
+  "server.hosted.detail.start.restore": "Restaurando datos",
   "server.hosted.detail.start.app": "Iniciando OpenBot",
   "server.hosted.detail.start.wait": "Esperando la respuesta de OpenBot",
   "server.hosted.detail.connect.signIn": "Iniciando sesión como tú",
@@ -676,4 +679,37 @@ export const messages = {
   "server.settings.responseStyleNatural": "Natural",
   "server.settings.responseStyleClassic": "Clásico",
   "server.settings.personalityLoadFailed": "No se pudo cargar la personalidad del servidor.",
+  "server.ownerTransfer.title": "Propiedad",
+  "server.ownerTransfer.ownerTitle": "Eres el propietario de este servidor",
+  "server.ownerTransfer.ownerDescription": "Haz propietaria a otra persona. Pierdes el acceso cuando acepte.",
+  "server.ownerTransfer.start": "Transferir propiedad…",
+  "server.ownerTransfer.pending": "Transferencia a {email} pendiente",
+  "server.ownerTransfer.expires": "Caduca el {date}",
+  "server.ownerTransfer.cancel": "Cancelar solicitud",
+  "server.ownerTransfer.emailTitle": "Transferir la propiedad de {server}",
+  "server.ownerTransfer.emailDescription":
+    "Escribe el correo del nuevo propietario. Debe aceptar con la sesión iniciada con ese correo.",
+  "server.ownerTransfer.email": "Correo del nuevo propietario",
+  "server.ownerTransfer.confirmTitle": "¿Hacer propietario a {email}?",
+  "server.ownerTransfer.confirmDescription": "Cuando {email} acepte:",
+  "server.ownerTransfer.confirmLoseAccess": "Pierdes el acceso a {server}.",
+  "server.ownerTransfer.confirmStays":
+    "Los agentes, rutinas, chats, inicios de sesión de proveedores, claves guardadas, accesos de Vault, inicios de sesión del navegador y apps conectadas se quedan en el servidor. El nuevo propietario puede usarlos.",
+  "server.ownerTransfer.confirmExpiry": "La solicitud caduca a los 7 días.",
+  "server.ownerTransfer.send": "Enviar solicitud",
+  "server.ownerTransfer.sendFailed": "No se pudo enviar la transferencia.",
+  "server.ownerTransfer.incomingTitle": "¿Ser propietario de {server}?",
+  "server.ownerTransfer.incomingDescription": "{name} quiere hacerte propietario de {server}.",
+  "server.ownerTransfer.incomingYours": "El servidor, sus agentes, rutinas y datos pasan a ser tuyos.",
+  "server.ownerTransfer.incomingPrevious": "{name} pierde el acceso al servidor.",
+  "server.ownerTransfer.incomingStays":
+    "Los inicios de sesión de proveedores, claves guardadas, accesos de Vault, inicios de sesión del navegador y apps conectadas del servidor se quedan allí y puedes usarlos.",
+  "server.ownerTransfer.incomingMachine":
+    "Quien todavía pueda iniciar sesión en el ordenador que ejecuta el servidor puede usar tu cuenta de OpenBot. Cambia sus contraseñas y claves SSH.",
+  "server.ownerTransfer.later": "Más tarde",
+  "server.ownerTransfer.decline": "Rechazar",
+  "server.ownerTransfer.accept": "Aceptar",
+  "server.ownerTransfer.accepted": "Ahora eres propietario de {server}",
+  "server.ownerTransfer.acceptFailed": "No se pudo aceptar la transferencia.",
+  "server.ownerTransfer.declineFailed": "No se pudo rechazar la transferencia.",
 } as const satisfies PartialTranslation<typeof source>;

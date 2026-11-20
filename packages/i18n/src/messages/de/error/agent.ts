@@ -144,6 +144,10 @@ export const messages = {
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
   "error.agent.deleteFolderInUse":
     "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Ein anderes Programm nutzt noch den Ordner dieses Agenten, zum Beispiel ein Programm, das der Agent gestartet hat. Schließe dieses Programm oder starte den Computer neu, auf dem dieser Agent läuft, und lösche den Agenten dann erneut.",
+  "error.agent.deleteWhenFolderFree":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. OpenBot löscht diesen Agenten, wenn diese Arbeit endet.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",
   "error.agent.waitBeforeDuplicate":
     "Warte, bis der Agent fertig ist, und leere seine Warteschlange, bevor du ihn duplizierst.",
@@ -212,6 +216,8 @@ export const messages = {
     "Der Bereich liegt nicht innerhalb eines Bildschirms. Verwende Desktop-Punkte innerhalb der Grenzen eines Bildschirms aus list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot hat keine Berechtigung zur Bildschirmaufnahme. Bitte den Benutzer, Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme zu öffnen, OpenBot zu aktivieren und OpenBot dann zu beenden und neu zu öffnen.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot hat noch keine Berechtigung zur Bildschirmaufnahme und kann die Fenster daher nicht auflisten. Um einen Bildschirm aufzunehmen, rufe capture_screen mit target screen auf. Der Benutzer erlaubt die Aufnahme zuerst, danach kann macOS den Benutzer um die Berechtigung bitten.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows hat ein leeres Bild geliefert. Bitte den Benutzer, den Computer zu entsperren und geschützte Inhalte zu schließen. Auch eine Richtlinie der Organisation kann die Bildschirmaufnahme verhindern.",
   "error.agent.screenCaptureFailed": "Die Bildschirmaufnahme ist fehlgeschlagen. Versuche es erneut.",

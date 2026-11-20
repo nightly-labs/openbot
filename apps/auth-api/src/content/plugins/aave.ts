@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Aave here is taken from aave.com. Each page used is in `sources`.
-// Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const AAVE_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

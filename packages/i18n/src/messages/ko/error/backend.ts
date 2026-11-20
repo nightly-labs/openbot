@@ -285,6 +285,12 @@ export const messages = {
     "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. {provider}은(는) 이 서버의 도구를 사용할 수 없어요. {provider}은(는) 서버를 직접 시작하므로 OpenBot의 연결 테스트는 성공할 수 있어요. 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpServerTimedOutInProvider":
     "서버가 제시간에 응답하지 않아 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "서버를 지금 사용할 수 없어 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 몇 분 기다린 후 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider}이(가) MCP 서버 {name}에 연결할 수 없었어요. 마켓플레이스, 앱에서 {name}을(를) 열고 주소가 올바른지, 서버가 실행 중인지 확인하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.githubToolsNotStarted":
+    "GitHub가 응답하지 않아 {provider}이(가) GitHub 도구를 가져올 수 없었어요. 마켓플레이스, 앱에서 GitHub를 열고, 요청하면 다시 연결하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -354,8 +360,9 @@ export const messages = {
   "error.backend.takeoverInactive": "이 브라우저 제어권 가져오기는 더 이상 활성 상태가 아니에요.",
   "error.backend.authSubmitting": "인증을 이미 제출하는 중이에요.",
   "error.backend.apiKeySaveFailed": "OpenBot이 API 키를 저장할 수 없었어요. 다시 시도해 주세요.",
-  "error.backend.apiKeyNotAllowed": "서버 소유자 또는 관리자만 API 키를 입력할 수 있어요.",
   "error.backend.apiKeySaving": "API 키를 이미 저장하는 중이에요.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot이 API 키를 읽지 못했어요. 8,000자 이하의 키를 입력하고 키를 사용할 대상을 선택하세요.",
   "error.backend.authRequestInactive": "이 보안 인증 요청은 더 이상 활성 상태가 아니에요.",
   "error.backend.secureAuthUnavailable": "보안 인증을 사용할 수 없어요.",
   "error.backend.browserUrlRequired": "브라우저 URL이 필요해요.",
@@ -395,7 +402,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "팝업을 불러올 수 없어요. 원래 페이지에서 로그인을 다시 시도하세요.",
   "error.backend.browserTabNotFound": "브라우저 탭을 찾을 수 없어요.",
   "error.backend.authActive": "인증이 이미 진행 중이에요.",
-  "error.backend.authHttpsRequired": "보안 인증에는 HTTPS가 필요해요.",
+  "error.backend.authWebPageRequired": "보안 인증에는 HTTP/HTTPS가 필요해요.",
   "error.backend.authDigitsRange": "인증 코드는 4~12자리여야 해요.",
   "error.backend.authExpired": "인증 요청이 만료되었어요.",
   "error.backend.authDigitsRequired": "요청된 자릿수만큼 숫자를 입력하세요.",

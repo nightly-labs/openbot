@@ -138,8 +138,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "نفدت الكمية",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · تنتهي في {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · البيانات محفوظة حتى {date}",
   "mobile.server.hosted.state.payment": "في انتظار الدفع",
   "mobile.server.hosted.state.setup": "جارٍ الإعداد",
+  "mobile.server.hosted.state.restoring": "جارٍ استعادة البيانات",
   "mobile.server.hosted.state.starting": "جارٍ التشغيل",
   "mobile.server.hosted.state.running": "قيد التشغيل",
   "mobile.server.hosted.state.stopped": "متوقف",
@@ -636,6 +638,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "إضافة وكلاء",
   "mobile.server.browserProfiles.agentsHint":
     "تمنح النقرة الوكيلَ ملف التعريف هذا، أو تعيده إلى الملف المشترك. يُغلق التغيير علامات التبويب المفتوحة للوكيل.",
+  "mobile.server.browserProfiles.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل المنقول الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.server.browserProfiles.clear": "مسح البيانات",
   "mobile.server.browserProfiles.clearTitle": "هل تريد مسح بيانات {name}؟",
   "mobile.server.browserProfiles.clearBody":
@@ -743,7 +747,7 @@ export const messages = {
   "mobile.server.vault.import": "استيراد كلمات المرور من ملف CSV",
   "mobile.server.vault.importing": "جارٍ الاستيراد…",
   "mobile.server.vault.importFooter":
-    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف الذي ليس HTTPS أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
+    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف ذا العنوان غير المدعوم أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
   "mobile.server.vault.importResult": "المضاف: {imported}. المتخطّى: {skipped}.",
   "mobile.server.vault.importTooLarge": "هذا الملف أكبر من أن يُرسل من هاتف. استورده في OpenBot على {host}.",
   "mobile.server.vault.importReadFailed": "تعذّرت قراءة الملف.",
@@ -757,7 +761,8 @@ export const messages = {
   "mobile.server.vault.saveFailed": "تعذّر حفظ العنصر. أعد المحاولة.",
   "mobile.server.vault.gone": "لم يعد هذا العنصر في الخزنة.",
   "mobile.server.vault.website": "موقع الويب",
-  "mobile.server.vault.websiteHint": "عنوان HTTPS. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
+  "mobile.server.vault.websiteHint":
+    "عنوان موقع ويب، مثل example.com. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
   "mobile.server.vault.username": "اسم المستخدم",
   "mobile.server.vault.password": "كلمة المرور",
   "mobile.server.vault.notes": "ملاحظات",
@@ -988,6 +993,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "في Proton Pass، أنشئ مفتاح وصول يمكنه قراءة الخزنة التي تشاركها مع OpenBot فقط، ثم الصقه هنا. يحتفظ {host} بالمفتاح؛ ولا يحتفظ به هذا الهاتف.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "لا تتضمن خطة Proton الخاصة بك أداة سطر الأوامر في Proton Pass. تحتاج إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} غير متاح على هذا الخادم.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "سجّل الدخول إلى {name} على هذا الهاتف. بعد ذلك ينشئ {host} خزنة مشتركة ومفتاح وصول للقراءة فقط لها، ويحتفظ بهذا المفتاح فقط. لا يرى الوكلاء أي كلمة مرور.",
@@ -1023,8 +1030,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "للقراءة فقط",
   "mobile.server.connectors.passwordManager.keyExpires": "للقراءة فقط. تنتهي صلاحيته في {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "انتهت صلاحيته في {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "تتطلب أداة سطر الأوامر في {name} خطة مدفوعة. غيّر خطة حسابك، ثم أعد الربط.",
   "mobile.server.connectors.passwordManager.expiredTitle": "انتهت صلاحية مفتاح {name}",
   "mobile.server.connectors.passwordManager.expiredBody":
     "لا يستطيع الوكلاء على {host} تسجيل الدخول ببيانات تسجيل الدخول المشتركة حتى تعيد الربط.",
@@ -1276,7 +1281,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "mobile.server.connectors.whatsapp.add": "إضافة",
   "mobile.server.connectors.whatsapp.groupTitle": "إضافة مجموعة",
-  "mobile.server.connectors.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "mobile.server.connectors.whatsapp.groupSearch": "بحث في المجموعات",
   "mobile.server.connectors.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",
@@ -1739,6 +1745,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "يطلب منك خادم MCP هذا تسجيل الدخول. سجّل الدخول من OpenBot على حاسوب، ثم اختبر مجددًا.",
+  "mobile.server.mcp.signIn": "تسجيل الدخول",
+  "mobile.server.mcp.signInHere": "يطلب خادم MCP هذا تسجيل الدخول. اضغط تسجيل الدخول، ثم اختبر مرة أخرى.",
   "mobile.server.mcp.signedInDescription": "{server} مسجّل الدخول إلى خادم MCP هذا.",
   "mobile.server.mcp.signOut": "تسجيل الخروج",
   "mobile.server.mcp.saveFailed": "تعذّر حفظ التغيير. أعد المحاولة.",
@@ -1800,6 +1808,7 @@ export const messages = {
     other: "{count} ساعة",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} دقيقة",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "التحديثات",
   "mobile.server.settings.updateAvailable": "يتوفر تحديث",
   "mobile.server.route.updates": "التحديثات",
@@ -2204,6 +2213,10 @@ export const messages = {
     many: "نسخ {count} وكيلًا",
     other: "نسخ {count} وكيل",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "هل تريد نسخ وكلاء مكررين؟",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "نسخ المكررين",
   "mobile.server.transfer.copying": "جارٍ النسخ…",
   "mobile.server.transfer.copyFailed": "لم يكتمل النسخ.",
   "mobile.server.transfer.copied": {
@@ -2217,4 +2230,39 @@ export const messages = {
   "mobile.server.transfer.copyAgents": "الوكلاء المطلوب نسخهم",
   "mobile.server.transfer.copyNext": "يستخدم الوكلاء المنسوخون قواعد الموافقة لـ {server}.",
   "mobile.server.transfer.copyNoServer": "اتصل بخادم آخر بصفتك مالكًا أو مسؤولًا لنسخ الوكلاء إليه.",
+  "mobile.server.route.ownerTransfer": "نقل الملكية",
+  "mobile.server.ownerTransfer.unavailable": "اتصل بهذا الخادم بصفتك المالك لنقل الملكية.",
+  "mobile.server.ownerTransfer.hosted": "يستضيف OpenBot هذا الخادم، لذا لا يمكن تغيير مالكه.",
+  "mobile.server.ownerTransfer.lede":
+    "يتلقى المالك الجديد بريدًا إلكترونيًا، ويجب أن يقبل وهو مسجّل الدخول بهذا البريد. بعد ذلك تُزال من هذا الخادم.",
+  "mobile.server.ownerTransfer.email": "بريد المالك الجديد",
+  "mobile.server.ownerTransfer.send": "إرسال",
+  "mobile.server.ownerTransfer.sending": "جارٍ الإرسال…",
+  "mobile.server.ownerTransfer.stays":
+    "تبقى الوكلاء والدردشات والمهام الدورية وتسجيلات الدخول إلى المزوّدين والمفاتيح المحفوظة وبيانات دخول الخزنة وتسجيلات دخول المتصفح والتطبيقات المتصلة على الخادم. ويمكن للمالك الجديد استخدامها.",
+  "mobile.server.ownerTransfer.expiry": "ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirmTitle": "هل تجعل {email} المالك؟",
+  "mobile.server.ownerTransfer.confirmBody":
+    "عندما يقبل {email} يصبح مالك {server} وتفقد الوصول إليه. تبقى البيانات على الخادم. ينتهي الطلب بعد 7 أيام.",
+  "mobile.server.ownerTransfer.confirm": "نقل",
+  "mobile.server.ownerTransfer.sendFailed": "لم يُرسَل الطلب.",
+  "mobile.server.ownerTransfer.loadFailed": "تعذّرت قراءة النقل المعلّق.",
+  "mobile.server.ownerTransfer.pending": "بانتظار المالك الجديد",
+  "mobile.server.ownerTransfer.expires": "ينتهي في {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "يجب أن يقبل {email} وهو مسجّل الدخول بهذا البريد. حتى ذلك الحين تبقى أنت المالك.",
+  "mobile.server.ownerTransfer.cancel": "إلغاء النقل",
+  "mobile.server.ownerTransfer.cancelTitle": "هل تلغي النقل؟",
+  "mobile.server.ownerTransfer.cancelBody": "لن يتمكن {email} من قبوله بعد ذلك.",
+  "mobile.server.ownerTransfer.keep": "إبقاء",
+  "mobile.server.ownerTransfer.cancelFailed": "لم يُلغَ النقل.",
+  "mobile.server.ownerTransfer.incomingTitle": "هل تصبح مالك {server}؟",
+  "mobile.server.ownerTransfer.incomingBody":
+    "يريد {name} أن يجعلك مالك {server}. ستتحكم في الخادم بالكامل، وتبقى عليه وكلاؤه ودردشاته ومهامه الدورية وتسجيلات الدخول المحفوظة. ويفقد {name} الوصول. يمكن لأي شخص لا يزال يستطيع تسجيل الدخول إلى الكمبيوتر الذي يشغّل الخادم أن يستخدم حسابك في OpenBot. غيّر كلمات المرور ومفاتيح SSH على ذلك الكمبيوتر.",
+  "mobile.server.ownerTransfer.accept": "قبول",
+  "mobile.server.ownerTransfer.decline": "رفض",
+  "mobile.server.ownerTransfer.accepted": "أنت الآن مالك {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "تعذّر قبول النقل",
+  "mobile.server.ownerTransfer.declineFailed": "تعذّر رفض النقل",
+  "mobile.server.ownerTransfer.tryAgain": "حاول مرة أخرى لاحقًا.",
 } as const satisfies PartialTranslation<typeof source>;

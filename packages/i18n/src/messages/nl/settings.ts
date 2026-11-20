@@ -58,6 +58,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro zonsondergang",
   "settings.chatBackdrop.snowfall": "Sneeuwval",
   "settings.chatBackdrop.fireflies": "Vuurvliegjes",
+  "settings.chatBackdrop.coast": "Neonkust",
   "settings.chatBackdrop.upload": "Afbeelding uploaden…",
   "settings.chatBackdrop.uploadRefused": "Gebruik een PNG-, JPEG-, GIF-, WebP- of AVIF-afbeelding van maximaal 20 MB.",
   "settings.chatBackdrop.saveFailed": "De achtergrond is niet opgeslagen.",
@@ -606,6 +607,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Abonnement beëindigd",
   "settings.hostedServers.state.creating": "Wordt gemaakt",
   "settings.hostedServers.state.starting": "Wordt gestart",
+  "settings.hostedServers.state.restoring": "Gegevens herstellen",
   "settings.hostedServers.state.running": "Actief",
   "settings.hostedServers.state.stopping": "Wordt gestopt",
   "settings.hostedServers.state.stopped": "Gestopt",
@@ -616,6 +618,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "De installatie begint wanneer Stripe de betaling bevestigt.",
   "settings.hostedServers.planEndedDescription":
     "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard. Verleng het abonnement om hem te starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard tot {date}. Verleng het abonnement vóór die datum om hem te starten.",
   "settings.hostedServers.pay": "Open betaalpagina",
   "settings.hostedServers.payLabel": "Open betaalpagina voor {name}",
   "settings.hostedServers.renew": "Verleng abonnement",
@@ -720,6 +724,13 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. Zo klinken je antwoorden.",
   "settings.voice.speech.listenFailed": "Kan het voorbeeld niet afspelen.",
   "settings.voice.live.section": "Live spraak",
+  "settings.voice.talk.section": "Spraakgesprek",
+  "settings.voice.talkKey.title": "Toets om te praten",
+  "settings.voice.talkKey.description": "Houd deze toetsen ingedrukt om te praten in een spraakgesprek.",
+  "settings.voice.talkKey.change": "Toets om te praten wijzigen",
+  "settings.voice.talkKey.recording": "Druk op de toetsen",
+  "settings.voice.talkKey.refused": "Voeg nog een toets toe",
+  "settings.voice.talkKey.reset": "Herstellen",
   "settings.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
   "settings.transfer.title": "Verplaats deze server naar een andere computer",
   "settings.transfer.lede": "Je agents, hun vaardigheden, routines, herinneringen en bestanden gaan in één bestand.",
@@ -825,6 +836,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "settings.transfer.copy.submit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Dubbele agents kopiëren?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} heeft al agents met deze namen: {names}. De kopie voegt voor elk een tweede agent toe. Elke kopie is een aparte agent met eigen chats, bestanden en herinneringen.",
+  "settings.transfer.copy.duplicatesConfirm": "Dubbele kopiëren",
   "settings.transfer.copy.copying": "Kopiëren…",
   "settings.transfer.copy.done": {
     one: "{count} agent gekopieerd naar {server}.",

@@ -2,41 +2,26 @@ import { Button, Pause, Play, SeekSlider } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Show } from "solid-js";
 
-/** How many bars the waveform has. */
 const BAR_COUNT = 40;
-/** The waveform of a recording that is not decoded, or of a reply that was not read to its end. */
 const PLACEHOLDER_PEAKS: readonly number[] = new Array(BAR_COUNT).fill(0);
-/** How far an arrow key moves the position, in seconds. A page key moves it ten times as far. */
 const SEEK_STEP_SECONDS = 0.5;
 
 export interface VoicePlayerProps {
-  /** `message` plays the user's own recording; `reply` reads the agent's answer aloud. */
   kind: "message" | "reply";
   state: "idle" | "playing" | "paused";
-  /**
-   * The shape of the recording, from 0 to 1. Missing until the recording is decoded, and for a reply
-   * until it was read to its end once, because it is synthesized while it plays.
-   */
   peaks?: readonly number[] | undefined;
-  /** The length and how far it played, in seconds. A reply has a length when it has peaks. */
   duration?: number | undefined;
   elapsed?: number | undefined;
-  /** For a reply without peaks: the loudness of the voice while it is read, oldest first, from 0 to 1. */
   levels?: readonly number[] | undefined;
   onToggle: () => void;
-  /** Moves a recording to a position, in seconds, and plays it from there. */
   onSeek?: ((seconds: number) => void) | undefined;
-  /** For a reply: the speed it plays at, where 1 is normal speed. */
   speed?: number | undefined;
-  /** For a reply: changes to the next speed. Without it, the player has no speed button. */
   onCycleSpeed?: (() => void) | undefined;
 }
 
-/** Plays a spoken turn in its message: the user's recording, or the agent's reply read aloud. */
 export function VoicePlayer(props: VoicePlayerProps) {
   const { t, format } = useText();
   const speed = () => format.number(props.speed ?? 1);
-  /** Where a drag or a key moved the position, in seconds, until the user releases it. */
   const [dragged, setDragged] = createSignal<number | null>(null);
   const active = () => props.state !== "idle";
   const duration = () => props.duration ?? 0;
@@ -45,7 +30,6 @@ export function VoicePlayer(props: VoicePlayerProps) {
     return drag ?? props.elapsed ?? 0;
   };
   const progress = () => (duration() > 0 ? elapsed() / duration() : 0);
-  /** A reply that is read for the first time shows the loudness of its voice, newest at the end. */
   const live = () => !props.peaks && active() && props.levels !== undefined;
   const bars = (): readonly number[] => {
     if (props.peaks) return props.peaks;

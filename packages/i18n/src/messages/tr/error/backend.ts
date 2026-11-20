@@ -10,7 +10,6 @@ export const messages = {
     "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",
   "error.backend.webhookRouteUnavailable":
     "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "Canlı tarayıcı görünümü yalnızca uzak bir ana makine içindir.",
   "error.backend.browserViewUnsupported": "Bu uzak ana makine canlı tarayıcı görünümünü desteklemiyor.",
   "error.backend.browserViewLimit": "Bu ana makinede çok fazla tarayıcı görünümü açık.",
@@ -290,6 +289,12 @@ export const messages = {
     "{provider}, {name} MCP sunucusunu başlatamadı. Araçları {provider} için kullanılamıyor. {provider} sunucuyu kendisi başlatır, bu yüzden OpenBot'taki bağlantı testi başarılı olabilir. Yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu zamanında yanıt vermedi. Yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu şu anda kullanılamıyor. Birkaç dakika bekleyin, ardından yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider}, {name} MCP sunucusuna ulaşamadı. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve adresin doğru olduğunu ve sunucunun çalıştığını kontrol edin. Ardından yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.githubToolsNotStarted":
+    "{provider}, GitHub yanıt vermediği için GitHub araçlarını alamadı. Pazaryeri, Uygulamalar bölümünde GitHub öğesini açın ve isterse yeniden bağlayın. Ardından yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -357,8 +362,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Bu tarayıcı devralması artık etkin değil.",
   "error.backend.authSubmitting": "Kimlik doğrulama gönderimi zaten devam ediyor.",
   "error.backend.apiKeySaveFailed": "OpenBot API anahtarını kaydedemedi. Yeniden deneyin.",
-  "error.backend.apiKeyNotAllowed": "API anahtarını yalnızca sunucu sahibi veya bir yönetici girebilir.",
   "error.backend.apiKeySaving": "API anahtarı zaten kaydediliyor.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot API anahtarını okuyamadı. En fazla 8.000 karakterlik bir anahtar girin ve onu kimin kullanabileceğini seçin.",
   "error.backend.authRequestInactive": "Bu güvenli kimlik doğrulama isteği artık etkin değil.",
   "error.backend.secureAuthUnavailable": "Güvenli kimlik doğrulaması kullanılamıyor.",
   "error.backend.browserUrlRequired": "Bir tarayıcı URL'si gereklidir.",
@@ -400,7 +406,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Açılır pencere yüklenemedi. Orijinal sayfadan oturum açmayı tekrar deneyin.",
   "error.backend.browserTabNotFound": "Tarayıcı sekmesi bulunamadı.",
   "error.backend.authActive": "Kimlik doğrulaması zaten etkin.",
-  "error.backend.authHttpsRequired": "Güvenli kimlik doğrulaması HTTPS gerektirir.",
+  "error.backend.authWebPageRequired": "Güvenli kimlik doğrulaması HTTP/HTTPS gerektirir.",
   "error.backend.authDigitsRange": "Kimlik doğrulama kodları 4–12 basamak gerektirir.",
   "error.backend.authExpired": "Kimlik doğrulama isteğinin süresi doldu.",
   "error.backend.authDigitsRequired": "İstenen basamak sayısını girin.",

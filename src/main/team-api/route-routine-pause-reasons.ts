@@ -10,12 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireListedAgent, requireVisibleBodyAgent, stringField } from "./request-helpers";
 
-/**
- * `routine-pause-reasons-v1`: the paused routines of an agent that a scheduled run of their own paused,
- * with the time of that run (#10048). A member reads them for an agent that the member can see, and
- * only for the routines that the released routes show that member, as `routine-run-place-v1` does. The
- * route changes nothing.
- */
 export async function routeRoutinePauseReasons(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listAgents">,
@@ -26,7 +20,6 @@ export async function routeRoutinePauseReasons(
   if (method !== "POST" || url.pathname !== ROUTINE_PAUSE_REASONS_ROUTES.list) return "unmatched";
   if (!records || !capabilities.has(ROUTINE_PAUSE_REASONS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.routinePauseReasonsUnsupported"));
-  // `readJson` has already run the body through the routine-pause-reasons wire codec.
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const agentId = stringField(body, "agentId");

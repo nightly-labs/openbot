@@ -12,7 +12,6 @@ export const messages = {
   "error.billing.storageUnavailable": "Ce stockage n'est pas disponible pour ce serveur.",
   "error.billing.storagePaymentFailed":
     "Le paiement du stockage a échoué. Mettez à jour le moyen de paiement et réessayez.",
-  // Billing errors.
   "error.billing.licenseExists": "Ce compte a déjà une licence. Modifiez plutôt son nombre d'utilisateurs.",
   "error.billing.licenseCurrency": "La licence doit utiliser la devise de vos autres forfaits.",
   "error.billing.planCurrency": "Un nouveau forfait doit utiliser la devise de vos autres forfaits.",

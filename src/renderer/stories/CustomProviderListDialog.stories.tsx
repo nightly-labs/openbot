@@ -1,8 +1,3 @@
-/**
- * The list of saved custom endpoints, where the user removes them. The note is the outcome of the
- * last removal; the stories make it from the same keys as the app.
- */
-
 import type { CustomProviderSummary } from "@openbot/contracts/ipc";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { useText } from "@openbot/ui/text";
@@ -52,15 +47,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Delete opens the removal question. */
 export const WithEndpoints: Story = {};
 
-/** One endpoint is being removed, so every Delete button is disabled. */
 export const Removing: Story = {
   args: { removing: LM_STUDIO.id },
 };
 
-/** A remote server lists its endpoints but does not remove them. */
 export const ReadOnly: Story = {
   args: { onDelete: undefined },
 };
@@ -69,7 +61,6 @@ export const Empty: Story = {
   args: { providers: [] },
 };
 
-/** The last endpoint was removed: the dialog stays open on its empty state with the outcome. */
 export const RemovedLast: Story = {
   args: { providers: [] },
   render: (storyArgs) => {
@@ -78,7 +69,6 @@ export const RemovedLast: Story = {
   },
 };
 
-/** OpenCode was busy, so the model list changes after its next restart. */
 export const RemovedWhileBusy: Story = {
   args: { providers: [OLLAMA, OPENROUTER] },
   render: (storyArgs) => {

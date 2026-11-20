@@ -17,12 +17,17 @@ export const messages = {
   "error.workflow.agentMissing": "Choisissez un agent pour cette étape.",
   "error.workflow.handoffFailed": "OpenBot n’a pas pu envoyer cette étape à son agent.",
   "error.workflow.agentStepEnded": "Le message à l’agent a été supprimé avant sa réponse.",
+  "error.workflow.agentStepStopped": "L’agent s’est arrêté avant de répondre à cette étape. Relancez l’étape.",
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelTimedOut":
     "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",
   "error.workflow.modelToolUse":
     "Le modèle a essayé d’utiliser un outil, mais cette étape ne peut répondre qu’avec du texte. Relancez l’étape ou choisissez un autre modèle pour elle.",
+  "error.workflow.modelImageUnsupported":
+    "Le modèle de cette étape ne peut pas lire les images. Choisissez un modèle qui le peut, ou supprimez la connexion de l’image.",
+  "error.workflow.modelImageType":
+    "Une étape de modèle ne lit que les images PNG, JPEG, GIF et WebP. Connectez une image de l’un de ces types.",
   "error.workflow.modelUnavailable":
     "Le modèle de cette étape n’est pas disponible. Choisissez un autre modèle pour cette étape.",
   "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",
@@ -37,6 +42,8 @@ export const messages = {
     "Écrivez une description, ou exécutez les étapes précédentes pour qu’un texte ou une image arrive.",
   "error.workflow.mediaInputNotImage":
     "Cette étape n’accepte que des images, pas des vidéos. Supprimez la connexion depuis la vidéo.",
+  "error.workflow.mediaInputNotClip":
+    "Cette entrée n’accepte que des vidéos et des fichiers audio. Supprimez la connexion depuis le fichier.",
   "error.workflow.stepMissing": "Cette étape n’existe plus.",
   "error.workflow.nodeMissing": "Cette étape n’est pas dans le workflow.",
   "error.workflow.runMissing": "Cette exécution n’existe plus.",

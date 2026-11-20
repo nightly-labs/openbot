@@ -228,6 +228,14 @@ export const messages = {
     "Das aktuelle Geheimnis funktioniert nicht mehr. Der Host lehnt Anfragen ab, die es verwenden.",
   "mobile.agent.webhook.rotateConfirm": "Neu erstellen",
   "mobile.agent.webhook.rotateFailed": "Das Geheimnis konnte nicht neu erstellt werden. Versuche es erneut.",
+  "mobile.agent.webhook.giveToAgent": "Signaturgeheimnis an {name} weitergeben",
+  "mobile.agent.webhook.giveTitle": "Neues Signaturgeheimnis an {name} weitergeben?",
+  "mobile.agent.webhook.giveBody":
+    "Das aktuelle Geheimnis funktioniert nicht mehr. {name} speichert das neue Geheimnis als API-Schlüssel und kann es beim Absender eintragen.",
+  "mobile.agent.webhook.giveConfirm": "Weitergeben",
+  "mobile.agent.webhook.giveFailed":
+    "Das Signaturgeheimnis konnte nicht an den Agenten weitergegeben werden. Versuche es erneut.",
+  "mobile.agent.webhook.given": "{name} hat das neue Signaturgeheimnis.",
   "mobile.agent.webhook.activity": "Aktivität",
   "mobile.agent.webhook.activityFailed": "Die Aktivität konnte nicht geladen werden. Versuche es erneut.",
   "mobile.agent.webhook.activity.ignored": "Ignoriert",
@@ -401,6 +409,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profile verwalten",
   "mobile.agent.browserProfile.footer":
     "Jedes Profil hat eigene Anmeldungen und Cookies. Eine Änderung schließt die offenen Tabs des Agenten.",
+  "mobile.agent.browserProfile.movedNote":
+    "Anmeldungen bei Websites bleiben im alten Profil. Der Agent muss sich bei diesen Websites erneut anmelden.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot konnte das Browser-Profil des Agenten nicht ändern.",
   "mobile.agent.planCard.label": "Plan vor langen Aufgaben zeigen",
   "mobile.agent.planCard.footer":
@@ -420,10 +430,11 @@ export const messages = {
     "Dieser Server kann keine eigene Benachrichtigungsstufe für einen Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "mobile.agent.newChat.title": "Neuer Chat",
   "mobile.agent.newChat.starting": "Neuer Chat wird gestartet…",
-  "mobile.agent.newChat.footer": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",
+  "mobile.agent.newChat.footer":
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Seine Einrichtung bleibt erhalten.",
   "mobile.agent.newChat.confirmTitle": "Neuen Chat mit {name} starten?",
   "mobile.agent.newChat.confirmBody":
-    "Der Agent vergisst diesen Chat. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "mobile.agent.newChat.confirm": "Neuen Chat starten",
   "mobile.agent.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden",
   "mobile.agent.newChat.failedBody": "Der Host konnte keinen neuen Chat starten.",

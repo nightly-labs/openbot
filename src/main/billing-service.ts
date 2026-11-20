@@ -20,11 +20,6 @@ import {
 
 export type BillingAuthClient = AccountRequestClient;
 
-/**
- * The Stripe plan of each server that the account pays for. The renderer never sends a URL: this
- * service gets the Customer Portal URL from the account server and opens it only when it is an https
- * Stripe page.
- */
 export class BillingDesktopService {
   readonly #platform: Layer.Layer<AccountServicePlatform>;
 
@@ -40,17 +35,14 @@ export class BillingDesktopService {
     return openBillingPortal(request).pipe(Effect.provide(this.#platform));
   }
 
-  /** Buys a larger storage tier for one server. The account server charges the saved payment method. */
   buyStorage(request: BillingStorageRequest): Effect.Effect<BillingState, AccountServiceFailure> {
     return buyBillingStorage(request).pipe(Effect.provide(this.#platform));
   }
 
-  /** The billing country and EU VAT ID of the account. */
   getDetails(): Effect.Effect<BillingDetails, AccountServiceFailure> {
     return readBillingDetails().pipe(Effect.provide(this.#platform));
   }
 
-  /** Saves the billing country and EU VAT ID. The account server checks a VAT ID with the EU VIES. */
   setDetails(request: BillingDetailsRequest): Effect.Effect<BillingDetails, AccountServiceFailure> {
     return saveBillingDetails(request).pipe(Effect.provide(this.#platform));
   }

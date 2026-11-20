@@ -20,36 +20,24 @@ export function fileTransferError(error: unknown): FileTransferError {
       });
 }
 
-// Native/DOM bridge copies Base64 strings. Keep its working set below the host's larger file limit.
 export const MOBILE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-// A type, not an interface: an upload crosses the native/DOM bridge as JSON, and only a type alias is a JSON object.
 export type RemoteFileUpload = {
   name: string;
   mimeType: string;
-  /** The file bytes. Empty when `file` gives the bytes. */
   base64: string;
-  /** A larger cap for one kind of upload, such as an agent export. The host's file limit still applies. */
   maxBytes?: number;
-  /**
-   * A file that stays on the device. The sender reads it in parts through a `RemoteFileReader`,
-   * so a large file does not cross the native/DOM bridge as one Base64 string.
-   */
   file?: { ref: string; size: number };
 };
 
-/** Reads a device file that a `RemoteFileUpload.file` names. */
 export type RemoteFileReader = {
-  /** The SHA-256 digest of the file, as 64 lowercase hex characters. */
   digest: (ref: string) => Effect.Effect<string, FileTransferError>;
   read: (ref: string, offset: number, length: number) => Effect.Effect<Uint8Array, FileTransferError>;
 };
 
 const CHUNK_BYTES = 60 * 1024;
-/** One read from a device file: 16 chunks. A part crosses the bridge as one Base64 string. */
 const FILE_PART_BYTES = 16 * CHUNK_BYTES;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
-/** The slowest upload rate a transfer waits for, in bytes per millisecond (256 KB/s). */
 const MINIMUM_UPLOAD_RATE = 256;
 
 export function createRemoteFileSender<E, R>(
@@ -64,7 +52,6 @@ export function createRemoteFileSender<E, R>(
     onProgress?: (sent: number, total: number) => void,
   ) {
     const busy = () => new FileTransferError({ message: sourceText("error.remote.attachmentBusy") });
-    // Check before the digest too: a device file can take seconds to read.
     if (pending.size !== 0) return yield* busy();
     const source = yield* uploadSource(input);
     if (pending.size !== 0) return yield* busy();
@@ -82,7 +69,6 @@ export function createRemoteFileSender<E, R>(
       error: null,
     };
     pending.set(transferId, transfer);
-    // A file of up to about 15 MB has one minute; a larger one has the time 256 KB/s needs.
     const timer = setTimeout(
       () => {
         transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
@@ -91,7 +77,6 @@ export function createRemoteFileSender<E, R>(
       Math.max(60_000, source.size / MINIMUM_UPLOAD_RATE),
     );
     return yield* Effect.gen(function* () {
-      // Observe rejection before starting I/O, including a synchronous native disconnect.
       yield* Effect.all(
         [
           Deferred.await(acknowledged),
@@ -150,7 +135,6 @@ export function createRemoteFileSender<E, R>(
       return {
         size: file.size,
         sha256: digest,
-        // A part with a different length means that the file changed after it was selected.
         read: (offset: number, length: number) =>
           reader
             .read(file.ref, offset, length)

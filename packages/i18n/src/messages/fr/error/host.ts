@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/host";
 
 export const messages = {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal n’a pas fourni de serveurs ICE.",
   "error.host.keyRotationUnavailable": "Ce serveur ne peut pas changer sa clé sans le service de comptes.",
   "error.host.keyRotationRefused":

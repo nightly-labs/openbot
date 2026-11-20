@@ -1,5 +1,3 @@
-// Bloub currently publishes its DOM-free engine in the same bundle as its Solid component.
-// Mobile imports only BotEngine and its data; these exports keep the unused UI layer out of Metro.
 function unsupportedSolidUi(): never {
   throw new Error("The Solid UI layer from bloub is not available in the native app.");
 }

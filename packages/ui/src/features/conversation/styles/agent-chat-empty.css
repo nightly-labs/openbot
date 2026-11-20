@@ -1,6 +1,3 @@
-/* A direct chat before its first message: the agent, its line, and a faint sample turn below.
-   It fills the scroll area and no more, so the chat cannot open scrolled past the title: on a
-   short window, the turn row gets only the height that is left. */
 .agent-chat-empty {
   box-sizing: border-box;
   height: 100%;
@@ -53,8 +50,6 @@
   text-wrap: balance;
 }
 
-/* The one handwritten word. It writes itself once, from the start side. The brand has no hand
-   font, so the system ones stand in. */
 .agent-chat-empty-hand {
   display: inline-block;
   color: var(--openbot-accent-text);
@@ -73,12 +68,10 @@
   }
 }
 
-/* In right-to-left text, the word writes itself from right to left. */
 :dir(rtl) .agent-chat-empty-hand {
   clip-path: inset(-0.4em -0.2em -0.4em 100%);
 }
 
-/* The faint turn, in a column of chat width. Its rows are the chat's own. */
 .agent-chat-empty-turn {
   width: min(100%, 40rem);
   min-height: 0;

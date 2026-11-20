@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "OpenBot auf {name} aktualisieren",
   "server.compatibility.unsafeDataTitle": "Der Host hat unsichere Daten zurückgegeben",
   "server.compatibility.cannotConnectTitle": "Verbindung mit {name} nicht möglich",
+  "server.compatibility.safeModeTitle": "{name} startet nicht",
   "server.compatibility.updateClientDescription":
     "Diese App unterstützt nur ältere Protokolle als der Host. Aktualisiere diese App und versuche es erneut.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,8 @@ export const messages = {
   "server.local.create": "Server erstellen",
   "server.local.creating": "Server wird erstellt…",
   "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
+  "server.local.createFailedRetry":
+    "Etwas ist schiefgelaufen. Versuche es erneut. Wenn es wieder fehlschlägt, starte OpenBot neu.",
   "server.local.limitReached":
     "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
   "server.local.deleteConfirmTitle": "{name} löschen?",
@@ -167,6 +170,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot wird auf die Maschine kopiert",
   "server.hosted.detail.create.key": "Einmaliger Anmeldeschlüssel wird hinzugefügt",
   "server.hosted.detail.start.boot": "Maschine wird eingeschaltet",
+  "server.hosted.detail.start.restore": "Daten werden wiederhergestellt",
   "server.hosted.detail.start.app": "OpenBot wird gestartet",
   "server.hosted.detail.start.wait": "Warten auf eine Antwort von OpenBot",
   "server.hosted.detail.connect.signIn": "Anmeldung mit deinem Konto läuft",
@@ -680,4 +684,38 @@ export const messages = {
   "server.settings.responseStyleNatural": "Natürlich",
   "server.settings.responseStyleClassic": "Klassisch",
   "server.settings.personalityLoadFailed": "Die Persönlichkeit des Servers konnte nicht geladen werden.",
+  "server.ownerTransfer.title": "Eigentümer",
+  "server.ownerTransfer.ownerTitle": "Du bist Eigentümer dieses Servers",
+  "server.ownerTransfer.ownerDescription":
+    "Mache eine andere Person zum Eigentümer. Du verlierst den Zugriff, wenn sie annimmt.",
+  "server.ownerTransfer.start": "Eigentum übertragen…",
+  "server.ownerTransfer.pending": "Übertragung an {email} ausstehend",
+  "server.ownerTransfer.expires": "Läuft ab: {date}",
+  "server.ownerTransfer.cancel": "Zurückziehen",
+  "server.ownerTransfer.emailTitle": "Eigentum von {server} übertragen",
+  "server.ownerTransfer.emailDescription":
+    "Gib die E-Mail des neuen Eigentümers ein. Er muss mit dieser E-Mail angemeldet annehmen.",
+  "server.ownerTransfer.email": "E-Mail des neuen Eigentümers",
+  "server.ownerTransfer.confirmTitle": "{email} zum Eigentümer machen?",
+  "server.ownerTransfer.confirmDescription": "Wenn {email} annimmt:",
+  "server.ownerTransfer.confirmLoseAccess": "Du verlierst den Zugriff auf {server}.",
+  "server.ownerTransfer.confirmStays":
+    "Agenten, Routinen, Chats, Anmeldungen bei Anbietern, gespeicherte Schlüssel, Vault-Logins, Browser-Anmeldungen und verbundene Apps bleiben auf dem Server. Der neue Eigentümer kann sie nutzen.",
+  "server.ownerTransfer.confirmExpiry": "Die Anfrage läuft nach 7 Tagen ab.",
+  "server.ownerTransfer.send": "Anfrage senden",
+  "server.ownerTransfer.sendFailed": "Die Übertragung konnte nicht gesendet werden.",
+  "server.ownerTransfer.incomingTitle": "Eigentümer von {server} werden?",
+  "server.ownerTransfer.incomingDescription": "{name} möchte dich zum Eigentümer von {server} machen.",
+  "server.ownerTransfer.incomingYours": "Der Server, seine Agenten, Routinen und Daten gehören dann dir.",
+  "server.ownerTransfer.incomingPrevious": "{name} verliert den Zugriff auf den Server.",
+  "server.ownerTransfer.incomingStays":
+    "Anmeldungen bei Anbietern, gespeicherte Schlüssel, Vault-Logins, Browser-Anmeldungen und verbundene Apps auf dem Server bleiben dort, und du kannst sie nutzen.",
+  "server.ownerTransfer.incomingMachine":
+    "Wer sich noch an dem Computer anmelden kann, auf dem der Server läuft, kann dein OpenBot-Konto nutzen. Ändere dort die Passwörter und SSH-Schlüssel.",
+  "server.ownerTransfer.later": "Später",
+  "server.ownerTransfer.decline": "Ablehnen",
+  "server.ownerTransfer.accept": "Annehmen",
+  "server.ownerTransfer.accepted": "Du bist jetzt Eigentümer von {server}",
+  "server.ownerTransfer.acceptFailed": "Die Übertragung konnte nicht angenommen werden.",
+  "server.ownerTransfer.declineFailed": "Die Übertragung konnte nicht abgelehnt werden.",
 } as const satisfies PartialTranslation<typeof source>;

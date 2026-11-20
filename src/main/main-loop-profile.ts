@@ -2,17 +2,7 @@ import { Session } from "node:inspector";
 import { Effect, Option, Schema } from "effect";
 import { AnalyticsOperationFailure } from "./analytics-effects";
 
-/**
- * A CPU profile of the main process for a minute in which the main loop stalls, and its summary: the
- * functions that used the time and who called them. The profile stays in memory. A summary holds
- * function names from the code, the file name of an application file, the name of a package and the
- * name of a Node module. A directory or a URL never reaches a summary, and code with a file outside
- * the application has no name in it.
- */
-
-/** A minute whose longest main-loop delay is at least this long can start or keep a profile. */
 export const PROFILE_STALL_MS = 2_000;
-/** The functions of one summary in the local file. An analytics event takes the first five. */
 const PROFILE_TOP_COUNT = 20;
 
 const SAMPLING_INTERVAL_US = 10_000;
@@ -20,15 +10,12 @@ const STACK_DEPTH = 8;
 const MAX_NAME_LENGTH = 60;
 const EXTERNAL = "(external)";
 const ANONYMOUS = "(anonymous)";
-// V8's own names for time that no JavaScript function has.
 const ENGINE_NAMES = new Set(["(program)", "(garbage collector)", "(idle)", "(root)"]);
 const FUNCTION_NAME = /^[A-Za-z_$][\w$.]*$/;
 const FILE_NAME = /^[\w.-]+$/;
-// A Node module is one name, or a path under `internal` or `electron`. Evaluated text can name any URL.
 const NODE_MODULE = /^node:(?:[a-z_]+|(?:internal|electron)\/[a-z0-9_/]+)$/;
 const PACKAGE_NAME = /^(?:@[a-z0-9][\w.-]{0,27}\/)?[a-z0-9][\w.-]{0,27}$/;
 
-/** One frame as a summary holds it. */
 const FRAME_PATTERN =
   /^(?:\((?:program|garbage collector|external|anonymous)\)|(?:[A-Za-z_$][\w$.]{0,59}|\(anonymous\)) (?:native|node:(?:[a-z_]{1,60}|(?:internal|electron)\/[a-z0-9_/]{1,50})|npm:(?:@[a-z0-9][\w.-]{0,27}\/)?[a-z0-9][\w.-]{0,27}|app:[\w.-]{1,60}:\d{1,8}))$/;
 const STACK_SEPARATOR = " < ";
@@ -40,7 +27,6 @@ interface CpuProfileNode {
   children?: readonly number[];
 }
 
-/** The parts of a V8 `Profiler.Profile` that a summary reads. Times are in microseconds. */
 export interface CpuProfile {
   nodes: readonly CpuProfileNode[];
   startTime: number;
@@ -50,22 +36,17 @@ export interface CpuProfile {
 }
 
 interface ProfileFunction {
-  /** `name place`: the place is `native`, `node:<module>`, `npm:<package>` or `app:<file>:<line>`. */
   frame: string;
-  /** The share of the profiled time that ran in this function itself. */
   selfPct: number;
-  /** The callers on the heaviest path to this function, nearest first, joined by ` < `. */
   stack: string;
 }
 
 export interface MainLoopProfileSummary {
   profiledMs: number;
-  /** The share of the profiled time in which the main thread was not idle. */
   busyPct: number;
   top: ProfileFunction[];
 }
 
-/** Whether a value has the shape of a frame that `summarizeCpuProfile` makes. The sender checks again. */
 export function isProfileFrame(value: unknown): value is string {
   return typeof value === "string" && FRAME_PATTERN.test(value);
 }
@@ -75,10 +56,6 @@ export function isProfileStack(value: unknown): value is string {
   return value === "" || value.split(STACK_SEPARATOR).every(isProfileFrame);
 }
 
-/**
- * The place of a frame with no directory. `appRoot` is the directory of the application's own code.
- * `null` means the code is not the application's, so the frame has no name either.
- */
 function framePlace(url: string, lineNumber: number, appRoot: string): string | null {
   if (url === "") return "native";
   if (url.startsWith("node:")) return NODE_MODULE.test(url) && url.length <= 65 ? url : null;
@@ -86,7 +63,6 @@ function framePlace(url: string, lineNumber: number, appRoot: string): string | 
   if (path === null) return null;
   const normalized = comparablePath(path);
   const root = comparablePath(appRoot).replace(/\/+$/, "");
-  // A path that goes up can end outside the application.
   if (normalized.split("/").some((part) => part === ".." || part === ".")) return null;
   if (root === "" || !normalized.startsWith(`${root}/`)) return null;
   const inside = normalized.slice(root.length + 1);
@@ -101,7 +77,6 @@ function framePlace(url: string, lineNumber: number, appRoot: string): string | 
   return `app:${file}:${Math.max(0, Math.min(99_999_999, Math.trunc(lineNumber) + 1))}`;
 }
 
-/** Forward slashes, and a lower-case drive letter: Windows gives `C:` and `c:` for the same disk. */
 function comparablePath(path: string): string {
   const slashed = path.replaceAll("\\", "/");
   return /^[A-Za-z]:\//.test(slashed) ? slashed.charAt(0).toLowerCase() + slashed.slice(1) : slashed;
@@ -111,7 +86,6 @@ function filePath(url: string): string | null {
   try {
     const { pathname } = new URL(url);
     const decoded = decodeURIComponent(pathname);
-    // `file:///C:/…` on Windows.
     return /^\/[A-Za-z]:\//.test(decoded) ? decoded.slice(1) : decoded;
   } catch {
     return null;
@@ -123,16 +97,12 @@ function frameLabel(node: CpuProfileNode, appRoot: string): string {
   if (ENGINE_NAMES.has(functionName)) return functionName;
   const place = framePlace(url, lineNumber, appRoot);
   if (place === null) return EXTERNAL;
-  // A name that is not a plain identifier, such as a getter or a computed key, keeps its place only.
   const name = FUNCTION_NAME.test(functionName) && functionName.length <= MAX_NAME_LENGTH ? functionName : ANONYMOUS;
-  // Code with no URL is a V8 builtin or evaluated text. A builtin always has a plain name. A named
-  // function of evaluated text keeps that name: nothing tells the two apart.
   if (place === "native" && name === ANONYMOUS) return EXTERNAL;
   const label = `${name} ${place}`;
   return FRAME_PATTERN.test(label) ? label : EXTERNAL;
 }
 
-/** Self time by function, and for each function the callers of its heaviest call path. */
 export function summarizeCpuProfile(profile: CpuProfile, appRoot: string): MainLoopProfileSummary {
   const selfUs = new Map<number, number>();
   const samples = profile.samples ?? [];
@@ -192,7 +162,6 @@ export function summarizeCpuProfile(profile: CpuProfile, appRoot: string): MainL
       while (current !== undefined && callers.length < STACK_DEPTH) {
         const caller = label(current);
         if (caller === "(root)") break;
-        // A run of the same frame, such as recursion or unknown code, is one step.
         if (caller !== callers.at(-1)) {
           length += caller.length + STACK_SEPARATOR.length;
           if (length > MAX_STACK_LENGTH) break;
@@ -237,10 +206,6 @@ const decodeStopResult = Schema.decodeUnknownOption(
   }),
 );
 
-/**
- * One in-process inspector session on the main thread. It needs no debugger port, so it works where
- * the `--inspect` arguments are off. Only one profile runs at a time.
- */
 export class MainLoopProfiler {
   #session: Session | null = null;
 
@@ -263,7 +228,6 @@ export class MainLoopProfiler {
     }).pipe(Effect.tapError(() => Effect.sync(() => this.discard())));
   });
 
-  /** Ends the profile and returns it, or `null` when none ran. */
   readonly stop = Effect.fn("MainLoopProfiler.stop")(function* (this: MainLoopProfiler) {
     const session = this.#session;
     if (!session) return null;
@@ -273,14 +237,11 @@ export class MainLoopProfiler {
     );
   });
 
-  /** Ends the profile with no result. Closing the session stops the sampling. */
   discard(): void {
     const session = this.#session;
     this.#session = null;
     try {
       session?.disconnect();
-    } catch {
-      // The session is gone already.
-    }
+    } catch {}
   }
 }

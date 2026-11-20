@@ -56,6 +56,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Zu viele Anmeldeversuche. Versuche es später erneut.",
   "error.team.clientUpdateRequired": "Aktualisiere diesen OpenBot-Client, bevor du dich mit diesem Host verbindest.",
   "error.team.hostUpdateRequired": "Aktualisiere OpenBot auf dem Host, bevor du dich verbindest.",
+  "error.team.serverSafeMode": "Dieser Server ist im abgesicherten Modus, weil OpenBot darauf nicht startet.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} auf diesem Server kann seine Daten nicht öffnen, weil eine neuere OpenBot-Version sie gespeichert hat. Ein neueres OpenBot-Release auf dem Server behebt das.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} auf diesem Server wurde angehalten, nachdem der Start mehrmals fehlgeschlagen ist. Ein neueres OpenBot-Release auf dem Server behebt das.",
   "error.team.sidebarLayoutUnavailable": "Die Anordnung der Seitenleiste ist nicht verfügbar.",
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
@@ -129,6 +134,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
   "error.team.hostRestartUnsupported": "Diese Verbindung unterstützt keinen Neustart des Servers.",
+  "error.team.ownerTransferUnsupported": "Die Übertragung des Eigentums wird von diesem Server nicht unterstützt.",
   "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
   "error.team.localServersUnsupported": "Diese Verbindung unterstützt keine Server auf diesem Computer.",
   "error.team.routineResultsUnsupported": "Diese Verbindung unterstützt keine Ziele für Routinen.",

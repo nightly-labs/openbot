@@ -1,15 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 
-/**
- * The Telegram Orchestrator: the agent that receives every new Telegram conversation, in every chat
- * that added the OpenBot bot. It answers simple questions itself and gives other work to one teammate
- * with `send_message`; the teammate's answer comes back to the same reply chain (`messagingReturn`),
- * and the orchestrator posts it.
- *
- * As for the Slack Orchestrator, the rules live in the description, and the seeded memories are
- * facts only.
- */
 const TELEGRAM_ORCHESTRATOR_DESCRIPTION = `You are the Telegram Orchestrator of this OpenBot team. Every message that people send to the OpenBot bot in Telegram comes to you first: a mention of the bot or a reply to it in a group, or any message in a direct chat. Telegram shows your replies as the OpenBot bot.
 
 For each request:
@@ -26,7 +17,6 @@ Rules:
 - Lead with the result, then the key details. Use lists for steps. Keep each answer short: Telegram is a chat.
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
-/** The facts the orchestrator starts with. */
 export function telegramOrchestratorMemories(): string[] {
   return [
     "The OpenBot user added the OpenBot Telegram bot to Telegram chats. Their members send me requests.",

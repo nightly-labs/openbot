@@ -4,71 +4,59 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import {
+  CallToolResultSchema,
   ErrorCode,
   isJSONRPCErrorResponse,
+  isJSONRPCNotification,
   isJSONRPCRequest,
   isJSONRPCResultResponse,
+  type JSONRPCErrorResponse,
+  type JSONRPCResultResponse,
   type RequestId,
 } from "@modelcontextprotocol/sdk/types.js";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { cliSpawnTarget } from "./cli";
+import { boundedError, MCP_TOOL_CALL_TIMEOUT_MS, type McpToolArguments, type McpToolCallResult } from "./mcp-probe";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
-/** A stdio MCP server as its provider would start it. */
 export interface StdioMcpLaunch {
   command: string;
   args: readonly string[];
   env: Record<string, string>;
   cwd: string;
-  /**
-   * The client closed its first request, `initialize`, before the server answered: it stopped
-   * waiting for the server to start. OpenCode 2.2.7 waits 30 seconds and then continues without the
-   * server, with no error, although OpenBot's own test waits 60 (#8520).
-   */
   onStartAbandoned?: () => void;
 }
 
+export type RelayedMcpToolOutcome = { result: McpToolCallResult } | { error: string };
+
 export interface StdioMcpRelay {
   url: string;
-  /** The bearer token of `url`. A secret: the provider logs must not show it. */
   token: string;
   close: () => Effect.Effect<void, ProviderClientOperationError>;
+  callTool: (name: string, args: McpToolArguments) => Effect.Effect<RelayedMcpToolOutcome | null>;
 }
 
-/** How long a server gets after its stdin closes and SIGTERM, before SIGKILL, as Pi gives it. */
+type OwnAnswer = (answer: JSONRPCResultResponse | JSONRPCErrorResponse | null) => void;
+
+interface RunningServer {
+  child: ChildProcess;
+  initialized: boolean;
+  own: Map<RequestId, OwnAnswer>;
+}
+
 const STOP_GRACE_MS = 2_000;
 
-/**
- * How long the relay reads a server's output after the server exits. A process of the server can keep
- * the pipe open, so the wait has a limit.
- */
 const OUTPUT_DRAIN_MS = 1_000;
 
-/**
- * Starts a stdio MCP server in OpenBot's process and serves it to one provider over Streamable HTTP
- * on 127.0.0.1, with a bearer token.
- *
- * A Workspace only provider runs in a sandbox, and the MCP servers that it starts run in that
- * sandbox too. The sandbox lets them write only in the workspace, so `npx` cannot write its cache in
- * `~/.npm` and the server does not start (#6191). The Access setting does not limit MCP servers, as
- * for Claude and Codex, so the provider gets this URL in place of the command.
- *
- * Each client session starts its own server process at its first message, and the session ends with
- * that process: the client then gets a 404 and starts a new session, as after a dropped connection.
- * Each request that the process did not answer first gets an error.
- * Messages pass unchanged in both directions. A response goes to the request with its id; a request
- * or notification of the server goes to the client's GET stream.
- */
 export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (launch: StdioMcpLaunch) {
   const token = randomBytes(32).toString("base64url");
   const expected = Buffer.from(`Bearer ${token}`);
   const transports = new Set<StreamableHTTPServerTransport>();
   const sessions = new Map<string, StreamableHTTPServerTransport>();
-  /** The server processes that have not exited. `close` waits for them, as a provider stop waits for its own. */
   const children = new Set<ChildProcess>();
-  /** A relay that closes ends its pending requests itself: that is no failed start. */
+  const running: RunningServer[] = [];
   let closing = false;
 
   const authorized = (request: IncomingMessage) => {
@@ -78,7 +66,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
 
   const open = () => {
     let child: ChildProcess | null = null;
-    /** The client's requests that the server process has not answered. */
+    let live: RunningServer | null = null;
     const pending = new Set<RequestId>();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomBytes(16).toString("hex"),
@@ -89,14 +77,24 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     transports.add(transport);
     transport.onmessage = (message) => {
       if (!child) {
-        const started = startServer(launch, transport, pending);
+        const own = new Map<RequestId, OwnAnswer>();
+        const started = startServer(launch, transport, pending, own);
+        const entry: RunningServer = { child: started, initialized: false, own };
+        const forget = () => {
+          children.delete(started);
+          const index = running.indexOf(entry);
+          if (index >= 0) running.splice(index, 1);
+        };
         children.add(started);
-        // A command that cannot start has no process id and sends `error`, not always `exit`.
-        started.once("exit", () => children.delete(started));
-        started.once("error", () => children.delete(started));
+        running.push(entry);
+        started.once("exit", forget);
+        started.once("error", forget);
         child = started;
+        live = entry;
       }
       if (isJSONRPCRequest(message)) pending.add(message.id);
+      if (live && isJSONRPCNotification(message) && message.method === "notifications/initialized")
+        live.initialized = true;
       child.stdin?.write(serializeMessage(message));
     };
     transport.onclose = () => {
@@ -120,7 +118,6 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       return;
     }
     const transport = existing ?? open();
-    // The client gave up on the start. Its process is ended now, not when the relay closes.
     if (!existing)
       response.once("close", () => {
         if (response.writableFinished || closing) return;
@@ -133,10 +130,37 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
         if (!response.headersSent) response.writeHead(500).end();
       })
       .finally(() => {
-        // A first request that was not `initialize` made no session.
         if (!existing && !transport.sessionId) void transport.close();
       });
   };
+
+  const callTool = (name: string, args: McpToolArguments) =>
+    Effect.callback<RelayedMcpToolOutcome | null>((resume, signal) => {
+      const target = running.findLast((entry) => entry.initialized && entry.child.stdin?.writable === true);
+      if (closing || !target) return resume(Effect.succeed(null));
+      const id = `openbot-${randomBytes(12).toString("hex")}`;
+      target.own.set(id, (answer) => {
+        target.own.delete(id);
+        resume(Effect.succeed(relayedOutcome(answer)));
+      });
+      target.child.stdin?.write(
+        serializeMessage({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }),
+      );
+      signal.addEventListener("abort", () => {
+        if (!target.own.delete(id)) return;
+        target.child.stdin?.write(
+          serializeMessage({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: id } }),
+        );
+      });
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: MCP_TOOL_CALL_TIMEOUT_MS,
+        orElse: () =>
+          Effect.succeed({
+            error: sourceText("error.backend.mcpServerNoAnswer", { seconds: MCP_TOOL_CALL_TIMEOUT_MS / 1000 }),
+          }),
+      }),
+    );
 
   const server = createServer(handle);
   yield* providerCall(
@@ -166,16 +190,23 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
         await Promise.all([...children].map(stopServer));
         await closed;
       }),
+    callTool,
   } satisfies StdioMcpRelay;
 });
 
-/** The server process of one session. Its exit ends the session. */
+function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | null): RelayedMcpToolOutcome {
+  if (answer === null) return { error: sourceText("error.backend.mcpServerStoppedDuringCall") };
+  if (!isJSONRPCResultResponse(answer)) return { error: boundedError(answer.error.message) };
+  const decoded = CallToolResultSchema.safeParse(answer.result);
+  return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
+}
+
 function startServer(
   launch: StdioMcpLaunch,
   transport: StreamableHTTPServerTransport,
   pending: Set<RequestId>,
+  own: Map<RequestId, OwnAnswer>,
 ): ChildProcess {
-  // A Windows `npx.cmd` starts only through `cmd.exe`.
   const target = cliSpawnTarget(launch.command, launch.args);
   const child = spawn(target.command, target.args, {
     ...(launch.cwd ? { cwd: launch.cwd } : {}),
@@ -187,9 +218,8 @@ function startServer(
   });
   endProcessGroupOnExit(child);
   const buffer = new ReadBuffer();
-  // Closing alone gives an open request no answer: the client waited for its own timeout, 12 hours
-  // in OpenCode, and the agent's turn with it (#11801). The errors go first, and the close after them.
   const end = () => {
+    for (const answer of [...own.values()]) answer(null);
     const message = sourceText("error.backend.mcpServerStoppedDuringCall");
     const answers = [...pending].map((id) =>
       transport.send({ jsonrpc: "2.0", id, error: { code: ErrorCode.InternalError, message } }).catch(() => undefined),
@@ -211,18 +241,22 @@ function startServer(
       try {
         message = buffer.readMessage();
       } catch {
-        // A line that is not JSON-RPC, such as a log line, is skipped, as the SDK's stdio client does.
         continue;
       }
       if (!message) break;
-      if ((isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) && message.id !== undefined)
+      if ((isJSONRPCResultResponse(message) || isJSONRPCErrorResponse(message)) && message.id !== undefined) {
+        const ownAnswer = own.get(message.id);
+        if (ownAnswer) {
+          ownAnswer(message);
+          continue;
+        }
         pending.delete(message.id);
+      }
       void transport.send(message).catch(() => undefined);
     }
   });
   child.stdin?.on("error", () => undefined);
   child.once("error", end);
-  // The last answers can still be in the pipe at `exit`. Without them, a call that the server answered got an error.
   child.once("exit", () => {
     const stdout = child.stdout;
     if (!stdout || stdout.readableEnded || stdout.destroyed) return end();
@@ -237,10 +271,6 @@ function startServer(
   return child;
 }
 
-/**
- * Closes stdin and sends SIGTERM, then SIGKILL to the group after the grace. Ends when the process
- * exits. `endProcessGroupOnExit` then stops the rest of its group.
- */
 function stopServer(child: ChildProcess): Promise<void> {
   const pid = child.pid;
   if (pid === undefined || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
@@ -248,9 +278,7 @@ function stopServer(child: ChildProcess): Promise<void> {
     const kill = setTimeout(() => {
       try {
         process.kill(PROVIDER_PROCESS_GROUP ? -pid : pid, "SIGKILL");
-      } catch {
-        /* The process already exited. */
-      }
+      } catch {}
     }, STOP_GRACE_MS);
     child.once("exit", () => {
       clearTimeout(kill);

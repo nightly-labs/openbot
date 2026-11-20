@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} の OpenBot を更新してください",
   "server.compatibility.unsafeDataTitle": "ホストが安全でないデータを返しました",
   "server.compatibility.cannotConnectTitle": "{name} に接続できません",
+  "server.compatibility.safeModeTitle": "{name} が起動しません",
   "server.compatibility.updateClientDescription":
     "このアプリはホストより古いプロトコルにのみ対応しています。このアプリを更新してから、もう一度お試しください。",
   "server.compatibility.updateHostDescription":
@@ -112,6 +113,8 @@ export const messages = {
   "server.local.create": "サーバーを作成",
   "server.local.creating": "サーバーを作成中…",
   "server.local.createFailed": "サーバーを作成できませんでした。",
+  "server.local.createFailedRetry":
+    "問題が発生しました。もう一度お試しください。再び失敗する場合は、OpenBot を再起動してください。",
   "server.local.limitReached":
     "このコンピューターに作成できるサーバーは最大 {limit} 台です。新しく作成するには、1 台を削除してください。",
   "server.local.deleteConfirmTitle": "{name} を削除しますか？",
@@ -162,6 +165,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot をマシンにコピーしています",
   "server.hosted.detail.create.key": "一度だけ使えるサインインキーを追加しています",
   "server.hosted.detail.start.boot": "マシンの電源を入れています",
+  "server.hosted.detail.start.restore": "データを復元中",
   "server.hosted.detail.start.app": "OpenBot を起動しています",
   "server.hosted.detail.start.wait": "OpenBot の応答を待っています",
   "server.hosted.detail.connect.signIn": "あなたのアカウントでサインインしています",
@@ -658,4 +662,38 @@ export const messages = {
   "server.settings.responseStyleNatural": "ナチュラル",
   "server.settings.responseStyleClassic": "クラシック",
   "server.settings.personalityLoadFailed": "サーバーのパーソナリティを読み込めませんでした。",
+  "server.ownerTransfer.title": "所有権",
+  "server.ownerTransfer.ownerTitle": "あなたはこのサーバーの所有者です",
+  "server.ownerTransfer.ownerDescription":
+    "別の人を所有者にします。相手が承認すると、あなたはアクセスできなくなります。",
+  "server.ownerTransfer.start": "所有権を移す…",
+  "server.ownerTransfer.pending": "{email} への所有権の移転を保留中",
+  "server.ownerTransfer.expires": "期限: {date}",
+  "server.ownerTransfer.cancel": "依頼を取り消す",
+  "server.ownerTransfer.emailTitle": "{server} の所有権を移す",
+  "server.ownerTransfer.emailDescription":
+    "新しい所有者のメールアドレスを入力してください。相手はこのメールアドレスでサインインした状態で承認する必要があります。",
+  "server.ownerTransfer.email": "新しい所有者のメールアドレス",
+  "server.ownerTransfer.confirmTitle": "{email} を所有者にしますか？",
+  "server.ownerTransfer.confirmDescription": "{email} が承認すると:",
+  "server.ownerTransfer.confirmLoseAccess": "{server} にアクセスできなくなります。",
+  "server.ownerTransfer.confirmStays":
+    "エージェント、ルーティン、チャット、プロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザーのサインイン、接続したアプリはサーバーに残ります。新しい所有者はこれらを使えます。",
+  "server.ownerTransfer.confirmExpiry": "依頼は 7 日後に期限切れになります。",
+  "server.ownerTransfer.send": "依頼を送信",
+  "server.ownerTransfer.sendFailed": "所有権の移転を送信できませんでした。",
+  "server.ownerTransfer.incomingTitle": "{server} の所有者になりますか？",
+  "server.ownerTransfer.incomingDescription": "{name} があなたを {server} の所有者にしようとしています。",
+  "server.ownerTransfer.incomingYours": "サーバーとそのエージェント、ルーティン、データはあなたのものになります。",
+  "server.ownerTransfer.incomingPrevious": "{name} はサーバーにアクセスできなくなります。",
+  "server.ownerTransfer.incomingStays":
+    "サーバー上のプロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザーのサインイン、接続したアプリはそのまま残り、あなたが使えます。",
+  "server.ownerTransfer.incomingMachine":
+    "サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
+  "server.ownerTransfer.later": "後で",
+  "server.ownerTransfer.decline": "拒否",
+  "server.ownerTransfer.accept": "承認",
+  "server.ownerTransfer.accepted": "{server} の所有者になりました",
+  "server.ownerTransfer.acceptFailed": "所有権の移転を承認できませんでした。",
+  "server.ownerTransfer.declineFailed": "所有権の移転を拒否できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

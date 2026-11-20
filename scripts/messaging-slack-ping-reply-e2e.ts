@@ -1,17 +1,3 @@
-// Checks that a person whom an agent's Slack post pinged can answer in the thread without a mention
-// (#5565). Runs the real agent and messaging services on a temporary profile, the real Slack event
-// parser and Slack mention renderer, and a fake Slack platform: `bun scripts/messaging-slack-ping-reply-e2e.ts`.
-//
-// 1. `messaging_post` with `<@U…>` records the person; a post with no live mention records nobody.
-// 2. A reply without a mention from a person who was not pinged reaches no agent.
-// 3. A reply without a mention from the pinged person reaches the Slack Orchestrator, with the post
-//    and the agent that posted it as the message that the reply answers. The thread gets its link.
-// 4. After that, a reply without a mention still counts only from the pinged person. Another person
-//    reaches the Orchestrator only with a mention.
-// 5. A pinged person's first reply that mentions OpenBot also gets the post as context.
-// 6. A thread reply that mentions OpenBot is left to its `app_mention` event.
-// 7. A thread reply without a mention that starts with another person's mention reaches no agent (#10669).
-// Writes .openbot-build/messaging-slack-ping-reply-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -74,7 +60,6 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** Polls a state of the services until it holds, or fails after the deadline. */
 async function waitFor<T>(what: string, read: () => T | null | undefined, timeoutMs = 10_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -88,6 +73,7 @@ async function waitFor<T>(what: string, read: () => T | null | undefined, timeou
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -118,7 +104,6 @@ const ingress: MessagingIngress = {
   onLinkedRoutes: () => () => {},
 };
 
-/** Each call that OpenBot made to the fake Slack. */
 const calls: { method: string; text?: string }[] = [];
 let nextTs = 1_700_000_000;
 function ts(): string {
@@ -126,7 +111,6 @@ function ts(): string {
   return `${nextTs}.000100`;
 }
 
-/** Records one call that posts, and gives the new post its ts. */
 function posted(method: string, text: string): string {
   calls.push({ method, text });
   return ts();
@@ -188,7 +172,6 @@ function memoryCredentials(): MessagingCredentials {
   };
 }
 
-/** One Slack Events API payload of a person's message, parsed by the real Slack event parser. */
 function event(type: "message" | "app_mention", user: string, threadTs: string, text: string) {
   return slackInboundMessage(
     {
@@ -214,7 +197,6 @@ const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
 const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
 await runCauseEffect(sidebar.initialize());
-// The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
 await runCauseEffect(store.initialize());
 await runCauseEffect(mailbox.initialize());
 const agents = new AgentService({ store, mailbox, browser, sidebarLayout: sidebar });
@@ -272,8 +254,6 @@ try {
     agents.createAgentProfile({ name: "Research", description: "", avatarSeed: "research", avatarHue: null }),
   );
   let thread = "";
-  // Read again after a later reply arrives: a reply that passed the check reaches the mailbox only after
-  // its name lookups, so an early read alone cannot show that it was dropped.
   let dropped = "";
 
   await step("a post with a live mention records the person; other posts record nobody", async () => {

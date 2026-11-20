@@ -3,11 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a table or its
-// marker; a newer or incomplete history is accepted; a task can point to no thread, or two tasks to one
-// thread; a deleted thread leaves its task behind; a task takes an origin or an outcome that the runtime
-// does not know. These fixtures cover each. They stop at version 46: migration 47 moves tasks to side
-// threads, and `agent-thread-migration.test.ts` covers it.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -44,14 +39,12 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** The agent's own chat and a second thread, in the columns every release has. */
 function seed(db: DatabaseSync): void {
   const insert = db.prepare("INSERT INTO projection_threads VALUES (?, 'chief', ?, NULL, ?, ?, 1)");
   insert.run("openbot-thread-chief", 'Chief 界"\\', "2026-10-01T07:00:00.000Z", "2026-10-01T07:00:00.000Z");
   insert.run("openbot-thread-task", "Billing export", "2026-10-01T08:00:00.000Z", "2026-10-01T08:00:00.000Z");
 }
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Record<string, unknown[]> {
   const tables = db
     .prepare(
@@ -92,7 +85,6 @@ describe("agent task migration", () => {
     "preserves every row from released schema %i",
     (version) => {
       const db = databaseAtWithSeed(version);
-      // The earlier migrations run first; the rows after them are what v38 must keep.
       if (version < 37) migrateUpTo(db, 37);
       const before = contents(db);
       migrateUpTo(db, 46);
@@ -122,9 +114,9 @@ describe("agent task migration", () => {
   it("rejects newer and incomplete migration histories before it creates the tables", () => {
     const db = databaseAtWithSeed(37);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(67,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=67; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(taskTables(db)).toEqual([]);

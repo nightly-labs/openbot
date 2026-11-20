@@ -6,7 +6,6 @@ import { createPointerDrag } from "./createPointerDrag";
 interface PanelResizerProps {
   label: string;
   controls: string;
-  /** The side of the panel in a left-to-right layout. A right-to-left layout swaps it. */
   direction: "left" | "right";
   value: number;
   defaultValue: number;
@@ -78,7 +77,6 @@ export function PanelResizer(props: PanelResizerProps) {
     const resizeTarget = props.onParentResize ? handle?.parentElement?.parentElement : handle?.parentElement;
     if (resizeTarget) {
       parentResizeObserver = new ResizeObserver(enforceBounds);
-      // Observe outer size only: inner padding changes must not reset a drag.
       parentResizeObserver.observe(resizeTarget, { box: "border-box" });
     }
     return () => {
@@ -88,7 +86,6 @@ export function PanelResizer(props: PanelResizerProps) {
     };
   });
 
-  // The grid mirrors in a right-to-left layout, so the panel is on the other side of the handle.
   const panelSide = (): "left" | "right" => {
     if (!handle || getComputedStyle(handle).direction !== "rtl") return props.direction;
     return props.direction === "left" ? "right" : "left";
@@ -110,7 +107,6 @@ export function PanelResizer(props: PanelResizerProps) {
 
   const handleKeyDown = (event: KeyboardEvent) => {
     const side = panelSide();
-    // The arrow that points away from the panel makes it wider.
     const growKey = side === "left" ? "ArrowRight" : "ArrowLeft";
     const shrinkKey = side === "left" ? "ArrowLeft" : "ArrowRight";
     let next: number | undefined;

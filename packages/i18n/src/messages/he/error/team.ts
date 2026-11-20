@@ -52,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "יותר מדי ניסיונות התחברות. אפשר לנסות שוב מאוחר יותר.",
   "error.team.clientUpdateRequired": "יש לעדכן את לקוח OpenBot הזה לפני ההתחברות למארח הזה.",
   "error.team.hostUpdateRequired": "יש לעדכן את OpenBot במארח לפני ההתחברות.",
+  "error.team.serverSafeMode": "השרת הזה במצב בטוח כי OpenBot לא מופעל בו.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} בשרת הזה לא יכול לפתוח את הנתונים שלו, כי גרסה חדשה יותר של OpenBot שמרה אותם. גרסה חדשה יותר של OpenBot בשרת תפתור את זה.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} בשרת הזה נעצר אחרי שההפעלה נכשלה פעמים רבות. גרסה חדשה יותר של OpenBot בשרת תפתור את זה.",
   "error.team.sidebarLayoutUnavailable": "פריסת סרגל הצד אינה זמינה.",
   "error.team.providersUnsupported": "הגדרות ספקים אינן נתמכות בחיבור הזה.",
   "error.team.providerNotManaged": "OpenBot אינו מנהל את ה-CLI של הספק הזה.",
@@ -116,6 +121,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "עדכוני מארח אינם נתמכים בחיבור הזה.",
   "error.team.hostTimezoneUnsupported": "אזור הזמן של השרת אינו נתמך בחיבור הזה.",
   "error.team.hostRestartUnsupported": "הפעלה מחדש של השרת אינה נתמכת בחיבור הזה.",
+  "error.team.ownerTransferUnsupported": "השרת הזה לא תומך בהעברת בעלות.",
   "error.team.hostKeyRotationUnsupported": "שינוי מפתח השרת אינו נתמך בחיבור הזה.",
   "error.team.localServersUnsupported": "שרתים במחשב הזה אינם נתמכים בחיבור הזה.",
   "error.team.routineResultsUnsupported": "יעדי שגרות אינם נתמכים בחיבור הזה.",

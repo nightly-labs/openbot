@@ -28,6 +28,8 @@ export const messages = {
   "mcp.signIn.waiting": "Warten auf den Browser…",
   "mcp.signIn.continue": "Weiter zu {name}",
   "mcp.signIn.pageDescription": "Diese Seite ist im Browser auf {host} geöffnet. Melde dich hier an.",
+  "mcp.signIn.copyHint": "Wenn die Seite nicht lädt, kopiere den Link und öffne ihn in einem anderen Browser.",
+  "mcp.signIn.copyLink": "Link kopieren",
   "mcp.test.connected": {
     one: "Verbunden · {count} Werkzeug",
     other: "Verbunden · {count} Werkzeuge",

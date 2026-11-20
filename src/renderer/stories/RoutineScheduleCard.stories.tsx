@@ -10,18 +10,11 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 
-/*
- * The chat record of a routine an agent created or changed. The person moves the run from the
- * chat with the same chip row the routine settings use. `onChange` is a spy here; in the app,
- * `RoutineChatCard` saves each change. The card is a variant of "Conversation/Chat action card".
- */
-
 const STORY_TODAY = new Date(2026, 8, 24, 10, 0);
 const chief = requireFixture(STORY_AGENTS[0], "Story agent 0");
 
 type CardArgs = Omit<RoutineScheduleCardProps, "onChange"> & { onChange: (schedule: RoutineScheduleDraft) => void };
 
-/** Holds the schedule, so a chip change redraws the row the way a saved update will. */
 function CardStage(props: CardArgs & { editable?: boolean }) {
   const [schedule, setSchedule] = createSignal(() => props.schedule);
   return (
@@ -82,7 +75,6 @@ export const Saving: Story = { args: { state: "saving" } };
 
 export const Saved: Story = { args: { action: "updated", state: "saved" } };
 
-/** A scheduled run of the routine paused it, so the card says which run and gives no next run. */
 export const PausedByItsRun: Story = {
   args: {
     action: "updated",
@@ -93,7 +85,6 @@ export const PausedByItsRun: Story = {
   },
 };
 
-/** The routine runs in a zone that is not the viewer's, for example a teammate's computer. */
 export const OtherTimeZone: Story = { args: { timeZoneLabel: "Warsaw time" } };
 
 export const SaveError: Story = {
@@ -124,7 +115,6 @@ const reply = message(
   "9:59 AM",
 );
 
-/** The card between the request and the reply, at the width of a chat. */
 export const InConversation: Story = {
   parameters: { layout: "fullscreen" },
   render: (args) => (

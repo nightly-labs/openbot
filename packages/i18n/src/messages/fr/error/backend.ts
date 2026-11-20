@@ -310,6 +310,12 @@ export const messages = {
     "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’est pas disponible pour le moment. Attendez quelques minutes, puis commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} n’a pas pu joindre le serveur MCP {name}. Ouvrez {name} dans Marketplace, Apps, et vérifiez que son adresse est correcte et que le serveur fonctionne. Commencez ensuite une nouvelle discussion pour réessayer.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} n’a pas pu obtenir les outils GitHub, car GitHub n’a pas répondu. Ouvrez GitHub dans Marketplace, Apps, et reconnectez-le s’il vous le demande. Commencez ensuite une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -384,8 +390,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
-  "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot n’a pas pu lire la clé d’API. Saisissez une clé de 8 000 caractères au plus, puis choisissez qui peut l’utiliser.",
   "error.backend.authRequestInactive": "Cette demande d’authentification sécurisée n’est plus active.",
   "error.backend.secureAuthUnavailable": "L’authentification sécurisée est indisponible.",
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
@@ -429,7 +436,7 @@ export const messages = {
     "La fenêtre contextuelle n’a pas pu se charger. Réessayez la connexion depuis la page d’origine.",
   "error.backend.browserTabNotFound": "Onglet de navigateur introuvable.",
   "error.backend.authActive": "L’authentification est déjà active.",
-  "error.backend.authHttpsRequired": "L’authentification sécurisée nécessite HTTPS.",
+  "error.backend.authWebPageRequired": "L’authentification sécurisée nécessite HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Les codes d’authentification doivent comporter de 4 à 12 chiffres.",
   "error.backend.authExpired": "La demande d’authentification a expiré.",
   "error.backend.authDigitsRequired": "Saisissez le nombre de chiffres demandé.",

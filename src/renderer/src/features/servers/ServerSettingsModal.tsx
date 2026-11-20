@@ -39,6 +39,7 @@ import {
   ShieldCheck,
   Smile,
   Sparkles,
+  Store,
   Tabs,
   Text,
   UsersRound,
@@ -91,6 +92,7 @@ import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { createServerMemorySection } from "./ServerMemorySection";
+import { createServerOwnerTransferSection, type OwnerTransferCalls } from "./ServerOwnerTransferSection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
@@ -105,7 +107,6 @@ import type { ServerSettingsSectionHost } from "./server-settings-section";
 export interface ServerSettingsModalProps {
   open: boolean;
   platform: "darwin" | "win32" | "linux";
-  /** False where no remote desktop can start, such as the browser client. The section is then absent. */
   remoteDesktopSupported?: boolean;
   server: ServerSummary;
   hostStatus?: HostStatus | null;
@@ -116,210 +117,63 @@ export interface ServerSettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
-  /**
-   * Saves the plush look that the server shows with no logo; null gives the automatic look. The
-   * picker shows only where a caller supplies this.
-   */
   onSaveAppearance?: ((appearance: ServerAppearance | null) => Promise<void>) | undefined;
   onSetPublished: (published: boolean) => Promise<void>;
-  /**
-   * Changes the key of the server on this computer, and paired devices follow it. The Server key
-   * section appears only when a caller supplies this.
-   */
   onRotateHostKey?: (() => Promise<void>) | undefined;
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
-  /**
-   * The license of the signed-in account. When the owner invites a person to a full license, the
-   * Members section first asks to add a user to it. Absent on surfaces with no account license.
-   */
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
-  /** Company sign-in for the owner of a published server. Absent where the app cannot manage it. */
   companySignIn?: CompanySignInCalls | undefined;
-  /**
-   * Opens the desktop app download where `companySignIn` is absent. The owner then sees that setup
-   * needs the desktop app, instead of no section.
-   */
+  ownerTransfer?: OwnerTransferCalls | undefined;
   onDownloadDesktopApp?: (() => void) | undefined;
-  /** Opens the contact page when a full license already has the most users that the app sells. */
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
   onRevokeInvite: (inviteId: string) => Promise<void>;
-  /**
-   * Ends this account's membership of a joined server. The Leave section appears only when a
-   * caller supplies this: the browser client is attached to one host and cannot leave it.
-   */
   onLeaveServer?: () => Promise<void>;
-  /**
-   * Removes a server that the user owns from the account service, also when its host is offline.
-   * The Remove section appears only when a caller supplies this.
-   */
   onRemoveServer?: (() => Promise<void>) | undefined;
-  /** Opens the macOS pane that grants OpenBot screen recording, for the host that was refused it. */
   onOpenScreenRecordingSettings: () => Promise<void>;
-  /** Asks the host to read the grant again, so the owner who gave it sees the warning go. */
   onRecheckScreenRecording: () => Promise<void>;
-  /**
-   * The Storage section appears only when a caller supplies this: a remote host without
-   * `storage-v1` passes nothing. Every member reads it; `canManage` adds Clear and Delete.
-   */
   storage?: ServerStorageOptions | undefined;
-  /**
-   * The Sites section appears only when a caller supplies this: this computer, or a remote host with
-   * `hosted-sites-v1`. Every member reads the list; an owner or admin can delete.
-   */
   hostedSites?: ServerHostedSitesOptions | undefined;
-  /**
-   * The Providers section: this computer, or a remote host with `providers-v1` that this account
-   * administers. A member gets no section.
-   */
   providers?: HostProviderSettings | undefined;
-  /**
-   * For a server that the window has not selected. The provider state belongs to the selected server,
-   * so the Providers section shows a note and this action in place of the list.
-   */
   onSwitchToManageProviders?: (() => void) | undefined;
-  /**
-   * The Import section appears only when a caller supplies this: the local server, or a remote host
-   * with `agent-import-v1`. Any member can import.
-   */
   agentImport?: ServerImportOptions | undefined;
-  /**
-   * The Transfer section appears only when a caller supplies this: the local server, or a remote
-   * host with `instance-transfer-v1` where the user is an owner or admin.
-   */
   instanceTransfer?: ServerTransferOptions | undefined;
-  /**
-   * The Updates section appears only when a caller supplies this: a remote host with
-   * `host-update-v1` that this member administers.
-   */
   hostUpdate?: ServerUpdateOptions | undefined;
-  /**
-   * Agent defaults shows the server timezone only when a caller supplies this, and only for the local
-   * server or a remote host with `host-timezone-v1` that this member administers.
-   */
   hostTimezone?: ServerTimezoneOptions | undefined;
-  /**
-   * Agent defaults shows the thread limits only when a caller supplies this, and only for the local
-   * server or a remote host with `host-turn-limits-v1` that this member administers.
-   */
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
-  /**
-   * The Personality section shows only when a caller supplies this, and only for the local server or
-   * a remote host with `host-personality-v1` that this member administers.
-   */
   hostPersonality?: ServerPersonalityOptions | undefined;
-  /**
-   * General shows how many memories each agent keeps only when a caller supplies this, and only for
-   * the local server or a remote host with `agent-memory-limit-v1` that this member administers.
-   */
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
-  /**
-   * General shows how often the agents review their memories only when a caller supplies this, and
-   * only for the local server or a remote host with `memory-review-v1` that this member administers.
-   */
   memoryReview?: ServerMemoryReviewOptions | undefined;
-  /**
-   * General shows whether the memory review saves the skills it learns only when a caller supplies
-   * this, and only for the local server or a remote host with `skill-learning-v1` that this member
-   * administers.
-   */
   skillLearning?: ServerSkillLearningOptions | undefined;
-  /**
-   * General shows whether the agents learn from what people do in agent tabs they hold only when a
-   * caller supplies this, and only for the local server or a remote host with `browsing-memory-v1`
-   * that this member administers.
-   */
   browsingMemory?: ServerBrowsingMemoryOptions | undefined;
-  /**
-   * The Claude provider page shows how long Claude keeps the prompt cache only when a caller supplies
-   * this, and only for the local server or a remote host with `prompt-cache-ttl-v1` that this member
-   * administers.
-   */
   hostPromptCacheTtl?: HostPromptCacheTtlOptions | undefined;
-  /**
-   * The Claude provider page shows "Use my Claude Code setup" only when a caller supplies this, and
-   * only for the local server or a remote host with `claude-user-setup-v1` that this member
-   * administers.
-   */
   claudeUserSetup?: HostClaudeUserSetupOptions | undefined;
-  /**
-   * The Claude provider page shows the size at which Claude Code compacts chats only when a caller
-   * supplies this, and only for the local server or a remote host with `claude-compact-window-v1`
-   * that this member administers.
-   */
   claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
-  /**
-   * The provider pages show their Environment section only when a caller supplies this, and only for
-   * the local server or a remote host with `provider-environment-v1` that this member administers.
-   */
   providerEnvironment?: HostProviderEnvironmentOptions | undefined;
-  /**
-   * Each provider page shows its Models section only when a caller supplies this, and only for the
-   * local server or a remote host with `model-visibility-v1` that this member administers.
-   */
   hostModelVisibility?: HostModelVisibilityOptions | undefined;
-  /**
-   * The Providers section of a remote host with `provider-default-v1` that this member administers
-   * shows the host's Default provider only when a caller supplies this. This computer's comes with
-   * `providers`.
-   */
   hostDefaultProvider?: HostDefaultProviderOptions | undefined;
-  /**
-   * The Roles section appears only when a caller supplies this, and only for the local server or a
-   * remote host with `agent-access-v1` that this member administers.
-   */
   agentAccess?: ServerAgentAccessOptions | undefined;
-  /**
-   * The Audit log section appears only when a caller supplies this, and only for the local server or
-   * a remote host with `server-audit-v1` that this member administers.
-   */
   serverAudit?: ServerAuditOptions | undefined;
-  /**
-   * The Agents section appears only when a caller supplies this: for this computer, and for an online
-   * remote host with `agent-defaults-v1` that this member administers.
-   */
   agentDefaults?: ServerAgentDefaultsOptions | undefined;
-  /**
-   * The Routines section appears only when a caller supplies this: the feed listens on this
-   * computer, so a remote server passes nothing.
-   */
   routineFeed?: ServerRoutineFeedOptions | undefined;
-  /**
-   * The Browser profiles section appears only when a caller supplies this: for this computer, and for
-   * a host that serves `browser-profiles-v1` to an owner or admin.
-   */
   browserProfiles?: ServerBrowserProfilesOptions | undefined;
-  /** The Vault section: this computer, or a joined server that serves `vault-v1` to an owner or admin. */
   vault?: ServerVaultOptions | undefined;
-  /**
-   * The CRM of this server, for the CRM switch of the Experimental section. The section shows to an
-   * owner or admin of a server with `crm-v1`.
-   */
   crm?: CrmHost | undefined;
-  /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
-  /** Counts the open requests, so a new request moves to its section also when the section did not change. */
   initialSectionRequest?: number | undefined;
-  /** Gets the section on screen, so the rail can mark the page that it opened. */
   onSectionChange?: ((section: ServerSettingsSection) => void) | undefined;
-  /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
-  /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
   sectionQuery?: string | undefined;
-  /** A new number opens the first section that the search finds. */
   openFirstSectionRequest?: number | undefined;
-  /** Called when a request opened a section. The page then clears its search. */
   onFirstSectionOpened?: (() => void) | undefined;
+  onOpenMarketplaceApps?: (() => void) | undefined;
 }
 
 export interface ServerHostedSitesOptions {
-  /** Called with this dialog's server. */
   api: Pick<HostedSitesDesktopApi, "list" | "delete">;
   onOpenSite: (url: string) => void;
-  /** Called as a deletion starts. It returns the call that records the result. */
   trackDelete?: () => (result: HostedSiteDeleteResult) => void;
-  /** Opens the server plans when the server is at its site limit. Only for a user who can buy a plan. */
   onSeePlans?: (() => void) | undefined;
 }
 
@@ -368,7 +222,6 @@ const sections = {
   },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
-/** The row names of a section, so that the section search also finds a section by one of its rows. */
 const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   general: [
     "server.settings.name",
@@ -398,15 +251,12 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.companySignIn.title",
     "server.companySignIn.sso",
     "server.companySignIn.scim",
+    "server.ownerTransfer.title",
   ],
   storage: ["settings.backgroundProcesses.title"],
   experimental: ["server.settings.experimentalCrm"],
 };
 
-/**
- * The section list, in its order. The sections that most users need come first, and each group after
- * them starts with its label. A section shows only when the server and the caller support it.
- */
 const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group?: AppTextKey }> = [
   { value: "general", icon: Settings },
   { value: "providers", icon: Sparkles },
@@ -437,9 +287,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       notify?.(shown);
     },
   );
-  /** Set while a provider page is open, so the header reads `Providers › Codex`. */
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
-  /** Set while an import source is open, so the header reads `Import › Hermes Agent`. */
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
   const crumbDetail = () => {
     if (section() === "import") return importDetail();
@@ -447,28 +295,16 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (section() === "agents") return agents.crumb();
     return section() === "providers" ? providerDetail() : null;
   };
-  /** The key of the one action in flight, gating every panel at once rather than belonging to any. */
   const [busy, setBusy] = createSignal<string | null>(null);
   const [modalElement, setModalElement] = createSignal<HTMLElement | undefined>();
-  /**
-   * The height of the error toast, or 0 while no toast is shown. The panel reserves this much
-   * room at its end: the toast floats over the bottom of the panel, so without the reserve it
-   * covers - and swallows the clicks of - whatever the open panel puts last.
-   */
   const [toastHeight, setToastHeight] = createSignal(0);
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
-  // A named function, not a ternary in the prop: a ternary makes a memo on each read, and a read
-  // from an effect callback (a select that reports a change) then halts the renderer.
   const hostName = () => (local() ? undefined : props.server.name);
-  // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
-  // because its owner chooses there who can control the computer.
   const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
   const configured = () => (local() ? Boolean(props.hostStatus?.configured) : true);
   const actionsAvailable = () => local() || props.server.state === "online";
-  // A joined server reads its own Hermes folder for an owner or admin. Only this computer's server lets
-  // the user choose another folder: the folder dialog shows this computer's files.
   const hermesFolderPlace = (): HermesFolderPlace | undefined => {
     if (local()) return "computer";
     return serverCanAdminister(props.server, "hermes-import-v1") ? "server" : undefined;
@@ -511,7 +347,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "host-personality-v1")) return undefined;
     return options;
   }
-  /** The CRM switch needs an owner or admin, a host with `crm-v1`, and a host that answers. */
   function crmHost(): CrmHost | undefined {
     if (!props.crm || !actionsAvailable() || !serverCanAdminister(props.server, CRM_CAPABILITY)) return undefined;
     return props.crm;
@@ -561,7 +396,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const agents = createServerAgentsSection(host, () => section() === "agents");
   const memory = createServerMemorySection(host);
 
-  /** Whether this server and the caller support the section. */
   const sectionSupported = (value: Section): boolean => {
     switch (value) {
       case "general":
@@ -601,7 +435,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return Boolean(crmHost());
     }
   };
-  /** Whether the title or the description of the section holds the search of the page. */
   const sectionMatches = (value: Section): boolean => {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
@@ -610,20 +443,19 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       t(key).toLocaleLowerCase().includes(needle),
     );
   };
-  /** The sections that the search finds. Without a search, each section that this server supports. */
   const matchingSections = createMemo(() =>
     NAV_SECTIONS.filter((item) => sectionSupported(item.value) && sectionMatches(item.value)),
   );
-  /**
-   * The section list. The open section stays in it, so the search does not open a different section
-   * while the user types.
-   */
   const navSections = createMemo(() =>
     NAV_SECTIONS.filter(
       (item) => matchingSections().includes(item) || (item.value === section() && sectionSupported(item.value)),
     ),
   );
-  /** Each new request of the page opens the first section that the search finds, and the page clears its search. */
+  const marketplaceAppsMatches = () => {
+    const needle = props.sectionQuery?.trim().toLocaleLowerCase();
+    if (!needle || !props.onOpenMarketplaceApps) return false;
+    return t("app.settingsPage.marketplaceApps").toLocaleLowerCase().includes(needle);
+  };
   let handledOpenFirstRequest = untrack(() => props.openFirstSectionRequest ?? 0);
   createEffect(
     () => props.openFirstSectionRequest ?? 0,
@@ -631,15 +463,15 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       if (request === handledOpenFirstRequest) return;
       handledOpenFirstRequest = request;
       const first = untrack(matchingSections)[0];
-      if (!first) return;
-      setSection(first.value);
+      if (first) setSection(first.value);
+      else if (untrack(marketplaceAppsMatches)) untrack(() => props.onOpenMarketplaceApps?.());
+      else return;
       untrack(() => props.onFirstSectionOpened?.());
     },
   );
-  /** What a screen reader hears while the user types a search. */
   const searchStatus = () => {
     if (!props.sectionQuery?.trim()) return "";
-    const count = matchingSections().length;
+    const count = matchingSections().length + (marketplaceAppsMatches() ? 1 : 0);
     return count > 0 ? t("app.settingsPage.resultCount", { count }) : t("app.settingsPage.noResults");
   };
   const members = createServerMembersSection(
@@ -654,6 +486,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     host,
     () => props.companySignIn,
     () => props.onDownloadDesktopApp,
+    () => props.open && section() === "members",
+  );
+  const ownerTransfer = createServerOwnerTransferSection(
+    host,
+    () => props.ownerTransfer,
     () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(
@@ -674,14 +511,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     () => section() === "sites",
   );
 
-  /** Publishes the reserve to the shell stylesheet, which spends it as the panel's end padding. */
   createEffect(
     () => ({ element: modalElement(), height: toastHeight() }),
     ({ element, height }) => {
       element?.style.setProperty("--settings-modal-floating-space", `${height}px`);
     },
   );
-  /** Follows the toast, which grows with the length of the sentence the failure produced. */
   function measureToast(element: HTMLElement): void {
     const observer = new ResizeObserver(() => setToastHeight(element.offsetHeight));
     observer.observe(element);
@@ -691,8 +526,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       setToastHeight(0);
     });
   }
-  // The save bar docks over the footer, so the toast has to lift for it. It is `position: absolute`
-  // over the footer: without this it covers the bar and swallows its clicks.
   const saveBarDocked = () => section() === "general" && general.identityDirty();
 
   createEffect(
@@ -711,6 +544,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         general.resetForServer();
         members.resetForServer();
         companySignIn.resetForServer();
+        ownerTransfer.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
         agents.resetForServer();
@@ -719,7 +553,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** Roles leaves with the access that gives it: a host that goes offline or a role that changes. */
   createEffect(
     () => section() === "roles" && !roles.available(),
     (gone) => {
@@ -727,7 +560,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** The audit log leaves with the access that gives it, as Roles does. */
   createEffect(
     () => section() === "audit" && !audit.available(),
     (gone) => {
@@ -735,7 +567,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** The agent defaults leave with the access that gives them, as Roles does. */
   createEffect(
     () => section() === "agents" && !agents.available(),
     (gone) => {
@@ -743,7 +574,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** The memory settings leave with the access that gives them, as the agent defaults do. */
   createEffect(
     () => section() === "memory" && !memory.available(),
     (gone) => {
@@ -751,7 +581,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** A server with no Vault for this account has no Vault section. */
   createEffect(
     () => section() === "vault" && !props.vault,
     (gone) => {
@@ -759,7 +588,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
   const requestedSection = createMemo(() => (props.open ? availableInitialSection() : null));
   createEffect(
     () => ({ requested: requestedSection(), request: props.initialSectionRequest }),
@@ -768,7 +596,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
-  // A joined host can offer its scan after the section opens, when its capabilities arrive.
   createEffect(
     () => props.open && section() === "providers" && props.providers?.onShown !== undefined,
     (visible) => {
@@ -851,41 +678,37 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           </Show>
         }
         footer={
-          <>
-            {/* `true` while the identity form is dirty: the dock only needs to know that there is
-                something to show, so the bar's own markup stays as it was. */}
-            <SaveBarDock value={section() === "general" && general.identityDirty() ? true : null}>
-              {() => (
-                <section class="settings-modal-save-bar" aria-label={t("server.settings.unsavedChanges")}>
-                  <Text variant="caption" tone="muted">
-                    {t("server.settings.changesNotSaved")}
-                  </Text>
-                  <div class="settings-modal-save-actions">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={Boolean(busy())}
-                      onClick={general.resetIdentity}
-                    >
-                      {t("server.settings.reset")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="default"
-                      loading={busy() === "identity"}
-                      loadingLabel={t("common.saving")}
-                      disabled={Boolean(busy())}
-                      onClick={() => void general.saveIdentity()}
-                    >
-                      {t("common.save")}
-                    </Button>
-                  </div>
-                </section>
-              )}
-            </SaveBarDock>
-          </>
+          <SaveBarDock value={section() === "general" && general.identityDirty() ? true : null}>
+            {() => (
+              <section class="settings-modal-save-bar" aria-label={t("server.settings.unsavedChanges")}>
+                <Text variant="caption" tone="muted">
+                  {t("server.settings.changesNotSaved")}
+                </Text>
+                <div class="settings-modal-save-actions">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={Boolean(busy())}
+                    onClick={general.resetIdentity}
+                  >
+                    {t("server.settings.reset")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    loading={busy() === "identity"}
+                    loadingLabel={t("common.saving")}
+                    disabled={Boolean(busy())}
+                    onClick={() => void general.saveIdentity()}
+                  >
+                    {t("common.save")}
+                  </Button>
+                </div>
+              </section>
+            )}
+          </SaveBarDock>
         }
         sidebar={
           <>
@@ -907,7 +730,25 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 }}
               </For>
             </Tabs.List>
-            <Show when={matchingSections().length === 0}>
+            <Show when={marketplaceAppsMatches()}>
+              <ul class="settings-page-results" aria-label={t("app.settingsPage.results")}>
+                <li>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    class="settings-page-result"
+                    onClick={() => props.onOpenMarketplaceApps?.()}
+                  >
+                    <span class="settings-page-result-section">
+                      <Store aria-hidden="true" />
+                      {t("marketplace.title")}
+                    </span>
+                    <span class="settings-page-result-title">{t("app.settingsPage.marketplaceApps")}</span>
+                  </Button>
+                </li>
+              </ul>
+            </Show>
+            <Show when={matchingSections().length === 0 && !marketplaceAppsMatches()}>
               <p class="settings-page-empty">{t("app.settingsPage.noResults")}</p>
             </Show>
             <span class="sr-only" role="status">
@@ -960,6 +801,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
           <companySignIn.Panel />
+          <ownerTransfer.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">
@@ -981,7 +823,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
             />
           </Tabs.Content>
         </Show>
-        {/* Mounted only while selected, so the host is measured when the section opens. */}
         <Show when={props.storage}>
           {(storage) => (
             <Tabs.Content value="storage" class="settings-modal-tab-panel server-settings-panel" data-tab="storage">
@@ -1061,7 +902,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.agentImport}>
           {(agentImport) => (
             <Tabs.Content value="import" class="settings-modal-tab-panel server-settings-panel" data-tab="import">
-              {/* Keyed: an open export belongs to one server, so another server starts a new panel. */}
               <Show when={props.server.id} keyed>
                 {(serverId) => (
                   <ServerImportPanel
@@ -1080,7 +920,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.instanceTransfer}>
           {(instanceTransfer) => (
             <Tabs.Content value="transfer" class="settings-modal-tab-panel server-settings-panel" data-tab="transfer">
-              {/* Keyed: an open file belongs to one server, so another server starts a new panel. */}
               <Show when={props.server.id} keyed>
                 {(serverId) => <ServerTransferPanel serverId={serverId} {...instanceTransfer()} />}
               </Show>
@@ -1129,6 +968,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       </SettingsDialogShell>
 
       <members.ConfirmDialogs />
+      <ownerTransfer.Dialogs />
       <general.LeaveDialog />
       <general.RotateKeyDialog />
     </Tabs.Root>

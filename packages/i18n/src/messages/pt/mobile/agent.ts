@@ -224,6 +224,13 @@ export const messages = {
     "O segredo atual para de funcionar. O computador anfitrião rejeita requisições que o usam.",
   "mobile.agent.webhook.rotateConfirm": "Regenerar",
   "mobile.agent.webhook.rotateFailed": "Não foi possível regenerar o segredo. Tente de novo.",
+  "mobile.agent.webhook.giveToAgent": "Dar o segredo de assinatura a {name}",
+  "mobile.agent.webhook.giveTitle": "Dar um novo segredo de assinatura a {name}?",
+  "mobile.agent.webhook.giveBody":
+    "O segredo atual para de funcionar. {name} salva o novo segredo como chave de API e pode adicioná-lo ao remetente.",
+  "mobile.agent.webhook.giveConfirm": "Dar segredo",
+  "mobile.agent.webhook.giveFailed": "Não foi possível dar o segredo de assinatura ao agente. Tente de novo.",
+  "mobile.agent.webhook.given": "{name} tem o novo segredo de assinatura.",
   "mobile.agent.webhook.activity": "Atividade",
   "mobile.agent.webhook.activityFailed": "Não foi possível carregar a atividade. Tente de novo.",
   "mobile.agent.webhook.activity.ignored": "Ignorada",
@@ -398,6 +405,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gerenciar perfis",
   "mobile.agent.browserProfile.footer":
     "Cada perfil guarda seus próprios logins e cookies. Uma alteração fecha as abas abertas do agente.",
+  "mobile.agent.browserProfile.movedNote":
+    "Os logins nos sites ficam no perfil antigo. O agente precisa entrar nesses sites novamente.",
   "mobile.agent.browserProfile.saveFailed": "O OpenBot não conseguiu alterar o perfil do navegador do agente.",
   "mobile.agent.planCard.label": "Mostrar o plano antes de tarefas longas",
   "mobile.agent.planCard.footer":
@@ -417,10 +426,11 @@ export const messages = {
     "Este servidor não consegue guardar seu próprio nível de notificações para um agente. Atualize o OpenBot no computador que o executa.",
   "mobile.agent.newChat.title": "Novo chat",
   "mobile.agent.newChat.starting": "Iniciando novo chat…",
-  "mobile.agent.newChat.footer": "O agente esquece este chat. Sua configuração é mantida.",
+  "mobile.agent.newChat.footer":
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. Sua configuração é mantida.",
   "mobile.agent.newChat.confirmTitle": "Iniciar um novo chat com {name}?",
   "mobile.agent.newChat.confirmBody":
-    "O agente esquece este chat. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
   "mobile.agent.newChat.confirm": "Iniciar novo chat",
   "mobile.agent.newChat.failed": "Não foi possível iniciar um novo chat",
   "mobile.agent.newChat.failedBody": "O computador anfitrião não conseguiu iniciar um novo chat.",

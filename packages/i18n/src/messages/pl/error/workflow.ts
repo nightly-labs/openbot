@@ -16,12 +16,17 @@ export const messages = {
   "error.workflow.agentMissing": "Wybierz agenta dla tego kroku.",
   "error.workflow.handoffFailed": "OpenBot nie mógł wysłać tego kroku do jego agenta.",
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
+  "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
     "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",
   "error.workflow.modelToolUse":
     "Model próbował użyć narzędzia, ale ten krok może odpowiedzieć tylko tekstem. Uruchom krok ponownie lub wybierz dla niego inny model.",
+  "error.workflow.modelImageUnsupported":
+    "Model tego kroku nie może czytać obrazów. Wybierz model, który to potrafi, albo usuń połączenie obrazu.",
+  "error.workflow.modelImageType":
+    "Krok modelu może czytać tylko obrazy PNG, JPEG, GIF i WebP. Połącz obraz jednego z tych typów.",
   "error.workflow.modelUnavailable": "Model tego kroku jest niedostępny. Wybierz inny model dla tego kroku.",
   "error.workflow.providerBusy": "Dostawca jest zajęty. Poczekaj kilka minut, a potem uruchom krok ponownie.",
   "error.workflow.providerOffline":
@@ -33,6 +38,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",
   "error.workflow.mediaEmptyRequest": "Napisz opis albo uruchom wcześniejsze kroki, aby dotarł tekst lub obraz.",
   "error.workflow.mediaInputNotImage": "Ten krok przyjmuje tylko obrazy, nie wideo. Usuń połączenie z wideo.",
+  "error.workflow.mediaInputNotClip": "To wejście przyjmuje tylko wideo i pliki audio. Usuń połączenie z pliku.",
   "error.workflow.stepMissing": "Ten krok już nie istnieje.",
   "error.workflow.nodeMissing": "Tego kroku nie ma w przepływie pracy.",
   "error.workflow.runMissing": "To uruchomienie już nie istnieje.",

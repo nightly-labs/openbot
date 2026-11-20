@@ -44,10 +44,4 @@ export function Button(props: ButtonProps) {
   );
 }
 
-/**
- * The same button, addressed by route instead of by `href`. Every link inside the
- * site should use it: a plain anchor makes the browser fetch and parse a whole new
- * document, which throws away the router, the bundle and the page's own state, and
- * on a slow connection that is the whole delay between pressing and arriving.
- */
 export const ButtonLink = createLink(Button);
