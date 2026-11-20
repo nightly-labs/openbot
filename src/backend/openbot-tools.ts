@@ -421,7 +421,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "send_to_channel",
     description:
-      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. Each member that takes the request sends its result back here in a later turn, as a teammate reply. In a channel task, use channel_assign or channel_transfer.",
+      "Post a request into a channel when the user gives it work. Members do not see this conversation: write the whole brief. paths attaches local files. recipientAgentIds names members; without it, the lead chooses. Results come back here. In a channel task, use channel_assign or channel_transfer.",
     shape: sendToChannelToolSchema.shape,
   },
   {
