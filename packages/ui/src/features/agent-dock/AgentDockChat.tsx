@@ -64,6 +64,7 @@ export interface AgentDockChatAnswers {
   approval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
   prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
   takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
   usageLimitWait: (limit: AgentDockUsageLimit) => void;
@@ -483,7 +484,11 @@ export function AgentDockChat(props: {
                         preview={null}
                         previewStatus="idle"
                         onOpen={() => props.onOpenInMain()}
-                        onComplete={() => respondTakeover(current(), "complete")}
+                        onComplete={
+                          props.answers?.takeoverDone?.(current()) === false
+                            ? undefined
+                            : () => respondTakeover(current(), "complete")
+                        }
                         onCancel={() => respondTakeover(current(), "cancel")}
                         browserSecret={takeoverSecret(current())}
                       />

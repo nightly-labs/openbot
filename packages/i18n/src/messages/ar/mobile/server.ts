@@ -297,6 +297,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "في الانتظار. يشغّل المضيف أكبر عدد من الأدوار تسمح به ذاكرته.",
   "mobile.server.threads.hold.agentBusy": "في انتظار انتهاء عمل آخر لهذا الوكيل.",
   "mobile.server.threads.hold.oneTurn": "في الانتظار. يشغّل مزوّد هذا الوكيل دورًا واحدًا في كل مرة.",
+  "mobile.server.threads.hold.signIn": "في الانتظار. يحتاج مزوّد هذا الوكيل إلى تسجيل الدخول.",
   "mobile.server.threads.offline": "اتصل بهذا الخادم لرؤية سلاسله.",
   "mobile.server.threads.loading": "جارٍ تحميل السلاسل…",
   "mobile.server.threads.loadFailed": "تعذّر تحميل سلاسل بعض الوكلاء.",
@@ -638,6 +639,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "إضافة وكلاء",
   "mobile.server.browserProfiles.agentsHint":
     "تمنح النقرة الوكيلَ ملف التعريف هذا، أو تعيده إلى الملف المشترك. يُغلق التغيير علامات التبويب المفتوحة للوكيل.",
+  "mobile.server.browserProfiles.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل المنقول الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.server.browserProfiles.clear": "مسح البيانات",
   "mobile.server.browserProfiles.clearTitle": "هل تريد مسح بيانات {name}؟",
   "mobile.server.browserProfiles.clearBody":
@@ -2263,4 +2266,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "تعذّر قبول النقل",
   "mobile.server.ownerTransfer.declineFailed": "تعذّر رفض النقل",
   "mobile.server.ownerTransfer.tryAgain": "حاول مرة أخرى لاحقًا.",
+  "mobile.server.providers.updateAll": "تحديث الكل",
+  "mobile.server.providers.updateAllFailed": "لم تبدأ بعض التحديثات. حاول مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

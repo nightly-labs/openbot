@@ -1,5 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
+import { ServerPlanEndedScreen, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import type { JSX } from "@solidjs/web";
 import { omit, type ParentProps, Show } from "solid-js";
 import { type WindowPage, windowPageKind } from "./features/window/window-page-context";
@@ -14,6 +15,8 @@ type WorkspaceFrameProps = ParentProps<
     hidden?: boolean;
     blockedServer: ServerSummary | null;
     onRetryServer: (serverId: string) => Promise<void>;
+    planDeletesAt: (serverId: string) => number | null;
+    onRenewPlan?: ((serverId: string) => Promise<void>) | undefined;
     left: JSX.Element;
     windowPage: WindowPage;
     page?: JSX.Element;
@@ -33,6 +36,8 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "hidden",
     "blockedServer",
     "onRetryServer",
+    "planDeletesAt",
+    "onRenewPlan",
     "left",
     "windowPage",
     "page",
@@ -44,6 +49,11 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
   );
 
   const compactWidth = () => props.compact && (!pageOpen() || layout.leftPanelNarrow());
+  const planScreenShown = () => serverPlanScreenShown(props.blockedServer, props.planDeletesAt);
+  const leftPanelWidth = () => {
+    if (planScreenShown()) return 0;
+    return compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth();
+  };
 
   return (
     <div
@@ -64,10 +74,12 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         },
       ]}
       aria-hidden={props.hidden ? "true" : undefined}
-      style={`--left-panel-width: ${compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth()}px`}
+      style={`--left-panel-width: ${leftPanelWidth()}px`}
     >
       {props.left}
-      <WorkspaceLeftPanelResizer />
+      <Show when={!planScreenShown()}>
+        <WorkspaceLeftPanelResizer />
+      </Show>
       <div
         class="app-frame-panes server-connection-workspace"
         inert={pageOpen()}
@@ -76,7 +88,19 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         {props.connection}
         <div class="server-connection-content" hidden={props.initialLoading && !props.blockedServer}>
           <Show when={props.blockedServer} keyed fallback={props.children}>
-            {(server) => <RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
+            {(server) => (
+              <Show
+                when={planScreenShown()}
+                fallback={<RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
+              >
+                <ServerPlanEndedScreen
+                  server={server}
+                  deleteAt={props.planDeletesAt(server.id)}
+                  onRenew={props.onRenewPlan}
+                  onRetry={() => void props.onRetryServer(server.id)}
+                />
+              </Show>
+            )}
           </Show>
         </div>
       </div>

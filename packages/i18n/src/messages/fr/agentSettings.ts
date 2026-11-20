@@ -243,6 +243,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
   "agentSettings.browserProfile.manage": "Gérer",
+  "agentSettings.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tout le processus {provider} s’exécute dans un bac à sable : une écriture à l’extérieur échoue donc. Disponible sur macOS uniquement.",
 } as const satisfies PartialTranslation<typeof source>;

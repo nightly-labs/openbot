@@ -169,7 +169,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #checkRetentionMs = VERSION_RETENTION_MS;
   #revision = 0;
   #stopping = false;
-  #updateInstalled = false;
+  readonly #declined = new Map<ManagedRuntimeId, string>();
 
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
@@ -239,7 +239,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
         const offer =
           missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
-        const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
+        const automatic = this.#updatesAutomatically(provider, this.#target);
         providers[provider].availableVersion =
           offer && !configuredCliPath(provider) && !automatic && this.#isProviderOn(provider) ? version : null;
       }
@@ -387,10 +387,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       : VERSION_RETENTION_MS;
   }
 
-  startUpdateChecks(options: { intervalMs?: number; updateInstalled?: boolean } = {}): void {
+  startUpdateChecks(options: { intervalMs?: number } = {}): void {
     if (this.#checkTimer || !this.#target || this.#stopping) return;
     this.#checkIntervalMs = options.intervalMs ?? UPDATE_CHECK_INTERVAL_MS;
-    this.#updateInstalled = options.updateInstalled ?? false;
     const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
     this.#checkTimer = setInterval(check, this.#checkIntervalMs);
     this.#checkTimer.unref();
@@ -419,14 +418,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         { concurrency: "unbounded" },
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
-      if (this.#updateInstalled) {
-        yield* Effect.forEach(
-          this.#stopping ? [] : PROVIDERS.filter((provider) => this.#updatesInstalled(provider, target)),
-          (provider) => Effect.ignore(this.#startDownload(provider, target)),
-          { discard: true },
-        );
-        this.#updateInstalled = false;
-      }
+      yield* this.#startAutomaticUpdates(target);
       const repairs = PROVIDERS.filter(
         (provider) =>
           this.#rejected.has(provider) &&
@@ -455,12 +447,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #updatesInstalled(provider: ManagedProviderId, target: RuntimeTarget): boolean {
+  #startAutomaticUpdates(target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.forEach(
+      this.#stopping ? [] : PROVIDERS.filter((provider) => this.#updatesAutomatically(provider, target)),
+      (provider) => Effect.ignore(this.#startDownload(provider, target)),
+      { discard: true },
+    );
+  }
+
+  #updatesAutomatically(provider: ManagedProviderId, target: RuntimeTarget): boolean {
     const { phase, version } = this.#statuses[provider];
+    const offered = this.#targetSpec(provider, target).version;
     return (
+      this.#checkTimer !== null &&
+      this.#declined.get(provider) !== offered &&
       (phase === "ready" || phase === "not-downloaded") &&
       version !== null &&
-      olderVersion(version, this.#targetSpec(provider, target).version) &&
+      olderVersion(version, offered) &&
       !this.#systemVersions.has(provider) &&
       !configuredCliPath(provider) &&
       this.#isProviderOn(provider)
@@ -501,6 +504,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           yield* this.#inspectEffect(provider).pipe(Effect.ignore);
         }
       }
+      const target = this.#target;
+      const check = this.#check;
+      if (target && check) {
+        yield* Effect.forkIn(
+          this.#awaitReleaseCheck(check).pipe(Effect.andThen(this.#startAutomaticUpdates(target))),
+          this.#scope,
+        );
+      } else if (target) yield* this.#startAutomaticUpdates(target);
       this.#revision += 1;
       this.emit("status", this.getStatus());
     });
@@ -695,6 +706,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const task = this.#tasks.get(runtime);
       const spec = this.#transfers.get(runtime);
       this.#cancelled.add(runtime);
+      if (spec) this.#declined.set(runtime, spec.version);
       this.#controllers.get(runtime)?.abort();
       if (task) yield* Fiber.join(task);
       if (spec) yield* this.#removePartialEffect(spec);

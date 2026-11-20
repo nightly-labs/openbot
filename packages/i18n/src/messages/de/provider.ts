@@ -343,4 +343,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal bleibt angemeldet.",
+  "provider.settings.updateAll": "Alle aktualisieren",
 } as const satisfies PartialTranslation<typeof source>;

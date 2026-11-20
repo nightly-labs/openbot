@@ -19,6 +19,8 @@ export const messages = {
     "{provider} indica que tu plan está agotado. Elige otro modelo o mejora tu plan de {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} no cargó las herramientas de OpenBot, así que este agente no puede usarlas ni comunicarse con sus compañeros. Una política de equipo de {provider} puede bloquear los servidores MCP locales. Pide al administrador de tu equipo que los permita y vuelve a intentarlo.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} ejecutó este mensaje sin las herramientas de OpenBot, así que el agente no pudo comunicarse con sus compañeros, usar el navegador ni adjuntar archivos. Vuelve a intentarlo.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} no pudo iniciar el servidor MCP {name}, así que la respuesta se detuvo. Este servidor está en tu propia configuración de {provider}, no en OpenBot. Quítalo o repáralo allí y luego inicia un chat nuevo.",
   "error.provider.endpointsReadOnly":

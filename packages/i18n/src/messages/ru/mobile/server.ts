@@ -270,6 +270,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Ожидание. Хост выполняет столько ходов, сколько позволяет его память.",
   "mobile.server.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "mobile.server.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "mobile.server.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "mobile.server.threads.offline": "Подключитесь к этому серверу, чтобы увидеть его ветки.",
   "mobile.server.threads.loading": "Загрузка веток…",
   "mobile.server.threads.loadFailed": "Не удалось загрузить ветки некоторых агентов.",
@@ -613,6 +614,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Добавить агентов",
   "mobile.server.browserProfiles.agentsHint":
     "Нажатие назначает агенту этот профиль или возвращает его в общий профиль. Изменение закрывает открытые вкладки агента.",
+  "mobile.server.browserProfiles.movedNote":
+    "Входы на сайты остаются в старом профиле. Перемещённому агенту нужно снова войти на эти сайты.",
   "mobile.server.browserProfiles.clear": "Очистить данные",
   "mobile.server.browserProfiles.clearTitle": "Очистить данные профиля {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1876,4 +1879,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Не удалось принять передачу",
   "mobile.server.ownerTransfer.declineFailed": "Не удалось отклонить передачу",
   "mobile.server.ownerTransfer.tryAgain": "Попробуйте позже.",
+  "mobile.server.providers.updateAll": "Обновить все",
+  "mobile.server.providers.updateAllFailed": "Некоторые обновления не запустились. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

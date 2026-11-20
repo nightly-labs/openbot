@@ -266,6 +266,7 @@ const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
 const IDLE_TAB_SWEEP_MS = 60_000;
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
+const IDLE_TAB_FREEZE_MS = 2 * 60_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
@@ -554,6 +555,7 @@ export class BrowserHost {
   readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
+  readonly #idleTabFreezeMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
 
   constructor(
@@ -574,7 +576,7 @@ export class BrowserHost {
       computerExit?: (memberId: string) => RelayExit;
       quitShortcut?: (input: Input) => boolean;
       pagePreload?: string;
-      tabSleep?: { sweepMs: number; awakeGraceMs: number };
+      tabSleep?: { sweepMs: number; awakeGraceMs: number; freezeMs?: number };
       siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
       userBrowsing?: BrowserUserBrowsing;
       hideFromWindowSwitchers?: (window: BaseWindow) => void;
@@ -594,6 +596,7 @@ export class BrowserHost {
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
+    this.#idleTabFreezeMs = options.tabSleep?.freezeMs ?? IDLE_TAB_FREEZE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
     this.#agentChat = options.agentChat ?? (() => null);
@@ -676,7 +679,7 @@ export class BrowserHost {
 
     for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (activeTab) yield* this.#wake(activeTab);
+    if (activeTab && this.#visible) yield* this.#wake(activeTab);
   }).bind(this);
 
   readonly #wake = Effect.fn("BrowserHost.wake")(function* (this: BrowserHost, tab: BrowserHostTab) {
@@ -696,8 +699,8 @@ export class BrowserHost {
   });
 
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
-    this.#throttleHiddenTabs();
     const now = Date.now();
+    this.#throttleHiddenTabs(now);
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
     const awake: BrowserHostTab[] = [];
     for (const tab of this.#tabs.values()) {
@@ -712,20 +715,50 @@ export class BrowserHost {
     }
   });
 
-  #throttleHiddenTabs(): void {
+  #throttleHiddenTabs(now: number): void {
     for (const tab of this.#tabs.values()) {
-      if (tab.closing || tab.contents.isDestroyed() || tab.contents.getBackgroundThrottling()) continue;
-      if (this.#viewShown(tab.view)) continue;
-      if (this.#tabBusy(tab)) continue;
-      tab.contents.setBackgroundThrottling(true);
-      this.#setIdleFocus(tab, false);
+      if (tab.closing || tab.contents.isDestroyed() || this.#viewShown(tab.view) || this.#tabBusy(tab)) continue;
+      if (!tab.contents.getBackgroundThrottling()) {
+        tab.contents.setBackgroundThrottling(true);
+        this.#setIdleFocus(tab, false);
+      }
+      if (this.#mayFreeze(tab) && now - tab.lastUsedAt >= this.#idleTabFreezeMs) this.#setFrozen(tab, true);
     }
   }
 
   #unthrottle(tab: BrowserHostTab): void {
-    if (tab.contents.isDestroyed() || !tab.contents.getBackgroundThrottling()) return;
+    if (tab.contents.isDestroyed()) return;
+    this.#thaw(tab);
+    if (!tab.contents.getBackgroundThrottling()) return;
     tab.contents.setBackgroundThrottling(false);
     this.#setIdleFocus(tab, true);
+  }
+
+  #mayFreeze(tab: BrowserHostTab): boolean {
+    return !tab.pendingRestore && !tab.engine.dialog && this.#maySleep(tab);
+  }
+
+  #thaw(tab: BrowserHostTab): void {
+    if (!tab.engine.frozen) return;
+    this.#setFrozen(tab, false);
+    if (!tab.view.getVisible()) return;
+    tab.view.setVisible(false);
+    tab.view.setVisible(true);
+  }
+
+  #setFrozen(tab: BrowserHostTab, frozen: boolean): void {
+    if (tab.closing) return;
+    Effect.runFork(
+      tab.engine.setFrozen(frozen).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() =>
+            logger.warn("Unable to change the lifecycle state of a browser tab", { error: toLogValue(error) }),
+          ),
+        ),
+        Effect.ignore,
+        Effect.forkIn(tab.scope, { startImmediately: true }),
+      ),
+    );
   }
 
   #setIdleFocus(tab: BrowserHostTab, enabled: boolean): void {
@@ -748,7 +781,7 @@ export class BrowserHost {
   }
 
   #tabInUse(tab: BrowserHostTab): boolean {
-    return this.#activeTabId === tab.id || this.#tabBusy(tab);
+    return (this.#activeTabId === tab.id && this.#viewShown(tab.view)) || this.#tabBusy(tab);
   }
 
   #tabBusy(tab: BrowserHostTab): boolean {
@@ -1906,7 +1939,7 @@ export class BrowserHost {
     input: BrowserVisibilityInput,
   ) {
     const active = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (active) yield* this.#wake(active);
+    if (active && input.visible) yield* this.#wake(active);
     yield* browserSync(() => {
       const restoreRendererFocus = !input.visible && this.#attachedView?.webContents.isFocused();
       this.#visible = input.visible;
@@ -2074,6 +2107,7 @@ export class BrowserHost {
     tab: BrowserHostTab,
   ) {
     if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
+    this.#thaw(tab);
     const page = currentPreviewPage(tab);
     const frame = Deferred.makeUnsafe<BrowserPreview, BrowserOperationError>();
     const capture = { ...page, frame };

@@ -392,6 +392,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.browserProfile.manage": "Manage profiles",
   "mobile.agent.browserProfile.footer":
     "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
+  "mobile.agent.browserProfile.movedNote":
+    "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot could not change the browser profile of the agent.",
   "mobile.agent.planCard.label": "Show the plan before long tasks",
   "mobile.agent.planCard.footer":
