@@ -1903,7 +1903,7 @@ export class OpenBotToolRouter {
       return openBotToolResult({
         status: "posted",
         channel: { id: channel.id, name: channel.name },
-        next: "The channel members work on it in the channel. Tell the user to follow it there, and do not do the work here.",
+        next: "The channel members work on it in the channel, and each member that takes it sends its result back here in a later turn. Do not do the work here and do not wait: tell the user where it went, then end your turn.",
       });
     }
 
