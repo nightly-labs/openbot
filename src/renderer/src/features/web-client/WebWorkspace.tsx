@@ -3119,7 +3119,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       onReorderPinned={workspace.preferences.reorderPinnedSidebarItems}
                       onReorderPeople={() => {}}
                       onSelectAgent={(id) => {
-                        if (id === sidebarActiveAgentId()) agentThreads()?.tabs.open(id, MAIN_THREAD_ID);
+                        if (id === sidebarActiveAgentId() && !pageCovered())
+                          agentThreads()?.tabs.open(id, MAIN_THREAD_ID);
                         setMobilePane("conversation");
                         void select(id);
                       }}
