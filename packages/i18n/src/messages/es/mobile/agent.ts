@@ -322,6 +322,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "No hay modelos disponibles para este proveedor.",
   "mobile.agent.runtime.searchModels": "Buscar modelos",
   "mobile.agent.runtime.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Ningún modelo coincide con tu búsqueda. Tus ajustes de privacidad, proveedores y guardrails en openrouter.ai pueden ocultar modelos de esta lista.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Este proveedor no funciona con «Solo espacio de trabajo» en Windows y Linux. Para usarlo, cambia primero los «Permisos».",
   "mobile.agent.runtime.usageLimit": "Límite de uso alcanzado",
@@ -488,6 +490,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Este host no puede publicar agentes desde un dispositivo remoto.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens sin lecturas de caché",
   "mobile.agent.usage.estimatedCost": "Coste estimado",
+  "mobile.agent.usage.noCostEstimate": "Sin estimación de coste",
   "mobile.agent.usage.daily": "Uso diario",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Coste",
@@ -611,7 +614,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Ningún chat abierto",
   "mobile.agent.home.noChatOpenBody": "Elige un chat de la lista.",
   "mobile.agent.home.chatListWidth": "Ancho de la lista de chats",
-  "mobile.agent.home.serverTitle": "{name}, abrir servidores",
   "mobile.agent.home.waiting": "Esperando la conexión",
   "mobile.agent.home.waitingBody": "La lista de agentes se cargará cuando este servidor esté conectado.",
   "mobile.agent.home.noAgents": "No hay agentes en este servidor",

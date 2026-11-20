@@ -196,6 +196,7 @@ import {
   createRecoveryCountdowns,
   RecoveryCountdownContext,
 } from "@/features/workspace/context/server-recovery-countdown";
+import { useBackgroundRefresh } from "@/features/workspace/context/use-background-refresh";
 import { useConversationReads } from "@/features/workspace/context/use-conversation-reads";
 import { useServerOrder } from "@/features/workspace/context/use-server-order";
 import { createWorkflowActions } from "@/features/workspace/context/workflow-actions";
@@ -366,6 +367,19 @@ function showPreferencesFailure(error: unknown): void {
   );
 }
 
+function trackUntilSettled(pending: Set<Promise<void>>, work: Promise<unknown>): void {
+  const settled = work.then(
+    () => undefined,
+    () => undefined,
+  );
+  pending.add(settled);
+  void settled.then(() => pending.delete(settled));
+}
+
+function allSettled(pending: ReadonlySet<Promise<void>>): Promise<void> {
+  return Promise.allSettled([...pending]).then(() => undefined);
+}
+
 function withoutKeys<T>(record: Record<string, T>, keys: ReadonlySet<string>): Record<string, T> {
   return Object.keys(record).some((key) => keys.has(key))
     ? Object.fromEntries(Object.entries(record).filter(([key]) => !keys.has(key)))
@@ -407,6 +421,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [directoryLoads, setDirectoryLoads] = useState(0);
   const serversRef = useRef(servers);
   serversRef.current = servers;
+  const cacheWrites = useRef(new Set<Promise<void>>());
+  const serverLoads = useRef(new Set<Promise<void>>());
+  const { refreshing: backgroundRefreshing, connectionStatus: backgroundRefreshStatus } = useBackgroundRefresh({
+    foreground,
+    serverIds: () => serversRef.current.map((server) => server.id),
+    loaded: () => allSettled(serverLoads.current),
+    saved: () => allSettled(cacheWrites.current),
+  });
+  const live = foreground || backgroundRefreshing;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [sidebarByServer, setSidebarByServer] = useState<
     Record<string, { layout: SidebarLayoutSnapshot | null; error: string | null }>
@@ -860,7 +883,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     [request, preferenceStore, queryClient, queryScope],
   );
   useEffect(() => () => channelStore.dispose(), [channelStore]);
-  useEffect(() => channelStore.setActive(foreground), [channelStore, foreground]);
+  useEffect(() => channelStore.setActive(live), [channelStore, live]);
   useEffect(() => {
     channelStore.retainServers(servers.map((server) => server.id));
   }, [servers, channelStore]);
@@ -972,7 +995,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       const previous = persistedInputs.current.get(serverId);
       if (previous?.length === inputs.length && previous.every((input, index) => input === inputs[index])) return;
       persistedInputs.current.set(serverId, inputs);
-      void workspaceCache
+      const write = workspaceCache
         .write(serverId, {
           agents,
           hidden: hostHiddenRef.current[serverId] ?? null,
@@ -987,6 +1010,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .then((written) => {
           if (!written && persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
         });
+      trackUntilSettled(cacheWrites.current, write);
     },
     [workspaceCache, conversationStore, channelStore],
   );
@@ -1154,7 +1178,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const loadOpenChats = useCallback(
     (serverId: string, agentIds: string[], client: RemoteTeamTransportRef, context: ServerLoadContext) => {
       const open = agentIds.filter((agentId) => conversationStore.isObserved(agentId));
-      void (async () => {
+      const loads = (async () => {
         for (const agentId of open) {
           if (!context.isCurrent()) return;
           if (!conversationStore.get(agentId) || !conversationStore.isObserved(agentId)) continue;
@@ -1174,6 +1198,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         }
         if (context.isCurrent()) persistServer(serverId);
       })();
+      trackUntilSettled(serverLoads.current, loads);
     },
     [conversationStore, persistServer],
   );
@@ -1256,10 +1281,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
       if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
-        void syncSidebarPins(serverId, (method, path, decode, body) =>
-          client.request(method, path, decode, body),
-        ).catch(() => undefined);
-      void channelStore.refresh(serverId);
+        trackUntilSettled(
+          serverLoads.current,
+          syncSidebarPins(serverId, (method, path, decode, body) => client.request(method, path, decode, body)),
+        );
+      trackUntilSettled(serverLoads.current, channelStore.refresh(serverId));
       if (supportsBrowserView(compatibility.capabilities)) {
         void client
           .request("GET", TEAM_API_ROUTES.browser.tabs, decodeMobileBrowserTabs)
@@ -1448,6 +1474,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const handleConnectionStatus = useCallback(
     (hostId: string, status: RemoteRecoveryStatus, failure: RemoteConnectionFailure | null, resuming: boolean) => {
       recoveryCountdowns.publish(hostId, { status, message: remoteRecoveryMessage(status, failure?.message ?? null) });
+      backgroundRefreshStatus(hostId, status);
       if (status.phase === "connecting") limitFirstConnection(hostId);
       setServers((current) => {
         const index = current.findIndex((server) => server.id === hostId);
@@ -1463,11 +1490,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (status.phase === "online" && hostId === activeServerIdRef.current) setHold(null);
       if (status.phase === "online") wakeAttempts.current.delete(hostId);
       if (status.phase !== "waiting" && status.phase !== "cooldown") return;
+      if (!foregroundRef.current) return;
       if (wakeAttempts.current.get(hostId) === status.attempt) return;
       wakeAttempts.current.set(hostId, status.attempt);
       wakeSelectedServer(hostId);
     },
-    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection],
+    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection, backgroundRefreshStatus],
   );
   useEffect(() => {
     if (!foreground || !activeServerId) return;
@@ -1490,18 +1518,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   useEffect(() => () => focusUse.dispose(), [focusUse]);
 
   useEffect(() => {
-    if (!foreground) {
+    if (!live) {
       loadGeneration.current += 1;
       conversationStore.cancelRequests();
       conversationStore.flush();
       for (const { id } of serversRef.current) persistServer(id);
       connectionWaits.dropAll(new Error(sourceText("error.remote.appInBackground")));
     }
-    directoryRefresh.setActive(foreground);
-  }, [foreground, directoryRefresh, conversationStore, connectionWaits, persistServer]);
+    directoryRefresh.setActive(live);
+  }, [live, directoryRefresh, conversationStore, connectionWaits, persistServer]);
 
   useEffect(() => {
-    if (!foreground) {
+    if (!live) {
       setHold({ serverId: activeServerIdRef.current });
       return;
     }
@@ -1511,7 +1539,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     }
     const timer = setTimeout(() => setHold(null), OTHER_SERVERS_RETURN_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [foreground]);
+  }, [live]);
   useEffect(() => {
     if (hold && hold.serverId !== activeServerId) setHold(null);
   }, [hold, activeServerId]);
@@ -2651,7 +2679,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               key={server.id}
               hostId={server.id}
               publicKey={server.publicKey}
-              active={foreground && (!othersHeld || server.id === activeServerId)}
+              active={(foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing}
+              background={!foreground}
               directory={directory}
               register={registerConnection}
               load={loadServer}

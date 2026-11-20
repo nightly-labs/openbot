@@ -193,6 +193,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
   "error.team.pendingApprovalUnsupported": "هذا الاتصال لا يدعم قراءة طلب الموافقة كاملًا.",
+  "error.team.pendingPromptsUnsupported": "هذا الاتصال لا يدعم قراءة الأسئلة المفتوحة.",
   "error.team.phoneFeedbackUnsupported": "هذا الاتصال لا يدعم إرسال بلاغ من تطبيق الهاتف.",
   "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",

@@ -20,6 +20,10 @@ import { type BillingError, BillingOperationError, billingCall, OPEN_STATUSES_SQ
 const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 const CODE_LENGTH = 8;
 const CODE_ATTEMPTS = 4;
+export interface ReferralInviter {
+  firstName: string | null;
+}
+
 export interface ReferralPage {
   link: string;
   earned: ReferralMoney[];
@@ -112,6 +116,20 @@ export class Referrals {
         .first<{ referred: number }>(),
     );
     return row !== null;
+  }).bind(this);
+
+  readonly inviter = Effect.fn("Referrals.inviter")(function* (
+    this: Referrals,
+    code: string,
+  ): Effect.fn.Return<ReferralInviter | null, BillingError | BillingOperationError> {
+    if (!isReferralCode(code)) return null;
+    const row = yield* billingCall(() =>
+      this.#database
+        .prepare("SELECT u.name AS name FROM referral_codes c JOIN users u ON u.id = c.user_id WHERE c.code = ?")
+        .bind(code)
+        .first<{ name: string | null }>(),
+    );
+    return row ? { firstName: firstName(row.name) } : null;
   }).bind(this);
 
   readonly page = Effect.fn("Referrals.page")(function* (
@@ -279,9 +297,13 @@ function friend(
   };
 }
 
+function firstName(name: string | null): string | null {
+  return (name ?? "").trim().split(/\s+/u)[0]?.slice(0, 40) || null;
+}
+
 function shortName(name: string | null): string {
   const words = (name ?? "").trim().split(/\s+/u).filter(Boolean);
-  const first = words[0]?.slice(0, 40) ?? "";
+  const first = firstName(name) ?? "";
   const last = words.length > 1 ? words[words.length - 1]?.[0] : undefined;
   return last ? `${first} ${last.toUpperCase()}.` : first;
 }

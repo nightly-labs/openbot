@@ -191,6 +191,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
   "error.team.pendingApprovalUnsupported": "Это подключение не позволяет прочитать запрос на подтверждение целиком.",
+  "error.team.pendingPromptsUnsupported": "Это подключение не поддерживает чтение открытых вопросов.",
   "error.team.phoneFeedbackUnsupported": "Это подключение не позволяет отправить отчёт из приложения на телефоне.",
   "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":

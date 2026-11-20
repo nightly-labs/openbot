@@ -53,6 +53,7 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
+  agentAccessRank,
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
@@ -217,7 +218,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -1978,7 +1979,8 @@ export class OpenBotToolRouter {
     if (params.tool === "list_agents") {
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
-      const agents = this.#hooks.listAgents().map((agent) => {
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds).map((agent) => {
         const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
         const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
         const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
@@ -2031,7 +2033,12 @@ export class OpenBotToolRouter {
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
     }
 
-    if (params.tool === "interrupt_agent") return yield* this.#interruptTool.handle(params, senderAgentId);
+    if (params.tool === "interrupt_agent")
+      return yield* this.#interruptTool.handle(
+        params,
+        senderAgentId,
+        this.#memberRequesters(senderAgentId, params.turnId),
+      );
 
     if (params.tool === "read_agent") {
       const args = readAgentToolSchema.parse(params.arguments ?? {});
@@ -2275,6 +2282,7 @@ export class OpenBotToolRouter {
       inExecutionThread:
         this.#conversation.isExecutionThread(callerThreadId) &&
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
+      requesterIds: this.#memberRequesters(senderAgentId, params.turnId),
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;
@@ -2355,13 +2363,15 @@ export class OpenBotToolRouter {
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
-        const found = matches.length > 0 || serverPlaces.length > 0;
+        const chatPlaces = searchChatPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0 || chatPlaces.length > 0;
         const apps =
           "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
           status: found ? "matches" : "not_found",
           matches,
           ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          ...(chatPlaces.length > 0 ? { chatPlaces } : {}),
           next: found
             ? [
                 matches.length > 0
@@ -2369,6 +2379,9 @@ export class OpenBotToolRouter {
                   : "",
                 serverPlaces.length > 0
                   ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                chatPlaces.length > 0
+                  ? "A chat place is a feature of the chat itself, with no id and no card: when it fits, tell the user in words where it is and what it does."
                   : "",
                 apps,
                 "When none fits, try other English words once, then say that you found no setting for it.",
@@ -2901,6 +2914,33 @@ export class OpenBotToolRouter {
     return [...ids];
   }
 
+  #memberRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind === "agent") {
+        for (const id of this.#mailbox.requesterIds(delivery.messageId)) ids.add(id);
+        continue;
+      }
+      const member = this.#mailbox.senderMember(delivery.messageId);
+      if (member && this.#remoteMember(delivery.messageId)) ids.add(member.id);
+    }
+    return [...ids];
+  }
+
+  #reachableAgents(senderAgentId: string, requesterIds: readonly string[]): AgentSummary[] {
+    return this.#hooks
+      .listAgents()
+      .filter(
+        (agent) =>
+          agent.id === senderAgentId ||
+          requesterIds.every(
+            (personId) =>
+              agentAccessRank(this.#channels.hooks.personAgentLevel?.(personId, agent.id) ?? "manage") >=
+              agentAccessRank("chat"),
+          ),
+      );
+  }
+
   #fromRemoteMember(agentId: string, turnId: string): boolean {
     return this.#mailbox
       .findDeliveriesByTurn(agentId, turnId)
@@ -3338,7 +3378,8 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
-      const agents = this.#hooks.listAgents();
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds);
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
@@ -3422,6 +3463,7 @@ export class OpenBotToolRouter {
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
+          ...(requesterIds.length > 0 ? { requesterIds } : {}),
           recipientAgentIds: recipientValues,
           text,
           sourcePaths: paths,

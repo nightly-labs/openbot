@@ -12,6 +12,7 @@ import {
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
   WORKFLOW_SLACK_EVENTS,
+  WORKFLOW_STEP_NAME_FIELD,
   WORKFLOW_TELEGRAM_EVENTS,
   type WorkflowEdge,
   type WorkflowGraph,
@@ -185,8 +186,14 @@ function refuse(message: string): never {
   throw new WorkflowEditRefused(message);
 }
 
+function stepNameOf(node: WorkflowNode): string {
+  const name = node.fields[WORKFLOW_STEP_NAME_FIELD];
+  return typeof name === "string" ? name.trim() : "";
+}
+
 function readFields(node: WorkflowNode) {
-  const fields = runtimeFields(node);
+  const name = stepNameOf(node);
+  const fields = name ? { ...runtimeFields(node), [WORKFLOW_STEP_NAME_FIELD]: name } : runtimeFields(node);
   if (node.kind !== "trigger" || node.fields.trigger !== "github") return fields;
   const repositories = githubTriggerRepositories(node).join("\n");
   delete fields.repositories;
@@ -602,7 +609,7 @@ function stepLabel(node: WorkflowNode | undefined) {
   if (!node) return {};
   const field = LABEL_FIELD[node.kind];
   const value = field === undefined ? undefined : node.fields[field];
-  const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+  const text = (stepNameOf(node) || (typeof value === "string" ? value : "")).replace(/\s+/g, " ").trim();
   return text
     ? { kind: node.kind, label: text.length > LABEL_CHARS ? `${text.slice(0, LABEL_CHARS)}…` : text }
     : { kind: node.kind };
