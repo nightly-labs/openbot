@@ -9,3 +9,11 @@
 .thread-header-story[data-narrow] {
   width: 560px;
 }
+
+.threads-pane-story {
+  position: relative;
+  width: 360px;
+  height: 100vh;
+  border-inline-start: 1px solid var(--openbot-border);
+  margin-inline-start: auto;
+}
