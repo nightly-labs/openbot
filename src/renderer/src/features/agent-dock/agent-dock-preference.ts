@@ -5,6 +5,7 @@ import {
   type AgentDockEdge,
   type AgentDockOffset,
   type AgentDockSeatRef,
+  sameAgentDockDisplayBounds,
 } from "@openbot/contracts/ipc";
 import { agentDockSeatKey } from "@openbot/ui/features/agent-dock/AgentDock";
 import { createSignal } from "solid-js";
@@ -38,6 +39,7 @@ const DEFAULT_PREFERENCE: AgentDockPreference = {
   offsets: [],
 };
 
+const DISPLAY_EXTENT = AGENT_DOCK_LIMITS.inputExtent;
 const PREFERENCE_KEY = "openbot:agent-dock-preference";
 const SEATS_PREFIX = "openbot:agent-dock:";
 
@@ -65,7 +67,21 @@ const preferenceSchema = z
     results: z.boolean().catch(DEFAULT_PREFERENCE.results),
     activeSeats: z.boolean().catch(DEFAULT_PREFERENCE.activeSeats),
     offsets: z
-      .array(z.object({ displayId: z.number().int().nonnegative(), offset: z.number().min(0).max(1) }))
+      .array(
+        z.object({
+          displayId: z.number().int().nonnegative(),
+          offset: z.number().min(0).max(1),
+          bounds: z
+            .object({
+              x: z.number().int().min(-DISPLAY_EXTENT).max(DISPLAY_EXTENT),
+              y: z.number().int().min(-DISPLAY_EXTENT).max(DISPLAY_EXTENT),
+              width: z.number().int().min(1).max(DISPLAY_EXTENT),
+              height: z.number().int().min(1).max(DISPLAY_EXTENT),
+            })
+            .optional()
+            .catch(undefined),
+        }),
+      )
       .max(AGENT_DOCK_LIMITS.displays)
       .catch(DEFAULT_PREFERENCE.offsets),
   })
@@ -160,9 +176,12 @@ export function setAgentDockPreference(patch: Partial<AgentDockPreference>): voi
 }
 
 export function saveAgentDockOffset(moved: AgentDockOffset): void {
-  const others = preference().offsets.filter((item) => item.displayId !== moved.displayId);
+  const others = preference().offsets.filter(
+    (item) => item.displayId !== moved.displayId && !sameAgentDockDisplayBounds(item.bounds, moved.bounds),
+  );
+  const saved = { displayId: moved.displayId, offset: moved.offset, ...(moved.bounds && { bounds: moved.bounds }) };
   setAgentDockPreference({
-    offsets: [...others, { displayId: moved.displayId, offset: moved.offset }].slice(-AGENT_DOCK_LIMITS.displays),
+    offsets: [...others, saved].slice(-AGENT_DOCK_LIMITS.displays),
   });
 }
 
