@@ -59,6 +59,7 @@ import {
   reconcileAttentionApprovals,
   reconcileAttentionPrompts,
   sameData,
+  withListedPrompts,
   withoutAttention,
 } from "./agent-runtime-snapshot";
 import { useAgents } from "./agents-context";
@@ -160,6 +161,10 @@ export function AgentEventBridge() {
   const retryNotices = createRetryNotices();
   let readRefresh = 0;
   let snapshotReceived = false;
+  let promptListRead: "idle" | "reading" | "again" = "idle";
+  let promptListScope = 0;
+  const endedDuringPromptListRead = new Set<string>();
+  const askedDuringPromptListRead = new Set<string>();
   let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
@@ -321,6 +326,7 @@ export function AgentEventBridge() {
         return;
       case "turn-completed": {
         completedTurnByAgent.set(event.agentId, event.turnId);
+        if (promptListRead !== "idle") endedDuringPromptListRead.add(`turn:${event.turnId}`);
         const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
         retryNotices.clearAtTurnEnd(bannerKey, setConversationErrors, setConversationErrorRuns);
         setTurnProgress((current) => {
@@ -378,6 +384,7 @@ export function AgentEventBridge() {
           playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
+        if (promptListRead !== "idle") askedDuringPromptListRead.add(String(event.requestId));
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
         if (agentList().some((agent) => agent.id === event.agentId && agent.threadId === event.threadId)) {
           setPresentedPromptResolutions((current) => ({ ...current, [event.agentId]: undefined }));
@@ -391,6 +398,7 @@ export function AgentEventBridge() {
         return;
       case "agent-input-resolved":
         if (event.kind === "prompt") {
+          if (promptListRead !== "idle") endedDuringPromptListRead.add(`request:${event.requestId}`);
           setPendingPrompts((current) =>
             withoutAttention(
               current,
@@ -491,6 +499,40 @@ export function AgentEventBridge() {
     }
   }
 
+  function readListedPrompts(): void {
+    if (promptListRead !== "idle") {
+      promptListRead = "again";
+      return;
+    }
+    promptListRead = "reading";
+    endedDuringPromptListRead.clear();
+    askedDuringPromptListRead.clear();
+    const scope = promptListScope;
+    const serverId = activeServerId();
+    const local = serverId === LOCAL_SERVER_ID;
+    void agentsPort()
+      .agent.listPendingPrompts(serverId)
+      .then((prompts) => {
+        if (scope !== promptListScope || serverId !== activeServerId()) return;
+        const open = prompts.filter(
+          (prompt) =>
+            !endedDuringPromptListRead.has(`request:${prompt.requestId}`) &&
+            (!local || prompt.detached === true || !endedDuringPromptListRead.has(`turn:${prompt.turnId}`)),
+        );
+        flush(() =>
+          setPendingPrompts((pending) =>
+            withListedPrompts(pending, open, submittedPromptRequests(), askedDuringPromptListRead),
+          ),
+        );
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        const again = promptListRead === "again";
+        promptListRead = "idle";
+        if (again && scope === promptListScope) readListedPrompts();
+      });
+  }
+
   function applyAgentRuntimeSnapshot(snapshot: AgentRuntimeSnapshot): void {
     const runtimeTurns = new Map(snapshot.activeTurns.map((turn) => [turn.agentId, turn.turnId]));
     setActiveTurns((current) => keepEqualRecord(current, Object.fromEntries(runtimeTurns)));
@@ -543,6 +585,7 @@ export function AgentEventBridge() {
       keepEqualRecord(current, reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns)),
     );
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
+    if (!snapshot.attentionComplete) readListedPrompts();
     setApprovals((current) => {
       const next = reconcileAttentionApprovals(current, snapshot);
       return next.some(approvalIsCut) ? next : keepEqualList(current, next);
@@ -572,6 +615,7 @@ export function AgentEventBridge() {
       .catch(() => undefined);
     return () => {
       readRefresh += 1;
+      promptListScope += 1;
       unsubscribe();
       completedTurnByAgent.clear();
     };
