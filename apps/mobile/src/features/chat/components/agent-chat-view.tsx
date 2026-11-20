@@ -213,8 +213,13 @@ export function MobileChatView({
       if (pending?.unread && stored()) {
         setFocus((current) => (current?.messageId === pending.messageId ? { ...current, loaded: true } : current));
         await readLatest();
-        if (request.current === id && !stored())
-          await loadConversationAround(agent.id, pending.messageId, agent.serverId);
+        if (
+          request.current === id &&
+          !stored() &&
+          !(await loadConversationAround(agent.id, pending.messageId, agent.serverId)) &&
+          request.current === id
+        )
+          setFocus(null);
         return;
       }
       if (pending?.unread) {

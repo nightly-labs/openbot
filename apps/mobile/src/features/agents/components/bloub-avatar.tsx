@@ -10,6 +10,7 @@ import Animated, {
   type DerivedValue,
   Easing,
   ReduceMotion,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -166,10 +167,18 @@ const PlushAvatar = memo(function PlushAvatar({
   if (animate && !live) setLive(true);
   const { shown, style: popStyle } = usePlushPop(seed, hue, color, transition === "pop" && facesMove);
   const appearance = useConnectionAppearance(disconnected);
+  const [saturated, setSaturated] = useState(!disconnected);
+  useAnimatedReaction(
+    () => appearance.get().saturation >= 1,
+    (full, previous) => {
+      if (full !== previous) scheduleOnRN(setSaturated, full);
+    },
+  );
   const settling = live && !wantsMotion && !disconnected;
-  const release = useCallback(() => {
-    if (appearance.get().saturation >= 1) setLive(false);
-  }, [appearance]);
+  const [stillShown, setStillShown] = useState(false);
+  const showStill = useCallback(() => setStillShown(true), []);
+  if (!settling && stillShown) setStillShown(false);
+  if (settling && stillShown && saturated) setLive(false);
   const appearanceStyle = useAnimatedStyle(() => ({ opacity: appearance.get().opacity }));
   const saturation = useDerivedValue(() => appearance.get().saturation);
   const drawn = size * PLUSH_BODY_SCALE;
@@ -183,7 +192,7 @@ const PlushAvatar = memo(function PlushAvatar({
       size={drawn}
       pixels={pixels}
       saturation={disconnected ? DISCONNECTED_APPEARANCE.saturation : 1}
-      onDisplay={settling ? release : undefined}
+      onDisplay={settling ? showStill : undefined}
     />
   );
   return (

@@ -102,10 +102,20 @@ export default function RemoteTeamBridge({
   const browserView = useRef<ReturnType<typeof createBrowserViewBridge> | null>(null);
   const remoteDesktop = useRef<ReturnType<typeof createRemoteDesktopRelay> | null>(null);
   const queueTeamEvent = async (hostId: string, event: RemoteTeamEvent) => pendingEvents.push(hostId, event);
+  const afterTeamEvents = <Args extends unknown[]>(callback: ((...args: Args) => Promise<void>) | undefined) =>
+    callback &&
+    (async (...args: Args) => {
+      pendingEvents.flush();
+      await callback(...args);
+    });
   const actions = useRef<RemoteTeamPeerActions>({ ...callbacks, onTeamEvent: queueTeamEvent });
   actions.current = {
     ...callbacks,
     onTeamEvent: queueTeamEvent,
+    onUploadProgress: afterTeamEvents(callbacks.onUploadProgress),
+    onDownloadProgress: afterTeamEvents(callbacks.onDownloadProgress),
+    onAccountProfileChanged: afterTeamEvents(callbacks.onAccountProfileChanged),
+    onAccountServersChanged: afterTeamEvents(callbacks.onAccountServersChanged),
     onHostStreamData: (data) => {
       browserView.current?.receive(data);
       remoteDesktop.current?.receive(data);
@@ -218,11 +228,12 @@ export default function RemoteTeamBridge({
 
   useEffect(
     () => () => {
+      pendingEvents.flush();
       browserView.current?.disconnect(null);
       remoteDesktop.current?.disconnect(null);
       void peer.dispose();
     },
-    [peer],
+    [peer, pendingEvents],
   );
   return null;
 }

@@ -450,7 +450,15 @@ export const RemoteTeamTransport = memo(
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
       onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
         const { onTeamEvent } = latest.current.props;
-        for (const event of events) onTeamEvent(hostId, event);
+        let failure: { error: unknown } | null = null;
+        for (const event of events) {
+          try {
+            onTeamEvent(hostId, event);
+          } catch (error) {
+            failure ??= { error };
+          }
+        }
+        if (failure) throw failure.error;
       },
     }));
 

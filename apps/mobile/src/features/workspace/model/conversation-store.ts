@@ -52,6 +52,10 @@ export class MobileConversationStore {
     return this.#missedLatest.has(agentId);
   }
 
+  #markMissedLatest(agentId: string) {
+    if (!this.#upToDate.has(agentId)) this.#missedLatest.add(agentId);
+  }
+
   markStale() {
     this.#upToDate.clear();
   }
@@ -277,7 +281,7 @@ export class MobileConversationStore {
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
             if (!isCurrent() || this.#loads.get(agentId) !== load) {
-              this.#missedLatest.add(agentId);
+              this.#markMissedLatest(agentId);
               return page;
             }
             this.applyPage(page, undefined, load.attach);
@@ -287,7 +291,7 @@ export class MobileConversationStore {
           return page;
         })
         .catch((error: unknown) => {
-          this.#missedLatest.add(agentId);
+          this.#markMissedLatest(agentId);
           throw error;
         })
         .finally(() => {
