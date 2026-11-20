@@ -1160,8 +1160,9 @@ Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's
 browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
 (`~/.local/share/devin`). It has no device-code sign-in. For a user at another device, the CLI gives
 its page (`https://app.devin.ai/auth/cli/continue`, with a loopback `redirect_uri`) to OpenBot's
-`open` command, and `provider-sign-in-relay-v2` relays it to the client's browser (#9561). A Windows
-host does not advertise it: its CLI opens the page with no command that OpenBot can take. Sign out
+`open` command, and `provider-sign-in-relay-v2` relays it to the client's browser (#9561). Only a Linux host
+advertises it: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has
+no `open` command that the CLI uses, so OpenBot cannot take the page there. Sign out
 runs `devin auth logout`. A signed-out Devin process answers `session/new` with an empty model list
 and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
 

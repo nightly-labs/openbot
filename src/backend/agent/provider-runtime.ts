@@ -1573,7 +1573,7 @@ export class ProviderRuntime implements ProviderPort {
               ...(provider === "antigravity" && googleSignInByOpenBot(onHost)
                 ? { openSignInPage: { site: "google", open: openExternal } }
                 : {}),
-              ...(provider === "devin" && onHost && process.platform !== "win32"
+              ...(provider === "devin" && onHost && process.platform === "linux"
                 ? { openSignInPage: { site: "devin", open: openExternal } }
                 : {}),
             }).pipe(

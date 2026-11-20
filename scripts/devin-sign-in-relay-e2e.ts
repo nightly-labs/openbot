@@ -43,7 +43,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   server.listen(0, "127.0.0.1", () => {
     const redirect = "http://127.0.0.1:" + server.address().port + "/callback";
     const page = origin + "/auth/cli/continue?redirect_uri=" + encodeURIComponent(redirect) + "&state=" + state + "&code_challenge=x&code_challenge_method=S256";
-    spawn(process.platform === "darwin" ? "open" : "xdg-open", [page], { stdio: "ignore" });
+    spawn("xdg-open", [page], { stdio: "ignore" });
   });
 });
 `;
@@ -127,7 +127,7 @@ const report: {
   cases: SignInCase[];
 } = { passed: false, wire: {}, cases: [] };
 try {
-  if (process.platform === "win32") throw new Error("A Windows host does not advertise the capability.");
+  if (process.platform !== "linux") throw new Error("Only a Linux host advertises the capability.");
   const v1Only = (capability: string) => capability === SIGN_IN_RELAY_CAPABILITY;
   const both = (capability: string) =>
     capability === SIGN_IN_RELAY_CAPABILITY || capability === PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY;

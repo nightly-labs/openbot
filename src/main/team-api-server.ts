@@ -2610,7 +2610,7 @@ export class TeamApiServer {
           return (
             this.#options.mcpServers !== undefined &&
             this.#options.signInRelay !== undefined &&
-            process.platform !== "win32"
+            process.platform === "linux"
           );
         if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
           return (
