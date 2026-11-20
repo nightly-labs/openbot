@@ -25,7 +25,6 @@ import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agen
 import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
-import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
@@ -92,7 +91,7 @@ export function WorkspaceShell(props: {
     if (agentSetupOpen()) return "agent-setup";
     if (channelOpen()) return "channel";
     if (activeDirectMember()) return "direct";
-    return layout.sidebarView() === "routines" ? "routines" : "agent";
+    return "agent";
   });
   const agentChatOpen = () => middlePane() === "agent";
   if (chatWindow) {
@@ -390,9 +389,6 @@ export function WorkspaceShell(props: {
           </Show>
           <Show when={agentChatOpen() && !chatHeld()}>
             <WorkspaceConversation account={props.account} />
-          </Show>
-          <Show when={middlePane() === "routines"}>
-            <WorkspaceRoutineFlows />
           </Show>
           <Show when={middlePane() === "channel"}>
             <WorkspaceChannelConversation account={props.account} />

@@ -86,6 +86,3 @@ export const TasksView = lazy(() =>
 export const ServerOnboarding = lazy(() =>
   import("./features/onboarding/ServerOnboarding").then((module) => ({ default: module.ServerOnboarding })),
 );
-export const RoutineFlowsCanvas = lazy(() =>
-  import("./features/routine-flows/RoutineFlowsCanvas").then((module) => ({ default: module.RoutineFlowsCanvas })),
-);

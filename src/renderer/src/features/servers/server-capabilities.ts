@@ -109,8 +109,6 @@ export function serverSupportsCapability(
       capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
-      capability === "routine-flows-v1" ||
-      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||

@@ -263,18 +263,12 @@ iCloud, cannot read it.
 
 ## Routine flows
 
-A routine flow hands the answer of an agent routine on to other agents. The Routines view of the
-sidebar shows one canvas for each agent: every routine whose run reaches it, the agents its links
-reach, and the last run of each routine. The host keeps the flows. A joined desktop and the web
-client read and change them through the optional `routine-flows-v1` capability (see
-[Routine flows](servers.md#routine-flows)); a host without it shows a notice instead of the canvas.
-The agent event `routine-flows-changed` names the agent whose canvas changed, on this computer and
-on a joined host.
-
-- `src/renderer/src/features/routine-flows/RoutineFlowsCanvas.tsx` is the canvas. It reads no
-  application context: it takes a `RoutineFlowsHost` (`routine-flows-port.ts`), the open agent and
-  the agent list. `WorkspaceRoutineFlows.tsx` gives it the active server through main, and
-  `web-client/web-routine-flows.ts` gives it the connected host over the Team API.
+A routine flow hands the answer of an agent routine on to other agents. The host keeps the flows,
+and agents change them with their `openbot` tools. The desktop and the web client have no routine
+canvas: the Routines view of the sidebar was removed. The host still serves the optional
+`routine-flows-v1` and `routine-flow-stop-v1` routes (see [Routine flows](servers.md#routine-flows))
+to clients in the support window that still show the canvas. The agent event `routine-flows-changed`
+names the agent whose flows changed.
 
 - `src/backend/routine-flows/` owns the three tables of migration 31: links, node positions and steps.
   The rows are written directly, not through `dispatch`, because a step holds the text that one agent
@@ -296,17 +290,13 @@ on a joined host.
   the run as cancelled, so the end of its turn cannot change that, then cancels its queued delivery
   and interrupts its turn, also in the routine's side thread. A turn that cannot be stopped does not
   keep the run open. Then each running handoff step ends as cancelled and its turn stops, and each
-  agent that has not started is skipped. The canvas shows Stop in place of Run now while the run of the
-  routine in focus works; a joined host needs `routine-flow-stop-v1`.
-- A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
-  carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
-  runs a test through the events API, as the routine settings do. On a joined host only an owner or
-  admin has that API (`events-v1`); a member sees no webhook config and cannot change or run a
-  webhook routine from the canvas.
+  agent that has not started is skipped. Older clients send Stop through `routine-flow-stop-v1`.
+- The canvas route gives routines of every trigger kind (`routine-flow-routines.ts`). A webhook
+  routine carries its endpoint, event type and filters. Webhook config stays on the events API
+  (`events-v1`), as in the routine settings.
 - Agents read and change flows with the `openbot` tools `list_routine_flows`, `connect_routine_agents`
   and `disconnect_routine_agents` (`routine-flow-tools.ts`). `RoutineFlows` is built after the agent
-  service, so the tool router reads it through a getter. The canvas chat panel sends the user's request
-  to the open agent's own conversation and shows the answer of the turn that read it.
+  service, so the tool router reads it through a getter.
 
 ## Workflows
 
@@ -1421,8 +1411,8 @@ Fields added after version 1 shipped are optional, so an older app ignores them:
   agent step and a channel output named by key. A messaging connection is left empty and the
   workflow is marked `relink`; a webhook trigger needs a new address, which the user makes in the
   workflow, because its secret shows only once.
-- `settings.routineFlowPositions`: the places on each routine canvas, as `routine:<key>` or
-  `agent:<key>`.
+- `settings.routineFlowPositions`: the node places that older clients saved for each routine canvas,
+  as `routine:<key>` or `agent:<key>`.
 - With "Include chat history" (`includeHistory`, this computer's server only; `instance-transfer-v1`
   does not carry it), `agents[].history` names `agents/<key>/history/index.json`, which lists the
   agent's own chat and side threads (title, title source, origin, archived state, routine key) and the
