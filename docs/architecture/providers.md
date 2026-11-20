@@ -540,16 +540,19 @@ preload decoder. Cancellation and failure preserve the previous installation and
 Main updates the managed CLIs with no offer. After `startUpdateChecks`, each check (at start and
 then each hour) starts the download of each managed CLI that has a newer version, before it sends its
 status, so the renderer announces no offer. `providerUseChanged` does the same at once, for a provider
-that is turned on or that stops using a CLI the user installed. Until a check starts the downloads,
+that is turned on or that stops using a CLI the user installed. When a check runs at that time, it starts
+them after the check, so the download gets the latest version. Until a check starts the downloads,
 `getStatus` does not offer the CLIs that it will update. A CLI the user installed, an explicit path and
 an off provider keep the normal offer path. A failed update stays in `download-error` and is not started
-again by itself. A cancelled update is not started again for the same version, and stays offered. The
+again by itself. A cancelled update is not started again for the same version until the app restarts,
+and stays offered. The decline is kept in memory only. The
 download waits for idle agents through `updateRuntime`. The renderer shows a notification for such an
 update only when it fails, with a Retry.
 
 Provider settings show "Update all" in the Connected header when one or more providers that are on
 have an offer. It calls `onUpdateProvider` for each of them, so it uses the same local or Team API path
-as the Update button of one provider. The mobile server providers screen has the same action.
+as the Update button of one provider. The mobile server providers screen has the same action. Both leave out installer providers
+such as Hermes.
 
 `ProvidersProvider` starts the shared renderer runtime store for the active server. The store
 announces each provider that gains an offer as one notification, from an effect over both the

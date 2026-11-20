@@ -504,7 +504,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           yield* this.#inspectEffect(provider).pipe(Effect.ignore);
         }
       }
-      if (this.#target) yield* this.#startAutomaticUpdates(this.#target);
+      const target = this.#target;
+      const check = this.#check;
+      if (target && check) {
+        yield* Effect.forkIn(
+          this.#awaitReleaseCheck(check).pipe(Effect.andThen(this.#startAutomaticUpdates(target))),
+          this.#scope,
+        );
+      } else if (target) yield* this.#startAutomaticUpdates(target);
       this.#revision += 1;
       this.emit("status", this.getStatus());
     });

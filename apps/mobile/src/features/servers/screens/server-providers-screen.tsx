@@ -1,3 +1,4 @@
+import { isInstallerProvider } from "@openbot/contracts/agent-providers";
 import { isAgentProvider, type ProviderRuntimeSnapshot, providerDisplayName } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
@@ -61,22 +62,29 @@ export function ServerProvidersScreen() {
     );
   const connected = rows.filter((row) => row.status?.state === "available");
   const updates = rows.flatMap((row) =>
-    row.updatable && row.runtime && !row.status?.off ? [row.runtime.provider] : [],
+    row.updatable && row.runtime && !row.status?.off && !isInstallerProvider(row.runtime.provider)
+      ? [row.runtime.provider]
+      : [],
   );
   const updateAll = async (providerAdmin: ProviderAdmin) => {
     setUpdatingAll(true);
     setCheckResult(null);
     let failure: unknown = null;
     let snapshot: ProviderRuntimeSnapshot | null = null;
-    for (const provider of updates) {
-      try {
-        snapshot = await providerAdmin.download(provider);
-      } catch (cause) {
-        failure ??= cause;
+    try {
+      for (const provider of updates) {
+        try {
+          snapshot = await providerAdmin.download(provider);
+        } catch (cause) {
+          failure ??= cause;
+        }
       }
+      if (snapshot) await applyRuntimes(snapshot);
+    } catch (cause) {
+      failure ??= cause;
+    } finally {
+      setUpdatingAll(false);
     }
-    if (snapshot) await applyRuntimes(snapshot);
-    setUpdatingAll(false);
     if (failure === null) {
       void haptics.notification("success");
       return;
@@ -142,7 +150,7 @@ export function ServerProvidersScreen() {
           ) : null}
           <SettingsRow
             disclosure={false}
-            disabled={checking}
+            disabled={checking || updatingAll}
             leading={<RowIcon icon={RefreshCw} tone="accent" />}
             onPress={() => {
               setChecking(true);
