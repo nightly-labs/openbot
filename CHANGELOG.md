@@ -80,6 +80,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - A running Agent step shows what its agent does now, the step before it, and the number of steps
   that are done. The step keeps its size while the text changes. This also works on a joined server,
   with no server update.
+- An invite link (`openbot.run/?ref=CODE`) now opens an invite page. It shows the first name of the
+  person who sent the link, the 10% discount on your first payment, the invite code with a Copy
+  button, and the hosted server and license prices with the discount. An unknown code opens the
+  normal home page.
 
 ### Changed
 
@@ -547,6 +551,8 @@ All notable changes to OpenBot will be documented here. The project follows
   the work after it, and to a task that the agent starts for the member. Before, a member could ask
   an agent to get answers from an agent that their role hides. Owners, admins and the person on the
   server's own computer see no change. The server must also be on the new version.
+- A ChatGPT agent no longer shows the warning "Exceeded skills context budget" in the chat. The chat
+  continued after it, and you could do nothing about it.
 
 ## [0.74.0] - 2026-11-19
 
