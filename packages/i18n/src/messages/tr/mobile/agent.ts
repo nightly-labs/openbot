@@ -411,6 +411,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profilleri yönet",
   "mobile.agent.browserProfile.footer":
     "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
   "mobile.agent.planCard.footer":

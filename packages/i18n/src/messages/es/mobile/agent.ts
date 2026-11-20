@@ -400,6 +400,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gestionar perfiles",
   "mobile.agent.browserProfile.footer":
     "Cada perfil guarda sus propios inicios de sesión y cookies. Un cambio cierra las pestañas abiertas del agente.",
+  "mobile.agent.browserProfile.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. El agente debe iniciar sesión de nuevo en esos sitios.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot no pudo cambiar el perfil del navegador del agente.",
   "mobile.agent.planCard.label": "Mostrar el plan antes de tareas largas",
   "mobile.agent.planCard.footer":

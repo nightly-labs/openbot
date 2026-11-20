@@ -750,6 +750,10 @@ export class ProviderRuntime implements ProviderPort {
     );
   }
 
+  hasPendingOperation(): boolean {
+    return this.#providerStarts.size + this.#providerConnectionCommands.size + this.#replacingCli.size > 0;
+  }
+
   activeProcessCount(): number {
     return (
       this.#cliLogin.size +

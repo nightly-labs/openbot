@@ -57,6 +57,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "レトロな夕焼け",
   "settings.chatBackdrop.snowfall": "雪",
   "settings.chatBackdrop.fireflies": "ホタル",
+  "settings.chatBackdrop.coast": "ネオンの海岸",
   "settings.chatBackdrop.upload": "画像をアップロード…",
   "settings.chatBackdrop.uploadRefused": "20 MB 以下の PNG、JPEG、GIF、WebP、または AVIF 画像を使ってください。",
   "settings.chatBackdrop.saveFailed": "背景を保存できませんでした。",

@@ -20,6 +20,7 @@ const DynamicIsland = createSimpleContext({
     const coordinator = new DynamicIslandCoordinator(islandText);
     const connectedServers = new Set(["local"]);
     let presentationScheduled = false;
+    let publishedPresentation: string | undefined;
     let lastPublishedAt = Number.NEGATIVE_INFINITY;
     let publishTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -40,17 +41,28 @@ const DynamicIsland = createSimpleContext({
       return ordered.filter((serverId) => !muted.has(serverId) && isDynamicIslandServerVisible(choices, serverId));
     }
 
+    function islandCanShow(): boolean {
+      const info = platform.appInfo();
+      return info !== null && info.dynamicIslandUnavailable !== true && generalSettings().macBookNotch;
+    }
+
     function publishPresentation(): void {
       if (platform.landingPreview || platform.chatWindow || presentationScheduled) return;
+      if (!untrack(islandCanShow)) return;
       presentationScheduled = true;
       const send = () => {
         presentationScheduled = false;
         publishTimer = undefined;
         lastPublishedAt = performance.now();
         const presentation = coordinator.presentation(serverOrder());
+        const serialized = JSON.stringify(presentation);
+        if (serialized === publishedPresentation) return;
+        publishedPresentation = serialized;
         void dynamicIslandPort()
           .dynamicIsland.publishPresentation(presentation)
-          .catch(() => undefined);
+          .catch(() => {
+            if (publishedPresentation === serialized) publishedPresentation = undefined;
+          });
       };
       const wait = lastPublishedAt + PUBLISH_INTERVAL_MS - performance.now();
       if (wait > 0) publishTimer = setTimeout(send, wait);
@@ -81,7 +93,7 @@ const DynamicIsland = createSimpleContext({
     createEffect(
       () => {
         const settings = generalSettings();
-        return `${settings.macBookNotchNewServers}:${JSON.stringify(settings.macBookNotchServers)}`;
+        return `${islandCanShow()}:${settings.macBookNotchNewServers}:${JSON.stringify(settings.macBookNotchServers)}`;
       },
       () => publishPresentation(),
       { defer: true },
