@@ -36,7 +36,8 @@ export class TurnContext {
       else this.#memories.set(threadId, { current, delivered: null });
       this.#memoryOff.delete(threadId);
     } else {
-      if (this.#memories.get(threadId)?.delivered) this.#memoryOff.add(threadId);
+      if (this.#memories.get(threadId)?.delivered || (resume && carriesTurnContext(params)))
+        this.#memoryOff.add(threadId);
       this.#memories.delete(threadId);
     }
     if (isDynamicRecord(params) && typeof params.savedLogins === "boolean") {
@@ -99,6 +100,10 @@ export class TurnContext {
     this.#styleReminders.delete(threadId);
     this.#memoryOff.delete(threadId);
   }
+}
+
+function carriesTurnContext(params: unknown): boolean {
+  return isDynamicRecord(params) && "sectionTeammates" in params;
 }
 
 function readMemoryContext(params: unknown): MemoryContext | null {
