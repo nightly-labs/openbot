@@ -157,6 +157,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
         { kind: "apiKey", id: null, name: props.prefill.name ?? "", notes: "", key: apiKey() },
         props.scope ? scopeChoice() : undefined,
       );
+      setApiKey("");
     } catch (cause) {
       setSaveFailure(errorMessage(cause, t("vault.failed")));
     }
@@ -219,7 +220,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
       outcomeBadge
       inlineActions={!keyForm()}
       busy={props.busy}
-      error={saveFailure() ?? props.error}
+      error={props.error ?? saveFailure()}
       onSkip={props.onSkip}
       actions={
         <Show
