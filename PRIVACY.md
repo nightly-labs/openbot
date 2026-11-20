@@ -2257,6 +2257,23 @@ Notifications only inform: they have no buttons.
 Settings > Notifications turns this off, and sets the preview and the sound. Android also lists one
 notification channel for each sound in the system settings of the app.
 
+## Phone background refresh
+
+While you are signed in, the phone app reads your servers in the background, so it shows current
+agents, chats and channels when you open it. iOS starts this refresh through Background App Refresh,
+and Android through its job scheduler, at most once every 15 minutes. The system decides when it
+runs, and it can run it less often or not at all. The app refreshes only while it is still in the
+memory of the phone.
+
+A refresh uses the same encrypted host connection and the same requests as the app on screen, for at
+most 25 seconds. It sends no new data to the hosts, the OpenBot services, Apple or Google. The phone
+keeps what it reads in the same encrypted copy that it keeps for an offline start. During a refresh,
+the hosts know that the app is not on screen, so they continue to send notifications, and the app does
+not mark a chat as read.
+
+On iPhone, Settings > General > Background App Refresh turns this off. Signing out stops it on both
+phones.
+
 ## Optional macOS Host Manager
 
 An administrator can install a local Host Manager for several native macOS users. It reads only
