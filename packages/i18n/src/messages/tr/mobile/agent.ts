@@ -502,6 +502,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Bu ana makine uzak bir cihazdan ajan yayımlayamaz.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Önbellek okumaları hariç token'lar",
   "mobile.agent.usage.estimatedCost": "Tahmini maliyet",
+  "mobile.agent.usage.noCostEstimate": "Maliyet tahmini yok",
   "mobile.agent.usage.daily": "Günlük kullanım",
   "mobile.agent.usage.tokens": "Token'lar",
   "mobile.agent.usage.cost": "Maliyet",

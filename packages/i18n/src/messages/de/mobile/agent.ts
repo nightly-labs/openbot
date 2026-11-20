@@ -500,6 +500,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Dieser Host kann keine Agenten von einem Remote-Gerät aus veröffentlichen.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens ohne Cache-Lesevorgänge",
   "mobile.agent.usage.estimatedCost": "Geschätzte Kosten",
+  "mobile.agent.usage.noCostEstimate": "Keine Kostenschätzung",
   "mobile.agent.usage.daily": "Tägliche Nutzung",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Kosten",

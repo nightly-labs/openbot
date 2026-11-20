@@ -499,6 +499,7 @@ export const messages = {
     "Este computador anfitrião não pode publicar agentes a partir de um dispositivo remoto.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens sem leituras de cache",
   "mobile.agent.usage.estimatedCost": "Custo estimado",
+  "mobile.agent.usage.noCostEstimate": "Sem estimativa de custo",
   "mobile.agent.usage.daily": "Uso diário",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Custo",

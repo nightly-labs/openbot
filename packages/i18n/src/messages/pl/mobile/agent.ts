@@ -527,6 +527,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Ten host nie może publikować agentów ze zdalnego urządzenia.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokeny bez odczytów z pamięci podręcznej",
   "mobile.agent.usage.estimatedCost": "Szacowany koszt",
+  "mobile.agent.usage.noCostEstimate": "Brak szacunku kosztu",
   "mobile.agent.usage.daily": "Dzienne użycie",
   "mobile.agent.usage.tokens": "Tokeny",
   "mobile.agent.usage.cost": "Koszt",

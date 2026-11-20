@@ -480,6 +480,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.publish.unsupported": "This host cannot publish agents from a remote device.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens without cache reads",
   "mobile.agent.usage.estimatedCost": "Estimated cost",
+  "mobile.agent.usage.noCostEstimate": "No cost estimate",
   "mobile.agent.usage.daily": "Daily usage",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Cost",
