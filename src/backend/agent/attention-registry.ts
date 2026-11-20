@@ -146,6 +146,7 @@ interface PendingPrompt {
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
   detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
   detached?: LateAnswerTarget;
+  expireTimer?: ReturnType<typeof setTimeout>;
   subagent?: true;
 }
 
@@ -722,6 +723,7 @@ export class AttentionRegistry {
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
       clearTimeout(pending.detach?.timer);
+      clearTimeout(pending.expireTimer);
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
@@ -1769,7 +1771,7 @@ export class AttentionRegistry {
       questions,
       ...(request.subagent ? { subagent: true as const } : {}),
     };
-    if (!questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
+    this.#limitQuestion(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -2134,6 +2136,19 @@ export class AttentionRegistry {
     };
   }
 
+  #limitQuestion(request: AppServerRequest, pending: PendingPrompt): void {
+    if (!pending.questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
+    if (pending.detach) return;
+    pending.expireTimer = setTimeout(() => this.#expireUnanswered(request.id, pending), this.#userAnswerLimitMs);
+  }
+
+  #expireUnanswered(requestId: RequestId, pending: PendingPrompt): void {
+    if (this.#prompts.get(requestId) !== pending || pending.saving) return;
+    this.#routines.markRunningForTurn(pending.turnId);
+    this.#expirePrompt(requestId, pending);
+    this.#emitRuntimeSnapshot();
+  }
+
   detachPromptsOf(provider: AgentProvider): void {
     for (const [requestId, pending] of this.#prompts)
       if (pending.client.provider === provider && pending.detach && !pending.saving)
@@ -2179,6 +2194,7 @@ export class AttentionRegistry {
     this.#prompts.delete(requestId);
     clearTimeout(pending.autoAnswer?.timer);
     clearTimeout(pending.detach?.timer);
+    clearTimeout(pending.expireTimer);
     this.#emitInputResolved("prompt", requestId, pending.agentId);
     if (pending.client.running && !pending.detached) {
       try {

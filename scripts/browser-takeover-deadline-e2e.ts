@@ -540,6 +540,41 @@ try {
     return answer;
   });
 
+  const askQuestion = (target: AttentionRegistry, turnId: string, isSecret: boolean) => {
+    const id = nextRequest++;
+    target.surfaceDynamicPrompt(client, {
+      id,
+      method: "item/tool/call",
+      params: {
+        threadId: THREAD,
+        turnId,
+        callId: `call-${id}`,
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "q1", header: "Plan", question: "Which plan?", isSecret }] },
+      },
+    });
+    return client.answered(id);
+  };
+
+  await step("a question in a chat with no late answer target expires at the limit", async () => {
+    const routine = limitedRegistry(() => null);
+    const answer = answerOf(await askQuestion(routine, "turn-limit-8", false));
+    assert.equal(answer.success, false);
+    assert.match(answer.next ?? "", /expired/);
+    assert.equal(routine.runtimeAttention().pendingPrompts.length, 0, "the question card stayed open");
+    assert.equal(routine.hasAttentionForTurn(THREAD, "turn-limit-8"), false, "the turn still waits");
+    return answer;
+  });
+
+  await step("a secret question expires at the limit", async () => {
+    const answer = answerOf(await askQuestion(limited, "turn-limit-9", true));
+    assert.equal(answer.success, false);
+    assert.match(answer.next ?? "", /expired/);
+    assert.equal(limited.runtimeAttention().pendingPrompts.length, 0, "the secret question card stayed open");
+    return answer;
+  });
+
   const failedFill = async (turnId: string, failure: Error) => {
     fillFailure = failure;
     const shown = count("browser-takeover-requested");
