@@ -310,6 +310,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
   "mobile.agent.runtime.searchModels": "搜索模型",
   "mobile.agent.runtime.noMatches": "没有匹配的模型。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，此提供商无法以“仅工作区”运行。要使用它，请先更改“权限”。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
@@ -462,6 +464,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "这台主机不支持从远程设备发布助手。",
   "mobile.agent.usage.tokensWithoutCacheReads": "不含缓存读取的 token",
   "mobile.agent.usage.estimatedCost": "预计费用",
+  "mobile.agent.usage.noCostEstimate": "无费用估算",
   "mobile.agent.usage.daily": "每日用量",
   "mobile.agent.usage.tokens": "Token",
   "mobile.agent.usage.cost": "费用",

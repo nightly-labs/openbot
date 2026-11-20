@@ -18,6 +18,7 @@ import { flush, onSettled } from "solid-js";
 import { showNewAgentBackdrop } from "../../agent-backdrops";
 import { withoutAgent } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, prepareCompletionSound } from "../../completion-sound";
+import { rendererPerfCount } from "../../perf-count";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
 import { queueAfterTurnCompleted } from "../../queue-reconciliation";
@@ -595,6 +596,7 @@ export function AgentEventBridge() {
   onSettled(() => {
     if (soundLevel(null) === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
+      rendererPerfCount(`agent.event ${event.type}`);
       if (event.type === "channels-changed") {
         void channels.changed(event.channelId);
         return;

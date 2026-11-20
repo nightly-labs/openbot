@@ -325,6 +325,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
   "mobile.agent.runtime.searchModels": "モデルを検索",
   "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "このプロバイダーは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、先に「権限」を変更してください。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
@@ -491,6 +493,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "このホストでは、リモートデバイスからエージェントを公開できません。",
   "mobile.agent.usage.tokensWithoutCacheReads": "キャッシュ読み取りを除くトークン",
   "mobile.agent.usage.estimatedCost": "推定コスト",
+  "mobile.agent.usage.noCostEstimate": "コストの推定なし",
   "mobile.agent.usage.daily": "日別の使用量",
   "mobile.agent.usage.tokens": "トークン",
   "mobile.agent.usage.cost": "コスト",

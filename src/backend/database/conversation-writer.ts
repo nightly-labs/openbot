@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
@@ -228,7 +229,9 @@ export class ConversationWriter {
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         const streamedEvent = { threadId, messageId, eventType: input.eventType };
-        supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent));
+        perfTimed("db.supersedeStreamed", () =>
+          supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent)),
+        );
         this.#streamedEvents.set(streamedEvent, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
         this.#core

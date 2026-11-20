@@ -5,6 +5,7 @@ import {
   type WfnFields,
   type WfnResult,
   type WfnRunStatus,
+  type WorkflowAgentProgress,
 } from "@openbot/ui/features/workflows/workflow-board";
 import type { WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
@@ -24,6 +25,7 @@ export function NodeGallery(props: {
   runOnApprove?: boolean;
   fields?: Record<string, WfnFields>;
   answer?: (id: string) => string | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   children: JSX.Element;
 }) {
   const [run, setRun] = createStore<{ status: Record<string, WfnRunStatus> }>({
@@ -68,6 +70,7 @@ export function NodeGallery(props: {
     fields: untrack(() => props.fields),
     locked: untrack(() => props.locked),
     status: (id) => run.status[id],
+    progress: (id) => props.progress?.(id),
     error: (id) => props.errors?.[id],
     retry: runStep,
     runStep,

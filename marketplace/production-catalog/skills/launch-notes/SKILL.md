@@ -16,7 +16,7 @@ description: "Write release notes from merged work, with a launch checklist that
 1. **Merged work.** In this order:
    - `gh` in the workspace when the user is signed in to GitHub: merged pull requests since the last release
      tag or a date the user gives.
-   - An installed plugin such as Linear, Atlassian or Notion. Find it with `tool_search` in the `openbot` tools.
+   - The tools of an installed plugin such as Linear, Atlassian or Notion; `openbot.tool_search` does not list them.
      Read issues that are done, in progress and blocked.
    - A pasted list, changelog or meeting notes.
 2. **Release name and date.** If they are missing, ask once with `ask_user`. Else write "release: to name".

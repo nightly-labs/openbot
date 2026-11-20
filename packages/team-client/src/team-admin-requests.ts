@@ -352,6 +352,10 @@ import {
   PROVIDER_ENVIRONMENT_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import type {
+  ProviderSignInRelay,
+  ProviderSignInRelayProvider,
+} from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_ROUTES } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_ROUTES } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { decodeProviderUseResponse, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -371,7 +375,7 @@ import {
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
-import { type SIGN_IN_RELAY_PROVIDERS, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
@@ -1152,9 +1156,10 @@ export function startMcpSignInRelay(
 
 export function startProviderSignInRelay(
   request: TeamApiRequest,
-  provider: (typeof SIGN_IN_RELAY_PROVIDERS)[number],
+  relay: ProviderSignInRelay,
+  provider: ProviderSignInRelayProvider,
 ): Effect.Effect<{ flowId: string }, TeamAdminRequestError> {
-  return adminCall(() => request("POST", SIGN_IN_RELAY_ROUTES.providerStart, decodeSignInRelayFlow, { provider }));
+  return adminCall(() => request("POST", relay.start, decodeSignInRelayFlow, { provider }));
 }
 
 export function startProviderAccountSignInRelay(

@@ -116,6 +116,8 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "provider.picker.workspaceOnlyUnavailable":
     "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",

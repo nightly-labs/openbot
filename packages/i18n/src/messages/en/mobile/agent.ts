@@ -316,6 +316,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.runtime.noModels": "No models available for this provider.",
   "mobile.agent.runtime.searchModels": "Search models",
   "mobile.agent.runtime.noMatches": "No models match your search.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "No models match your search. Your privacy, provider and guardrail settings on openrouter.ai can hide models from this list.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "This provider does not work with Workspace only on Windows and Linux. To use it, change Permissions first.",
   "mobile.agent.runtime.usageLimit": "Usage limit reached",
@@ -478,6 +480,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.publish.unsupported": "This host cannot publish agents from a remote device.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens without cache reads",
   "mobile.agent.usage.estimatedCost": "Estimated cost",
+  "mobile.agent.usage.noCostEstimate": "No cost estimate",
   "mobile.agent.usage.daily": "Daily usage",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Cost",

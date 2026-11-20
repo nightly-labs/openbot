@@ -283,7 +283,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            ...(googleSignInByOpenBot(onHost) ? { openGoogleSignIn: openExternal } : {}),
+            ...(googleSignInByOpenBot(onHost) ? { openSignInPage: { site: "google", open: openExternal } } : {}),
           });
           return yield* login.done;
         }

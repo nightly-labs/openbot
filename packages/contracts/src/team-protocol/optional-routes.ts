@@ -114,6 +114,7 @@ import { PROVIDER_DETECTION_CODECS } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CODECS } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CODECS } from "./provider-host-sign-in-v1";
 import { PROVIDER_MODEL_SOURCE_CODECS } from "./provider-model-source-v1";
+import { PROVIDER_SIGN_IN_RELAY_V2_CODECS } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CODECS } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CODECS } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CODECS } from "./provider-use-v1";
@@ -291,6 +292,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_USAGE_RESET_CODECS,
   ...USAGE_CREDITS_CODECS,
   ...PROVIDER_SIGN_OUT_CODECS,
+  ...PROVIDER_SIGN_IN_RELAY_V2_CODECS,
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
   ...AGENT_ACCESS_CODECS,

@@ -104,6 +104,8 @@
     "./team-protocol/provider-account-keys-v1": "./src/team-protocol/provider-account-keys-v1.ts",
     "./team-protocol/provider-account-pool-v1": "./src/team-protocol/provider-account-pool-v1.ts",
     "./team-protocol/provider-accounts-v1": "./src/team-protocol/provider-accounts-v1.ts",
+    "./team-protocol/provider-sign-in-relay-v2": "./src/team-protocol/provider-sign-in-relay-v2.ts",
+    "./team-protocol/provider-sign-in-relays": "./src/team-protocol/provider-sign-in-relays.ts",
     "./team-protocol/provider-sign-out-v1": "./src/team-protocol/provider-sign-out-v1.ts",
     "./team-protocol/provider-usage-reset-v1": "./src/team-protocol/provider-usage-reset-v1.ts",
     "./team-protocol/setting-link-markers-v1": "./src/team-protocol/setting-link-markers-v1.ts",

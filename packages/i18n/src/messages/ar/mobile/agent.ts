@@ -350,6 +350,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
   "mobile.agent.runtime.searchModels": "البحث في النماذج",
   "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "لا يعمل هذا المزوّد مع «مساحة العمل فقط» على Windows وLinux. لاستخدامه، غيّر «الأذونات» أولًا.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",
@@ -529,6 +531,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "لا يستطيع هذا المضيف نشر الوكلاء من جهاز بعيد.",
   "mobile.agent.usage.tokensWithoutCacheReads": "الرموز دون قراءات ذاكرة التخزين المؤقت",
   "mobile.agent.usage.estimatedCost": "التكلفة المقدّرة",
+  "mobile.agent.usage.noCostEstimate": "لا يوجد تقدير للتكلفة",
   "mobile.agent.usage.daily": "الاستخدام اليومي",
   "mobile.agent.usage.tokens": "الرموز",
   "mobile.agent.usage.cost": "التكلفة",

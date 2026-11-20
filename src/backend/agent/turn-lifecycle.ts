@@ -46,6 +46,7 @@ import {
   MESSAGING_LANE,
   type UsageLimitContinuation,
 } from "../mailbox-store";
+import { perfCount } from "../perf-probe-hooks";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
@@ -1052,6 +1053,7 @@ export class TurnLifecycle {
   }
 
   handleStreamingDelta(notification: AppServerNotification): void {
+    perfCount("turn.streamingDelta");
     const params = notification.params;
     const { threadId, agentId } = this.#noteEvent(params);
     if (!threadId || !agentId) return;
@@ -2817,6 +2819,7 @@ export class TurnLifecycle {
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId },
+        requesterIds: this.#mailbox.requesterIds(messageId),
         recipientAgentIds: [recipientAgentId],
         text,
         replyToMessageId: messageId,
