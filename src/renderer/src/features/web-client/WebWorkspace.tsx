@@ -156,6 +156,7 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
@@ -2407,6 +2408,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const agent = conversationAgent();
     return ask && agent ? { agentId: agent.id, ask } : undefined;
   });
+  const sidebarActiveAgentId = () => (tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? ""));
   const sidebarThreads = createMemo(() => {
     const current = agentThreads();
     if (!current) return undefined;
@@ -2417,7 +2419,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return sidebarAgentThreads({
       tasks: current.tasks,
       tabs: current.tabs,
-      activeAgentId: () => (tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")),
+      activeAgentId: sidebarActiveAgentId,
       waits: () => ({
         approvals: workspace.state.approvals,
         prompts: workspace.state.prompts,
@@ -3081,7 +3083,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         ...serverActionCallbacks,
                       }}
                       agents={workspace.profiles()}
-                      activeAgentId={tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")}
+                      activeAgentId={sidebarActiveAgentId()}
                       agentThreads={sidebarThreads()}
                       people={[]}
                       directThreads={[]}
@@ -3117,6 +3119,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       onReorderPinned={workspace.preferences.reorderPinnedSidebarItems}
                       onReorderPeople={() => {}}
                       onSelectAgent={(id) => {
+                        if (id === sidebarActiveAgentId()) agentThreads()?.tabs.open(id, MAIN_THREAD_ID);
                         setMobilePane("conversation");
                         void select(id);
                       }}
