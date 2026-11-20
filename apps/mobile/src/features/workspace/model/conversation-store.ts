@@ -26,6 +26,7 @@ export class MobileConversationStore {
   #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean }>();
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
   #upToDate = new Set<string>();
+  #missedLatest = new Set<string>();
   #cached = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
@@ -45,6 +46,10 @@ export class MobileConversationStore {
   holdsRevision(agentId: string, revision: number, threadId?: string | null) {
     const entry = this.get(agentId);
     return Boolean(entry && entry.revision >= revision && (threadId === undefined || entry.threadId === threadId));
+  }
+
+  missedLatest(agentId: string) {
+    return this.#missedLatest.has(agentId);
   }
 
   markStale() {
@@ -79,6 +84,7 @@ export class MobileConversationStore {
     this.#entries.delete(agentId);
     this.#latestPages.delete(agentId);
     this.#upToDate.delete(agentId);
+    this.#missedLatest.delete(agentId);
     this.#cached.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
@@ -99,6 +105,7 @@ export class MobileConversationStore {
 
   cancelRequests() {
     this.markStale();
+    for (const agentId of this.#loads.keys()) this.#missedLatest.add(agentId);
     this.#loads.clear();
     this.#olderLoads.clear();
     for (const [id, entry] of this.#entries) {
@@ -269,11 +276,19 @@ export class MobileConversationStore {
             load.dirty = false;
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
-            if (!isCurrent() || this.#loads.get(agentId) !== load) return page;
+            if (!isCurrent() || this.#loads.get(agentId) !== load) {
+              this.#missedLatest.add(agentId);
+              return page;
+            }
             this.applyPage(page, undefined, load.attach);
           } while (load.dirty);
           this.#upToDate.add(agentId);
+          this.#missedLatest.delete(agentId);
           return page;
+        })
+        .catch((error: unknown) => {
+          this.#missedLatest.add(agentId);
+          throw error;
         })
         .finally(() => {
           if (this.#loads.get(agentId) === load) {

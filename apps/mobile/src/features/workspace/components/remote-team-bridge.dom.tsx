@@ -7,6 +7,7 @@ import {
   createRemoteTeamPeer,
   decodeRemoteTeamCommand,
   type RemoteTeamCommandResult,
+  type RemoteTeamEvent,
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 import { createTeamRequestId } from "@openbot/team-client/request-id";
@@ -29,9 +30,10 @@ export type RemoteTeamBridgeHandle = {
   cancelUpload: (value: BridgeJson) => void;
 };
 
-interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
+interface RemoteTeamBridgeProps extends Omit<RemoteTeamPeerActions, "onTeamEvent"> {
   ref?: Ref<RemoteTeamBridgeHandle>;
   active: boolean;
+  onTeamEvents: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>;
   onCommandResult: (result: RemoteTeamCommandResult) => Promise<void>;
   onReady?: () => Promise<void>;
   onBrowserViewEvent?: (event: BrowserViewBridgeEvent) => Promise<void>;
@@ -40,6 +42,37 @@ interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
 }
 
 const KNOWN_COMMAND_LIMIT = 1_000;
+const TEAM_EVENT_BATCH_MS = 16;
+
+function createTeamEventBatch(deliver: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>) {
+  let pending: { hostId: string; events: RemoteTeamEvent[] }[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let failure: { error: unknown } | null = null;
+  const flush = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    const runs = pending;
+    pending = [];
+    for (const run of runs)
+      void deliver(run.hostId, run.events).catch((error: unknown) => {
+        failure ??= { error };
+      });
+  };
+  return {
+    push(hostId: string, event: RemoteTeamEvent) {
+      if (failure) {
+        const { error } = failure;
+        failure = null;
+        throw error;
+      }
+      const last = pending.at(-1);
+      if (last?.hostId === hostId) last.events.push(event);
+      else pending.push({ hostId, events: [event] });
+      timer ??= setTimeout(flush, TEAM_EVENT_BATCH_MS);
+    },
+    flush,
+  };
+}
 
 function requestError(body: unknown): string {
   return isDynamicRecord(body) && isString(body.error) && body.error
@@ -54,22 +87,31 @@ export default function RemoteTeamBridge({
   onReady,
   onBrowserViewEvent,
   onRemoteDesktopEvent,
+  onTeamEvents,
   ...callbacks
 }: RemoteTeamBridgeProps) {
+  const teamEvents = useRef(onTeamEvents);
+  teamEvents.current = onTeamEvents;
+  const eventBatch = useRef<ReturnType<typeof createTeamEventBatch> | null>(null);
+  eventBatch.current ??= createTeamEventBatch((hostId, events) => teamEvents.current(hostId, events));
+  const pendingEvents = eventBatch.current;
   const browserViewEvent = useRef(onBrowserViewEvent);
   browserViewEvent.current = onBrowserViewEvent;
   const remoteDesktopEvent = useRef(onRemoteDesktopEvent);
   remoteDesktopEvent.current = onRemoteDesktopEvent;
   const browserView = useRef<ReturnType<typeof createBrowserViewBridge> | null>(null);
   const remoteDesktop = useRef<ReturnType<typeof createRemoteDesktopRelay> | null>(null);
-  const actions = useRef<RemoteTeamPeerActions>(callbacks);
+  const queueTeamEvent = async (hostId: string, event: RemoteTeamEvent) => pendingEvents.push(hostId, event);
+  const actions = useRef<RemoteTeamPeerActions>({ ...callbacks, onTeamEvent: queueTeamEvent });
   actions.current = {
     ...callbacks,
+    onTeamEvent: queueTeamEvent,
     onHostStreamData: (data) => {
       browserView.current?.receive(data);
       remoteDesktop.current?.receive(data);
     },
     onConnectionUpdate: async (update) => {
+      pendingEvents.flush();
       if (update.state !== "online") {
         browserView.current?.disconnect(update.message);
         remoteDesktop.current?.disconnect(update.message);
@@ -109,7 +151,10 @@ export default function RemoteTeamBridge({
   const runCommands = useRef<((commands: unknown) => void) | null>(null);
   if (!runCommands.current) {
     const knownCommandIds = new Set<string>();
-    const answer = (result: RemoteTeamCommandResult) => void commandResult.current(result);
+    const answer = (result: RemoteTeamCommandResult) => {
+      pendingEvents.flush();
+      void commandResult.current(result);
+    };
     runCommands.current = (commands) => {
       if (!Array.isArray(commands)) return;
       for (const value of commands) {

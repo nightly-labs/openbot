@@ -448,7 +448,10 @@ export const RemoteTeamTransport = memo(
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
+        const { onTeamEvent } = latest.current.props;
+        for (const event of events) onTeamEvent(hostId, event);
+      },
     }));
 
     return (
