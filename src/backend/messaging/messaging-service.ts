@@ -109,6 +109,7 @@ export interface MessagingCredentials {
 export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Effect.Effect<void, AgentLifecycleFailed>;
+  approvalExecutionThreadId(requestId: string | number): string | undefined;
   onEvent(listener: (event: AgentEvent) => void): () => void;
   createAgentProfile(
     input: Pick<AddMessagingOrchestratorInput, "provider" | "model" | "reasoningEffort"> & {
@@ -2053,7 +2054,13 @@ export class MessagingService {
   }
 
   #agentEvent(event: AgentEvent): void {
-    if (event.type === "approval") this.#dispatch(this.#approval(event.approval));
+    if (event.type === "approval")
+      this.#dispatch(
+        this.#approval(
+          event.approval,
+          this.#agents.approvalExecutionThreadId(event.approval.requestId) ?? event.approval.threadId,
+        ),
+      );
     else if (event.type === "agent-input-resolved" && event.kind === "approval")
       this.#dispatch(this.#approvalResolved(event.requestId));
   }
@@ -2061,8 +2068,9 @@ export class MessagingService {
   readonly #approval = Effect.fn("MessagingService.approval")(function* (
     this: MessagingService,
     approval: AgentApproval,
+    executionThreadId: string,
   ) {
-    const own = this.#threads.store.linkForThread(approval.threadId);
+    const own = this.#threads.store.linkForThread(executionThreadId);
     const request = own ? null : this.#threads.teammateRequest(approval.agentId, approval.turnId);
     const link = own ?? request?.link;
     if (!link) return;

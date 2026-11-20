@@ -832,6 +832,7 @@ async function createMessagingServices({
     agents: {
       listAgents: () => service.listAgents(),
       respondToApproval: (input) => service.respondToApproval(input, { owner: false }),
+      approvalExecutionThreadId: (requestId) => service.approvalExecutionThreadId(requestId),
       onEvent: (listener) => {
         service.on("event", listener);
         return () => service.off("event", listener);
