@@ -11,6 +11,8 @@ const WATCHED_ATTRIBUTES = [
   "hidden",
 ];
 
+const FIT_ATTRIBUTES = new Set(["data-fold", "data-mode", "data-model-fit"]);
+
 const TRAILING_EDGE_DELAY = "70ms";
 
 function slideTime(element: HTMLElement) {
@@ -41,7 +43,12 @@ export function TabShape(props: { selected: string; sized: string; scroller?: st
         });
     };
     const changed = (records: MutationRecord[]) => {
-      if (!records.some((record) => record.target !== element)) return;
+      const rowRecords = records.filter((record) => record.target !== element);
+      if (rowRecords.length === 0) return;
+      if (rowRecords.some((record) => FIT_ATTRIBUTES.has(record.attributeName ?? ""))) {
+        place();
+        return;
+      }
       sizes.unobserve(row);
       sizes.observe(row);
     };
