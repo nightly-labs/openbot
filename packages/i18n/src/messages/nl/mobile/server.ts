@@ -544,6 +544,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Agents toevoegen",
   "mobile.server.browserProfiles.agentsHint":
     "Een tik geeft de agent dit profiel of zet hem terug naar het gedeelde profiel. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logins bij sites blijven in het oude profiel. Een verplaatste agent moet opnieuw inloggen op deze sites.",
   "mobile.server.browserProfiles.clear": "Gegevens wissen",
   "mobile.server.browserProfiles.clearTitle": "Gegevens van {name} wissen?",
   "mobile.server.browserProfiles.clearBody":

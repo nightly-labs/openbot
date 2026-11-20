@@ -25,6 +25,7 @@ export function ServerBrowserProfileAgentsScreen() {
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [moved, setMoved] = useState(false);
   const list = profiles.profiles;
   const profile = list?.find((candidate) => candidate.id === profileId);
   if (!profiles.available || !list || !profile)
@@ -60,6 +61,7 @@ export function ServerBrowserProfileAgentsScreen() {
       .assign(agentId, next)
       .then(() => {
         void haptics.notification("success");
+        setMoved(true);
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
@@ -111,6 +113,11 @@ export function ServerBrowserProfileAgentsScreen() {
           );
         })}
       </SettingsSection>
+      {moved ? (
+        <Typography.Paragraph accessibilityRole="alert" type="body-xs" className="px-4 text-warning-text">
+          {t("mobile.server.browserProfiles.movedNote")}
+        </Typography.Paragraph>
+      ) : null}
     </SettingsContent>
   );
 }

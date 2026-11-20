@@ -143,6 +143,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Retro zonsondergang",
   "mobile.settings.appearance.backdrop.snowfall": "Sneeuwval",
   "mobile.settings.appearance.backdrop.fireflies": "Vuurvliegjes",
+  "mobile.settings.appearance.backdrop.coast": "Neonkust",
   "mobile.settings.appearance.backdrop.agentPage": "Agentpagina",
   "mobile.settings.appearance.backdrop.agentPageNote": "Ingesteld door een agent",
   "mobile.settings.appearance.backdrop.photo": "Foto",
@@ -445,6 +446,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Kies agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot is vergrendeld",
   "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
+  "mobile.settings.shortcuts.card.message": "{name} een bericht sturen",
+  "mobile.settings.shortcuts.card.messagePrompt": "Bericht aan {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open. Open Agent opent de chat.",
   "mobile.settings.shortcuts.send.sent": "Verzonden",

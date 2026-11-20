@@ -57,6 +57,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "레트로 노을",
   "settings.chatBackdrop.snowfall": "눈 내리는 밤",
   "settings.chatBackdrop.fireflies": "반딧불이",
+  "settings.chatBackdrop.coast": "네온 해안",
   "settings.chatBackdrop.upload": "이미지 업로드…",
   "settings.chatBackdrop.uploadRefused": "20MB 이하의 PNG, JPEG, GIF, WebP 또는 AVIF 이미지를 사용하세요.",
   "settings.chatBackdrop.saveFailed": "배경을 저장하지 못했습니다.",

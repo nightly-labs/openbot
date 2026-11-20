@@ -234,6 +234,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Her profil kendi oturum açma bilgilerini ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
   "agentSettings.browserProfile.manage": "Yönet",
+  "agentSettings.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tüm {provider} süreci bir korumalı alanda (sandbox) çalışır, bu nedenle dışarıya yazma işlemi başarısız olur. Yalnızca macOS'ta kullanılabilir.",
 } as const satisfies PartialTranslation<typeof source>;

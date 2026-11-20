@@ -142,6 +142,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "레트로 노을",
   "mobile.settings.appearance.backdrop.snowfall": "눈 내리는 밤",
   "mobile.settings.appearance.backdrop.fireflies": "반딧불이",
+  "mobile.settings.appearance.backdrop.coast": "네온 해안",
   "mobile.settings.appearance.backdrop.agentPage": "에이전트 페이지",
   "mobile.settings.appearance.backdrop.agentPageNote": "에이전트가 설정함",
   "mobile.settings.appearance.backdrop.photo": "사진",
@@ -562,6 +563,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "에이전트 선택",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot이 잠겨 있습니다",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot 열기",
+  "mobile.settings.shortcuts.card.message": "{name}에게 메시지 보내기",
+  "mobile.settings.shortcuts.card.messagePrompt": "{name}에게 보낼 메시지",
   "mobile.settings.shortcuts.footer":
     "단축어 앱의 Send Message는 이 에이전트에게 보냅니다. 앱은 열리지 않습니다. Open Agent는 이 에이전트의 채팅을 엽니다.",
   "mobile.settings.shortcuts.send.sent": "보냄",
