@@ -14,7 +14,7 @@ import { pluginConnectMethod, pluginInstalled } from "@/features/marketplace/mod
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId, type MobileConnectorId } from "@/features/servers/model/connectors";
 import { useConnectorRowState } from "@/features/servers/model/use-connector-rows";
-import { useMcpServerList, useServerMcp } from "@/features/servers/model/use-server-mcp";
+import { useMcpServerList, useMcpSignIns } from "@/features/servers/model/use-server-mcp";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
@@ -112,19 +112,21 @@ export function ChatMcpSignIn({
   mcpServerId: string;
 }) {
   const { t } = useText();
-  const mcp = useServerMcp(serverId);
+  const { canManage, list } = useMcpServerList(serverId);
+  const signIns = useMcpSignIns(serverId, canManage);
+  const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
   const { online } = useServerAccess(serverId);
-  const config = mcp.list.data?.find((item) => item.id === mcpServerId && item.transport === "http");
+  const config = list.data?.find((item) => item.id === mcpServerId && item.transport === "http");
   if (!config) return null;
   const listing = customListing(config);
-  const signedIn = Boolean(mcp.signIns.data?.some((item) => item.mcpServerId === config.id && item.signedIn));
+  const signedIn = Boolean(signIns.data?.some((item) => item.mcpServerId === config.id && item.signedIn));
   return (
     <SuggestionCard
       messageId={messageId}
       name={config.name}
       tagline={listing.description}
       icon={<ListingIcon listing={listing} size={ICON_SIZE} />}
-      state={!online ? "pending" : signedIn ? "connected" : "available"}
+      state={!online ? "pending" : signedIn ? "connected" : canRelay ? "available" : "unavailable"}
       actionLabel={t("mobile.server.mcp.signIn")}
       actionAccessibilityLabel={t("mobile.chat.mcpSignIn.signInNamed", { name: config.name })}
       doneLabel={t("mobile.chat.mcpSignIn.signedIn")}

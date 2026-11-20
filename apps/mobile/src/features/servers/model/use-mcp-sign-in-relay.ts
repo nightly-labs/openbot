@@ -7,6 +7,8 @@ import { useText } from "@/shared/lib/text";
 
 const RELAY_POLL_MS = 1_000;
 
+export const RELAY_PASTE_PLACEHOLDER = "http://localhost/callback?code=…";
+
 export type McpSignInRelayState =
   | { phase: "idle" }
   | { phase: "waiting"; flowId: string }
@@ -19,6 +21,7 @@ export function useMcpSignInRelay(serverId: string) {
   const { mcpSignInRelay } = useMobileWorkspaceActions();
   const [state, setState] = useState<McpSignInRelayState>({ phase: "idle" });
   const [error, setError] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
   const activeFlow = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -26,6 +29,7 @@ export function useMcpSignInRelay(serverId: string) {
     return () => {
       mounted.current = false;
       const flowId = activeFlow.current;
+      activeFlow.current = null;
       if (flowId)
         void mcpSignInRelay(serverId)
           .cancel(flowId)
@@ -41,7 +45,7 @@ export function useMcpSignInRelay(serverId: string) {
     try {
       setState({ phase: "waiting", flowId });
       let opened = false;
-      while (mounted.current) {
+      while (mounted.current && activeFlow.current === flowId) {
         const status = await relay.status(flowId);
         if (status.result) {
           activeFlow.current = null;
@@ -65,7 +69,10 @@ export function useMcpSignInRelay(serverId: string) {
       }
       throw cause;
     } finally {
-      if (mounted.current) setState({ phase: "idle" });
+      if (mounted.current) {
+        setState({ phase: "idle" });
+        setPasting(false);
+      }
     }
   }
 
@@ -76,10 +83,15 @@ export function useMcpSignInRelay(serverId: string) {
       setError(t("mobile.marketplace.app.pasteInvalid"));
       return;
     }
+    if (pasting) return;
     setError(null);
+    setPasting(true);
     await mcpSignInRelay(serverId)
       .complete(state.flowId, query)
-      .catch((cause: unknown) => setError(errorMessage(cause, t("mobile.marketplace.app.connectFailed"))));
+      .catch((cause: unknown) => setError(errorMessage(cause, t("mobile.marketplace.app.connectFailed"))))
+      .finally(() => {
+        if (mounted.current) setPasting(false);
+      });
   }
 
   function reopen() {
@@ -87,5 +99,5 @@ export function useMcpSignInRelay(serverId: string) {
     void Linking.openURL(state.url).catch(() => setError(t("mobile.marketplace.app.openFailed")));
   }
 
-  return { state, error, setError, mounted, signIn, paste, reopen };
+  return { state, error, setError, mounted, pasting, signIn, paste, reopen };
 }

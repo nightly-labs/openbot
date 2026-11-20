@@ -19,7 +19,7 @@ import {
   mcpServerDraftChanged,
   mcpServerDraftErrors,
 } from "@/features/servers/model/mcp-server-draft";
-import { useMcpSignInRelay } from "@/features/servers/model/use-mcp-sign-in-relay";
+import { RELAY_PASTE_PLACEHOLDER, useMcpSignInRelay } from "@/features/servers/model/use-mcp-sign-in-relay";
 import { useServerMcp } from "@/features/servers/model/use-server-mcp";
 import {
   SettingsContent,
@@ -50,7 +50,6 @@ const SIGN_IN_ERRORS = new Set([
 const COMMAND_PLACEHOLDER = "openai-dev-mcp";
 const WORKING_DIRECTORY_PLACEHOLDER = "~/code";
 const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
-const PASTE_PLACEHOLDER = "http://localhost/callback?code=…";
 
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
 
@@ -206,12 +205,15 @@ function McpServerForm({
     const { error, toolCount } = state.result;
     if (!error) return t("mobile.server.mcp.connected", { count: toolCount });
     if (!isSignInError(error)) return sourceText(error);
-    return showSignIn ? t("mobile.server.mcp.signInHere") : t("mobile.server.mcp.signInOnComputer");
+    if (showSignIn) return t("mobile.server.mcp.signInHere");
+    return matchingSourceKeys(error)[0] === "error.backend.mcpSignInRefused"
+      ? sourceText(error)
+      : t("mobile.server.mcp.signInOnComputer");
   }
 
   const relayPage = relay.state.phase === "signIn" ? relay.state : null;
 
-  const locked = action.isPending;
+  const locked = action.isPending || signingIn;
   return (
     <SettingsContent>
       <Stack.Screen options={{ title: saved ? saved.name : t("mobile.server.mcp.addTitle") }} />
@@ -427,7 +429,7 @@ function McpServerForm({
               <SheetFormField
                 label={t("mobile.marketplace.app.pasteLabel")}
                 hint={t("mobile.marketplace.app.pasteHint")}
-                placeholder={PASTE_PLACEHOLDER}
+                placeholder={RELAY_PASTE_PLACEHOLDER}
                 value={address}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -435,7 +437,11 @@ function McpServerForm({
                 onChangeText={setAddress}
               />
               <SettingsSection>
-                <SettingsRow disclosure={false} disabled={!address.trim()} onPress={() => void relay.paste(address)}>
+                <SettingsRow
+                  disclosure={false}
+                  disabled={!address.trim() || relay.pasting}
+                  onPress={() => void relay.paste(address)}
+                >
                   <Typography.Paragraph className="text-accent">
                     {t("mobile.marketplace.app.finishSignIn")}
                   </Typography.Paragraph>

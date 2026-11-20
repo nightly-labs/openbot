@@ -82,5 +82,5 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
     await relay.paste(address);
   }
 
-  return { state, error, connect, paste, reopen: relay.reopen };
+  return { state, error, connect, paste, pasting: relay.pasting, reopen: relay.reopen };
 }
