@@ -65,6 +65,7 @@ export interface ScrollStoreDeps {
   handedOverRowKeys: () => ReadonlyMap<string, string>;
   elements: ScrollElements;
   sticky: ScrollStickyState;
+  drawLatestFirst: () => boolean;
 }
 
 export function createScrollStore(deps: ScrollStoreDeps) {
@@ -364,7 +365,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     scrollMargin: virtualScrollMargin,
     stickToLatest: deps.sticky.getStickToLatest,
     followLatest: deps.sticky.followLatest,
-    drawLatestFirst: true,
+    drawLatestFirst: deps.drawLatestFirst,
     onRowsDrawn: deps.sticky.followReaderScroll,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];

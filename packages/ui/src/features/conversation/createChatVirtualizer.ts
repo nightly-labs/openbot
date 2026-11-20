@@ -18,7 +18,7 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   stickToLatest?: () => boolean;
   followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
-  drawLatestFirst?: boolean;
+  drawLatestFirst?: () => boolean;
   onRowsDrawn?: (element: TScrollElement) => void;
 }
 
@@ -45,9 +45,9 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
 ): ChatVirtualizer<TItemElement> {
   const initialCount = untrack(options.count);
-  const latestRowsStart = (count: number): number =>
-    options.drawLatestFirst ? Math.max(0, count - LATEST_ROWS_FIRST) : 0;
-  let drawFrom = initialCount > STATIC_CHAT_LIMIT ? 0 : latestRowsStart(initialCount);
+  const drawsLatestFirst = (): boolean => untrack(() => options.drawLatestFirst?.() === true);
+  const latestRowsStart = (count: number): number => Math.max(0, count - LATEST_ROWS_FIRST);
+  let drawFrom = initialCount > STATIC_CHAT_LIMIT || !drawsLatestFirst() ? 0 : latestRowsStart(initialCount);
   let drawFrame: number | undefined;
   const [virtualItems, setVirtualItems] = createSignal<VirtualItem[]>(
     untrack(() =>
@@ -161,7 +161,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   };
 
   const opensOtherRows = (count: number): boolean => {
-    if (!options.drawLatestFirst || count <= LATEST_ROWS_FIRST || untrack(virtualized)) return false;
+    if (!drawsLatestFirst() || count <= LATEST_ROWS_FIRST || untrack(virtualized)) return false;
     const checkedRows = drawFrom > 0 ? count : count - LATEST_ROWS_FIRST;
     return !Array.from({ length: checkedRows }, (_, index) => options.getItemKey(index)).some((key) =>
       stableItems.has(key),
