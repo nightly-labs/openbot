@@ -362,25 +362,17 @@ export class BillingReferral {
     this: BillingReferral,
     referrer: string,
   ): Effect.fn.Return<void, Failure> {
-    yield* billingCall(() =>
-      this.#database
-        .prepare(
-          `UPDATE referral_credits SET released_at = ?2
-           WHERE referrer_user_id = ?1 AND released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?2`,
-        )
-        .bind(referrer, this.#now())
-        .run(),
-    );
     yield* this.#followReferrerCurrency(referrer);
+    const now = this.#now();
     const totals = yield* billingCall(() =>
       this.#database
         .prepare(
           `SELECT currency, SUM(amount - reversed_amount) AS amount FROM referral_credits
-           WHERE referrer_user_id = ? AND released_at IS NOT NULL AND queued_at IS NULL
-             AND balance_transaction_id IS NULL
+           WHERE referrer_user_id = ?1 AND queued_at IS NULL AND balance_transaction_id IS NULL
+             AND (released_at IS NOT NULL OR (ready_at IS NOT NULL AND ready_at <= ?2))
            GROUP BY currency`,
         )
-        .bind(referrer)
+        .bind(referrer, now)
         .all<{ currency: string; amount: number }>(),
     );
     const full: BillingCurrency[] = [];
@@ -389,18 +381,23 @@ export class BillingReferral {
         full.push(total.currency);
       }
     }
-    if (full.length > 0) {
-      yield* billingCall(() =>
+    yield* billingCall(() =>
+      this.#database.batch([
+        this.#database
+          .prepare(
+            `UPDATE referral_credits SET released_at = ?2
+             WHERE referrer_user_id = ?1 AND released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?2`,
+          )
+          .bind(referrer, now),
         this.#database
           .prepare(
             `UPDATE referral_credits SET queued_at = ?2
              WHERE referrer_user_id = ?1 AND released_at IS NOT NULL AND queued_at IS NULL
                AND balance_transaction_id IS NULL AND currency IN (SELECT value FROM json_each(?3))`,
           )
-          .bind(referrer, this.#now(), JSON.stringify(full))
-          .run(),
-      );
-    }
+          .bind(referrer, now, JSON.stringify(full)),
+      ]),
+    );
     const queued = yield* billingCall(() =>
       this.#database
         .prepare(`SELECT ${CREDIT_COLUMNS} FROM referral_credits
