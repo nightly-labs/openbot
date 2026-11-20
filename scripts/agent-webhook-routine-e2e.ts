@@ -156,6 +156,7 @@ interface WebhookToolBody {
   deleted?: boolean;
   webhookRoutines?: { routineId: string; eventType: string | null; filters: unknown[]; instruction?: string }[];
   routines?: { id: string; instruction: string; instructionTruncated?: boolean; instructionLength?: number }[];
+  truncatedInstructions?: string;
   eventType?: string | null;
   filters?: { pointer: string; value: string }[];
   routineId?: string;
@@ -508,12 +509,12 @@ try {
     timezone: "UTC",
     schedule: { kind: "daily", time: "08:00" },
   });
-  const listedLong = (await callTool("list long", agent.id, { __tool: "list_routines" })).body?.routines?.find(
-    (item) => item.id === longRoutine.id,
-  );
+  const listedAll = (await callTool("list long", agent.id, { __tool: "list_routines" })).body;
+  const listedLong = listedAll?.routines?.find((item) => item.id === longRoutine.id);
   pass(
     "list_routines cuts a long instruction and marks it",
-    listedLong?.instructionTruncated === true &&
+    Boolean(listedAll?.truncatedInstructions) &&
+      listedLong?.instructionTruncated === true &&
       listedLong.instructionLength === longInstruction.length &&
       listedLong.instruction.length < longInstruction.length &&
       longInstruction.startsWith(listedLong.instruction),
@@ -524,6 +525,7 @@ try {
     readLong.body?.routines?.length === 1 &&
       readLong.body.routines[0]?.instruction === longInstruction &&
       readLong.body.routines[0].instructionTruncated === undefined &&
+      readLong.body.truncatedInstructions === undefined &&
       readLong.body.webhookRoutines?.length === 0,
     readLong.text,
   );

@@ -59,6 +59,7 @@ import {
   type OpenBotToolResponse,
   openBotToolFailure,
   openBotToolResult,
+  ROUTINE_LIST_TRUNCATION_NOTE,
   routineListInstruction,
   routineToolAgentId,
   routineToolArguments,
@@ -604,14 +605,18 @@ export class RoutineScheduler implements RoutineDueSource {
               routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
             ).id;
       const shown = (routine: { id: string }) => onlyId === null || routine.id === onlyId;
+      const routines = this.list(agentId)
+        .filter(shown)
+        .map((routine) => ({
+          ...routine,
+          ...(onlyId === null ? routineListInstruction(routine.instruction) : {}),
+          lastRun: this.#lastRun(agentId, routine.id),
+        }));
       return openBotToolResult({
-        routines: this.list(agentId)
-          .filter(shown)
-          .map((routine) => ({
-            ...routine,
-            ...(onlyId === null ? routineListInstruction(routine.instruction) : {}),
-            lastRun: this.#lastRun(agentId, routine.id),
-          })),
+        routines,
+        ...(routines.some((routine) => "instructionTruncated" in routine)
+          ? { truncatedInstructions: ROUTINE_LIST_TRUNCATION_NOTE }
+          : {}),
         webhookRoutines: this.#routines.listRecords(agentId).flatMap((routine) =>
           routine.trigger.kind === "webhook" && shown(routine)
             ? [

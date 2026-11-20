@@ -124,6 +124,9 @@ export interface OpenBotToolResponse {
 
 const ROUTINE_LIST_INSTRUCTION_PREVIEW = 1_000;
 
+export const ROUTINE_LIST_TRUNCATION_NOTE =
+  "A routine with instructionTruncated shows only the start of its instruction. Before you change that instruction, call list_routines with its routineId to get the full text: instruction in update_routine replaces the full saved text.";
+
 export function routineListInstruction(instruction: string) {
   if (instruction.length <= ROUTINE_LIST_INSTRUCTION_PREVIEW) return { instruction };
   const end = /[\uD800-\uDBFF]/.test(instruction.charAt(ROUTINE_LIST_INSTRUCTION_PREVIEW - 1))
