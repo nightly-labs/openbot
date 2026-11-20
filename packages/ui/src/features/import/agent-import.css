@@ -236,6 +236,8 @@
 .agent-import-picker-meta {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .agent-import-row {
@@ -358,8 +360,25 @@ label.agent-import-row:has(input:disabled) {
   list-style: none;
 }
 
+/* Grid keeps the chevron in its own column while long notes wrap in the middle. */
+.agent-import-picker.agent-import-source.ui-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.agent-import-picker.agent-import-source.ui-button > :is(.agent-import-source-logo, .agent-import-picker-icon) {
+  grid-column: 1;
+}
+
 .agent-import-source .agent-import-picker-copy {
-  flex: 1;
+  grid-column: 2;
+  min-width: 0;
+}
+
+.agent-import-picker.agent-import-source.ui-button > .storage-row-chevron {
+  grid-column: 3;
+  align-self: center;
 }
 
 .agent-import-source-logo {
