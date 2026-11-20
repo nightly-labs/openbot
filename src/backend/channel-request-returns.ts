@@ -68,7 +68,7 @@ export class ChannelRequestReturns {
       if (this.#handled.has(key)) return [];
       this.#handled.add(key);
       const request = this.#channels.store.message(channelId, task.requestMessageId);
-      if (request?.taskId && request.taskId !== task.id) return [];
+      if (request && movedToOpenTask(task, request)) return [];
       const requesterId = request ? channelHandoffSenderAgentId(request) : null;
       if (!request || !requesterId) return [];
       return [{ key, task, request, requesterId }];
@@ -137,6 +137,12 @@ export class ChannelRequestReturns {
 
 function returned(task: ChannelTask): boolean {
   return task.parentTaskId === null && RETURNED_STATES.has(task.state);
+}
+
+function movedToOpenTask(task: ChannelTask, request: ChannelMessage): boolean {
+  return (
+    task.state === "cancelled" && task.ownerAgentId === null && request.taskId !== null && request.taskId !== task.id
+  );
 }
 
 function returnKey(task: ChannelTask): string {

@@ -307,8 +307,9 @@ handled, so an upgrade or a restart sends no old results. A send that fails is r
 (`channel_request_return_failed`) and is not tried again. The reply goes to the main chat of the
 agent, also when it sent the request from a side task. No result is sent when the owner is the
 sender, or when one of the two agents was deleted. When the lead moves a request into an open
-task, the request message gets the `taskId` of that task, and the cancelled routing task sends
-nothing; the open task sends the result. The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
+task, the request message gets the `taskId` of that task, and the cancelled routing task (it has
+no owner) sends nothing; the open task sends the result. Each member task of a request with more
+than one recipient has an owner, so each one sends its own result. The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
 an agent chat opens the channel with the message text in its composer. Attachments stay behind.
 
 A workflow output with the target `chat-channel` posts its result as a note (`ChannelService.postNote`).
