@@ -271,6 +271,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765",
     },
     {
+      slug: "bulkpublish",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "36585a592a36d0cf39eaad48eb5f297dbaed2d54cfa62e08af0c47e998dafb54",
+    },
+    {
       slug: "composio",
       version: "1.2.0",
       featured: false,
@@ -3245,6 +3251,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://trypost.it",
     privacyPolicyUrl: "https://trypost.it/en/privacy",
     termsUrl: "https://trypost.it/en/terms",
+    skills: [],
+  },
+  bulkpublish: {
+    slug: "bulkpublish",
+    name: "BulkPublish",
+    tagline: "Social media scheduling",
+    description:
+      "BulkPublish lets agents list your connected social media channels, upload images and video, and draft, schedule or publish posts on 15 networks, such as Instagram, TikTok, YouTube, LinkedIn, X and Pinterest. Agents can also read post analytics, and read and answer comments, direct messages and reviews in the Inbox. Sign in to your BulkPublish account through the browser. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "BulkPublish",
+    iconUrl: "https://raw.githubusercontent.com/bulkpublish/bulkpublish-ai-toolkit/main/assets/logo.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-channels", text: "Which social media channels are connected to BulkPublish?" },
+      { id: "prompt-week", text: "Which posts are scheduled for next week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    ],
+    apps: [
+      {
+        id: "app-bulkpublish-mcp",
+        name: "BulkPublish",
+        description:
+          "Channels, posts, media, analytics and the Inbox, over BulkPublish's MCP server with browser sign-in.",
+        iconUrl: "https://raw.githubusercontent.com/bulkpublish/bulkpublish-ai-toolkit/main/assets/logo.png",
+        server: {
+          name: "bulkpublish",
+          transport: "http",
+          url: "https://mcp.bulkpublish.com/mcp",
+          auth: [{ id: "bulkpublish-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.bulkpublish.com",
+    privacyPolicyUrl: "https://www.bulkpublish.com/privacy/",
+    termsUrl: "https://www.bulkpublish.com/terms/",
     skills: [],
   },
   composio: {
