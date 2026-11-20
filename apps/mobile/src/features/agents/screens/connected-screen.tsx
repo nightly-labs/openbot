@@ -1050,13 +1050,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       </AndroidBlurTarget>
 
       {onboarding.active ? null : (
-        <LargeTitleBar
-          scroll={scroll}
-          title={activeServer.name}
-          blurTarget={barBlurTarget}
-          androidSurfaceOnScroll={homeCard}
-          hidden
-        >
+        <LargeTitleBar scroll={scroll} blurTarget={barBlurTarget} androidSurfaceOnScroll={homeCard}>
           <AppUpdateBlock header={updateHeader} scroll={scroll} hidden={search.open} />
         </LargeTitleBar>
       )}

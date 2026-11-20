@@ -1,7 +1,7 @@
 import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { type PropsWithChildren, type ReactNode, type RefObject, useContext, useRef, useState } from "react";
-import { Pressable, View, type ViewInstance } from "react-native";
+import { View, type ViewInstance } from "react-native";
 import Animated, {
   cubicBezier,
   Extrapolation,
@@ -61,21 +61,7 @@ export function useLargeTitleScroll(customBar?: { headerHeight: number }): Large
   return { onScroll, scrolled, titleHeight, headerHeight, barTop, ownsInset, nativeBar: customBar === undefined };
 }
 
-export function LargeTitle({
-  scroll,
-  title,
-  caption,
-  above,
-  accessibilityLabel,
-  onPress,
-}: {
-  scroll: LargeTitleScroll;
-  title: string;
-  caption?: string;
-  above?: ReactNode;
-  accessibilityLabel?: string;
-  onPress?: () => void;
-}) {
+export function LargeTitle({ scroll, title, caption }: { scroll: LargeTitleScroll; title: string; caption?: string }) {
   const reduced = useReducedMotion();
   const { scrolled, titleHeight } = scroll;
   const titleStyle = useAnimatedStyle(() => {
@@ -95,47 +81,30 @@ export function LargeTitle({
       transform: [{ scale: interpolate(scrolled.get(), [-160, 0], [1.08, 1], Extrapolation.CLAMP) }],
     };
   });
-  const heading = (
-    <Animated.View style={[{ transformOrigin: "left center" }, titleStyle]}>
-      <Typography.Heading
-        className="font-bold"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.82}
-        style={isAndroid ? typeScale.largeTitleAndroid : typeScale.largeTitle}
-      >
-        {title}
-      </Typography.Heading>
-    </Animated.View>
-  );
   return (
     <View
       className={isAndroid ? "px-5 pt-2" : "px-5"}
       style={{ paddingBottom: TITLE_BOTTOM_PADDING }}
       onLayout={(event) => titleHeight.set(event.nativeEvent.layout.height)}
     >
-      {above}
       {caption ? (
         <Typography.Paragraph className="text-muted" numberOfLines={1} style={typeScale.caption}>
           {caption}
         </Typography.Paragraph>
       ) : null}
-      {onPress ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-          hitSlop={8}
-          className="self-start"
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          onPress={onPress}
-        >
-          {heading}
-        </Pressable>
-      ) : (
-        <View accessible accessibilityRole="header">
-          {heading}
-        </View>
-      )}
+      <View accessible accessibilityRole="header">
+        <Animated.View style={[{ transformOrigin: "left center" }, titleStyle]}>
+          <Typography.Heading
+            className="font-bold"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+            style={isAndroid ? typeScale.largeTitleAndroid : typeScale.largeTitle}
+          >
+            {title}
+          </Typography.Heading>
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -143,7 +112,6 @@ export function LargeTitle({
 export function LargeTitleBar({
   scroll,
   title,
-  hidden = false,
   insetLeft = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   insetRight = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   surface = "canvas",
@@ -152,8 +120,7 @@ export function LargeTitleBar({
   children,
 }: PropsWithChildren<{
   scroll: LargeTitleScroll;
-  title: string;
-  hidden?: boolean;
+  title?: string;
   insetLeft?: number;
   insetRight?: number;
   surface?: "canvas" | "sheet";
@@ -235,7 +202,7 @@ export function LargeTitleBar({
         />
       )}
       {children}
-      {hidden ? null : (
+      {title ? (
         <Animated.View
           pointerEvents="none"
           accessibilityElementsHidden
@@ -264,7 +231,7 @@ export function LargeTitleBar({
             {title}
           </Typography.Paragraph>
         </Animated.View>
-      )}
+      ) : null}
     </>
   );
 }
