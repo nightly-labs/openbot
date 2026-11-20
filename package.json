@@ -285,6 +285,7 @@
     "test:provider-live": "bun scripts/provider-live-e2e.ts",
     "test:hermes-catalog-tools": "bun scripts/hermes-catalog-tools-e2e.ts",
     "test:hermes-server": "bun scripts/hermes-server-e2e.ts",
+    "test:hermes-session-processes": "bun scripts/hermes-session-processes-e2e.ts",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",
     "test:custom-agents:login-path": "bun scripts/custom-acp-agent-login-path-e2e.ts",
     "test:claude:login-path": "bun scripts/claude-session-login-path-e2e.ts",
