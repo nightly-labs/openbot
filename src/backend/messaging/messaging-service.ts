@@ -2370,6 +2370,17 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
 const DISCORD_NOT_LINKED =
   "This Discord server is not linked to this OpenBot server now. Another OpenBot server of the user may answer there. Tell the user to open Marketplace, then Apps, then Discord, and to select Reconnect for this Discord server if this server must answer there.";
 
+const TELEGRAM_RELAY_REFUSALS = new Map([
+  [
+    "telegram_503 relay_unavailable",
+    "OpenBot on this computer is not connected to the OpenBot service now. Telegram calls go through that service, so Telegram did not refuse this call, and the connection and place ids are not the cause. OpenBot connects again by itself. When a Telegram call fails again in a few minutes, tell the user that OpenBot on this computer cannot connect to its service, and that the computer must be online and signed in to OpenBot.",
+  ],
+  [
+    "telegram_504 timeout",
+    "The OpenBot service did not answer this Telegram call in time. Telegram did not refuse it, and the connection and place ids are not the cause.",
+  ],
+]);
+
 function telegramNotReady(state: IngressState): MessagingOperationFailed {
   const text =
     state === "online"
@@ -2387,6 +2398,9 @@ function refusal(failure: MessagingAdapterError): string {
   const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
   if (local) return local;
   if (cause instanceof DiscordApiError && cause.code === "unknown_guild") return DISCORD_NOT_LINKED;
+  const relay =
+    cause instanceof TelegramCallError ? TELEGRAM_RELAY_REFUSALS.get(`${cause.code} ${cause.message}`) : undefined;
+  if (relay) return relay;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code
