@@ -52,6 +52,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     messagePins,
     changeMarkerActions,
     openWaitingAgent,
+    shownSubagentId,
+    toggleSubagentPanel,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -254,6 +256,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             queue={threadQueue.view(current().thread.task, draftKey())}
             awaiting={awaiting()}
             selectionActions={selectionActions(current().thread)}
+            subagents={{ selectedId: shownSubagentId(), onOpen: toggleSubagentPanel }}
           />
         )}
       </Show>
