@@ -271,7 +271,7 @@ function antigravitySettingsUnreadable(appDataDir: string): boolean {
   }
 }
 
-const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
+const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot", AGY_CLI_DISABLE_AUTO_UPDATE: "true" };
 
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
