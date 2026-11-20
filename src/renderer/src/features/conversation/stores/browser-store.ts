@@ -301,19 +301,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return browserTabOwner(tab) !== undefined && browserInteractionAvailable() && !closingBrowserTabIds.has(tab.id);
   };
 
-  createEffect(
-    () => {
-      const request = deps.takeoverPageRequest();
-      if (!request || request.agentId !== deps.props.agent?.id) return undefined;
-      return browserTabs().find((tab) => tab.id === request.tabId);
-    },
-    (tab) => {
-      if (!tab) return;
-      deps.setTakeoverPageRequest(null);
-      untrack(() => openBrowserTakeoverTab(tab));
-    },
-  );
-
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
   const canSignInLocally = (tab: BrowserTab | undefined) =>
     !deps.props.runtime &&
@@ -335,6 +322,26 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       return undefined;
     return { server: deps.props.server?.name ?? "", signingIn: localSignIn()?.tabId === tab.id };
   }
+
+  createEffect(
+    () => {
+      const request = deps.takeoverPageRequest();
+      if (!request || request.agentId !== deps.props.agent?.id) return undefined;
+      const tab = browserTabs().find((entry) => entry.id === request.tabId);
+      if (!tab) return undefined;
+      const signInFromCard = deps.props.browserTakeover?.tabId === tab.id && blockedTakeoverSignIn() !== undefined;
+      return { tab, signInFromCard };
+    },
+    (target) => {
+      if (!target) return;
+      deps.setTakeoverPageRequest(null);
+      if (!target.signInFromCard) {
+        untrack(() => openBrowserTakeoverTab(target.tab));
+        return;
+      }
+      if (untrack(deps.panels.activeRightPanel) === "browser-expanded") deps.panels.setActiveRightPanel("browser");
+    },
+  );
 
   function updateLocalSignIn(tabId: string, change: Partial<LocalSignIn>) {
     setLocalSignIn((current) => (current?.tabId === tabId ? { ...current, ...change } : current));
