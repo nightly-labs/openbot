@@ -263,7 +263,7 @@ for that Checkout page. It is not sent to analytics. When you open an invite lin
 address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
 When you sign in on the web, the web client sends the code to the account service and removes it from
 `localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
-on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. The invite page shows the first name from the profile of the account that made the link to anyone who opens the link. It shows no other name, picture or email. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
