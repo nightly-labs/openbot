@@ -97,6 +97,7 @@ interface RemoteTeamTransportProps {
   active: boolean;
   directory: RemoteTeamDirectoryClient;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
+  onDiagnostic?: (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => void;
   onMembershipChanged?: () => Promise<void>;
   onNetworkRestored?: () => void;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
@@ -439,14 +440,16 @@ export const RemoteTeamTransport = memo(
       },
       onAccountServersChanged: async () => latest.current.props.onMembershipChanged?.(),
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
-      onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
+      onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) => {
         supportLog.add(
           step === "failed" || step === "stalled" || step === "signal-error" || step === "ice-candidate-error"
             ? "warn"
             : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
-        ),
+        );
+        latest.current.props.onDiagnostic?.(step, detail);
+      },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
       onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
     }));
