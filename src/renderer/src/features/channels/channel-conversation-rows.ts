@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import {
   type AgentApproval,
   type BrowserTakeoverRequest,
@@ -52,10 +53,17 @@ function channelRoutineRow(row: AgentMessage, entry: ChannelMessage, tasks: read
   };
 }
 
+function localizedCoordinatorEntry(entry: ChannelMessage, localize: (text: string) => string): ChannelMessage {
+  const text = coordinatorText(entry.author, entry.message.text, localize);
+  return text === entry.message.text ? entry : { ...entry, message: { ...entry.message, text } };
+}
+
 export function channelConversationRows(
-  entries: readonly ChannelMessage[],
+  sourceEntries: readonly ChannelMessage[],
   tasks: readonly ChannelTask[],
+  localize: (text: string) => string,
 ): AgentMessage[] {
+  const entries = sourceEntries.map((entry) => localizedCoordinatorEntry(entry, localize));
   const rows = toAgentMessages(
     entries.map((entry) => ({ ...entry.message, id: entry.id })),
     undefined,

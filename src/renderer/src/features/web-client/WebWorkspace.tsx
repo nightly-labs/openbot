@@ -3437,7 +3437,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   <GlobalSearchOverlay
                     open={searchOpen()}
                     agents={searchAgents()}
-                    channels={channels.supported() ? globalSearchChannels(channels.state.channels) : undefined}
+                    channels={
+                      channels.supported() ? globalSearchChannels(channels.state.channels, text.sourceText) : undefined
+                    }
                     onSearchMessages={searchAllMessages}
                     onSearchFiles={fileSearch()}
                     routines={searchRoutines()}

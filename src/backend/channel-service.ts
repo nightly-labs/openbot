@@ -1401,17 +1401,17 @@ export class ChannelService {
           }
           if (prompt.length > ROUTING_PROMPT_CHARACTERS)
             throw new ChannelRoutingError(sourceText("error.backend.channelRoutingTooLong"));
-          const response = channelResult(
-            yield* Effect.result(
-              this.hooks
-                .generate(
-                  lead,
-                  prompt,
-                  agents.filter((agent) => agent.id !== lead.id),
-                )
-                .pipe(Effect.mapError(channelFailure)),
-            ),
+          const generated = yield* Effect.result(
+            this.hooks
+              .generate(
+                lead,
+                prompt,
+                agents.filter((agent) => agent.id !== lead.id),
+              )
+              .pipe(Effect.mapError(channelFailure)),
           );
+          const timedOut = Result.isFailure(generated) && routingTimedOut(generated.failure.cause);
+          const response = timedOut ? "" : channelResult(generated);
           if (this.#deletedChannels.has(channelId)) return;
           if (this.routingState(channelId) !== revision) {
             this.#wakeAgain.add(channelId);
@@ -1420,24 +1420,33 @@ export class ChannelService {
           channel = channelResult(yield* Effect.result(channelSync(() => this.store.get(channelId))));
           let decision: typeof RoutingDecision.Type;
           let keys: string[] | null = null;
-          try {
-            const answer = extractJsonObject(response);
-            keys = Object.keys(answer);
-            const decoded = decodeRoutingDecision(answer);
-            if (Result.isFailure(decoded))
-              throw new StructuredOutputError("The provider returned a JSON object of the wrong shape.");
-            decision = decoded.success;
-          } catch (error) {
-            if (!(error instanceof StructuredOutputError)) throw error;
-            logger.warn("A routing answer was unreadable, so the lead takes the request.", {
+          if (timedOut) {
+            logger.warn("A routing turn did not answer in time, so the lead takes the request.", {
               channelId,
               provider: lead.provider,
               model: lead.model,
-              reason: error.message,
-              characters: response.length,
-              fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
             });
             decision = { agentId: lead.id };
+          } else {
+            try {
+              const answer = extractJsonObject(response);
+              keys = Object.keys(answer);
+              const decoded = decodeRoutingDecision(answer);
+              if (Result.isFailure(decoded))
+                throw new StructuredOutputError("The provider returned a JSON object of the wrong shape.");
+              decision = decoded.success;
+            } catch (error) {
+              if (!(error instanceof StructuredOutputError)) throw error;
+              logger.warn("A routing answer was unreadable, so the lead takes the request.", {
+                channelId,
+                provider: lead.provider,
+                model: lead.model,
+                reason: error.message,
+                characters: response.length,
+                fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
+              });
+              decision = { agentId: lead.id };
+            }
           }
           if ("taskId" in decision) {
             const existing = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
@@ -3742,10 +3751,12 @@ function routingRequest(text: string): string {
   return read < text.length ? `${text.slice(0, read)}\n\n[truncated]` : text;
 }
 
+function routingTimedOut(error: unknown): boolean {
+  return error instanceof Error && error.message === sourceText("error.agent.profileTimedOut");
+}
+
 function routingFailureText(error: unknown): string | null {
   if (!(error instanceof Error) || !isFixedSourceText(error.message)) return null;
-  if (error.message === sourceText("error.agent.profileTimedOut"))
-    return sourceText("error.backend.channelLeadTimedOut");
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;

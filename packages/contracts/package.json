@@ -45,6 +45,7 @@
     "./markdown-lists": "./src/markdown-lists.ts",
     "./mcp-accounts": "./src/mcp-accounts.ts",
     "./markdown-preview-text": "./src/markdown-preview-text.ts",
+    "./coordinator-text": "./src/coordinator-text.ts",
     "./selection-instruction": "./src/selection-instruction.ts",
     "./speech-language": "./src/speech-language.ts",
     "./speech-models": "./src/speech-models.ts",
