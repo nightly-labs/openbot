@@ -1163,7 +1163,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sendLateAnswer: (agentId, target, text, sender) =>
         Effect.runFork(
-          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+          this.#sendUserMessage(
+            { agentId, text, ...target },
+            sender,
+            undefined,
+            undefined,
+            false,
+            false,
+            undefined,
+            true,
+          ).pipe(
             Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
             Effect.forkIn(this.#scope, { startImmediately: true }),
           ),
@@ -6327,6 +6336,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     welcome = false,
     agentSetup = false,
     relayed?: LiveVoiceRelayed,
+    lateAnswer = false,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6425,7 +6435,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
       if (!targetThreadId) return;
-      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (!welcome && !agentSetup && !lateAnswer) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
       if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
