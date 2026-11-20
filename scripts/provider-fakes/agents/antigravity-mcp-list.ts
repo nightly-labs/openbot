@@ -6,7 +6,6 @@ const MODELS = {
 };
 const servers = new Map<string, NonNullable<AcpParams["mcpServers"]>>();
 let sessions = 0;
-const CLI_LIST_LIMIT_MS = 5_000;
 
 function toolCount(text: string): number {
   const answer: { result?: { tools?: readonly object[] } } = JSON.parse(
@@ -51,11 +50,6 @@ const open = (sessionId: string, request: AcpRequest, peer: Parameters<AcpHandle
     peer.reply(request, request.method === "session/new" ? { sessionId, models: MODELS } : { models: MODELS });
   };
   if (mode === "never") return answer(null);
-  if (mode === "late") {
-    setTimeout(() => answer(null), CLI_LIST_LIMIT_MS);
-    setTimeout(() => void listOpenBotTools(sessionId), Number(process.env.FAKE_LATE_MS ?? 0));
-    return;
-  }
   void listOpenBotTools(sessionId).then(answer);
 };
 

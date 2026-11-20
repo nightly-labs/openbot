@@ -2587,6 +2587,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       ) {
         turn.failureCause = "unknown";
         turn.providerError = sourceText("error.provider.acpToolsNotLoaded", { provider: this.#label });
+        thread.needsResume = true;
       }
       const status =
         turn.stopped || response.stopReason === "cancelled"

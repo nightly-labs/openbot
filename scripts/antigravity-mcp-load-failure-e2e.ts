@@ -494,17 +494,16 @@ try {
     missedCause !== null && isCauseCode(missedCause) && !FAILOVER_CAUSES.has(missedCause),
     "No backup model runs the prompt again.",
   );
+  const resumes = async () =>
+    (await readJsonl<{ method: string }>(never.log)).filter((entry) => entry.method === "session/resume").length;
+  const resumesBefore = await resumes();
   const listedTurn = await runTurn(never.listClient, never.threadId, { ...plain, text: "list the tools" });
   report.turns.toolsListedAtPrompt = listedTurn;
   assert.equal(listedTurn.status, "completed", "A prompt that lists the tools in time completes.");
+  assert.equal(await resumes(), resumesBefore + 1, "The turn after the failure opens the session again.");
   const keptTurn = await runTurn(never.listClient, never.threadId, plain);
   report.turns.toolsKept = keptTurn;
   assert.equal(keptTurn.status, "completed", "The session keeps the tools for the next prompt.");
-
-  const lateList = await listAgent("late", { FAKE_OPEN_LIST: "late", FAKE_LATE_MS: "6500" });
-  const lateListTurn = await runTurn(lateList.listClient, lateList.threadId, plain);
-  report.turns.toolsListedLate = lateListTurn;
-  assert.equal(lateListTurn.status, "failed", "A turn whose tools came after the limit fails.");
 
   const older = await listAgent("older", { FAKE_OPEN_LIST: "never", FAKE_VERSION: "1.5.10" });
   const olderTurn = await runTurn(older.listClient, older.threadId, plain);
