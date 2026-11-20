@@ -321,7 +321,6 @@ import {
   decodePasswordManagerResponses,
 } from "./password-manager-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
-import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
   decodeRoutineResultDeliveries,
   decodeRoutineResultDestination,
@@ -888,15 +887,6 @@ const openbotApi: OpenBotDesktopApi = {
     removeDownload: decodeProviderRuntimeSnapshot,
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
-  }),
-  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
-    canvas: decodeRoutineFlowCanvas,
-    savePosition: decodeVoid,
-    removePosition: decodeVoid,
-    connect: decodeRoutineFlowLink,
-    disconnect: decodeVoid,
-    updateLink: decodeRoutineFlowLink,
-    stopRun: decodeVoid,
   }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,

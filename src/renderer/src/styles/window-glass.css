@@ -131,8 +131,7 @@
     .app-window
     > .app-frame-edge
     .side-panel-maximized
-    > :is(.settings-panel, .browser-panel),
-  :root[data-openbot-window-glass] .app-frame-edge .diagram-view-body {
+    > :is(.settings-panel, .browser-panel) {
     background: var(--window-glass-card);
   }
 }
@@ -178,12 +177,8 @@
 
 :root[data-openbot-window-glass]
   .app-window
-  :is(.schedule-pane, .agent-usage, .tasks-page, .diagram-view, .settings-page-content .agent-files-view) {
+  :is(.schedule-pane, .agent-usage, .tasks-page, .workflows-notice, .settings-page-content .agent-files-view) {
   background: transparent;
-}
-
-:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
-  background-color: transparent;
 }
 
 :root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
@@ -213,14 +208,6 @@
 
 :root[data-openbot-window-glass] .app-window .composer-stack {
   clip-path: inset(0 0 var(--composer-stack-overlap) 0);
-}
-
-:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
-  --openbot-bg-surface: var(--window-solid-surface);
-  --openbot-bg-surface-raised: var(--window-solid-surface-raised);
-  --openbot-bg-control: var(--window-solid-control);
-  --openbot-bg-control-hover: var(--window-solid-control-hover);
-  --openbot-bg-control-active: var(--window-solid-control-active);
 }
 
 :root[data-openbot-window-glass] .app-window .wfn-stage {

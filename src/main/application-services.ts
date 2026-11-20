@@ -106,11 +106,7 @@ import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import {
-  createRoutineFlows,
-  type RoutineFlowsHandle,
-  routineFlowNoticeEvent,
-} from "../backend/routine-flows/routine-flows";
+import { createRoutineFlows, routineFlowNoticeEvent } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import {
   createRoutineResults,
@@ -634,7 +630,6 @@ export interface ApplicationServiceContext {
 
 export interface ApplicationServices {
   service: AgentService;
-  routineFlows: RoutineFlowsHandle;
   workflows: WorkflowsHandle;
   workflowGitHub: WorkflowGitHubDirectory;
   crm: CrmHandle;
@@ -4127,7 +4122,6 @@ export async function createApplicationServices({
 
   return {
     service,
-    routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
     workflowGitHub,
     crm,

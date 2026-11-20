@@ -60,6 +60,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Das gewählte Agentenmodell ist nicht verfügbar.",
   "error.agent.modelProviderNotConnected":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht verbunden.",
+  "error.agent.modelProviderSignInRequired":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht eine Anmeldung. Melde dich bei {provider} an und versuche es erneut.",
+  "error.agent.modelProviderNotInstalled":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} ist nicht installiert.",
+  "error.agent.modelProviderOutdated":
+    "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} braucht ein Update.",
   "error.agent.modelListEmpty":
     "Das gewählte Agentenmodell „{model}“ ist nicht verfügbar: {provider} hat keine Modelle aufgeführt. Letzter Fehler: {detail}",
   "error.agent.modelListEmptyNoError":
