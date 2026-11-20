@@ -210,6 +210,7 @@ interface TabEntry {
   value: string;
   label: string;
   icon: () => JSX.Element;
+  badge?: SidePanelPaneBadge | undefined;
   select: () => void;
 }
 
@@ -359,6 +360,7 @@ function SidePanelTabRow(
       value: pane,
       label: labelOf(pane),
       icon: () => <PaneIcon pane={pane} />,
+      badge: props.badges?.[pane],
       select: () => props.onSelect(pane),
     })),
     ...threads().map((thread) => ({
@@ -733,7 +735,8 @@ function SidePanelTabRow(
                         }}
                       >
                         <span class="side-panel-hidden-tab-icon">{entry().icon()}</span>
-                        <span>{entry().label}</span>
+                        <span class="side-panel-hidden-tab-label">{entry().label}</span>
+                        <PaneBadge badge={entry().badge} />
                       </DropdownMenu.Item>
                     )}
                   </For>
@@ -766,6 +769,7 @@ function SidePanelTabRow(
                       <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
                         <PaneIcon pane={pane} />
                         {labelOf(pane)}
+                        <PaneBadge badge={props.badges?.[pane]} />
                       </DropdownMenu.Item>
                     )}
                   </For>

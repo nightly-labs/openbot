@@ -3,9 +3,10 @@ import { sidebarMessageTime } from "@openbot/ui/features/sidebar/sidebar-filteri
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
+import { ThreadStemMark } from "./ThreadMenu";
 import { ThreadStatusMark } from "./ThreadStatusMark";
 import { ThreadTitle } from "./ThreadTitle";
-import type { ThreadItem, ThreadStem } from "./thread-types";
+import type { ThreadItem } from "./thread-types";
 
 export interface ThreadsPaneProps {
   threads: readonly ThreadItem[];
@@ -14,19 +15,8 @@ export interface ThreadsPaneProps {
   canStartNew: boolean;
   resizer?: JSX.Element;
   onOpen: (id: string) => void;
-  onOpenBeside: (id: string) => void;
+  onToggleBeside: (id: string) => void;
   onNew: () => void;
-}
-
-function ThreadStemMark(props: { stem: ThreadStem }) {
-  return (
-    <span class="agent-threads-menu-stem" aria-hidden="true">
-      <For each={props.stem.through}>
-        {(line) => <span class={["agent-threads-stem-rail", line && "agent-threads-stem-line"]} />}
-      </For>
-      <span class={["agent-threads-stem-elbow", props.stem.last && "agent-threads-stem-last"]} />
-    </span>
-  );
 }
 
 function ThreadsPaneRow(props: {
@@ -34,7 +24,7 @@ function ThreadsPaneRow(props: {
   current: boolean;
   beside: boolean;
   onOpen: () => void;
-  onOpenBeside: () => void;
+  onToggleBeside: () => void;
 }) {
   const { t, format } = useText();
   const draft = () => props.thread.kind === "draft";
@@ -60,7 +50,7 @@ function ThreadsPaneRow(props: {
           class="threads-pane-beside"
           label={t("conversation.threads.toSide")}
           aria-pressed={props.beside ? "true" : "false"}
-          onClick={() => props.onOpenBeside()}
+          onClick={() => props.onToggleBeside()}
         >
           <PanelRight aria-hidden="true" />
         </IconButton>
@@ -95,7 +85,7 @@ export function ThreadsPane(props: ThreadsPaneProps) {
                   current={props.activeId === thread().id}
                   beside={props.besideIds.includes(thread().id)}
                   onOpen={() => props.onOpen(thread().id)}
-                  onOpenBeside={() => props.onOpenBeside(thread().id)}
+                  onToggleBeside={() => props.onToggleBeside(thread().id)}
                 />
               )}
             </For>

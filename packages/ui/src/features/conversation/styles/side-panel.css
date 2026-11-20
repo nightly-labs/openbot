@@ -250,7 +250,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.side-panel-launch .side-panel-tab-count.z-badge {
+:is(.side-panel-launch, .side-panel-menu-item) .side-panel-tab-count.z-badge {
   margin-inline-start: auto;
 }
 
@@ -265,7 +265,7 @@
   inline-size: var(--openbot-space-6);
 }
 
-.side-panel-hidden-tabs .side-panel-menu-item > span:last-child {
+.side-panel-hidden-tab-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

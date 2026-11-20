@@ -52,9 +52,14 @@ function ThreadsPaneStory(props: { threads: ThreadItem[]; active?: string; besid
             draft.active = id;
           })
         }
-        onOpenBeside={(id) =>
+        onToggleBeside={(id) =>
           setState((draft) => {
-            if (!draft.beside.includes(id)) draft.beside.push(id);
+            if (draft.beside.includes(id)) {
+              draft.beside = draft.beside.filter((entry) => entry !== id);
+              draft.active = id;
+              return;
+            }
+            draft.beside.push(id);
             if (draft.active === id) draft.active = MAIN_THREAD_ID;
           })
         }

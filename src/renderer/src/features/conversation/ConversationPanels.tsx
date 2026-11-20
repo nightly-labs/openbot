@@ -525,8 +525,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (sideThreadIds().includes(id)) movePanelThreadToChat(id);
     else props.threads?.header.onOpen(id);
   };
-  const openListedThreadBeside = (id: string) => {
-    if (sideThreadIds().includes(id)) openPanelThread(id);
+  const toggleListedThreadBeside = (id: string) => {
+    if (sideThreadIds().includes(id)) movePanelThreadToChat(id);
     else moveThreadToPanel(id);
   };
   return (
@@ -691,7 +691,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         {(threadId) => <ConversationSideThread threadId={threadId} resizer={sidePanelResizer("side-thread-panel")} />}
       </Show>
 
-      <Show when={activeRightPanel() === "threads"}>
+      <Show when={activeRightPanel() === "threads" && sidePanelPanes().includes("threads")}>
         <ThreadsPane
           threads={listedThreads()}
           activeId={props.threads?.header.activeId ?? ""}
@@ -699,7 +699,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           canStartNew={props.threads?.header.canStartNew ?? false}
           resizer={sidePanelResizer("threads-panel")}
           onOpen={openListedThread}
-          onOpenBeside={openListedThreadBeside}
+          onToggleBeside={toggleListedThreadBeside}
           onNew={startNewThread}
         />
       </Show>
