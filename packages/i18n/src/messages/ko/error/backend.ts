@@ -87,6 +87,8 @@ export const messages = {
     "이 채널의 멤버에게는 아직 압축할 대화가 없습니다. 멤버가 채널에서 답한 후에 압축하세요.",
   "error.backend.channelCompactNotSupported":
     "이 채널의 어떤 멤버도 요청 시 압축할 수 없습니다. 지원하는 멤버는 컨텍스트가 거의 가득 차면 자동으로 압축합니다.",
+  "error.backend.channelCompactProviderUnavailable":
+    "채널 멤버의 제공자가 지금 작동하지 않아요. 제공자를 새로 고친 다음 채널을 다시 압축해 주세요.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",
   "error.backend.channelArchiveRunning": "이 채널에서 실행 중인 작업을 중지한 다음 삭제하세요.",
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
