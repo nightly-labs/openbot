@@ -1,4 +1,4 @@
-import type { VaultItemKind, VaultSaveInput } from "@openbot/contracts/ipc";
+import { VAULT_API_KEY_LIMIT, type VaultItemKind, type VaultSaveInput } from "@openbot/contracts/ipc";
 import {
   UI_API_KEY_SCOPE_FIELD_ID,
   type UiBlockStatus,
@@ -6,8 +6,8 @@ import {
   type UiVaultSavedItem,
 } from "@openbot/contracts/ui-blocks";
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, CreditCard, KeyRound, UserRound } from "@openbot/ui";
-import { createSignal, Match, onCleanup, Show, Switch } from "solid-js";
+import { Button, CreditCard, Field, KeyRound, NativeSelect, UserRound } from "@openbot/ui";
+import { createSignal, createUniqueId, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { UiBlockCard } from "../conversation/ui-blocks/UiBlockCard";
 import {
@@ -16,6 +16,7 @@ import {
   VaultContactLogo,
   VaultRequestDialog,
   type VaultRequestScope,
+  VaultSecretInput,
   VaultSiteLogo,
 } from "./VaultPanel";
 
@@ -26,6 +27,7 @@ export interface VaultRequestCardProps {
   prefill: Readonly<Record<string, string>>;
   scope?: VaultRequestScope | undefined;
   keyPlaceholder?: string | undefined;
+  submitLabel?: string | undefined;
   status: UiBlockStatus;
   saved?: UiVaultSavedItem | undefined;
   closedOutcome?: string | undefined;
@@ -86,11 +88,79 @@ function SavedLogo(props: { kind: VaultItemKind; saved: UiVaultSavedItem; values
   );
 }
 
+function ApiKeyRequestForm(props: {
+  formId: string;
+  name: string;
+  placeholder?: string | undefined;
+  scope?: VaultRequestScope | undefined;
+  apiKey: string;
+  scopeChoice: string;
+  onKeyChange: (key: string) => void;
+  onScopeChange: (scope: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <form
+      id={props.formId}
+      class="ui-block-form-fields"
+      novalidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onSubmit();
+      }}
+    >
+      <Field label={props.name}>
+        <VaultSecretInput
+          field="key"
+          saved={false}
+          value={props.apiKey}
+          maxlength={VAULT_API_KEY_LIMIT}
+          placeholder={props.placeholder}
+          onChange={props.onKeyChange}
+          onReveal={() => Promise.resolve("")}
+          onRevealFailed={() => undefined}
+        />
+      </Field>
+      <Show when={props.scope}>
+        {(choice) => (
+          <Field label={choice().label}>
+            <NativeSelect
+              value={props.scopeChoice}
+              onChange={(event) => props.onScopeChange(event.currentTarget.value)}
+            >
+              <For each={choice().options}>{(option) => <option value={option}>{option}</option>}</For>
+            </NativeSelect>
+          </Field>
+        )}
+      </Show>
+    </form>
+  );
+}
+
 export function VaultRequestCard(props: VaultRequestCardProps) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
+  const formId = createUniqueId();
+  const [apiKey, setApiKey] = createSignal("");
+  const [scopeChoice, setScopeChoice] = createSignal(untrack(() => props.scope?.value ?? ""));
+  const [saveFailure, setSaveFailure] = createSignal<string>();
   onCleanup(() => props.elementRef?.(undefined));
   const pending = () => props.status === "pending";
+  const keyForm = () => props.kind === "apiKey" && pending();
+
+  async function saveApiKey(): Promise<void> {
+    const save = props.onSave;
+    if (!save || props.busy || apiKey().trim() === "") return;
+    setSaveFailure(undefined);
+    try {
+      await save(
+        { kind: "apiKey", id: null, name: props.prefill.name ?? "", notes: "", key: apiKey() },
+        props.scope ? scopeChoice() : undefined,
+      );
+    } catch (cause) {
+      setSaveFailure(errorMessage(cause, t("vault.failed")));
+    }
+  }
 
   const saved = () => props.status === "answered" && (props.saved !== undefined || props.kind === "apiKey");
 
@@ -147,25 +217,50 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
       }
       outcome={saved() ? t("vault.request.saved") : props.status === "closed" ? props.closedOutcome : undefined}
       outcomeBadge
-      inlineActions
+      inlineActions={!keyForm()}
       busy={props.busy}
-      error={props.error}
+      error={saveFailure() ?? props.error}
       onSkip={props.onSkip}
       actions={
-        <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
-          {t(ADD_LABEL[props.kind])}
-        </Button>
+        <Show
+          when={props.kind === "apiKey"}
+          fallback={
+            <Button size="sm" disabled={!props.onSave || props.busy} onClick={() => setDialogOpen(true)}>
+              {t(ADD_LABEL[props.kind])}
+            </Button>
+          }
+        >
+          <Button
+            type="submit"
+            size="sm"
+            form={formId}
+            disabled={!props.onSave || props.busy || apiKey().trim() === ""}
+          >
+            {props.submitLabel ?? t("common.save")}
+          </Button>
+        </Show>
       }
     >
+      <Show when={keyForm()}>
+        <ApiKeyRequestForm
+          formId={formId}
+          name={props.prefill.name ?? ""}
+          placeholder={props.keyPlaceholder}
+          scope={props.scope}
+          apiKey={apiKey()}
+          scopeChoice={scopeChoice()}
+          onKeyChange={setApiKey}
+          onScopeChange={setScopeChoice}
+          onSubmit={() => void saveApiKey()}
+        />
+      </Show>
       <Show when={dialogOpen() && pending() ? props.onSave : undefined}>
         {(save) => (
           <VaultRequestDialog
             kind={props.kind}
             title={props.title}
             prefill={props.prefill}
-            scope={props.scope}
-            keyPlaceholder={props.keyPlaceholder}
-            onSave={(input, scope) => save()(input, scope)}
+            onSave={(input) => save()(input)}
             onClose={() => setDialogOpen(false)}
           />
         )}

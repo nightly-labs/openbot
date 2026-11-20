@@ -58,6 +58,7 @@ interface ApiKeyRequest {
   keyFieldId: string;
   name: string;
   placeholder: string | undefined;
+  submit: string | undefined;
   scope: VaultRequestScope;
 }
 
@@ -73,6 +74,7 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
     keyFieldId: key.id,
     name: key.label ?? key.id,
     placeholder: "placeholder" in key ? key.placeholder : undefined,
+    submit: spec.submit,
     scope: { label: scope.label ?? scope.id, options: scope.options, value: scope.value ?? first },
   };
 }
@@ -191,6 +193,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           prefill={prefill()}
           scope={apiKeyRequest()?.scope}
           keyPlaceholder={apiKeyRequest()?.placeholder}
+          submitLabel={apiKeyRequest()?.submit}
           status={state().status}
           closedOutcome={state().outcome}
           saved={props.block.vault?.saved}
