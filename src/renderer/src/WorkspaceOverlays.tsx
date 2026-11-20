@@ -353,8 +353,13 @@ function HostedUpsell(props: AccountProps) {
       hostedServersLoaded() &&
       hostedServerIds().size === 0 &&
       (activeServer()?.kind === "local" || activeServer()?.role === "owner") &&
-      activeServer()?.hosted !== true
+      activeServer()?.hosted !== true &&
+      !activeServerRunsAsService()
     );
+  }
+  function activeServerRunsAsService(): boolean {
+    const server = activeServer();
+    return server?.kind === "remote" && serverSupportsCapability(server, "host-restart-v1");
   }
   function upsellServerId(): string {
     return activeServer()?.id ?? "local";

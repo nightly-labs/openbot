@@ -3187,7 +3187,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       hostedServers.loaded() &&
                       !hostedServers.ownsHostedServer() &&
                       server()?.role === "owner" &&
-                      server()?.hosted !== true
+                      server()?.hosted !== true &&
+                      !workspace.state.capabilities.includes(HOST_RESTART_CAPABILITY)
                     }
                     serverId={server()?.id ?? ""}
                     host={{ name: server()?.name ?? "" }}
