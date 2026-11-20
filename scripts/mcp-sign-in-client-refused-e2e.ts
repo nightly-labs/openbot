@@ -606,6 +606,26 @@ async function main(): Promise<void> {
     check(openedElsewhere, openedElsewhere.signedIn, "no token is stored after the sign-in");
     report.cases.push(openedElsewhere);
 
+    const lostElsewhere = await runCase("opened-elsewhere-after-lost-callback-sign-in", ["none"], 1, {
+      storedClient: "e2e-lost-callback-client",
+      storedClientRedirects: [callback],
+      storedClientLost: true,
+      relayDeepLink: null,
+    });
+    check(
+      lostElsewhere,
+      lostElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${lostElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      lostElsewhere,
+      lostElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${lostElsewhere.redirects.join()}`,
+    );
+    check(lostElsewhere, lostElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lostElsewhere);
+
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(
       forbidden,

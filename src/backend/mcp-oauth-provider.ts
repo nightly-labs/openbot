@@ -802,9 +802,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const retry = this.#retryRedirectUrl;
     if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !registersAddress(client.redirect_uris, retry))
       return this.#register();
-    const neverSignedIn =
-      !retry && !record.tokens && record.lostAt === undefined && client.client_id !== MCP_CLIENT_METADATA_URL;
-    if (neverSignedIn && !this.#registersFirstAddress(client)) return this.#register();
+    const openedElsewhere = this.#options.firstRedirectUrl === this.#options.redirectUrl;
+    const neverSignedIn = !record.tokens && record.lostAt === undefined;
+    const checksFirstAddress = !retry && client.client_id !== MCP_CLIENT_METADATA_URL;
+    if (checksFirstAddress && (openedElsewhere || neverSignedIn) && !this.#registersFirstAddress(client))
+      return this.#register();
     const scopeAllowed =
       !client.scope ||
       !discovery?.resourceMetadata?.scopes_supported?.length ||
