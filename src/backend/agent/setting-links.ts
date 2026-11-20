@@ -405,6 +405,25 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
   },
 ];
 
+const CHAT_PLACES: readonly SettingLinkEntry[] = [
+  {
+    title: "Threads",
+    place:
+      "In the agent's chat, the chat header: + (New thread) starts a thread, and the thread menu shows the thread tabs, New thread and All threads. On a message: Branch in new thread. On the phone app: touch the agent's name at the top of the chat for Main chat, New thread and All threads.",
+    about:
+      "More conversations with the same agent beside its main chat, for example for parallel work. Each thread has its own conversation and context: it does not see the messages of the main chat or of other threads, except the messages that a branch copies. All threads share the agent's memories, skills, settings and working directory.",
+    words: "parallel side tab tabs branch fork session sessions",
+  },
+];
+
+export function searchChatPlaces(query: string, limit = 1): ServerPlace[] {
+  return rank(CHAT_PLACES, (entry) => entry, terms(query), limit, false).map(({ title, place, about }) => ({
+    title,
+    place,
+    about,
+  }));
+}
+
 const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
