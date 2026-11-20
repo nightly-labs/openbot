@@ -21,6 +21,7 @@ import {
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeLiveVoiceAccount } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -256,9 +257,7 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
 }
 
 export function parseSetLiveVoiceAccountInput(value: unknown): SetLiveVoiceAccountInput {
-  if (!isDynamicRecord(value) || (value.accountId !== null && !isProviderAccountId(value.accountId)))
-    throw new Error("Invalid live voice account.");
-  return { accountId: value.accountId };
+  return { accountId: decodeLiveVoiceAccount(value) };
 }
 
 export function parseResetProviderUsageInput(value: unknown): ResetProviderUsageInput {
