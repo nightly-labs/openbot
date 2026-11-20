@@ -1,4 +1,5 @@
 import { join, posix } from "node:path";
+import { registerPublicValues } from "@openbot/logging";
 import { Effect } from "effect";
 import type { LocalSkillTools } from "../backend/agent/skill-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
@@ -34,7 +35,11 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
         return skill;
       }),
     install: (input) => skills.installLocal(input).pipe(toToolOperationFailed),
-    listInstalled: (agentId) => skills.listInstalled(agentId).pipe(toToolOperationFailed),
+    listInstalled: (agentId) =>
+      skills.listInstalled(agentId).pipe(
+        Effect.tap((installed) => Effect.sync(() => registerPublicValues(installed.map((skill) => skill.skillId)))),
+        toToolOperationFailed,
+      ),
     setEnabled: (input) => skills.setEnabled(input).pipe(toToolOperationFailed),
     uninstall: (input) => skills.uninstall(input).pipe(toToolOperationFailed),
     create: (input) =>
