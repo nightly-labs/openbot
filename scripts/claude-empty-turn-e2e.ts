@@ -348,6 +348,12 @@ try {
   expect("an empty turn", await runCase("EMPTY-TURN"), "failed", [NO_ANSWER]);
   expect("a step and no answer", await runCase("STEP-THEN-EMPTY"), "completed", [NO_ANSWER_AFTER_STEPS]);
   expect("background work and no answer", await runCase("BACKGROUND-THEN-EMPTY"), "completed", []);
+  expect(
+    "a later step and no answer while earlier background work runs",
+    await runCase("LATER-STEP-THEN-EMPTY"),
+    "completed",
+    [NO_ANSWER_AFTER_STEPS],
+  );
   report.passed = report.failures.length === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

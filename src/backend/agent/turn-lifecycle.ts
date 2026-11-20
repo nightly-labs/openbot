@@ -367,6 +367,7 @@ export class TurnLifecycle {
       carriedHistory: boolean;
       workedBesidesReaction: boolean;
       compacted: boolean;
+      startedBackgroundWork: boolean;
       narration: string | null;
       openTools: Set<string>;
       failureReports: Set<string>;
@@ -856,8 +857,8 @@ export class TurnLifecycle {
     const running = this.#runningTurns.get(turnId);
     if (
       (source.provider !== "codex" && source.provider !== "claude") ||
-      this.#waitingThreads.has(threadId) ||
       running === undefined ||
+      (running.startedBackgroundWork && this.#waitingThreads.has(threadId)) ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
       this.#failoverTurns.has(turnId) ||
@@ -1157,6 +1158,7 @@ export class TurnLifecycle {
           carriedHistory: false,
           workedBesidesReaction: false,
           compacted: false,
+          startedBackgroundWork: false,
           narration: null,
           openTools: new Set(),
           failureReports: new Set(),
@@ -1389,6 +1391,9 @@ export class TurnLifecycle {
         if (runs === this.#waitingThreads.has(threadId)) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
+        if (runs)
+          for (const turn of this.#runningTurns.values())
+            if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
         this.#hooks.emitRuntimeSnapshot();
         return;
       }
