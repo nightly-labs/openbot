@@ -2,12 +2,12 @@ import { type AgentProviderId, providerDisplayName } from "@openbot/contracts/ag
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View } from "react-native";
-import { useServerProviders } from "@/features/servers/model/use-server-providers";
+import { useServerProviderStatus } from "@/features/servers/model/use-server-providers";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
 export function useProviderSignInNeeded(serverId: string, provider: AgentProviderId | undefined): boolean {
-  const { status } = useServerProviders(serverId);
+  const status = useServerProviderStatus(serverId);
   if (!provider) return false;
   return (status.data?.providers ?? []).some((entry) => entry.id === provider && entry.state === "sign-in-required");
 }
