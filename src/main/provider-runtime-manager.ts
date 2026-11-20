@@ -653,9 +653,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     );
   }
   #findLatestRelease(provider: ManagedProviderId, target: RuntimeTarget): Effect.Effect<void> {
-    return latestRelease(provider, { target, lock: this.#lock, fetch: this.#fetch }).pipe(
-      Effect.tap((release) => Effect.sync(() => this.#latest.set(provider, release))),
-      Effect.ignore,
+    const lookups = [
+      fetchBlockedVersions(this.#fetch).pipe(
+        Effect.tap((blocked) =>
+          Effect.sync(() => {
+            this.#blocked = blocked;
+          }),
+        ),
+      ),
+      latestRelease(provider, { target, lock: this.#lock, fetch: this.#fetch }).pipe(
+        Effect.tap((release) => Effect.sync(() => this.#latest.set(provider, release))),
+      ),
+    ];
+    return Effect.forEach(lookups, (lookup) => Effect.ignore(lookup), { concurrency: "unbounded", discard: true }).pipe(
       Effect.timeoutOrElse({ duration: RELEASE_CHECK_WAIT_MS, orElse: () => Effect.void }),
     );
   }
