@@ -616,9 +616,10 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Turn succeeds | Stay open unless the agent called `close_tab`. |
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
-| Restart | Restored from the browser's own state file. |
+| Restart | Restored from the browser's own state file. A tab loads its page only when a person shows it or an agent uses it, the selected tab too. |
+| Not shown and idle 2 min | Stays open and loaded, but its page is frozen with `Page.setWebLifecycleState`: timers, animation and scripts stop. The next use (agent call, preview, live view, takeover or recording) makes it active again first. A tab with an open dialog or a pending restore is not frozen. |
 | Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
-| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown, busy, held, recording, playing audio, or with a secret) does not count. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown to a person, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |

@@ -137,6 +137,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #lastSample: ResourceSample | null = null;
   #lastSampleAt: number | null = null;
   #previousCpuSeconds: Map<number, number> | null = null;
+  #previousAppCpuSeconds = new Map<string, number>();
   #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null; appWindow: boolean }[] = [];
   #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
     longTasks: 0,
@@ -289,6 +290,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #resume = () => {
     this.#lastSampleAt = null;
     this.#previousCpuSeconds = null;
+    this.#previousAppCpuSeconds = new Map();
     this.#loop.reset();
     this.#measureLoop();
     this.#startLoopWindow();
@@ -436,13 +438,25 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const rss = new Map<ProcessGroup, number>();
     const privateMemory = new Map<ProcessGroup, number>();
     const cpu = new Map<ProcessGroup, number>();
+    const appCpuSeconds = new Map<string, number>();
+    const processorCount = cpus().length;
     for (const metric of metrics) {
       const group = processGroup(metric, tabPids);
       rss.set(group, (rss.get(group) ?? 0) + metric.memory.workingSetSize / 1024);
       const privateKb = metric.memory.privateBytes;
       if (privateKb !== undefined) privateMemory.set(group, (privateMemory.get(group) ?? 0) + privateKb / 1024);
-      cpu.set(group, (cpu.get(group) ?? 0) + metric.cpu.percentCPUUsage);
+      const processKey = `${metric.pid}:${metric.creationTime}`;
+      const cumulativeSeconds = metric.cpu.cumulativeCPUUsage;
+      if (cumulativeSeconds !== undefined) appCpuSeconds.set(processKey, cumulativeSeconds);
+      const usage = appProcessCpuPct(
+        metric,
+        this.#previousAppCpuSeconds.get(processKey),
+        elapsedSeconds,
+        processorCount,
+      );
+      cpu.set(group, (cpu.get(group) ?? 0) + usage);
     }
+    this.#previousAppCpuSeconds = appCpuSeconds;
 
     let providerTreeSupported = process.platform !== "win32";
     const totalKnown = () => providerTreeSupported || process.platform === "win32";
@@ -582,6 +596,18 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     if (closedDay || Date.now() - this.#persistedAt >= PERSIST_INTERVAL_MS) yield* this.#persist().pipe(Effect.ignore);
     if (closedDay) this.#onDayClosed();
   });
+}
+
+function appProcessCpuPct(
+  metric: ProcessMetric,
+  previousSeconds: number | undefined,
+  elapsedSeconds: number,
+  processorCount: number,
+): number {
+  const seconds = metric.cpu.cumulativeCPUUsage;
+  if (seconds === undefined) return metric.cpu.percentCPUUsage * processorCount;
+  if (previousSeconds === undefined || elapsedSeconds <= 0) return 0;
+  return (Math.max(0, seconds - previousSeconds) / elapsedSeconds) * 100;
 }
 
 function processGroup(metric: ProcessMetric, tabPids: ReadonlySet<number>): ProcessGroup {
