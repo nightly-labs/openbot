@@ -37,13 +37,14 @@ function HomeLayout() {
     <>
       <Show when={page()}>
         {(data) => (
-          <Show when={referral()} fallback={<LandingPage text={data().text} />}>
+          <Show when={referral()} keyed fallback={<LandingPage text={data().text} />}>
             {(landing) => (
               <ReferralPage
                 text={data().text.referral}
-                invite={landing().invite}
-                offer={landing().offer}
+                invite={landing.invite}
+                offer={landing.offer}
                 lang={data().lang}
+                locale={data().locale}
               />
             )}
           </Show>

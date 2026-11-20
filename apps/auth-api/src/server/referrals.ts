@@ -303,7 +303,7 @@ function firstName(name: string | null): string | null {
 
 function shortName(name: string | null): string {
   const words = (name ?? "").trim().split(/\s+/u).filter(Boolean);
-  const first = words[0]?.slice(0, 40) ?? "";
+  const first = firstName(name) ?? "";
   const last = words.length > 1 ? words[words.length - 1]?.[0] : undefined;
   return last ? `${first} ${last.toUpperCase()}.` : first;
 }

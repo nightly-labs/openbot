@@ -36,7 +36,7 @@ const readReferralInviter = createServerFn({ method: "GET" })
       return { found: inviter !== null, inviterName: inviter?.firstName ?? null };
     } catch {
       console.warn("referral landing: the inviter did not load");
-      return { found: true, inviterName: null };
+      return { found: false, inviterName: null };
     }
   });
 

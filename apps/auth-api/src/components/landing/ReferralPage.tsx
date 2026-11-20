@@ -2,8 +2,11 @@ import { AppLogo } from "@openbot/brand";
 import type { BillingInterval } from "@openbot/contracts/billing";
 import { LICENSE_YEAR_DISCOUNT_PERCENT, licensePlanPrice } from "@openbot/contracts/license";
 import { REFERRAL_SHARE_PERCENT } from "@openbot/contracts/referral";
+import type { TranslatedLocale } from "@openbot/i18n";
+import { createFormat } from "@openbot/i18n/format";
+import { formatMinorMoney } from "@openbot/ui/features/billing/money";
 import { yearlyDiscountPercent } from "@openbot/ui/features/billing/OrderForm";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import type { PricingOffer } from "../../lib/pricing-page";
 import type { ReferralInvite } from "../../lib/referral-landing";
@@ -27,6 +30,8 @@ const SPARKLES = [
   { x: "54%", y: "-10%", size: "12px", delay: "1.7s" },
 ] as const;
 
+const COPIED_FOR_MS = 1600;
+
 const TILT_PROPERTIES = ["--referral-card-mx", "--referral-card-my", "--referral-card-rx", "--referral-card-ry"];
 
 interface ReferralFormat {
@@ -37,7 +42,7 @@ interface ReferralFormat {
 interface OfferRow {
   id: string;
   name: string;
-  detail: string;
+  detail: (interval: BillingInterval) => string;
   price: (interval: BillingInterval) => number;
 }
 
@@ -49,19 +54,12 @@ interface OfferGroup {
   rows: readonly OfferRow[];
 }
 
-function referralFormat(lang: string): ReferralFormat {
-  const money = (minor: number) => {
-    const whole = minor % 100 === 0;
-    return new Intl.NumberFormat(lang, {
-      style: "currency",
-      currency: "EUR",
-      currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: whole ? 0 : 2,
-      maximumFractionDigits: whole ? 0 : 2,
-    }).format(minor / 100);
+function referralFormat(locale: TranslatedLocale, lang: string): ReferralFormat {
+  const format = createFormat(locale, lang);
+  return {
+    money: (minor) => formatMinorMoney(format, minor, "eur"),
+    percent: (value) => format.percent(value / 100),
   };
-  const percent = (value: number) => new Intl.NumberFormat(lang, { style: "percent" }).format(value / 100);
-  return { money, percent };
 }
 
 function saving(minor: number): number {
@@ -90,7 +88,8 @@ function offerGroups(text: ReferralPageText, offer: PricingOffer, format: Referr
         .map((plan) => ({
           id: plan.id,
           name: text.server.plans[plan.id].name,
-          detail: `${text.server.plans[plan.id].members} · ${fill(text.server.storage, { size: `${plan.diskGb}` })}`,
+          detail: () =>
+            `${text.server.plans[plan.id].members} · ${fill(text.server.storage, { size: `${plan.diskGb}` })}`,
           price: (interval: BillingInterval) => plan.prices.eur[interval],
         })),
     },
@@ -103,13 +102,14 @@ function offerGroups(text: ReferralPageText, offer: PricingOffer, format: Referr
         {
           id: "license-starter",
           name: text.license.starter,
-          detail: text.license.starterDetail,
+          detail: () => text.license.starterDetail,
           price: (interval) => license("starter", interval).base,
         },
         {
           id: "license-team",
           name: text.license.team,
-          detail: fill(text.license.teamDetail, { price: format.money(license("team", "month").extraUser) }),
+          detail: (interval) =>
+            fill(text.license.teamDetail, { price: format.money(license("team", interval).extraUser) }),
           price: (interval) => license("team", interval).base,
         },
       ],
@@ -199,13 +199,17 @@ function CopyGlyph() {
 
 function CopyButton(props: { code: string; text: ReferralPageText["card"] }) {
   const [copied, setCopied] = createSignal(false);
+  let reset: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(reset));
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(props.code);
-      setCopied(true);
     } catch {
-      setCopied(false);
+      return;
     }
+    setCopied(true);
+    clearTimeout(reset);
+    reset = setTimeout(() => setCopied(false), COPIED_FOR_MS);
   };
   return (
     <button type="button" class="referral-card-copy" data-copied={`${copied()}`} onClick={copy}>
@@ -348,10 +352,11 @@ export function ReferralPage(props: {
   invite: ReferralInvite;
   offer: PricingOffer;
   lang: string;
+  locale: TranslatedLocale;
 }) {
   const [interval, setInterval] = createSignal<BillingInterval>("month");
   const path = useSitePath();
-  const format = () => referralFormat(props.lang);
+  const format = () => referralFormat(props.locale, props.lang);
   const groups = () => offerGroups(props.text, props.offer, format());
   const yearlyPercent = () => Math.min(yearlyDiscountPercent(props.offer.plans, "eur"), LICENSE_YEAR_DISCOUNT_PERCENT);
   const percent = () => format().percent(REFERRAL_SHARE_PERCENT);
@@ -425,7 +430,7 @@ export function ReferralPage(props: {
                         <li class="referral-price-row">
                           <div>
                             <p class="referral-price-name">{row.name}</p>
-                            <p class="referral-price-detail">{row.detail}</p>
+                            <p class="referral-price-detail">{row.detail(interval())}</p>
                           </div>
                           <Show when={interval()} keyed>
                             {(period) => (
