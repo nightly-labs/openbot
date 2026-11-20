@@ -5,4 +5,5 @@
   The step tells you when the account has no credit or its plan does not permit the model, when the
   provider does not permit the model, blocks the input, or does not accept the step, and when the
   input is too long. For another refusal, the step shows the provider's reason, with secrets
-  removed. On a joined server, the server must also be on this version.
+  removed. On a joined server, the server must also be on this version. An app on an older version
+  shows these new texts in English.
