@@ -1,4 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
+import { redactText } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProvider } from "../agent-client";
 import { providerLabel } from "./thread-items";
@@ -18,17 +19,21 @@ export function workflowGenerationError(cause: unknown, provider: AgentProvider)
 
 export function workflowMediaError(cause: unknown, provider: AgentProvider): string {
   const failed = sourceText("error.workflow.mediaFailed");
-  return workflowProviderError(cause instanceof Error ? cause : null, provider, failed) ?? failed;
+  const failure = cause instanceof Error ? cause : null;
+  if (failure?.message === sourceText("error.agent.profileTimedOut")) return failed;
+  return workflowProviderError(failure, provider, failed) ?? failed;
 }
 
 const MEDIA_ANSWER_LENGTH = 500;
 
 export function workflowMediaAnswerError(answer: string): string {
-  const text = answer.replace(/\s+/gu, " ").trim();
-  if (!text) return sourceText("error.workflow.mediaFailed");
-  return sourceText("error.workflow.mediaNotMade", {
-    answer: text.length > MEDIA_ANSWER_LENGTH ? `${text.slice(0, MEDIA_ANSWER_LENGTH - 1)}…` : text,
-  });
+  const characters = Array.from(redactText(answer).replace(/\s+/gu, " ").trim());
+  if (characters.length === 0) return sourceText("error.workflow.mediaFailed");
+  const text =
+    characters.length > MEDIA_ANSWER_LENGTH
+      ? `${characters.slice(0, MEDIA_ANSWER_LENGTH - 1).join("")}…`
+      : characters.join("");
+  return sourceText("error.workflow.mediaNotMade", { answer: text });
 }
 
 function workflowProviderError(failure: Error | null, provider: AgentProvider, timedOut: string): string | null {
