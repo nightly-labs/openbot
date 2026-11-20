@@ -1162,7 +1162,6 @@ export class ThreadLifecycle {
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
-              // tools of these servers, Computer Use included, through tool_call (#12340).
               client.provider === "antigravity"
               ? mcpServers
                   .filter((config) => mcpFallbackRunsServer(config, agent))

@@ -1014,8 +1014,6 @@ export class OpenBotToolRouter {
     const call = deferredCall(params);
     const found = servers && agentId && call ? findAgentMcpTool(servers.forAgent(agentId), call.name) : null;
     if (!servers || !agentId || !call || !found) return null;
-    // Computer Use runs only in the process of a session that has it, never in a new copy. A task
-    // thread beside the agent's own chat has no Computer Use, so it gets none here either (#12340).
     const computerUse = found.config.id === COMPUTER_USE_MCP_SERVER_ID;
     if (computerUse && client.relaysMcpServer?.(params.threadId, found.config) !== true) return null;
     const decision = yield* this.#attention

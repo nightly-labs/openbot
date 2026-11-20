@@ -653,7 +653,6 @@ process.stdin.on("data", (chunk) => {
     contentItems: [{ type: "inputText", text: "get_messages key=true" }],
   });
 
-  // Antigravity leaves out most Computer Use tools, so tool_call runs them for an agent that has it (#12340).
   const computerUse: McpServerConfig = {
     ...stdioRow,
     id: COMPUTER_USE_MCP_SERVER_ID,

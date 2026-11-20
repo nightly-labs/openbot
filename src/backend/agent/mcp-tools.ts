@@ -138,10 +138,6 @@ export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?:
   return config.transport === "http" || !workspaceAccessEnforced(agent);
 }
 
-/**
- * The servers whose tools `tool_call` runs for an agent: its saved rows, the GitHub connection, and
- * Computer Use when it is on for the agent, as the provider gets it (#12340).
- */
 export function agentFallbackMcpServers(
   enabled: readonly McpServerConfig[],
   savedIds: ReadonlySet<string>,
