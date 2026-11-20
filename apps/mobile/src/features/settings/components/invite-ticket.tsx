@@ -39,6 +39,7 @@ import interRegular from "@/assets/fonts/inter/Inter-Regular.ttf";
 import interSemiBold from "@/assets/fonts/inter/Inter-SemiBold.ttf";
 import { ListingGradient } from "@/features/marketplace/components/listing-gradient";
 import {
+  INVITE_STUB_LAYOUT,
   renderInviteStubTexture,
   type StubBox,
   type StubColors,
@@ -52,10 +53,12 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { currentLocale, useText } from "@/shared/lib/text";
 
-const NOTCH = 24;
+const NOTCH = INVITE_STUB_LAYOUT.notch;
 const NOTCHES = 6;
-const HOLE = 7;
-const HOLES = Array.from({ length: 18 }, (_, index) => `hole-${index}`);
+const HOLE = INVITE_STUB_LAYOUT.hole;
+const HOLE_INSET = INVITE_STUB_LAYOUT.holeInset;
+const STUB_RADIUS = INVITE_STUB_LAYOUT.radius;
+const HOLES = Array.from({ length: INVITE_STUB_LAYOUT.holes }, (_, index) => `hole-${index}`);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const GRAVITY = Easing.bezier(0.45, 0, 0.9, 0.55);
 const SHARE_AFTER_TEAR_MS = 260;
@@ -289,7 +292,7 @@ export function InviteTicket({
       <View style={{ zIndex: 2 }}>
         <View
           className="overflow-hidden"
-          style={{ borderTopLeftRadius: 22, borderTopRightRadius: 22, borderCurve: "continuous" }}
+          style={{ borderTopLeftRadius: STUB_RADIUS, borderTopRightRadius: STUB_RADIUS, borderCurve: "continuous" }}
         >
           <View style={{ minHeight: 236, padding: 22, gap: 18, justifyContent: "space-between" }}>
             <ListingGradient name="OpenBot guest pass night" />
@@ -341,7 +344,7 @@ export function InviteTicket({
                 );
               }}
             >
-              <TornEdge edge="top" paper={stub.paper} hole={stub.hole ?? surface} transparent />
+              <StubTopEdge hole={surface} />
               <View
                 className="flex-row items-center justify-between gap-3"
                 style={{ paddingHorizontal: 22, paddingTop: 8, paddingBottom: 18 }}
@@ -395,8 +398,8 @@ const BEND_LAYER = {
   left: -CANVAS_BLEED,
 } as const;
 const STUB_PAPER = {
-  borderBottomLeftRadius: 22,
-  borderBottomRightRadius: 22,
+  borderBottomLeftRadius: STUB_RADIUS,
+  borderBottomRightRadius: STUB_RADIUS,
   borderCurve: "continuous",
 } as const;
 const BEND_SHIFT = [{ translateX: CANVAS_BLEED }, { translateY: CANVAS_BLEED }];
@@ -596,8 +599,8 @@ function PerforatedStrip({ paper, size }: { paper: string; size: SharedValue<SkS
     builder.addRect(rect(0, 0, width, height));
     builder.addCircle(0, height, NOTCH / 2);
     builder.addCircle(width, height, NOTCH / 2);
-    const first = NOTCH / 2 + 6 + HOLE / 2;
-    const last = width - NOTCH / 2 - 6 - HOLE / 2;
+    const first = HOLE_INSET + HOLE / 2;
+    const last = width - HOLE_INSET - HOLE / 2;
     for (let index = 0; index < HOLES.length; index += 1) {
       builder.addCircle(first + ((last - first) * index) / (HOLES.length - 1), height, HOLE / 2);
     }
@@ -611,24 +614,12 @@ function PerforatedStrip({ paper, size }: { paper: string; size: SharedValue<SkS
   );
 }
 
-function TornEdge({
-  edge,
-  paper,
-  hole,
-  transparent = false,
-}: {
-  edge: "top" | "bottom";
-  paper: string;
-  hole: string;
-  transparent?: boolean;
-}) {
-  const holeOnLine = edge === "bottom" ? { bottom: -HOLE / 2 } : { top: -HOLE / 2 };
-  const notchOnLine = edge === "bottom" ? { bottom: -NOTCH / 2 } : { top: -NOTCH / 2 };
+function StubTopEdge({ hole }: { hole: string }) {
   return (
-    <View style={{ height: NOTCH / 2, backgroundColor: transparent ? undefined : paper, overflow: "hidden" }}>
+    <View style={{ height: NOTCH / 2, overflow: "hidden" }}>
       <View
         className="flex-row justify-between"
-        style={{ position: "absolute", left: NOTCH / 2 + 6, right: NOTCH / 2 + 6, ...holeOnLine }}
+        style={{ position: "absolute", left: HOLE_INSET, right: HOLE_INSET, top: -HOLE / 2 }}
       >
         {HOLES.map((id) => (
           <View key={id} style={{ width: HOLE, height: HOLE, borderRadius: HOLE / 2, backgroundColor: hole }} />
@@ -639,7 +630,7 @@ function TornEdge({
           key={side}
           style={{
             position: "absolute",
-            ...notchOnLine,
+            top: -NOTCH / 2,
             ...(side === "left" ? { left: -NOTCH / 2 } : { right: -NOTCH / 2 }),
             width: NOTCH,
             height: NOTCH,

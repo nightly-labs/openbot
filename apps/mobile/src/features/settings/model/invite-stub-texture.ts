@@ -38,7 +38,7 @@ export interface InviteStubTextureInput {
 
 export type StubLine = "admit" | "link" | "hint";
 
-const INVITE_STUB_LAYOUT = {
+export const INVITE_STUB_LAYOUT = {
   notch: 24,
   hole: 7,
   holes: 18,
@@ -50,12 +50,11 @@ export interface StubColors {
   paper: string;
   ink: string;
   muted: string;
-  hole: string | null;
 }
 
 export const STUB_COLORS: Record<"light" | "dark", StubColors> = {
-  light: { paper: "#ffffff", ink: "#1d1822", muted: "rgba(29,24,34,0.55)", hole: null },
-  dark: { paper: "#f6f1ea", ink: "#1d1822", muted: "rgba(29,24,34,0.55)", hole: null },
+  light: { paper: "#ffffff", ink: "#1d1822", muted: "rgba(29,24,34,0.55)" },
+  dark: { paper: "#f6f1ea", ink: "#1d1822", muted: "rgba(29,24,34,0.55)" },
 };
 
 function fill(color: string) {
@@ -115,7 +114,7 @@ function paragraph(text: string, fonts: SkTypefaceFontProvider, style: LineStyle
   return result;
 }
 
-function drawPaper(canvas: SkCanvas, width: number, height: number, paper: string, hole: string | null) {
+function drawPaper(canvas: SkCanvas, width: number, height: number, paper: string) {
   const { radius, notch, hole: size, holes, holeInset } = INVITE_STUB_LAYOUT;
   const outline = Skia.Path.MakeFromSVGString(
     `M0 0 H${width} V${height - radius} A${radius} ${radius} 0 0 1 ${width - radius} ${height} H${radius} A${radius} ${radius} 0 0 1 0 ${height - radius} Z`,
@@ -124,13 +123,12 @@ function drawPaper(canvas: SkCanvas, width: number, height: number, paper: strin
   const clear = Skia.Paint();
   clear.setAntiAlias(true);
   clear.setBlendMode(BlendMode.Clear);
-  const holePaint = hole ? fill(hole) : clear;
-  canvas.drawCircle(0, 0, notch / 2, holePaint);
-  canvas.drawCircle(width, 0, notch / 2, holePaint);
+  canvas.drawCircle(0, 0, notch / 2, clear);
+  canvas.drawCircle(width, 0, notch / 2, clear);
   const first = holeInset + size / 2;
   const last = width - holeInset - size / 2;
   for (let index = 0; index < holes; index += 1) {
-    canvas.drawCircle(first + ((last - first) * index) / (holes - 1), 0, size / 2, holePaint);
+    canvas.drawCircle(first + ((last - first) * index) / (holes - 1), 0, size / 2, clear);
   }
 }
 
@@ -141,7 +139,7 @@ export function renderInviteStubTexture(input: InviteStubTextureInput): SkImage 
   if (!surface) return null;
   const canvas = surface.getCanvas();
   canvas.scale(scale, scale);
-  drawPaper(canvas, width, height, input.colors.paper, input.colors.hole);
+  drawPaper(canvas, width, height, input.colors.paper);
   const { row, column } = input.parts;
   const left = row.x + column.x;
   const top = row.y + column.y;
