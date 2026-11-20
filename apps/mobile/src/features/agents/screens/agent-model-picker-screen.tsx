@@ -96,7 +96,6 @@ export function AgentModelPickerScreen() {
         <SettingsNote>{t("mobile.agent.runtime.noModels")}</SettingsNote>
       ) : matches.length === 0 ? (
         <SettingsNote>
-          {/* OpenRouter lists only the models that the key's account settings allow (#7093). */}
           {request.provider === "openrouter"
             ? t("mobile.agent.runtime.openrouterNoMatches")
             : t("mobile.agent.runtime.noMatches")}
