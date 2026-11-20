@@ -927,6 +927,7 @@ export class ThreadLifecycle {
           ...(instructionsFile.found?.text ? [["instructions", instructionsFile.found.text]] : []),
           ...(catalogCommands.length > 0 ? [["catalog-commands", ...catalogCommands]] : []),
           ...(agentComputerUseEnabled(agent) ? [] : ["codex-computer-use-off"]),
+          ...(agentMemoryEnabled(agent) ? [] : ["memory-off"]),
         ]),
       )
       .digest("hex");

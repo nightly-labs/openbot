@@ -225,6 +225,12 @@ const MEMORY_LABEL =
 const MEMORY_BLOCK_START = "<openbot_saved_memories>";
 const MEMORY_UPDATE_START = "<openbot_saved_memories_update>";
 
+export const MEMORY_OFF_UPDATE = [
+  MEMORY_UPDATE_START,
+  "The user turned OpenBot memory off for you. The saved memories in earlier saved-memory blocks are no longer current: do not use them.",
+  "</openbot_saved_memories_update>",
+].join("\n");
+
 export function memoryContext(
   memories: AgentMemory[],
   options: Pick<DeveloperInstructionOptions, "memoryLimit" | "storedMemoryCount"> = {},

@@ -29,6 +29,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  agentMemoryEnabled,
   type ChannelCommand,
   DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -1308,6 +1309,10 @@ export async function createApplicationServices({
   let agentBrowserProfiles: BrowserProfileService | null = null;
   let crmHandle: CrmHandle | null = null;
   const agentThreads = new AgentThreadStore(store.database);
+  const agentMemoryOn = (agentId: string) => {
+    const agent = store.list().find((candidate) => candidate.id === agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
@@ -1323,13 +1328,15 @@ export async function createApplicationServices({
     quitShortcut: (input) => windows.handleQuitShortcut(mainWindow, input),
     pagePreload: join(__dirname, "../preload/browserPage.cjs"),
     siteMemories: (agentId, hostname) =>
-      siteMemoryStore
-        .forHost(agentId, hostname)
-        .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : [])),
+      agentMemoryOn(agentId)
+        ? siteMemoryStore
+            .forHost(agentId, hostname)
+            .flatMap(({ id, site, text }) => (site ? [{ id, site, text: redactSecrets(text) }] : []))
+        : [],
     userBrowsing: {
       enabled: () => browsingMemory.get().enabled,
       record: (agentId, step) => {
-        Effect.runFork(userBrowsing.record(agentId, step));
+        if (agentMemoryOn(agentId)) Effect.runFork(userBrowsing.record(agentId, step));
       },
     },
     hideFromWindowSwitchers: hidePanelFromWindowSwitchers,
