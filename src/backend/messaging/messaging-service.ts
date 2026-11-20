@@ -2430,7 +2430,7 @@ function finalPost(
   const reaction = reacts ? "done" : null;
   if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
   if (activity.answer) return { answer: true, text: redactPostText(activity.answer), reaction };
-  if (answerOnly) return { answer: false, text: "", reaction };
+  if (answerOnly || activity.teammateRequest) return { answer: false, text: "", reaction };
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
   if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };
