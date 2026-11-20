@@ -165,8 +165,16 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle, aboveAppsSupport } =
-    info;
+  const {
+    platform,
+    variant,
+    analyticsCaptureUrl,
+    analyticsInstallId,
+    softwareRendering,
+    hourCycle,
+    aboveAppsSupport,
+    dynamicIslandUnavailable,
+  } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
@@ -178,6 +186,8 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
   if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
     throw new Error("Invalid agent dock screen support.");
+  if (dynamicIslandUnavailable !== undefined && !isBoolean(dynamicIslandUnavailable))
+    throw new Error("Invalid Dynamic Island availability.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -188,6 +198,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     ...(softwareRendering === undefined ? {} : { softwareRendering }),
     ...(hourCycle === undefined ? {} : { hourCycle }),
     ...(aboveAppsSupport === undefined ? {} : { aboveAppsSupport }),
+    ...(dynamicIslandUnavailable === undefined ? {} : { dynamicIslandUnavailable }),
   };
 }
 
