@@ -44,27 +44,21 @@ interface RemoteTeamBridgeProps extends Omit<RemoteTeamPeerActions, "onTeamEvent
 const KNOWN_COMMAND_LIMIT = 1_000;
 const TEAM_EVENT_BATCH_MS = 16;
 
-function createTeamEventBatch(deliver: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>) {
+function createTeamEventBatch(
+  deliver: (hostId: string, events: RemoteTeamEvent[]) => Promise<void>,
+  failed: () => void,
+) {
   let pending: { hostId: string; events: RemoteTeamEvent[] }[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let failure: { error: unknown } | null = null;
   const flush = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
     const runs = pending;
     pending = [];
-    for (const run of runs)
-      void deliver(run.hostId, run.events).catch((error: unknown) => {
-        failure ??= { error };
-      });
+    for (const run of runs) void deliver(run.hostId, run.events).catch(failed);
   };
   return {
     push(hostId: string, event: RemoteTeamEvent) {
-      if (failure) {
-        const { error } = failure;
-        failure = null;
-        throw error;
-      }
       const last = pending.at(-1);
       if (last?.hostId === hostId) last.events.push(event);
       else pending.push({ hostId, events: [event] });
@@ -92,8 +86,12 @@ export default function RemoteTeamBridge({
 }: RemoteTeamBridgeProps) {
   const teamEvents = useRef(onTeamEvents);
   teamEvents.current = onTeamEvents;
+  const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
   const eventBatch = useRef<ReturnType<typeof createTeamEventBatch> | null>(null);
-  eventBatch.current ??= createTeamEventBatch((hostId, events) => teamEvents.current(hostId, events));
+  eventBatch.current ??= createTeamEventBatch(
+    (hostId, events) => teamEvents.current(hostId, events),
+    () => runtime.current?.eventsFailed(),
+  );
   const pendingEvents = eventBatch.current;
   const browserViewEvent = useRef(onBrowserViewEvent);
   browserViewEvent.current = onBrowserViewEvent;
@@ -129,7 +127,6 @@ export default function RemoteTeamBridge({
       await callbacks.onConnectionUpdate(update);
     },
   };
-  const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
   if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
   const peer = runtime.current;
   if (!browserView.current)
