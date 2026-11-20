@@ -419,6 +419,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
       yield* this.#startAutomaticUpdates(target);
+      yield* Effect.forEach(
+        this.#stopping ? [] : PROVIDERS.filter((provider) => !this.#tasks.has(provider)),
+        (provider) => this.#removeBlockedCopiesEffect(provider, target),
+        { discard: true },
+      );
       const repairs = PROVIDERS.filter(
         (provider) =>
           this.#rejected.has(provider) &&
@@ -472,6 +477,21 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
 
   #isBlocked(runtime: ManagedRuntimeId, version: string): boolean {
     return !isManagedToolRuntime(runtime) && (this.#blocked.get(runtime)?.has(version) ?? false);
+  }
+
+  #removeBlockedCopiesEffect(runtime: ManagedRuntimeId, target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const targetRoot = dirname(this.#installRoot(runtimeSpec(runtime, target, this.#lock)));
+      const versions = yield* runtimeIO(async () => await readdir(targetRoot).catch(() => []));
+      const blocked = versions.filter(
+        (version) => version !== this.#statuses[runtime].version && this.#isBlocked(runtime, version),
+      );
+      const unused = yield* Effect.forEach(blocked, (version) => {
+        const path = join(targetRoot, version);
+        return this.#stampedBySiblingEffect(path).pipe(Effect.map((inUse) => (inUse ? [] : [path])));
+      });
+      yield* this.#removeOldVersionPathsEffect(unused.flat(), Number.POSITIVE_INFINITY);
+    }).pipe(Effect.catch(() => Effect.void));
   }
 
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
@@ -815,10 +835,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
       }
       yield* this.#activateEffect(spec, signal, installed.phase !== "ready");
-      if (previous && previous !== spec.version && this.#isBlocked(spec.runtime, previous)) {
-        const blockedRoot = join(dirname(this.#installRoot(spec)), previous);
-        yield* this.#removeOldVersionPathsEffect([blockedRoot], Number.POSITIVE_INFINITY);
-      }
+      if (previous && previous !== spec.version && this.#isBlocked(spec.runtime, previous))
+        yield* this.#removeBlockedCopiesEffect(spec.runtime, spec.target);
     });
   }
 
@@ -1338,13 +1356,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const active = this.#statuses[spec.runtime].version;
       const keep = new Set(
         active
-          ? [
-              active,
-              backup,
-              ...versions.filter(
-                (version) => !(olderVersion(version, active) || this.#isBlocked(spec.runtime, version)),
-              ),
-            ]
+          ? [active, backup, ...versions.filter((version) => !olderVersion(version, active))]
           : [spec.version, ...versions.sort((a, b) => compareReleases(b, a)).slice(0, 1)],
       );
       const paths = versions.filter((version) => !keep.has(version)).map((version) => join(targetRoot, version));

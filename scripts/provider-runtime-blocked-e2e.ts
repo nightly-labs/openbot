@@ -24,7 +24,11 @@ interface Scenario {
 interface Report {
   passed: boolean;
   pinnedVersion?: string;
-  blocked?: Scenario & { versionAfterRestart: string | null; leftCopyKeptAfterCleanup: boolean };
+  blocked?: Scenario & {
+    versionAfterRestart: string | null;
+    copyInUseKept: boolean;
+    unusedCopyKept: boolean;
+  };
   notBlocked?: Scenario;
   userCli?: Scenario;
 }
@@ -154,22 +158,25 @@ try {
   const restarted = await blocked.open();
   const versionAfterRestart = version(restarted);
   await blocked.leaveBlockedCopy();
-  const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-  await utimes(blocked.blockedRoot, old, old);
   restarted.startUpdateChecks();
   await runCauseEffect(restarted.checkForUpdates()).catch(() => undefined);
-  await runCauseEffect(restarted.removeOldVersions());
+  const copyInUseKept = await exists(blocked.blockedRoot);
+  const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  await utimes(blocked.blockedRoot, old, old);
+  await runCauseEffect(restarted.checkForUpdates()).catch(() => undefined);
   report.blocked = {
     versionBefore,
     versionAfter,
     blockedCopyKept,
     versionAfterRestart,
-    leftCopyKeptAfterCleanup: await exists(blocked.blockedRoot),
+    copyInUseKept,
+    unusedCopyKept: await exists(blocked.blockedRoot),
   };
   assert.equal(versionAfter, pinnedVersion, "a copy on a blocked version moves back to the pinned one");
   assert.equal(blockedCopyKept, false, "the blocked copy goes after the move back");
   assert.equal(versionAfterRestart, pinnedVersion, "a restart keeps the pinned copy");
-  assert.equal(report.blocked.leftCopyKeptAfterCleanup, false, "the cleanup removes a blocked copy that stayed");
+  assert.equal(copyInUseKept, true, "a blocked copy that another OpenBot process stamped stays");
+  assert.equal(report.blocked.unusedCopyKept, false, "the next check removes a blocked copy that nothing uses");
 
   const notBlocked = await startManager("not-blocked", []);
   const notBlockedBefore = version(notBlocked.manager);

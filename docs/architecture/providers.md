@@ -408,7 +408,8 @@ install is used. The newest version in the store that verifies is the one that r
 `provider-runtime-blocklist.json` on `main` names versions no installation may offer. It stops a
 broken upstream release without an OpenBot release. When the OpenBot copy of a provider runs a blocked
 version, the automatic update installs the version that the check offers, also when it is older, and then
-removes the blocked copy. When that removal fails, the cleanup of old versions removes it later. A CLI that the user installed or configured stays. A list
+removes the blocked copy. Each update check also removes a blocked copy that is not active. A copy that
+another OpenBot process stamped in the retention time stays. A CLI that the user installed or configured stays. A list
 that cannot be read blocks nothing.
 
 The `Provider CLI canary` workflow (`.github/workflows/provider-cli-canary.yml`) finds a broken
