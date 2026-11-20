@@ -329,7 +329,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Ver",
   "routine.webhook.giveSecretFailed": "İmzalama gizli anahtarı {name} ajanına verilemedi.",
   "routine.webhook.secretGiven": "{name} yeni imzalama gizli anahtarını aldı.",
-  "routine.webhook.statusFailed": "Ana makinenin aktarıcıya bağlı olup olmadığı denetlenemedi.",
   "routine.settings.instruction": "Talimat",
   "routine.settings.instructionPlaceholderAgent": "Bu ajanın ne yapması gerektiğini açıklayın.",
   "routine.settings.instructionPlaceholderChannel": "Bu kanalın ne yapması gerektiğini açıklayın.",

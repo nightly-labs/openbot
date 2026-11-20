@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "La respuesta de inicio de sesión no es válida.",
   "webClient.pane.navigation": "Navegación del espacio de trabajo",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Rutinas",
   "webClient.pane.workspace": "Espacio de trabajo",
   "webClient.phoneApp.title": "Usa la app de OpenBot",
   "webClient.phoneApp.description":

@@ -1,7 +1,6 @@
 import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
 import type { WebRuntimeEvents, WebWorkspaceRuntime } from "../features/web-client/web-runtime";
 import { createMockOpenBot, type MockOpenBotControls } from "./mock-openbot";
@@ -59,7 +58,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         "agent-duplication",
         "sidebar-layout",
         CHANNEL_CHATS_CAPABILITY,
-        ROUTINE_FLOWS_CAPABILITY,
         MESSAGE_DELETE_CAPABILITY,
         MESSAGE_PINS_CAPABILITY,
       ];
@@ -121,7 +119,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),
-    routineFlows: mock.api.routineFlows,
     updateRoutine: (input) => agent.updateRoutine(input),
     testRoutine: (input) => agent.testRoutine(input),
     react: (input) => agent.setMessageReaction(input),
