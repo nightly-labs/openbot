@@ -128,6 +128,7 @@ interface ToolAnswer {
   error?: string;
   toolCount?: number;
   tools?: string[];
+  server?: { signedIn?: boolean };
   servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean; forYou?: boolean }>;
   enabled?: boolean;
   removed?: boolean;
@@ -216,10 +217,10 @@ try {
     calls.push(entry);
     return entry;
   };
-  const appStatus = async (name: string, appId: string, app: MarketplaceAppServer) => {
+  const appStatus = async (name: string, appId: string, app: MarketplaceAppServer, using = tools) => {
     const signInCards: string[] = [];
     const response = await runCauseEffect(
-      marketplaceAppStatus(tools, app, (config) =>
+      marketplaceAppStatus(using, app, (config) =>
         Effect.sync(() => {
           signInCards.push(config.id);
         }),
@@ -444,6 +445,20 @@ try {
   assert.equal(ready.result.status, "ready");
   assert.deepEqual(ready.result.tools, ["search", "read_page", "create_page"]);
   assert.equal(ready.result.setupSteps, undefined);
+  assert.doesNotMatch(ready.result.next ?? "", /Sign in again/);
+
+  const signedInApp = await appStatus(
+    "an installed app that answers while signed in",
+    "quo",
+    { config: readyApp, setupSteps },
+    { ...tools, signIns: () => [{ mcpServerId: readyApp.id, signedIn: true }] },
+  );
+  assert.equal(signedInApp.result.status, "ready");
+  assert.equal(signedInApp.result.server?.signedIn, true);
+  assert.match(signedInApp.result.next ?? "", /^The app answers\./);
+  assert.match(signedInApp.result.next ?? "", /Marketplace, Apps/);
+  assert.match(signedInApp.result.next ?? "", /Sign in again/);
+  assert.match(signedInApp.result.next ?? "", /server owner or admin/);
 
   const unknown = await call("an unknown name", "test_mcp_server", { name: "nothing" });
   assert.equal(unknown.success, false);
