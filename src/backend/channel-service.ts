@@ -155,8 +155,16 @@ interface ChannelHandoffCommand {
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
 
+const CHANNEL_HANDOFF_AUTHOR_PREFIX = "agent:";
+
 function channelHandoffAuthorId(agentId: string): string {
-  return `agent:${agentId}`;
+  return `${CHANNEL_HANDOFF_AUTHOR_PREFIX}${agentId}`;
+}
+
+export function channelHandoffSenderAgentId(request: ChannelMessage): string | null {
+  return request.author.kind === "member" && request.author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)
+    ? request.author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null
+    : null;
 }
 
 export class ChannelService {
@@ -3783,7 +3791,7 @@ function holdsKeyToken(text: string, value: string): boolean {
   return false;
 }
 
-function channelResultId(assignment: ChannelAssignment): string {
+export function channelResultId(assignment: ChannelAssignment): string {
   return `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
 }
 

@@ -241,6 +241,16 @@ export function sameRequest(task: ChannelTask, other: ChannelTask): boolean {
   return task.sourceMessageIds.some((id) => other.sourceMessageIds.includes(id));
 }
 
+export function isTaskAnswer(message: ChannelMessage, taskId: string): boolean {
+  return (
+    message.author.kind === "agent" &&
+    message.taskId === taskId &&
+    message.message.text.trim() !== "" &&
+    (message.id.startsWith("channel-result-") ||
+      (message.message.status === "completed" && message.message.itemType !== "commentary"))
+  );
+}
+
 export function isMemberThinking({ message }: ChannelMessage): boolean {
   return message.author === "assistant" && message.itemType === "commentary" && REASONING_ID.test(message.id);
 }
@@ -440,14 +450,7 @@ export class ChannelHistory {
       const request = messages.find((message) => message.id === task.requestMessageId);
       const tasks = yield* channelSync(() => dependencies.store.tasks(channel.id));
       const origin = messages.find((message) => message.id === task.sourceMessageIds[0]) ?? request;
-      const answered = messages.some(
-        (message) =>
-          message.author.kind === "agent" &&
-          message.taskId === task.id &&
-          message.message.text.trim() &&
-          (message.id.startsWith("channel-result-") ||
-            (message.message.status === "completed" && message.message.itemType !== "commentary")),
-      );
+      const answered = messages.some((message) => isTaskAnswer(message, task.id));
       const siblings = new Set(
         task.parentTaskId === null && !answered
           ? tasks
