@@ -76,6 +76,7 @@ export interface PromptAnswerOptions {
 
 export interface ConversationChannelSource {
   id: string;
+  loading?: () => boolean;
   name: () => string;
   readOnly: () => boolean;
   author: (message: AgentMessage) => ChatMessageAuthor;
