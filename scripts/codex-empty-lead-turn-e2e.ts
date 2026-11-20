@@ -46,7 +46,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 interface FakeCall {
   tool: "send_message";
-  arguments: { recipientAgentIds: string[]; text: string; expectsReply: boolean };
+  arguments: { recipientAgentIds: string[]; text: string; expectsReply: boolean; replyToMessageId?: string };
 }
 
 const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`;
@@ -127,7 +127,7 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "repeat-empty" || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
@@ -499,6 +499,45 @@ try {
     );
     assert.deepEqual(outcome.errors, [NO_ANSWER]);
     return outcome;
+  });
+
+  await check("an empty lead turn for a repeated teammate result ends quietly and does not run again", async () => {
+    const first = await askTeam(lead.id, [alpha.id], "repeat");
+    assert.deepEqual(first.errors, [], JSON.stringify(first));
+    assert.equal(await lastAnswer(lead.id), "Team done.");
+    const requestId = agents
+      .listQueue(lead.id)
+      .deliveries.findLast(
+        (delivery) =>
+          delivery.sender.kind === "agent" && delivery.sender.agentId === alpha.id && delivery.replyToMessageId,
+      )?.replyToMessageId;
+    assert.ok(requestId);
+    const before = new Set(agents.listQueue(lead.id).deliveries.map((delivery) => delivery.id));
+    const since = events.length;
+    await runCauseEffect(
+      agents.sendMessage({
+        agentId: alpha.id,
+        text: `Send the result again. ${calls({
+          tool: "send_message",
+          arguments: {
+            recipientAgentIds: [lead.id],
+            text: "TEAM-RESULT mode:repeat-empty",
+            replyToMessageId: requestId,
+            expectsReply: false,
+          },
+        }).replace("TEAM-RESULT", "TEAM\\u002dRESULT")}`,
+      }),
+    );
+    const [repeated] = await waitFor("the repeated result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 1 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    const turns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "repeat-empty");
+    assert.equal(turns.length, 1, `The repeated result does not run again: ${JSON.stringify(turns)}`);
+    assert.equal(repeated?.status, "completed");
+    assert.deepEqual(errorsFor(lead.id, since), [], "No error shows for a result that the lead already gave.");
+    return { status: repeated?.status, turns };
   });
 
   await check("a person's message that gets an empty turn shows the error and does not run again", async () => {

@@ -2238,6 +2238,31 @@ export class MailboxStore {
     );
   }
 
+  repeatsHandledReply(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const messages = this.#messagesById();
+    const reply = messages.get(delivery.messageId);
+    if (!reply || !isAnswer(reply)) return false;
+    return this.#state.deliveries.some((earlier) => {
+      if (
+        earlier.id === delivery.id ||
+        earlier.recipientAgentId !== delivery.recipientAgentId ||
+        earlier.status !== "completed" ||
+        earlier.turnId === null ||
+        earlier.turnId === delivery.turnId
+      )
+        return false;
+      const answer = messages.get(earlier.messageId);
+      return (
+        answer !== undefined &&
+        isAnswer(answer) &&
+        answer.sender.agentId === reply.sender.agentId &&
+        answer.replyToMessageId === reply.replyToMessageId
+      );
+    });
+  }
+
   hasSentResultFor(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!delivery?.turnId) return false;
