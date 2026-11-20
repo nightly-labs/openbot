@@ -151,7 +151,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
-import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
 import { flushMainLog, startMainLog } from "./provider-log";
@@ -1066,7 +1066,7 @@ function registerIpcHandlers({
       messageLinks: new MessageLinkRelay({
         remoteServers,
         relay: signInRelayClient,
-        openUrl: (url) => openHttpLink(url, openLink),
+        openUrl: (url) => openMessageLink(url, openLink),
       }),
       openExternal: openLink,
       modelVisibility,

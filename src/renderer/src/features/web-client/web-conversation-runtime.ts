@@ -65,7 +65,7 @@ import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import { webBrowserProfileCalls } from "./web-browser-profiles";
 import { useWebLiveVoice, webLiveVoicePort } from "./web-live-voice";
-import { webMessageLinks } from "./web-message-link-relay";
+import { openWebMessageLink, webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
@@ -286,7 +286,14 @@ export function createWebConversationRuntime(
     void cancelImportFiles();
     attachmentMedia.dispose();
   });
-  const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
+  const messageLinks = adminRequest
+    ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true)
+    : {
+        openMessageLink: async ({ url }: { url: string }) => {
+          await openWebMessageLink(url);
+          return null;
+        },
+      };
   const browserProfiles = adminRequest
     ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
     : undefined;
