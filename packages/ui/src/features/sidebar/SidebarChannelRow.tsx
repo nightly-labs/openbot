@@ -1,10 +1,10 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
-import { coordinatorText } from "../channels/coordinator-text";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
 import { SidebarNameTooltip } from "./SidebarNameTooltip";

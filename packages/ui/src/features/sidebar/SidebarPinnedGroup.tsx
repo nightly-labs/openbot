@@ -1,8 +1,8 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
-import { coordinatorText } from "../channels/coordinator-text";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarPinnedAvatar } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";

@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import {
   type AgentApproval,
   type BrowserTakeoverRequest,
@@ -11,7 +12,6 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
-import { coordinatorText } from "@openbot/ui/features/channels/coordinator-text";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 
 export function channelMessageHasContent(entry: ChannelMessage): boolean {

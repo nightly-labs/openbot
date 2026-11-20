@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import * as Crypto from "expo-crypto";
@@ -30,7 +31,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
-import { coordinatorText } from "../model/coordinator-text";
 import { ChannelAvatar } from "./channel-avatar";
 
 function useChannelMenuActions(channel: ChannelSummary, serverId: string) {

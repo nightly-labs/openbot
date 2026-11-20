@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { Link, useLocalSearchParams } from "expo-router";
@@ -14,7 +15,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { ChannelAvatar } from "../components/channel-avatar";
 import { useChannels } from "../components/use-channels";
-import { coordinatorText } from "../model/coordinator-text";
 
 export function DeletedChatsScreen() {
   const { t, errorMessage, sourceText } = useText();

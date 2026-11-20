@@ -3,6 +3,7 @@ import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
@@ -40,7 +41,6 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { coordinatorText } from "@/features/channels/model/coordinator-text";
 import { MOBILE_PLUGINS } from "@/features/marketplace/model/plugin-catalog.generated";
 import { isMobileConnectorId } from "@/features/servers/model/connectors";
 import { thinkingRowId } from "./turn-thinking";
