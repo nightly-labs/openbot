@@ -17,6 +17,10 @@ function afterRegistrations(change: () => Promise<void>): Promise<void> {
   return registrations;
 }
 
+function statusText(status: BackgroundTask.BackgroundTaskStatus): "available" | "restricted" {
+  return status === BackgroundTask.BackgroundTaskStatus.Available ? "available" : "restricted";
+}
+
 async function runTask(): Promise<BackgroundTask.BackgroundTaskResult> {
   const run = current;
   if (!run) {
@@ -33,10 +37,15 @@ export const androidBackgroundRefresh: BackgroundRefreshNative = {
     current = run;
     void afterRegistrations(() =>
       BackgroundTask.registerTaskAsync(TASK_NAME, { minimumInterval: BACKGROUND_REFRESH_MINUTES }),
-    ).then(
-      () => supportLog.add("info", "app", "Background refresh: available"),
-      (error) => supportLog.add("warn", "app", `Background refresh not scheduled: ${supportLogValue(error)}`),
-    );
+    )
+      .then(() => BackgroundTask.getStatusAsync())
+      .then(
+        (status) => {
+          const text = statusText(status);
+          supportLog.add(text === "available" ? "info" : "warn", "app", `Background refresh: ${text}`);
+        },
+        (error) => supportLog.add("warn", "app", `Background refresh not scheduled: ${supportLogValue(error)}`),
+      );
     return () => {
       if (current !== run) return;
       current = null;

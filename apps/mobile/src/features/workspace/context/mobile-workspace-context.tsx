@@ -367,6 +367,19 @@ function showPreferencesFailure(error: unknown): void {
   );
 }
 
+function trackUntilSettled(pending: Set<Promise<void>>, work: Promise<unknown>): void {
+  const settled = work.then(
+    () => undefined,
+    () => undefined,
+  );
+  pending.add(settled);
+  void settled.then(() => pending.delete(settled));
+}
+
+function allSettled(pending: ReadonlySet<Promise<void>>): Promise<void> {
+  return Promise.allSettled([...pending]).then(() => undefined);
+}
+
 function withoutKeys<T>(record: Record<string, T>, keys: ReadonlySet<string>): Record<string, T> {
   return Object.keys(record).some((key) => keys.has(key))
     ? Object.fromEntries(Object.entries(record).filter(([key]) => !keys.has(key)))
@@ -409,10 +422,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const serversRef = useRef(servers);
   serversRef.current = servers;
   const cacheWrites = useRef(new Set<Promise<void>>());
+  const serverLoads = useRef(new Set<Promise<void>>());
   const { refreshing: backgroundRefreshing, connectionStatus: backgroundRefreshStatus } = useBackgroundRefresh({
     foreground,
     serverIds: () => serversRef.current.map((server) => server.id),
-    saved: () => Promise.allSettled([...cacheWrites.current]).then(() => undefined),
+    loaded: () => allSettled(serverLoads.current),
+    saved: () => allSettled(cacheWrites.current),
   });
   const live = foreground || backgroundRefreshing;
   const firstConnectionTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -995,8 +1010,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .then((written) => {
           if (!written && persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
         });
-      cacheWrites.current.add(write);
-      void write.finally(() => cacheWrites.current.delete(write));
+      trackUntilSettled(cacheWrites.current, write);
     },
     [workspaceCache, conversationStore, channelStore],
   );
@@ -1164,7 +1178,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const loadOpenChats = useCallback(
     (serverId: string, agentIds: string[], client: RemoteTeamTransportRef, context: ServerLoadContext) => {
       const open = agentIds.filter((agentId) => conversationStore.isObserved(agentId));
-      void (async () => {
+      const loads = (async () => {
         for (const agentId of open) {
           if (!context.isCurrent()) return;
           if (!conversationStore.get(agentId) || !conversationStore.isObserved(agentId)) continue;
@@ -1184,6 +1198,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         }
         if (context.isCurrent()) persistServer(serverId);
       })();
+      trackUntilSettled(serverLoads.current, loads);
     },
     [conversationStore, persistServer],
   );
@@ -1266,10 +1281,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
       if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
-        void syncSidebarPins(serverId, (method, path, decode, body) =>
-          client.request(method, path, decode, body),
-        ).catch(() => undefined);
-      void channelStore.refresh(serverId);
+        trackUntilSettled(
+          serverLoads.current,
+          syncSidebarPins(serverId, (method, path, decode, body) => client.request(method, path, decode, body)),
+        );
+      trackUntilSettled(serverLoads.current, channelStore.refresh(serverId));
       if (supportsBrowserView(compatibility.capabilities)) {
         void client
           .request("GET", TEAM_API_ROUTES.browser.tabs, decodeMobileBrowserTabs)
@@ -2664,6 +2680,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
               hostId={server.id}
               publicKey={server.publicKey}
               active={(foreground && (!othersHeld || server.id === activeServerId)) || backgroundRefreshing}
+              background={!foreground}
               directory={directory}
               register={registerConnection}
               load={loadServer}

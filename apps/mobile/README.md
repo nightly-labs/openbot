@@ -289,9 +289,10 @@ the user unlocks. Expo Go does not have the module: it measures with the phone c
 
 While the user is signed in, the phone asks the system for a background refresh at most once every
 15 minutes. The system decides when it runs. In a refresh, the workspace makes the server connections
-active for at most 25 seconds, waits until each server loads or fails, saves the encrypted workspace
-copy, and makes the connections inactive again. The app stays "away" for the hosts, so they continue
-to send notifications, and a chat on screen is not marked as read.
+active for at most 25 seconds. It waits until each server loads with its channels and open chats, or
+stops at the retry cooldown, then saves the encrypted workspace copy and makes the connections
+inactive again. The app stays "away" for the hosts, so they continue to send notifications, and a
+chat on screen is not marked as read. A refresh sends no connection analytics.
 
 - iOS uses `BGAppRefreshTask` with the identifier `run.openbot.mobile.refresh` (`UIBackgroundModes`
   `fetch` in `app.json`). The local `modules/background-refresh` module registers the task at launch

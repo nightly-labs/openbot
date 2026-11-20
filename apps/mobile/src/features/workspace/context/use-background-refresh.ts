@@ -15,6 +15,7 @@ interface RefreshWindow {
 interface BackgroundRefreshInput {
   foreground: boolean;
   serverIds(): readonly string[];
+  loaded(): Promise<void>;
   saved(): Promise<void>;
 }
 
@@ -25,7 +26,7 @@ export interface BackgroundRefresh {
 
 function settlesServer(refresh: RefreshWindow, hostId: string, status: RemoteRecoveryStatus): boolean {
   if (status.phase === "online" || status.phase === "suspended") return true;
-  return (status.phase === "waiting" || status.phase === "cooldown") && refresh.attempted.has(hostId);
+  return status.phase === "cooldown" && refresh.attempted.has(hostId);
 }
 
 type SkipReason = "ended by the system" | "app in foreground" | "a refresh is running" | "no servers";
@@ -62,7 +63,7 @@ export function useBackgroundRefresh(input: BackgroundRefreshInput): BackgroundR
     if (!settlesServer(refresh, hostId, status)) return;
     refresh.pending.delete(hostId);
     if (status.phase === "online") refresh.loaded.add(hostId);
-    if (refresh.pending.size === 0) refresh.end();
+    if (refresh.pending.size === 0) void inputRef.current.loaded().then(refresh.end);
   }, []);
 
   useEffect(() => {
