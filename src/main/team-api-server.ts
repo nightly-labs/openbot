@@ -300,6 +300,7 @@ import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
+import { perfCount } from "../backend/perf-probe-hooks";
 import { canConfineProcesses } from "../backend/process-confinement";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -1729,6 +1730,7 @@ export class TeamApiServer {
             : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
         if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
         let encoded: string | null;
+        perfCount("teamapi.encode");
         try {
           encoded = this.#encodeProviderEvent(
             event,
@@ -1867,6 +1869,8 @@ export class TeamApiServer {
       if (Buffer.byteLength(outgoing) > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
+      perfCount(`teamapi.send ${event.type}`);
+      perfCount("teamapi.sendBytes", outgoing.length);
       if (event.type !== "turn-completed" || !supportsRuntimeSnapshots || connection.includeConversationEvents) {
         continue;
       }
@@ -1881,6 +1885,7 @@ export class TeamApiServer {
       if (!completionSnapshot) continue;
       if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
+      perfCount("teamapi.completionSnapshot");
     }
   }
 
