@@ -107,6 +107,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
+  const [videoReady, setVideoReady] = createSignal<string>();
   let media: HTMLElement | undefined;
   const openViewer = () => {
     const shown = board.shown(props.id);
@@ -228,6 +229,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   label={prompt() || text("description")}
                   durationSeconds={specs().duration}
                   fullControls
+                  loading={videoReady() !== url()}
+                  onMetadata={() => setVideoReady(url())}
+                  onError={() => setVideoReady(url())}
                   ref={(element) => {
                     media = element;
                   }}

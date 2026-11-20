@@ -253,7 +253,11 @@ function WorkflowAppWindow(props: { children: JSX.Element }) {
   );
 }
 
-export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
+export function WorkflowInAppStory(props: {
+  workflows: readonly StoryWorkflow[];
+  features?: WorkflowFeatures;
+  opening?: boolean;
+}) {
   const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
   const features = () => props.features ?? WORKFLOW_FEATURES_V1;
   return (
@@ -267,6 +271,7 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
             github={story.github}
             frame="window"
             {...story.props}
+            opening={props.opening === true || story.props.opening}
           />
         )}
       </Show>

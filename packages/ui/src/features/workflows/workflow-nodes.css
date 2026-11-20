@@ -498,6 +498,26 @@
   background: var(--wfn-hover);
 }
 
+.wfn-media-spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--openbot-text-primary);
+  pointer-events: none;
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) var(--openbot-duration-fast) both;
+}
+
+.wfn-media-spinner .ui-spinner {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  border-width: 2px;
+}
+
+.wfn-media-spinner + img {
+  visibility: hidden;
+}
+
 .wfn-media-empty {
   position: absolute;
   inset: 0;

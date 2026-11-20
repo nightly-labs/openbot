@@ -450,6 +450,7 @@ export const messages = {
 
   "workflow.canvas.label": "Tela do fluxo de trabalho: {name}",
   "workflow.canvas.untitled": "Fluxo de trabalho sem título",
+  "workflow.canvas.opening": "Abrindo fluxo de trabalho…",
   "workflow.canvas.copyOf": "Cópia de {name}",
   "workflow.canvas.step": "Etapa",
   "workflow.canvas.kind.note": "Nota adesiva",

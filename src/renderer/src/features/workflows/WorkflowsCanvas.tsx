@@ -9,6 +9,7 @@ import {
   workflowCatalogMediaModel,
   workflowCatalogProvider,
 } from "@openbot/contracts/ipc";
+import { Spinner } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import type { WorkflowAgentProgress } from "@openbot/ui/features/workflows/workflow-board";
@@ -17,7 +18,7 @@ import {
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { currentText } from "@openbot/ui/text";
+import { currentText, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
@@ -35,6 +36,7 @@ export function WorkflowsCanvas(props: {
   serverId?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
 }) {
+  const { t } = useText();
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
@@ -235,7 +237,14 @@ export function WorkflowsCanvas(props: {
     };
   });
   return (
-    <Show when={workflows.detail()}>
+    <Show
+      when={workflows.detail()}
+      fallback={
+        <main class="window-page workflows-notice">
+          <Spinner size="lg" label={t("workflow.canvas.opening")} />
+        </main>
+      }
+    >
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}

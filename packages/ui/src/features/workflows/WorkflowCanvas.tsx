@@ -43,6 +43,7 @@ import {
   Scan,
   Search,
   SendToBack,
+  Spinner,
   Trash2,
   Type,
   Undo2,
@@ -205,6 +206,7 @@ export interface WorkflowCanvasProps {
   versions: readonly WorkflowVersion[];
   versionPreview?: { versionId: string; graph: WorkflowGraph } | undefined;
   library: readonly WorkflowSummary[];
+  opening?: boolean | undefined;
   readOnly?: boolean | undefined;
   presence?: WorkflowPresence | undefined;
   build?: WorkflowBuild | undefined;
@@ -3465,7 +3467,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           )}
         </Show>
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
-        <Show when={live().length === 0 && !frozen() && allows("trigger")}>
+        <Show when={props.opening}>
+          <div class="wfn-opening">
+            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          </div>
+        </Show>
+        <Show when={live().length === 0 && !frozen() && !props.opening && allows("trigger")}>
           <div class="wfn-empty">
             <span class="wfn-menu-icon wfn-empty-icon" data-kind="trigger" aria-hidden="true">
               <Zap />

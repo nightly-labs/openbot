@@ -1,5 +1,6 @@
-import { Skeleton } from "@openbot/ui";
+import { Skeleton, Spinner } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
+import { useText } from "../../text";
 
 export function CardPicture(props: {
   src: string;
@@ -11,8 +12,8 @@ export function CardPicture(props: {
   const settle = () => setReady(props.src);
   return (
     <>
-      <Show when={ready() === undefined}>
-        <Skeleton class="wfn-media-loading" />
+      <Show when={ready() !== props.src}>
+        <CardPictureLoading />
       </Show>
       <img
         ref={(element: HTMLImageElement) => props.ref?.(element)}
@@ -29,5 +30,13 @@ export function CardPicture(props: {
 }
 
 export function CardPictureLoading() {
-  return <Skeleton class="wfn-media-loading" />;
+  const { t } = useText();
+  return (
+    <>
+      <Skeleton class="wfn-media-loading" />
+      <span class="wfn-media-spinner">
+        <Spinner label={t("common.loading")} />
+      </span>
+    </>
+  );
 }
