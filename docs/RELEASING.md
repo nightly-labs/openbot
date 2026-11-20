@@ -879,8 +879,9 @@ MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
 It prints a table per platform and for servers, and writes `.openbot-build/release-health/report.json`.
 The metrics are finished starts, crashes, startup crashes, quit hangs, and update arrivals: the share
-of the computers that started an update install and then started the new release. The thresholds are
-in the script header.
+of the computers that started an update install and then started a version other than the one that
+installed it, before the end of the window. An install of an older release that a computer downloaded
+earlier counts for the window in which it started. The thresholds are in the script header.
 
 - Exit code 0: no metric is clearly worse. Raise the rollout.
 - Exit code 1: a metric is clearly worse. Keep the rollout where it is, find the cause, and publish a
