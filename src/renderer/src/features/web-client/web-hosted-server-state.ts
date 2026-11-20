@@ -3,7 +3,7 @@ import type { PricingOrder } from "@openbot/contracts/license";
 import { serverPlanDeletionDates } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import type { AddServerResume } from "../servers/AddServerOverlay";
-import { openServerPlanCheckout } from "../servers/ServerPlanReminder";
+import { openServerPlanCheckout, refreshEndedPlansOnFocus } from "../servers/ServerPlanReminder";
 import { createWebHostedServerCalls } from "./web-hosted-servers";
 
 export interface WebHostedServersOptions {
@@ -25,9 +25,12 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
   const [loaded, setLoaded] = createSignal(false);
   const [hostedIds, setHostedIds] = createSignal<ReadonlySet<string>>(new Set());
   const [planDeletesAtById, setPlanDeletesAtById] = createSignal<ReadonlyMap<string, number>>(new Map());
+  let listRequest = 0;
   async function refresh(): Promise<boolean> {
+    const request = ++listRequest;
     const list = await calls.list().catch(() => null);
     if (!list) return available();
+    if (request !== listRequest) return list.available;
     setAvailable(list.available);
     setLoaded(true);
     setHostedIds(new Set(list.servers.map((server) => server.serverId)));
@@ -35,11 +38,7 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
     return list.available;
   }
   void refresh();
-  const refreshEndedPlans = () => {
-    if (untrack(planDeletesAtById).size > 0) void refresh();
-  };
-  window.addEventListener("focus", refreshEndedPlans);
-  onCleanup(() => window.removeEventListener("focus", refreshEndedPlans));
+  onCleanup(refreshEndedPlansOnFocus(() => untrack(planDeletesAtById).size > 0, refresh));
   const readOwnedHostIds = new Set<string>();
   createEffect(
     () =>
@@ -66,6 +65,7 @@ export function createWebHostedServers(options: WebHostedServersOptions) {
     isHosted: (serverId: string) => hostedIds().has(serverId),
     ownsHostedServer: () => hostedIds().size > 0,
     planDeletesAt: (serverId: string) => planDeletesAtById().get(serverId) ?? null,
+    refresh,
     renewPlan: (serverId: string) => openServerPlanCheckout(calls.openCheckout, serverId),
     addServer,
     closeAddServer: () => setAddServer(null),

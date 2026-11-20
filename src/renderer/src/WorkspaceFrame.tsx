@@ -1,6 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
-import { ServerPlanEndedScreen, serverPlanBlocks } from "@openbot/ui/features/servers/ServerPlanEnd";
+import { ServerPlanEndedScreen, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import type { JSX } from "@solidjs/web";
 import { omit, type ParentProps, Show } from "solid-js";
 import { type WindowPage, windowPageKind } from "./features/window/window-page-context";
@@ -49,10 +49,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
   );
 
   const compactWidth = () => props.compact && (!pageOpen() || layout.leftPanelNarrow());
-  const planScreenShown = () => {
-    const server = props.blockedServer;
-    return server !== null && serverPlanBlocks(server, props.planDeletesAt(server.id));
-  };
+  const planScreenShown = () => serverPlanScreenShown(props.blockedServer, props.planDeletesAt);
   const leftPanelWidth = () => {
     if (planScreenShown()) return 0;
     return compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth();
@@ -93,7 +90,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
           <Show when={props.blockedServer} keyed fallback={props.children}>
             {(server) => (
               <Show
-                when={serverPlanBlocks(server, props.planDeletesAt(server.id))}
+                when={planScreenShown()}
                 fallback={<RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
               >
                 <ServerPlanEndedScreen

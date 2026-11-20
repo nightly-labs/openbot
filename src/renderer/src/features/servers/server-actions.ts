@@ -13,6 +13,10 @@ import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";
 import { serversPort } from "./servers-port";
 
+export function renewServerPlan(serverId: string): Promise<void> {
+  return openServerPlanCheckout((id) => serversPort().hostedServers.openCheckout(id), serverId);
+}
+
 export function useServerActions() {
   const platform = usePlatform();
   const { t, errorMessage } = useText();
@@ -123,7 +127,7 @@ export function useServerActions() {
     onHide: (serverId) => void hideLocal(serverId),
     canHide: () => remoteServers().length > 0,
     planDeletesAt,
-    onRenewPlan: (serverId) => openServerPlanCheckout((id) => serversPort().hostedServers.openCheckout(id), serverId),
+    onRenewPlan: renewServerPlan,
   } satisfies ServerActionCallbacks;
 
   return {

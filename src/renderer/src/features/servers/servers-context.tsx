@@ -10,6 +10,7 @@ import { createEffect, createMemo, createSignal, flush, onSettled, untrack } fro
 import { actionToast } from "../../action-toast";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { refreshEndedPlansOnFocus } from "./ServerPlanReminder";
 import {
   olderAppSide,
   remoteUpdateServer,
@@ -259,29 +260,41 @@ const Servers = createSimpleContext({
           setHostedServersLoaded(false);
         }
       });
-      const refreshEndedPlans = () => {
-        if (untrack(planDeletesAtById).size > 0) void refreshHostedServersAvailable();
-      };
-      window.addEventListener("focus", refreshEndedPlans);
+      const stopPlanRefresh = refreshEndedPlansOnFocus(
+        () => untrack(planDeletesAtById).size > 0,
+        refreshHostedServersAvailable,
+      );
       return () => {
         unsubscribeServers();
         unsubscribeHost();
         unsubscribeAuth();
-        window.removeEventListener("focus", refreshEndedPlans);
+        stopPlanRefresh();
       };
     });
 
+    let hostedListRequest = 0;
     async function refreshHostedServersAvailable(): Promise<boolean> {
+      const request = ++hostedListRequest;
       const list = await serversPort()
         .hostedServers.list()
         .catch(() => null);
       if (!list) return hostedServersAvailable();
+      if (request !== hostedListRequest) return list.available;
       setHostedServersAvailable(list.available);
       setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
       setPlanDeletesAtById(serverPlanDeletionDates(list.servers));
       setHostedServersLoaded(true);
       return list.available;
     }
+
+    createEffect(
+      () =>
+        hostedServersLoaded() &&
+        servers().some((server) => server.hostedIssue === "plan_ended" && !planDeletesAtById().has(server.id)),
+      (dateMissing) => {
+        if (dateMissing) void refreshHostedServersAvailable();
+      },
+    );
 
     createEffect(
       () => {

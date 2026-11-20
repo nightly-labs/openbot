@@ -157,6 +157,13 @@ export function serverPlanBlocks(server: ServerSummary | undefined, deleteAt: nu
   return deleteAt !== null && server.state !== "online" && server.state !== "connecting";
 }
 
+export function serverPlanScreenShown(
+  server: ServerSummary | null,
+  planDeletesAt: (serverId: string) => number | null,
+): boolean {
+  return server !== null && serverPlanBlocks(server, planDeletesAt(server.id));
+}
+
 export function ServerPlanEndedScreen(props: {
   server: ServerSummary;
   deleteAt: number | null;

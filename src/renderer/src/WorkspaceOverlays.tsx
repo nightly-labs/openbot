@@ -224,13 +224,16 @@ export function SkillsMarketplace() {
 }
 
 function PlanReminder() {
+  const platform = usePlatform();
   const { orderedServers, callbacks } = useServerActions();
   return (
-    <ServerPlanReminder
-      servers={orderedServers()}
-      planDeletesAt={callbacks.planDeletesAt}
-      onRenew={callbacks.onRenewPlan}
-    />
+    <Show when={platform.chatWindow === null}>
+      <ServerPlanReminder
+        servers={orderedServers()}
+        planDeletesAt={callbacks.planDeletesAt}
+        onRenew={callbacks.onRenewPlan}
+      />
+    </Show>
   );
 }
 

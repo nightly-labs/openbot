@@ -3,6 +3,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import {
   type ServerPlanEnd,
   ServerPlanEndedDialog,
+  serverPlanBlocks,
   serverPlanDaysLeft,
   serverPlanEnds,
 } from "@openbot/ui/features/servers/ServerPlanEnd";
@@ -14,6 +15,7 @@ import { actionToast } from "../../action-toast";
 const REMINDER_STORAGE_KEY = "openbot:server-plan-reminders";
 const REMINDER_INTERVAL_MS = 24 * 60 * 60_000;
 const DAILY_START_REMINDER_DAYS = 3;
+const PLAN_FOCUS_REFRESH_MS = 30_000;
 const sessionStartedAt = Date.now();
 
 const reminderTimesSchema = z.record(z.string(), z.number());
@@ -32,6 +34,30 @@ export async function openServerPlanCheckout(
       report: { operation: "settings", source: "action", cause_code: classifyFailure(error) },
     });
   }
+}
+
+export function refreshEndedPlansOnFocus(hasEndedPlan: () => boolean, refresh: () => Promise<unknown>): () => void {
+  let running = false;
+  let refreshedAt = 0;
+  const focus = () => {
+    if (running || !hasEndedPlan() || Date.now() - refreshedAt < PLAN_FOCUS_REFRESH_MS) return;
+    running = true;
+    void refresh().finally(() => {
+      running = false;
+      refreshedAt = Date.now();
+    });
+  };
+  window.addEventListener("focus", focus);
+  return () => window.removeEventListener("focus", focus);
+}
+
+function remindableEnds(
+  servers: readonly ServerSummary[],
+  planDeletesAt: (serverId: string) => number | null,
+): ServerPlanEnd[] {
+  return serverPlanEnds(servers, planDeletesAt).filter(
+    (end) => !(end.server.active && serverPlanBlocks(end.server, end.deleteAt)),
+  );
 }
 
 function readReminderTimes(): ReminderTimes {
@@ -64,7 +90,7 @@ export function ServerPlanReminder(props: {
 
   createEffect(
     () => ({
-      ends: serverPlanEnds(props.servers, props.planDeletesAt),
+      ends: remindableEnds(props.servers, props.planDeletesAt),
       open: state.open,
       shownId: state.end?.server.id,
     }),

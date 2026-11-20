@@ -174,7 +174,7 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
-import { serverPlanBlocks } from "@openbot/ui/features/servers/ServerPlanEnd";
+import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
@@ -651,10 +651,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       ? current
       : null;
   });
-  const planScreenShown = () => {
-    const current = blockedServer();
-    return current !== null && serverPlanBlocks(current, hostedServers.planDeletesAt(current.id));
-  };
+  const planScreenShown = () => serverPlanScreenShown(blockedServer(), hostedServers.planDeletesAt);
+  createEffect(
+    () =>
+      hostedServers.loaded() &&
+      servers().some((item) => item.hostedIssue === "plan_ended" && hostedServers.planDeletesAt(item.id) === null),
+    (dateMissing) => {
+      if (dateMissing) void hostedServers.refresh();
+    },
+  );
   const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
   const frameFirstLoad = () =>
     workspace.state.workspaceLoaded &&
@@ -2851,6 +2856,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }
               onRetryServer={(serverId) =>
                 workspace.run(async () => {
+                  void hostedServers.refresh();
                   const host = workspace.state.hosts.find((item) => item.hostId === serverId);
                   if (host) await workspace.connect(host);
                 })
