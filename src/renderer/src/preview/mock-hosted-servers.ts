@@ -3,6 +3,7 @@ import {
   type BillingPlanId,
   type BillingServerPlan,
   billingListPrices,
+  storageTierGb,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
@@ -32,7 +33,7 @@ function prices(plan: BillingPlanId) {
 export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
   plans: BILLING_PLANS.map((plan) => ({
     id: plan.id,
-    diskGb: plan.storageGb,
+    diskGb: storageTierGb(plan.id, 0),
     memberLimit: plan.memberLimit,
     relativeSpeed: plan.relativeSpeed,
     prices: prices(plan.id),
