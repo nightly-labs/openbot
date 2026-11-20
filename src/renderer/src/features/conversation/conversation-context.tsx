@@ -148,13 +148,15 @@ const Conversation = createSimpleContext({
     } = useTurns();
     const { clearUiErrors } = useUiErrors();
     const { centralAuth } = useAuth();
+    const prefetchedConversationPages = new Map<string, ConversationPage>();
     const signedInAccount = createMemo(() => {
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : null;
     });
     createEffect(signedInAccount, (account, previous) => {
-      if (account && previous !== undefined && account !== previous)
-        clearUiErrors(currentText().t("chat.errorStatus.readState"));
+      if (previous === undefined || account === previous) return;
+      prefetchedConversationPages.clear();
+      if (account) clearUiErrors(currentText().t("chat.errorStatus.readState"));
     });
 
     const [conversations, writeConversations] = createStore<Record<string, ConversationState>>({});
@@ -246,6 +248,11 @@ const Conversation = createSimpleContext({
         }
         const { agentId } = next;
         if (!agentId) return;
+        const prefetched = prefetchedConversationPages.get(agentId);
+        if (prefetched) {
+          prefetchedConversationPages.delete(agentId);
+          if (!conversations[agentId]?.loaded) applyConversationPage(prefetched, "replace", "latest");
+        }
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
@@ -302,6 +309,66 @@ const Conversation = createSimpleContext({
       },
     );
 
+    const prefetchKey = createMemo(() => {
+      const server = activeServer();
+      const agentId = activeAgentId();
+      if (!signedInAccount() || server?.kind !== "remote" || server.state !== "online" || !agentId) return "";
+      if (conversations[agentId]?.loaded !== true) return "";
+      const ids = agentList()
+        .map((agent) => agent.id)
+        .join("\0");
+      return `${server.id}\n${agentId}\n${ids}`;
+    });
+
+    createEffect(prefetchKey, (key) => {
+      if (!key || typeof window.requestIdleCallback !== "function") return;
+      const [serverId, agentId, ids = ""] = key.split("\n");
+      if (!serverId || !agentId || !ids) return;
+
+      for (const cachedId of prefetchedConversationPages.keys()) {
+        if (untrack(() => conversations[cachedId]?.loaded)) prefetchedConversationPages.delete(cachedId);
+      }
+      const freeSlots = Math.max(0, 20 - prefetchedConversationPages.size);
+      if (freeSlots === 0) return;
+
+      const candidates = ids
+        .split("\0")
+        .filter(
+          (id) => id !== agentId && !prefetchedConversationPages.has(id) && !untrack(() => conversations[id]?.loaded),
+        )
+        .slice(0, freeSlots);
+      let stopped = false;
+      let idle: number | undefined;
+
+      function next(): void {
+        const id = candidates.shift();
+        if (stopped || !id) return;
+        idle = window.requestIdleCallback(() => {
+          const request = conversationPageRequests.get(id);
+          void conversationPort()
+            .agent.readConversationPage({ agentId: id, anchor: { type: "latest" }, limit: 24 }, serverId)
+            .then((page) => {
+              if (
+                !stopped &&
+                scopeIsCurrent() &&
+                conversationPageRequests.get(id) === request &&
+                !untrack(() => conversations[id]?.loaded)
+              ) {
+                prefetchedConversationPages.set(id, page);
+              }
+            })
+            .catch(() => undefined)
+            .finally(next);
+        });
+      }
+
+      next();
+      return () => {
+        stopped = true;
+        if (idle !== undefined) window.cancelIdleCallback(idle);
+      };
+    });
+
     function initializeConversation(agentId: string): void {
       updateConversation(agentId, (conversation) => {
         conversation.loaded = true;
@@ -315,6 +382,7 @@ const Conversation = createSimpleContext({
       deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
       pendingConversationSnapshots.delete(agentId);
       conversationPageRequests.delete(agentId);
+      prefetchedConversationPages.delete(agentId);
       agentChatsRetriedOnOpen.delete(agentId);
     }
 
