@@ -8,6 +8,7 @@ import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
+import type { AttachmentPreviews } from "./attachment-previews";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
@@ -61,13 +62,19 @@ export interface AttachmentProtocolDependencies {
   mailbox: MailboxStore;
   agents: AgentService;
   remoteServers: RemoteServerManager;
+  attachmentPreviews: AttachmentPreviews;
 }
 
 function asksForPreview(url: URL): boolean {
   return url.searchParams.get("preview") === "1";
 }
 
-export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: AttachmentProtocolDependencies): void {
+export function configureAttachmentProtocol({
+  mailbox,
+  agents,
+  remoteServers,
+  attachmentPreviews,
+}: AttachmentProtocolDependencies): void {
   const logger = createOpenBotLogger("attachment-protocol");
   session.defaultSession.protocol.handle("openbot-attachment", async (request) => {
     try {
@@ -75,14 +82,19 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const id = url.pathname.split("/").filter(Boolean).at(-1);
       const attachment = id ? await runCauseEffect(mailbox.resolveAttachment(id)) : null;
       if (!attachment) return new Response("Not found", { status: 404 });
+      const preview =
+        id && asksForPreview(url) && attachment.mimeType.startsWith("image/")
+          ? await runCauseEffect(attachmentPreviews.ready(id, { path: attachment.path, mimeType: attachment.mimeType }))
+          : null;
+      const shown = preview ?? attachment;
       return await runCauseEffect(
         fileResponse(
-          attachment.path,
+          shown.path,
           {
-            "Content-Type": attachment.mimeType,
+            "Content-Type": shown.mimeType,
             "Cache-Control": "no-store",
             ...attachmentCorsHeaders(request.headers.get("Origin")),
-            ...attachmentDocumentHeaders(attachment.mimeType),
+            ...attachmentDocumentHeaders(shown.mimeType),
             "X-Content-Type-Options": "nosniff",
             "Content-Disposition": inlineContentDisposition(attachment.name),
           },

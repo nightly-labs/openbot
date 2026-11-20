@@ -94,6 +94,7 @@ export interface LibraryPageProps {
   initialFavorites?: readonly string[] | undefined;
   onFavoritesChange?: ((keys: readonly string[]) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   opensFiles?: boolean | undefined;
 }
 
@@ -138,6 +139,7 @@ export function LibraryPage(props: LibraryPageProps) {
     });
   });
   const fileById = createMemo(() => new Map(files().map((file) => [file.id, file])));
+  const pictureUrl = (file: StoredFileRow) => props.pictureUrl?.(file) ?? file.previewUrl ?? "";
   const pictures = createLibraryPictureLoader({
     source: untrack(() => props.mediaSource),
     file: (fileId) => untrack(fileById).get(fileId),
@@ -1001,6 +1003,7 @@ export function LibraryPage(props: LibraryPageProps) {
             fileCount={(folderId) => libraryCounts().folder.get(folderId) ?? 0}
             folderCount={(folderId) => childCounts().get(folderId) ?? 0}
             peek={(folderId) => peeks().get(folderId) ?? NO_FILES}
+            pictureUrl={pictureUrl}
             newTarget={newTarget()}
             newMark={drag.newMark}
             dropMark={drag.dropMark}
@@ -1048,6 +1051,7 @@ export function LibraryPage(props: LibraryPageProps) {
                   now={props.now}
                   canDelete={props.canDelete}
                   selection={listSelection}
+                  pictureUrl={props.pictureUrl}
                   folderLabel={listFolderLabel()}
                   rowMenu={listRowMenu()}
                   opensFiles={props.opensFiles}
@@ -1114,7 +1118,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                 ref={(element) => thumbnails.set(id, element)}
                                 onClick={(event) => activate(file(), event)}
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file())} alt="" loading="lazy" draggable="false" />
                               </Button>
                             </Show>
                           }
@@ -1140,7 +1144,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                   </span>
                                 }
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file())} alt="" loading="lazy" draggable="false" />
                               </Show>
                             </span>
                             <span class="library-folder-tile-name library-truncate">{file().name}</span>

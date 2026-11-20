@@ -19,11 +19,26 @@ export interface SeedScale {
   channels: number;
   channelMessages: number;
   attachments: number;
+  pictures: number;
 }
 
-export const NO_SCALE: SeedScale = { agents: 0, messages: 0, channels: 0, channelMessages: 0, attachments: 0 };
+export const NO_SCALE: SeedScale = {
+  agents: 0,
+  messages: 0,
+  channels: 0,
+  channelMessages: 0,
+  attachments: 0,
+  pictures: 0,
+};
 
-const SCALE_KEYS: readonly (keyof SeedScale)[] = ["agents", "messages", "channels", "channelMessages", "attachments"];
+const SCALE_KEYS: readonly (keyof SeedScale)[] = [
+  "agents",
+  "messages",
+  "channels",
+  "channelMessages",
+  "attachments",
+  "pictures",
+];
 
 const SCALE_LIMITS: Record<keyof SeedScale, number> = {
   agents: 500,
@@ -31,7 +46,23 @@ const SCALE_LIMITS: Record<keyof SeedScale, number> = {
   channels: 100,
   channelMessages: 50_000,
   attachments: 200,
+  pictures: 400,
 };
+
+const PICTURE_SIZES: readonly (readonly [number, number])[] = [
+  [4_032, 3_024],
+  [3_024, 4_032],
+  [1_920, 1_080],
+  [1_080, 1_920],
+  [2_400, 1_600],
+  [800, 600],
+  [512, 512],
+  [3_000, 3_000],
+  [1_280, 720],
+  [5_000, 1_600],
+  [640, 960],
+  [2_048, 1_536],
+];
 
 export function parseSeedScale(raw: string): SeedScale {
   const scale: SeedScale = { ...NO_SCALE };
@@ -49,8 +80,8 @@ export function parseSeedScale(raw: string): SeedScale {
     if (name === "channelMessages") channelMessagesSet = true;
   }
   if (!channelMessagesSet) scale.channelMessages = scale.messages;
-  if (scale.attachments > 0 && scale.agents === 0) {
-    throw new Error("--scale attachments go into the first scaled agent, so agents must be at least 1.");
+  if ((scale.attachments > 0 || scale.pictures > 0) && scale.agents === 0) {
+    throw new Error("--scale attachments and pictures go into the first scaled agent, so agents must be at least 1.");
   }
   return scale;
 }
@@ -161,7 +192,7 @@ function pngChunk(type: string, data: Uint8Array): Uint8Array {
   return chunk;
 }
 
-export function largePng(width: number, height: number, seed: number): Uint8Array {
+export function largePng(width: number, height: number, seed: number, noiseBits = 5): Uint8Array {
   const raw = new Uint8Array(height * (1 + width * 3));
   let state = seed || 1;
   for (let y = 0; y < height; y += 1) {
@@ -169,7 +200,7 @@ export function largePng(width: number, height: number, seed: number): Uint8Arra
     raw[row] = 0;
     for (let x = 0; x < width; x += 1) {
       state = (state * 1_103_515_245 + 12_345) >>> 0;
-      const noise = state >>> 27;
+      const noise = state >>> (32 - noiseBits);
       const offset = row + 1 + x * 3;
       raw[offset] = ((x * 255) / width + noise) & 0xff;
       raw[offset + 1] = ((y * 255) / height + noise) & 0xff;
@@ -272,6 +303,28 @@ export async function seedScale(options: ScaledSeedOptions): Promise<void> {
           source: "assistant",
           text: `Image ${image + 1} of the generated set.`,
           createdAt: new Date(now - 30 * 60_000 + image * 1_000).toISOString(),
+          status: "completed",
+          attachments: [attachment],
+        });
+      }
+      for (let picture = 0; picture < scale.pictures; picture += 1) {
+        const [width, height] = PICTURE_SIZES[picture % PICTURE_SIZES.length] ?? [1_024, 768];
+        const attachment: AttachmentSummary = await runCauseEffect(
+          mailbox.storeGeneratedAttachment({
+            name: `scale-picture-${picture + 1}-${width}x${height}.png`,
+            mimeType: "image/png",
+            bytes: largePng(width, height, picture + 1, 2),
+            ownerAgentId: agentId,
+            ownerThreadId: threadId,
+          }),
+        );
+        transferDirectories.push(`generated/${attachment.id}`);
+        messages.push({
+          id: `${agentId}-picture-${picture}`,
+          author: "assistant",
+          source: "assistant",
+          text: `Picture ${picture + 1}, ${width} x ${height}.`,
+          createdAt: new Date(now - 20 * 60_000 + picture * 1_000).toISOString(),
           status: "completed",
           attachments: [attachment],
         });
