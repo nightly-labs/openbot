@@ -397,7 +397,7 @@ import {
 } from "./remote-session-reuse-preference-store";
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
-import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
@@ -3963,6 +3963,9 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
     announce: (state, version) => host.announceRestart(state, version),
     clientInUse: hostedServer ? clientInUseSinceStart : undefined,
+    maximumIdleWait: hostedServer
+      ? { afterMs: HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, providerOperationPending: () => service.hasProviderOperation() }
+      : undefined,
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () =>
