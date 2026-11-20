@@ -542,6 +542,7 @@ export class AgentTasks implements TaskLanes {
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
+        requesterIds: caller.requesterIds,
         taskId: task.taskId,
         recipientAgentIds: [caller.agentId],
         text: input.text,
@@ -742,7 +743,7 @@ export class AgentTasks implements TaskLanes {
 
   #reportsTurn(task: AgentThreadRecord, event: AgentTurnCompletedEvent): boolean {
     if (!isStartedTask(task) || task.closedAt !== null || event.origin === "user") return false;
-    if (this.#mailbox.taskBusy(task.agentId, task.taskId)) return false;
+    if (this.#mailbox.taskAwaitsAgent(task.agentId, task.taskId)) return false;
     const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
     return !stopped || this.#userStops.get(task.taskId) === event.turnId;
   }
@@ -757,6 +758,7 @@ export class AgentTasks implements TaskLanes {
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: task.agentId },
+        requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
         senderTaskId: task.taskId,
         recipientAgentIds: [task.agentId],
         text,
