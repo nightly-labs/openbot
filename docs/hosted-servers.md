@@ -1338,17 +1338,18 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    `cat >/root/openbot-move.tar`, and the move removes it after the export. So no archive is on the
    disk of the sandbox, and the copy has no separate step. The downtime of the customer starts here.
    The command sets `/run/openbot-pre-stop`, stops `openbot.service`, and archives, with numeric
-   owners, the home of `user` and `/srv/openbot-hosted`. The home has each provider sign-in, API key,
-   MCP server and CLI that OpenBot downloaded. The archive also has what the customer installed
+   owners, the home of `user` and `/srv/openbot-hosted`. The home has each provider sign-in, API key
+   and MCP server. The archive does not have the provider CLIs that OpenBot downloaded
+   (`~/.config/OpenBot/provider-runtimes`, but `bun` stays) or the caches: at start, a hosted server
+   downloads the CLI of each provider that an agent uses. The archive also has what the customer installed
    outside the home, and not what the boat image has (the lists at the top of the script, from image
    `c4ed68db` and `5f37c910`):
    - each directory that the customer added in `/opt`, `/usr/local` and `/usr/local/lib`, and each
      npm package for all users. A directory that programs of root read, such as
      `/usr/local/lib/systemd` or `/usr/local/lib/python3.12`, stays out, and the report names it.
-   - each agent CLI of the image (`claude`, `codex`, `pi`, `cursor-agent`, `hermes`) whose sign-in
-     file in the home has a sign-in. A VPS has none, and OpenBot would ask the customer to download it
-     again. An empty file, a file with only `{}`, or the `.env` that the image writes for Hermes is not
-     a sign-in.
+   - the Hermes CLI of the image when its sign-in file in the home has a sign-in. OpenBot does not
+     download Hermes as it downloads the other provider CLIs. An empty file, a file with only `{}`, or
+     the `.env` that the image writes for Hermes is not a sign-in.
    - each program in `/usr/local/bin` that the image does not have, each link there into a moved
      directory or into the home, and the crontab of `user`.
    - the names of the apt packages that the customer installed (`~/.base-apt-packages.txt` of the
@@ -1464,8 +1465,8 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
 The VPS is not the same machine as the sandbox:
 
 - The boat image has commands that npm installed for all users (`claude`, `codex` and `pnpm` on
-  2026-11-11). The VPS has none. The move copies the agent CLIs that the customer signed in to, and
-  `import` names each other one that is missing. At start, a hosted server downloads the CLI of each
+  2026-11-11). The VPS has none. The move copies only the Hermes CLI of the image, and `import` names each other one that
+  is missing. At start, a hosted server downloads the CLI of each
   provider that an agent uses and that is not off. The user downloads the CLI of another provider in
   OpenBot.
 - `prepare` makes only the primary group of `user`, and the VPS has no Docker. `import` names each
