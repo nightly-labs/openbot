@@ -1359,7 +1359,7 @@ export class ChannelService {
               text: item.message.text.slice(-ROUTING_TEXT_CHARACTERS),
             }));
           const tasks = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId))))
-            .filter((item) => !terminal(item))
+            .filter((item) => item.id !== task.id && !terminal(item))
             .map((item) => ({
               id: item.id,
               ownerAgentId: item.ownerAgentId && keyOf(item.ownerAgentId),
