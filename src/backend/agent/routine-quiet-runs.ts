@@ -13,7 +13,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { bridgedToolName, getString, type ThreadItem } from "../protocol";
 
-const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
+export const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
 
 const HERMES_SILENT_MARKER = "[silent]";
 
