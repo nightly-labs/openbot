@@ -56,6 +56,7 @@ const diagnostics = new Map<string, DiagnosticStats>();
 const restorers: (() => void)[] = [];
 let recording = false;
 let startedAt = 0;
+let startOptions: StartOptions = {};
 let stopAttribution: (() => void) | null = null;
 let stopDiagnostics: (() => void) | null = null;
 let mutations: MutationObserver | null = null;
@@ -325,6 +326,7 @@ function solidCosts() {
 
 function start(options: StartOptions = {}): void {
   if (recording) return;
+  startOptions = options;
   counters.clear();
   timers.clear();
   diagnostics.clear();
@@ -382,8 +384,14 @@ function stop() {
   };
 }
 
+function reset(): void {
+  if (!recording) return;
+  stop();
+  start(startOptions);
+}
+
 export function installRendererPerfProbes(): void {
   installIntervalProbe();
   installResizeObserverProbe();
-  Object.assign(window, { __openbotPerfProbes: { start, stop } });
+  Object.assign(window, { __openbotPerfProbes: { start, stop, reset } });
 }

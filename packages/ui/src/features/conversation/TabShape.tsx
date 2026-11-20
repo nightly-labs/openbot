@@ -41,7 +41,9 @@ export function TabShape(props: { selected: string; sized: string; scroller?: st
         });
     };
     const changed = (records: MutationRecord[]) => {
-      if (records.some((record) => record.target !== element)) place();
+      if (!records.some((record) => record.target !== element)) return;
+      sizes.unobserve(row);
+      sizes.observe(row);
     };
     const watchList = () => {
       const next = scroller ? row.querySelector<HTMLElement>(scroller) : null;
