@@ -28,17 +28,20 @@
 
 :root[data-openbot-ambient-motion-paused]
   :is(
-    .ui-spinner,
     .agent-row-thinking-dots i,
     .agent-activity-shine,
     .agent-activity-shine-text,
-    .subagents-status-icon,
-    .chat-action-target-status-in-progress .ui-marker-icon svg,
-    .context-meter-ring .ui-radial-progress-chart,
     .image-generation-glow,
-    .media-generation-label[data-shine]
+    .media-generation-label[data-shine],
+    .task-list-item[data-state="active"] .task-list-item-text,
+    .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label,
+    [data-wait-state="resuming"] .open-waits-row-state
   ) {
   animation-play-state: paused;
+}
+
+:root[data-openbot-ambient-motion-paused] .task-list-title[data-showing="task"] .task-list-title-task-text {
+  animation-play-state: running, paused;
 }
 
 @media (prefers-reduced-motion: reduce) {

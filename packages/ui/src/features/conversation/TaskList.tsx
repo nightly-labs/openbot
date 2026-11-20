@@ -1,6 +1,5 @@
 import { Button, ChevronDown } from "@openbot/ui";
 import { createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
-import { useAmbientMotion } from "../../ambient-motion";
 import { createDigitRoll } from "../../digit-roll";
 import { DigitRuns } from "../../digit-runs";
 import { useText } from "../../text";
@@ -205,13 +204,12 @@ export function TaskMark(props: { state: TaskMarkState }) {
 }
 
 export function createTaskListPlayState() {
-  const ambientMotion = useAmbientMotion();
-  const [hidden, setHidden] = createSignal(document.hidden);
+  const [playState, setPlayState] = createSignal(document.hidden ? "paused" : "running");
   onSettled(() => {
-    const refresh = () => setHidden(document.hidden);
+    const refresh = () => setPlayState(document.hidden ? "paused" : "running");
     refresh();
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
   });
-  return () => (hidden() || !ambientMotion() ? "paused" : "running");
+  return playState;
 }
