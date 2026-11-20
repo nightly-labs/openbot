@@ -101,6 +101,8 @@ import {
   apiKeyPromptResult,
   approvalPermissions,
   browserTakeoverError,
+  browserTakeoverExpiredResult,
+  browserTakeoverReleasedResult,
   browserTakeoverResult,
   browserTakeoverWaitingResult,
   commandText,
@@ -206,6 +208,7 @@ const MCP_TOOL_CONSENT_UNANSWERABLE = {
 const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
 const TAKEOVER_TAB_OF_OTHER_CHAT =
   "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
+const USER_ANSWER_LIMIT_MS = 10 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const NO_LOGIN_FOR_SITE =
@@ -393,7 +396,9 @@ interface PendingBrowserTakeover {
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
+  releaseAt: number;
   detached?: true;
+  released?: LateAnswerTarget;
   subagent?: true;
 }
 
@@ -470,6 +475,7 @@ export interface AttentionRegistryOptions {
     text: string,
     sender: ConversationMessageSender | undefined,
   ): void;
+  userAnswerLimitMs?: number;
 }
 
 export interface CodexSubagentParent {
@@ -510,6 +516,7 @@ export class AttentionRegistry {
   readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
   readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
+  readonly #userAnswerLimitMs: number;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -536,6 +543,7 @@ export class AttentionRegistry {
     this.#apiKeys = options.apiKeys ?? null;
     this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
     this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
+    this.#userAnswerLimitMs = options.userAnswerLimitMs ?? USER_ANSWER_LIMIT_MS;
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
@@ -585,7 +593,7 @@ export class AttentionRegistry {
           (getString(pending.params, "turnId") ?? turnId) === turnId,
       ) ||
       [...this.#takeovers.values()].some(
-        (pending) => pending.params.threadId === threadId && pending.params.turnId === turnId,
+        (pending) => !pending.released && pending.params.threadId === threadId && pending.params.turnId === turnId,
       )
     );
   }
@@ -1188,6 +1196,22 @@ export class AttentionRegistry {
     const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
     if (waiting) {
       const [waitingId, pending] = waiting;
+      if (pending.released && pending.request.threadId === publicThreadId && pending.params.tool === params.tool) {
+        if (pending.params.turnId === turnId) return browserTakeoverReleasedResult(params.tool, tabId);
+        const call = takeoverCall();
+        delete pending.released;
+        pending.client = client;
+        pending.providerRequestId = request.id;
+        pending.params = params;
+        pending.request.turnId = turnId;
+        pending.releaseAt = Date.now() + this.#userAnswerLimitMs;
+        pending.resolve = call.resolve;
+        if (request.subagent) pending.subagent = true;
+        else delete pending.subagent;
+        this.#routines.markNeedsAttention(turnId);
+        this.#emitRuntimeSnapshot();
+        return yield* this.#awaitBrowserTakeover(waitingId, pending, request, call.completion, Effect.void);
+      }
       if (
         !pending.detached ||
         pending.params.threadId !== threadId ||
@@ -1222,6 +1246,7 @@ export class AttentionRegistry {
       params,
       request: takeover,
       resolve: call.resolve,
+      releaseAt: Date.now() + this.#userAnswerLimitMs,
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     this.#takeovers.set(requestId, pending);
@@ -1303,20 +1328,41 @@ export class AttentionRegistry {
       request.answerBeforeMs === undefined
         ? undefined
         : setTimeout(() => this.#detachBrowserTakeover(requestId, pending), request.answerBeforeMs);
+    const release = setTimeout(
+      () => this.#releaseBrowserTakeover(requestId, pending),
+      Math.max(0, pending.releaseAt - Date.now()),
+    );
     return show.pipe(
       Effect.andThen(Deferred.await(completion)),
       Effect.ensuring(
         Effect.sync(() => {
           clearTimeout(detach);
-          if (this.#takeovers.get(requestId) === pending && !pending.detached)
+          clearTimeout(release);
+          if (this.#takeovers.get(requestId) === pending && !pending.detached && !pending.released)
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
         }),
       ),
     );
   }
 
+  #releaseBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
+    const answerCall = pending.resolve;
+    const target = this.#lateAnswerTarget(pending.request.agentId, pending.request.threadId);
+    if (!target) {
+      pending.resolve = () => answerCall(browserTakeoverExpiredResult());
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+      return;
+    }
+    pending.released = target;
+    pending.resolve = () => undefined;
+    this.#routines.markRunningForTurn(pending.request.turnId);
+    this.#emitRuntimeSnapshot();
+    answerCall(browserTakeoverReleasedResult(pending.params.tool, pending.request.tabId));
+  }
+
   #detachBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
-    if (this.#takeovers.get(requestId) !== pending || pending.detached) return;
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
     const answerCall = pending.resolve;
     const { threadId, turnId, tool } = pending.params;
     const { tabId } = pending.request;
@@ -1962,7 +2008,7 @@ export class AttentionRegistry {
     }
     for (const [requestId, pending] of this.#takeovers) {
       if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
-      if (completed && pending.subagent && !pending.detached) continue;
+      if (completed && (pending.released || (pending.subagent && !pending.detached))) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
     for (const [tabId, held] of this.#heldTakeoverResults) {
@@ -1991,6 +2037,11 @@ export class AttentionRegistry {
       if (this.#closeForUserMessage(requestId, pending)) changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.released || pending.submitting) continue;
+      if (pending.request.agentId !== agentId || pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
   }
 
   #closeForUserMessage(requestId: RequestId, pending: PendingPrompt): boolean {
@@ -2031,7 +2082,7 @@ export class AttentionRegistry {
     }
     if (changed) this.#emitRuntimeSnapshot();
     for (const [requestId, pending] of this.#takeovers) {
-      if (!pending.subagent) continue;
+      if (!pending.subagent && !pending.released) continue;
       if (agentId !== null && pending.request.agentId !== agentId) continue;
       if (publicThreadId !== null && pending.request.threadId !== publicThreadId) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
@@ -2061,7 +2112,12 @@ export class AttentionRegistry {
       changed = true;
     }
     for (const [key, takeover] of this.#takeovers) {
-      if (takeover.client === client && takeover.providerRequestId === requestId && !takeover.detached) {
+      if (
+        takeover.client === client &&
+        takeover.providerRequestId === requestId &&
+        !takeover.detached &&
+        !takeover.released
+      ) {
         this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
@@ -2072,10 +2128,10 @@ export class AttentionRegistry {
     const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
     if (!target) return;
     const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    pending.detach =
-      deadlines.length === 0
-        ? { target }
-        : { target, timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)) };
+    pending.detach = {
+      target,
+      timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(this.#userAnswerLimitMs, ...deadlines)),
+    };
   }
 
   detachPromptsOf(provider: AgentProvider): void {
@@ -2140,7 +2196,7 @@ export class AttentionRegistry {
 
   clearBrowserTakeovers(client?: AgentClient): void {
     for (const [requestId, pending] of this.#takeovers) {
-      if (client && pending.client !== client) continue;
+      if (client && (pending.client !== client || pending.released)) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
   }
@@ -2356,6 +2412,18 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
+    if (pending.released && (decision === "complete" || pending.personCancelled))
+      this.#sendLateAnswer(
+        pending.request.agentId,
+        pending.released,
+        sourceText(
+          decision === "complete" ? "status.agent.takeoverLateCompleted" : "status.agent.takeoverLateCancelled",
+          {
+            tabId: pending.request.tabId,
+          },
+        ),
+        undefined,
+      );
     pending.resolve(
       browserTakeoverResult(
         decision,

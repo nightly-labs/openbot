@@ -22,6 +22,7 @@ const TAB = "tab-1";
 const SECRET = "e2e-password-7c41";
 const VAULT_SECRET = "e2e-vault-password-93be";
 const DEADLINE_MS = 50;
+const USER_ANSWER_LIMIT_MS = 200;
 
 interface AgentAnswer {
   status?: string;
@@ -122,9 +123,18 @@ const registry = new AttentionRegistry({
 let nextRequest = 1;
 
 function call(tool: "submit_secret" | "request_takeover", turnId: string, answerBeforeMs?: number) {
+  return callOn(registry, tool, turnId, answerBeforeMs);
+}
+
+function callOn(
+  target: AttentionRegistry,
+  tool: "submit_secret" | "request_takeover",
+  turnId: string,
+  answerBeforeMs?: number,
+) {
   const id = nextRequest++;
   return runCauseEffect(
-    registry.surfaceBrowserTakeover(client, {
+    target.surfaceBrowserTakeover(client, {
       id,
       method: "item/tool/call",
       params: {
@@ -380,6 +390,156 @@ try {
     }
   });
 
+  const releasedAnswers: string[] = [];
+  const limitedEvents: AgentEvent[] = [];
+  const limitedLog: string[] = [];
+  const limitedRegistry = (lateAnswerTarget: () => { taskId?: string } | null) =>
+    new AttentionRegistry({
+      conversation: {
+        agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+        publicThreadId: (_agentId, threadId) => threadId,
+        ensureSnapshot: () => snapshot,
+        emitConversation: () => {
+          snapshot.revision += 1;
+        },
+      },
+      browser: {
+        listTabs: () => tabs,
+        prepareSecret: () => Effect.sync(preparedSecret),
+        beginTakeover: (tabId) =>
+          Effect.sync(() => {
+            limitedLog.push(`begin:${tabId}`);
+          }),
+        endTakeover: (tabId) => {
+          limitedLog.push(`end:${tabId}`);
+        },
+      },
+      hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      emit: (event) => limitedEvents.push(event),
+      emitError: () => {},
+      emitRuntimeSnapshot: () => {},
+      lateAnswerTarget,
+      sendLateAnswer: (_agentId, _target, text) => releasedAnswers.push(text),
+      userAnswerLimitMs: USER_ANSWER_LIMIT_MS,
+    });
+  const limited = limitedRegistry(() => ({}));
+  const limitedCards = () => limited.runtimeAttention().pendingBrowserTakeovers;
+  const limitedCount = (type: AgentEvent["type"]) => limitedEvents.filter((event) => event.type === type).length;
+
+  await step("with no provider deadline, a takeover ends its call at the limit and the card stays", async () => {
+    const answer = answerOf(await callOn(limited, "request_takeover", "turn-limit-1"));
+    assert.equal(answer.success, true);
+    assert.equal(answer.status, "waiting");
+    assert.match(answer.next ?? "", /arrives as the user's next message/);
+    assert.match(answer.next ?? "", /end your turn/);
+    assert.equal(limitedCount("browser-takeover-requested"), 1, "the card was not shown once");
+    assert.equal(limitedCount("browser-takeover-resolved"), 0, "the limit closed the card");
+    assert.equal(limitedCards().length, 1);
+    assert.equal(limited.hasAttentionForTurn(THREAD, "turn-limit-1"), false, "the turn still waits for the card");
+    limited.clearForTurn(THREAD, "turn-limit-1", true);
+    assert.equal(limitedCards().length, 1, "the end of the turn closed the released card");
+    assert.deepEqual(limitedLog, [`begin:${TAB}`], "the tab went back to the agent");
+    return answer;
+  });
+
+  await step("a second call in the same turn does not wait and shows no new card", async () => {
+    const answer = answerOf(await callOn(limited, "request_takeover", "turn-limit-1"));
+    assert.equal(answer.status, "waiting");
+    assert.equal(limitedCount("browser-takeover-requested"), 1, "the call showed a second card");
+    assert.equal(limitedCards().length, 1);
+    return answer;
+  });
+
+  await step("a late answer reaches the agent as a new message, once", async () => {
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    assert.equal(limitedCards().length, 0);
+    assert.equal(limitedCount("browser-takeover-resolved"), 1);
+    assert.deepEqual(releasedAnswers, [
+      `I finished the browser takeover in tab ${TAB}. Take a fresh snapshot and continue.`,
+    ]);
+    assert.deepEqual(limitedLog, [`begin:${TAB}`, `end:${TAB}`]);
+    const again = await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" })).then(
+      () => "accepted",
+      () => "refused",
+    );
+    assert.equal(again, "refused", "the takeover ran twice");
+    assert.equal(releasedAnswers.length, 1, "the agent got a second late answer");
+    return { lateAnswer: releasedAnswers[0], again };
+  });
+
+  await step("a cancel by the user also reaches the agent as a new message", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-2");
+    limited.clearForTurn(THREAD, "turn-limit-2", true);
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "cancel" }));
+    assert.equal(
+      releasedAnswers.at(-1),
+      `I cancelled the browser takeover in tab ${TAB}. Do not try it again until I ask.`,
+    );
+    return releasedAnswers.at(-1);
+  });
+
+  await step("a call in a later turn waits on the released card and gets its result", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-3");
+    limited.clearForTurn(THREAD, "turn-limit-3", true);
+    const shown = limitedCount("browser-takeover-requested");
+    const requestId = limitedCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    const late = releasedAnswers.length;
+    const next = callOn(limited, "request_takeover", "turn-limit-4");
+    await runCauseEffect(limited.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    const answer = answerOf(await next);
+    assert.equal(answer.status, "completed");
+    assert.equal(limitedCount("browser-takeover-requested"), shown, "the later turn showed a new card");
+    assert.equal(releasedAnswers.length, late, "the agent got the result twice");
+    assert.equal(limitedCards().length, 0);
+    return answer;
+  });
+
+  await step("a message of the user in the chat closes a released card with no late answer", async () => {
+    await callOn(limited, "request_takeover", "turn-limit-5");
+    limited.clearForTurn(THREAD, "turn-limit-5", true);
+    assert.equal(limitedCards().length, 1);
+    const late = releasedAnswers.length;
+    limited.closeDetachedForUserMessage(AGENT, THREAD);
+    assert.equal(limitedCards().length, 0, "the message did not close the card");
+    assert.equal(releasedAnswers.length, late, "the agent got a late answer for the user's own message");
+    return "closed";
+  });
+
+  await step("a chat with no late answer target closes the card at the limit", async () => {
+    const routine = limitedRegistry(() => null);
+    const answer = answerOf(await callOn(routine, "request_takeover", "turn-limit-6"));
+    assert.equal(answer.status, "expired");
+    assert.equal(routine.runtimeAttention().pendingBrowserTakeovers.length, 0, "the card stayed open");
+    return answer;
+  });
+
+  await step("a question with no provider deadline detaches at the limit", async () => {
+    const id = nextRequest++;
+    limited.surfaceDynamicPrompt(client, {
+      id,
+      method: "item/tool/call",
+      params: {
+        threadId: THREAD,
+        turnId: "turn-limit-7",
+        callId: `call-${id}`,
+        namespace: "openbot",
+        tool: "ask_user",
+        arguments: { questions: [{ id: "q1", header: "Plan", question: "Which plan?" }] },
+      },
+    });
+    const answer = answerOf(await client.answered(id));
+    assert.equal(answer.status, "waiting");
+    assert.equal(limited.runtimeAttention().pendingPrompts[0]?.detached, true);
+    limited.clearForTurn(THREAD, "turn-limit-7", false);
+    return answer;
+  });
+
   const failedFill = async (turnId: string, failure: Error) => {
     fillFailure = failure;
     const shown = count("browser-takeover-requested");
@@ -527,7 +687,10 @@ try {
     },
   );
 
-  await writeFile(resolve(OUT, "report.json"), `${JSON.stringify({ ok: true, steps, browserLog }, null, 2)}\n`);
+  await writeFile(
+    resolve(OUT, "report.json"),
+    `${JSON.stringify({ ok: true, steps, browserLog, limitedLog, releasedAnswers }, null, 2)}\n`,
+  );
   process.stdout.write(`browser-takeover-deadline-e2e: ${steps.length} steps passed\n`);
 } catch (error) {
   await writeFile(

@@ -652,6 +652,22 @@ export function browserTakeoverWaitingResult(tool: string, tabId: string): Dynam
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
+export function browserTakeoverReleasedResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open for the user, and the browser tools of this chat stay unavailable until the user finishes. When the user finishes or cancels, the result arrives as the user's next message. Do not call ${tool} again for tab "${tabId}" in this turn. Tell the user in one short sentence that the browser waits for them, and end your turn unless other work does not need the browser.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function browserTakeoverExpiredResult(): DynamicToolResult {
+  const value = {
+    status: "expired",
+    next: "The user did not answer in time, and the card closed. Tell the user in one short sentence what they must do in the browser, and end your turn.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 export function browserUserControlResult(): DynamicToolResult {
   return {
     success: true,
