@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { AGENT_PROVIDERS, type RoutineRun } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -101,6 +102,7 @@ process.stdin.on("data", (chunk) => {
 
 const ONCE_INSTRUCTION = "Check the open orders and report.";
 const SKIP_INSTRUCTION = "Check the new mail and report.";
+const REMINDER_INSTRUCTION = "Send the renewal reminder.";
 const RESTART_NOTE = "Do the routine again now.";
 
 interface TurnEntry {
@@ -116,6 +118,8 @@ interface FirstRestart {
   skipRunStatus: string;
   skipDelivery: string;
   skipTurns: number;
+  reminderRunStatus: string;
+  reminderTurns: number;
 }
 
 interface SecondRestart {
@@ -125,9 +129,17 @@ interface SecondRestart {
   onceTurns: number;
 }
 
+interface NewerSlotRestart {
+  cutRunStatus: string;
+  newerRunStatus: string;
+  onceTurns: number;
+  newerTurnHasNote: boolean;
+}
+
 const report: {
   firstRestart?: FirstRestart;
   secondRestart?: SecondRestart;
+  newerSlotRestart?: NewerSlotRestart;
   checks: { name: string; passed: boolean; detail?: string }[];
   passed: boolean;
   error?: string;
@@ -224,6 +236,12 @@ function runs(service: Service, agentId: string, routineId: string): RoutineRun[
   return service.agents.listRoutineRuns({ agentId, routineId });
 }
 
+function idle(service: Service, agentId: string): boolean {
+  return service.agents
+    .listQueue(agentId)
+    .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
+}
+
 function deliveryStatus(service: Service, deliveryId: string | null): string {
   return (deliveryId && service.mailbox.getDelivery(deliveryId)?.delivery.status) || "missing";
 }
@@ -245,14 +263,10 @@ try {
     );
   const orders = await createAgent("Orders");
   const mail = await createAgent("Mail");
+  const reminders = await createAgent("Reminders");
   await waitFor(
     "the first chat turns to end",
-    () =>
-      [orders.id, mail.id].every((agentId) =>
-        service.agents
-          .listQueue(agentId)
-          .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
-      ),
+    () => [orders.id, mail.id, reminders.id].every((agentId) => idle(service, agentId)),
     60_000,
   );
   const once = service.agents.createRoutine({
@@ -273,13 +287,30 @@ try {
     schedule: { kind: "daily", time: "09:00" },
     missedPolicy: "skip",
   });
+  const reminder = service.agents.createRoutine({
+    agentId: reminders.id,
+    name: "Renewal reminder",
+    instruction: REMINDER_INSTRUCTION,
+    active: true,
+    timezone: "UTC",
+    schedule: { kind: "once", date: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), time: "09:00" },
+    missedPolicy: "run-once",
+  });
 
   await writeFile(fakeHold, "");
-  makeDue(service, [once.id, skip.id]);
+  makeDue(service, [once.id, skip.id, reminder.id]);
   await waitFor(
-    "both routine turns to start and hold",
-    () => turns(ONCE_INSTRUCTION).length === 1 && turns(SKIP_INSTRUCTION).length === 1,
+    "the routine turns to start and hold",
+    () =>
+      turns(ONCE_INSTRUCTION).length === 1 &&
+      turns(SKIP_INSTRUCTION).length === 1 &&
+      turns(REMINDER_INSTRUCTION).length === 1,
     90_000,
+  );
+  const reminderRun = await waitFor(
+    "the one-time routine run to run",
+    () => runs(service, reminders.id, reminder.id).find((run) => run.status === "running"),
+    10_000,
   );
   const onceRun = await waitFor(
     "the run-once routine run to run",
@@ -306,6 +337,11 @@ try {
     () => runs(service, mail.id, skip.id).find((run) => run.id === skipRun.id && run.status !== "running"),
     60_000,
   );
+  const reminderDone = await waitFor(
+    "the one-time routine run to finish after the restart",
+    () => runs(service, reminders.id, reminder.id).find((run) => run.id === reminderRun.id && run.status !== "running"),
+    60_000,
+  );
   const onceTurns = turns(ONCE_INSTRUCTION);
   const onceRoutine = service.agents.listRoutines(orders.id).find((routine) => routine.id === once.id);
   report.firstRestart = {
@@ -317,6 +353,8 @@ try {
     skipRunStatus: skipped.status,
     skipDelivery: deliveryStatus(service, skipped.deliveryId),
     skipTurns: turns(SKIP_INSTRUCTION).length,
+    reminderRunStatus: reminderDone.status,
+    reminderTurns: turns(REMINDER_INSTRUCTION).length,
   };
   pass("The cut-off run-once routine run finishes after the restart", retried.status === "succeeded");
   pass("The retry uses the same run, so the slot gets no second run", runs(service, orders.id, once.id).length === 1);
@@ -330,6 +368,12 @@ try {
   );
   pass("The cut-off skip routine run stays interrupted", skipped.status === "interrupted", skipped.status);
   pass("The skip routine does not run again", turns(SKIP_INSTRUCTION).length === 1);
+  pass("The cut-off one-time routine run finishes after the restart", reminderDone.status === "succeeded");
+  pass(
+    "The one-time routine runs one more time, with the note",
+    turns(REMINDER_INSTRUCTION).length === 2 && turns(REMINDER_INSTRUCTION)[1]?.text.includes(RESTART_NOTE) === true,
+    String(turns(REMINDER_INSTRUCTION).length),
+  );
 
   await writeFile(fakeHold, "");
   makeDue(service, [once.id]);
@@ -359,7 +403,7 @@ try {
     () => runs(service, orders.id, once.id).find((run) => run.id === secondRun.id && run.status !== "running"),
     60_000,
   );
-  await new Promise((done) => setTimeout(done, 2_000));
+  await waitFor("the agent queue to be idle", () => idle(service, orders.id), 30_000);
   report.secondRestart = {
     retriedStatus: retriedAgain.status,
     endedStatus: ended.status,
@@ -368,6 +412,55 @@ try {
   };
   pass("A run that a second restart cuts off ends as interrupted", ended.status === "interrupted", ended.status);
   pass("A run is retried only one time", turns(ONCE_INSTRUCTION).length === 4, String(turns(ONCE_INSTRUCTION).length));
+
+  await writeFile(fakeHold, "");
+  makeDue(service, [once.id]);
+  const cutRun = await waitFor(
+    "a third run-once routine run to run",
+    () =>
+      runs(service, orders.id, once.id).find(
+        (run) => run.id !== onceRun.id && run.id !== secondRun.id && run.status === "running",
+      ),
+    90_000,
+  );
+  await waitFor("the third routine turn to hold", () => turns(ONCE_INSTRUCTION).length === 5, 30_000);
+  await close(service);
+
+  await rm(fakeHold);
+  const offline = new DatabaseSync(service.database.path);
+  offline
+    .prepare("UPDATE projection_routine_triggers SET next_run_at = ? WHERE routine_id = ?")
+    .run(new Date(Date.now() - 1_000).toISOString(), once.id);
+  offline.close();
+  service = open();
+  await runCauseEffect(service.agents.initialize());
+  const newer = await waitFor(
+    "the run of the newer slot to finish",
+    () =>
+      runs(service, orders.id, once.id).find(
+        (run) => run.scheduledFor > cutRun.scheduledFor && run.status === "succeeded",
+      ),
+    90_000,
+  );
+  const cutEnded = await waitFor(
+    "the cut-off run to end",
+    () => runs(service, orders.id, once.id).find((run) => run.id === cutRun.id && run.status !== "running"),
+    30_000,
+  );
+  await waitFor("the agent queue to be idle again", () => idle(service, orders.id), 30_000);
+  const newerTurn = turns(ONCE_INSTRUCTION)[5];
+  report.newerSlotRestart = {
+    cutRunStatus: cutEnded.status,
+    newerRunStatus: newer.status,
+    onceTurns: turns(ONCE_INSTRUCTION).length,
+    newerTurnHasNote: newerTurn?.text.includes(RESTART_NOTE) ?? false,
+  };
+  pass("A cut-off run is not retried when a newer slot is due", cutEnded.status === "interrupted", cutEnded.status);
+  pass(
+    "Only the newer slot runs, one time and as a normal run",
+    turns(ONCE_INSTRUCTION).length === 6 && newerTurn?.text.includes(RESTART_NOTE) === false,
+    String(turns(ONCE_INSTRUCTION).length),
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

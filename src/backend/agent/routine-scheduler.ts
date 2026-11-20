@@ -231,12 +231,20 @@ export class RoutineScheduler implements RoutineDueSource {
     )
       return false;
     const routine = this.#routines.getRecord(run.agentId, run.routineId);
+    if (
+      routine?.missedPolicy !== "run-once" ||
+      routine.trigger.kind !== "schedule" ||
+      routine.trigger.id !== run.triggerId ||
+      Date.parse(routine.updatedAt) > Date.parse(run.createdAt)
+    )
+      return false;
+    if (routine.trigger.schedule.kind === "once") return true;
     return (
-      routine?.active === true &&
-      routine.missedPolicy === "run-once" &&
-      routine.trigger.kind === "schedule" &&
-      routine.trigger.id === run.triggerId &&
-      Date.parse(routine.updatedAt) <= Date.parse(run.createdAt)
+      routine.active &&
+      Date.parse(routine.trigger.nextRunAt) > Date.now() &&
+      !this.#routines
+        .listRuns(run.agentId, run.routineId, 50, true)
+        .some((other) => other.kind === "scheduled" && other.scheduledFor > run.scheduledFor)
     );
   }
 

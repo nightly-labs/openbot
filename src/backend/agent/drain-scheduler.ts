@@ -908,10 +908,10 @@ export class DrainScheduler {
         );
         const restarted = batch.filter((item) => item.restartedResult);
         return restarted.length
-          ? restartedResultInput(
-              input,
-              restarted.some((item) => item.delivery.sender.kind === "routine"),
-            )
+          ? restartedResultInput(input, {
+              routine: restarted.some((item) => item.delivery.sender.kind === "routine"),
+              result: restarted.some((item) => item.delivery.sender.kind !== "routine"),
+            })
           : input;
       };
       const completeInput =
