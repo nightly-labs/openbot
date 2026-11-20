@@ -1952,7 +1952,7 @@ const fakeCipher = {
 const createBitwardenHost = () =>
   new BitwardenConnectorService({
     runCli: fakeBitwardenCli,
-    findCli: async () => "/fixture/bw",
+    findCli: () => Effect.succeed({ executable: "/fixture/bw" }),
     host: {
       store: new BitwardenConnectorStore(bitwardenFile, fakeCipher),
       dataDirectory: bitwardenData,
