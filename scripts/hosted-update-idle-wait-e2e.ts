@@ -144,6 +144,8 @@ softAndHard.clientInUse = true;
 await until("the end of the maximum wait", () => hasLine(hosted.log, "It now waits only for"));
 await morePolls(hosted, POLLS_PAST_MAXIMUM);
 assert.equal(hosted.updater.installs, 0, "The release installed while an agent turn ran.");
+assert.deepEqual(hosted.updater.status.scheduledRestart?.waitingFor, ["agent-turn"]);
+assert.ok(hasLine(hosted.log, "waits for: agent-turn."), "The reduced wait reasons were not logged.");
 softAndHard.agentTurn = false;
 await until("the install that ignores soft blockers", () => hosted.updater.installs === 1);
 assert.ok(

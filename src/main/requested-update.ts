@@ -288,10 +288,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     const schedule = this.#schedule;
     if (!schedule || this.#updater.getStatus().phase !== "ready") return;
     const waitingFor = schedule.mode === "when-idle" ? this.#waitingFor(schedule) : [];
-    if (waitingFor.length > 0 && this.#blockers(schedule, waitingFor).length > 0) {
-      if (waitingFor.join() !== schedule.waitingFor.join()) {
-        schedule.waitingFor = waitingFor;
-        this.#log(`The update restart that ${describe(schedule)} asked for waits for: ${waitingFor.join(", ")}.`);
+    const blockers = waitingFor.length > 0 ? this.#blockers(schedule, waitingFor) : [];
+    if (blockers.length > 0) {
+      if (blockers.join() !== schedule.waitingFor.join()) {
+        schedule.waitingFor = blockers;
+        this.#log(`The update restart that ${describe(schedule)} asked for waits for: ${blockers.join(", ")}.`);
         this.#publish();
       }
       this.#scheduleAttempt(this.#pollMs);
