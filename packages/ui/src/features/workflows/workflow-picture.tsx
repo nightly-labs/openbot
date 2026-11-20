@@ -12,7 +12,7 @@ export function CardPicture(props: {
   const settle = () => setReady(props.src);
   return (
     <>
-      <Show when={ready() !== props.src}>
+      <Show when={ready() === undefined}>
         <CardPictureLoading />
       </Show>
       <img

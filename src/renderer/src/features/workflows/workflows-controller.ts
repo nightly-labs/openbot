@@ -141,6 +141,7 @@ export function createWorkflowsController(
   const [resetKey, setResetKey] = createSignal(0);
   const [build, setBuild] = createSignal<WorkflowBuild>();
   const [opening, setOpening] = createSignal<string>();
+  const [failed, setFailed] = createSignal(false);
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
@@ -331,11 +332,11 @@ export function createWorkflowsController(
 
   const readOpening = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
     const shownId = stored()?.detail.summary.id;
-    if (shownId !== undefined && shownId !== workflowId) setOpening(workflowId);
+    setOpening(shownId !== undefined && shownId !== workflowId ? workflowId : undefined);
     try {
       return await read(workflowId, undefined, listed);
     } finally {
-      if (untrack(opening) === workflowId) setOpening(undefined);
+      if (opening() === workflowId) setOpening(undefined);
     }
   };
 
@@ -485,7 +486,7 @@ export function createWorkflowsController(
     readLevels();
     readGitHubCatalog();
   });
-  write(async () => {
+  void queued(async () => {
     const asked = untrack(() => requested?.workflowId());
     const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
     const known = asked ?? (current === "" ? remembered : current);
@@ -508,7 +509,7 @@ export function createWorkflowsController(
     }
     const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
     if (!disposed) await load(created.summary.id);
-  });
+  }).catch(() => setFailed(true));
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -712,6 +713,7 @@ export function createWorkflowsController(
 
   return {
     detail: () => stored()?.detail,
+    failed,
     places,
     channels,
     discord,

@@ -588,7 +588,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
-    canChange: () => !frozen() && !deleted(),
+    canChange: () => !editsBlocked() && !deleted(),
     root: () => root,
     retry: (id) => {
       const step = stepOf(id);
@@ -723,6 +723,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   let liveCanvas: CanvasSnapshot | undefined;
   const previewing = () => props.versionPreview !== undefined;
   const frozen = () => previewing() || props.readOnly === true;
+  const editsBlocked = () => frozen() || props.opening === true;
   const versionList = () =>
     props.versions.map((version) => ({
       id: version.id,
@@ -967,7 +968,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     untrack(() => props.onGraphChange(next));
   };
   createEffect(
-    () => (frozen() || deleted() ? undefined : graph()),
+    () => (editsBlocked() || deleted() ? undefined : graph()),
     (next) => {
       if (next) send(next);
     },
@@ -1071,7 +1072,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }
     const merged = asSaved(mergeWorkflowGraphs(before, graphFromSnapshot(capture()), theirs));
     mergeIn(merged);
-    if (!frozen() && !deleted() && !gesturing()) send(merged);
+    if (!editsBlocked() && !deleted() && !gesturing()) send(merged);
   };
   createEffect(
     () => [resetToken(), props.workflow.graph] as const,
@@ -2828,7 +2829,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const takesFiles = (event: DragEvent) =>
       event.dataTransfer?.types.includes("Files") === true &&
       !deleted() &&
-      !frozen() &&
+      !editsBlocked() &&
       allows("asset") &&
       props.features.uploads === true &&
       !(event.target instanceof Element && event.target.closest("[data-node-id], [data-wfn-portal], .wfn-hud"));
@@ -2846,7 +2847,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onPaste = (event: ClipboardEvent) => {
       const key = event.clipboardData?.getData(CLIP_TYPE);
-      if (deleted() || frozen()) return;
+      if (deleted() || editsBlocked()) return;
       if (!key || copied()?.key !== key) {
         pastePictures(event);
         return;
@@ -2885,7 +2886,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const node = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-node-id]") : null;
       const arrow = ARROWS[event.key];
       const action = (() => {
-        if (frozen()) {
+        if (editsBlocked()) {
           if (inMenu) return undefined;
           if (event.key === "Escape" && following()) return stopFollow;
           if (event.key === "Escape") return previewing() ? closeVersion : undefined;
@@ -3469,7 +3470,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
         <Show when={props.opening}>
           <div class="wfn-opening">
-            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+            <Spinner label={t("workflow.canvas.opening")} />
           </div>
         </Show>
         <Show when={live().length === 0 && !frozen() && !props.opening && allows("trigger")}>

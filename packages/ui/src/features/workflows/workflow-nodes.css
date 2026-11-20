@@ -508,12 +508,6 @@
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) var(--openbot-duration-fast) both;
 }
 
-.wfn-media-spinner .ui-spinner {
-  width: var(--openbot-control-sm);
-  height: var(--openbot-control-sm);
-  border-width: 2px;
-}
-
 .wfn-media-spinner + img {
   visibility: hidden;
 }

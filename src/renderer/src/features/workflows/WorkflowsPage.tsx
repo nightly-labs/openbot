@@ -30,7 +30,7 @@ export function WorkflowsPage(props: { serverId: string }) {
       keyed
       fallback={
         <main class="window-page workflows-notice">
-          <Show when={!checking()} fallback={<Spinner size="lg" label={t("workflow.canvas.opening")} />}>
+          <Show when={!checking()} fallback={<Spinner size="lg" label={t("common.loading")} />}>
             <p>{t("error.workflow.serverTooOld")}</p>
           </Show>
         </main>

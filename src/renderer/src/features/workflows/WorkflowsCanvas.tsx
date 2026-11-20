@@ -241,7 +241,9 @@ export function WorkflowsCanvas(props: {
       when={workflows.detail()}
       fallback={
         <main class="window-page workflows-notice">
-          <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          <Show when={!workflows.failed()}>
+            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          </Show>
         </main>
       }
     >
