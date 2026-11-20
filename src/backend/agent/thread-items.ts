@@ -132,6 +132,10 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
+function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+}
+
 function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
   return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
 }
@@ -187,7 +191,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
-  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
+    return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isStuckAcpTurn(provider, message))
     return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
