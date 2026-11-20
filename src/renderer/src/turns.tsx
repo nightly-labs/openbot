@@ -25,7 +25,7 @@ import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
-import { isRoutineSteerRefusal } from "./routine-steer-refusal";
+import { isQuietSteerRefusal } from "./quiet-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -435,7 +435,7 @@ const Turns = createSimpleContext({
           if (activeTurns()[agent.id] !== turnId) return;
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
-          if (isRoutineSteerRefusal(error)) return;
+          if (isQuietSteerRefusal(error)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
