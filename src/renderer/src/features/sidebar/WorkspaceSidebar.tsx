@@ -2,6 +2,7 @@ import type { ChatWindowTarget } from "@openbot/contracts/ipc";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
@@ -35,6 +36,7 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
+import { useWindowPage } from "../window/window-page-context";
 import { createCommunityCardVisibility } from "./community-card";
 import { DevWorktreeLabel } from "./DevWorktreeLabel";
 import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
@@ -48,6 +50,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const layout = useLayout();
   const platform = usePlatform();
   const channels = useChannels();
+  const windowPage = useWindowPage();
   const serverScope = useServerScope();
   const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
   const [chatWindows, setChatWindows] = createSignal<ChatWindowTarget[]>([]);
@@ -162,6 +165,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   });
   const channelWaits = createMemo(() => sidebarChannelWaits({ channels: visibleChannels(), ...waits() }));
   const activeAgentId = () => (activeDirectMember() || channels.state.selectedId ? "" : (activeAgent()?.id ?? ""));
+  const agentChatShown = (agentId: string) => agentId === activeAgentId() && !windowPage.conversationCovered();
   const sideThreads = createMemo(() =>
     platform.chatWindow
       ? undefined
@@ -260,7 +264,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onUnpin={unpinSidebarItem}
         onReorderPinned={reorderPinnedSidebarItems}
         onReorderPeople={reorderSidebarPeople}
-        onSelectAgent={selectAgent}
+        onSelectAgent={(agentId) => selectAgent(agentId, agentChatShown(agentId) ? MAIN_THREAD_ID : undefined)}
         onSelectPerson={(memberId) => void selectDirectMember(memberId)}
         onPreloadDirectConversation={props.peopleEnabled ? () => void DirectConversation.preload() : undefined}
         onCreateAgent={() => {
