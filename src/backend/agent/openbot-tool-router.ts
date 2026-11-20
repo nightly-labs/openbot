@@ -462,6 +462,9 @@ export interface OpenBotToolRouterOptions {
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
+  mcpServerAddedBy?:
+    | ((mcpServerId: string, personId: string) => Effect.Effect<void, { readonly cause: unknown }>)
+    | undefined;
   apiKeys?: AgentApiKeys | null | undefined;
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
@@ -515,6 +518,10 @@ export class OpenBotToolRouter {
   readonly #crm: () => CrmHandle | null;
   readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
   readonly #personCanAdminister: (personId: string) => boolean;
+  readonly #mcpServerAddedBy: (
+    mcpServerId: string,
+    personId: string,
+  ) => Effect.Effect<void, { readonly cause: unknown }>;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -578,6 +585,7 @@ export class OpenBotToolRouter {
     this.#crm = options.crm ?? (() => null);
     this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
     this.#personCanAdminister = options.personCanAdminister ?? (() => true);
+    this.#mcpServerAddedBy = options.mcpServerAddedBy ?? (() => Effect.void);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -2770,6 +2778,7 @@ export class OpenBotToolRouter {
           ),
       keysFromPerson: (values) => this.#keysFromPerson(agentId, params.turnId, threadId, values),
       requestSignIn: (config) => toolStep(() => this.#postMcpSignInCard(agentId, threadId, params.turnId, config)),
+      added: (config) => this.#recordMcpServerAdder(agentId, params.turnId, config),
     });
   });
 
@@ -2822,6 +2831,13 @@ export class OpenBotToolRouter {
       }),
     );
   });
+
+  #recordMcpServerAdder(agentId: string, turnId: string, config: McpServerConfig) {
+    const [personId, ...others] = this.#turnRequesters(agentId, turnId);
+    if (personId === undefined || others.length > 0 || !(this.#channels.hooks.remotePerson?.(personId) ?? false))
+      return Effect.void;
+    return this.#mcpServerAddedBy(config.id, personId).pipe(toToolOperationFailed);
+  }
 
   #postMcpSignInCard(agentId: string, threadId: string, turnId: string, config: McpServerConfig): void {
     const itemType = mcpSignInItemType({ mcpServerId: config.id });

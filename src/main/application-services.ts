@@ -2094,6 +2094,7 @@ export async function createApplicationServices({
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
+    mcpServerAddedBy: (mcpServerId, personId) => mcpServerOwners.add(mcpServerId, personId),
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,

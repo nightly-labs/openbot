@@ -425,6 +425,9 @@ export interface AgentServiceOptions {
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
+  mcpServerAddedBy?:
+    | ((mcpServerId: string, personId: string) => Effect.Effect<void, { readonly cause: unknown }>)
+    | undefined;
   sidebarLayout?: AgentSidebar | null;
   libraryFolders?: AgentLibraryFolders | null;
   credentials?: ProviderClientContext;
@@ -1980,6 +1983,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? {}
         : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       ...(options.personCanAdminister === undefined ? {} : { personCanAdminister: options.personCanAdminister }),
+      ...(options.mcpServerAddedBy === undefined ? {} : { mcpServerAddedBy: options.mcpServerAddedBy }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),

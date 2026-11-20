@@ -177,6 +177,7 @@ interface Call {
   result: ToolAnswer;
   approvals: string[];
   signInCards: string[];
+  added: string[];
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-agent-mcp-tools-"));
@@ -224,6 +225,7 @@ try {
   const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true, using = tools) => {
     const approvals: string[] = [];
     const signInCards: string[] = [];
+    const added: string[] = [];
     const response = await runCauseEffect(
       handleMcpServerTool(using, {
         tool,
@@ -239,6 +241,10 @@ try {
           Effect.sync(() => {
             signInCards.push(config.id);
           }),
+        added: (config) =>
+          Effect.sync(() => {
+            added.push(config.id);
+          }),
       }),
     );
     const text = response.contentItems[0]?.type === "inputText" ? response.contentItems[0].text : "{}";
@@ -251,6 +257,7 @@ try {
       result: JSON.parse(text),
       approvals,
       signInCards,
+      added,
     };
     calls.push(entry);
     return entry;
@@ -274,6 +281,7 @@ try {
       result: JSON.parse(text),
       approvals: [],
       signInCards,
+      added: [],
     };
     calls.push(entry);
     return entry;
@@ -311,6 +319,7 @@ try {
   });
   assert.equal(signIn.result.status, "needs_sign_in");
   assert.deepEqual(signIn.signInCards, [row("calendar")?.id]);
+  assert.deepEqual(signIn.added, [row("calendar")?.id], "a new server names the person who added it");
 
   const key = await call("add a server that needs a key", "save_mcp_server", { name: "crm", url: servers.key.url });
   assert.equal(key.result.status, "needs_key");
@@ -406,6 +415,7 @@ try {
   });
   assert.equal(edited.result.status, "ready");
   assert.match(edited.approvals[0] ?? "", /^Change the MCP server crm/u);
+  assert.deepEqual(edited.added, [], "a change to a server does not change who added it");
   assert.deepEqual(row("crm")?.headers, keys);
   const movedWithKeys = await call("new keys go with a new address", "save_mcp_server", {
     name: "crm",

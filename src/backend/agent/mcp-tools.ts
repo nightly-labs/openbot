@@ -222,6 +222,7 @@ export interface McpServerToolCall {
   approve(reason: string, cwd?: string | null): Effect.Effect<boolean, ToolOperationFailed>;
   keysFromPerson(values: readonly string[]): Effect.Effect<boolean>;
   requestSignIn(config: McpServerConfig): Effect.Effect<void, ToolOperationFailed>;
+  added(config: McpServerConfig): Effect.Effect<void, ToolOperationFailed>;
 }
 
 export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) =>
@@ -353,8 +354,13 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       );
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
-      if (!config.enabled) {
+      const save = Effect.fnUntraced(function* () {
         yield* servers.save(config);
+        const saved = servers.list().find((candidate) => candidate.name === config.name);
+        if (saved && !existing) yield* call.added(saved);
+      });
+      if (!config.enabled) {
+        yield* save();
         const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
         return openBotToolResult({
           status: "disabled",
@@ -370,7 +376,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
             config,
           ),
         );
-      yield* servers.save(config);
+      yield* save();
       return yield* report(servers, call, config, outcome, true);
     }
     case "set_mcp_server_enabled": {
