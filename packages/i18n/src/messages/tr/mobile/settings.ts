@@ -143,6 +143,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Retro gün batımı",
   "mobile.settings.appearance.backdrop.snowfall": "Kar yağışı",
   "mobile.settings.appearance.backdrop.fireflies": "Ateş böcekleri",
+  "mobile.settings.appearance.backdrop.coast": "Neon sahil",
   "mobile.settings.appearance.backdrop.agentPage": "Ajan sayfası",
   "mobile.settings.appearance.backdrop.agentPageNote": "Bir ajan ayarladı",
   "mobile.settings.appearance.backdrop.photo": "Fotoğraf",

@@ -144,6 +144,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "レトロな夕焼け",
   "mobile.settings.appearance.backdrop.snowfall": "雪",
   "mobile.settings.appearance.backdrop.fireflies": "ホタル",
+  "mobile.settings.appearance.backdrop.coast": "ネオンの海岸",
   "mobile.settings.appearance.backdrop.agentPage": "エージェントのページ",
   "mobile.settings.appearance.backdrop.agentPageNote": "エージェントが設定",
   "mobile.settings.appearance.backdrop.photo": "写真",

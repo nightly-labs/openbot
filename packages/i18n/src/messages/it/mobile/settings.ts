@@ -144,6 +144,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Tramonto rétro",
   "mobile.settings.appearance.backdrop.snowfall": "Nevicata",
   "mobile.settings.appearance.backdrop.fireflies": "Lucciole",
+  "mobile.settings.appearance.backdrop.coast": "Costa al neon",
   "mobile.settings.appearance.backdrop.agentPage": "Pagina dell'agente",
   "mobile.settings.appearance.backdrop.agentPageNote": "Impostato da un agente",
   "mobile.settings.appearance.backdrop.photo": "Foto",

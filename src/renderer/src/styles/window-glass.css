@@ -289,8 +289,8 @@
   > .ui-bubble-content {
   --message-solid-surface: color-mix(
     in srgb,
-    var(--openbot-text-primary) var(--message-surface-lift),
-    var(--message-chat-color)
+    color-mix(in srgb, var(--openbot-text-primary) var(--message-surface-lift), var(--message-chat-color)) 45%,
+    transparent
   );
   --openbot-bg-canvas: var(--message-solid-surface);
   --openbot-bg-sidebar: var(--message-solid-surface);
@@ -299,5 +299,13 @@
   --openbot-bg-control: var(--message-solid-surface);
   --openbot-bg-control-hover: var(--message-solid-surface);
   --openbot-bg-control-active: var(--message-solid-surface);
-  background: var(--message-chat-color);
+  background: color-mix(in srgb, var(--message-chat-color) var(--message-glass-solid-opacity, 55%), transparent);
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-glass-solid-opacity: 80%;
 }

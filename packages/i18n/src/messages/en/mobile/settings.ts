@@ -142,6 +142,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.backdrop.sunset": "Old-style sunset",
   "mobile.settings.appearance.backdrop.snowfall": "Snowfall",
   "mobile.settings.appearance.backdrop.fireflies": "Fireflies",
+  "mobile.settings.appearance.backdrop.coast": "Neon coast",
   "mobile.settings.appearance.backdrop.agentPage": "Agent page",
   "mobile.settings.appearance.backdrop.agentPageNote": "Set by an agent",
   "mobile.settings.appearance.backdrop.photo": "Photo",
