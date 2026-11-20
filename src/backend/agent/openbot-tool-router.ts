@@ -2319,7 +2319,7 @@ export class OpenBotToolRouter {
           return openBotToolResult({
             status: "no_agent",
             app: args.app,
-            next: `${name} is connected for every agent of this server, so openbot.messaging_post can post there. But no agent answers the messages that people send there: the ${name} Orchestrator is missing. Only the user can add it. Tell the user to open the card in the chat, or Marketplace > Apps > ${name}, and click Add agent.`,
+            next: `${name} is connected for every agent of this server, so openbot.messaging_post can post there; do the task. But the ${name} Orchestrator is missing, so no agent answers new messages that people send there, except the ones that a workflow takes. Only the user can add it. When the user wants an agent to answer there, tell them to open the card in the chat, or Marketplace > Apps > ${name}, and click Add agent.`,
           });
         }
         return openBotToolResult({
