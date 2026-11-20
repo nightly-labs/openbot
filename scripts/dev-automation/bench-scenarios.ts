@@ -842,12 +842,13 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "s15-library-pictures",
     description:
-      "The Library with 96 pictures in 12 sizes (0.3 to 12 megapixels), scrolled through, closed and opened again",
+      "The Library with 96 pictures in 12 sizes (0.3 to 12 megapixels), scrolled through, closed for 20 s and opened again",
     seed: scaled("agents:1,messages:4,pictures:96"),
     act: async (context) => {
       await openLibrary(context);
       context.record(libraryPassMetrics("first", await scrollLibraryPictures(context)));
       await openRailPage(context, "Agents");
+      await context.wait(20 * SECOND);
       await openLibrary(context);
       context.record(libraryPassMetrics("again", await scrollLibraryPictures(context)));
     },

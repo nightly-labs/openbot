@@ -1,7 +1,7 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { ConversationFilesPanel } from "@openbot/ui/features/files/ConversationFilesPanel";
 import { type FilesPort, filesPort } from "./files-port";
-import { smallPictureUrl } from "./library-picture-url";
+import { createSmallPictureUrl } from "./library-picture-url";
 import { createStorageUsage } from "./storage-usage";
 
 export type ChatFilesSource =
@@ -26,6 +26,7 @@ export default function ChatFilesPanel(props: {
     () => props.calls ?? filesPort(),
   );
   const usage = () => storage.state.usage;
+  const smallPictureUrl = createSmallPictureUrl();
   const bytes = () => {
     const source = props.source;
     const current = usage();

@@ -16,6 +16,7 @@ const PREVIEW_SOURCE_PIXELS = 40_000_000;
 const SMALL_FILE_BYTES = 256 * 1024;
 const JPEG_QUALITY = 82;
 const KNOWN_ENTRIES = 4096;
+const QUIET_BEFORE_MAKING_MS = 1_000;
 
 export interface PreviewFile {
   path: string;
@@ -70,6 +71,9 @@ export class AttachmentPreviews {
   readonly #known = new Map<string, PreviewFile | "source">();
   readonly #pending = new Map<string, Deferred.Deferred<PreviewFile | "source">>();
   readonly #making = Semaphore.makeUnsafe(1);
+  readonly #later = Semaphore.makeUnsafe(1);
+  readonly #queued = new Set<string>();
+  #lastAsked = 0;
   #written = 0;
 
   constructor(root: string) {
@@ -107,6 +111,37 @@ export class AttachmentPreviews {
     );
     return found === "source" ? yield* smallSource(source) : found;
   });
+
+  readonly ready = Effect.fn("AttachmentPreviews.ready")(function* (
+    this: AttachmentPreviews,
+    attachmentId: string,
+    source: PreviewFile,
+  ) {
+    this.#lastAsked = Date.now();
+    const key = hash(`${PREVIEW_FORMAT}:${attachmentId}`);
+    const known = this.#known.get(key) ?? (yield* this.#stored(key));
+    if (known) {
+      this.#remember(key, known);
+      return known === "source" ? null : known;
+    }
+    if (!this.#queued.has(key) && !this.#pending.has(key)) {
+      this.#queued.add(key);
+      yield* Effect.forkDetach(
+        this.#later
+          .withPermit(this.#quiet().pipe(Effect.andThen(this.file(attachmentId, source))))
+          .pipe(Effect.ensuring(Effect.sync(() => this.#queued.delete(key)))),
+      );
+    }
+    return null;
+  });
+
+  #quiet = Effect.fn("AttachmentPreviews.quiet")(function* (this: AttachmentPreviews) {
+    for (let wait = this.#quietWait(); wait > 0; wait = this.#quietWait()) yield* Effect.sleep(wait);
+  });
+
+  #quietWait(): number {
+    return this.#lastAsked + QUIET_BEFORE_MAKING_MS - Date.now();
+  }
 
   #stored = Effect.fn("AttachmentPreviews.stored")(function* (this: AttachmentPreviews, key: string) {
     const copies = Object.entries(EXTENSIONS).map(([mimeType, extension]) => ({

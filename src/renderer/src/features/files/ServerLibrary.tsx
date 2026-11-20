@@ -14,7 +14,7 @@ import { type AgentLevelsSource, createAgentLevels } from "../conversation/messa
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
 import { createLibraryFolders } from "./library-folders";
-import { smallPictureUrl } from "./library-picture-url";
+import { createSmallPictureUrl } from "./library-picture-url";
 import {
   readLibraryCollapsedRows,
   readLibraryFavorites,
@@ -51,6 +51,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
   const storage = createStorageUsage(() => ({ serverId: props.serverId, input: { scope: "host" } }), props.calls);
   const agents = createServerAgents(() => props.serverId, props.calls);
   const [viewing, setViewing] = createSignal<Viewing | null>(null);
+  const smallPictureUrl = createSmallPictureUrl();
   const agentIds = createMemo(() => new Set((agents() ?? []).map((agent) => agent.id)));
   const fileAgents = createMemo(
     () => new Map((storage.state.usage?.files ?? []).map((file) => [file.id, file.agentId] as const)),

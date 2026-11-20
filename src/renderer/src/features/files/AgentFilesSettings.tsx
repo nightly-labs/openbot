@@ -1,7 +1,7 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { AgentFilesView } from "@openbot/ui/features/files/AgentFilesView";
 import type { FilesPort } from "./files-port";
-import { smallPictureUrl } from "./library-picture-url";
+import { createSmallPictureUrl } from "./library-picture-url";
 import type { StorageUsageResource } from "./storage-usage";
 
 export interface AgentFilesOptions {
@@ -23,6 +23,7 @@ export function AgentFilesSettings(
   },
 ) {
   const usage = () => props.storage.state.usage;
+  const smallPictureUrl = createSmallPictureUrl();
   const showInChat = {
     onShowInChat: (row: StoredFileRow) => {
       if (row.messageId) props.onShowMessage(row.messageId);

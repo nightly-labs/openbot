@@ -8,6 +8,7 @@ import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { applicationContentType } from "./application-content-type";
+import type { AttachmentPreviews } from "./attachment-previews";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { inlineContentDisposition } from "./content-disposition";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
@@ -17,7 +18,6 @@ import { canAnswerRemoteRanges } from "./remote-attachment-cache";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { parseRemoteAvatarUrl, remoteAttachmentPreviewSize } from "./remote-server-urls";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
-import type { TeamApiAttachmentPreviews } from "./team-api/dependencies";
 import type { TeamStore } from "./team-store";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
@@ -62,7 +62,7 @@ export interface AttachmentProtocolDependencies {
   mailbox: MailboxStore;
   agents: AgentService;
   remoteServers: RemoteServerManager;
-  attachmentPreviews: TeamApiAttachmentPreviews;
+  attachmentPreviews: AttachmentPreviews;
 }
 
 function asksForPreview(url: URL): boolean {
@@ -84,7 +84,7 @@ export function configureAttachmentProtocol({
       if (!attachment) return new Response("Not found", { status: 404 });
       const preview =
         id && asksForPreview(url) && attachment.mimeType.startsWith("image/")
-          ? await runCauseEffect(attachmentPreviews.file(id, { path: attachment.path, mimeType: attachment.mimeType }))
+          ? await runCauseEffect(attachmentPreviews.ready(id, { path: attachment.path, mimeType: attachment.mimeType }))
           : null;
       const shown = preview ?? attachment;
       return await runCauseEffect(
