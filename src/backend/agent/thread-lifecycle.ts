@@ -5,6 +5,7 @@ import {
   type AgentSummary,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentProviderDescriptor,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
@@ -1129,7 +1130,8 @@ export class ThreadLifecycle {
     instructionsFile: InstructionsFileInPrompt,
     workspaceSkills: readonly string[] = [],
   ): DynamicRecord {
-    const memories = this.#memories.essentialFor(agent.id);
+    const memoryEnabled = agentMemoryEnabled(agent);
+    const memories = memoryEnabled ? this.#memories.essentialFor(agent.id) : [];
     const options = {
       computerUseInOwnChat,
       computerUseNotReady:
@@ -1147,7 +1149,7 @@ export class ThreadLifecycle {
       skillRevision: this.#skillRevision(),
       memoryLimit: this.#memories.limit(),
       storedMemoryCount: this.#memories.listFor(agent.id).length,
-      memoriesInTurns: client.turnContext === true,
+      memoriesInTurns: memoryEnabled && client.turnContext === true,
       teammatesInTurns: client.turnContext === true,
       savedLoginsInTurns: client.turnContext === true,
       instructionsFileInTurns: this.#instructionsFileInTurns(client),
@@ -1179,10 +1181,10 @@ export class ThreadLifecycle {
       this.#store.agentDefaults(),
       options,
     );
-    return options.memoriesInTurns
+    return client.turnContext === true
       ? {
           developerInstructions: instructions,
-          memoryContext: memoryContext(memories, options),
+          ...(options.memoriesInTurns ? { memoryContext: memoryContext(memories, options) } : {}),
           sectionTeammates: section,
           savedLogins: options.passwordVault,
           ...(options.instructionsFileInTurns ? { instructionsFile: options.instructionsFile } : {}),

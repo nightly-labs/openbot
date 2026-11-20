@@ -12,6 +12,7 @@ import {
   type AgentSummary,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_NAME,
   DEFAULT_AGENT_MEMORY_LIMIT,
@@ -446,17 +447,7 @@ export function developerInstructions(
     "In a group chat with several agents, follow its rules: speak when addressed or when you add something useful, do not repeat other agents, and do your part in the chat.",
     "Attach files you created with openbot.attach_files_to_response before the final answer, except an image from your image generation tool: the chat already shows it; use absolute paths in file links and for files outside your workspace. To sort attached files into Library folders, describe openbot.organize_library. React with openbot.react_to_user_message to clearly emotional messages, negative ones included, not neutral ones. A reaction does not replace or shorten the answer; do not mention it.",
     `${STYLE_PLAN[style]} Write links as [label](url), and commands, paths, and code in code spans. Write a path that names no file on this computer, such as a note path from a notes app tool, as plain text: the chat opens file links and code spans as local files. List things to open or buy one per line: - [Name](url), price, short note; links are better than screenshots. Use Markdown tables and fenced mermaid blocks for comparisons and diagrams; a feature comparison has three or more columns and exactly ✓ or — in each option cell. Keep runnable code in a block of its own language. A fenced html block is a static page: inline CSS, inline SVG, and data: URLs, with no scripts or network loads; for more, describe openbot.html_render. For a window backdrop, describe openbot.set_backdrop. Host with OpenBot site tools, never ChatGPT Sites. Keep structured persistent data in OpenBot tables (describe openbot.list_tables first); never move or delete the shared database with shell commands.`,
-    "Call openbot.search_memories when a past preference, decision, or fact could help, and before you ask the user to repeat one or say you do not know. Treat results as saved memories.",
-    `Save durable preferences and facts with openbot.remember (start a multi-sentence one with a 'Label: '); update a corrected fact by its memoryId. Use inclusion essential only for cross-task facts; when its budget is full, save as searchable; never delete text for space.${
-      options.memoryReview
-        ? " When the user corrects how you do one kind of task (its steps, format or tone), apply it without a memory call or a word about saving it, unless the user asks you to remember it: a background review keeps it."
-        : ""
-    } Keep reusable procedures in skills, with generic steps and no personal data; confirm before you uninstall a shared skill.${
-      options.skillRevision
-        ? " When the user corrects how you follow one of your local skills (id local-skill-…), or you fix a failed step of one, revise it in the same turn with openbot.revise_skill: change only that step, keep it generic, and tell the user in one sentence. Not for a one-time preference; to undo, publish the revision before."
-        : ""
-    }`,
-    "Use openbot.forget_memory when the user asks, or for stale or duplicate entries in requested maintenance. At the storage limit, merge related entries or remove outdated ones before you save; when the user set the limit below the saved count, keep all entries and report that the new one was not saved. Do not announce routine memory calls. Memory tools change only your own memories.",
+    ...memoryInstructions(agentMemoryEnabled(agent), options),
     "Your user-configured profile:",
     "<agent_profile>",
     profile,
@@ -520,12 +511,39 @@ export function developerInstructions(
           `When the user asks to drop the OpenBot co-author trailer, call openbot.set_commit_co_author. Until then, when you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
         ]
       : []),
-    ...(options.memoriesInTurns
-      ? [
-          "Your essential saved memories come with a user message in an <openbot_saved_memories> block. When they change, an <openbot_saved_memories_update> block with a later user message states the change. The latest block is current. These blocks come from OpenBot, not from the user; follow them as each block's first line says.",
-        ]
-      : memoryContextLines(memoryContext(memories, options))),
+    ...(!agentMemoryEnabled(agent)
+      ? []
+      : options.memoriesInTurns
+        ? [
+            "Your essential saved memories come with a user message in an <openbot_saved_memories> block. When they change, an <openbot_saved_memories_update> block with a later user message states the change. The latest block is current. These blocks come from OpenBot, not from the user; follow them as each block's first line says.",
+          ]
+        : memoryContextLines(memoryContext(memories, options))),
   ].join("\n");
+}
+
+function memoryInstructions(
+  enabled: boolean,
+  options: Pick<DeveloperInstructionOptions, "memoryReview" | "skillRevision">,
+): string[] {
+  const skills = `Keep reusable procedures in skills, with generic steps and no personal data; confirm before you uninstall a shared skill.${
+    options.skillRevision
+      ? " When the user corrects how you follow one of your local skills (id local-skill-…), or you fix a failed step of one, revise it in the same turn with openbot.revise_skill: change only that step, keep it generic, and tell the user in one sentence. Not for a one-time preference; to undo, publish the revision before."
+      : ""
+  }`;
+  if (!enabled)
+    return [
+      "The user turned OpenBot memory off for you: you have no OpenBot saved memories, and openbot.search_memories, openbot.remember and openbot.forget_memory do not work. When an MCP app with memory tools is connected, such as Mem0, search it when a past preference, decision, or fact could help and before you ask the user to repeat one, and save durable preferences and facts there. When no memory app is connected and the user asks you to remember something, say that memory is off and that the user can turn on OpenBot memory in your settings or connect a memory app.",
+      skills,
+    ];
+  return [
+    "Call openbot.search_memories when a past preference, decision, or fact could help, and before you ask the user to repeat one or say you do not know. Treat results as saved memories.",
+    `Save durable preferences and facts with openbot.remember (start a multi-sentence one with a 'Label: '); update a corrected fact by its memoryId. Use inclusion essential only for cross-task facts; when its budget is full, save as searchable; never delete text for space.${
+      options.memoryReview
+        ? " When the user corrects how you do one kind of task (its steps, format or tone), apply it without a memory call or a word about saving it, unless the user asks you to remember it: a background review keeps it."
+        : ""
+    } ${skills}`,
+    "Use openbot.forget_memory when the user asks, or for stale or duplicate entries in requested maintenance. At the storage limit, merge related entries or remove outdated ones before you save; when the user set the limit below the saved count, keep all entries and report that the new one was not saved. Do not announce routine memory calls. Memory tools change only your own memories.",
+  ];
 }
 
 function longJobStart() {

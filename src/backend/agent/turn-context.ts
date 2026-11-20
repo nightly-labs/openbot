@@ -32,7 +32,7 @@ export class TurnContext {
       const memory = this.#memories.get(threadId);
       if (memory) memory.current = current;
       else this.#memories.set(threadId, { current, delivered: null });
-    }
+    } else this.#memories.delete(threadId);
     if (isDynamicRecord(params) && typeof params.savedLogins === "boolean") {
       const logins = this.#savedLogins.get(threadId);
       if (logins) logins.current = params.savedLogins;

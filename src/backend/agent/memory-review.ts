@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type AgentModelOption,
   type AgentSummary,
+  agentMemoryEnabled,
   type ConversationMessage,
   isContextResetMarker,
   SKILL_SUGGESTION_NAME_CHARACTERS,
@@ -382,10 +383,12 @@ export class MemoryReview {
           .map((entry) => entry.memory.id),
       );
       const skillInput = yield* this.#skillInput(agentId, messages);
-      const browsing = options.browsing ? yield* options.browsing.pending(agentId) : [];
+      const memoryEnabled = agentMemoryEnabled(agent);
+      if (!memoryEnabled && !skillInput) return yield* this.#saveCursor(conversation);
+      const browsing = options.browsing && memoryEnabled ? yield* options.browsing.pending(agentId) : [];
       const prompt = memoryReviewPrompt(
         agent,
-        { ...base, memories: redacted },
+        { ...base, memories: memoryEnabled ? redacted : [] },
         excerpt.map((message) => redactedMessage(message, options.redact)),
         skillInput ?? undefined,
         browsing.map((step) => redactedStep(step, options.redact)),
@@ -404,9 +407,9 @@ export class MemoryReview {
       const result = yield* Schema.decodeUnknownEffect(MemoryReviewResult)(json);
       const lastStep = browsing.at(-1);
       if (lastStep) yield* options.browsing?.reviewed(agentId, lastStep.at) ?? Effect.void;
-      const operations = result.operations.filter(
-        (operation) => operation.type === "add" || !hidden.has(operation.memoryId),
-      );
+      const operations = memoryEnabled
+        ? result.operations.filter((operation) => operation.type === "add" || !hidden.has(operation.memoryId))
+        : [];
       const suggestion = skillInput
         ? yield* Schema.decodeUnknownEffect(SkillReviewResult)(json).pipe(
             Effect.map(({ skill }) => acceptedSuggestion(skill, skillInput.skills)),

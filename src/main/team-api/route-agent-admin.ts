@@ -2,6 +2,7 @@ import {
   parseSetAgentDefaultChoiceInput,
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
+  parseUpdateAgentBuiltinMemoryInput,
   parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
@@ -15,6 +16,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
@@ -217,6 +222,36 @@ export async function routeAgentPlanCard(
       throw new HttpError(400, error instanceof Error ? error.message : "Invalid plan card setting.");
     }
     return json(200, await runCauseEffect(settings.updatePlanCard(input)));
+  } catch (error) {
+    if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
+    throw error;
+  }
+}
+
+export async function routeAgentBuiltinMemory(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  const read = method === "POST" && url.pathname === AGENT_BUILTIN_MEMORY_ROUTES.settings;
+  const update = method === "POST" && url.pathname === AGENT_BUILTIN_MEMORY_ROUTES.update;
+  if (!read && !update) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(AGENT_BUILTIN_MEMORY_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
+  requireAdmin(member);
+  const body = await readJson(request);
+  requireVisibleBodyAgent(body, hiddenAgentIds);
+  try {
+    if (read) return json(200, settings.readBuiltinMemory(stringField(body, "agentId")));
+    let input: ReturnType<typeof parseUpdateAgentBuiltinMemoryInput>;
+    try {
+      input = parseUpdateAgentBuiltinMemoryInput(body);
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : "Invalid memory setting.");
+    }
+    return json(200, await runCauseEffect(settings.updateBuiltinMemory(input)));
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;
