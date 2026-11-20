@@ -144,6 +144,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "レトロな夕焼け",
   "mobile.settings.appearance.backdrop.snowfall": "雪",
   "mobile.settings.appearance.backdrop.fireflies": "ホタル",
+  "mobile.settings.appearance.backdrop.coast": "ネオンの海岸",
   "mobile.settings.appearance.backdrop.agentPage": "エージェントのページ",
   "mobile.settings.appearance.backdrop.agentPageNote": "エージェントが設定",
   "mobile.settings.appearance.backdrop.photo": "写真",
@@ -573,6 +574,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "エージェントを選ぶ",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot はロックされています",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot を開く",
+  "mobile.settings.shortcuts.card.message": "{name} にメッセージ",
+  "mobile.settings.shortcuts.card.messagePrompt": "{name} へのメッセージ",
   "mobile.settings.shortcuts.footer":
     "ショートカットアプリの Send Message はこのエージェントに送信します。アプリは開きません。Open Agent はこのエージェントのチャットを開きます。",
   "mobile.settings.shortcuts.send.sent": "送信済み",

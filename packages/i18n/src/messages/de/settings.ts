@@ -59,6 +59,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro-Sonnenuntergang",
   "settings.chatBackdrop.snowfall": "Schneefall",
   "settings.chatBackdrop.fireflies": "Glühwürmchen",
+  "settings.chatBackdrop.coast": "Neonküste",
   "settings.chatBackdrop.upload": "Bild hochladen…",
   "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
   "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",

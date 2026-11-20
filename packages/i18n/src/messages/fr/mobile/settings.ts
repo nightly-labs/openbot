@@ -145,6 +145,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Coucher de soleil rétro",
   "mobile.settings.appearance.backdrop.snowfall": "Chute de neige",
   "mobile.settings.appearance.backdrop.fireflies": "Lucioles",
+  "mobile.settings.appearance.backdrop.coast": "Côte néon",
   "mobile.settings.appearance.backdrop.agentPage": "Page de l’agent",
   "mobile.settings.appearance.backdrop.agentPageNote": "Défini par un agent",
   "mobile.settings.appearance.backdrop.photo": "Photo",
@@ -585,6 +586,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Choisir un agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot est verrouillé",
   "mobile.settings.shortcuts.card.locked.action": "Ouvrir OpenBot",
+  "mobile.settings.shortcuts.card.message": "Envoyer un message à {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Message pour {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas. Open Agent ouvre sa discussion.",
   "mobile.settings.shortcuts.send.sent": "Envoyé",
