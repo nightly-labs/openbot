@@ -26,6 +26,8 @@ export const SETTING_LINK_SCOPES = {
   "voice.read-replies": "app",
   "voice.speech-voice": "app",
   "voice.speech-speed": "app",
+  "voice.codex-live": "app",
+  "voice.server": "app",
   "phones.devices": "app",
   "app.launch-at-login": "app",
   "app.restore-workspace": "app",
