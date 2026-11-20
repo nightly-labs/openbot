@@ -26,7 +26,7 @@ import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, flush, onSettled, Show, untrack } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
@@ -318,6 +318,10 @@ function SidePanelTabRow(
   const row = tabRow.row;
   createEffect(createMemo(selectedValue), (value) => tabRow.reveal(value));
   createEffect(
+    createMemo(() => row.hidden.length > 0),
+    () => tabRow.reveal(untrack(selectedValue)),
+  );
+  createEffect(
     () => tabValues().join(),
     () => tabRow.measure(),
   );
@@ -558,9 +562,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
                     onKeyDown={(event) => onTabKeyDown(event, pane, close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <PaneIcon pane={pane} />
-                    </span>
                     <span class="side-panel-tab-label">{label()}</span>
                   </Tabs.Trigger>
                   <Button
@@ -573,6 +574,9 @@ function SidePanelTabRow(
                     title={t("conversation.sidePanel.closePane", { name: label() })}
                     onClick={() => closeWithPointer(pane, close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <PaneIcon pane={pane} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -608,9 +612,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
-                    </span>
                     <span class="side-panel-tab-label">{thread().title}</span>
                     <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
@@ -624,6 +625,9 @@ function SidePanelTabRow(
                     title={t("conversation.threads.closeTab")}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -659,9 +663,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <FileTabIcon file={file()} />
-                    </span>
                     <span class="side-panel-tab-label">{file().name}</span>
                   </Tabs.Trigger>
                   <Button
@@ -674,6 +675,9 @@ function SidePanelTabRow(
                     title={t("conversation.sidePanel.closePane", { name: file().name })}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <FileTabIcon file={file()} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>

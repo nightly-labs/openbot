@@ -2753,14 +2753,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (!model) return yield* failed(sourceText("error.provider.noModel"));
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.agent.sideQuestionBusy"));
+      const taskId = input.taskId;
+      if (taskId !== undefined && !this.#tasks.has(agent.id, taskId))
+        return yield* failed(sourceText("error.backend.threadNotFound"));
+      const taskThreadId = taskId === undefined ? undefined : this.#tasks.require(agent.id, taskId).threadId;
+      const threadId = taskThreadId ?? agent.threadId;
+      const loaded =
+        taskThreadId === undefined
+          ? this.#conversation.loadedSnapshot(agent.id)
+          : this.#conversation.loadedExecutionSnapshot(taskThreadId);
       const messages =
-        this.#conversation.loadedSnapshot(agent.id)?.messages ??
-        this.#store.database.readConversationPage(
-          agent.id,
-          agent.threadId,
-          { type: "latest" },
-          SIDE_QUESTION_CHAT_MESSAGES,
-        ).messages;
+        loaded?.messages ??
+        this.#store.database.readConversationPage(agent.id, threadId, { type: "latest" }, SIDE_QUESTION_CHAT_MESSAGES)
+          .messages;
       const client = this.#providers.createProfileClient(agent.provider, agent.providerAccountId);
       return yield* this.#profileClients
         .run(client, (cancelled) =>

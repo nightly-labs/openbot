@@ -129,6 +129,7 @@ export function serverSupportsCapability(
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "side-question-threads-v1" ||
       capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1" ||
       capability === "sidebar-pins-v1" ||

@@ -60,6 +60,11 @@ tabs. When the closed pane showed, the panel shows, in this order:
 3. The last file tab.
 4. The pane list, when no tab stays.
 
+The question pane keeps one side question for the agent's chat and one for each side thread
+(`side-question-store.ts`). It shows the side question of the thread that is open in the chat, and
+the host answers from that thread. A draft thread has no messages yet, so it shows the chat's side
+question. Close tab deletes all side questions of the agent.
+
 The panel keeps its tabs while it is collapsed. Each agent and each channel has its own tabs.
 The panel stays open or closed when the user opens another agent or channel on the same server
 (`keepSidePanelShown` in `conversation-scope.ts`). An open panel shows the last tab of the new chat,
