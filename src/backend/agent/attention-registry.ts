@@ -397,7 +397,12 @@ interface PendingBrowserTakeover {
   subagent?: true;
 }
 
+function heldTakeoverKey(tabId: string, threadId: string): string {
+  return JSON.stringify([tabId, threadId]);
+}
+
 interface HeldTakeoverResult {
+  tabId: string;
   threadId: string;
   turnId: string;
   result: DynamicToolResult;
@@ -1181,9 +1186,10 @@ export class AttentionRegistry {
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     if (!this.#browser.toolCanUseTab({ ...params, threadId: publicThreadId, ownerAgentId: agentId }, tabId))
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
-    const held = this.#heldTakeoverResults.get(tabId);
-    if (held?.threadId === threadId) {
-      this.#heldTakeoverResults.delete(tabId);
+    const heldKey = heldTakeoverKey(tabId, threadId);
+    const held = this.#heldTakeoverResults.get(heldKey);
+    if (held) {
+      this.#heldTakeoverResults.delete(heldKey);
       if (held.turnId === turnId) return held.result;
     }
     const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
@@ -1326,7 +1332,7 @@ export class AttentionRegistry {
     pending.resolve = (result) => {
       if (held) return;
       held = true;
-      this.#heldTakeoverResults.set(tabId, { threadId, turnId, result });
+      this.#heldTakeoverResults.set(heldTakeoverKey(tabId, threadId), { tabId, threadId, turnId, result });
     };
     answerCall(browserTakeoverWaitingResult(tool, tabId));
   }
@@ -1966,8 +1972,8 @@ export class AttentionRegistry {
       if (completed && pending.subagent && !pending.detached) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
-    for (const [tabId, held] of this.#heldTakeoverResults) {
-      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(tabId);
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(key);
     }
   }
 
@@ -2192,8 +2198,8 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
     }
-    for (const tabId of this.#heldTakeoverResults.keys()) {
-      if (!tabs.some((tab) => tab.id === tabId)) this.#heldTakeoverResults.delete(tabId);
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (!tabs.some((tab) => tab.id === held.tabId)) this.#heldTakeoverResults.delete(key);
     }
   }
 
