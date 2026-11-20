@@ -90,6 +90,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "החיבור הזה לא יכול לעצור הרצה של שגרה.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
   "error.team.libraryFoldersUnsupported": "תיקיות הספרייה אינן נתמכות בחיבור הזה.",
+  "error.team.workflowFoldersUnsupported": "החיבור הזה אינו תומך בתיקיות של תהליכי עבודה.",
   "error.team.agentNotificationLevelsUnsupported":
     "השרת הזה אינו יכול לשמור רמת התראות אישית לכל סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "error.team.sidebarPinsUnsupported":
@@ -121,6 +122,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "עדכוני מארח אינם נתמכים בחיבור הזה.",
   "error.team.hostTimezoneUnsupported": "אזור הזמן של השרת אינו נתמך בחיבור הזה.",
   "error.team.hostRestartUnsupported": "הפעלה מחדש של השרת אינה נתמכת בחיבור הזה.",
+  "error.team.ownerTransferUnsupported": "השרת הזה לא תומך בהעברת בעלות.",
   "error.team.hostKeyRotationUnsupported": "שינוי מפתח השרת אינו נתמך בחיבור הזה.",
   "error.team.localServersUnsupported": "שרתים במחשב הזה אינם נתמכים בחיבור הזה.",
   "error.team.routineResultsUnsupported": "יעדי שגרות אינם נתמכים בחיבור הזה.",
@@ -190,6 +192,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "אישיות השרת אינה נתמכת בחיבור הזה.",
   "error.team.agentWaitsUnsupported": "החיבור הזה לא תומך בהמתנות פתוחות.",
   "error.team.pendingApprovalUnsupported": "החיבור הזה לא תומך בקריאת בקשת אישור מלאה.",
+  "error.team.pendingPromptsUnsupported": "חיבור זה אינו תומך בקריאת השאלות הפתוחות.",
   "error.team.phoneFeedbackUnsupported": "החיבור הזה לא תומך בשליחת דיווח מאפליקציית הטלפון.",
   "error.team.messagePinsUnsupported": "החיבור הזה אינו תומך בהודעות מוצמדות.",
   "error.team.queuedMessageThreadUnsupported": "החיבור הזה לא תומך בהרצת הודעה מהתור כשרשור חדש.",

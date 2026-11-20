@@ -2,6 +2,7 @@ import { AppLoadingShell } from "@openbot/ui/features/account/AppLoadingShell";
 import { Dynamic } from "@solidjs/web";
 import { createLazyFileRoute } from "@tanstack/solid-router";
 import { type Component, createSignal, flush, lazy, onSettled, Show } from "solid-js";
+import { WebSlowLoadNotice } from "../../../../src/renderer/src/features/web-client/WebSlowLoadNotice";
 import { showSavedAppearance } from "../../../../src/renderer/src/features/web-client/web-appearance-preference";
 import { markSoftwareRendering } from "../../../../src/renderer/src/features/web-client/web-software-rendering";
 import "../../../../src/renderer/src/features/web-client/web-client.css";
@@ -41,6 +42,7 @@ function BrowserAppPage() {
             <Show when={crew()} fallback={<AppLoadingShell />}>
               {(screen) => <Dynamic component={screen()} />}
             </Show>
+            <WebSlowLoadNotice startsWait />
           </div>
         }
       >

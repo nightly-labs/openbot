@@ -1,4 +1,4 @@
-import type { AgentApproval, AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { AgentApproval, AgentEvent, AgentRuntimePrompt, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { keepWholeApprovals, reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -77,6 +77,26 @@ export function reconcileAttentionPrompts(
   }
   for (const request of snapshot.pendingBrowserTakeovers) {
     next[attentionKey(request.agentId, request.threadId)] = { type: "browser-takeover-requested", request };
+  }
+  return keepEqualRecord(current, next);
+}
+
+export function withListedPrompts(
+  current: PendingAttentionPrompts,
+  prompts: readonly AgentRuntimePrompt[],
+  submittedRequests: Record<string, string | undefined>,
+  askedDuringRead: ReadonlySet<string>,
+): PendingAttentionPrompts {
+  const next: PendingAttentionPrompts = { ...current };
+  for (const prompt of prompts) {
+    const key = attentionKey(prompt.agentId, prompt.threadId);
+    const shown = next[key];
+    const replaceable =
+      shown === undefined ||
+      (shown.type === "prompt" &&
+        String(shown.requestId) !== String(prompt.requestId) &&
+        !askedDuringRead.has(String(shown.requestId)));
+    if (replaceable && !promptAnswerInFlight(prompt, submittedRequests)) next[key] = { type: "prompt", ...prompt };
   }
   return keepEqualRecord(current, next);
 }

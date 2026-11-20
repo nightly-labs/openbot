@@ -385,11 +385,14 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
   };
 }
 
-export function detachedPromptResult(): DynamicToolResult {
-  const value = {
-    status: "waiting",
-    next: "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.",
-  };
+const DETACHED_PROMPT_NOTE =
+  "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.";
+
+export function detachedPromptResult(
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
+): DynamicToolResult | { answers: Record<string, never>; note: string } {
+  if (responseKind === "user-input") return { answers: {}, note: DETACHED_PROMPT_NOTE };
+  const value = { status: "waiting", next: DETACHED_PROMPT_NOTE };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
@@ -610,6 +613,35 @@ const TAKEOVER_SIGN_IN_MISSING_NEXT =
 const TAKEOVER_USER_CANCELLED_NEXT =
   "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
 
+function browserTakeoverNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+) {
+  return {
+    ...(vault ? { vault } : {}),
+    ...(vaultSkipped ? { vaultSkipped } : {}),
+    ...(signInMissing ? { signIn: "not-received" } : {}),
+    ...(secureInputFailed === undefined
+      ? {}
+      : {
+          secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
+        }),
+  };
+}
+
+export function browserTakeoverLateNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+): string {
+  const notes = browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed);
+  if (Object.keys(notes).length === 0) return "";
+  return JSON.stringify(signInMissing ? { ...notes, next: TAKEOVER_SIGN_IN_MISSING_NEXT } : notes);
+}
+
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
@@ -625,14 +657,7 @@ export function browserTakeoverResult(
         type: "inputText",
         text: JSON.stringify({
           status: decision === "complete" ? "completed" : "cancelled",
-          ...(vault ? { vault } : {}),
-          ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(signInMissing ? { signIn: "not-received" } : {}),
-          ...(secureInputFailed === undefined
-            ? {}
-            : {
-                secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
-              }),
+          ...browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed),
           ...(decision === "complete"
             ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
             : userCancelled
@@ -648,6 +673,22 @@ export function browserTakeoverWaitingResult(tool: string, tabId: string): Dynam
   const value = {
     status: "waiting",
     next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function browserTakeoverReleasedResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open for the user, and the browser tools of this chat stay unavailable until the user finishes. When the user finishes or cancels, the result arrives as the user's next message. Do not call ${tool} again for tab "${tabId}" in this turn. Tell the user in one short sentence that the browser waits for them, and end your turn unless other work does not need the browser.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function browserTakeoverExpiredResult(): DynamicToolResult {
+  const value = {
+    status: "expired",
+    next: "The user did not answer in time, and the card closed. Tell the user in one short sentence what they must do in the browser, and end your turn.",
   };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }

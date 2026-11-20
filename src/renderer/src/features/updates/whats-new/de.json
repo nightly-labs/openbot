@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren die Einstellungen von Workflow-Schritten, Ab diesem Schritt ausführen, die Übergabe des Besitzes, die Schaltfläche Alle aktualisieren und viele Korrekturen für Agenten nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sprich mit einem Agenten per Push-to-Talk. Halte die Sprechtaste oder die Push-to-Talk-Taste gedrückt, während du sprichst. OpenBot sendet, was du gesagt hast, wenn du loslässt. Ändere die Taste unter Einstellungen > Diktat.",
+          "Starte einen Workflow ab einem Schritt neu. Wähle im Menü des Schritts Ab diesem Schritt ausführen. Die Schritte davor behalten ihre Antworten und laufen nicht noch einmal.",
+          "Sieh dir die Einstellungen und Eingaben an, die das Ergebnis eines Workflow-Schritts erzeugt haben. Wähle am Schritt Einstellungen und dann Diese Einstellungen verwenden, um ihn auf die gleiche Weise erneut auszuführen.",
+          "Gib deinen Server an ein anderes OpenBot-Konto weiter. Gib unter Servereinstellungen > Mitglieder die E-Mail-Adresse des neuen Besitzers ein. Der Server wechselt den Besitzer, wenn der neue Besitzer ihn annimmt.",
+          "Aktualisiere alle Anbieter auf einmal. Einstellungen > Anbieter zeigt Alle aktualisieren, wenn ein oder mehrere Anbieter ein Update haben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot aktualisiert die Anbieter-CLIs, die es heruntergeladen hat, jede Stunde, sobald eine neue Version verfügbar ist. Das Update wartet, bis die Agenten im Leerlauf sind.",
+          "Jeder Thread eines Agenten kann die Browser-Tabs nutzen, die der Hauptchat oder ein anderer Thread dieses Agenten geöffnet hat.",
+          "Der Tab Routinen ist aus der Seitenleiste verschwunden. Routinen laufen weiter. Verwalte sie in den Einstellungen des Agenten, auf der Seite Zeitplan und unter Servereinstellungen > Routinen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Neustart für ein heruntergeladenes Update wartet jetzt, bis die Agenten im Leerlauf sind, mit Neustart abbrechen. Vorher schloss sich OpenBot sofort und beendete die Aufgabe des Agenten.",
+          "Ein Agent bleibt nach einem Neustart oder einem Nutzungslimit nicht mehr auf „In Arbeit“ mit wartenden Nachrichten. Der beendete Durchlauf wird als unterbrochen angezeigt, und die wartenden Nachrichten starten.",
+          "Einem ausgelasteten Server mit vielen Agenten und verbundenen Geräten geht nicht mehr der Speicher aus, und er friert nicht mehr ein, wenn er den nächsten Durchlauf auswählt.",
+          "Eine Nachricht, die du nach einer Pause sendest, bleibt nicht mehr auf „Nicht gesendet“ mit „Verbinde Claude, um fortzufahren.“, wenn Claude angemeldet ist.",
+          "Ungenutzte Browser-Tabs von Agenten verbrauchen nach 2 Minuten keine Prozessorleistung mehr."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren kleine Kopien der Bilder auf dem Workflow-Canvas, benutzerdefinierte Videolängen und Agenten, die eine Anfrage ohne „Weiter“ abschließen, nur, wenn der Server diese Version hat.",
+      "Unter Linux: Wenn OpenBot nach dem Update immer noch langsam ist, lösche die Datei `~/.config/OpenBot/gpu-crash.json` und starte OpenBot neu.",
+      "Wenn du für einen Mistral-Agenten unter Anbietereinstellungen Denken festgelegt hast, wähle die Stufe im Menü Aufwand erneut aus und setze die alte Zeile Denken zurück."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Teile deinen Einladungslink unter Einstellungen > Invite friends. Der Tab zeigt dein Guthaben und die Freunde, die beigetreten sind. Ein Freund erhält 10 % Rabatt auf jede Zahlung, und du erhältst 10 % jeder bezahlten Rechnung deines Freundes als Guthaben.",
+          "Lege Knoten eines Workflow-Canvas in eine Gruppe. Wähle sie aus und drücke Gruppieren (⌘G). Klappe eine Gruppe zu einer einzigen Stapelkarte zusammen, und drücke Gruppierung aufheben (⇧⌘G), um sie zu beenden.",
+          "Gib einem Videoschritt auf dem Workflow-Canvas jede Länge, die sein Sunra- oder Higgsfield-Modell unterstützt. Wähle im Menü Länge die Option Eigene und nutze den Schieberegler.",
+          "Öffne den Marketplace über die Zeile Apps in den Einstellungen eines Agenten. Verbinde eine App, oder füge mit Eigene hinzufügen deinen eigenen MCP-Server hinzu.",
+          "Wenn du dich auf einem neuen Computer anmeldest und dein Konto bereits Server hat, zeigt der erste Schritt sie an. Öffne einen Server, um mit seinen Agenten und Chats weiterzumachen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agenten schließen deine Anfrage ohne „Weiter“ von dir ab. Wenn ein Teil der Anfrage nicht fertig ist, macht der Agent mit diesem Teil weiter, höchstens 3 Mal. Eine Frage, die deine Wahl oder Freigabe braucht, hält den Agenten weiterhin an.",
+          "Tabs der Seitenleiste behalten ihren Titel und eine einheitliche Breite. Wenn die Tabs nicht passen, scrollt die Zeile, und ein Menü am Ende der Zeile listet die anderen Tabs auf. Ein Klick mit der mittleren Maustaste schließt einen Tab.",
+          "Auf einem verbundenen Server werden die Bilder des Workflow-Canvas viel schneller angezeigt. Der Canvas erhält eine kleine Kopie jedes Bildes, und das volle Bild öffnet sich im Viewer.",
+          "Ein Thread sieht jetzt wie der Chat des Agenten aus. Nachrichten desselben Absenders wirken als ein Block, und die Schritte einer Antwort werden daneben angezeigt."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Claude- oder ChatGPT-Agent bleibt nicht mehr stundenlang bei „In Arbeit“ hängen, wenn der Anbieter nicht mehr antwortet. Nach 15 Minuten ohne Ausgabe (60 Minuten, während ein Werkzeug läuft) beendet OpenBot den Durchlauf, und die wartenden Nachrichten laufen weiter.",
+          "Wenn „Mein Claude-Code-Setup verwenden“ ausgeschaltet ist, laden Claude-Agenten deine globalen Claude-Code-Anweisungen und -Regeln nicht mehr. Jeder Durchlauf ist schneller und kostet weniger. Um sie zu behalten, schalte „Mein Claude-Code-Setup verwenden“ ein.",
+          "Deine Agenten arbeiten weiter, während OpenBot ein Update für einen Anbieter herunterlädt. Ein Download, der eine Minute lang keine Daten erhält, stoppt, und er wird beim nächsten Versuch dort fortgesetzt, wo er aufgehört hat.",
+          "Agenten senden Nachrichten wieder direkt an die anderen Agenten ihres Teams. Vorher musste eine Karte jede Übergabe bestätigen, und die Arbeit stand still, bis du zugestimmt hast.",
+          "Ein Agent mit automatischen Ersatzmodellen wechselt in mehr Fällen zu seinem nächsten Ersatzmodell, zum Beispiel nach einer Ratenbegrenzung oder wenn Gemini die Verbindung zu Google verliert."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [

@@ -1,3 +1,8 @@
+import { parseWorkflowFolderAction } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOW_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -11,6 +16,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -18,6 +27,10 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
@@ -44,6 +57,7 @@ import {
   decodeRemoteWorkflowSaveResult,
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
+  decodeRemoteWorkflowStepSettings,
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
@@ -55,9 +69,10 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { WorkflowsHandle } from "../../backend/workflows/workflows";
 import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsService } from "../host-events-service";
-import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, decodeWorkflowFoldersSnapshotFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
+import type { WorkflowFoldersService } from "../workflow-folders-service";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import {
@@ -90,7 +105,10 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
+      | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY
+      | typeof WORKFLOW_FOLDERS_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -104,6 +122,7 @@ interface WorkflowIpcDependencies {
   workflows: WorkflowsHandle;
   events: Pick<HostEventsService, "rotateWorkflowSecret">;
   github: WorkflowGitHubDirectory;
+  workflowFolders: Pick<WorkflowFoldersService, "read" | "change">;
   remoteServers: WorkflowRemoteServers;
 }
 
@@ -111,6 +130,7 @@ export function workflowIpcHandlers({
   workflows,
   events,
   github,
+  workflowFolders,
   remoteServers,
 }: WorkflowIpcDependencies): Pick<IpcGroupHandlers, "workflows"> {
   function remote<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: unknown): Promise<T> {
@@ -122,6 +142,11 @@ export function workflowIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_GITHUB_CAPABILITY))
       throw new Error(sourceText("error.workflow.serverTooOld"));
     return remote(serverId, path, decoder, body);
+  }
+  function remoteFolders(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, WORKFLOW_FOLDERS_CAPABILITY))
+      throw new Error(sourceText("error.team.workflowFoldersUnsupported"));
+    return remote(serverId, path, decodeWorkflowFoldersSnapshotFromHost, body);
   }
   return {
     workflows: {
@@ -197,6 +222,14 @@ export function workflowIpcHandlers({
       run: scopedHandler(parseWorkflowRunId, {
         local: (id) => runCauseEffect(workflows.run(id)),
         remote: (runId, serverId) => remote(serverId, WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
+      }),
+      stepSettings: scopedHandler(parseWorkflowStepId, {
+        local: (stepId) => runCauseEffect(workflows.stepSettings(stepId)),
+        remote: (stepId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
+        },
       }),
       rotateWebhookSecret: scopedHandler(parseWorkflowTrigger, {
         local: (input) => runCauseEffect(events.rotateWorkflowSecret(input)),
@@ -280,16 +313,28 @@ export function workflowIpcHandlers({
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
         remote: (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-            : Promise.resolve({ models: [] }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+              : Promise.resolve({ models: [] }),
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
         local: (input) => runCauseEffect(workflows.mediaPrice(input)),
         remote: (input, serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-            : Promise.resolve({ credits: null }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+              : Promise.resolve({ credits: null }),
+      }),
+      folders: scopedQueryHandler({
+        local: () => runCauseEffect(workflowFolders.read()),
+        remote: (serverId) => remoteFolders(serverId, WORKFLOW_FOLDERS_ROUTES.read, {}),
+      }),
+      folderAction: scopedHandler(parseWorkflowFolderAction, {
+        local: (action) => runCauseEffect(workflowFolders.change(action)),
+        remote: (action, serverId) => remoteFolders(serverId, WORKFLOW_FOLDERS_ROUTES.actions, action),
       }),
     },
   };

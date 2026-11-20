@@ -78,13 +78,17 @@ export type WebHostNotice = Extract<
       | "turn-completed"
       | "error"
       | "agent-input-resolved"
-      | "browser-takeover-resolved";
+      | "browser-takeover-resolved"
+      | "runtime-snapshot";
   }
 >;
 
 export function isWebHostNotice(event: AgentEvent | TeamRealtimeEvent): event is WebHostNotice {
   return (
-    agentEventCanNotify(event) || event.type === "agent-input-resolved" || event.type === "browser-takeover-resolved"
+    agentEventCanNotify(event) ||
+    event.type === "agent-input-resolved" ||
+    event.type === "browser-takeover-resolved" ||
+    event.type === "runtime-snapshot"
   );
 }
 

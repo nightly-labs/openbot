@@ -60,6 +60,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -70,6 +71,7 @@ import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-default-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
+import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import {
@@ -97,7 +99,7 @@ import {
   PROVIDERS_V5_RUNTIME_PROVIDERS,
 } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
-import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
   cancelProviderAccountCodeLogin,
@@ -134,6 +136,7 @@ import {
   setHostPromptCacheTtl,
   setHostProviderDefault,
   setHostProviderEnvironment,
+  setLiveVoiceAccount,
   setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
@@ -177,7 +180,7 @@ function codeSignInProviders(capabilities: readonly string[]): readonly AgentPro
 
 function providerSignInMethod(provider: AgentProviderId, capabilities: readonly string[]): ProviderSignInMethod | null {
   if (codeSignInProviders(capabilities).includes(provider)) return "code";
-  return capabilities.includes(SIGN_IN_RELAY_CAPABILITY) && isOneOf(SIGN_IN_RELAY_PROVIDERS, provider) ? "relay" : null;
+  return providerSignInRelay(provider, (capability) => capabilities.includes(capability)) ? "relay" : null;
 }
 
 function runtimeProviders(capabilities: readonly string[]): readonly DownloadableProviderId[] {
@@ -190,8 +193,7 @@ function runtimeProviders(capabilities: readonly string[]): readonly Downloadabl
 
 function providerSignInAlternative(provider: AgentProviderId, capabilities: readonly string[]): "relay" | null {
   return providerSignInMethod(provider, capabilities) === "code" &&
-    capabilities.includes(SIGN_IN_RELAY_CAPABILITY) &&
-    isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)
+    providerSignInRelay(provider, (capability) => capabilities.includes(capability))
     ? "relay"
     : null;
 }
@@ -398,9 +400,9 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     cancelCodeSignIn: (provider: AgentProviderId): Promise<AgentStatus> =>
       runTeamRequest(cancelProviderCodeLogin(request, provider, signInRoutes)),
     startRelay: async (provider: AgentProviderId): Promise<string> => {
-      if (!isOneOf(SIGN_IN_RELAY_PROVIDERS, provider))
-        throw new Error(currentText().t("mobile.server.providers.signInUnsupported"));
-      return (await runTeamRequest(startProviderSignInRelay(request, provider))).flowId;
+      const match = providerSignInRelay(provider, has);
+      if (!match) throw new Error(currentText().t("mobile.server.providers.signInUnsupported"));
+      return (await runTeamRequest(startProviderSignInRelay(request, match.relay, match.provider))).flowId;
     },
     relayStatus: (flowId: string): Promise<SignInRelayStatus> => runTeamRequest(signInRelayStatus(request, flowId)),
     completeRelay: (flowId: string, query: string): Promise<SignInRelayStatus> =>
@@ -425,10 +427,20 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     accounts: has(PROVIDER_ACCOUNTS_CAPABILITY)
       ? {
           list: (): Promise<HostProviderAccounts> =>
-            runTeamRequest(listProviderAccountsWithModels(request, false, has(PROVIDER_ACCOUNT_POOL_CAPABILITY))),
+            runTeamRequest(
+              listProviderAccountsWithModels(
+                request,
+                false,
+                has(PROVIDER_ACCOUNT_POOL_CAPABILITY),
+                has(LIVE_VOICE_ACCOUNT_CAPABILITY),
+              ),
+            ),
           setPool: has(PROVIDER_ACCOUNT_POOL_CAPABILITY)
             ? (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]): Promise<void> =>
                 runTeamRequest(setProviderAccountPool(request, { provider, enabled, leftOut: [...leftOut] }))
+            : null,
+          setLiveVoiceAccount: has(LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? (accountId: string | null): Promise<void> => runTeamRequest(setLiveVoiceAccount(request, { accountId }))
             : null,
           rename: (provider: AgentProviderId, accountId: string, label: string | null): Promise<void> =>
             runTeamRequest(renameProviderAccount(request, { provider, accountId, label })),

@@ -155,8 +155,16 @@ interface ChannelHandoffCommand {
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
 
+const CHANNEL_HANDOFF_AUTHOR_PREFIX = "agent:";
+
 function channelHandoffAuthorId(agentId: string): string {
-  return `agent:${agentId}`;
+  return `${CHANNEL_HANDOFF_AUTHOR_PREFIX}${agentId}`;
+}
+
+export function channelHandoffSenderAgentId(request: ChannelMessage): string | null {
+  return request.author.kind === "member" && request.author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)
+    ? request.author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null
+    : null;
 }
 
 export class ChannelService {
@@ -1351,7 +1359,7 @@ export class ChannelService {
               text: item.message.text.slice(-ROUTING_TEXT_CHARACTERS),
             }));
           const tasks = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId))))
-            .filter((item) => !terminal(item))
+            .filter((item) => item.id !== task.id && !terminal(item))
             .map((item) => ({
               id: item.id,
               ownerAgentId: item.ownerAgentId && keyOf(item.ownerAgentId),
@@ -1393,17 +1401,17 @@ export class ChannelService {
           }
           if (prompt.length > ROUTING_PROMPT_CHARACTERS)
             throw new ChannelRoutingError(sourceText("error.backend.channelRoutingTooLong"));
-          const response = channelResult(
-            yield* Effect.result(
-              this.hooks
-                .generate(
-                  lead,
-                  prompt,
-                  agents.filter((agent) => agent.id !== lead.id),
-                )
-                .pipe(Effect.mapError(channelFailure)),
-            ),
+          const generated = yield* Effect.result(
+            this.hooks
+              .generate(
+                lead,
+                prompt,
+                agents.filter((agent) => agent.id !== lead.id),
+              )
+              .pipe(Effect.mapError(channelFailure)),
           );
+          const timedOut = Result.isFailure(generated) && routingTimedOut(generated.failure.cause);
+          const response = timedOut ? "" : channelResult(generated);
           if (this.#deletedChannels.has(channelId)) return;
           if (this.routingState(channelId) !== revision) {
             this.#wakeAgain.add(channelId);
@@ -1412,32 +1420,43 @@ export class ChannelService {
           channel = channelResult(yield* Effect.result(channelSync(() => this.store.get(channelId))));
           let decision: typeof RoutingDecision.Type;
           let keys: string[] | null = null;
-          try {
-            const answer = extractJsonObject(response);
-            keys = Object.keys(answer);
-            const decoded = decodeRoutingDecision(answer);
-            if (Result.isFailure(decoded))
-              throw new StructuredOutputError("The provider returned a JSON object of the wrong shape.");
-            decision = decoded.success;
-          } catch (error) {
-            if (!(error instanceof StructuredOutputError)) throw error;
-            logger.warn("A routing answer was unreadable, so the lead takes the request.", {
+          if (timedOut) {
+            logger.warn("A routing turn did not answer in time, so the lead takes the request.", {
               channelId,
               provider: lead.provider,
               model: lead.model,
-              reason: error.message,
-              characters: response.length,
-              fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
             });
             decision = { agentId: lead.id };
+          } else {
+            try {
+              const answer = extractJsonObject(response);
+              keys = Object.keys(answer);
+              const decoded = decodeRoutingDecision(answer);
+              if (Result.isFailure(decoded))
+                throw new StructuredOutputError("The provider returned a JSON object of the wrong shape.");
+              decision = decoded.success;
+            } catch (error) {
+              if (!(error instanceof StructuredOutputError)) throw error;
+              logger.warn("A routing answer was unreadable, so the lead takes the request.", {
+                channelId,
+                provider: lead.provider,
+                model: lead.model,
+                reason: error.message,
+                characters: response.length,
+                fields: keys ? keys.slice(0, 8).map((key) => key.slice(0, 40)) : [],
+              });
+              decision = { agentId: lead.id };
+            }
           }
-          if ("taskId" in decision) {
-            const existing = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
-              (item) => item.id === decision.taskId && item.id !== task?.id && !terminal(item),
-            );
-            if (!existing?.ownerAgentId)
-              throw new ChannelRoutingError(sourceText("error.backend.channelRequestMemberRequired"));
-            const ownerAgentId = existing.ownerAgentId;
+          const continuedTaskId = "taskId" in decision ? decision.taskId : null;
+          const existing =
+            continuedTaskId === null
+              ? undefined
+              : channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
+                  (item) => item.id === continuedTaskId && item.id !== task?.id && !terminal(item),
+                );
+          const ownerAgentId = existing?.ownerAgentId;
+          if (existing && ownerAgentId) {
             channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, ownerAgentId))));
             const source = task
               ? channelResult(
@@ -1487,6 +1506,14 @@ export class ChannelService {
             channelResult(yield* Effect.result(this.interruptTasks(channelId, affected)));
             this.#wakeAgain.add(channelId);
             continue;
+          }
+          if ("taskId" in decision) {
+            logger.warn("A routing answer named no open task with an owner, so the lead takes the request.", {
+              channelId,
+              provider: lead.provider,
+              model: lead.model,
+            });
+            decision = { agentId: lead.id };
           }
           const eligible = this.eligibleMembers(channel);
           const tags = chatTagReferences(task.instruction);
@@ -2107,36 +2134,7 @@ export class ChannelService {
           continue;
         if (context?.delivery.status === "queued")
           yield* this.mailbox.cancel(assignment.agentId, context.delivery.id).pipe(Effect.mapError(channelFailure));
-        if (
-          context?.delivery.status === "completed" &&
-          context.delivery.turnId &&
-          assignment.pendingRevision === null
-        ) {
-          assignment = { ...assignment, turnId: context.delivery.turnId };
-          yield* channelSync(() =>
-            this.store.update(this.store.get(channelId), {
-              assignments: [assignment],
-              tasks: task?.revision === assignment.taskRevision ? [{ ...task, state: "running" }] : [],
-            }),
-          );
-          yield* this.complete(channelId, context.delivery.turnId, "completed");
-        } else {
-          yield* channelSync(() =>
-            this.store.update(this.store.get(channelId), {
-              assignments: [{ ...assignment, state: "interrupted" }],
-              tasks:
-                task && (task.revision === assignment.taskRevision || task.revision === assignment.pendingRevision)
-                  ? [
-                      {
-                        ...task,
-                        state: "paused",
-                        error: "The previous turn has no confirmed result. Check its work before you resume.",
-                      },
-                    ]
-                  : [],
-            }),
-          );
-        }
+        yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
       }
       if (!archived.has(channelId)) {
         const stopped = (yield* channelSync(() => this.store.tasks(channelId)))
@@ -2148,6 +2146,74 @@ export class ChannelService {
     }
     yield* this.wake();
   }).bind(this);
+
+  readonly settleAgentDeliveries = Effect.fn("ChannelService.settleAgentDeliveries")(function* (
+    this: ChannelService,
+    agentId: string,
+  ): Effect.fn.Return<void, ChannelOperationError> {
+    if (this.#stopped) return;
+    const release = this.#releaseHeldAgents([agentId]).pipe(
+      Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))),
+    );
+    yield* Effect.gen({ self: this }, function* () {
+      for (const channelId of yield* channelSync(() => this.store.ids())) {
+        if (this.#deletedChannels.has(channelId)) continue;
+        const assignmentIds = (yield* channelSync(() => this.store.assignments(channelId)))
+          .filter((assignment) => assignment.agentId === agentId && activeAssignment(assignment))
+          .map((assignment) => assignment.id);
+        let settled = false;
+        for (const assignmentId of assignmentIds) {
+          const assignment = (yield* channelSync(() => this.store.assignments(channelId))).find(
+            (item) => item.id === assignmentId,
+          );
+          if (!assignment?.deliveryId || !activeAssignment(assignment)) continue;
+          const context = this.mailbox.getDelivery(assignment.deliveryId);
+          if (!context || ["queued", "starting", "running"].includes(context.delivery.status)) continue;
+          const task = (yield* channelSync(() => this.store.tasks(channelId))).find(
+            (item) => item.id === assignment.taskId,
+          );
+          yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
+          settled = true;
+        }
+        if (settled) this.publish(channelId);
+      }
+    }).pipe(Effect.ensuring(release));
+  });
+
+  readonly #settleUnrunAssignment = Effect.fn("ChannelService.settleUnrunAssignment")(function* (
+    this: ChannelService,
+    channelId: string,
+    assignment: ChannelAssignment,
+    context: DeliveryContext | null | undefined,
+    task: ChannelTask | undefined,
+  ): Effect.fn.Return<void, ChannelOperationError> {
+    if (context?.delivery.status === "completed" && context.delivery.turnId && assignment.pendingRevision === null) {
+      const completed = { ...assignment, turnId: context.delivery.turnId };
+      yield* channelSync(() =>
+        this.store.update(this.store.get(channelId), {
+          assignments: [completed],
+          tasks: task?.revision === completed.taskRevision ? [{ ...task, state: "running" }] : [],
+        }),
+      );
+      yield* this.complete(channelId, context.delivery.turnId, "completed");
+      return;
+    }
+    yield* channelSync(() =>
+      this.store.update(this.store.get(channelId), {
+        assignments: [{ ...assignment, state: "interrupted" }],
+        tasks:
+          task && (task.revision === assignment.taskRevision || task.revision === assignment.pendingRevision)
+            ? [
+                {
+                  ...task,
+                  state: "paused",
+                  error: "The previous turn has no confirmed result. Check its work before you resume.",
+                },
+              ]
+            : [],
+      }),
+    );
+  });
 
   resumesAfterSubtasks(deliveryId: string): boolean {
     return this.#resumedDeliveries.has(deliveryId);
@@ -3734,10 +3800,12 @@ function routingRequest(text: string): string {
   return read < text.length ? `${text.slice(0, read)}\n\n[truncated]` : text;
 }
 
+function routingTimedOut(error: unknown): boolean {
+  return error instanceof Error && error.message === sourceText("error.agent.profileTimedOut");
+}
+
 function routingFailureText(error: unknown): string | null {
   if (!(error instanceof Error) || !isFixedSourceText(error.message)) return null;
-  if (error.message === sourceText("error.agent.profileTimedOut"))
-    return sourceText("error.backend.channelLeadTimedOut");
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
@@ -3783,7 +3851,7 @@ function holdsKeyToken(text: string, value: string): boolean {
   return false;
 }
 
-function channelResultId(assignment: ChannelAssignment): string {
+export function channelResultId(assignment: ChannelAssignment): string {
   return `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
 }
 

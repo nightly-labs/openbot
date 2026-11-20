@@ -37,9 +37,11 @@ import {
   restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
+  type TaskReportState,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import { handoffHasHistory } from "./handoff-history";
+import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
@@ -97,16 +99,20 @@ export interface DrainHooks {
   servesModel(model: string, provider: AgentProvider): boolean;
   redactMcp(text: string): string;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
+  liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   mayContinueOnBackup(agentId: string): boolean;
   mayFailOver(agentId: string): boolean;
   followUsageLimit(agentId: string): boolean;
   followPendingRuntime(agentId: string): boolean;
   turnEnded(turnId: string): boolean;
+  staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
+  orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
   turnRestarting(turnId: string): void;
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   startRequestedNewChat(agentId: string, queuedRuns?: readonly string[]): Effect.Effect<void>;
   dropRequestedNewChat(agentId: string): void;
+  signInWait(agentId: string, provider: AgentProvider): void;
 }
 
 export interface TaskLanes {
@@ -115,6 +121,7 @@ export interface TaskLanes {
   limit(agentId: string): number;
   oneTurnAtATime(agentId: string): boolean;
   isRoutineThread(taskId: string): boolean;
+  taskReport(taskId: string): TaskReportState | null;
 }
 
 interface Lane {
@@ -193,6 +200,8 @@ export class DrainScheduler {
   readonly #turnModels = new Map<string, { turnId: string; model: string }>();
   readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
+  readonly #settlingTurns = new Set<string>();
+  readonly #recoveringAgents = new Set<string>();
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
   readonly #startRetry = new RoutineStartRetry({
     retry: (deliveryId, agentId, provider) => Effect.runFork(this.#retryRoutineStart(deliveryId, agentId, provider)),
@@ -283,7 +292,11 @@ export class DrainScheduler {
   }
 
   #ownThreadTurnActive(agentId: string, messaging: boolean): boolean {
-    return [...this.#conversation.activeSnapshots()].some(
+    return this.#ownThreadTurn(agentId, messaging) !== undefined;
+  }
+
+  #ownThreadTurn(agentId: string, messaging: boolean) {
+    return [...this.#conversation.activeSnapshots()].find(
       ([id, snapshot]) =>
         id === agentId &&
         Boolean(snapshot.activeTurnId) &&
@@ -292,7 +305,33 @@ export class DrainScheduler {
           (snapshot.threadId !== null &&
             this.#conversation.isExecutionThread(snapshot.threadId) &&
             this.#messaging?.inMessagingLane(agentId, snapshot.threadId) === true),
-    );
+    )?.[1];
+  }
+
+  #settleStaleOwnTurn(lane: Lane): void {
+    if (lane.taskId !== null && lane.taskId !== MESSAGING_LANE) return;
+    const snapshot = this.#ownThreadTurn(lane.agentId, lane.taskId === MESSAGING_LANE);
+    const turnId = snapshot?.activeTurnId;
+    if (!snapshot?.threadId || !turnId || this.#settlingTurns.has(turnId)) return;
+    const settlement = this.#hooks.staleTurnSettlement(lane.agentId, snapshot.threadId, turnId);
+    if (!settlement) return;
+    this.#settlingTurns.add(turnId);
+    Effect.runFork(settlement.pipe(Effect.ensuring(Effect.sync(() => this.#settlingTurns.delete(turnId)))));
+  }
+
+  #recoverIdleLane(lane: Lane): void {
+    const { agentId, taskId } = lane;
+    if (
+      taskId !== null ||
+      this.#recoveringAgents.has(agentId) ||
+      this.#laneTurnActive(lane) ||
+      !this.#mailbox.laneActive(agentId, taskId)
+    )
+      return;
+    const recovery = this.#hooks.orphanedDeliveryRecovery(agentId);
+    if (!recovery) return;
+    this.#recoveringAgents.add(agentId);
+    Effect.runFork(recovery.pipe(Effect.ensuring(Effect.sync(() => this.#recoveringAgents.delete(agentId)))));
   }
 
   #compactionHolds(lane: Lane): boolean {
@@ -375,6 +414,8 @@ export class DrainScheduler {
     const working =
       reason === "active-turn" && lane.taskId === null ? this.#conversation.workingSnapshot(lane.agentId) : undefined;
     const channelId = laneChannelId(lane.taskId);
+    const provider = reason === "sign-in" ? this.#laneProvider(lane) : null;
+    if (provider) this.#hooks.signInWait(lane.agentId, provider);
     logger.info("A queued message waits.", {
       agentId: lane.agentId,
       ...(lane.taskId === null
@@ -385,8 +426,14 @@ export class DrainScheduler {
             ? { channelId }
             : { taskId: lane.taskId }),
       reason,
+      ...(provider ? { provider } : {}),
       ...(working ? { threadId: working.threadId, turnId: working.activeTurnId } : {}),
     });
+  }
+
+  #laneProvider(lane: Lane): AgentProvider | null {
+    const agent = this.#store.get(lane.agentId);
+    return agent ? providerForAgent(agent) : null;
   }
 
   messagingTurnActive(agentId: string): boolean {
@@ -493,6 +540,8 @@ export class DrainScheduler {
       this.#heldBy(lane) ||
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
+    if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+    if (hold === "machine") this.#recoverIdleLane(lane);
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
       return true;
@@ -603,6 +652,8 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) {
       this.#reportHold(lane, hold);
+      if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+      if (hold === "machine") this.#recoverIdleLane(lane);
       return;
     }
     this.#reportedHolds.delete(key);
@@ -611,6 +662,7 @@ export class DrainScheduler {
       if (this.#laneTurnActive(lane)) return;
       const context = this.#mailbox.nextQueued(agentId, taskId);
       if (!context) {
+        this.#recoverIdleLane(lane);
         if (taskId === null) yield* this.#hooks.startRequestedNewChat(agentId);
         return;
       }
@@ -847,6 +899,14 @@ export class DrainScheduler {
           item.sender.kind === "agent" && item.replyToMessageId ? [item.replyToMessageId] : [],
         ),
       );
+      const stillWorking = new Set(
+        [...requestIds].flatMap((requestId) => this.#mailbox.stillWorkingRecipients(agent.id, requestId)),
+      );
+      const unanswered = new Set(
+        [...requestIds]
+          .flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId))
+          .filter((recipientId) => !stillWorking.has(recipientId)),
+      );
       const promptInput = (executionText: string | undefined) => {
         const continued = new Set<string>();
         const input = combinedPromptInput(
@@ -867,14 +927,24 @@ export class DrainScheduler {
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
+              taskReport: this.taskReport(item),
               tags,
+              liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
+              externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),
-          [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
+          [...unanswered],
           agentNames,
+          [...stillWorking],
         );
-        return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
+        const restarted = batch.filter((item) => item.restartedResult);
+        return restarted.length
+          ? restartedResultInput(input, {
+              routine: restarted.some((item) => item.delivery.sender.kind === "routine"),
+              result: restarted.some((item) => item.delivery.sender.kind !== "routine"),
+            })
+          : input;
       };
       const completeInput =
         planNote === undefined ? promptInput(execution?.text) : [{ type: "text" as const, text: planNote }];
@@ -1279,6 +1349,12 @@ export class DrainScheduler {
     const taskId = this.#mailbox.taskIdForDelivery(id);
     if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
     return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
+  }
+
+  taskReport(context: DeliveryContext): TaskReportState | null {
+    const { sender, recipientAgentId } = context.delivery;
+    const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
+    return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
   }
 
   answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {

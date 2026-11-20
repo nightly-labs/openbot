@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Bewegte Agentengesichter",
   "settings.movingFaces.description":
     "Agentengesichter blinzeln und bewegen sich. Auf einem Computer ohne GPU sind sie anfangs still.",
+  "settings.startupAnimation.title": "Startanimation",
+  "settings.startupAnimation.description": "Zeigt die Agentenanimation, während OpenBot startet.",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -59,6 +61,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro-Sonnenuntergang",
   "settings.chatBackdrop.snowfall": "Schneefall",
   "settings.chatBackdrop.fireflies": "Glühwürmchen",
+  "settings.chatBackdrop.coast": "Neonküste",
   "settings.chatBackdrop.upload": "Bild hochladen…",
   "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
   "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",
@@ -616,6 +619,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Tarif abgelaufen",
   "settings.hostedServers.state.creating": "Wird erstellt",
   "settings.hostedServers.state.starting": "Wird gestartet",
+  "settings.hostedServers.state.restoring": "Wiederherstellung",
   "settings.hostedServers.state.running": "Läuft",
   "settings.hostedServers.state.stopping": "Wird gestoppt",
   "settings.hostedServers.state.stopped": "Gestoppt",
@@ -626,6 +630,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Die Einrichtung beginnt, sobald Stripe die Zahlung bestätigt.",
   "settings.hostedServers.planEndedDescription":
     "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben erhalten. Verlängere den Tarif, um ihn zu starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben bis zum {date} erhalten. Verlängere den Tarif vorher, um ihn zu starten.",
   "settings.hostedServers.pay": "Zahlungsseite öffnen",
   "settings.hostedServers.payLabel": "Zahlungsseite für {name} öffnen",
   "settings.hostedServers.renew": "Tarif verlängern",
@@ -739,7 +745,18 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
   "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.talk.section": "Sprachgespräch",
+  "settings.voice.talkKey.title": "Push-to-Talk-Taste",
+  "settings.voice.talkKey.description": "Halte diese Tasten gedrückt, um in einem Sprachgespräch zu sprechen.",
+  "settings.voice.talkKey.change": "Push-to-Talk-Taste ändern",
+  "settings.voice.talkKey.recording": "Drücke die Tasten",
+  "settings.voice.talkKey.refused": "Füge noch eine Taste hinzu",
+  "settings.voice.talkKey.reset": "Zurücksetzen",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
+  "settings.voice.live.account": "Konto",
+  "settings.voice.live.accountAutomatic": "Automatisch",
+  "settings.voice.live.accountDescription":
+    "Das ChatGPT-Konto, das Live-Sprache nutzt. Wähle ein Konto, dessen Abo Sprache enthält.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":
     "Deine Agenten mit ihren Fähigkeiten, Routinen, Erinnerungen und Dateien kommen in eine Datei.",

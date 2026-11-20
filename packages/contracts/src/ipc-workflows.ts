@@ -60,12 +60,22 @@ export type WorkflowFieldValue = string | number | boolean;
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
 export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
+export const WORKFLOW_STEP_NAME_FIELD = "stepName";
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
-export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4", "21:9", "3:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+export const WORKFLOW_MEDIA_CATALOG_V1_ASPECTS: readonly WorkflowMediaAspect[] = [
+  "1:1",
+  "4:3",
+  "16:9",
+  "9:16",
+  "4:5",
+  "5:4",
+];
+const WORKFLOW_IMAGE_ASPECTS = WORKFLOW_MEDIA_CATALOG_V1_ASPECTS;
 const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
 export const WORKFLOW_MEDIA_LEGACY_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_VIDEO_ASPECTS;
 
@@ -94,7 +104,36 @@ export interface WorkflowMediaModel {
   durations?: readonly number[];
   resolutions?: readonly string[];
   transparent?: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
 }
+
+export interface WorkflowMediaOption {
+  name: string;
+  kind: "switch" | "choice";
+  values: readonly string[];
+  default: string;
+}
+
+export interface WorkflowMediaOptionValue {
+  name: string;
+  value: string;
+}
+
+export const WORKFLOW_MEDIA_INPUTS = ["frames", "references", "videos", "audios"] as const;
+export type WorkflowMediaInput = (typeof WORKFLOW_MEDIA_INPUTS)[number];
+
+export interface WorkflowMediaMode {
+  value: string;
+  inputs: readonly WorkflowMediaInput[];
+}
+export const WORKFLOW_MEDIA_MODE_OPTION = "mode";
+
+export const WORKFLOW_MEDIA_OPTIONS_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_VALUES_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_TEXT_MAX = 64;
+export const WORKFLOW_MEDIA_SWITCH_VALUES = ["off", "on"] as const;
 
 const SUNRA_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 const SUNRA_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
@@ -230,13 +269,13 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
   return fields.media === "video" ? "video" : "image";
 }
 
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
+type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent" | "options">;
 
 export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
   kind: WorkflowMediaKind,
 ): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_IMAGE_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
@@ -307,6 +346,26 @@ export interface WorkflowMediaSpecs {
   resolution: string | null;
   transparent: boolean;
   size: WorkflowMediaSize | null;
+  options: readonly WorkflowMediaOptionValue[];
+}
+
+export function workflowMediaOptions(
+  fields: WorkflowFields,
+  model: WorkflowMediaRange | null | undefined,
+): WorkflowMediaOptionValue[] {
+  const options = model?.options;
+  if (!options?.length || typeof fields.options !== "string" || !fields.options) return [];
+  let chosen: unknown;
+  try {
+    chosen = JSON.parse(fields.options);
+  } catch {
+    return [];
+  }
+  if (!isDynamicRecord(chosen)) return [];
+  return options.flatMap((option) => {
+    const value = chosen[option.name];
+    return typeof value === "string" && option.values.includes(value) ? [{ name: option.name, value }] : [];
+  });
 }
 
 export function workflowMediaSpecs(
@@ -333,7 +392,7 @@ export function workflowMediaSpecs(
       ? preferred
       : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
-  return { aspect, duration, resolution, transparent, size };
+  return { aspect, duration, resolution, transparent, size, options: workflowMediaOptions(fields, model) };
 }
 
 export function workflowMediaModel(
@@ -389,43 +448,110 @@ export interface WorkflowGraph {
   strokes: WorkflowStroke[];
 }
 
-export function workflowLoopEdges(
-  nodes: readonly { id: string }[],
-  edges: readonly { id: string; from: string; to: string }[],
-): Set<string> {
-  const next = new Map<string, { id: string; to: string }[]>();
-  const entered = new Set<string>();
-  for (const edge of edges) {
-    const list = next.get(edge.from);
-    if (list) list.push(edge);
-    else next.set(edge.from, [edge]);
-    entered.add(edge.to);
+type LoopNode = { id: string; at?: { x: number; y: number } };
+type LoopEdge = { id: string; from: string; to: string };
+
+export function workflowLoopEdges(nodes: readonly LoopNode[], edges: readonly LoopEdge[]): Set<string> {
+  const { order, cyclic } = walkOrder(nodes, edges);
+  const loops = new Set(edges.filter((edge) => edge.from === edge.to).map((edge) => edge.id));
+  if (!cyclic) return loops;
+  const place = new Map(nodes.map((node) => [node.id, node.at]));
+  const into = loopEdgesBy(edges, "to");
+  const firstReached = (ids: readonly string[]) =>
+    ids.reduce((best, id) =>
+      (order.get(id) ?? Number.POSITIVE_INFINITY) < (order.get(best) ?? Number.POSITIVE_INFINITY) ? id : best,
+    );
+  const pending = [new Set(nodes.map((node) => node.id))];
+  for (let group = pending.pop(); group; group = pending.pop()) {
+    const inside = edges.filter((edge) => group.has(edge.from) && group.has(edge.to) && !loops.has(edge.id));
+    for (const loop of loopGroups(group, inside)) {
+      const entries = [...loop].filter((id) => (into.get(id) ?? []).some((edge) => !loop.has(edge.from)));
+      const start = entries.length > 0 ? firstReached(topLeft(entries, place)) : firstReached([...loop]);
+      for (const edge of inside) if (edge.to === start && loop.has(edge.from)) loops.add(edge.id);
+      pending.push(loop);
+    }
   }
-  const loops = new Set<string>();
-  const done = new Set<string>();
-  const open = new Set<string>();
+  return loops;
+}
+
+function topLeft(ids: readonly string[], place: ReadonlyMap<string, { x: number; y: number } | undefined>): string[] {
+  const placed = ids.filter((id) => place.get(id));
+  if (placed.length < ids.length) return [...ids];
+  const x = Math.min(...placed.map((id) => place.get(id)?.x ?? 0));
+  const left = placed.filter((id) => place.get(id)?.x === x);
+  const y = Math.min(...left.map((id) => place.get(id)?.y ?? 0));
+  return left.filter((id) => place.get(id)?.y === y);
+}
+
+function walkOrder(
+  nodes: readonly LoopNode[],
+  edges: readonly LoopEdge[],
+): { order: Map<string, number>; cyclic: boolean } {
+  const next = loopEdgesBy(edges, "from");
+  const entered = new Set(edges.map((edge) => edge.to));
   const starts = [...nodes.filter((node) => !entered.has(node.id)), ...nodes.filter((node) => entered.has(node.id))];
+  const order = new Map<string, number>();
+  const open = new Set<string>();
+  let cyclic = false;
   for (const { id: start } of starts) {
-    if (done.has(start)) continue;
-    const stack = [{ id: start, index: 0 }];
+    if (order.has(start)) continue;
+    order.set(start, order.size);
     open.add(start);
+    const stack = [{ id: start, index: 0 }];
     for (let top = stack.at(-1); top; top = stack.at(-1)) {
       const edge = next.get(top.id)?.[top.index];
       if (!edge) {
         stack.pop();
         open.delete(top.id);
-        done.add(top.id);
         continue;
       }
       top.index += 1;
-      if (open.has(edge.to)) loops.add(edge.id);
-      else if (!done.has(edge.to)) {
+      if (open.has(edge.to)) cyclic = true;
+      else if (!order.has(edge.to)) {
+        order.set(edge.to, order.size);
         open.add(edge.to);
         stack.push({ id: edge.to, index: 0 });
       }
     }
   }
+  return { order, cyclic };
+}
+
+function loopGroups(group: ReadonlySet<string>, inside: readonly LoopEdge[]): Set<string>[] {
+  const next = loopEdgesBy(inside, "from");
+  const back = loopEdgesBy(inside, "to");
+  const placed = new Set<string>();
+  const loops: Set<string>[] = [];
+  for (const id of group) {
+    if (placed.has(id)) continue;
+    const behind = reachedBy(id, back, "from");
+    const loop = new Set([...reachedBy(id, next, "to")].filter((each) => behind.has(each)));
+    for (const each of loop) placed.add(each);
+    if (loop.size > 1) loops.push(loop);
+  }
   return loops;
+}
+
+function loopEdgesBy(edges: readonly LoopEdge[], end: "from" | "to"): Map<string, LoopEdge[]> {
+  const map = new Map<string, LoopEdge[]>();
+  for (const edge of edges) {
+    const list = map.get(edge[end]);
+    if (list) list.push(edge);
+    else map.set(edge[end], [edge]);
+  }
+  return map;
+}
+
+function reachedBy(origin: string, edges: ReadonlyMap<string, readonly LoopEdge[]>, end: "from" | "to"): Set<string> {
+  const seen = new Set([origin]);
+  const pending = [origin];
+  for (let id = pending.pop(); id !== undefined; id = pending.pop())
+    for (const edge of edges.get(id) ?? [])
+      if (!seen.has(edge[end])) {
+        seen.add(edge[end]);
+        pending.push(edge[end]);
+      }
+  return seen;
 }
 
 export type WorkflowGraphProblem = "annotation" | "port" | "branch" | "condition-branch" | "duplicate";
@@ -440,7 +566,7 @@ export const WORKFLOW_PORTS: Readonly<
   asset: { in: [], out: ALL_PORTS },
   llm: { in: ALL_PORTS, out: ["text"] },
   agent: { in: ALL_PORTS, out: ["text"] },
-  image: { in: ["text", "image"], out: ["image"] },
+  image: { in: ["text", "image", "file"], out: ["image", "file"] },
   condition: { in: ["text"], out: ["text"] },
   approval: { in: ["text"], out: ["text"] },
   output: { in: ALL_PORTS, out: [] },
@@ -569,6 +695,75 @@ export interface WorkflowStep {
   error: string | null;
   startedAt: string | null;
   endedAt: string | null;
+}
+
+export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly string[]>> = {
+  trigger: [
+    "trigger",
+    "timezone",
+    "repositories",
+    "event",
+    "filters",
+    "labels",
+    "titleText",
+    "branch",
+    "connectionId",
+    "placeId",
+    "roles",
+    "text",
+  ],
+  agent: ["agentId", "task"],
+  llm: ["provider", "model", "effort", "prompt", "system"],
+  condition: ["rule", "provider", "model", "effort"],
+  approval: ["question"],
+  output: [
+    "target",
+    "connectionId",
+    "placeId",
+    "channelId",
+    "repository",
+    "item",
+    "action",
+    "labels",
+    "labelsFrom",
+    "person",
+    "reason",
+    "title",
+    "emoji",
+  ],
+  prompt: ["text"],
+  text: ["text"],
+  note: ["text"],
+  shape: ["text"],
+  asset: ["fileId"],
+  image: [
+    "media",
+    "model",
+    "account",
+    "prompt",
+    "aspect",
+    "width",
+    "height",
+    "background",
+    "duration",
+    "resolution",
+    "firstFrame",
+    "lastFrame",
+    "voice",
+    "options",
+  ],
+};
+
+export interface WorkflowStepSource {
+  from: string;
+  type: WorkflowPortType;
+  stepId: string | null;
+  attachmentId: string | null;
+}
+
+export interface WorkflowStepSettings {
+  settings: WorkflowFields | null;
+  sources: WorkflowStepSource[] | null;
 }
 
 export interface WorkflowRunDetail {
@@ -841,6 +1036,28 @@ export function isWorkflowStep(value: unknown): value is WorkflowStep {
   );
 }
 
+export function isWorkflowFields(value: unknown): value is WorkflowFields {
+  return isFields(value);
+}
+
+export function isWorkflowStepSource(value: unknown): value is WorkflowStepSource {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.from) &&
+    isOneOf(WORKFLOW_PORT_TYPES, value.type) &&
+    (value.stepId === null || isIdentifier(value.stepId)) &&
+    (value.attachmentId === null || isIdentifier(value.attachmentId))
+  );
+}
+
+export function isWorkflowStepSettings(value: unknown): value is WorkflowStepSettings {
+  return (
+    isDynamicRecord(value) &&
+    (value.settings === null || isWorkflowFields(value.settings)) &&
+    (value.sources === null || (Array.isArray(value.sources) && value.sources.every(isWorkflowStepSource)))
+  );
+}
+
 export function isWorkflowRunDetail(value: unknown): value is WorkflowRunDetail {
   return (
     isDynamicRecord(value) &&
@@ -1023,6 +1240,9 @@ export interface WorkflowMediaCatalogModel {
   durations: readonly number[];
   resolutions: readonly string[];
   transparent: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
 }
 
 export interface WorkflowMediaCatalog {
@@ -1041,13 +1261,45 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
     isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
     isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
     isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
-    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.aspects, WORKFLOW_MEDIA_ASPECTS.length, (entry): entry is WorkflowMediaAspect =>
+      isOneOf(WORKFLOW_MEDIA_ASPECTS, entry),
+    ) &&
     isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOption)) &&
+    (value.inputs === undefined || isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)) &&
+    (value.modes === undefined || isListOf(value.modes, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isWorkflowMediaMode))
   );
+}
+
+const isWorkflowMediaInput = (value: unknown): value is WorkflowMediaInput => isOneOf(WORKFLOW_MEDIA_INPUTS, value);
+
+function isWorkflowMediaMode(value: unknown): value is WorkflowMediaMode {
+  return (
+    isDynamicRecord(value) &&
+    isOptionText(value.value) &&
+    isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)
+  );
+}
+
+const isOptionText = (value: unknown): value is string =>
+  isBoundedString(value, WORKFLOW_MEDIA_OPTION_TEXT_MAX) && value.length > 0;
+
+function isWorkflowMediaOption(value: unknown): value is WorkflowMediaOption {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.name) &&
+    isOneOf(["switch", "choice"] as const, value.kind) &&
+    isListOf(value.values, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isOptionText) &&
+    isOptionText(value.default)
+  );
+}
+
+function isWorkflowMediaOptionValue(value: unknown): value is WorkflowMediaOptionValue {
+  return isDynamicRecord(value) && isIdentifier(value.name) && isOptionText(value.value);
 }
 
 export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
@@ -1072,6 +1324,9 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
     ...(kind === "video" ? { durations: entry.durations } : {}),
     resolutions: entry.resolutions,
     transparent: kind === "image" && entry.transparent,
+    ...(entry.options?.length ? { options: entry.options } : {}),
+    ...(kind === "video" && entry.inputs ? { inputs: entry.inputs } : {}),
+    ...(kind === "video" && entry.modes?.length ? { modes: entry.modes } : {}),
   };
 }
 
@@ -1101,6 +1356,7 @@ export interface WorkflowMediaPriceRequest {
   duration: number;
   resolution: string | null;
   transparent: boolean;
+  options?: readonly WorkflowMediaOptionValue[];
 }
 
 export interface WorkflowMediaPrice {
@@ -1117,7 +1373,8 @@ export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMe
     isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
     isCreditCount(value.duration) &&
     (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOptionValue))
   );
 }
 

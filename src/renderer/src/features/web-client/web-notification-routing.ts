@@ -12,6 +12,7 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationRequestKey,
+  settledRequestKeys,
   teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import { channelReplyNotifications } from "@openbot/team-client/channel-notifications";
@@ -28,6 +29,7 @@ import {
   showWebAgentNotification,
   showWebChannelNotifications,
   watchWebTabFocus,
+  withdrawSettledWebAgentNotifications,
   withdrawWebAgentNotification,
 } from "./web-notifications";
 
@@ -81,6 +83,11 @@ export function createWebNotificationRouting(options: {
     void levelsOf(hostId);
   }
   function notify(hostId: string, event: AgentEvent, agents: ClientAgentSummary[]): void {
+    if (event.type === "runtime-snapshot") {
+      for (const key of settledRequestKeys(hostId, event.snapshot, waitingRequests)) waitingRequests.delete(key);
+      withdrawSettledWebAgentNotifications(hostId, event.snapshot);
+      return;
+    }
     withdrawWebAgentNotification(hostId, event);
     const requestKey = notificationRequestKey(hostId, event);
     if (event.type === "agent-input-resolved" || event.type === "browser-takeover-resolved") {
@@ -126,6 +133,7 @@ export function createWebNotificationRouting(options: {
       agents: untrack(() => workspace.state.agents),
       translate: options.t,
       level,
+      agentLevels: untrack(agentLevels)[hostId] ?? null,
       redact: null,
     });
     showWebChannelNotifications({ hostId, replies, onOpen: (channelId) => options.onOpenChannel(hostId, channelId) });

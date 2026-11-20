@@ -186,6 +186,16 @@ const subscriptionDiscountsSchema = Schema.Struct({
     ),
   ),
 });
+type SubscriptionDiscount = Exclude<
+  NonNullable<(typeof subscriptionDiscountsSchema.Type)["discounts"]>[number],
+  string
+>;
+
+function discountCouponId(discount: SubscriptionDiscount): string | null {
+  const coupon = discount.source?.coupon ?? discount.coupon;
+  return typeof coupon === "string" ? coupon : (coupon?.id ?? null);
+}
+
 const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ invoice: expandable })) });
 const invoicePaymentIntentListSchema = Schema.Struct({
   data: Schema.Array(
@@ -804,30 +814,48 @@ export class StripeClient {
     return fingerprints;
   }).bind(this);
 
+  readonly subscriptionCouponIds = Effect.fn("StripeClient.subscriptionCouponIds")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+  ): Effect.fn.Return<string[], StripeRequestError | StripeTransportError> {
+    const subscription = yield* this.#subscriptionDiscounts(subscriptionId);
+    return (subscription.discounts ?? []).flatMap((discount) => {
+      const couponId = typeof discount === "string" ? null : discountCouponId(discount);
+      return couponId ? [couponId] : [];
+    });
+  }).bind(this);
+
   readonly removeSubscriptionCoupon = Effect.fn("StripeClient.removeSubscriptionCoupon")(function* (
     this: StripeClient,
     subscriptionId: string,
-    couponId: string,
+    couponIds: readonly string[],
   ): Effect.fn.Return<boolean, StripeRequestError | StripeTransportError> {
-    const path = `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`;
-    const query = new URLSearchParams({ "expand[]": "discounts" });
-    const subscription = yield* this.#requestEffect("GET", `${path}?${query}`, null, subscriptionDiscountsSchema);
+    const subscription = yield* this.#subscriptionDiscounts(subscriptionId);
     if (subscription.status === "canceled" || subscription.status === "incomplete_expired") return false;
     const discounts = subscription.discounts ?? [];
-    const idOf = (value: string | { id: string } | null | undefined) =>
-      typeof value === "string" ? value : (value?.id ?? null);
     const keep = discounts
-      .filter(
-        (discount) => typeof discount === "string" || idOf(discount.source?.coupon ?? discount.coupon) !== couponId,
-      )
+      .filter((discount) => typeof discount === "string" || !couponIds.includes(discountCouponId(discount) ?? ""))
       .map((discount) => (typeof discount === "string" ? discount : discount.id));
     if (keep.length === discounts.length) return false;
     const body = new URLSearchParams();
     if (keep.length === 0) body.set("discounts", "");
     for (const [index, id] of keep.entries()) body.set(`discounts[${index}][discount]`, id);
-    yield* this.#requestEffect("POST", path, body, subscriptionDiscountsSchema);
+    yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionDiscountsSchema,
+    );
     return true;
   }).bind(this);
+
+  readonly #subscriptionDiscounts = (subscriptionId: string) =>
+    this.#requestEffect(
+      "GET",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}?${new URLSearchParams({ "expand[]": "discounts" })}`,
+      null,
+      subscriptionDiscountsSchema,
+    );
 
   readonly #requestEffect = Effect.fn("StripeClient.request")(function* <T>(
     this: StripeClient,

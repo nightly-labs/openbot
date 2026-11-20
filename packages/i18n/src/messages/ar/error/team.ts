@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "لا يمكن لهذا الاتصال إيقاف تشغيل مهمة دورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
+  "error.team.workflowFoldersUnsupported": "لا يدعم هذا الاتصال مجلدات مسارات العمل.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.sidebarPinsUnsupported":
@@ -122,6 +123,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
+  "error.team.ownerTransferUnsupported": "لا يدعم هذا الخادم نقل الملكية.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",
@@ -192,6 +194,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
   "error.team.pendingApprovalUnsupported": "هذا الاتصال لا يدعم قراءة طلب الموافقة كاملًا.",
+  "error.team.pendingPromptsUnsupported": "هذا الاتصال لا يدعم قراءة الأسئلة المفتوحة.",
   "error.team.phoneFeedbackUnsupported": "هذا الاتصال لا يدعم إرسال بلاغ من تطبيق الهاتف.",
   "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",

@@ -1,12 +1,16 @@
 import {
+  applyWorkflowFolderAction,
+  EMPTY_WORKFLOW_FOLDERS,
   isWorkflowStepKind,
   nodeAgentId,
   type OpenBotDesktopApi,
+  prunedWorkflowFolders,
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
+  type WorkflowFoldersSnapshot,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubDelivery,
   type WorkflowGitHubItem,
@@ -14,11 +18,13 @@ import {
   type WorkflowGraph,
   type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
+  type WorkflowMediaOptionValue,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
   type WorkflowRunSource,
   type WorkflowStep,
+  type WorkflowStepSettings,
   type WorkflowSummary,
   type WorkflowTriggerState,
   type WorkflowVersion,
@@ -103,16 +109,79 @@ function mockAnswer(node: WorkflowNode, input: string): string {
   }
 }
 
+const PREVIEW_VIDEO_OPTIONS: Pick<WorkflowMediaCatalogModel, "aspects" | "options" | "inputs"> = {
+  aspects: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames", "references"],
+};
+
+const previewSeconds = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+const PREVIEW_SEEDANCE: Pick<WorkflowMediaCatalogModel, "durations" | "resolutions" | "options" | "inputs"> = {
+  durations: previewSeconds(4, 15),
+  resolutions: ["480p", "720p", "1080p", "4K"],
+  options: [
+    { name: "mode", kind: "choice", values: ["std", "fast"], default: "std" },
+    {
+      name: "genre",
+      kind: "choice",
+      values: ["auto", "action", "horror", "comedy", "noir", "drama", "epic"],
+      default: "auto",
+    },
+    { name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" },
+  ],
+  inputs: ["frames", "references", "videos", "audios"],
+};
+
+const PREVIEW_KLING: Pick<WorkflowMediaCatalogModel, "aspects" | "durations" | "options" | "inputs" | "modes"> = {
+  aspects: ["1:1", "16:9", "9:16", "21:9"],
+  durations: previewSeconds(3, 30),
+  options: [
+    {
+      name: "mode",
+      kind: "choice",
+      values: ["text-to-video", "image-to-video", "reference-to-video"],
+      default: "text-to-video",
+    },
+  ],
+  inputs: ["frames", "references", "videos"],
+  modes: [
+    { value: "text-to-video", inputs: [] },
+    { value: "image-to-video", inputs: ["frames"] },
+    { value: "reference-to-video", inputs: ["references", "videos"] },
+  ],
+};
+
+const PREVIEW_LIVE_MODELS: Readonly<
+  Record<
+    string,
+    Partial<Pick<WorkflowMediaCatalogModel, "aspects" | "durations" | "resolutions" | "options" | "inputs" | "modes">>
+  >
+> = {
+  "higgsfield-seedance_2_0": PREVIEW_SEEDANCE,
+  "higgsfield-kling4_0": PREVIEW_KLING,
+};
+
 const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-  if (model.provider === "higgsfield") return [workflowFixedCatalogModel(model, model.provider)];
+  if (model.provider === "higgsfield") {
+    const entry = workflowFixedCatalogModel(model, model.provider);
+    if (!model.kinds.includes("video")) return [entry];
+    return [{ ...entry, ...PREVIEW_VIDEO_OPTIONS, ...PREVIEW_LIVE_MODELS[model.id] }];
+  }
   if (model.provider !== "sunra") return [];
   const entry = workflowFixedCatalogModel(model, model.provider);
   return [{ ...entry, resolutions: entry.resolutions.map((value) => value.replace(/K$/u, "k")) }];
 });
 
-function previewQuote(kind: "image" | "video", duration: number, resolution: string | null): number {
+function previewQuote(
+  kind: "image" | "video",
+  duration: number,
+  resolution: string | null,
+  options?: readonly WorkflowMediaOptionValue[],
+): number {
   const scale = resolution?.startsWith("4") || resolution === "1080p" ? 2 : 1;
-  return (kind === "video" ? duration * 2.5 : 1.5) * scale;
+  const sound = options?.some((option) => option.name === "generate_audio" && option.value === "off") ? 1 : 1.5;
+  return (kind === "video" ? duration * 2.5 * sound : 1.5) * scale;
 }
 
 const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
@@ -124,6 +193,7 @@ const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
 export function mockWorkflows(
   seeds: readonly MockWorkflowSeed[],
   emit: (workflowId: string) => void,
+  emitFolders: () => void = () => undefined,
 ): OpenBotDesktopApi["workflows"] {
   const records = new Map<string, MockWorkflowRecord>();
   const stamp = () => new Date().toISOString();
@@ -213,7 +283,35 @@ export function mockWorkflows(
     timers.delete(step.id);
     Object.assign(step, { endedAt: stamp(), ...patch });
   };
-  const addStep = (workflowId: string, runId: string | null, node: WorkflowNode, input: string) => {
+  const recorded = new Map<string, WorkflowStepSettings>();
+  const doneSteps = (workflowId: string) => {
+    const latest = new Map<string, WorkflowStep>();
+    for (const step of steps.values())
+      if (step.workflowId === workflowId && step.status === "done") latest.set(step.nodeId, step);
+    return latest;
+  };
+  const recordOf = (
+    graph: WorkflowGraph,
+    node: WorkflowNode,
+    latest: ReadonlyMap<string, WorkflowStep>,
+  ): WorkflowStepSettings => ({
+    settings: Object.fromEntries(Object.entries(node.fields).filter(([name]) => name !== "label")),
+    sources: graph.edges
+      .filter((edge) => edge.to === node.id)
+      .map((edge) => {
+        const from = graph.nodes.find((candidate) => candidate.id === edge.from);
+        const fileId = from?.kind === "asset" && typeof from.fields.fileId === "string" ? from.fields.fileId : null;
+        return { from: edge.from, type: edge.type, stepId: latest.get(edge.from)?.id ?? null, attachmentId: fileId };
+      })
+      .filter((source) => source.stepId !== null || source.attachmentId !== null),
+  });
+  const addStep = (
+    workflowId: string,
+    runId: string | null,
+    node: WorkflowNode,
+    input: string,
+    settings: WorkflowStepSettings,
+  ) => {
     const attempt = [...steps.values()].filter((step) => step.runId === runId && step.nodeId === node.id).length + 1;
     const step: WorkflowStep = {
       id: crypto.randomUUID(),
@@ -231,6 +329,7 @@ export function mockWorkflows(
     };
     steps.set(step.id, step);
     stepInputs.set(step.id, input);
+    recorded.set(step.id, settings);
     if (node.kind === "approval") {
       step.status = "approval";
       return step;
@@ -282,14 +381,14 @@ export function mockWorkflows(
         const inputs = inputsOf(graph, node.id, latest);
         if (before.length > 0 && inputs.length === 0) {
           if (!current) {
-            const skipped = addStep(run.workflowId, runId, node, "");
+            const skipped = addStep(run.workflowId, runId, node, "", recordOf(graph, node, latest));
             clearTimeout(timers.get(skipped.id));
             end(skipped, { status: "skipped" });
             started = true;
           }
           continue;
         }
-        addStep(run.workflowId, runId, node, inputs.join("\n\n"));
+        addStep(run.workflowId, runId, node, inputs.join("\n\n"), recordOf(graph, node, latest));
         started = true;
       }
       if (!started) break;
@@ -378,7 +477,17 @@ export function mockWorkflows(
     return node;
   };
 
+  let folders: WorkflowFoldersSnapshot = structuredClone(EMPTY_WORKFLOW_FOLDERS);
+  const currentFolders = () => prunedWorkflowFolders(folders, new Set(records.keys()));
   return {
+    folders: async () => structuredClone(currentFolders()),
+    folderAction: async (action) => {
+      const current = currentFolders();
+      const next = applyWorkflowFolderAction(current, action, { workflowIds: new Set(records.keys()) });
+      folders = next;
+      if (next !== current) emitFolders();
+      return structuredClone(next);
+    },
     list: async () =>
       structuredClone([...records.values()].map((entry) => entry.detail.summary)).sort((left, right) =>
         right.updatedAt.localeCompare(left.updatedAt),
@@ -429,7 +538,8 @@ export function mockWorkflows(
     startRun: async (input) => beginRun(input, "manual"),
     runStep: async (input) => {
       const node = nodeOf(input.workflowId, input.nodeId);
-      const step = addStep(input.workflowId, null, node, "");
+      const graph = record(input.workflowId).detail.graph;
+      const step = addStep(input.workflowId, null, node, "", recordOf(graph, node, doneSteps(input.workflowId)));
       emit(input.workflowId);
       return structuredClone(step);
     },
@@ -459,7 +569,15 @@ export function mockWorkflows(
         entry.run.status = "running";
         entry.run.endedAt = null;
       }
-      const step = addStep(failed.workflowId, failed.runId, node, stepInputs.get(failed.id) ?? "");
+      const graph = entry?.graph ?? record(failed.workflowId).detail.graph;
+      const latest = entry ? latestOf(entry.run.id) : doneSteps(failed.workflowId);
+      const step = addStep(
+        failed.workflowId,
+        failed.runId,
+        node,
+        stepInputs.get(failed.id) ?? "",
+        recordOf(graph, node, latest),
+      );
       if (entry) advance(entry.run.id);
       emit(failed.workflowId);
       return structuredClone(step);
@@ -498,6 +616,8 @@ export function mockWorkflows(
       };
     },
     run: async (runId) => runDetail(runId),
+    stepSettings: async (stepId) =>
+      structuredClone(recorded.get(stepOf(stepId).id) ?? { settings: null, sources: null }),
     rotateWebhookSecret: async (input) => {
       const { detail } = record(input.workflowId);
       webhooks.add(`${input.workflowId}/${input.nodeId}`);
@@ -510,7 +630,9 @@ export function mockWorkflows(
       workflowMediaProvidersOf(accounts.map(({ provider, id, name }) => ({ provider, id, name }))),
     mediaCredits: async () => workflowMediaCreditsOf(structuredClone(accounts)),
     mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
-    mediaPrice: async (input) => ({ credits: previewQuote(input.kind, input.duration, input.resolution) }),
+    mediaPrice: async (input) => ({
+      credits: previewQuote(input.kind, input.duration, input.resolution, input.options),
+    }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

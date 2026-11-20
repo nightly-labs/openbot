@@ -11,7 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { EMPTY_GITHUB_HISTORY, type WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
-import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowCatalogs, WorkflowImageModel } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { FILES_ROWS } from "./files-fixtures";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_TEAM_MEMBERS } from "./fixtures";
@@ -19,6 +19,57 @@ import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_TEAM_MEMBERS } fr
 export const STORY_IMAGES = FILES_ROWS.filter((file) => file.previewKind === "image" && file.previewUrl);
 
 const STORY_CONNECTION = "story-team";
+
+const STORY_VIDEO_OPTIONS = {
+  aspects: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames", "references"],
+} as const satisfies Partial<WorkflowImageModel>;
+
+const storySeconds = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+const STORY_SEEDANCE = {
+  durations: storySeconds(4, 15),
+  resolutions: ["480p", "720p", "1080p", "4K"],
+  options: [
+    { name: "mode", kind: "choice", values: ["std", "fast"], default: "std" },
+    {
+      name: "genre",
+      kind: "choice",
+      values: ["auto", "action", "horror", "comedy", "noir", "drama", "epic"],
+      default: "auto",
+    },
+    { name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" },
+  ],
+  inputs: ["frames", "references", "videos", "audios"],
+} as const satisfies Partial<WorkflowImageModel>;
+
+const STORY_KLING = {
+  aspects: ["1:1", "16:9", "9:16", "21:9"],
+  durations: storySeconds(3, 30),
+  options: [
+    {
+      name: "mode",
+      kind: "choice",
+      values: ["text-to-video", "image-to-video", "reference-to-video"],
+      default: "text-to-video",
+    },
+  ],
+  inputs: ["frames", "references", "videos"],
+  modes: [
+    { value: "text-to-video", inputs: [] },
+    { value: "image-to-video", inputs: ["frames"] },
+    { value: "reference-to-video", inputs: ["references", "videos"] },
+  ],
+} as const satisfies Partial<WorkflowImageModel>;
+
+type StoryLiveSettings = Partial<
+  Pick<WorkflowImageModel, "aspects" | "durations" | "resolutions" | "options" | "inputs" | "modes">
+>;
+const STORY_LIVE_MODELS: Readonly<Record<string, StoryLiveSettings>> = {
+  "higgsfield-seedance_2_0": STORY_SEEDANCE,
+  "higgsfield-kling4_0": STORY_KLING,
+};
 
 export const STORY_CATALOGS: WorkflowCatalogs = {
   agents: STORY_AGENTS,
@@ -37,7 +88,11 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-support", name: "support" },
   ],
   mediaSize: true,
-  mediaPrice: async (request) => ({ credits: request.kind === "video" ? request.duration * 2.5 : 1.5 }),
+  agentFiles: true,
+  mediaPrice: async (request) => {
+    const silent = request.options?.some((option) => option.name === "generate_audio" && option.value === "off");
+    return { credits: request.kind === "video" ? request.duration * (silent ? 2 : 2.5) : 1.5 };
+  },
   imageModels: [
     {
       id: "gpt-image",
@@ -70,7 +125,11 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
       kinds: ["image", "video"],
       voices: true,
     },
-    ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === "sunra" || model.provider === "higgsfield"),
+    ...WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+      if (model.provider !== "sunra" && model.provider !== "higgsfield") return [];
+      if (model.provider !== "higgsfield" || !model.kinds.includes("video")) return [model];
+      return [{ ...model, ...STORY_VIDEO_OPTIONS, ...STORY_LIVE_MODELS[model.id] }];
+    }),
   ],
   files: FILES_ROWS,
   self: STORY_TEAM_MEMBERS.find((member) => member.id === "member-self")?.name ?? undefined,
@@ -471,6 +530,30 @@ export const newCompetitorAlert = (): StoryWorkflow => ({
   id: "new-competitor-alert",
   title: "New competitor alert",
   graph: NEW_COMPETITOR_ALERT,
+});
+
+export const higgsfieldVideo = (): StoryWorkflow => ({
+  id: "launch-teaser",
+  title: "Launch teaser",
+  graph: {
+    nodes: [
+      {
+        kind: "image",
+        id: "teaser",
+        at: { x: 0, y: 0 },
+        fields: {
+          media: "video",
+          model: "higgsfield-seedance_2_0",
+          prompt: "A slow push-in on the product window at dusk, soft city sounds",
+          aspect: "21:9",
+          duration: 5,
+          resolution: "720p",
+        },
+      },
+    ],
+    edges: [],
+    strokes: [],
+  },
 });
 
 const TRIAGE_REPOSITORY = "openbot-preview/app";

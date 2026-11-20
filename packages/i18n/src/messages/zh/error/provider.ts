@@ -16,6 +16,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":
     "{provider} 没有加载 OpenBot 的工具，因此此智能体无法使用这些工具，也无法联系队友。{provider} 的团队策略可能会阻止本地 MCP 服务器。请让团队管理员允许它们，然后重试。",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} 在没有 OpenBot 工具的情况下处理了这条消息，因此智能体无法联系队友、使用浏览器或附加文件。请重试。",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} 无法启动 MCP 服务器 {name}，因此回复已停止。此服务器位于你自己的 {provider} 设置中，而不在 OpenBot 中。请在那里移除或修复该服务器，然后开始新的聊天。",
   "error.provider.endpointsReadOnly":
@@ -231,6 +233,10 @@ export const messages = {
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeModelUnavailable": "你无法使用此模型。请为该助手改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请选择更低的强度或其他模型，然后重新发送消息。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请在设置中打开自定义服务商，点击此端点的编辑，为该模型设置更大的最大输出。也可以选择更低的强度或其他模型。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
   "error.provider.opencodeModelNotServed": "模型服务商目前不向你的账号提供此模型。请选择其他模型，然后重新发送消息。",
@@ -285,6 +291,8 @@ export const messages = {
     "Gemini 拒绝了此请求，但没有给出原因。聊天记录中的某一项可能导致这种情况，例如智能体打开的图片。OpenBot 已带着聊天记录开启新的 Gemini 会话，请重试。如果仍然报错，请换一个模型。",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini 无法读取此聊天的已保存记录。OpenBot 已带着聊天记录开启新的 Gemini 会话。请重新发送你的消息。",
+  "error.provider.acpTurnStuck":
+    "{provider} 没有结束上一轮，因此没有接受这条消息。OpenBot 已带着聊天记录开启新的 {provider} 会话。请重新发送你的消息。",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
@@ -350,6 +358,10 @@ export const messages = {
     "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
   "error.provider.codexRequestRefused":
     "{provider} 拒绝了此聊天的请求，但没有给出原因。在包含大量图片的长聊天中可能出现这种情况。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.codexSafetyBlocked":
+    "{provider} 因其安全规则拦截了此消息：{reason} 智能体现在看不到此消息，因此它不会阻止你后续的消息。请换一种说法重新发送你的请求。",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} 因其安全规则拦截了此消息：{reason} 如果 {provider} 也拦截你后续的消息，请开始新对话。",
   "error.provider.codexAudioRefused":
     "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
   "error.provider.imageTooSmall":

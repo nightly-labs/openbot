@@ -43,7 +43,7 @@ export interface RoutineSettingsRequest {
   nonce: number;
 }
 
-interface SidePanelFile {
+export interface SidePanelFile {
   key: string;
   name: string;
   folder: boolean;
@@ -540,7 +540,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function openWorkspaceFolderEntry(path: string) {
     const file = deps.sidebarFilePreview();
-    openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId(), "here");
+    const folder = file?.directory?.path;
+    const agentId = previewWorkspaceAgentId();
+    const openInWorkspace = () => openWorkspaceFile(path, folder, agentId, "here");
+    const sibling = file?.source.kind === "shared" ? sharedSiblingPath(file.source.path, path) : null;
+    if (sibling) openSharedFile(sibling, "here", openInWorkspace);
+    else openInWorkspace();
   }
 
   const turnStep = createMemo(() => {
@@ -730,7 +735,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   };
 }
 
-function filePreviewKey(source: SidebarFilePreview["source"]): string {
+export function filePreviewKey(source: SidebarFilePreview["source"]): string {
   if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
   if (source.kind === "shared") return `shared\u0000${source.path}`;
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
@@ -752,6 +757,13 @@ const MISSING_PATH_KEYS = new Set([
   "error.backend.workspacePathMissing",
   "error.backend.workspacePathMissingForMember",
 ]);
+
+function sharedSiblingPath(documentPath: string, link: string): string | null {
+  if (/^(?:[/\\~]|[A-Za-z]:)/u.test(link) || SHARED_FOLDER_PATH.test(link)) return null;
+  const end = Math.max(documentPath.lastIndexOf("/"), documentPath.lastIndexOf("\\"));
+  if (end < 0) return null;
+  return `${documentPath.slice(0, end + 1)}${decodedPath(link)}`;
+}
 
 function samePreview(next: FilePreview, shown: FilePreview): boolean {
   if (

@@ -10,6 +10,7 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentExclusionChange,
   AgentFolderBrowse,
@@ -153,6 +154,7 @@ import type {
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
@@ -391,6 +393,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<void>;
   setServerAppearance: (serverId: string, appearance: ServerAppearance | null) => Promise<void>;
   canRotateServerKey: (serverId: string) => boolean;
+  canTransferOwnership: (serverId: string) => boolean;
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   reloadServerList: () => Promise<void>;
   canCreateLocalServers: (serverId: string) => boolean;
@@ -431,6 +434,7 @@ export interface MobileWorkspaceContextValue {
   canManageWhatsAppConnector: (serverId: string) => boolean;
   canManagePasswordManagers: (serverId: string) => boolean;
   canManageVault: (serverId: string) => boolean;
+  canSaveVaultRequest: (serverId: string) => boolean;
   canImportVault: (serverId: string) => boolean;
   canImportAgents: (serverId: string) => boolean;
   canTransferServer: (serverId: string) => boolean;
@@ -628,6 +632,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentPlanCard: (serverId: string) => boolean;
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  canManageAgentBuiltinMemory: (serverId: string) => boolean;
+  loadAgentBuiltinMemory: (agentId: string, serverId: string) => Promise<AgentBuiltinMemorySettings | null>;
+  updateAgentBuiltinMemory: (
+    input: UpdateAgentBuiltinMemoryInput,
+    serverId: string,
+  ) => Promise<AgentBuiltinMemorySettings>;
   canManageAgentDefaults: (serverId: string) => boolean;
   loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
   updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
@@ -817,6 +827,7 @@ type ServerCheckKey =
   | "canEditServerIdentity"
   | "canEditServerAppearance"
   | "canRotateServerKey"
+  | "canTransferOwnership"
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
@@ -836,6 +847,7 @@ type ServerCheckKey =
   | "canManageWhatsAppConnector"
   | "canManagePasswordManagers"
   | "canManageVault"
+  | "canSaveVaultRequest"
   | "canImportVault"
   | "canImportAgents"
   | "canTransferServer"
@@ -869,6 +881,7 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentBuiltinMemory"
   | "canManageAgentDefaults"
   | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"

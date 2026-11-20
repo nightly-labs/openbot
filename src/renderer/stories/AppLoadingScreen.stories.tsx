@@ -36,6 +36,16 @@ export const Loading: Story = {
   render: () => <AppLoadingScreen />,
 };
 
+export const QuietLoading: Story = {
+  render: () => <AppLoadingScreen scene="quiet" title="Loading OpenBot" />,
+};
+
+export const QuietStartingServer: Story = {
+  render: () => (
+    <ServerConnectionNotice name="My server" phase="waking" initial loadingScene="quiet" onRetry={() => {}} />
+  ),
+};
+
 export const Seeded: StoryObj<{ seed: number }> = {
   args: { seed: 7 },
   argTypes: { seed: { control: { type: "number", min: 0, step: 1 } } },
@@ -55,6 +65,17 @@ export const StartingOpenBot: Story = {
       name="My server"
       phase="waking"
       start={{ step: "openbot", startedAt: Date.now() - 4 * 60_000 }}
+      initial
+      onRetry={() => {}}
+    />
+  ),
+};
+export const StartRestoring: Story = {
+  render: () => (
+    <ServerConnectionNotice
+      name="My server"
+      phase="waking"
+      start={{ step: "restore", startedAt: Date.now() - 3 * 60_000 }}
       initial
       onRetry={() => {}}
     />

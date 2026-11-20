@@ -367,6 +367,7 @@ export const resolveAntigravityCli: (input?: {
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
       if (Result.isSuccess(attempt)) return attempt.success;
+      if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
     }
     if (!found && override.length > 0)
       throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
@@ -802,6 +803,13 @@ function parseMistralVersion(output: string): string {
 
 export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
 
+export const ANTIGRAVITY_UPDATE_ENV: Readonly<Record<string, string>> = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" };
+
+const VERSION_READ_ENV: Partial<Record<AgentProviderId, Readonly<Record<string, string>>>> = {
+  copilot: COPILOT_ENV,
+  antigravity: ANTIGRAVITY_UPDATE_ENV,
+};
+
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
@@ -1161,6 +1169,7 @@ export function cliSpawnTarget(
 }
 
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+const ANTIGRAVITY_VERSION_TIMEOUT_MS = 90_000;
 const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
 const slowVersionReads = new Set<string>();
 
@@ -1177,8 +1186,9 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
   const slow = slowVersionReads.has(candidate);
-  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
-  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
+  const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
+  const providerEnv = VERSION_READ_ENV[provider] ?? {};
   const output = yield* Effect.tryPromise({
     try: (signal) =>
       target

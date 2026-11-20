@@ -21,7 +21,7 @@ import { PLUGINS_UPDATED_AT, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
 import { PRICING_PAGE_UPDATED_AT, PRICING_ROUTE } from "../lib/pricing-page";
 import { PRIVACY_POLICY_ROUTE, PRIVACY_POLICY_UPDATED_AT } from "../lib/privacy-policy";
 import { OPENBOT_SITE_TITLE, OPENBOT_SITE_URL } from "../lib/site-metadata";
-import { type EnglishPagePath, LOCALIZED_PAGE_PATHS } from "../lib/site-paths";
+import { type EnglishPagePath, localizedPagePath, TRANSLATED_SITE_LOCALES } from "../lib/site-paths";
 import { TEAMS_PAGE_UPDATED_AT, TEAMS_ROUTE } from "../lib/teams-page";
 import { readMarketplaceSitemapListings } from "./marketplace-catalog";
 
@@ -93,8 +93,8 @@ function marketplaceSitemapEntries(listings: MarketplaceSitemapListings | null):
 }
 
 function localizedSitemapEntries(page: EnglishPagePath, lastmod: string): SitemapEntry[] {
-  return Object.values(LOCALIZED_PAGE_PATHS).map((paths) => ({
-    loc: new URL(paths[page], OPENBOT_SITE_URL).toString(),
+  return TRANSLATED_SITE_LOCALES.map((locale) => ({
+    loc: new URL(localizedPagePath(locale, page), OPENBOT_SITE_URL).toString(),
     lastmod,
   }));
 }

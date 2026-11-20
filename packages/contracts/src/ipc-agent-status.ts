@@ -42,6 +42,7 @@ export interface AgentProviderStatus {
   lastErrorAt?: number;
   accounts?: ProviderAccountStatus[];
   accountPool?: ProviderAccountPool;
+  liveVoiceAccount?: string;
   modelSource?: ProviderModelSource;
 }
 
@@ -164,6 +165,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
         value.accounts.length <= MAX_PROVIDER_ACCOUNTS &&
         value.accounts.every(isProviderAccountStatus))) &&
     (value.accountPool === undefined || isProviderAccountPool(value.accountPool)) &&
+    (value.liveVoiceAccount === undefined || isProviderAccountId(value.liveVoiceAccount)) &&
     (value.modelSource === undefined || isProviderModelSource(value.modelSource))
   );
 }
@@ -303,7 +305,7 @@ export function withReadCredits(read: AccountUsageLimit | undefined, limit: Acco
 
 export const MAX_USAGE_GROUPS = 16;
 
-function isAccountUsageGroup(value: unknown): value is AccountUsageGroup {
+export function isAccountUsageGroup(value: unknown): value is AccountUsageGroup {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.identifier) &&
@@ -373,6 +375,10 @@ export interface SetProviderAccountPoolInput {
   leftOut: string[];
 }
 
+export interface SetLiveVoiceAccountInput {
+  accountId: string | null;
+}
+
 export interface RemoveProviderAccountInput {
   provider: AgentProviderId;
   accountId: string;
@@ -395,6 +401,7 @@ export type ProviderUsageResetOutcome = (typeof PROVIDER_USAGE_RESET_OUTCOMES)[n
 export interface HostProviderAccounts {
   providers: { provider: AgentProviderId; accounts: ProviderAccountStatus[] }[];
   pools?: { provider: AgentProviderId; pool: ProviderAccountPool }[];
+  liveVoiceAccount?: string | null;
   agents: { agentId: string; accountId: string }[];
 }
 

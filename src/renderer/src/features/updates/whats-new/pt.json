@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Em um servidor, as configurações das etapas do fluxo de trabalho, Executar a partir desta etapa, a transferência de proprietário, o botão Atualizar tudo e muitas correções para agentes funcionam só quando o servidor tem esta versão.",
+      "Depois desta atualização, uma versão mais antiga do OpenBot não consegue abrir os seus dados."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Converse com um agente usando Pressione para falar. Mantenha pressionado o botão de falar ou a tecla de falar, enquanto fala. O OpenBot envia o que você disse quando você solta. Altere a tecla em Configurações > Voz.",
+          "Reinicie um fluxo de trabalho a partir de uma etapa. No menu da etapa, selecione Executar a partir desta etapa. As etapas anteriores mantêm as respostas e não são executadas de novo.",
+          "Veja as configurações e as entradas que geraram o resultado de uma etapa do fluxo de trabalho. Selecione Configurações na etapa e depois Usar estas configurações para executá-la de novo do mesmo jeito.",
+          "Passe a propriedade do seu servidor para outra conta do OpenBot. Em Configurações do servidor > Membros, digite o e-mail do novo proprietário. O servidor muda de mãos quando ele aceitar.",
+          "Atualize todos os provedores de uma vez. Em Configurações > Provedores aparece Atualizar tudo quando um ou mais provedores têm uma atualização."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "O OpenBot atualiza a cada hora as CLIs dos provedores que baixou, quando há uma nova versão disponível. A atualização espera até os agentes ficarem ociosos.",
+          "Cada thread de um agente pode usar as abas do navegador que o chat principal ou outro thread desse agente abriu.",
+          "A aba Rotinas saiu da barra lateral. As rotinas continuam sendo executadas. Gerencie-as nas configurações do agente, na página Agenda e em Configurações do servidor > Rotinas."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O reinício de uma atualização baixada agora espera até os agentes ficarem ociosos, com o botão Não reiniciar. Antes, o OpenBot fechava na hora e interrompia a tarefa do agente.",
+          "Um agente não fica mais em \"Trabalhando\" com as mensagens esperando depois de um reinício ou de um limite de uso. O turno interrompido aparece como interrompido, e as mensagens em espera começam.",
+          "Um servidor ocupado, com muitos agentes e dispositivos conectados, não fica mais sem memória e não trava ao escolher o próximo turno.",
+          "Uma mensagem enviada depois de uma pausa não fica mais como \"Não enviada\" com \"Conecte Claude para continuar.\" quando o Claude já está conectado.",
+          "As abas do navegador dos agentes que ninguém usa deixam de usar o processador depois de 2 minutos."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Em um servidor, as pequenas cópias das imagens do canvas do fluxo de trabalho, as durações de vídeo personalizadas e os agentes que concluem um pedido sem \"continuar\" funcionam só quando o servidor tem esta versão.",
+      "No Linux, se o OpenBot continuar lento depois da atualização, apague o arquivo `~/.config/OpenBot/gpu-crash.json` e abra o OpenBot de novo.",
+      "Se você definiu o Raciocínio em Configurações do provedor para um agente Mistral, selecione o nível de novo no menu Esforço e redefina a linha antiga de Raciocínio."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Compartilhe seu link de convite em Configurações > Invite friends. A aba mostra seu crédito e os amigos que entraram. Um amigo ganha 10% de desconto em cada pagamento, e você ganha 10% de cada fatura paga do seu amigo, como crédito.",
+          "Coloque nós de um canvas de fluxo de trabalho em um grupo. Selecione-os e pressione Agrupar (⌘G). Recolha um grupo em um único cartão empilhado, e pressione Desagrupar (⇧⌘G) para encerrá-lo.",
+          "Dê a uma etapa de vídeo no canvas do fluxo de trabalho qualquer duração que o modelo do Sunra ou do Higgsfield aceite. Selecione Personalizada no menu Duração e use o controle deslizante.",
+          "Abra a Loja pela linha Apps nas configurações de um agente. Conecte um app ou adicione seu próprio servidor MCP com Adicionar personalizado.",
+          "Ao entrar em um computador novo, se a sua conta já tiver servidores, a primeira etapa os mostra. Abra um deles para continuar com os agentes e chats dele."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Os agentes concluem seu pedido sem que você precise dizer \"continuar\". Quando uma parte do pedido não está pronta, o agente continua essa parte, no máximo 3 vezes. Uma pergunta que precise da sua escolha ou aprovação ainda para o agente.",
+          "As abas do painel lateral mantêm o título e uma largura. Quando as abas não cabem, a linha rola, e um menu no fim da linha lista as outras abas. Um clique com o botão do meio fecha uma aba.",
+          "Em um servidor em que você entrou, as imagens do canvas do fluxo de trabalho aparecem muito mais rápido. O canvas recebe uma pequena cópia de cada imagem, e a imagem completa abre no visualizador.",
+          "Um thread agora parece o chat do agente. As mensagens de um mesmo remetente aparecem como um bloco, e as etapas de uma resposta aparecem ao lado."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Um agente Claude ou ChatGPT não fica mais em \"Trabalhando\" por horas quando o provedor para de responder. Depois de 15 minutos sem saída (60 minutos enquanto uma ferramenta roda), o OpenBot encerra o turno, e as mensagens na fila continuam.",
+          "Com \"Usar minha configuração do Claude Code\" desativada, os agentes Claude não carregam mais suas instruções e regras globais do Claude Code. Cada turno fica mais rápido e custa menos. Para mantê-las, ative \"Usar minha configuração do Claude Code\".",
+          "Seus agentes continuam trabalhando enquanto o OpenBot baixa uma atualização do provedor. Um download que não recebe dados por um minuto para e continua de onde parou quando você tenta de novo.",
+          "Os agentes voltam a enviar mensagens diretamente para os agentes da equipe. Antes, um cartão pedia sua aprovação para cada transferência, e o trabalho parava até você aprovar.",
+          "Um agente com modelos de reserva automáticos passa para o próximo modelo de reserva em mais casos, por exemplo depois de um limite de requisições ou quando o Gemini perde a conexão com o Google."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [

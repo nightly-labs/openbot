@@ -20,6 +20,8 @@ export const messages = {
     "{provider} のプランの利用上限に達しました。別のモデルを選ぶか、{provider} のプランをアップグレードしてください。",
   "error.provider.acpMcpNotLoaded":
     "{provider} が OpenBot のツールを読み込まなかったため、このエージェントはツールを使えず、チームメイトにも連絡できません。{provider} のチームポリシーがローカル MCP サーバーをブロックしている可能性があります。チーム管理者に許可を依頼してから、もう一度お試しください。",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} が OpenBot のツールなしでこのメッセージを実行したため、エージェントはチームメイトへの連絡、ブラウザの使用、ファイルの添付ができませんでした。もう一度お試しください。",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} が MCP サーバー {name} を起動できなかったため、応答が止まりました。このサーバーは OpenBot ではなく、ご自身の {provider} の設定にあります。そこでサーバーを削除するか修復してから、新しいチャットを始めてください。",
   "error.provider.endpointsReadOnly":
@@ -273,6 +275,10 @@ export const messages = {
     "このモデルは利用できません。このエージェントに別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。設定でカスタムプロバイダーを開き、このエンドポイントの編集をクリックして、このモデルの最大出力を大きくしてください。または、推論の強さを下げるか別のモデルを選んでください。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeModelNotServed":
@@ -337,6 +343,8 @@ export const messages = {
     "Gemini がこのリクエストを拒否しましたが、原因は示されていません。エージェントが開いた画像など、チャット履歴内の項目が原因の場合があります。OpenBot はチャット履歴を引き継いだ新しい Gemini セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選んでください。",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini はこのチャットの保存済みの履歴を読み取れませんでした。OpenBot はチャット履歴を引き継いで新しい Gemini セッションを開始しました。メッセージをもう一度送信してください。",
+  "error.provider.acpTurnStuck":
+    "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -411,6 +419,10 @@ export const messages = {
     "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.codexRequestRefused":
     "{provider} がこのチャットのリクエストを拒否しましたが、原因は示されていません。画像の多い長いチャットで起こることがあります。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexSafetyBlocked":
+    "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} エージェントにはこのメッセージが見えなくなったため、次のメッセージは止まりません。別の言葉でもう一度リクエストを送ってください。",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} 次のメッセージも {provider} にブロックされる場合は、新しいチャットを開始してください。",
   "error.provider.codexAudioRefused":
     "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
   "error.provider.imageTooSmall":

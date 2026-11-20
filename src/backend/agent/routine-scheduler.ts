@@ -13,13 +13,18 @@ import type {
   QueueDelivery,
   Routine,
   RoutineConversationEventAction,
+  RoutineMissedRuns,
   RoutineRun,
   RoutineRunConversationEventStatus,
   TestRoutineInput,
   UpdateRoutineInput,
   WorkflowRunSource,
 } from "@openbot/contracts/ipc";
-import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
+import {
+  ROUTINE_MISSED_COUNT_LIMIT,
+  routineConversationEventItemType,
+  routineRunConversationEventItemType,
+} from "@openbot/contracts/ipc";
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -54,6 +59,8 @@ import {
   type OpenBotToolResponse,
   openBotToolFailure,
   openBotToolResult,
+  ROUTINE_LIST_TRUNCATION_NOTE,
+  routineListInstruction,
   routineToolAgentId,
   routineToolArguments,
   routineToolPolicies,
@@ -101,6 +108,15 @@ export interface RoutineHooks {
 const logger = createOpenBotLogger("routine-scheduler");
 
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
+const SKIPPED_WHILE_CLOSED = "Skipped: OpenBot was closed at the scheduled time.";
+
+function skippedRuns(scheduledFor: string, missed: RoutineMissedRuns) {
+  return {
+    scheduledFor,
+    ...(missed.until ? { until: missed.until } : {}),
+    ...(missed.count > ROUTINE_MISSED_COUNT_LIMIT ? { moreThan: ROUTINE_MISSED_COUNT_LIMIT } : { count: missed.count }),
+  };
+}
 
 export interface RoutineSchedulerOptions {
   store: AgentStore;
@@ -206,6 +222,32 @@ export class RoutineScheduler implements RoutineDueSource {
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
     return run !== null && quietRoutineRun(run);
+  }
+
+  retriesAfterRestart(deliveryId: string): boolean {
+    const run = this.#routines.runForDelivery(deliveryId);
+    if (
+      run?.kind !== "scheduled" ||
+      run.source !== undefined ||
+      !["queued", "running", "needs-attention"].includes(run.status)
+    )
+      return false;
+    const routine = this.#routines.getRecord(run.agentId, run.routineId);
+    if (
+      routine?.missedPolicy !== "run-once" ||
+      routine.trigger.kind !== "schedule" ||
+      routine.trigger.id !== run.triggerId ||
+      Date.parse(routine.updatedAt) > Date.parse(run.createdAt)
+    )
+      return false;
+    if (routine.trigger.schedule.kind === "once") return true;
+    return (
+      routine.active &&
+      Date.parse(routine.trigger.nextRunAt) > Date.now() &&
+      !this.#routines
+        .listRuns(run.agentId, run.routineId, 50, true)
+        .some((other) => other.kind === "scheduled" && other.scheduledFor > run.scheduledFor)
+    );
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -553,15 +595,34 @@ export class RoutineScheduler implements RoutineDueSource {
     requestedByPerson: () => boolean,
   ) {
     if (params.tool === "list_routines") {
-      const args = routineToolArguments(params.arguments, ["agentId"]);
+      const args = routineToolArguments(params.arguments, ["agentId", "routineId"]);
       const agentId = this.#toolAgentId(args, senderAgentId);
+      const onlyId =
+        args.routineId === undefined
+          ? null
+          : this.#requireToolRoutine(
+              agentId,
+              routineToolString(args.routineId, "routineId", INPUT_LIMITS.identifier, "routineId is required."),
+            ).id;
+      const shown = (routine: { id: string }) => onlyId === null || routine.id === onlyId;
+      const routines = this.list(agentId)
+        .filter(shown)
+        .map((routine) => ({
+          ...routine,
+          ...(onlyId === null ? routineListInstruction(routine.instruction) : {}),
+          lastRun: this.#lastRun(agentId, routine.id),
+        }));
       return openBotToolResult({
-        routines: this.list(agentId).map((routine) => ({ ...routine, lastRun: this.#lastRun(agentId, routine.id) })),
+        routines,
+        ...(routines.some((routine) => "instructionTruncated" in routine)
+          ? { truncatedInstructions: ROUTINE_LIST_TRUNCATION_NOTE }
+          : {}),
         webhookRoutines: this.#routines.listRecords(agentId).flatMap((routine) =>
-          routine.trigger.kind === "webhook"
+          routine.trigger.kind === "webhook" && shown(routine)
             ? [
                 {
                   ...webhookRoutineSummary({ ...routine, trigger: routine.trigger }),
+                  ...(onlyId === null ? {} : { instruction: routine.instruction }),
                   lastRun: this.#lastRun(agentId, routine.id),
                 },
               ]
@@ -1176,12 +1237,14 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   #lastRun(agentId: string, routineId: string) {
-    const run = this.#routines.listRuns(agentId, routineId, 1)[0];
+    const run = this.#routines.listRuns(agentId, routineId, 1, true)[0];
     if (!run) return null;
+    const reason = run.error ? redactText(run.error) : run.missed ? SKIPPED_WHILE_CLOSED : null;
     return {
       status: run.status,
       at: run.updatedAt,
-      ...(run.error ? { reason: redactText(run.error) } : {}),
+      ...(run.missed ? { skipped: skippedRuns(run.scheduledFor, run.missed) } : {}),
+      ...(reason ? { reason } : {}),
     };
   }
 

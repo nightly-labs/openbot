@@ -273,6 +273,10 @@ export const toollessTurn = Effect.fnUntraced(function* (
     const threadId = getString(getRecord(thread, "thread"), "id");
     if (!threadId)
       return yield* new ProfileGenerationFailed({ cause: new Error(sourceText("error.agent.profileNotStarted")) });
+    if (mode !== "media" && images.length > 0 && client.imageInput?.(threadId) !== true)
+      return yield* new ProfileGenerationFailed({
+        cause: new Error(sourceText("error.workflow.modelImageUnsupported")),
+      });
     yield* client
       .request(
         "turn/start",

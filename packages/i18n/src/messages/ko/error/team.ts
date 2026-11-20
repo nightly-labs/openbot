@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "이 연결에서는 루틴 실행을 중지할 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.libraryFoldersUnsupported": "이 연결에서는 라이브러리 폴더를 지원하지 않아요.",
+  "error.team.workflowFoldersUnsupported": "이 연결은 워크플로 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "error.team.sidebarPinsUnsupported":
@@ -124,6 +125,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
+  "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
   "error.team.localServersUnsupported": "이 연결은 이 컴퓨터의 서버를 지원하지 않습니다.",
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",
@@ -191,6 +193,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
   "error.team.pendingApprovalUnsupported": "이 연결에서는 승인 요청 전체를 읽을 수 없어요.",
+  "error.team.pendingPromptsUnsupported": "이 연결에서는 답변을 기다리는 질문을 읽을 수 없습니다.",
   "error.team.phoneFeedbackUnsupported": "이 연결에서는 휴대폰 앱에서 신고를 보낼 수 없어요.",
   "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",

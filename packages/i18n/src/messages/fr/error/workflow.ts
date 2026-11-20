@@ -24,6 +24,10 @@ export const messages = {
     "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",
   "error.workflow.modelToolUse":
     "Le modèle a essayé d’utiliser un outil, mais cette étape ne peut répondre qu’avec du texte. Relancez l’étape ou choisissez un autre modèle pour elle.",
+  "error.workflow.modelImageUnsupported":
+    "Le modèle de cette étape ne peut pas lire les images. Choisissez un modèle qui le peut, ou supprimez la connexion de l’image.",
+  "error.workflow.modelImageType":
+    "Une étape de modèle ne lit que les images PNG, JPEG, GIF et WebP. Connectez une image de l’un de ces types.",
   "error.workflow.modelUnavailable":
     "Le modèle de cette étape n’est pas disponible. Choisissez un autre modèle pour cette étape.",
   "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",
@@ -31,6 +35,7 @@ export const messages = {
     "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
+  "error.workflow.mediaNotMade": "Le modèle n’a pas créé l’image ou la vidéo. Sa réponse : {answer}",
   "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
   "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
   "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",
@@ -38,6 +43,8 @@ export const messages = {
     "Écrivez une description, ou exécutez les étapes précédentes pour qu’un texte ou une image arrive.",
   "error.workflow.mediaInputNotImage":
     "Cette étape n’accepte que des images, pas des vidéos. Supprimez la connexion depuis la vidéo.",
+  "error.workflow.mediaInputNotClip":
+    "Cette entrée n’accepte que des vidéos et des fichiers audio. Supprimez la connexion depuis le fichier.",
   "error.workflow.stepMissing": "Cette étape n’existe plus.",
   "error.workflow.nodeMissing": "Cette étape n’est pas dans le workflow.",
   "error.workflow.runMissing": "Cette exécution n’existe plus.",

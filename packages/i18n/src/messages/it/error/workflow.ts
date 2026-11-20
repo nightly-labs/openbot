@@ -24,6 +24,10 @@ export const messages = {
     "Il modello non ha risposto in tempo. Scegli un impegno più basso o un modello più veloce per questo passaggio, poi eseguilo di nuovo.",
   "error.workflow.modelToolUse":
     "Il modello ha provato a usare uno strumento, ma questo passaggio può rispondere solo con testo. Esegui di nuovo il passaggio o scegli un altro modello.",
+  "error.workflow.modelImageUnsupported":
+    "Il modello di questo passaggio non può leggere le immagini. Scegli un modello che può farlo, oppure rimuovi il collegamento dell’immagine.",
+  "error.workflow.modelImageType":
+    "Un passaggio di modello può leggere solo immagini PNG, JPEG, GIF e WebP. Collega un’immagine di uno di questi tipi.",
   "error.workflow.modelUnavailable":
     "Il modello di questo passaggio non è disponibile. Scegli un altro modello per questo passaggio.",
   "error.workflow.providerBusy": "Il provider è occupato. Attendi qualche minuto, poi esegui di nuovo il passaggio.",
@@ -31,6 +35,7 @@ export const messages = {
     "OpenBot non è riuscito a raggiungere il provider. Controlla la connessione a internet, poi esegui di nuovo il passaggio.",
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
   "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
+  "error.workflow.mediaNotMade": "Il modello non ha creato l’immagine o il video. Ha risposto: {answer}",
   "error.workflow.pictureMissing": "L’immagine non è più sul server. Inviala di nuovo.",
   "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing":
@@ -39,6 +44,8 @@ export const messages = {
     "Scrivi una descrizione o esegui i passaggi precedenti, così arriva un testo o un’immagine.",
   "error.workflow.mediaInputNotImage":
     "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
+  "error.workflow.mediaInputNotClip":
+    "Questo ingresso accetta solo video e file audio. Rimuovi il collegamento dal file.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",
   "error.workflow.nodeMissing": "Questo passaggio non è nel flusso di lavoro.",
   "error.workflow.runMissing": "Questa esecuzione non esiste più.",

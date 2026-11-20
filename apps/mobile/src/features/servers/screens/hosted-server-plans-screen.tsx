@@ -205,11 +205,12 @@ function PlansHeader({ description }: { description: string }) {
   );
 }
 
-type OwnedServerState = "payment" | "setup" | "starting" | "running" | "stopped" | "planEnded" | "failed";
+type OwnedServerState = "payment" | "setup" | "restoring" | "starting" | "running" | "stopped" | "planEnded" | "failed";
 
 const OWNED_STATE_TEXT = {
   payment: "mobile.server.hosted.state.payment",
   setup: "mobile.server.hosted.state.setup",
+  restoring: "mobile.server.hosted.state.restoring",
   starting: "mobile.server.hosted.state.starting",
   running: "mobile.server.hosted.state.running",
   stopped: "mobile.server.hosted.state.stopped",
@@ -219,6 +220,7 @@ const OWNED_STATE_TEXT = {
 
 function ownedServerState(server: HostedServerSummary): OwnedServerState {
   if (server.error === "plan_ended") return "planEnded";
+  if (server.restoring) return "restoring";
   switch (server.state) {
     case "awaiting_payment":
       return "payment";
@@ -244,13 +246,18 @@ function OwnedServerRow({ server, listed }: { server: HostedServerSummary; liste
   const plan = t(PLAN_TEXT[server.plan].name);
   const interval = server.interval === "year" ? t("mobile.server.hosted.yearly") : t("mobile.server.hosted.monthly");
   const supportingText =
-    server.deletionScheduledAt != null
-      ? t("mobile.server.hosted.serverPlanEnds", {
+    state === "planEnded" && server.dataKeptUntil
+      ? t("mobile.server.hosted.serverDataKept", {
           plan,
-          interval,
-          date: format.date(server.deletionScheduledAt, DATE_FORMAT),
+          date: format.date(server.dataKeptUntil, DATE_FORMAT),
         })
-      : t("mobile.server.hosted.serverPlan", { plan, interval });
+      : server.deletionScheduledAt != null
+        ? t("mobile.server.hosted.serverPlanEnds", {
+            plan,
+            interval,
+            date: format.date(server.deletionScheduledAt, DATE_FORMAT),
+          })
+        : t("mobile.server.hosted.serverPlan", { plan, interval });
   const inSetup = hostedServerInSetup(server, listed);
   const label = (
     <Typography.Paragraph

@@ -53,6 +53,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
   "error.agent.modelUnavailable": "Seçilen ajan modeli kullanılamıyor.",
   "error.agent.modelProviderNotConnected": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bağlı değil.',
+  "error.agent.modelProviderSignInRequired":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} oturum açmayı gerektiriyor. {provider} hesabında oturum açıp yeniden dene.',
+  "error.agent.modelProviderNotInstalled": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} yüklü değil.',
+  "error.agent.modelProviderOutdated": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} güncellenmeli.',
   "error.agent.modelListEmpty":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi. Son hata: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -124,6 +128,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
   "error.agent.deleteFolderInUse":
     "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
+  "error.agent.deleteFolderLocked":
+    "Başka bir program, örneğin ajanın başlattığı bir program, bu ajanın klasörünü hâlâ kullanıyor. O programı kapatın veya bu ajanın çalıştığı bilgisayarı yeniden başlatın, sonra ajanı tekrar silin.",
   "error.agent.deleteWhenFolderFree":
     "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde OpenBot bu ajanı siler.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
@@ -186,6 +192,8 @@ export const messages = {
     "Bölge tek bir ekranın içinde değil. list_capture_sources sonucundaki tek bir ekranın sınırları içinde kalan masaüstü noktaları kullanın.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot'un Ekran Kaydı izni yok. Kullanıcıdan Sistem Ayarları > Gizlilik ve Güvenlik > Ekran ve Sistem Sesi Kaydı bölümünü açmasını, OpenBot'u etkinleştirmesini, sonra OpenBot'tan çıkıp yeniden açmasını isteyin.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot'un henüz Ekran Kaydı izni yok, bu yüzden pencereleri listeleyemez. Bir ekranı yakalamak için capture_screen'i target screen ile çağırın. Kullanıcı önce yakalamayı onaylar, sonra macOS kullanıcıdan izin isteyebilir.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows boş bir görüntü verdi. Kullanıcıdan bilgisayarın kilidini açmasını ve korumalı içeriği kapatmasını isteyin. Bir kuruluş ilkesi de ekran yakalamayı engelleyebilir.",
   "error.agent.screenCaptureFailed": "Ekran yakalama başarısız oldu. Tekrar deneyin.",

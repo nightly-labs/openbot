@@ -46,6 +46,7 @@ import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
   type AgentCliInfo,
+  ANTIGRAVITY_UPDATE_ENV,
   antigravityTakesStateFolders,
   COPILOT_ENV,
   cliPathEnvironment,
@@ -271,7 +272,7 @@ function antigravitySettingsUnreadable(appDataDir: string): boolean {
   }
 }
 
-const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
+const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot", ...ANTIGRAVITY_UPDATE_ENV };
 
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
@@ -1021,6 +1022,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineClineTarget(target, confinement) } : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
         additionalModels: clineFreeModels(),
+        encodesModelIds: true,
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
@@ -1037,6 +1039,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         profileGeneration: true,
         env: { ...CLINE_ENV },
         additionalModels: clineFreeModels(),
+        encodesModelIds: true,
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
       }),

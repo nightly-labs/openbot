@@ -89,6 +89,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "此连接无法停止自动化任务的运行。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
+  "error.team.workflowFoldersUnsupported": "此连接不支持工作流文件夹。",
   "error.team.agentNotificationLevelsUnsupported":
     "此服务器无法为每个助手保存你自己的通知级别。请在运行它的电脑上更新 OpenBot。",
   "error.team.sidebarPinsUnsupported": "此服务器无法为你的所有设备保存已置顶的聊天。请在运行它的电脑上更新 OpenBot。",
@@ -118,6 +119,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
   "error.team.hostRestartUnsupported": "当前连接不支持重启服务器。",
+  "error.team.ownerTransferUnsupported": "该服务器不支持转移所有权。",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",
@@ -186,6 +188,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
   "error.team.agentWaitsUnsupported": "此连接不支持未关闭的等待。",
   "error.team.pendingApprovalUnsupported": "此连接不支持读取完整的批准请求。",
+  "error.team.pendingPromptsUnsupported": "此连接不支持读取待回答的问题。",
   "error.team.phoneFeedbackUnsupported": "此连接不支持从手机应用发送报告。",
   "error.team.messagePinsUnsupported": "此连接不支持置顶消息。",
   "error.team.queuedMessageThreadUnsupported": "此连接不支持将排队的消息作为新线程运行。",

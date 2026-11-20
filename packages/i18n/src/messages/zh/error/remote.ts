@@ -22,6 +22,7 @@ export const messages = {
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
     "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
+  "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
   "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
   "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
@@ -191,6 +192,9 @@ export const messages = {
   "error.remote.formUnavailable": "该表单已不可用。",
   "error.remote.hostedServerRemoval": "请使用账单页面删除托管服务器。",
   "error.remote.hostRemoved": "所有者已将该服务器从账户中移除。",
+  "error.remote.ownerTransferSelf": "你已经是该服务器的所有者。请输入新所有者的邮箱。",
+  "error.remote.ownerTransferHosted": "由 OpenBot 托管的服务器无法更换所有者。",
+  "error.remote.ownerTransferInvalid": "此所有权转移已失效。请让所有者重新发送。",
   "error.remote.channelsUnsupported": "请更新这台桌面服务器以使用频道。",
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",

@@ -52,7 +52,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatActivityRow, type ChatActivitySpec } from "@/features/chat/components/chat-activity-row";
-import { ChatAppSuggestion } from "@/features/chat/components/chat-app-suggestion";
+import { ChatAppSuggestion, ChatMcpSignIn } from "@/features/chat/components/chat-app-suggestion";
 import { type ApprovalDecision, approvalTitle, ChatApprovalCard } from "@/features/chat/components/chat-approval-card";
 import { ChatExchangeGroup, ChatExchangeMarker } from "@/features/chat/components/chat-exchange-marker";
 import { ChatMarkdown, chatMarkdownHasTable } from "@/features/chat/components/chat-markdown";
@@ -775,10 +775,12 @@ const MessageRow = memo(function MessageRow({
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "app-suggestion" ? (
       <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
+    ) : message.kind === "mcp-sign-in" ? (
+      <ChatMcpSignIn key={message.id} serverId={serverId} messageId={message.id} mcpServerId={message.mcpServerId} />
     ) : message.kind === "exchange-group" ? (
-      <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} muted={muted} />
+      <ChatExchangeGroup key={message.id} group={message} agents={agents} agentsById={agentsById} />
     ) : message.kind === "exchange" || message.kind === "channel-routing" ? (
-      <ChatExchangeMarker key={message.id} message={message} agents={agents} agentsById={agentsById} muted={muted} />
+      <ChatExchangeMarker key={message.id} message={message} agents={agents} agentsById={agentsById} />
     ) : message.kind === "plan" ? (
       <ChatPlan key={message.id} message={message} />
     ) : message.kind === "subagents" ? (
@@ -1011,11 +1013,9 @@ interface RowContextValue {
   dayLabels: ReadonlyMap<string, string>;
   branchDivider: { rowId: string; label: string | null; onOpen: (() => void) | undefined } | null;
   unreadLineRowId: string | null;
-  unreadLineColor: string | undefined;
-  unreadLineAnimated: Set<string>;
+  unreadLine: { color: string | undefined; animated: Set<string> };
   highlightedRowId: string | null;
-  highlightColor: string;
-  highlightShown: Set<string>;
+  highlight: { color: string; shown: Set<string> };
 }
 
 const FOCUS_HIGHLIGHT_OPACITY = 0.16;
@@ -1109,58 +1109,79 @@ function MessageWithTime({
   );
 }
 
-function ChatRow({ item }: { item: VisibleMessage }) {
-  const row = useContext(RowContext);
+interface ChatRowBodyProps {
+  message: VisibleMessage;
+  hidden: boolean;
+  responseStyle: RowContextValue["responseStyle"] | undefined;
+  highlight: { color: string; shown: Set<string> } | null;
+  day: string | undefined;
+  unreadLine: { color: string | undefined; animated: Set<string> } | null;
+  turn: TurnStepsSummary | undefined;
+  onOpenTurn: ((turnId: string) => void) | undefined;
+  branchDivider: RowContextValue["branchDivider"];
+  isFirstUser: boolean;
+  source: ChatMessage | undefined;
+  questionForm: QuestionPromptController | undefined;
+  upload: ChatUpload | undefined;
+  outbox: OutboxRowStatus | undefined;
+  selecting: boolean;
+  arriving: boolean;
+  revealed: boolean;
+  shared: MessageRowShared;
+}
+
+const ChatRowBody = memo(function ChatRowBody({
+  message,
+  hidden,
+  responseStyle,
+  highlight,
+  day,
+  unreadLine,
+  turn,
+  onOpenTurn,
+  branchDivider,
+  isFirstUser,
+  source,
+  questionForm,
+  upload,
+  outbox,
+  selecting,
+  arriving,
+  revealed,
+  shared,
+}: ChatRowBodyProps) {
   const timeReveal = useContext(ChatTimeRevealContext);
-  if (!row) return null;
-  const message = row.rowsById.get(item.id) ?? item;
-  const response = row.responseIds.has(message.id);
-  const turn = row.turnSummaries?.get(message.id);
-  const openTurn = row.onOpenTurn;
-  const day = row.dayLabels.get(message.id);
+  const turnId = turn?.turnId;
+  const openTurn = useMemo(() => (onOpenTurn && turnId ? () => onOpenTurn(turnId) : undefined), [onOpenTurn, turnId]);
   const messageRow =
     message.kind === "thinking" ? null : (
       <MessageRow
         message={message}
-        isFirstUser={message.id === row.firstUserId}
-        source={
-          message.kind === "message" && message.replyToMessageId
-            ? row.messagesById.get(message.replyToMessageId)
-            : undefined
-        }
-        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-        upload={row.upload?.messageId === message.id ? row.upload : undefined}
-        outbox={row.outboxStatuses?.get(message.id)}
-        selecting={message.id === row.selectingMessageId}
-        arriving={row.arrivals.has(message.id)}
-        revealed={row.revealedIds.has(message.id)}
-        shared={row.shared}
+        isFirstUser={isFirstUser}
+        source={source}
+        questionForm={questionForm}
+        upload={upload}
+        outbox={outbox}
+        selecting={selecting}
+        arriving={arriving}
+        revealed={revealed}
+        shared={shared}
       />
     );
   return (
     <Animated.View
-      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
-      accessibilityElementsHidden={response && !row.responseVisible}
-      importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
+      style={[ROW_STYLE, responseStyle]}
+      accessibilityElementsHidden={hidden}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
     >
-      {message.id === row.highlightedRowId ? (
-        <FocusHighlight rowId={message.id} color={row.highlightColor} shown={row.highlightShown} />
-      ) : null}
+      {highlight ? <FocusHighlight rowId={message.id} color={highlight.color} shown={highlight.shown} /> : null}
       {day ? (
         <Typography.Paragraph type="body-xs" align="center" className="pb-3 pt-1 text-muted">
           {day}
         </Typography.Paragraph>
       ) : null}
-      {message.id === row.unreadLineRowId ? (
-        <UnreadLineRow rowId={message.id} color={row.unreadLineColor} animated={row.unreadLineAnimated} />
-      ) : null}
-      {turn ? (
-        <ChatTurnStepsRow
-          summary={turn}
-          muted={row.shared.themeMuted}
-          onPress={openTurn ? () => openTurn(turn.turnId) : undefined}
-        />
-      ) : null}
+      {unreadLine ? <UnreadLineRow rowId={message.id} color={unreadLine.color} animated={unreadLine.animated} /> : null}
+      {turn ? <ChatTurnStepsRow summary={turn} muted={shared.themeMuted} onPress={openTurn} /> : null}
       {message.kind === "message" && timeReveal ? (
         <MessageWithTime createdAt={message.createdAt} reveal={timeReveal.offset}>
           {messageRow}
@@ -1168,10 +1189,43 @@ function ChatRow({ item }: { item: VisibleMessage }) {
       ) : (
         messageRow
       )}
-      {row.branchDivider?.rowId === message.id ? (
-        <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
+      {branchDivider ? (
+        <BranchDividerRow label={branchDivider.label} onOpen={branchDivider.onOpen} muted={shared.muted} />
       ) : null}
     </Animated.View>
+  );
+});
+
+function ChatRow({ item }: { item: VisibleMessage }) {
+  const row = useContext(RowContext);
+  if (!row) return null;
+  const message = row.rowsById.get(item.id) ?? item;
+  const response = row.responseIds.has(message.id);
+  return (
+    <ChatRowBody
+      message={message}
+      hidden={response && !row.responseVisible}
+      responseStyle={response ? row.responseStyle : undefined}
+      highlight={message.id === row.highlightedRowId ? row.highlight : null}
+      day={row.dayLabels.get(message.id)}
+      unreadLine={message.id === row.unreadLineRowId ? row.unreadLine : null}
+      turn={row.turnSummaries?.get(message.id)}
+      onOpenTurn={row.onOpenTurn}
+      branchDivider={row.branchDivider?.rowId === message.id ? row.branchDivider : null}
+      isFirstUser={message.id === row.firstUserId}
+      source={
+        message.kind === "message" && message.replyToMessageId
+          ? row.messagesById.get(message.replyToMessageId)
+          : undefined
+      }
+      questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+      upload={row.upload?.messageId === message.id ? row.upload : undefined}
+      outbox={row.outboxStatuses?.get(message.id)}
+      selecting={message.id === row.selectingMessageId}
+      arriving={row.arrivals.has(message.id)}
+      revealed={row.revealedIds.has(message.id)}
+      shared={row.shared}
+    />
   );
 }
 
@@ -1776,6 +1830,11 @@ export const ChatMessageList = memo(function ChatMessageList({
   );
   const listRows = useListRows(rows, routineRowType);
   const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
+  const unreadLine = useMemo(
+    () => ({ color: unreadLineColor, animated: unreadLineAnimated.current }),
+    [unreadLineColor],
+  );
+  const highlight = useMemo(() => ({ color: highlightColor, shown: highlightShown.current }), [highlightColor]);
   const rowContext = useMemo<RowContextValue>(
     () => ({
       shared,
@@ -1796,11 +1855,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       dayLabels,
       branchDivider: rowBranchDivider,
       unreadLineRowId,
-      unreadLineColor,
-      unreadLineAnimated: unreadLineAnimated.current,
+      unreadLine,
       highlightedRowId,
-      highlightColor,
-      highlightShown: highlightShown.current,
+      highlight,
     }),
     [
       shared,
@@ -1821,9 +1878,9 @@ export const ChatMessageList = memo(function ChatMessageList({
       dayLabels,
       rowBranchDivider,
       unreadLineRowId,
-      unreadLineColor,
+      unreadLine,
       highlightedRowId,
-      highlightColor,
+      highlight,
     ],
   );
   const showThinking = useThinkingDisplayPreference((state) => state.enabled);

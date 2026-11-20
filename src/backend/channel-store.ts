@@ -38,6 +38,22 @@ import { revokeRoutineWebhooks } from "./webhook-route-store";
 const SHOWN_MESSAGE_SQL =
   "(instr(message_json, '\"deleted\"') = 0 OR json_extract(message_json, '$.deleted') IS NOT 1)";
 
+const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_messages AS m
+  WHERE m.channel_id = ?
+    AND m.sequence > COALESCE(
+      (SELECT r.through_sequence FROM projection_channel_reads AS r
+        WHERE r.channel_id = ? AND r.member_id = ?), 0)
+    AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
+    AND json_extract(m.message_json, '$.author.id') IS NOT ?
+    AND json_extract(m.message_json, '$.author.id') IS NOT ?
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
+
 function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
   return {
     id: entry.id,
@@ -101,8 +117,47 @@ interface ChannelChange {
 
 export class ChannelStore {
   readonly #completedMessageChanges = new Map<string, number>();
+  readonly #unreadCounts = new Map<string, Map<string, number>>();
+  #unreadCountsConnection: DatabaseSync | null = null;
+  #unreadCountsDataVersion: unknown = null;
 
   constructor(readonly database: OpenBotDatabase) {}
+
+  #keepsUnreadCounts(): boolean {
+    const db = this.database.connection;
+    if (db.isTransaction) return false;
+    const dataVersion = databaseRow(cachedStatement(db, "PRAGMA data_version").get())?.data_version;
+    if (db !== this.#unreadCountsConnection || dataVersion !== this.#unreadCountsDataVersion) {
+      this.#unreadCounts.clear();
+      this.#unreadCountsConnection = db;
+      this.#unreadCountsDataVersion = dataVersion;
+    }
+    return true;
+  }
+
+  #unreadCount(channelId: string, memberId: string, excludedId: string, keep: boolean): number {
+    const key = `${memberId}\n${excludedId}`;
+    const kept = keep ? this.#unreadCounts.get(channelId)?.get(key) : undefined;
+    if (kept !== undefined) return kept;
+    const row = databaseRow(
+      cachedStatement(this.database.connection, UNREAD_COUNT_SQL).get(
+        channelId,
+        channelId,
+        memberId,
+        memberId,
+        excludedId,
+        `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+        `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+      ),
+    );
+    const count = Number(row?.unread ?? 0);
+    if (keep) {
+      const counts = this.#unreadCounts.get(channelId) ?? new Map<string, number>();
+      counts.set(key, count);
+      this.#unreadCounts.set(channelId, counts);
+    }
+    return count;
+  }
 
   completedMessageChanges(channelId: string): number {
     return this.#completedMessageChanges.get(channelId) ?? 0;
@@ -146,21 +201,6 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
               ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
-            (SELECT COUNT(*) FROM projection_channel_messages AS m
-              WHERE m.channel_id = c.channel_id
-                AND m.sequence > COALESCE(
-                  (SELECT r.through_sequence FROM projection_channel_reads AS r
-                    WHERE r.channel_id = c.channel_id AND r.member_id = ?), 0)
-                AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
-                AND json_extract(m.message_json, '$.author.id') IS NOT ?
-                AND json_extract(m.message_json, '$.author.id') IS NOT ?
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
                 AND json_extract(t.task_json, '$.state') = 'running') AS running,
@@ -169,14 +209,9 @@ export class ChannelStore {
                 AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
-        .all(
-          memberId,
-          memberId,
-          excludedId,
-          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
-          `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
-        ),
+        .all(),
     );
+    const keepsCounts = this.#keepsUnreadCounts();
     const threads = new Map<string, ChannelThread[]>();
     for (const row of databaseRows(
       this.database.connection
@@ -205,7 +240,7 @@ export class ChannelStore {
           : undefined;
       return {
         ...channel,
-        unreadCount: Number(row.unread ?? 0),
+        unreadCount: this.#unreadCount(channel.id, memberId, excludedId, keepsCounts),
         activeTasks: Number(row.running ?? 0),
         openTasks: Number(row.open ?? 0),
         lastMessage: latest
@@ -418,6 +453,15 @@ export class ChannelStore {
     return this.messages(channelId, undefined, 1)[0]?.sequence ?? 0;
   }
 
+  private storedSequence(channelId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ?")
+        .get(channelId),
+    );
+    return row && typeof row.sequence === "number" ? row.sequence : 0;
+  }
+
   withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
     if (!tasks.some((task) => task.state === "waiting")) return tasks;
     const started = new Map<string, number>();
@@ -535,13 +579,7 @@ export class ChannelStore {
   }
 
   deleteHistory(channel: Channel): boolean {
-    const db = this.database.connection;
-    const last = databaseRow(
-      db
-        .prepare("SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ?")
-        .get(channel.id),
-    );
-    const throughSequence = last && typeof last.sequence === "number" ? last.sequence : 0;
+    const throughSequence = this.storedSequence(channel.id);
     if (throughSequence === 0) return false;
     const updated = { ...channel, revision: channel.revision + 1 };
     const change: ChannelChange = { channel: updated, messages: [], tasks: [], assignments: [] };
@@ -609,6 +647,7 @@ export class ChannelStore {
   }
 
   private project(db: DatabaseSync, change: ChannelChange): void {
+    this.#unreadCounts.delete(change.channel.id);
     db.prepare(
       "INSERT INTO projection_channels VALUES (?, ?) ON CONFLICT(channel_id) DO UPDATE SET channel_json = excluded.channel_json",
     ).run(change.channel.id, JSON.stringify(change.channel));
@@ -782,6 +821,7 @@ export class ChannelStore {
         },
       ],
       (db) => {
+        this.#unreadCounts.delete(channelId);
         const memoryIds = databaseRows(
           db.prepare("SELECT memory_id FROM projection_channel_memories WHERE channel_id = ?").all(channelId),
         ).map((row) => requiredStringColumn(row, "memory_id"));
@@ -932,9 +972,8 @@ export class ChannelStore {
     }
   }
 
-  markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
-    const maximum = this.latestSequence(channelId);
-    if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
+  markRead(channelId: string, memberId: string, requestedSequence: number, operationId: string): Channel {
+    const throughSequence = Math.min(requestedSequence, this.storedSequence(channelId));
     return this.database.dispatch(
       `channel-read:${memberId}:${operationId}`,
       [
@@ -946,6 +985,7 @@ export class ChannelStore {
         },
       ],
       (db) => {
+        this.#unreadCounts.delete(channelId);
         db.prepare(
           "INSERT INTO projection_channel_reads VALUES (?, ?, ?) ON CONFLICT(channel_id, member_id) DO UPDATE SET through_sequence = MAX(through_sequence, excluded.through_sequence)",
         ).run(channelId, memberId, throughSequence);
@@ -956,6 +996,7 @@ export class ChannelStore {
 
   rebuild(channelId: string): void {
     const db = this.database.connection;
+    this.#unreadCounts.delete(channelId);
     withTransaction(db, () => {
       const events = databaseRows(
         db

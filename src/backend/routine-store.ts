@@ -33,6 +33,7 @@ import {
   validateStoredRoutineSchedule,
 } from "@openbot/team-client/routine-schedule";
 import {
+  databaseRow,
   databaseRows,
   optionalStringColumn,
   requiredNumberColumn,
@@ -692,8 +693,14 @@ export class RoutineStore {
 
   advanceTrigger(routineId: string, triggerId: string, nextRunAt: string): void {
     const { commandPrefix, eventPrefix, routineAggregate, triggerTable } = this.tables;
+    const current = databaseRow(
+      this.database.connection
+        .prepare(`SELECT next_run_at, last_event_sequence FROM ${triggerTable} WHERE trigger_id = ? AND routine_id = ?`)
+        .get(triggerId, routineId),
+    );
+    if (!current || current.next_run_at === nextRunAt) return;
     this.database.dispatch(
-      `${commandPrefix}-trigger:advance:${triggerId}:${nextRunAt}`,
+      `${commandPrefix}-trigger:advance:${triggerId}:${requiredNumberColumn(current, "last_event_sequence")}:${nextRunAt}`,
       [
         {
           aggregateType: routineAggregate,

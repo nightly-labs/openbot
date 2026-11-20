@@ -16,6 +16,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
     "لم يحمّل {provider} أدوات OpenBot، لذا لا يمكن لهذا الوكيل استخدامها أو الوصول إلى زملائه. قد تحظر سياسة فريق {provider} خوادم MCP المحلية. اطلب من مسؤول فريقك السماح بها، ثم أعد المحاولة.",
+  "error.provider.acpToolsNotLoaded":
+    "شغّل {provider} هذه الرسالة بدون أدوات OpenBot، لذا لم يتمكن الوكيل من الوصول إلى زملائه أو استخدام المتصفح أو إرفاق الملفات. أعد المحاولة.",
   "error.provider.acpOwnMcpServerFailed":
     "تعذّر على {provider} تشغيل خادم MCP {name}، لذا توقّف الرد. هذا الخادم موجود في إعدادات {provider} الخاصة بك، وليس في OpenBot. أزِل الخادم من هناك أو أصلحه، ثم ابدأ محادثة جديدة.",
   "error.provider.endpointsReadOnly":
@@ -245,6 +247,10 @@ export const messages = {
   "error.provider.opencodeModelUnavailable": "هذا النموذج غير متاح لك. اختر نموذجًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. في الإعدادات، افتح مزوّد مخصص، وانقر تعديل على نقطة النهاية هذه، واضبط أقصى إخراج أكبر لهذا النموذج. أو اختر جهدًا أقل أو نموذجًا آخر.",
   "error.provider.opencodeReasoningOverlap":
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeModelNotServed":
@@ -302,6 +308,8 @@ export const messages = {
     "رفض Gemini هذا الطلب ولم يذكر السبب. قد يسبب هذا عنصر في سجل الدردشة، مثل صورة فتحها الوكيل. بدأ OpenBot جلسة Gemini جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا آخر.",
   "error.provider.antigravityHistoryUnreadable":
     "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpTurnStuck":
+    "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
@@ -369,6 +377,10 @@ export const messages = {
     "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.codexRequestRefused":
     "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.codexSafetyBlocked":
+    "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} لم يعد الوكيل يرى هذه الرسالة، لذلك لن تمنع رسائلك التالية. أرسل طلبك مرة أخرى بكلمات مختلفة.",
+  "error.provider.codexSafetyBlockedKept":
+    "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} إذا حظر {provider} رسائلك التالية أيضًا، فابدأ دردشة جديدة.",
   "error.provider.codexAudioRefused":
     "لا يستطيع هذا النموذج الاستماع إلى الصوت، لذلك لم يقبل الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. للمتابعة، أرسل طلبك مرة أخرى واطلب من الوكيل أن يعمل بدون الصوت. لفحص الصوت، اختر في قائمة نموذج الوكيل نموذجًا يستطيع الاستماع إلى الصوت.",
   "error.provider.imageTooSmall":

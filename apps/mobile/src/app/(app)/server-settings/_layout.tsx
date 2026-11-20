@@ -16,6 +16,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="invite" options={{ title: t("mobile.server.route.invite") }} />
       <Stack.Screen name="member" options={{ title: t("mobile.server.route.member") }} />
       <Stack.Screen name="member-roles" options={{ title: t("mobile.server.roles.title") }} />
+      <Stack.Screen name="owner-transfer" options={{ title: t("mobile.server.route.ownerTransfer") }} />
       <Stack.Screen name="roles" options={{ title: t("mobile.server.route.roles") }} />
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
       <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />

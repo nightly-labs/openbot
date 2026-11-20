@@ -24,18 +24,25 @@ export const messages = {
     "El modelo no respondió a tiempo. Elige un esfuerzo menor o un modelo más rápido para este paso y ejecútalo de nuevo.",
   "error.workflow.modelToolUse":
     "El modelo intentó usar una herramienta, pero este paso solo puede responder con texto. Ejecuta el paso de nuevo o elige otro modelo para él.",
+  "error.workflow.modelImageUnsupported":
+    "El modelo de este paso no puede leer imágenes. Elige un modelo que pueda, o quita la conexión de la imagen.",
+  "error.workflow.modelImageType":
+    "Un paso de modelo solo puede leer imágenes PNG, JPEG, GIF y WebP. Conecta una imagen de uno de estos tipos.",
   "error.workflow.modelUnavailable": "El modelo de este paso no está disponible. Elige otro modelo para este paso.",
   "error.workflow.providerBusy": "El proveedor está ocupado. Espera unos minutos y ejecuta el paso de nuevo.",
   "error.workflow.providerOffline":
     "OpenBot no pudo conectar con el proveedor. Comprueba la conexión a internet y ejecuta el paso de nuevo.",
   "error.workflow.modelBusy": "Hay otra solicitud al modelo en curso. Ejecuta el paso de nuevo en breve.",
   "error.workflow.mediaFailed": "El modelo no pudo crear la imagen o el vídeo. Ejecuta el paso de nuevo.",
+  "error.workflow.mediaNotMade": "El modelo no creó la imagen ni el vídeo. Respondió: {answer}",
   "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
   "error.workflow.pictureType": "Usa una imagen PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing": "Una imagen de un paso anterior no está disponible. Ejecuta ese paso de nuevo.",
   "error.workflow.mediaEmptyRequest":
     "Escribe una descripción o ejecuta los pasos anteriores para que llegue un texto o una imagen.",
   "error.workflow.mediaInputNotImage": "Este paso solo acepta imágenes, no vídeos. Quita la conexión desde el vídeo.",
+  "error.workflow.mediaInputNotClip":
+    "Esta entrada solo acepta vídeos y archivos de audio. Quita la conexión desde el archivo.",
   "error.workflow.stepMissing": "Este paso ya no existe.",
   "error.workflow.nodeMissing": "Este paso no está en el flujo de trabajo.",
   "error.workflow.runMissing": "Esta ejecución ya no existe.",

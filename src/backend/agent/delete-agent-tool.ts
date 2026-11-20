@@ -105,7 +105,11 @@ export const handleDeleteAgentTool = Effect.fn("DeleteAgentTool.handle")(
       deleted: count,
       failed: results.length - count,
       results,
-      ...(count < results.length ? { next: "Tell the user which agents were not deleted, and why." } : {}),
+      ...(count < results.length
+        ? {
+            next: "Tell the user which agents were not deleted, and why. Do not delete their folders or files another way.",
+          }
+        : {}),
     });
   },
   Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),

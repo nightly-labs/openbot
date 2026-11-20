@@ -21,6 +21,12 @@ export interface TeamInviteEmailInput {
   role: "admin" | "member";
 }
 
+export interface OwnerTransferEmailInput {
+  fromEmail: string;
+  serverName: string;
+  appUrl: string;
+}
+
 export interface ContactMessageEmailInput {
   name: string | null;
   email: string;
@@ -153,6 +159,47 @@ export function renderTeamInviteEmail(input: TeamInviteEmailInput): RenderedEmai
           muted: true,
         }),
         linkFallback(input.inviteUrl),
+      ].join(""),
+      footer,
+    }),
+  };
+}
+
+export function renderOwnerTransferEmail(input: OwnerTransferEmailInput): RenderedEmail {
+  const serverName = input.serverName.trim();
+  const subject = `Take ownership of ${serverName} on OpenBot`;
+  const preheader = `${input.fromEmail} wants to make you the owner of ${serverName}.`;
+  const footer = "If you did not expect this email, you can ignore it. Nothing changes until you accept.";
+  return {
+    subject,
+    preheader,
+    text: textBody(
+      [
+        `${input.fromEmail} wants to make you the owner of ${serverName} on OpenBot.`,
+        "",
+        "Open OpenBot and sign in with this email address to accept or decline:",
+        input.appUrl,
+        "",
+        "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account, so change its passwords and SSH keys. The request expires after 7 days.",
+      ],
+      footer,
+    ),
+    html: renderLayout({
+      title: subject,
+      preheader,
+      body: [
+        heading(`Take ownership of ${escapeHtml(serverName)}`),
+        paragraph(
+          `<strong style="color:${COLOR.text};font-weight:600;">${escapeHtml(input.fromEmail)}</strong> wants to make you the owner of a server on OpenBot.`,
+        ),
+        paragraph(
+          "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account, so change its passwords and SSH keys.",
+        ),
+        button("Open OpenBot", input.appUrl),
+        paragraph("Sign in with this email address to accept or decline. The request expires after 7 days.", {
+          muted: true,
+        }),
+        linkFallback(input.appUrl),
       ].join(""),
       footer,
     }),

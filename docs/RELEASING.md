@@ -26,7 +26,8 @@ Installed apps do not wait for a release to get a new provider CLI: they offer t
 release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
-blocked version is no longer offered, but it stays on the computers that already installed it.
+blocked version is no longer offered. An OpenBot copy that already runs a blocked version moves to the
+newest version that is not blocked, also when that version is older. A CLI that the user installed stays.
 
 ## One-time GitHub setup
 
@@ -609,11 +610,13 @@ The workflow:
 
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
-3. runs the complete offline repository check;
+3. runs the complete offline repository check on its own macOS runner, in parallel with the builds;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
    and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
    architecture builds on its own runner, because the voice runtime and the remote desktop runtime
-   are prepared for the architecture of the build machine. The Host PKG is ARM64 only.
+   are prepared for the architecture of the build machine. The Host PKG is ARM64 only. The x64 job
+   does not run on an Apple silicon runner under Rosetta: there, the packaged app checks take about
+   ten times longer, and the upgrade check does not finish.
    When `hdiutil create` fails with "Device not configured" or "Resource busy", or a network
    connection drops, the app build of each architecture starts again, up to 3 attempts, because
    these runner errors are not caused by the app;
@@ -876,8 +879,9 @@ MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
 It prints a table per platform and for servers, and writes `.openbot-build/release-health/report.json`.
 The metrics are finished starts, crashes, startup crashes, quit hangs, and update arrivals: the share
-of the computers that started an update install and then started the new release. The thresholds are
-in the script header.
+of the computers that started an update install and then started a version other than the one that
+installed it, before the end of the window. An install of an older release that a computer downloaded
+earlier counts for the window in which it started. The thresholds are in the script header.
 
 - Exit code 0: no metric is clearly worse. Raise the rollout.
 - Exit code 1: a metric is clearly worse. Keep the rollout where it is, find the cause, and publish a

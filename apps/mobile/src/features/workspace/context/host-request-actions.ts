@@ -7,6 +7,7 @@ import {
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
@@ -53,6 +54,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_COLORS_ROUTES,
@@ -478,6 +483,8 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
+  | "loadAgentBuiltinMemory"
+  | "updateAgentBuiltinMemory"
   | "loadAgentDefaults"
   | "updateAgentDefaults"
   | "setAgentDefaultChoice"
@@ -1428,6 +1435,20 @@ export function createHostRequestActions({
     updateAgentPlanCard: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
+    },
+    loadAgentBuiltinMemory: async (agentId, serverId) =>
+      has(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY)
+        ? request("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, decodeAgentBuiltinMemorySettings, { agentId }, serverId)
+        : null,
+    updateAgentBuiltinMemory: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_BUILTIN_MEMORY_CAPABILITY, "mobile.agent.host.unsupported");
+      return request(
+        "POST",
+        AGENT_BUILTIN_MEMORY_ROUTES.update,
+        decodeAgentBuiltinMemorySettings,
+        { ...input },
+        serverId,
+      );
     },
     loadAgentDefaults: async (serverId) =>
       has(serverId, AGENT_DEFAULTS_CAPABILITY)

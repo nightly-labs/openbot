@@ -479,6 +479,8 @@ const server = createServer((request, response) => {
     </script>`);
 });
 
+const HANG_LIMIT_MS = 10 * 60_000;
+
 const SCENARIOS = [
   "identity",
   "background",
@@ -523,7 +525,7 @@ async function main(): Promise<void> {
   const hardTimeout = setTimeout(() => {
     process.stderr.write("BrowserHost smoke test timed out.\n");
     app.exit(1);
-  }, 180_000);
+  }, HANG_LIMIT_MS);
 
   try {
     if (persistencePhase) {
@@ -2791,6 +2793,7 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
     }
     if (!pressed) throw new Error("A live view click did not reach the page.");
     await runLiveViewClipboard(browser, tabId, contents);
+    await runLiveViewDigitTyping(browser, tabId, contents);
 
     await contents.executeJavaScript(
       `(() => {
@@ -2962,6 +2965,48 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
   } finally {
     await Effect.runPromise(stopView());
   }
+}
+
+async function runLiveViewDigitTyping(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const code = "482913";
+  for (const filter of ["keydown-keycode", "keypress-key"]) {
+    await contents.executeJavaScript(
+      `(() => {
+      document.getElementById('live-view-digits')?.remove();
+      const field = document.createElement('input');
+      field.id = 'live-view-digits';
+      field.inputMode = 'numeric';
+      field.style.cssText = 'position:fixed;left:10px;top:230px;width:300px;height:60px;z-index:2147483647';
+      if ('${filter}' === 'keydown-keycode') {
+        field.addEventListener('keydown', event => { if (event.keyCode < 48 || event.keyCode > 57) event.preventDefault(); });
+      } else {
+        field.addEventListener('keypress', event => { if (!/^[0-9]$/.test(event.key)) event.preventDefault(); });
+      }
+      document.body.append(field);
+      field.focus();
+    })()`,
+      true,
+    );
+    for (const digit of code) {
+      for (const action of ["down", "char", "up"] as const) {
+        await runCauseEffect(
+          browser.dispatchViewInput(tabId, {
+            type: "key",
+            action,
+            key: digit,
+            code: `Digit${digit}`,
+            text: action === "char" ? digit : "",
+            modifiers: 0,
+          }),
+        );
+      }
+    }
+    const typed = await contents.executeJavaScript("document.getElementById('live-view-digits').value", true);
+    if (typed !== code) {
+      throw new Error(`Live view digits in a field with a ${filter} digit filter left ${JSON.stringify(typed)}.`);
+    }
+  }
+  await contents.executeJavaScript("document.getElementById('live-view-digits').remove()", true);
 }
 
 async function runLiveViewClipboard(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {

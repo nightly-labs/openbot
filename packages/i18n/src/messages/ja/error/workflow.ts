@@ -25,18 +25,25 @@ export const messages = {
     "モデルが時間内に回答しませんでした。このステップの推論レベルを下げるか、より速いモデルを選んでから、もう一度実行してください。",
   "error.workflow.modelToolUse":
     "モデルがツールを使おうとしましたが、このステップはテキストでしか回答できません。ステップをもう一度実行するか、別のモデルを選んでください。",
+  "error.workflow.modelImageUnsupported":
+    "このステップのモデルは画像を読み取れません。画像を読み取れるモデルを選ぶか、画像の接続を外してください。",
+  "error.workflow.modelImageType":
+    "モデルのステップが読み取れる画像は PNG、JPEG、GIF、WebP だけです。これらの形式の画像を接続してください。",
   "error.workflow.modelUnavailable": "このステップのモデルは利用できません。このステップに別のモデルを選んでください。",
   "error.workflow.providerBusy": "プロバイダーが混み合っています。数分待ってから、ステップをもう一度実行してください。",
   "error.workflow.providerOffline":
     "OpenBot がプロバイダーに接続できませんでした。インターネット接続を確認してから、ステップをもう一度実行してください。",
   "error.workflow.modelBusy": "別のモデルリクエストが実行中です。しばらくしてからステップを再実行してください。",
   "error.workflow.mediaFailed": "モデルが画像または動画を作成できませんでした。ステップをもう一度実行してください。",
+  "error.workflow.mediaNotMade": "モデルは画像または動画を作成しませんでした。モデルの回答: {answer}",
   "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
   "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
   "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",
   "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
   "error.workflow.mediaInputNotImage":
     "このステップは画像のみを受け取り、動画は受け取れません。動画からの接続を削除してください。",
+  "error.workflow.mediaInputNotClip":
+    "この入力は動画と音声ファイルのみを受け取ります。ファイルからの接続を削除してください。",
   "error.workflow.stepMissing": "このステップはもう存在しません。",
   "error.workflow.nodeMissing": "この手順はワークフローにありません。",
   "error.workflow.runMissing": "この実行はもう存在しません。",

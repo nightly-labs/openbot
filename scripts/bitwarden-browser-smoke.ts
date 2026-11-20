@@ -28,7 +28,7 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
   let cliFails = false;
   let vaultLogins: VaultLogin[] = [];
   const connector = new BitwardenConnectorService({
-    findCli: async () => "/fixture/bw",
+    findCli: () => Effect.succeed({ executable: "/fixture/bw" }),
     runCli: async (_executable, args) => {
       if (cliFails) throw new Error("Fixture bw failure.");
       if (args[0] === "sync") return "Sync complete.";

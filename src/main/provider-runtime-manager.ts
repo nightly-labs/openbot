@@ -169,7 +169,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #checkRetentionMs = VERSION_RETENTION_MS;
   #revision = 0;
   #stopping = false;
-  #updateInstalled = false;
+  readonly #declined = new Map<ManagedRuntimeId, string>();
 
   constructor(options: ProviderRuntimeManagerOptions) {
     super();
@@ -239,7 +239,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
         const offer =
           missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
-        const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
+        const automatic = this.#updatesAutomatically(provider, this.#target);
         providers[provider].availableVersion =
           offer && !configuredCliPath(provider) && !automatic && this.#isProviderOn(provider) ? version : null;
       }
@@ -387,10 +387,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       : VERSION_RETENTION_MS;
   }
 
-  startUpdateChecks(options: { intervalMs?: number; updateInstalled?: boolean } = {}): void {
+  startUpdateChecks(options: { intervalMs?: number } = {}): void {
     if (this.#checkTimer || !this.#target || this.#stopping) return;
     this.#checkIntervalMs = options.intervalMs ?? UPDATE_CHECK_INTERVAL_MS;
-    this.#updateInstalled = options.updateInstalled ?? false;
     const check = () => void runCauseEffect(this.checkForUpdates()).catch(() => undefined);
     this.#checkTimer = setInterval(check, this.#checkIntervalMs);
     this.#checkTimer.unref();
@@ -419,14 +418,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         { concurrency: "unbounded" },
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
-      if (this.#updateInstalled) {
-        yield* Effect.forEach(
-          this.#stopping ? [] : PROVIDERS.filter((provider) => this.#updatesInstalled(provider, target)),
-          (provider) => Effect.ignore(this.#startDownload(provider, target)),
-          { discard: true },
-        );
-        this.#updateInstalled = false;
-      }
+      yield* this.#startAutomaticUpdates(target);
+      yield* Effect.forEach(
+        this.#stopping ? [] : PROVIDERS.filter((provider) => !this.#tasks.has(provider)),
+        (provider) => this.#removeBlockedCopiesEffect(provider, target),
+        { discard: true },
+      );
       const repairs = PROVIDERS.filter(
         (provider) =>
           this.#rejected.has(provider) &&
@@ -455,16 +452,46 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     });
   }
 
-  #updatesInstalled(provider: ManagedProviderId, target: RuntimeTarget): boolean {
+  #startAutomaticUpdates(target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.forEach(
+      this.#stopping ? [] : PROVIDERS.filter((provider) => this.#updatesAutomatically(provider, target)),
+      (provider) => Effect.ignore(this.#startDownload(provider, target)),
+      { discard: true },
+    );
+  }
+
+  #updatesAutomatically(provider: ManagedProviderId, target: RuntimeTarget): boolean {
     const { phase, version } = this.#statuses[provider];
+    const offered = this.#targetSpec(provider, target).version;
     return (
+      this.#checkTimer !== null &&
+      this.#declined.get(provider) !== offered &&
       (phase === "ready" || phase === "not-downloaded") &&
       version !== null &&
-      olderVersion(version, this.#targetSpec(provider, target).version) &&
+      (olderVersion(version, offered) || (version !== offered && this.#isBlocked(provider, version))) &&
       !this.#systemVersions.has(provider) &&
       !configuredCliPath(provider) &&
       this.#isProviderOn(provider)
     );
+  }
+
+  #isBlocked(runtime: ManagedRuntimeId, version: string): boolean {
+    return !isManagedToolRuntime(runtime) && (this.#blocked.get(runtime)?.has(version) ?? false);
+  }
+
+  #removeBlockedCopiesEffect(runtime: ManagedRuntimeId, target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const targetRoot = dirname(this.#installRoot(runtimeSpec(runtime, target, this.#lock)));
+      const versions = yield* runtimeIO(async () => await readdir(targetRoot).catch(() => []));
+      const blocked = versions.filter(
+        (version) => version !== this.#statuses[runtime].version && this.#isBlocked(runtime, version),
+      );
+      const unused = yield* Effect.forEach(blocked, (version) => {
+        const path = join(targetRoot, version);
+        return this.#stampedBySiblingEffect(path).pipe(Effect.map((inUse) => (inUse ? [] : [path])));
+      });
+      yield* this.#removeOldVersionPathsEffect(unused.flat(), Number.POSITIVE_INFINITY);
+    }).pipe(Effect.catch(() => Effect.void));
   }
 
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
@@ -501,6 +528,14 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           yield* this.#inspectEffect(provider).pipe(Effect.ignore);
         }
       }
+      const target = this.#target;
+      const check = this.#check;
+      if (target && check) {
+        yield* Effect.forkIn(
+          this.#awaitReleaseCheck(check).pipe(Effect.andThen(this.#startAutomaticUpdates(target))),
+          this.#scope,
+        );
+      } else if (target) yield* this.#startAutomaticUpdates(target);
       this.#revision += 1;
       this.emit("status", this.getStatus());
     });
@@ -571,8 +606,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (!isManagedToolRuntime(runtime) && configuredCliPath(runtime))
         return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cliOverride")) });
       if (this.#tasks.has(runtime)) return this.getStatus();
-      if (this.#check && !(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
-        yield* this.#awaitReleaseCheck(this.#check);
+      if (!(isManagedToolRuntime(runtime) || this.#latest.has(runtime))) {
+        if (this.#check) yield* this.#awaitReleaseCheck(this.#check);
+        else if (this.#checkTimer && this.#statuses[runtime].version === null)
+          yield* this.#findLatestRelease(runtime, this.#target);
         if (this.#stopping)
           return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
         if (this.#tasks.has(runtime)) return this.getStatus();
@@ -591,7 +628,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#tasks.has(runtime)) return this.getStatus();
       const spec = this.#targetSpec(runtime, target);
       const current = this.#statuses[runtime];
-      if (current.version && !olderVersion(current.version, spec.version)) {
+      if (
+        current.version &&
+        !olderVersion(current.version, spec.version) &&
+        !(current.version !== spec.version && this.#isBlocked(runtime, current.version))
+      ) {
         if (current.phase !== "ready") this.#setStatus(runtime, yield* this.#inspectEffect(runtime));
         return this.getStatus();
       }
@@ -636,6 +677,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   ): Effect.Effect<void, ProviderRuntimeFailure> {
     return Deferred.await(check).pipe(
       Effect.catch(() => Effect.void),
+      Effect.timeoutOrElse({ duration: RELEASE_CHECK_WAIT_MS, orElse: () => Effect.void }),
+    );
+  }
+  #findLatestRelease(provider: ManagedProviderId, target: RuntimeTarget): Effect.Effect<void> {
+    const lookups = [
+      fetchBlockedVersions(this.#fetch).pipe(
+        Effect.tap((blocked) =>
+          Effect.sync(() => {
+            this.#blocked = blocked;
+          }),
+        ),
+      ),
+      latestRelease(provider, { target, lock: this.#lock, fetch: this.#fetch }).pipe(
+        Effect.tap((release) => Effect.sync(() => this.#latest.set(provider, release))),
+      ),
+    ];
+    return Effect.forEach(lookups, (lookup) => Effect.ignore(lookup), { concurrency: "unbounded", discard: true }).pipe(
       Effect.timeoutOrElse({ duration: RELEASE_CHECK_WAIT_MS, orElse: () => Effect.void }),
     );
   }
@@ -695,6 +753,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const task = this.#tasks.get(runtime);
       const spec = this.#transfers.get(runtime);
       this.#cancelled.add(runtime);
+      if (spec) this.#declined.set(runtime, spec.version);
       this.#controllers.get(runtime)?.abort();
       if (task) yield* Fiber.join(task);
       if (spec) yield* this.#removePartialEffect(spec);
@@ -786,16 +845,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
   #updateProviderRuntime(spec: RuntimeSpec, signal: AbortSignal): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      const previous = this.#statuses[spec.runtime].version;
       const installed = yield* this.#readStoreEffect(spec);
-      if (installed.phase === "ready") {
-        yield* this.#activateEffect(spec, signal, false);
-        return;
+      if (installed.phase !== "ready") {
+        if (this.#stopping)
+          return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
+        yield* runtimeSync(() => signal.throwIfAborted());
+        this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
       }
-      if (this.#stopping)
-        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
-      yield* runtimeSync(() => signal.throwIfAborted());
-      this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
-      yield* this.#activateEffect(spec, signal, true);
+      yield* this.#activateEffect(spec, signal, installed.phase !== "ready");
+      if (previous && previous !== spec.version && this.#isBlocked(spec.runtime, previous))
+        yield* this.#removeBlockedCopiesEffect(spec.runtime, spec.target);
     });
   }
 

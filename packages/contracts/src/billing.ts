@@ -42,18 +42,11 @@ export interface BillingPlan {
 
 export const BILLING_PLANS: readonly BillingPlan[] = [
   { id: "starter", storageGb: 25, memberLimit: 1, siteLimit: 3, relativeSpeed: 1 },
-  { id: "standard", storageGb: 50, memberLimit: 5, siteLimit: 10, relativeSpeed: 2 },
-  { id: "pro", storageGb: 100, memberLimit: 10, siteLimit: 50, relativeSpeed: 4 },
+  { id: "standard", storageGb: 75, memberLimit: 5, siteLimit: 10, relativeSpeed: 2 },
+  { id: "pro", storageGb: 150, memberLimit: 10, siteLimit: 50, relativeSpeed: 4 },
 ];
 
-const OPERATOR_HOST_STORAGE_GB: Readonly<Record<BillingPlanId, number>> = {
-  starter: 25,
-  standard: 75,
-  pro: 150,
-};
-
-export function planStorageGb(plan: BillingPlanId, onOperatorHost: boolean): number {
-  if (onOperatorHost) return OPERATOR_HOST_STORAGE_GB[plan];
+function planStorageGb(plan: BillingPlanId): number {
   return BILLING_PLANS.find((candidate) => candidate.id === plan)?.storageGb ?? 0;
 }
 
@@ -72,12 +65,8 @@ export function storageTierOf(value: unknown): BillingStorageTier {
 }
 
 export function storageTierGb(plan: BillingPlanId, tier: BillingStorageTier): number {
-  if (tier === 0) return OPERATOR_HOST_STORAGE_GB[plan];
+  if (tier === 0) return planStorageGb(plan);
   return STORAGE_TIER_GB[plan][tier === 1 ? 0 : 1];
-}
-
-export function hostedPlanStorageGb(plan: BillingPlanId, onOperatorHost: boolean, tier: BillingStorageTier): number {
-  return onOperatorHost ? storageTierGb(plan, tier) : planStorageGb(plan, false);
 }
 
 export function isStorageGb(value: unknown): value is number {
@@ -90,7 +79,7 @@ interface ServerStorage {
 }
 
 export function serverStorageGb(server: ServerStorage): number {
-  return server.storageGb ?? planStorageGb(server.plan, false);
+  return server.storageGb ?? planStorageGb(server.plan);
 }
 
 export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {

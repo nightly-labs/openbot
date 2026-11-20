@@ -53,6 +53,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Wybrany model agenta jest niedostępny.",
   "error.agent.modelProviderNotConnected":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest połączony.",
+  "error.agent.modelProviderSignInRequired":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga zalogowania. Zaloguj się do {provider} i spróbuj ponownie.",
+  "error.agent.modelProviderNotInstalled":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest zainstalowany.",
+  "error.agent.modelProviderOutdated":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga aktualizacji.",
   "error.agent.modelListEmpty":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli. Ostatni błąd: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -126,6 +132,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Nie udało się całkowicie usunąć danych agenta. Spróbuj ponownie usunąć agenta.",
   "error.agent.deleteFolderInUse":
     "Praca innego agenta nadal używa folderu tego agenta. Usuń agenta ponownie, gdy ta praca się zakończy, lub po ponownym uruchomieniu OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Inny program nadal używa folderu tego agenta, na przykład program uruchomiony przez agenta. Zamknij ten program lub uruchom ponownie komputer, na którym działa ten agent, a potem usuń agenta ponownie.",
   "error.agent.deleteWhenFolderFree":
     "Praca innego agenta nadal używa folderu tego agenta. OpenBot usunie tego agenta, gdy ta praca się zakończy.",
   "error.agent.duplicationBusy": "Ten agent jest już duplikowany.",
@@ -191,6 +199,8 @@ export const messages = {
     "Obszar nie mieści się w jednym wyświetlaczu. Użyj punktów pulpitu w granicach jednego wyświetlacza z list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot nie ma uprawnienia do nagrywania ekranu. Poproś użytkownika, aby otworzył Ustawienia systemowe > Prywatność i ochrona > Nagrywanie ekranu i dźwięku systemowego, włączył OpenBot, a potem zamknął i ponownie otworzył OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot nie ma jeszcze uprawnienia do nagrywania ekranu, więc nie może wyświetlić listy okien. Aby przechwycić ekran, wywołaj capture_screen z target screen. Użytkownik najpierw zatwierdza przechwycenie, a potem macOS może poprosić go o uprawnienie.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows zwrócił pusty obraz. Poproś użytkownika, aby odblokował komputer i zamknął chronione treści. Przechwytywanie ekranu może też blokować zasada organizacji.",
   "error.agent.screenCaptureFailed": "Przechwycenie ekranu nie powiodło się. Spróbuj ponownie.",

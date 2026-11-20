@@ -137,7 +137,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   #lastSample: ResourceSample | null = null;
   #lastSampleAt: number | null = null;
   #previousCpuSeconds: Map<number, number> | null = null;
-  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null }[] = [];
+  #previousAppCpuSeconds = new Map<string, number>();
+  #gone: { kind: "renderer" | "child"; reason: GoneReason; type: ChildType | null; appWindow: boolean }[] = [];
   #rendererTiming: { longTasks: number; inputs: number; inputDelaysMs: number[] } = {
     longTasks: 0,
     inputs: 0,
@@ -289,6 +290,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #resume = () => {
     this.#lastSampleAt = null;
     this.#previousCpuSeconds = null;
+    this.#previousAppCpuSeconds = new Map();
     this.#loop.reset();
     this.#measureLoop();
     this.#startLoopWindow();
@@ -311,25 +313,26 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#turnInLoopWindow = this.#activeTurns.size > 0;
   }
 
-  readonly #rendererGone = (_event: Event, _contents: WebContents, details: RenderProcessGoneDetails) =>
-    this.#recordGone("renderer", details.reason, null);
+  readonly #rendererGone = (_event: Event, contents: WebContents, details: RenderProcessGoneDetails) =>
+    this.#recordGone("renderer", details.reason, null, this.#options.appWindowContents?.().includes(contents) ?? false);
   readonly #childGone = (_event: Event, details: Details) => {
     if (details.type === "Utility" && details.reason === "killed") return;
     this.#recordGone("child", details.reason, childType(details));
   };
 
-  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null): void {
+  #recordGone(kind: "renderer" | "child", reason: string, type: ChildType | null, appWindow = false): void {
     const known = goneReason(reason);
     if (!known) return;
     const name = type ? `child_gone:${type}` : `${kind}_gone`;
     this.#options.trace.record({ kind: "crash", name, durationMs: 0, outcome: known });
     Effect.runFork(this.#options.trace.flush());
-    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type });
+    if (this.#gone.length < MAX_PENDING_GONE) this.#gone.push({ kind, reason: known, type, appWindow });
   }
 
   #countGone(day: ResourceDay): void {
-    for (const { kind, reason, type } of this.#gone) {
+    for (const { kind, reason, type, appWindow } of this.#gone) {
       addCount(day, kind === "renderer" ? COUNTER.rendererGone : COUNTER.childGone);
+      if (appWindow) addCount(day, COUNTER.windowGone);
       if (type) addCount(day, COUNTER.childType(type));
       addCount(day, COUNTER.goneReason(reason));
     }
@@ -435,13 +438,25 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     const rss = new Map<ProcessGroup, number>();
     const privateMemory = new Map<ProcessGroup, number>();
     const cpu = new Map<ProcessGroup, number>();
+    const appCpuSeconds = new Map<string, number>();
+    const processorCount = cpus().length;
     for (const metric of metrics) {
       const group = processGroup(metric, tabPids);
       rss.set(group, (rss.get(group) ?? 0) + metric.memory.workingSetSize / 1024);
       const privateKb = metric.memory.privateBytes;
       if (privateKb !== undefined) privateMemory.set(group, (privateMemory.get(group) ?? 0) + privateKb / 1024);
-      cpu.set(group, (cpu.get(group) ?? 0) + metric.cpu.percentCPUUsage);
+      const processKey = `${metric.pid}:${metric.creationTime}`;
+      const cumulativeSeconds = metric.cpu.cumulativeCPUUsage;
+      if (cumulativeSeconds !== undefined) appCpuSeconds.set(processKey, cumulativeSeconds);
+      const usage = appProcessCpuPct(
+        metric,
+        this.#previousAppCpuSeconds.get(processKey),
+        elapsedSeconds,
+        processorCount,
+      );
+      cpu.set(group, (cpu.get(group) ?? 0) + usage);
     }
+    this.#previousAppCpuSeconds = appCpuSeconds;
 
     let providerTreeSupported = process.platform !== "win32";
     const totalKnown = () => providerTreeSupported || process.platform === "win32";
@@ -581,6 +596,18 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     if (closedDay || Date.now() - this.#persistedAt >= PERSIST_INTERVAL_MS) yield* this.#persist().pipe(Effect.ignore);
     if (closedDay) this.#onDayClosed();
   });
+}
+
+function appProcessCpuPct(
+  metric: ProcessMetric,
+  previousSeconds: number | undefined,
+  elapsedSeconds: number,
+  processorCount: number,
+): number {
+  const seconds = metric.cpu.cumulativeCPUUsage;
+  if (seconds === undefined) return metric.cpu.percentCPUUsage * processorCount;
+  if (previousSeconds === undefined || elapsedSeconds <= 0) return 0;
+  return (Math.max(0, seconds - previousSeconds) / elapsedSeconds) * 100;
 }
 
 function processGroup(metric: ProcessMetric, tabPids: ReadonlySet<number>): ProcessGroup {

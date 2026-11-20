@@ -93,6 +93,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.backgroundBlur.title", descriptionKey: "settings.backgroundBlur.description" },
       { titleKey: "settings.movingFaces.title", descriptionKey: "settings.movingFaces.description" },
+      { titleKey: "settings.startupAnimation.title", descriptionKey: "settings.startupAnimation.description" },
     ],
   },
   {
@@ -124,6 +125,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       },
       { titleKey: "settings.voice.speech.voice.title" },
       { titleKey: "settings.voice.speech.speed.title" },
+      { titleKey: "settings.voice.talkKey.title", descriptionKey: "settings.voice.talkKey.description" },
       {
         titleKey: "settings.voice.speech.codexLive.title",
         descriptionKey: "settings.voice.speech.codexLive.description",

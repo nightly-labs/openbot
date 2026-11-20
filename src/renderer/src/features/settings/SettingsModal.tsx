@@ -51,6 +51,7 @@ import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
+import type { LiveVoiceAccountChoice } from "./LiveVoiceAccountRow";
 import { licenseContactUs, trackLicenseEvent } from "./license-analytics";
 import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
@@ -107,6 +108,7 @@ export interface SettingsModalProps {
   hostedServersApi?: HostedServersDesktopApi | undefined;
   onAddHostedServer?: (() => void) | undefined;
   codexLiveAccess?: CodexLiveAccess | undefined;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   onConnectCodex?: (() => void) | undefined;
   hostedServerDeleteRequest?: { serverId: string; nonce: number } | null;
   onTestNotification?: () => void | Promise<void>;
@@ -348,6 +350,8 @@ export function SettingsModal(props: SettingsModalProps) {
             selectMount={modalElement}
             codexLiveAccess={props.codexLiveAccess}
             onConnectCodex={props.onConnectCodex}
+            liveVoiceAccount={props.liveVoiceAccount}
+            platform={props.appInfo?.platform}
           />
         </Tabs.Content>
 

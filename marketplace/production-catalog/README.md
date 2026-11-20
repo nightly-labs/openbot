@@ -1,8 +1,8 @@
 # OpenBot team launch catalog
 
-Version v4 contains 41 Skills and 27 Agents. The `pstack` Skill installs 52 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
+Version v5 contains 41 Skills and 28 Agents. The `pstack` Skill installs 52 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
 
-Each Agent has one job and a named result, in its title. Its instructions name two input paths (a tool such as the browser, an installed plugin or the repository; else pasted or uploaded material), one approval gate, the evidence each claim needs, a fixed rubric for judgment work, and the adjacent work that belongs to another Agent. Agents with a routine install it active. A routine first reads its saved setup. With no setup, the first run sends one short setup request and later runs stay quiet; a run with nothing new calls `routine_no_update` and sends no message. Dr. Eggbot's two healthchecks still install paused. State that an Agent keeps, such as a saved site address or a care log, goes in a shared data table named for what it holds, on the user's computer.
+Each Agent has one job and a named result, in its title. Its instructions name two input paths (a tool such as the browser, an installed plugin or the repository; else pasted or uploaded material), one approval gate, the evidence each claim needs, a fixed rubric for judgment work, and the adjacent work that belongs to another Agent. Agents with a routine install it active. A routine first reads its saved setup. With no setup, the first run sends one short setup request and later runs stay quiet; a run with nothing new calls `routine_no_update` and sends no message. The two healthchecks of Dr. Eggbot and of dr eggbot v2 still install paused. State that an Agent keeps, such as a saved site address or a care log, goes in a shared data table named for what it holds, on the user's computer.
 
 The Skills work from supplied material and available tools; they do not assume a connected inbox, CRM, ad account, or phone service. The `pstack` Skill is the exception: it is the upstream text, unchanged in substance, and some of its skills use MCP servers, connectors or web links when the agent has them.
 
@@ -23,7 +23,7 @@ bun run marketplace:build
 bun run marketplace:publish:production
 ```
 
-The build writes deterministic ZIP bundles, one SVG icon per Skill, manifests, notices, and checksums to `out/marketplace-production/v4`. A Skill icon is the artwork of its category, so a listing reads as a set; the mark uses paths, not emoji, because a reader's computer may not carry the font. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
+The build writes deterministic ZIP bundles, one SVG icon per Skill, manifests, notices, and checksums to `out/marketplace-production/v5`. A Skill icon is the artwork of its category, so a listing reads as a set; the mark uses paths, not emoji, because a reader's computer may not carry the font. The publish command without flags is an offline dry run. Review the catalog and ensure the account database has migrations through `0019_marketplace_presentation.sql` before production publication.
 
 To publish after review, authenticate Wrangler for the production account and provide `SKILLS_ADMIN_TOKEN` through the environment, then run:
 
@@ -78,6 +78,7 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | Home Care Log | `home-care-log` | other | A private care log for plants, pets and filters, with a weekend due list | `care-log` | Saturdays 09:00 |
 | Bill Tracker | `bill-tracker` | other | Recurring charges, price changes and renewals from your statements, with the statement lines | `recurring-charges` | Mondays 09:15 |
 | Dr. Eggbot | `dr-eggbot` | automation | Designs focused agents, skills and routines | `agent-designer`, `eggbot-getting-started`, `routine-healthcheck`, `agent-chat-healthcheck`, `working-with-teammate-agents`, `pstack` | weekdays 08:44 (paused); Mondays 08:49 (paused) |
+| dr eggbot v2 | `dr-eggbot-v2` | automation | Agent designer | `agent-designer`, `pstack`, `routine-healthcheck`, `agent-chat-healthcheck`, `working-with-teammate-agents`, `eggbot-getting-started` | weekdays 08:44 (paused); Mondays 08:49 (paused) |
 
 ## Skills
 

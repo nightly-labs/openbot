@@ -172,7 +172,7 @@ function unknownReference(argument: "messageId" | "before", input: string): z.Zo
   const message =
     argument === "before"
       ? "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again."
-      : "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.";
+      : "This chat has no such message. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.";
   return new z.ZodError([{ code: "custom", path: [argument], input, message }]);
 }
 
@@ -198,7 +198,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];
@@ -249,6 +249,7 @@ interface HistoryEntry {
   nextOffset: number | null;
   totalCharacters: number;
   attachments: { id: string; name: string; mimeType: string; size: number }[];
+  beforeNewChat?: true;
   workSteps?: string;
   workStepsOffset?: number;
   nextWorkStepsOffset?: number | null;
@@ -279,7 +280,8 @@ export class HistoryTools {
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
     const latest = (threadId: string, author: "user" | "assistant") =>
-      store.database.readAgentHistory(agentId, threadId, { author, limit: 1 }).messages[0]?.message ?? null;
+      store.database.readAgentHistory(agentId, threadId, { author, acrossResets: true, limit: 1 }).messages[0]
+        ?.message ?? null;
     const shown = (entry: ThreadEntry) => after === null || (entry.lastActivityAt ?? "") >= after;
     const listed = yield* toolStep(() => {
       const entry = (taskId: string, threadId: string, record: AgentThreadRecord | null): ThreadEntry => {
@@ -452,6 +454,7 @@ export class HistoryTools {
     const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
       outgoing: true,
+      acrossResets: true,
       limit: read?.messageId ? 1 : scanLimit + 1,
       ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
@@ -518,6 +521,7 @@ export class HistoryTools {
         author: sentTo ? "assistant" : message.author,
         ...(sentTo ? { sentTo } : {}),
         createdAt: message.createdAt,
+        ...(row.beforeReset ? { beforeNewChat: true as const } : {}),
         text: excerpt,
         offset,
         nextOffset: offset + excerpt.length < text.length ? offset + excerpt.length : null,
@@ -593,7 +597,12 @@ export class HistoryTools {
     if (result.nextCursor === null) delete result.next;
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>
-        store.database.readAgentHistory(agentId, threadId, { messageId: entry.messageId, outgoing: true, limit: 1 }),
+        store.database.readAgentHistory(agentId, threadId, {
+          messageId: entry.messageId,
+          outgoing: true,
+          acrossResets: true,
+          limit: 1,
+        }),
       );
       if (
         checked.resetMessageId !== page.resetMessageId ||

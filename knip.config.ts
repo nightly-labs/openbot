@@ -76,8 +76,8 @@ const config: KnipConfig = {
       ignoreUnresolved: ["scripts/.+\\.ts"],
     },
     "apps/auth-api": {
-      entry: ["*.ts", "src/email-relay-entry.ts"],
-      project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "*.ts"],
+      entry: ["*.ts", "src/email-relay-entry.ts", "scripts/*.ts"],
+      project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "scripts/**/*.ts", "*.ts"],
       ignoreDependencies: ["cloudflare"],
     },
     "apps/site-router": {

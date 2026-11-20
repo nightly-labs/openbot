@@ -177,5 +177,6 @@ export function parseWorkflowMediaPrice(value: unknown): WorkflowMediaPriceReque
     duration: value.duration,
     resolution: value.resolution,
     transparent: value.transparent,
+    ...(value.options ? { options: value.options.map(({ name, value }) => ({ name, value })) } : {}),
   };
 }

@@ -43,6 +43,7 @@ import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
+    message.startsWith("Exceeded skills context budget") ||
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
     message.startsWith("Under-development features enabled:") ||
     message.startsWith("Configured service tier ") ||
@@ -57,7 +58,9 @@ export function isArchivedThreadError(error: unknown): boolean {
 }
 
 export function isCodexMissingRollout(error: unknown): boolean {
-  return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
+  if (!(error instanceof AppServerError)) return false;
+  if (/^invalid paginated history lineage for \S+: missing source rollout$/.test(error.message)) return true;
+  return error.code === -32600 && error.message.startsWith("thread not loaded:");
 }
 
 export function isCodexRolloutPending(error: unknown): boolean {
@@ -130,6 +133,14 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
+function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+}
+
+function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
+  return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
+}
+
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
@@ -181,7 +192,10 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
-  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
+    return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isStuckAcpTurn(provider, message))
+    return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
@@ -490,6 +504,9 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   const openBot = openBotTool(item);
   if (openBot === "search_memories" || openBot === "list_memories") {
     return completed ? null : sourceText("status.agent.memoriesSearching");
+  }
+  if (openBot === "history_search" || openBot === "history_read") {
+    return completed ? null : sourceText("status.agent.chatsSearching");
   }
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");

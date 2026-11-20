@@ -52,6 +52,12 @@ export const messages = {
   "error.agent.modelUnavailable": "선택한 에이전트 모델을 사용할 수 없어요.",
   "error.agent.modelProviderNotConnected":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 연결되어 있지 않아요.',
+  "error.agent.modelProviderSignInRequired":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 로그인해야 해요. {provider}에 로그인한 후 다시 시도하세요.',
+  "error.agent.modelProviderNotInstalled":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}이(가) 설치되어 있지 않아요.',
+  "error.agent.modelProviderOutdated":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}을(를) 업데이트해야 해요.',
   "error.agent.modelListEmpty":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요. 마지막 오류: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -121,6 +127,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
   "error.agent.deleteFolderInUse":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
+  "error.agent.deleteFolderLocked":
+    "다른 프로그램(예: 에이전트가 시작한 프로그램)이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 프로그램을 닫거나 이 에이전트가 실행되는 컴퓨터를 다시 시작한 뒤에 에이전트를 다시 삭제해 주세요.",
   "error.agent.deleteWhenFolderFree":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나면 OpenBot이 이 에이전트를 삭제해요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",
@@ -180,6 +188,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",
   "error.agent.mcpServerKeysMove":
     "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 마켓플레이스, 앱, {name}에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 서버 {name}은(는) 로컬 명령을 실행하므로 헤더를 받지 않아요. 사용자에게 마켓플레이스, 앱, {name}에서 키를 입력해 달라고 요청하세요.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "이 OpenBot의 사용자만 나와의 채팅에서 MCP 서버 {name}의 키를 줄 수 있어요. 사용자에게 마켓플레이스, 앱, {name}에서 키를 입력해 달라고 요청하세요.",
   "error.agent.mcpServerBuiltIn":
     "{name}은(는) OpenBot의 일부라서 MCP 도구로 테스트하거나 켜고 끄거나 제거할 수 없어요. 사용자가 OpenBot을 실행하는 컴퓨터에서 관리해요. GitHub 연결은 마켓플레이스, 앱, GitHub에서, 컴퓨터 제어는 설정, 컴퓨터 제어에서 관리해요.",
   "error.agent.mcpServerUnknown": "{name}(이)라는 MCP 서버가 없어요. list_mcp_servers를 호출해 이름을 확인하세요.",
@@ -191,6 +203,8 @@ export const messages = {
     "해당 영역이 하나의 디스플레이 안에 있지 않아요. list_capture_sources에서 가져온 한 디스플레이 범위 안의 데스크톱 포인트를 사용하세요.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot에 화면 녹화 권한이 없어요. 사용자에게 시스템 설정 > 개인정보 보호 및 보안 > 화면 및 시스템 오디오 녹화를 열어 OpenBot을 켠 다음, OpenBot을 종료했다가 다시 열도록 요청하세요.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot에 아직 화면 녹화 권한이 없어서 창 목록을 가져올 수 없어요. 디스플레이를 캡처하려면 target screen으로 capture_screen을 호출하세요. 사용자가 먼저 캡처를 승인하고, 그다음 macOS가 사용자에게 권한을 요청할 수 있어요.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows가 빈 이미지를 반환했어요. 사용자에게 컴퓨터 잠금을 해제하고 보호된 콘텐츠를 닫도록 요청하세요. 조직의 정책이 화면 캡처를 막을 수도 있어요.",
   "error.agent.screenCaptureFailed": "화면 캡처에 실패했어요. 다시 시도해 주세요.",

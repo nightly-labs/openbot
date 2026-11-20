@@ -26,13 +26,11 @@ import {
   storageTierOf,
 } from "@openbot/contracts/billing";
 import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
-import {
-  type HostedServerCatalog,
-  type HostedServerCatalogPlan,
-  type HostedServerEntryPoint,
-  type HostedServerPlanPrices,
-  type HostedServerSize,
-  hostedServerStorageGb,
+import type {
+  HostedServerCatalog,
+  HostedServerCatalogPlan,
+  HostedServerEntryPoint,
+  HostedServerPlanPrices,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -54,6 +52,7 @@ import {
   type PlanChangeDirection,
   type PlanEndReason,
 } from "./account-analytics";
+import { subscriptionPaysForOwnerSql } from "./billing-entitlement";
 import {
   BillingError,
   BillingOperationError,
@@ -133,7 +132,6 @@ interface ServerPlanRow {
   current_period_end: number | null;
   cancel_at_period_end: number;
   on_operator_host: number;
-  server_size: HostedServerSize | null;
   storage_tier: number;
 }
 
@@ -288,6 +286,7 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       referralCoupon: (userId) => this.#referral.couponFor(userId),
+      keptReferralCoupon: (subscriptionId) => this.#referral.keptCoupon(subscriptionId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
@@ -318,7 +317,7 @@ export class BillingService {
         }
         const entry: HostedServerCatalogPlan = {
           id: plan.id,
-          diskGb: plan.storageGb,
+          diskGb: storageTierGb(plan.id, 0),
           memberLimit: plan.memberLimit,
           relativeSpeed: plan.relativeSpeed,
           prices: planPrices,
@@ -334,6 +333,9 @@ export class BillingService {
 
   readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
     this.#referral.credit(userId);
+
+  readonly releaseReferralCredit = (): Effect.Effect<number, BillingError | BillingOperationError> =>
+    this.#referral.releaseDue();
 
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (
@@ -781,10 +783,9 @@ export class BillingService {
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
                   hs.operator_host IS NOT NULL AS on_operator_host,
-                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
                   COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
-           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
            WHERE s.user_id = ? AND s.status IN ${OPEN_STATUSES_SQL}
            ORDER BY h.name IS NULL, h.name COLLATE NOCASE, s.updated_at DESC`,
@@ -1418,7 +1419,7 @@ function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size, storageTier),
+    storageGb: storageTierGb(row.plan, storageTier),
     ...(canBuyStorage(row)
       ? { storageUpgrades: storageUpgrades(row.plan, row.interval, row.currency, storageTier, row.amount, prices) }
       : {}),

@@ -13,20 +13,38 @@ export function isMcpSessionClosingDiagnostic(message: string): boolean {
   return /\bsession is closing \(process scope already reclaimed\)/u.test(message);
 }
 
-export type McpProviderFailureKind = "sign_in" | "timeout" | "failed";
+export type McpProviderFailureKind = "sign_in" | "timeout" | "unavailable" | "unreachable" | "failed";
 
 export function mcpProviderFailureKind(message: string): McpProviderFailureKind {
-  return isMcpSignInDiagnostic(message) ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+  if (isMcpSignInDiagnostic(message)) return "sign_in";
+  if (isMcpTimeoutDiagnostic(message)) return "timeout";
+  if (isMcpUnavailableDiagnostic(message)) return "unavailable";
+  return isMcpUnreachableDiagnostic(message) ? "unreachable" : "failed";
 }
 
 export const MCP_PROVIDER_FAILURE_TEXT = {
   sign_in: "error.backend.mcpServerSignInForProvider",
   timeout: "error.backend.mcpServerTimedOutInProvider",
+  unavailable: "error.backend.mcpServerUnavailableInProvider",
+  unreachable: "error.backend.mcpServerUnreachableInProvider",
   failed: "error.backend.mcpServerFailedInProvider",
 } as const;
 
 function isMcpTimeoutDiagnostic(message: string): boolean {
   return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
+}
+
+function isMcpUnavailableDiagnostic(message: string): boolean {
+  return (
+    /\bHTTP\W{0,3}5\d\d\b/.test(message) ||
+    /\bstatus(?:\s+code)?\W{0,3}5\d\d\b|\bservice unavailable\b|\bbad gateway\b|\bgateway time-?out\b/i.test(message)
+  );
+}
+
+function isMcpUnreachableDiagnostic(message: string): boolean {
+  return /\berror sending request\b|\bconnection (?:refused|reset)\b|\bECONNREFUSED\b|\bECONNRESET\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\bEHOSTUNREACH\b|\bENETUNREACH\b|\bdns error\b|\bfailed to lookup address\b|\bno route to host\b|\bnetwork is unreachable\b/i.test(
+    message,
+  );
 }
 
 export function isTelemetryExportDiagnostic(message: string): boolean {
@@ -124,6 +142,12 @@ const RUST_LOG_RECORD =
 
 export function isRustLogBelowErrorDiagnostic(message: string): boolean {
   return RUST_LOG_RECORD.test(message);
+}
+
+const PI_WARNING_RECORD = /^Warning: /u;
+
+export function isPiWarningDiagnostic(message: string): boolean {
+  return PI_WARNING_RECORD.test(message);
 }
 
 export const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;

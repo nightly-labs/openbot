@@ -53,7 +53,9 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
+  agentAccessRank,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
   agentQuickAcknowledgementEnabled,
@@ -111,7 +113,13 @@ import {
   setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
-import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
+import {
+  type AppServerRequest,
+  type DynamicToolCallParams,
+  type DynamicToolResult,
+  isRecord,
+  PROVIDER_STOPPED_WAITING,
+} from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import type { VaultItems } from "../vault-items";
@@ -217,7 +225,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchChatPlaces, searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -267,6 +275,14 @@ function requestAborted(signal: AbortSignal | undefined) {
     return Effect.sync(() => signal?.removeEventListener("abort", abort));
   });
 }
+
+const AGENT_MEMORY_TOOLS: ReadonlySet<string> = new Set([
+  "search_memories",
+  "list_memories",
+  "set_memory_inclusion",
+  "remember",
+  "forget_memory",
+]);
 
 const LISTED_DESCRIPTION_LENGTH = 300;
 
@@ -404,6 +420,8 @@ export interface OpenBotToolRouterHooks {
   runsTurn(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
+  turnUnfinished(turnId: string): boolean;
+  startedTask(turnId: string): void;
   requestNoUpdate(
     agentId: string,
     threadId: string,
@@ -606,9 +624,11 @@ export class OpenBotToolRouter {
     request: AppServerRequest,
   ) {
     if (request.signal?.aborted) return;
-    request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
-      once: true,
-    });
+    request.signal?.addEventListener(
+      "abort",
+      () => this.#attention.cancelRequest(client, request.id, request.signal?.reason === PROVIDER_STOPPED_WAITING),
+      { once: true },
+    );
     const reportFailure = (error: unknown) =>
       Effect.sync(() => {
         if (client.running) {
@@ -1012,6 +1032,8 @@ export class OpenBotToolRouter {
     const call = deferredCall(params);
     const found = servers && agentId && call ? findAgentMcpTool(servers.forAgent(agentId), call.name) : null;
     if (!servers || !agentId || !call || !found) return null;
+    const computerUse = found.config.id === COMPUTER_USE_MCP_SERVER_ID;
+    if (computerUse && client.relaysMcpServer?.(params.threadId, found.config) !== true) return null;
     const decision = yield* this.#attention
       .awaitToolApproval(client, request, {
         requestId: request.id,
@@ -1027,9 +1049,19 @@ export class OpenBotToolRouter {
       })
       .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
-    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments)).pipe(
-      Effect.raceFirst(requestAborted(request.signal)),
-    );
+    const relayed =
+      client.callRelayedMcpTool?.(params.threadId, found.config, found.tool, call.arguments) ?? Effect.succeed(null);
+    const outcome = yield* Effect.result(
+      relayed.pipe(
+        Effect.flatMap((answer) =>
+          answer
+            ? Effect.succeed(answer)
+            : computerUse
+              ? Effect.succeed({ error: sourceText("error.backend.mcpServerStoppedDuringCall") })
+              : servers.callTool(found.config, found.tool, call.arguments),
+        ),
+      ),
+    ).pipe(Effect.raceFirst(requestAborted(request.signal)));
     if (Result.isFailure(outcome))
       return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
     return "error" in outcome.success
@@ -1644,6 +1676,11 @@ export class OpenBotToolRouter {
     };
   }
 
+  #memoryEnabled(agentId: string): boolean {
+    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agents = this.#hooks.listAgents();
     const agent = agents.find((candidate) => candidate.id === agentId);
@@ -1889,7 +1926,7 @@ export class OpenBotToolRouter {
       return openBotToolResult({
         status: "posted",
         channel: { id: channel.id, name: channel.name },
-        next: "The channel members work on it in the channel. Tell the user to follow it there, and do not do the work here.",
+        next: "The channel members work on it in the channel, and each member that takes it sends its result back here in a later turn. Do not do the work here and do not wait: tell the user where it went, then end your turn.",
       });
     }
 
@@ -1964,7 +2001,8 @@ export class OpenBotToolRouter {
     if (params.tool === "list_agents") {
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
-      const agents = this.#hooks.listAgents().map((agent) => {
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds).map((agent) => {
         const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
         const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
         const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
@@ -2017,7 +2055,12 @@ export class OpenBotToolRouter {
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
     }
 
-    if (params.tool === "interrupt_agent") return yield* this.#interruptTool.handle(params, senderAgentId);
+    if (params.tool === "interrupt_agent")
+      return yield* this.#interruptTool.handle(
+        params,
+        senderAgentId,
+        this.#memberRequesters(senderAgentId, params.turnId),
+      );
 
     if (params.tool === "read_agent") {
       const args = readAgentToolSchema.parse(params.arguments ?? {});
@@ -2246,7 +2289,16 @@ export class OpenBotToolRouter {
       );
     }
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcpForAgent);
+    if (AGENT_MEMORY_TOOLS.has(params.tool) && !this.#memoryEnabled(senderAgentId))
+      return openBotToolFailure(
+        "OpenBot memory is off for you, so this tool does not work. Use a connected memory app instead, or tell the user that they can turn on OpenBot memory in your settings.",
+      );
+    const memoryResult = this.#memories.handleTool(
+      params,
+      senderAgentId,
+      this.#hooks.redactMcpForAgent,
+      this.#hooks.turnUnfinished(params.turnId),
+    );
     if (memoryResult) return memoryResult;
 
     const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
@@ -2256,11 +2308,13 @@ export class OpenBotToolRouter {
       inExecutionThread:
         this.#conversation.isExecutionThread(callerThreadId) &&
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
+      requesterIds: this.#memberRequesters(senderAgentId, params.turnId),
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
+    if (taskResult?.success) this.#hooks.startedTask(params.turnId);
     if (taskResult) return taskResult;
 
     const tableResult = yield* handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
@@ -2283,11 +2337,29 @@ export class OpenBotToolRouter {
           app: args.app,
           next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
-      const connection = this.#messaging.store
+      const appId = args.app;
+      const suggestCard = () =>
+        this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
+          itemType: marketplaceSuggestionItemType({ appId }),
+          text: sourceText("status.agent.marketplaceSuggested", { app: appId }),
+          eventType: "marketplace.suggested",
+          detail: { appId },
+        });
+      const connected = this.#messaging.store
         .connections()
-        .find((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+        .filter((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      const connection = connected[0];
       if (connection) {
         const name = PLATFORM_NAMES[connection.platform];
+        const agentIds = new Set(this.#hooks.listAgents().map((agent) => agent.id));
+        if (connected.some((record) => !record.orchestratorAgentId || !agentIds.has(record.orchestratorAgentId))) {
+          suggestCard();
+          return openBotToolResult({
+            status: "no_agent",
+            app: args.app,
+            next: `${name} is connected for every agent of this server, so openbot.messaging_post can post there; do the task. But the ${name} Orchestrator is missing, so no agent answers new messages that people send there, except the ones that a workflow takes. Only the user can add it. When the user wants an agent to answer there, tell them to open the card in the chat, or Marketplace > Apps > ${name}, and click Add agent.`,
+          });
+        }
         return openBotToolResult({
           status: "connected",
           app: args.app,
@@ -2299,12 +2371,7 @@ export class OpenBotToolRouter {
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
           toolStep(() => this.#postMcpSignInCard(senderAgentId, executionThreadId, params.turnId, config)),
         );
-      this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
-        itemType: marketplaceSuggestionItemType({ appId: args.app }),
-        text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
-        eventType: "marketplace.suggested",
-        detail: { appId: args.app },
-      });
+      suggestCard();
       return openBotToolResult({
         status: "suggested",
         app: args.app,
@@ -2322,11 +2389,15 @@ export class OpenBotToolRouter {
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
-        const found = matches.length > 0 || serverPlaces.length > 0;
+        const chatPlaces = searchChatPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0 || chatPlaces.length > 0;
+        const apps =
+          "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
           status: found ? "matches" : "not_found",
           matches,
           ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          ...(chatPlaces.length > 0 ? { chatPlaces } : {}),
           next: found
             ? [
                 matches.length > 0
@@ -2335,11 +2406,15 @@ export class OpenBotToolRouter {
                 serverPlaces.length > 0
                   ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
                   : "",
+                chatPlaces.length > 0
+                  ? "A chat place is a feature of the chat itself, with no id and no card: when it fits, tell the user in words where it is and what it does."
+                  : "",
+                apps,
                 "When none fits, try other English words once, then say that you found no setting for it.",
               ]
                 .filter(Boolean)
                 .join(" ")
-            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
+            : `No setting matches. ${apps} For a setting, try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.`,
         });
       }
       const shown = settingLinkSummary(setting);
@@ -2664,11 +2739,15 @@ export class OpenBotToolRouter {
     }
     const target = yield* this.#captureApprovalReason(host, capture);
     if (typeof target !== "string") return target;
+    const promptsForPermission = yield* host.promptsForPermission();
     const channelName = channelId ? this.#channels.store.get(channelId).name : null;
-    const reason =
-      channelName === null
-        ? target
-        : `${target} ${sourceText("status.agent.screenCaptureChannel", { channel: channelName })}`;
+    const reason = [
+      target,
+      promptsForPermission ? sourceText("status.agent.screenCapturePermissionNext") : null,
+      channelName === null ? null : sourceText("status.agent.screenCaptureChannel", { channel: channelName }),
+    ]
+      .filter((part) => part !== null)
+      .join(" ");
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -2684,7 +2763,7 @@ export class OpenBotToolRouter {
         grantRoot: null,
         permissions: null,
       },
-      { alwaysAsk: channelId !== null },
+      { alwaysAsk: channelId !== null || promptsForPermission },
     );
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.screenCaptureDeclined"));
     const image = yield* Effect.result(host.capture(capture));
@@ -2728,8 +2807,29 @@ export class OpenBotToolRouter {
             Effect.map((decision) => decision === "accept"),
             toToolOperationFailed,
           ),
+      keysFromPerson: (values) => this.#keysFromPerson(agentId, params.turnId, threadId, values),
       requestSignIn: (config) => toolStep(() => this.#postMcpSignInCard(agentId, threadId, params.turnId, config)),
     });
+  });
+
+  readonly #keysFromPerson = Effect.fn("OpenBotToolRouter.keysFromPerson")(function* (
+    this: OpenBotToolRouter,
+    agentId: string,
+    turnId: string,
+    threadId: string,
+    values: readonly string[],
+  ) {
+    if (this.#messaging.store.linkForThread(threadId)) return false;
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId) return this.#requestedByPerson(agentId, turnId, threadId);
+    for (const value of values) {
+      const token = value.trim().split(/\s+/u).at(-1) ?? value;
+      const holds = yield* this.#channels
+        .localRequestHolds(channelId, agentId, turnId, token)
+        .pipe(Effect.catch(() => Effect.succeed(false)));
+      if (!holds) return false;
+    }
+    return true;
   });
 
   readonly #searchSignIns = Effect.fn("OpenBotToolRouter.searchSignIns")(function* (
@@ -2840,6 +2940,33 @@ export class OpenBotToolRouter {
     return [...ids];
   }
 
+  #memberRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind === "agent") {
+        for (const id of this.#mailbox.requesterIds(delivery.messageId)) ids.add(id);
+        continue;
+      }
+      const member = this.#mailbox.senderMember(delivery.messageId);
+      if (member && this.#remoteMember(delivery.messageId)) ids.add(member.id);
+    }
+    return [...ids];
+  }
+
+  #reachableAgents(senderAgentId: string, requesterIds: readonly string[]): AgentSummary[] {
+    return this.#hooks
+      .listAgents()
+      .filter(
+        (agent) =>
+          agent.id === senderAgentId ||
+          requesterIds.every(
+            (personId) =>
+              agentAccessRank(this.#channels.hooks.personAgentLevel?.(personId, agent.id) ?? "manage") >=
+              agentAccessRank("chat"),
+          ),
+      );
+  }
+
   #fromRemoteMember(agentId: string, turnId: string): boolean {
     return this.#mailbox
       .findDeliveriesByTurn(agentId, turnId)
@@ -2898,17 +3025,17 @@ export class OpenBotToolRouter {
       const { x, y, width, height } = capture.region;
       return sourceText("status.agent.screenCaptureRegion", { x, y, width, height });
     }
-    const listed = yield* Effect.result(host.listSources());
-    if (Result.isFailure(listed)) return captureFailure(listed.failure);
-    const sources = listed.success;
     if (capture.target === "window") {
-      const window = sources.windows.find(({ id }) => id === capture.windowId);
+      const listed = yield* Effect.result(host.listSources());
+      if (Result.isFailure(listed)) return captureFailure(listed.failure);
+      const window = listed.success.windows.find(({ id }) => id === capture.windowId);
       if (!window) return openBotToolFailure(sourceText("error.agent.screenCaptureWindowMissing"));
       return sourceText("status.agent.screenCaptureWindow", { name: window.name });
     }
+    const displays = yield* host.listDisplays();
     const display = capture.displayId
-      ? sources.displays.find(({ id }) => id === capture.displayId)
-      : sources.displays.find(({ primary }) => primary);
+      ? displays.find(({ id }) => id === capture.displayId)
+      : displays.find(({ primary }) => primary);
     if (capture.displayId && !display) return openBotToolFailure(sourceText("error.agent.screenCaptureDisplayMissing"));
     return display?.name
       ? sourceText("status.agent.screenCaptureDisplay", { name: display.name })
@@ -3277,7 +3404,8 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
-      const agents = this.#hooks.listAgents();
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds);
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
@@ -3361,6 +3489,7 @@ export class OpenBotToolRouter {
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
+          ...(requesterIds.length > 0 ? { requesterIds } : {}),
           recipientAgentIds: recipientValues,
           text,
           sourcePaths: paths,

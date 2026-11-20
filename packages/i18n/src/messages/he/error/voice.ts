@@ -30,6 +30,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
+  "error.voice.live.chooseAccount":
+    "חשבון ChatGPT זה לא יכול להשתמש בקול חי. בהגדרות ← קול יש לבחור חשבון שהמינוי שלו כולל קול.",
   "error.voice.live.unavailable": "OpenAI לא הצליחה להפעיל קול חי. הבעיה היא בצד של OpenAI. יש לנסות שוב מאוחר יותר.",
   "error.voice.live.refused":
     "OpenAI סירבה להפעיל קול חי. יש לנסות שוב מאוחר יותר, או לכבות את הקול החי בהגדרות כדי לדבר בקול.",

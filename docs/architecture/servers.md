@@ -235,6 +235,13 @@ member. The capability is advertised only to protocol 7
 clients. The desktop on a joined server and the web client show the side question only when the host
 advertises it.
 
+`side-question-threads-v1` (protocol 10) adds an optional `taskId` to the same request. The host then
+answers from the end of that side thread, not from the agent's chat, and answers 409 when the agent has
+no such thread. A host without the capability drops the field and reads the chat, so a client sends
+`taskId` only when the host advertises it. Without it, the desktop and the web client hide the side
+question actions in a side thread. A question pane that is already open there shows the chat's side
+question.
+
 ### Live voice
 
 `live-voice-v1` (`team-protocol/live-voice-v1.ts`) lets a member talk to an agent of the host by Codex
@@ -370,8 +377,9 @@ Later operations keep the current process's files. Local files selected by the u
 
 ### Routine flows
 
-`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to a
-joined desktop and to the web client. Its routes are `POST /v1/routine-flows/canvas`,
+`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to older
+clients in the support window. Current clients do not show the canvas and do not call these routes.
+Its routes are `POST /v1/routine-flows/canvas`,
 `/positions/save`, `/positions/remove`, `/links/connect`, `/links/disconnect` and `/links/update`,
 with the input in the body. Any member who can see the agents can read and change a canvas, as with
 the agent routine routes; it is not an admin capability. A member sees a routine only when every
@@ -381,13 +389,11 @@ output and error cross with at most 4,000 characters each, and the host empties 
 routines with the oldest runs first when a canvas would pass three quarters of one WebRTC frame. The
 optional event `routine-flows-changed { agentId }` names the canvas that changed; the host sends it
 only to a connection with the capability and never for a hidden agent. Webhook config, secret
-rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
-in the Routines view; the web client shows the view switch only when the host serves it.
+rotation and webhook test runs stay on `events-v1`.
 
 `routine-flow-stop-v1` adds `POST /v1/routine-flows/runs/stop { routineId, runId }`, which stops a run
 that has not ended and answers `{}`. The member needs manage access to each agent of the routine and
-of the run's steps, and every one of them must be visible. A client without the capability shows no
-Stop.
+of the run's steps, and every one of them must be visible.
 
 ### Workflows
 
@@ -491,6 +497,13 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-agent-files-v1` says that the host gives an Agent step the files of the steps that connect
+to it. The host attaches each image and file input to the message for the agent, and the message
+tells the agent to use them together, as given, and not to invent a substitute. The capability adds
+no route. A client shows the connected pictures on the Agent card only on a host that advertises it,
+because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
+them without the note and does not advertise the capability, so its Agent card shows no pictures.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -523,6 +536,35 @@ stay on the first account. The capability goes to protocol 10 peers. When a serv
 account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
 shows one credits button for each account, with its name.
 
+`workflows-media-catalog-v2` (protocol 10) adds the other settings of a model and the aspect ratios
+`21:9` and `3:4`. `POST /v1/workflows/media/v2/catalog {}` answers `{ models }` as v1 does, and each
+model can have `options`: a `switch` (values `off` and `on`) or a `choice`, each with its `default`. The
+host reads them from the `parameters` of the service and leaves out a setting that the canvas sets
+another way (prompt, pictures, aspect ratio, length, resolution, background). `POST
+/v1/workflows/media/v2/price` takes the v1 request and `options`, a list of `{ name, value }`. The node
+field `options` is a JSON text of an object, a name to a value; the host sends only the names and values
+that the model has. The v1 routes keep their shape: the v1 catalog leaves out `options`, `21:9` and
+`3:4`, and a model left with no aspect ratio. A client reads the v2 routes when the host advertises the
+capability, and offers the settings and the new aspect ratios only for a model of the v2 catalog.
+
+A v2 video model can also have `inputs`, the files that it takes (`frames`, `references`, `videos`,
+`audios`), and `modes`, a list of `{ value, inputs }` for the values of its `mode` setting. The client
+shows only the input ports of the chosen mode; with no mode, the host chooses it from the inputs. A
+video step has one `file` input port for its video and audio references: the host gives each file its
+role from its type (`video/*` or `audio/*`) and refuses another type. The v1 catalog leaves out `inputs`
+and `modes`.
+
+`workflows-step-settings-v1` reads the settings and the inputs that one step attempt ran with.
+`POST /v1/workflows/step-settings { stepId }` answers `{ settings, sources }`. `settings` are the
+runtime fields of the node (`runtimeFields` in `src/backend/workflows/workflow-graph.ts`), so the
+label and the canvas layout are not in them. Each source names the node of an incoming edge, the
+edge type, the step that the attempt read (`stepId`) and the file of an asset or image input
+(`attachmentId`). A step from a release before migration 66 answers `null` for both: "not
+recorded". Each member who can read the run can read its steps. A workflow that the member cannot
+see answers `missing`, and a step of an agent that the member cannot see answers `stepMissing`. The fields are the node settings that the member can already read
+in the graph, and no secret is in them. The answer has its own route so that the frozen
+`workflows-v1` step stays as it is. The capability goes to protocol 10 peers.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -550,6 +592,36 @@ Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workf
 The chats, workspaces and channels come from the routine-results options, so the fields are the same
 as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
 sends the Discord roles.
+
+### Workflow folders
+
+The optional `workflow-folders-v1` capability (`team-protocol/workflow-folders-v1.ts`, protocol 10)
+adds `POST /v1/workflow-folders` and `POST /v1/workflow-folders/actions` for the folders of the
+Workflows page. The folders are one flat list for the server, and a workflow is in one folder or in
+none. The folders are a layout only: a change moves, copies and deletes no workflow. The host keeps
+them in `openbot-workflow-folders-v1.json` in its user data (`src/backend/workflow-folders-store.ts`,
+a versioned JSON file), and `src/main/workflow-folders-service.ts` applies each action (create,
+rename, delete, place) for the `workflows:folders` and `workflows:folder-action` IPC of this computer
+and for the route, so a joined server uses the same rules (`applyWorkflowFolderAction` in
+`@openbot/contracts/ipc-workflow-folders`). The placement shows only the workflows that the member
+can see, with the same filter as the workflow list. A member who may use workflows reads each empty
+folder and each folder with a workflow that the member can see; a folder with only hidden workflows
+does not show. Each member who may use workflows creates folders. To rename or delete a folder, to
+place a workflow, or to create a folder with workflows, the member needs `manage` access to each
+workflow that the action changes or that the folder holds, and gets 403 without it and 404 for a
+workflow that they cannot see. A refused change is
+404 for a folder or a workflow that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. The service reads the workflow ids from the
+workflow list and removes the entries of deleted workflows on each read and before each change, so
+a workflow that an agent, a transfer or a restore deletes also leaves its folder. A stale entry
+stays in the file until the next saved change.
+
+After each saved change, the host sends the optional event `workflow-folders-changed`, with no data,
+only to the connections that advertise `workflow-folders-v1`; `application-services.ts` emits it
+through `AgentService`, so this computer's windows get it too. The desktop with a joined server and
+the web client hide the folders while the host does not have the capability, and read the folders
+again after the event and after a reconnect, with the workflow list. The phone does not show workflow folders. The instance
+transfer does not carry the folders.
 
 ### CRM
 
@@ -929,6 +1001,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
 | `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
+| `agent-builtin-memory-v1` | Whether the agent uses OpenBot memory (`/v1/admin/agents/builtin-memory`, `/update`). When it is off, the agent gets no saved memories, its memory tools refuse, and the memory review saves no memories; saved memories stay. A user can then connect a memory app such as Mem0. Protocol 10 only | `agentAdmin` |
 | `agent-defaults-v1` | Server Settings › Agents of the host: the defaults of local scripts, the agent's own new chats and the plan card, the plan start time, the local script limit for each hour, the commit co-author line and "Steer agents while they work", and the own value of each visible agent. An update changes only the fields it sends; a choice sets `default`, `on` or `off` for a list of agents. Owners and admins only. Before it, these defaults were a local choice of the host. Protocol 9 only | `agentAdmin` |
 | `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
 | `agent-speed-v1` | The speed of the agent: standard, fast or ultrafast. Its model list adds the Ultrafast tier ids and the Claude models, which `agent-fast-mode-v1` leaves out. A client that advertises it asks the user to confirm the price before it turns on a faster speed for a Claude agent. The access is that of `agent-fast-mode-v1`. A client uses it in place of `agent-fast-mode-v1` when the host has both. Protocol 9 only | `agentAdmin` |
@@ -964,6 +1037,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -997,6 +1071,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
+| `vault-member-save-v1` | No route or field of its own. The host takes a password save on `browser-secret-vault-v1` and a `request_vault_item` or API key card answer from any member, not only from an owner or admin. The item goes to all agents of the host | `agent` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the
@@ -1066,6 +1141,25 @@ The host answers, then quits; it does not use `app.relaunch`, which would start 
 `xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
 account service, and a server on this computer through `localServers`. A host that does not answer
 cannot get the request; then the owner runs `sudo openbot restart`.
+
+`owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
+Members (desktop, web client and mobile). The owner enters an email; the account service stores a
+request in `remote_owner_transfers`, sends an email and an `account-servers-changed` event to that
+account, and the new owner accepts or declines in the app while signed in with that email. The
+request expires after 7 days, and a new request replaces it. A server with a `hosted_servers` row
+(OpenBot hosts it) is refused with `owner_transfer_hosted`, when the request is made and when it is
+accepted. Accept changes, in one D1 batch, `remote_hosts.owner_user_id`, the owner membership (the
+earlier owner is removed), the member and site limits, the hosted sites and the Slack, Discord,
+Telegram and webhook routes of the server, and it raises the auth epoch. A server plan stays with
+the earlier owner's Stripe subscription and still counts for the server
+(`subscriptionPaysForOwnerSql`) until someone cancels it. The host notices
+the change when its account registration gets `host_owner_mismatch` or when a renewed Signal ticket
+names another account. It then asks `POST /v2/remote/hosts/:hostId/owner-session` with its machine
+token for a session of the new owner, which revokes the session of the earlier owner on the host,
+rebinds the owner of its team file and signs in as the new owner. Only a host in server mode that
+OpenBot does not host does this, because a desktop app must keep the account of the person at the
+computer.
+Agents, chats, provider sign-ins, saved keys, Vault logins and browser sign-ins stay on the server.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
@@ -1303,6 +1397,17 @@ member IDs (`TeamMemberSummary.id`). A member gets the highest level of Everyone
 names them. An owner or an admin always gets `manage`. So a server with no roles works as before, and
 a new agent is open to every member until an admin closes it.
 
+An agent that works for a member keeps to the member's levels too. In a turn that a member's message
+started, `list_agents` lists, and `send_message` reaches, only the agents where the member has `chat`
+or more (`OpenBotToolRouter.#reachableAgents`). An agent that the member cannot use reads as an
+unknown id, so the refusal does not name it. The message that such an agent sends to another agent,
+its automatic result, the note about a failed request, its interrupt notice and a task that it starts
+keep the IDs of those members (`requesterIds` in the stored message), so each next agent in the chain
+keeps to the same levels. The field is optional JSON in `message_json`: there is no migration, and an
+older build ignores it. This is a routing rule for the OpenBot tools, not a wall between agents: an
+agent with Full access can still read the files of other agents on the host.
+`scripts/agent-message-access-e2e.ts` checks these rules.
+
 The host keeps the roles in `openbot-agent-access-v1.json`, by server ID (`src/main/agent-access-store.ts`).
 It is a preference file, not the database: there is no migration, and an older build ignores it, so a
 downgrade keeps the roles. A file that does not decode closes every agent to members until the next
@@ -1325,6 +1430,9 @@ Known limits:
 - `GET /v1/attachments/:id` does not check the agent of the attachment.
 - Channel messages of an agent that a member cannot see stay in the channel. A send to a channel does
   not check the levels of the agents in it; only a save that adds an agent checks `chat`.
+- The member levels of an agent's turn apply only to `list_agents`, `send_message` and the work that
+  they start. `send_to_channel` and channel work, `read_agent` and the other tools that take the id of
+  another agent, and the turn that a wait opens when it wakes do not use them.
 
 ### Audit log
 

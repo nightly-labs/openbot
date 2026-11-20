@@ -23,6 +23,8 @@ export const messages = {
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
   "error.remote.windowsSessionDisconnected":
     "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
+  "error.remote.macScreenLocked":
+    "Il Mac è bloccato, quindi non può condividere lo schermo. Sblocca il Mac dal suo schermo, poi riprova.",
   "error.remote.streamTooSlowLowerQuality":
     "La connessione all'host è troppo lenta per l'immagine. Riprova: la prossima connessione userà una qualità più bassa.",
   "error.remote.streamTooSlow":
@@ -211,6 +213,10 @@ export const messages = {
   "error.remote.formUnavailable": "Questo modulo non è più disponibile.",
   "error.remote.hostedServerRemoval": "Usa Fatturazione per eliminare un server ospitato.",
   "error.remote.hostRemoved": "Il proprietario ha rimosso questo server dall'account.",
+  "error.remote.ownerTransferSelf": "Questo server è già tuo. Inserisci l'email del nuovo proprietario.",
+  "error.remote.ownerTransferHosted": "Un server ospitato da OpenBot non può cambiare proprietario.",
+  "error.remote.ownerTransferInvalid":
+    "Questo trasferimento di proprietà non è più disponibile. Chiedi al proprietario di inviarlo di nuovo.",
   "error.remote.channelsUnsupported": "Aggiorna questo server desktop per usare i canali.",
   "error.remote.channelDeleteUnsupported": "Aggiorna questo server desktop per eliminare i canali.",
   "error.remote.historyRefreshFailed":

@@ -19,6 +19,8 @@ export const messages = {
     "{provider} מדווח שהתוכנית שלך נוצלה במלואה. יש לבחור מודל אחר או לשדרג את התוכנית של {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} לא טען את הכלים של OpenBot, ולכן הסוכן הזה לא יכול להשתמש בהם או להגיע לחברי הצוות שלו. מדיניות צוות של {provider} יכולה לחסום שרתי MCP מקומיים. יש לבקש ממנהל הצוות לאפשר אותם, ואז לנסות שוב.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} הריץ את ההודעה הזו בלי הכלים של OpenBot, ולכן הסוכן לא יכול היה להגיע לחברי הצוות שלו, להשתמש בדפדפן או לצרף קבצים. יש לנסות שוב.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, ולכן התשובה נעצרה. השרת הזה נמצא בהגדרות {provider} שלך, ולא ב-OpenBot. הסר את השרת משם או תקן אותו, ואז התחל צ׳אט חדש.",
   "error.provider.endpointsReadOnly":
@@ -246,6 +248,10 @@ export const messages = {
   "error.provider.opencodeModelUnavailable": "המודל הזה אינו זמין עבורך. יש לבחור מודל אחר לסוכן הזה.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "התשובה של המודל נקטעה או שלא הייתה תקינה. יש לשלוח את ההודעה שוב או לבחור מודל אחר.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "התשובה של המודל ארוכה ממגבלת הפלט שלו שלוש פעמים, ולכן התור נעצר. בחרו מאמץ נמוך יותר או מודל אחר, ואז שלחו את ההודעה שוב.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "התשובה של המודל ארוכה ממגבלת הפלט שלו שלוש פעמים, ולכן התור נעצר. בהגדרות, פתחו את ספק מותאם אישית, לחצו על עריכה בנקודת הקצה הזו והגדירו פלט מרבי גדול יותר למודל הזה. או בחרו מאמץ נמוך יותר או מודל אחר.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
   "error.provider.opencodeModelNotServed":
@@ -304,6 +310,8 @@ export const messages = {
     "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini לא הצליח לקרוא את ההיסטוריה השמורה של הצ'אט הזה. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
+  "error.provider.acpTurnStuck":
+    "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
@@ -371,6 +379,10 @@ export const messages = {
     "Codex לא הצליח להמשיך את הצ'אט הזה, כי פריט בהיסטוריה השמורה שלו חסר. OpenBot התחיל סשן חדש של Codex עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.codexRequestRefused":
     "{provider} דחה את הבקשה של הצ'אט הזה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך עם הרבה תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} הסוכן כבר לא רואה את ההודעה הזאת, ולכן היא לא עוצרת את ההודעות הבאות שלך. שלח את הבקשה שוב במילים אחרות.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} אם {provider} חוסם גם את ההודעות הבאות שלך, התחל צ'אט חדש.",
   "error.provider.codexAudioRefused":
     "המודל הזה לא יכול להאזין לאודיו, ולכן הוא לא קיבל את הצליל בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. כדי להמשיך, שלח שוב את הבקשה ובקש מהסוכן לעבוד בלי הצליל. כדי לבדוק צליל, בחר בתפריט המודל של הסוכן מודל שיכול להאזין לאודיו.",
   "error.provider.imageTooSmall":

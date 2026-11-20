@@ -1,10 +1,6 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
-import {
-  SIDEBAR_CHAT_ORDERS,
-  type SidebarChatOrder,
-  type SidebarView,
-} from "@openbot/ui/features/sidebar/sidebar-types";
+import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "@openbot/ui/features/sidebar/sidebar-types";
 import { PAGE_RAIL_PINNABLE_PAGES, type PageRailPinnablePage } from "@openbot/ui/features/window/PageRail";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { z } from "zod";
@@ -23,7 +19,6 @@ import {
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
   SIDEBAR_CHAT_ORDER_STORAGE_KEY,
-  SIDEBAR_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
 import { createSimpleContext } from "./simple-context";
@@ -89,9 +84,6 @@ const Layout = createSimpleContext({
     const [serverView, setServerViewSignal] = createSignal<ServerView>(
       window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "rail" ? "rail" : "menu",
     );
-    const [sidebarView, setSidebarViewSignal] = createSignal<SidebarView>(
-      window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY) === "routines" ? "routines" : "agents",
-    );
     const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
     const railPinned = createMemo(() => {
@@ -150,11 +142,6 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
     }
 
-    function setSidebarView(view: SidebarView): void {
-      setSidebarViewSignal(view);
-      window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
-    }
-
     function setSidebarChatOrder(order: SidebarChatOrder): void {
       setSidebarChatOrderSignal(order);
       try {
@@ -188,8 +175,6 @@ const Layout = createSimpleContext({
       serverView,
       setServerView,
       serverRailVisible,
-      sidebarView,
-      setSidebarView,
       sidebarChatOrder,
       setSidebarChatOrder,
       railPinned,

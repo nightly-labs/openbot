@@ -143,9 +143,11 @@ export function createSetupProviders(
     setErrorCode(reference ? { message, reference } : null);
   };
   const [providerErrors, setProviderErrors] = createSignal<Partial<Record<AgentProviderId, string>>>({});
-  const visibleError = createMemo(
-    () => error() || SETUP_PROVIDERS.map((provider) => providerErrors()[provider.id]).find(Boolean) || "",
-  );
+  const selectedProviderError = () => {
+    const selected = selectedProvider();
+    return selected ? providerErrors()[selected] : undefined;
+  };
+  const visibleError = createMemo(() => error() || selectedProviderError() || "");
   const previousConnectionStates = new Map<AgentProviderId, boolean>();
   const connectionStartingMessages = new Map<AgentProviderId, string | null>();
   const refreshedConnectionStates = new Set<AgentProviderId>();

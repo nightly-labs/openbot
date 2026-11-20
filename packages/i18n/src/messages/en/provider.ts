@@ -117,6 +117,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.openrouterNoMatches":
+    "No models match your search. Your privacy, provider and guardrail settings on openrouter.ai can hide models from this list.",
   "provider.picker.workspaceOnlyUnavailable":
     "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
@@ -401,4 +403,5 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
+  "provider.settings.updateAll": "Update all",
 });

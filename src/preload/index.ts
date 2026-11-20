@@ -7,6 +7,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentExclusionChangeFromMain,
   decodeAgentFastModeSettings,
@@ -107,6 +108,7 @@ import {
   decodeWebhookSecret,
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
+import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -129,6 +131,7 @@ import {
   decodeMemory,
   decodeMemorySelection,
   decodeOptionalMemorySelection,
+  decodePendingPrompts,
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeProviderUsageResetOutcomeFromMain,
@@ -204,6 +207,8 @@ import {
   decodeNotificationPreference,
   decodeNullablePath,
   decodeOnePasswordConnectorStatus,
+  decodeOwnerTransferList,
+  decodeOwnerTransferOrNull,
   decodePendingAgentTemplate,
   decodePendingListing,
   decodePendingMarketplaceListing,
@@ -318,7 +323,6 @@ import {
   decodePasswordManagerResponses,
 } from "./password-manager-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
-import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
   decodeRoutineResultDeliveries,
   decodeRoutineResultDestination,
@@ -372,6 +376,7 @@ import {
 import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
+  decodeWorkflowFoldersSnapshotFromMain,
   decodeWorkflowGitHubCatalog,
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
@@ -385,6 +390,7 @@ import {
   decodeWorkflowRunPage,
   decodeWorkflowSaveResult,
   decodeWorkflowStep,
+  decodeWorkflowStepSettings,
   decodeWorkflowSummaries,
   decodeWorkflowSummary,
   decodeWorkflowVersions,
@@ -685,6 +691,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   respondToPrompt: decodeVoid,
   respondToApproval: decodeVoid,
   readPendingApproval: decodePendingApproval,
+  listPendingPrompts: decodePendingPrompts,
   respondToBrowserSecret: decodeVoid,
   respondToBrowserTakeover: decodeVoid,
   scopedEvent: decodeScopedAgentEvent,
@@ -722,6 +729,9 @@ const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   listInvites: decodeTeamInvites,
   revokeInvite: decodeVoid,
   createInvite: decodeInviteSummary,
+  getOwnerTransfer: decodeOwnerTransferOrNull,
+  startOwnerTransfer: decodeOwnerTransfer,
+  cancelOwnerTransfer: decodeVoid,
   setTyping: decodeVoid,
   scopedPresence: decodeScopedTeamPresence,
   listDirectThreads: decodeDirectThreads,
@@ -813,6 +823,7 @@ const openbotApi: OpenBotDesktopApi = {
     renameProviderAccount: decodeAgentStatusFromMain,
     removeProviderAccount: decodeAgentStatusFromMain,
     setProviderAccountPool: decodeAgentStatusFromMain,
+    setLiveVoiceAccount: decodeAgentStatusFromMain,
     signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
@@ -882,15 +893,6 @@ const openbotApi: OpenBotDesktopApi = {
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
   }),
-  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
-    canvas: decodeRoutineFlowCanvas,
-    savePosition: decodeVoid,
-    removePosition: decodeVoid,
-    connect: decodeRoutineFlowLink,
-    disconnect: decodeVoid,
-    updateLink: decodeRoutineFlowLink,
-    stopRun: decodeVoid,
-  }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,
     get: decodeWorkflowDetail,
@@ -909,6 +911,7 @@ const openbotApi: OpenBotDesktopApi = {
     decide: decodeVoid,
     runs: decodeWorkflowRunPage,
     run: decodeWorkflowRunDetail,
+    stepSettings: decodeWorkflowStepSettings,
     rotateWebhookSecret: decodeWorkflowWebhookSecret,
     githubCatalog: decodeWorkflowGitHubCatalog,
     githubOptions: decodeWorkflowGitHubOptions,
@@ -919,6 +922,8 @@ const openbotApi: OpenBotDesktopApi = {
     mediaCredits: decodeWorkflowMediaCredits,
     mediaCatalog: decodeWorkflowMediaCatalog,
     mediaPrice: decodeWorkflowMediaPrice,
+    folders: decodeWorkflowFoldersSnapshotFromMain,
+    folderAction: decodeWorkflowFoldersSnapshotFromMain,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,
@@ -1001,7 +1006,11 @@ const openbotApi: OpenBotDesktopApi = {
     removeCompanySignIn: decodeCompanySignInSettings,
     createCompanySignInScimToken: decodeCompanySignInScimToken,
     revokeCompanySignInScimToken: decodeCompanySignInSettings,
+    listOwnerTransfers: decodeOwnerTransferList,
+    acceptOwnerTransfer: decodeAcceptedOwnerTransfer,
+    declineOwnerTransfer: decodeVoid,
     event: decodeCentralAuthState,
+    ownerTransfersChanged: decodeVoid,
   }),
   skills: bridgeGroup(IPC_ENDPOINTS.skills, {
     localList: decodeSkillDetails,
@@ -1192,6 +1201,7 @@ const openbotApi: OpenBotDesktopApi = {
     renameAccount: decodeVoid,
     removeAccount: decodeVoid,
     setAccountPool: decodeVoid,
+    setLiveVoiceAccount: decodeVoid,
     hostDefaultProvider: decodeHostDefaultProviderFromMain,
     setHostDefaultProvider: decodeHostDefaultProviderFromMain,
     usageResets: decodeProviderUsageResetsFromMain,
@@ -1433,6 +1443,8 @@ const openbotApi: OpenBotDesktopApi = {
       unpublishAgentTemplate: decodeVoid,
       getAgentPlanCard: decodeAgentPlanCardSettings,
       updateAgentPlanCard: decodeAgentPlanCardSettings,
+      getAgentBuiltinMemory: decodeAgentBuiltinMemorySettings,
+      updateAgentBuiltinMemory: decodeAgentBuiltinMemorySettings,
       getAgentFastMode: decodeAgentFastModeSettings,
       updateAgentFastMode: decodeAgentFastModeSettings,
       listBrowserProfiles: decodeBrowserProfileList,
@@ -1546,7 +1558,7 @@ const openbotApi: OpenBotDesktopApi = {
     getStatus: decodeUpdateStatus,
     check: decodeUpdateStatus,
     download: decodeUpdateStatus,
-    install: decodeVoid,
+    install: decodeUpdateStatus,
     getPreference: decodeUpdatePreference,
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,

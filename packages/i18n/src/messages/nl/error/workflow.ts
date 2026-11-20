@@ -25,6 +25,10 @@ export const messages = {
     "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",
   "error.workflow.modelToolUse":
     "Het model probeerde een tool te gebruiken, maar deze stap kan alleen met tekst antwoorden. Voer de stap opnieuw uit of kies er een ander model voor.",
+  "error.workflow.modelImageUnsupported":
+    "Het model van deze stap kan geen afbeeldingen lezen. Kies een model dat dat wel kan, of verwijder de afbeeldingsverbinding.",
+  "error.workflow.modelImageType":
+    "Een modelstap kan alleen PNG-, JPEG-, GIF- en WebP-afbeeldingen lezen. Verbind een afbeelding van een van deze typen.",
   "error.workflow.modelUnavailable":
     "Het model van deze stap is niet beschikbaar. Kies een ander model voor deze stap.",
   "error.workflow.providerBusy": "De provider is bezet. Wacht een paar minuten en voer de stap dan opnieuw uit.",
@@ -32,6 +36,7 @@ export const messages = {
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
+  "error.workflow.mediaNotMade": "Het model heeft de afbeelding of video niet gemaakt. Het antwoordde: {answer}",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":
@@ -40,6 +45,8 @@ export const messages = {
     "Schrijf een beschrijving, of voer de stappen ervoor uit zodat er een tekst of afbeelding binnenkomt.",
   "error.workflow.mediaInputNotImage":
     "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
+  "error.workflow.mediaInputNotClip":
+    "Deze invoer neemt alleen video’s en audiobestanden aan. Verwijder de verbinding vanaf het bestand.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",
   "error.workflow.nodeMissing": "Deze stap staat niet in de workflow.",
   "error.workflow.runMissing": "Deze run bestaat niet meer.",

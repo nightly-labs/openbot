@@ -911,16 +911,6 @@ textarea {
     background: transparent;
   }
 
-  .app-frame-edge .diagram-view-header {
-    border-bottom: 0;
-    background: transparent;
-  }
-
-  .app-frame-edge .diagram-view-body {
-    overflow: hidden;
-    background: var(--openbot-bg-canvas);
-  }
-
   .app-frame-edge .header-panel-toggle[aria-expanded="true"]:not(.computer-button-agent-active, .side-panel-toggle) {
     border-color: var(--openbot-border-strong);
     background: var(--openbot-bg-control-hover);
@@ -1221,7 +1211,8 @@ textarea {
   text-overflow: ellipsis;
 }
 
-.sidebar-compact .dev-worktree-label {
+.sidebar-compact .dev-worktree-label,
+.app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .dev-worktree-label {
   display: none;
 }
 
@@ -1310,6 +1301,10 @@ textarea {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   stroke-width: var(--openbot-icon-stroke);
+}
+
+.sidebar-history-button > svg:dir(rtl) {
+  transform: scaleX(-1);
 }
 
 .sidebar-history-button:disabled,

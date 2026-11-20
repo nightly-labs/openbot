@@ -8,7 +8,7 @@ import {
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import type { ProviderAccountRelayProvider } from "@openbot/contracts/team-protocol/provider-account-relays";
-import type { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
+import type { ProviderSignInRelayProvider } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Duration, Effect, Schema } from "effect";
@@ -18,7 +18,7 @@ import type { ProviderAccountsHost } from "./provider-accounts-host";
 import type { ProviderHostSignIns } from "./provider-host-sign-ins";
 import { HttpError } from "./team-api/http-error";
 
-export type SignInRelayProvider = (typeof SIGN_IN_RELAY_PROVIDERS)[number];
+export type SignInRelayProvider = ProviderSignInRelayProvider;
 
 const SIGN_IN_RELAY_TTL_MS = 10 * 60_000;
 const FLOW_LIMIT = 16;

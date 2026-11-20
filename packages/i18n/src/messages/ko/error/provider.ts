@@ -19,6 +19,8 @@ export const messages = {
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
   "error.provider.acpMcpNotLoaded":
     "{provider}가 OpenBot 도구를 불러오지 않아 이 에이전트는 도구를 사용하거나 팀원에게 연락할 수 없습니다. {provider} 팀 정책이 로컬 MCP 서버를 차단할 수 있습니다. 팀 관리자에게 허용을 요청한 다음 다시 시도하세요.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider}가 OpenBot 도구 없이 이 메시지를 실행해서 에이전트가 팀원에게 연락하거나 브라우저를 사용하거나 파일을 첨부할 수 없었습니다. 다시 시도하세요.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider}가 MCP 서버 {name}을(를) 시작하지 못해 응답이 중단되었습니다. 이 서버는 OpenBot이 아니라 사용자의 {provider} 설정에 있습니다. 그곳에서 서버를 제거하거나 고친 다음 새 채팅을 시작하세요.",
   "error.provider.endpointsReadOnly":
@@ -264,6 +266,10 @@ export const messages = {
     "이 모델은 사용할 수 없어요. 이 에이전트에 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 설정에서 사용자 지정 제공자를 열고 이 엔드포인트의 편집을 클릭한 다음 이 모델의 최대 출력을 더 크게 설정하세요. 또는 더 낮은 강도나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeModelNotServed":
@@ -324,6 +330,8 @@ export const messages = {
     "Gemini가 원인을 알리지 않고 이 요청을 거부했어요. 에이전트가 연 이미지처럼 채팅 기록의 항목 때문일 수 있어요. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델을 선택하세요.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini가 이 채팅의 저장된 기록을 읽지 못했습니다. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpTurnStuck":
+    "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -394,6 +402,10 @@ export const messages = {
     "저장된 기록의 항목이 없어서 Codex가 이 채팅을 계속할 수 없었어요. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.codexRequestRefused":
     "{provider}이(가) 원인을 알리지 않고 이 채팅의 요청을 거부했습니다. 이미지가 많은 긴 채팅에서 발생할 수 있습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.codexSafetyBlocked":
+    "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} 에이전트가 이제 이 메시지를 보지 않으므로 다음 메시지는 막히지 않습니다. 다른 표현으로 요청을 다시 보내세요.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} {provider}이(가) 다음 메시지도 차단하면 새 채팅을 시작하세요.",
   "error.provider.codexAudioRefused":
     "이 모델은 오디오를 들을 수 없어서 이 채팅의 소리를 받지 않았습니다. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했습니다. 계속하려면 요청을 다시 보내고 에이전트에게 소리 없이 작업하라고 요청하세요. 소리를 확인하려면 에이전트의 모델 메뉴에서 오디오를 들을 수 있는 모델을 선택하세요.",
   "error.provider.imageTooSmall":

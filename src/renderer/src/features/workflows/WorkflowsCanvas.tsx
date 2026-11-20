@@ -9,14 +9,16 @@ import {
   workflowCatalogMediaModel,
   workflowCatalogProvider,
 } from "@openbot/contracts/ipc";
+import { Spinner } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowAgentProgress } from "@openbot/ui/features/workflows/workflow-board";
 import {
   WORKFLOW_FEATURES_V1,
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { currentText } from "@openbot/ui/text";
+import { currentText, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
@@ -32,7 +34,9 @@ export function WorkflowsCanvas(props: {
   self?: WorkflowCatalogs["self"];
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
+  agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
 }) {
+  const { t } = useText();
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
@@ -177,6 +181,12 @@ export function WorkflowsCanvas(props: {
     get mediaSize() {
       return props.host.mediaSizeSupported();
     },
+    get agentFiles() {
+      return props.host.agentFilesSupported();
+    },
+    get stepSettings() {
+      return props.host.stepSettingsSupported() ? props.host.workflows.stepSettings : undefined;
+    },
     get media() {
       return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
     },
@@ -227,7 +237,16 @@ export function WorkflowsCanvas(props: {
     };
   });
   return (
-    <Show when={workflows.detail()}>
+    <Show
+      when={workflows.detail()}
+      fallback={
+        <main class="window-page workflows-notice">
+          <Show when={!workflows.failed()}>
+            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          </Show>
+        </main>
+      }
+    >
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -236,6 +255,7 @@ export function WorkflowsCanvas(props: {
           github={workflows.github}
           frame="window"
           readOnly={workflows.readOnly()}
+          agentProgress={props.agentProgress}
           {...workflows.props}
           onRotateWebhookSecret={props.admin ? workflows.props.onRotateWebhookSecret : undefined}
         />

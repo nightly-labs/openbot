@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Caras de agentes en movimiento",
   "settings.movingFaces.description":
     "Las caras de los agentes parpadean y se mueven. Empiezan quietas en un equipo sin GPU.",
+  "settings.startupAnimation.title": "Animación de inicio",
+  "settings.startupAnimation.description": "Muestra la animación de agentes mientras se abre OpenBot.",
   "settings.logoColor.title": "Color del logotipo",
   "settings.logoColor.description": "Se muestra en el Dock, la barra de tareas y Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -59,6 +61,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Atardecer retro",
   "settings.chatBackdrop.snowfall": "Nevada",
   "settings.chatBackdrop.fireflies": "Luciérnagas",
+  "settings.chatBackdrop.coast": "Costa de neón",
   "settings.chatBackdrop.upload": "Subir imagen…",
   "settings.chatBackdrop.uploadRefused": "Usa una imagen PNG, JPEG, GIF, WebP o AVIF de 20 MB como máximo.",
   "settings.chatBackdrop.saveFailed": "El fondo no se guardó.",
@@ -613,6 +616,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan finalizado",
   "settings.hostedServers.state.creating": "Creando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando datos",
   "settings.hostedServers.state.running": "En ejecución",
   "settings.hostedServers.state.stopping": "Deteniendo",
   "settings.hostedServers.state.stopped": "Detenido",
@@ -623,6 +627,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuración comienza cuando Stripe confirma el pago.",
   "settings.hostedServers.planEndedDescription":
     "El plan finalizó y el servidor se detuvo. Sus datos se conservan. Renueva el plan para iniciarlo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "El plan finalizó y el servidor se detuvo. Sus datos se conservan hasta el {date}. Renueva el plan antes para iniciarlo.",
   "settings.hostedServers.pay": "Abrir página de pago",
   "settings.hostedServers.payLabel": "Abrir página de pago de {name}",
   "settings.hostedServers.renew": "Renovar plan",
@@ -733,7 +739,18 @@ export const messages = {
   "settings.voice.speech.sample": "Hola. Así sonarán tus respuestas.",
   "settings.voice.speech.listenFailed": "No se pudo reproducir la muestra.",
   "settings.voice.live.section": "Voz en directo",
+  "settings.voice.talk.section": "Conversación por voz",
+  "settings.voice.talkKey.title": "Tecla para hablar",
+  "settings.voice.talkKey.description": "Mantén pulsadas estas teclas para hablar en una conversación por voz.",
+  "settings.voice.talkKey.change": "Cambiar la tecla para hablar",
+  "settings.voice.talkKey.recording": "Pulsa las teclas",
+  "settings.voice.talkKey.refused": "Añade otra tecla",
+  "settings.voice.talkKey.reset": "Restablecer",
   "settings.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",
+  "settings.voice.live.account": "Cuenta",
+  "settings.voice.live.accountAutomatic": "Automática",
+  "settings.voice.live.accountDescription":
+    "La cuenta de ChatGPT que usa la voz en directo. Elige una cuenta cuyo plan incluya voz.",
   "settings.transfer.title": "Trasladar este servidor a otro equipo",
   "settings.transfer.lede": "Tus agentes, sus habilidades, rutinas, recuerdos y archivos van en un solo archivo.",
   "settings.transfer.flow.label": "Cómo funciona una transferencia",

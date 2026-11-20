@@ -111,8 +111,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Esgotado",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Termina em {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Dados mantidos até {date}",
   "mobile.server.hosted.state.payment": "Pagamento pendente",
   "mobile.server.hosted.state.setup": "Configurando",
+  "mobile.server.hosted.state.restoring": "Restaurando dados",
   "mobile.server.hosted.state.starting": "Iniciando",
   "mobile.server.hosted.state.running": "Em execução",
   "mobile.server.hosted.state.stopped": "Parado",
@@ -227,6 +229,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Em espera. O host executa tantos turnos quanto a memória permite.",
   "mobile.server.threads.hold.agentBusy": "Aguardando outro trabalho deste agente terminar.",
   "mobile.server.threads.hold.oneTurn": "Em espera. O provedor deste agente executa um turno por vez.",
+  "mobile.server.threads.hold.signIn": "Em espera. O provedor deste agente precisa de login.",
   "mobile.server.threads.offline": "Conecte-se a este servidor para ver os tópicos dele.",
   "mobile.server.threads.loading": "Carregando tópicos…",
   "mobile.server.threads.loadFailed": "Não foi possível carregar os tópicos de alguns agentes.",
@@ -547,6 +550,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Adicionar agentes",
   "mobile.server.browserProfiles.agentsHint":
     "Um toque dá este perfil ao agente ou o devolve ao perfil compartilhado. Uma alteração fecha as abas abertas do agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Os logins nos sites ficam no perfil antigo. Um agente movido precisa entrar nesses sites novamente.",
   "mobile.server.browserProfiles.clear": "Apagar dados",
   "mobile.server.browserProfiles.clearTitle": "Apagar os dados de {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1273,6 +1278,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Conectado · {count} ferramenta", other: "Conectado · {count} ferramentas" },
   "mobile.server.mcp.signInOnComputer":
     "Este servidor MCP pede login. Entre pelo OpenBot em um computador e teste de novo.",
+  "mobile.server.mcp.signIn": "Entrar",
+  "mobile.server.mcp.signInHere": "Este servidor MCP pede que você entre. Toque em Entrar e teste de novo.",
   "mobile.server.mcp.signedInDescription": "{server} está conectado a este servidor MCP.",
   "mobile.server.mcp.signOut": "Sair",
   "mobile.server.mcp.saveFailed": "Não foi possível salvar a alteração. Tente de novo.",
@@ -1323,6 +1330,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 horas",
   "mobile.server.planLimits.window.hours": { one: "{count} hora", other: "{count} horas" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Atualizações",
   "mobile.server.settings.updateAvailable": "Atualização disponível",
   "mobile.server.route.updates": "Atualizações",
@@ -1661,4 +1669,42 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Os agentes copiados usam as regras de aprovação de {server}.",
   "mobile.server.transfer.copyNoServer":
     "Conecte-se a outro servidor como proprietário ou administrador para copiar agentes para ele.",
+  "mobile.server.route.ownerTransfer": "Transferir propriedade",
+  "mobile.server.ownerTransfer.unavailable":
+    "Conecte-se a este servidor como proprietário para transferir a propriedade.",
+  "mobile.server.ownerTransfer.hosted": "O OpenBot hospeda este servidor, então o proprietário não pode mudar.",
+  "mobile.server.ownerTransfer.lede":
+    "O novo proprietário recebe um e-mail e precisa aceitar com a sessão iniciada nesse e-mail. Depois disso, você é removido deste servidor.",
+  "mobile.server.ownerTransfer.email": "E-mail do novo proprietário",
+  "mobile.server.ownerTransfer.send": "Enviar",
+  "mobile.server.ownerTransfer.sending": "Enviando…",
+  "mobile.server.ownerTransfer.stays":
+    "Agentes, chats, rotinas, logins de provedores, chaves salvas, logins do Vault, logins do navegador e apps conectados ficam no servidor. O novo proprietário pode usá-los.",
+  "mobile.server.ownerTransfer.expiry": "O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirmTitle": "Tornar {email} o proprietário?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quando {email} aceitar, essa pessoa passa a ser proprietária de {server} e você perde o acesso. Os dados ficam no servidor. O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirm": "Transferir",
+  "mobile.server.ownerTransfer.sendFailed": "O pedido não foi enviado.",
+  "mobile.server.ownerTransfer.loadFailed": "Não foi possível ler a transferência pendente.",
+  "mobile.server.ownerTransfer.pending": "Aguardando o novo proprietário",
+  "mobile.server.ownerTransfer.expires": "Expira em {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} precisa aceitar com a sessão iniciada neste e-mail. Até lá, você continua como proprietário.",
+  "mobile.server.ownerTransfer.cancel": "Cancelar",
+  "mobile.server.ownerTransfer.cancelTitle": "Cancelar a transferência?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} não poderá mais aceitá-la.",
+  "mobile.server.ownerTransfer.keep": "Manter",
+  "mobile.server.ownerTransfer.cancelFailed": "A transferência não foi cancelada.",
+  "mobile.server.ownerTransfer.incomingTitle": "Ser proprietário de {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} quer tornar você proprietário de {server}. Você terá controle total do servidor, e os agentes, chats, rotinas e logins salvos continuam nele. {name} perde o acesso. Quem ainda consegue entrar no computador que executa o servidor pode usar sua conta OpenBot. Troque as senhas e chaves SSH dele.",
+  "mobile.server.ownerTransfer.accept": "Aceitar",
+  "mobile.server.ownerTransfer.decline": "Recusar",
+  "mobile.server.ownerTransfer.accepted": "Agora você é proprietário de {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Não foi possível aceitar a transferência",
+  "mobile.server.ownerTransfer.declineFailed": "Não foi possível recusar a transferência",
+  "mobile.server.ownerTransfer.tryAgain": "Tente novamente mais tarde.",
+  "mobile.server.providers.updateAll": "Atualizar tudo",
+  "mobile.server.providers.updateAllFailed": "Algumas atualizações não começaram. Tente novamente.",
 } as const satisfies PartialTranslation<typeof source>;

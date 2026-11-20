@@ -395,7 +395,10 @@ The runtime manager offers the latest upstream release of each provider CLI. It 
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini (`google-antigravity/antigravity-cli`), the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entry `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
-answered, and Bun, which is a tool runtime and not a provider, stays on it.
+answered, and Bun, which is a tool runtime and not a provider, stays on it. When the last check
+found no release for a provider that is not installed, `Download` and `Retry` look it up again,
+with the blocklist, for up to 10 seconds, before they use the pinned version. A vendor can remove an old build, as
+Cognition did for Devin CLI 3000.11.234 (#13549), so the pin alone can be a dead link.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
 Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
@@ -406,8 +409,11 @@ file it installed, and every start verifies that record and the binary's `--vers
 install is used. The newest version in the store that verifies is the one that runs.
 
 `provider-runtime-blocklist.json` on `main` names versions no installation may offer. It stops a
-broken upstream release without an OpenBot release. It suppresses an offer only: it does not remove
-a version a user already installed. A list that cannot be read blocks nothing.
+broken upstream release without an OpenBot release. When the OpenBot copy of a provider runs a blocked
+version, the automatic update installs the version that the check offers, also when it is older, and then
+removes the blocked copy. Each update check also removes a blocked copy that is not active. A copy that
+another OpenBot process stamped in the retention time stays. A CLI that the user installed or configured stays. A list
+that cannot be read blocks nothing.
 
 The `Provider CLI canary` workflow (`.github/workflows/provider-cli-canary.yml`) finds a broken
 release before many users install it. Every six hours it reads the newest release of each provider
@@ -537,13 +543,22 @@ that it is not supported instead of offering a download. An older managed instal
 metadata until the offered runtime passes the existing download and install checks. Runtime snapshots carry the previous version and an optional `availableVersion` through the
 preload decoder. Cancellation and failure preserve the previous installation and its update offer.
 
-After an app upgrade, main updates the managed CLIs with no offer (#3164).
-`openbot-provider-cli-app-version-v1.json` in `userData` keeps the app version that last started the
-update checks. A different or missing version calls `startUpdateChecks({ updateInstalled: true })`.
-Until the first check starts the downloads, `getStatus` does not offer the CLIs that it will update. That check then starts the
-download of each managed CLI that has a newer version, before it sends its status, so the renderer
-announces no offer. A CLI the user installed, an explicit path and an off provider keep the normal
-offer path. The renderer shows a notification for such an update only when it fails, with a Retry.
+Main updates the managed CLIs with no offer. After `startUpdateChecks`, each check (at start and
+then each hour) starts the download of each managed CLI that has a newer version, before it sends its
+status, so the renderer announces no offer. `providerUseChanged` does the same at once, for a provider
+that is turned on or that stops using a CLI the user installed. When a check runs at that time, it starts
+them after the check, so the download gets the latest version. Until a check starts the downloads,
+`getStatus` does not offer the CLIs that it will update. A CLI the user installed, an explicit path and
+an off provider keep the normal offer path. A failed update stays in `download-error` and is not started
+again by itself. A cancelled update is not started again for the same version until the app restarts,
+and stays offered. The decline is kept in memory only. The
+download waits for idle agents through `updateRuntime`. The renderer shows a notification for such an
+update only when it fails, with a Retry.
+
+Provider settings show "Update all" in the Connected header when one or more providers that are on
+have an offer. It calls `onUpdateProvider` for each of them, so it uses the same local or Team API path
+as the Update button of one provider. The mobile server providers screen has the same action. Both leave out installer providers
+such as Hermes.
 
 `ProvidersProvider` starts the shared renderer runtime store for the active server. The store
 announces each provider that gains an offer as one notification, from an effect over both the
@@ -1158,9 +1173,13 @@ the download size. `OPENBOT_DEVIN_PATH` selects another executable.
 
 Sign in calls the ACP `authenticate` method `devin-browser`, which opens Devin's page in the system
 browser. Devin CLI 3000.11.234 keeps the sign-in in `credentials.toml` of its XDG data folder
-(`~/.local/share/devin`). It has no device-code sign-in, so a joined computer cannot sign in Devin on
-the host. Sign out runs `devin auth logout`. A signed-out Devin process answers `session/new` with an
-empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
+(`~/.local/share/devin`). It has no device-code sign-in. For a user at another device, the CLI gives
+its page (`https://app.devin.ai/auth/cli/continue`, with a loopback `redirect_uri`) to OpenBot's
+`open` command, and `provider-sign-in-relay-v2` relays it to the client's browser (#9561). Only a Linux host
+advertises it: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has
+no `open` command that the CLI uses, so OpenBot cannot take the page there. Sign out
+runs `devin auth logout`. A signed-out Devin process answers `session/new` with an empty model list
+and no error. `noModelsWhenSignedOut` reads that list as "sign-in required".
 
 `devinStatePaths` lets a confined process write `devin/cli` and `devin/mcp` in the XDG data folder,
 `devin` in the XDG cache folder and `~/.devin/plans`. Its config folder, `credentials.toml` and
@@ -1411,6 +1430,15 @@ Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session mak
 and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
 `HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
 session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
+Hermes before 0.22.1 keeps one MCP server of each name for its whole process, so in one shared
+process each session's `openbot` call went out with the bearer token of the first session. OpenBot
+then ran it as that session's agent, and a message to that agent was refused as a message to
+itself (#13120). Hermes 0.22.1 gives each session its own servers (`GatewayACPAgent`). Both Hermes
+flavors set `sessionProcessesBefore: "0.22.1"`: when `initialize` reports an older `agentInfo.version`,
+each session runs in a Hermes process of its own, as for Mistral. Hermes keeps its sessions in
+`state.db`, so an idle session closes with its process and loads again in a new one. A version that
+`isVersion` does not read keeps the shared process. `bun run test:hermes-session-processes` checks
+both versions with a fake `hermes` agent.
 Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API

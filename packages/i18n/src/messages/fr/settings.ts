@@ -31,6 +31,8 @@ export const messages = {
   "settings.movingFaces.title": "Visages d’agents animés",
   "settings.movingFaces.description":
     "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
+  "settings.startupAnimation.title": "Animation de démarrage",
+  "settings.startupAnimation.description": "Affiche l’animation des agents pendant l’ouverture d’OpenBot.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -60,6 +62,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
   "settings.chatBackdrop.snowfall": "Chute de neige",
   "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.coast": "Côte néon",
   "settings.chatBackdrop.upload": "Importer une image…",
   "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
   "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
@@ -619,6 +622,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Forfait terminé",
   "settings.hostedServers.state.creating": "Création",
   "settings.hostedServers.state.starting": "Démarrage",
+  "settings.hostedServers.state.restoring": "Restauration des données",
   "settings.hostedServers.state.running": "En marche",
   "settings.hostedServers.state.stopping": "Arrêt en cours",
   "settings.hostedServers.state.stopped": "Arrêté",
@@ -629,6 +633,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",
   "settings.hostedServers.planEndedDescription":
     "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées. Renouvelez le forfait pour le démarrer.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées jusqu’au {date}. Renouvelez le forfait avant cette date pour le démarrer.",
   "settings.hostedServers.pay": "Ouvrir la page de paiement",
   "settings.hostedServers.payLabel": "Ouvrir la page de paiement de {name}",
   "settings.hostedServers.renew": "Renouveler le forfait",
@@ -736,7 +742,18 @@ export const messages = {
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
   "settings.voice.live.section": "Voix en direct",
+  "settings.voice.talk.section": "Conversation vocale",
+  "settings.voice.talkKey.title": "Touche pour parler",
+  "settings.voice.talkKey.description": "Maintenez ces touches enfoncées pour parler dans une conversation vocale.",
+  "settings.voice.talkKey.change": "Changer la touche pour parler",
+  "settings.voice.talkKey.recording": "Appuyez sur les touches",
+  "settings.voice.talkKey.refused": "Ajoutez une autre touche",
+  "settings.voice.talkKey.reset": "Rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "settings.voice.live.account": "Compte",
+  "settings.voice.live.accountAutomatic": "Automatique",
+  "settings.voice.live.accountDescription":
+    "Le compte ChatGPT qu'utilise la voix en direct. Choisissez un compte dont l'abonnement inclut la voix.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",

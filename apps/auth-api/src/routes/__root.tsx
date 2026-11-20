@@ -72,8 +72,9 @@ const NO_SCRIPT_STYLE = "<style>[data-revealed=false],[data-revealed=false] *{op
 function RootDocument(props: { children: JSX.Element }) {
   const chrome = useRouteSiteChrome();
   const lang = () => chrome()?.lang ?? "en";
+  const dir = () => chrome()?.dir ?? "ltr";
   return (
-    <html lang={lang()}>
+    <html lang={lang()} dir={dir()}>
       <head>
         <HeadContent />
         <noscript innerHTML={NO_SCRIPT_STYLE} />

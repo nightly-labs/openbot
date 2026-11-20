@@ -114,7 +114,7 @@ function parseModeOf(call: Call | undefined): string | undefined {
 
 const adapter = telegramDriver({ ingress }).createAdapter(
   { botId: BOT, chatId: CHAT, botUsername: "openbot_e2e_bot", chatTitle: "E2E group" },
-  { rateLimited: () => {} },
+  { connectionId: "telegram-e2e", rateLimited: () => {} },
 );
 const target = { platformChannelId: CHAT, replyThreadId: null };
 

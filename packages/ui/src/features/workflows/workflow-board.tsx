@@ -1,4 +1,4 @@
-import type { RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -16,7 +16,6 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
-import { diagramEdgeMidpoint, diagramEdgePath } from "../diagrams/diagram-graph";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
 import type { Box } from "./workflow-ink";
 import type { WorkflowLoop } from "./workflow-loops";
@@ -25,6 +24,19 @@ import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 export type WfnPortType = "text" | "image" | "file";
 export type WfnPortSide = "in" | "out";
 export type WfnRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
+
+export interface WorkflowAgentProgress {
+  agentId: string;
+  detail: string;
+  previous: string | undefined;
+  activity: AgentStepActivity | null;
+  done: number;
+}
+
+export function customStepName(value: WfnFieldValue | undefined): string | undefined {
+  const name = typeof value === "string" ? value.trim() : "";
+  return name || undefined;
+}
 export type WfnEdgeTone = "idle" | "run" | "done";
 export type WfnFieldValue = string | number | boolean;
 export type WfnFields = Record<string, WfnFieldValue>;
@@ -32,6 +44,15 @@ export type WfnFields = Record<string, WfnFieldValue>;
 export interface WfnPoint {
   x: number;
   y: number;
+}
+
+function edgePath(from: WfnPoint, to: WfnPoint): string {
+  const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
+  return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
+}
+
+function edgeMidpoint(from: WfnPoint, to: WfnPoint): WfnPoint {
+  return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
 }
 
 export interface WfnSize {
@@ -167,6 +188,7 @@ export interface WfnBoard {
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
   catalogs: () => WorkflowCatalogs;
@@ -233,6 +255,7 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
   runFrom?: (id: string) => void;
@@ -281,7 +304,7 @@ interface BoardState {
   points: Record<string, PortPoint>;
   message: string;
   results: Record<string, WfnResult[]>;
-  picked: Record<string, string>;
+  picked: Record<string, { result: string; newest: string | undefined }>;
   viewing: number | null;
 }
 
@@ -712,7 +735,7 @@ export function createBoard(options: BoardOptions) {
     if (failed) result.failed = true;
     setState((draft) => {
       draft.results[id] = [...(draft.results[id] ?? []), result];
-      draft.picked[id] = result.id;
+      delete draft.picked[id];
     });
   };
 
@@ -742,6 +765,11 @@ export function createBoard(options: BoardOptions) {
   };
 
   const resultsOf = (id: string): readonly WfnResult[] => options.resultsOf?.(id) ?? state.results[id] ?? [];
+  const latestOf = (id: string): WfnResult | undefined => {
+    const list = resultsOf(id);
+    const viewing = state.viewing;
+    return viewing === null ? list.at(-1) : list.findLast((result) => result.run === viewing);
+  };
   const selectedIds = createMembership(() => state.selection);
   const removedIds = createMembership(() => state.removed);
   const lockedIds = createMembership(() => state.locked);
@@ -803,6 +831,7 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
     runFrom: options.runFrom,
@@ -825,17 +854,18 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     shown: (id) => {
-      const list = resultsOf(id);
+      const latest = latestOf(id);
       const picked = state.picked[id];
-      if (picked) return list.find((result) => result.id === picked);
-      const viewing = state.viewing;
-      if (viewing !== null) return list.findLast((result) => result.run === viewing);
-      return list.at(-1);
+      const stillNewest = picked !== undefined && latest?.id === picked.newest;
+      if (!stillNewest) return latest;
+      return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
-    pick: (id, result) =>
+    pick: (id, result) => {
+      const newest = latestOf(id)?.id;
       setState((draft) => {
-        draft.picked[id] = result;
-      }),
+        draft.picked[id] = { result, newest };
+      });
+    },
     record: (id, value, run) => add(id, value, run, false),
     recordFailure: (id, message, run) => add(id, message, run, true),
     viewing: () => state.viewing,
@@ -853,13 +883,20 @@ export function createBoard(options: BoardOptions) {
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
       }),
     drawsLine: (node, side, type, branch) =>
+      point(node, side, type, branch) !== undefined &&
       state.edges.some((edge) => {
         if (edge.type !== type || options.hides?.(edge)) return false;
-        if (side === "out") return edge.from === node && edge.branch === branch && !outAnchor(edge);
+        if (side === "out") {
+          if (edge.from !== node || edge.branch !== branch || outAnchor(edge)) return false;
+          return targets(edge).some(
+            (slot) => inAnchor(edge, slot) !== undefined || point(edge.to, "in", type, slot) !== undefined,
+          );
+        }
         if (edge.to !== node) return false;
         const slots = slotsOf(edge);
         const slot = branch === undefined ? slots.length === 0 : slots.includes(branch);
-        return slot && !inAnchor(edge, branch);
+        if (!slot || inAnchor(edge, branch)) return false;
+        return outAnchor(edge, branch) !== undefined || point(edge.from, "out", type, edge.branch) !== undefined;
       }),
     armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
@@ -1128,7 +1165,7 @@ export function createBoard(options: BoardOptions) {
 
   const shapeOf = (edge: WfnEdge, from: WfnPoint, to: WfnPoint) => {
     const loop = options.loops?.().get(edge.id);
-    if (!loop) return { path: diagramEdgePath(from, to), middle: diagramEdgeMidpoint(from, to), turn: undefined };
+    if (!loop) return { path: edgePath(from, to), middle: edgeMidpoint(from, to), turn: undefined };
     const bottoms = loop.body.flatMap((id) => {
       const box = options.box?.(id);
       return box ? [box.y + box.height] : [];
@@ -1207,7 +1244,7 @@ export function createBoard(options: BoardOptions) {
       const anchor = options.anchor?.(from, undefined)?.at() ?? point(from.node, from.side, from.type, from.branch);
       const end = draftEnd();
       if (!anchor || !end) return null;
-      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+      return from.side === "out" ? edgePath(anchor, end) : edgePath(end, anchor);
     };
     const draftPath = () => (state.pending ? draftLine(state.pending) : null);
     const companionPaths = () => {

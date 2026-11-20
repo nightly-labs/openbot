@@ -1,4 +1,10 @@
-import type { HostedServerIssue, HostedServerSleep, HostedServerStart } from "@openbot/contracts/ipc";
+import type {
+  HostedServerIssue,
+  HostedServerSleep,
+  HostedServerStart,
+  HostedServerStartStep,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { Button, IconButton } from "../../button";
 import { ErrorReference } from "../../error-reference";
@@ -7,6 +13,13 @@ import { useText } from "../../text";
 import { toast } from "../../toast";
 import { AppLoadingScreen } from "../account/AppLoadingScreen";
 import { ServerStatusDialog } from "./ServerStatusDialog";
+
+const START_STEP_TEXT = {
+  machine: "server.hosted.detail.start.boot",
+  restore: "server.hosted.detail.start.restore",
+  openbot: "server.hosted.detail.start.app",
+  provider_limit: "server.connection.providerLimit",
+} as const satisfies Record<HostedServerStartStep, AppTextKey>;
 
 export type ServerWorkspacePhase =
   | "connecting"
@@ -52,6 +65,7 @@ export interface ServerConnectionNoticeProps {
   onExited?: (() => void) | undefined;
   onMountViews?: (() => void) | undefined;
   screen?: boolean;
+  loadingScene?: "pile" | "quiet";
   hideDetails?: boolean;
   onRetry: () => void;
   onManage?: () => void;
@@ -127,10 +141,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   const startProgress = () => {
     const start = props.start;
     if (props.phase !== "waking" || props.issue || !start) return null;
-    const step =
-      start.step === "provider_limit"
-        ? t("server.connection.providerLimit")
-        : t(start.step === "openbot" ? "server.hosted.detail.start.app" : "server.hosted.detail.start.boot");
+    const step = t(START_STEP_TEXT[start.step]);
     const seconds = Math.max(0, Math.floor((now() - start.startedAt) / 1000));
     return t("server.connection.startProgress", { step, time: formatElapsed(seconds) });
   };
@@ -277,6 +288,8 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         <Show when={props.screen !== false}>
           <AppLoadingScreen
             label={title()}
+            title={title()}
+            scene={props.loadingScene ?? "pile"}
             ready={props.ready}
             onExited={props.onExited}
             onMountViews={props.onMountViews}

@@ -306,7 +306,13 @@ export function attachmentIpcHandlers({
         },
         remote: async (parsed, serverId) => {
           const downloaded = await runCauseEffect(
-            remoteServers.downloadWorkspaceFile(parsed.agentId, parsed.path, serverId, parsed.maxBytes),
+            remoteServers.downloadWorkspaceFile(
+              parsed.agentId,
+              parsed.path,
+              serverId,
+              parsed.maxBytes,
+              parsed.exactPath === true,
+            ),
           );
           return filePreviewFromBytes(downloaded.name, downloaded.bytes);
         },

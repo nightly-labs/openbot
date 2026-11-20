@@ -32,6 +32,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "サーバーの Codex がライブ音声を開始できませんでした。オーナーに、そのコンピューターの Codex を更新して ChatGPT でサインインするよう依頼してから、もう一度お試しください。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
+  "error.voice.live.chooseAccount":
+    "この ChatGPT アカウントではライブ音声を使えません。設定 → 音声で、プランに音声が含まれるアカウントを選んでください。",
   "error.voice.live.unavailable":
     "OpenAI がライブ音声を開始できませんでした。OpenAI 側の問題です。しばらくしてからもう一度お試しください。",
   "error.voice.live.refused":

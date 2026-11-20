@@ -263,6 +263,12 @@ export const messages = {
     "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器现在不可用。请等几分钟，然后开始新的聊天再试一次。",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} 无法连接到 MCP 服务器 {name}。请在 市场、应用 中打开 {name}，确认地址正确并且服务器正在运行。然后开始新的聊天再试一次。",
+  "error.backend.githubToolsNotStarted":
+    "{provider} 无法获取 GitHub 工具，因为 GitHub 没有响应。请在 市场、应用 中打开 GitHub，如果它提示，请重新连接。然后开始新的聊天再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
   "error.backend.mcpOAuthRenewalFailed":
@@ -295,6 +301,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "该文件夹不存在或已被删除。",
   "error.backend.libraryFolderOtherAgent": "文件只能放入其所属助手的文件夹。",
   "error.backend.libraryFolderMoveInvalid": "无法将此文件夹移到那里。",
+  "error.backend.workflowFolderLimit": "一台服务器最多可有 {limit} 个工作流文件夹。",
+  "error.backend.workflowFolderPlacementLimit": "文件夹中的工作流过多。",
   "error.backend.sectionNameDuplicate": "分区名称必须唯一。",
   "error.backend.directMessageRequired": "请先写下消息内容。",
   "error.backend.directMessageTooLong": "私信最多可有 {limit} 个字符。",
@@ -329,9 +337,9 @@ export const messages = {
   "error.backend.takeoverInactive": "该浏览器接管已不再有效。",
   "error.backend.authSubmitting": "身份验证正在提交中。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
-  "error.backend.apiKeyNotAllowed": "只有服务器所有者或管理员可以输入 API 密钥。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
-  "error.backend.vaultItemNotAllowed": "只有服务器所有者或管理员可以向保险库添加项目。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot 无法读取 API 密钥。请输入不超过 8,000 个字符的密钥，并选择谁可以使用它。",
   "error.backend.vaultItemSaving": "该保险库项目正在保存中。",
   "error.backend.authRequestInactive": "该安全验证请求已不再有效。",
   "error.backend.secureAuthUnavailable": "安全验证不可用。",
@@ -366,7 +374,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "弹窗加载失败。请从原页面重新尝试登录。",
   "error.backend.browserTabNotFound": "未找到该浏览器标签页。",
   "error.backend.authActive": "身份验证已在进行中。",
-  "error.backend.authHttpsRequired": "安全验证需要 HTTPS。",
+  "error.backend.authWebPageRequired": "安全验证需要 HTTP/HTTPS。",
   "error.backend.authDigitsRange": "验证码需为 4–12 位数字。",
   "error.backend.authExpired": "验证请求已过期。",
   "error.backend.authDigitsRequired": "请输入要求位数的数字。",
@@ -400,9 +408,11 @@ export const messages = {
   "error.backend.threadMoveRefused": "只有你单独发给该助手的消息才能在新话题中运行。",
   "error.backend.taskTitleRequired": "请给任务起一个简短的标题。",
   "error.backend.taskToolInvalid": "标题不超过 120 个字符，并写明要做什么。",
+  "error.backend.taskControlInvalid": "请提供你启动的任务的 taskId。消息还需要文本。",
   "error.backend.taskOwnChatOnly": "只能在自己的对话中启动任务。频道、消息对话或其他任务都无法启动任务。",
   "error.backend.taskUnfinishedLimit": "该助手已有 {count} 个未完成的任务。请等其中一个结束后再启动新任务。",
   "error.backend.taskOpenLimitReached": "该助手有 {count} 个未关闭的任务。请关闭一个任务，再启动或打开其他任务。",
   "error.backend.taskRemoteUnsupported": "任务仅适用于本电脑上的助手。",
+  "error.backend.taskMessageFailed": "OpenBot 无法将消息发送给该任务，请稍后重试。",
   "error.backend.taskStartFailed": "OpenBot 无法启动该任务，请改为在本轮对话中完成。",
 } as const satisfies PartialTranslation<typeof source>;

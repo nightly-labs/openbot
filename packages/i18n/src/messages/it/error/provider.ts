@@ -20,6 +20,8 @@ export const messages = {
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
   "error.provider.acpMcpNotLoaded":
     "{provider} non ha caricato gli strumenti di OpenBot, quindi questo agente non può usarli né contattare i suoi compagni. Una policy del team {provider} può bloccare i server MCP locali. Chiedi all’amministratore del team di consentirli, poi riprova.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} ha eseguito questo messaggio senza gli strumenti di OpenBot, quindi l’agente non ha potuto contattare i compagni, usare il browser né allegare file. Riprova.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} non è riuscito ad avviare il server MCP {name}, quindi la risposta si è fermata. Questo server è nelle tue impostazioni di {provider}, non in OpenBot. Rimuovilo o riparalo lì, poi avvia una nuova chat.",
   "error.provider.endpointsReadOnly":
@@ -269,6 +271,10 @@ export const messages = {
     "Questo modello non è disponibile per te. Scegli un altro modello per questo agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. Scegli un impegno più basso o un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. In Impostazioni, apri Provider personalizzato, fai clic su Modifica per questo endpoint e imposta un Output massimo più alto per questo modello. Oppure scegli un impegno più basso o un altro modello.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeModelNotServed":
@@ -332,6 +338,8 @@ export const messages = {
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini non è riuscito a leggere la cronologia salvata di questa chat. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Invia di nuovo il messaggio.",
+  "error.provider.acpTurnStuck":
+    "{provider} non ha terminato il turno precedente, quindi non ha accettato questo messaggio. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Invia di nuovo il messaggio.",
   "error.provider.antigravityLocationUnsupported":
     "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -402,6 +410,10 @@ export const messages = {
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} L'agente non vede più questo messaggio, quindi non blocca i tuoi prossimi messaggi. Invia di nuovo la richiesta con parole diverse.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
   "error.provider.codexAudioRefused":
     "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":

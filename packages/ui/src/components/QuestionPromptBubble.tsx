@@ -107,6 +107,7 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
   });
   const animateEntrance = untrack(() => !props.resolution);
   let stage: HTMLDivElement | undefined;
+  let card: HTMLDivElement | undefined;
   let holdTimer: number | undefined;
   let presentTimer: number | undefined;
   let resolutionPresentationPending = false;
@@ -174,15 +175,24 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       draft.announced = keepFocus || !question ? "" : markdownPlainText(question.question);
     });
     fitStage(next);
-    if (!keepFocus) return;
-    queueMicrotask(() => {
-      const page = stage?.children[next];
-      const target =
-        next < total() && toOption
-          ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
-          : null;
-      (target ?? stage)?.focus({ preventScroll: true });
-    });
+    if (keepFocus) {
+      queueMicrotask(() => {
+        const page = stage?.children[next];
+        const target =
+          next < total() && toOption
+            ? (page?.querySelector<HTMLElement>("input:checked") ?? page?.querySelector<HTMLElement>("input"))
+            : null;
+        (target ?? stage)?.focus({ preventScroll: true });
+      });
+    }
+    if (next < total()) queueMicrotask(revealCardTop);
+  }
+
+  function revealCardTop(): void {
+    const scroller = card && scrollingAncestor(card);
+    if (card && scroller && card.getBoundingClientRect().top < scroller.getBoundingClientRect().top) {
+      card.scrollIntoView({ block: "start" });
+    }
   }
 
   function presentResolution(): void {
@@ -491,7 +501,10 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
 
   return (
     <Bubble
-      ref={(element) => props.elementRef?.(element)}
+      ref={(element) => {
+        card = element;
+        props.elementRef?.(element);
+      }}
       variant="muted"
       class="question-prompt-bubble"
       data-state={resolved() ? "done" : busy() ? "pending" : "idle"}
@@ -588,4 +601,11 @@ export function QuestionPromptBubble(props: QuestionPromptBubbleProps) {
       </BubbleContent>
     </Bubble>
   );
+}
+
+function scrollingAncestor(element: HTMLElement): HTMLElement | undefined {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return undefined;
 }

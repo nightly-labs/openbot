@@ -1,6 +1,6 @@
-import type { ChatWindowTarget } from "@openbot/contracts/ipc";
+import { type ChatWindowTarget, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { type ParentProps, Show } from "solid-js";
+import { type ParentProps, Show, untrack } from "solid-js";
 import { AnsweredPromptsProvider } from "./answered-prompts";
 import { AppBootstrap } from "./app-bootstrap";
 import { AuthProvider } from "./features/account/account-context";
@@ -131,7 +131,12 @@ interface ScopedConversationProps {
 
 function ScopedProviders(props: ParentProps<ScopedConversationProps>): JSX.Element {
   const platform = usePlatform();
-  const conversationController = { ...props.stableConversation, ...createServerConversationState() };
+  const { activeServerId } = useServers();
+  const keepSidePanelFiles = !platform.chatWindow && untrack(activeServerId) === LOCAL_SERVER_ID;
+  const conversationController = {
+    ...props.stableConversation,
+    ...createServerConversationState(keepSidePanelFiles),
+  };
   return (
     <ConversationControllerProvider controller={conversationController}>
       <PresenceProvider>
