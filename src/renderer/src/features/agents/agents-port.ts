@@ -22,6 +22,7 @@ export interface AgentsPort {
     | "listModels"
     | "onEvent"
     | "getRuntimeSnapshot"
+    | "listPendingPrompts"
     | "setAgentHidden"
     | "setAgentNotificationLevel"
     | "setAvatar"

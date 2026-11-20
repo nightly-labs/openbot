@@ -43,6 +43,7 @@ import {
   PROVIDER_DETECTION_CAPABILITY,
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -168,6 +169,7 @@ function webProviderAdmin(
   accountRelay: () => ProviderAccountRelay | null,
   accountModels: () => boolean,
   accountPools: () => boolean,
+  providerRelay: (provider: AgentProviderId) => ReturnType<typeof providerSignInRelay>,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -317,7 +319,7 @@ function webProviderAdmin(
       runTeamEffect(getProviderUse(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setProviderUse: async ({ provider, on }, serverId) =>
       runTeamEffect(setProviderUse(request(serverId), provider, on).pipe(Effect.mapError((error) => error.cause))),
-    ...webProviderRelay(request, accountRelay),
+    ...webProviderRelay(request, accountRelay, providerRelay),
   };
 }
 
@@ -403,6 +405,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
+    (provider) => providerSignInRelay(provider, (capability) => serverSupportsCapability(options.server(), capability)),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(

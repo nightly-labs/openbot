@@ -1,4 +1,4 @@
-import type { RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -24,6 +24,19 @@ import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 export type WfnPortType = "text" | "image" | "file";
 export type WfnPortSide = "in" | "out";
 export type WfnRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
+
+export interface WorkflowAgentProgress {
+  agentId: string;
+  detail: string;
+  previous: string | undefined;
+  activity: AgentStepActivity | null;
+  done: number;
+}
+
+export function customStepName(value: WfnFieldValue | undefined): string | undefined {
+  const name = typeof value === "string" ? value.trim() : "";
+  return name || undefined;
+}
 export type WfnEdgeTone = "idle" | "run" | "done";
 export type WfnFieldValue = string | number | boolean;
 export type WfnFields = Record<string, WfnFieldValue>;
@@ -175,6 +188,7 @@ export interface WfnBoard {
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
   catalogs: () => WorkflowCatalogs;
@@ -241,6 +255,7 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
   runFrom?: (id: string) => void;
@@ -816,6 +831,7 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
     runFrom: options.runFrom,

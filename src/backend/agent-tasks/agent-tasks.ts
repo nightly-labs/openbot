@@ -10,6 +10,7 @@ import {
   type AgentTaskBranch,
   type AgentTaskHold,
   type AgentTasksSnapshot,
+  type AgentTurnCompletedEvent,
   type AttachmentSummary,
   agentTaskLimit,
   type BranchAgentTaskInput,
@@ -21,6 +22,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
+import { TASK_REPORT_CUT_MARK, type TaskReportState } from "../agent/delivery-content";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import {
@@ -44,9 +46,32 @@ const AGENT_STARTED_FINISHED_KEPT = 8;
 
 export const START_TASK_TOOL = "start_task";
 
+export const MESSAGE_TASK_TOOL = "message_task";
+
+export const CLOSE_TASK_TOOL = "close_task";
+
+const TASK_TOOLS: ReadonlySet<string> = new Set([START_TASK_TOOL, MESSAGE_TASK_TOOL, CLOSE_TASK_TOOL]);
+
+const TASK_REPORT_ANSWER_LIMIT = 6000;
+
+const TASK_REPORT_ERROR_LIMIT = 500;
+
+const TASK_REPORT_RUNNING_LIMIT = 8;
+
 export const startTaskToolSchema = z.strictObject({
   title: z.string().trim().min(1).max(INPUT_LIMITS.agentTaskTitle),
   brief: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+});
+
+const taskIdSchema = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
+
+export const messageTaskToolSchema = z.strictObject({
+  taskId: taskIdSchema,
+  text: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
+});
+
+export const closeTaskToolSchema = z.strictObject({
+  taskId: taskIdSchema,
 });
 
 export interface AgentTasksHooks {
@@ -57,11 +82,15 @@ export interface AgentTasksHooks {
   queued(agentId: string): void;
   turnActive(agentId: string, threadId: string): boolean;
   archived(agentId: string, tasks: readonly AgentThreadRecord[]): Effect.Effect<void>;
+  turnAnswer(agentId: string, threadId: string, turnId: string): string | null;
+  closeTask(agentId: string, taskId: string): Effect.Effect<void, unknown>;
+  fork(work: Effect.Effect<void>): void;
 }
 
 export interface AgentTaskCaller {
   agentId: string;
   inExecutionThread: boolean;
+  requesterIds: readonly string[];
 }
 
 export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFailed>()("AgentTaskBranchFailed", {
@@ -95,6 +124,7 @@ export class AgentTasks implements TaskLanes {
   readonly #hooks: AgentTasksHooks;
   readonly #progress = new Map<string, string>();
   readonly #stoppedTurns = new Map<string, string>();
+  readonly #userStops = new Map<string, string>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   readonly #branches = Semaphore.makeUnsafe(1);
@@ -207,6 +237,19 @@ export class AgentTasks implements TaskLanes {
     this.#store.retitle(thread.threadId, title);
     this.changed(thread.agentId);
     return this.#store.task(thread.taskId) ?? thread;
+  }
+
+  taskReport(taskId: string): TaskReportState | null {
+    const task = this.#store.task(taskId);
+    if (!task || !isStartedTask(task)) return null;
+    const stillRunning = this.#store
+      .openTaskIds(task.agentId)
+      .flatMap((otherId) => this.#store.task(otherId) ?? [])
+      .filter((other) => other.taskId !== task.taskId && isStartedTask(other) && !this.#finished(other))
+      .slice(0, TASK_REPORT_RUNNING_LIMIT)
+      .map((other) => ({ taskId: other.taskId, title: other.title }));
+    const outcome = task.outcome === "interrupted" && this.#userStops.has(task.taskId) ? "stopped" : task.outcome;
+    return { taskId: task.taskId, title: task.title, outcome, stillRunning };
   }
 
   isRoutineThread(taskId: string): boolean {
@@ -329,6 +372,7 @@ export class AgentTasks implements TaskLanes {
   delete(task: AgentThreadRecord): void {
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
+    this.#userStops.delete(task.taskId);
     this.#turnEndWaiters.delete(task.taskId);
     this.#store.delete(task.taskId);
     this.changed(task.agentId);
@@ -347,6 +391,7 @@ export class AgentTasks implements TaskLanes {
     this.#store.close(task.taskId);
     this.#progress.delete(task.taskId);
     this.#stoppedTurns.delete(task.taskId);
+    this.#userStops.delete(task.taskId);
   }
 
   reopen(task: AgentThreadRecord): void {
@@ -370,8 +415,10 @@ export class AgentTasks implements TaskLanes {
     );
   }
 
-  markStopped(taskId: string, turnId: string): void {
+  markStopped(taskId: string, turnId: string, byUser: boolean): void {
     this.#stoppedTurns.set(taskId, turnId);
+    if (byUser) this.#userStops.set(taskId, turnId);
+    else this.#userStops.delete(taskId);
   }
 
   stoppedTurn(taskId: string): string | null {
@@ -434,6 +481,7 @@ export class AgentTasks implements TaskLanes {
     for (const taskId of this.#store.taskIdsForAgent(agentId)) {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
+      this.#userStops.delete(taskId);
     }
     this.#store.deleteForAgent(agentId);
   }
@@ -443,11 +491,99 @@ export class AgentTasks implements TaskLanes {
     params: DynamicToolCallParams,
     caller: AgentTaskCaller,
   ): Effect.fn.Return<OpenBotToolResponse | null> {
-    if (params.tool !== START_TASK_TOOL) return null;
+    if (!TASK_TOOLS.has(params.tool)) return null;
+    if (params.tool === MESSAGE_TASK_TOOL) {
+      const parsed = messageTaskToolSchema.safeParse(params.arguments);
+      if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskControlInvalid"));
+      if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
+      return yield* this.#starts.withPermit(this.#message(params, caller, parsed.data));
+    }
+    if (params.tool === CLOSE_TASK_TOOL) {
+      const parsed = closeTaskToolSchema.safeParse(params.arguments);
+      if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskControlInvalid"));
+      if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
+      return yield* this.#close(caller, parsed.data.taskId);
+    }
     const parsed = startTaskToolSchema.safeParse(params.arguments);
     if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskToolInvalid"));
     if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
     return yield* this.#starts.withPermit(this.#start(params, caller, parsed.data));
+  });
+
+  #startedBy(agentId: string, taskId: string): AgentThreadRecord | null {
+    const task = this.#store.task(taskId);
+    return task && isStartedTask(task) && task.agentId === agentId ? task : null;
+  }
+
+  readonly #message = Effect.fn("AgentTasks.message")(function* (
+    this: AgentTasks,
+    params: DynamicToolCallParams,
+    caller: AgentTaskCaller,
+    input: z.infer<typeof messageTaskToolSchema>,
+  ): Effect.fn.Return<OpenBotToolResponse> {
+    const task = this.#startedBy(caller.agentId, input.taskId);
+    if (!task) return openBotToolFailure(sourceText("error.backend.taskNotFound"));
+    const idempotencyKey = `message-task:${createHash("sha256")
+      .update(JSON.stringify([caller.agentId, params.turnId, params.callId]))
+      .digest("hex")}`;
+    if (this.#mailbox.deliveryForKey(idempotencyKey)) return messagedTaskResult(task, false);
+    const running = task.closedAt === null && !this.#finished(task);
+    if (!running && this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
+      return openBotToolFailure(
+        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
+      );
+    if (task.closedAt !== null) {
+      if (this.#store.openTaskIds(caller.agentId).length >= INPUT_LIMITS.agentTasks)
+        return openBotToolFailure(
+          sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }),
+        );
+      this.reopen(task);
+    }
+    const queued = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: caller.agentId },
+        requesterIds: caller.requesterIds,
+        taskId: task.taskId,
+        recipientAgentIds: [caller.agentId],
+        text: input.text,
+        replyToMessageId: null,
+        idempotencyKey,
+      })
+      .pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not queue a message for a task.", { agentId: caller.agentId, error: failure.cause });
+            return false;
+          }),
+        ),
+      );
+    if (!queued) return openBotToolFailure(sourceText("error.backend.taskMessageFailed"));
+    this.changed(caller.agentId);
+    this.#hooks.queued(caller.agentId);
+    return messagedTaskResult(task, running);
+  });
+
+  readonly #close = Effect.fn("AgentTasks.close")(function* (
+    this: AgentTasks,
+    caller: AgentTaskCaller,
+    taskId: string,
+  ): Effect.fn.Return<OpenBotToolResponse> {
+    const task = this.#startedBy(caller.agentId, taskId);
+    if (!task) return openBotToolFailure(sourceText("error.backend.taskNotFound"));
+    if (task.closedAt === null) {
+      const closed = yield* this.#hooks.closeTask(caller.agentId, task.taskId).pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not close a task for its agent.", { agentId: caller.agentId, error: failure });
+            return false;
+          }),
+        ),
+      );
+      if (!closed) return openBotToolFailure(sourceText("error.backend.taskStillRunning"));
+    }
+    return openBotToolResult({ taskId: task.taskId, title: task.title, state: "closed" });
   });
 
   readonly #start = Effect.fn("AgentTasks.start")(function* (
@@ -465,13 +601,12 @@ export class AgentTasks implements TaskLanes {
     if (startedTask) return startedTaskResult(startedTask);
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
-    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
-    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
+    if (this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
       return openBotToolFailure(
         sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
       );
     const finishedByAgent = finished
-      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
+      .filter(isStartedTask)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
     const others = open.length - finishedByAgent.length;
     const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
@@ -484,6 +619,7 @@ export class AgentTasks implements TaskLanes {
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
+        requesterIds: caller.requesterIds,
         taskId: task.taskId,
         recipientAgentIds: [caller.agentId],
         text: input.brief,
@@ -566,6 +702,7 @@ export class AgentTasks implements TaskLanes {
         const task = this.#taskOf(event.threadId);
         if (!task) return false;
         this.#progress.delete(task.taskId);
+        if (this.#userStops.get(task.taskId) !== event.turnId) this.#userStops.delete(task.taskId);
         if (task.error !== null) this.#store.setError(task.taskId, null);
         this.#store.touch(task.taskId);
         this.changed(task.agentId);
@@ -574,6 +711,8 @@ export class AgentTasks implements TaskLanes {
       case "turn-completed": {
         const task = this.#taskOf(event.threadId);
         if (!task) return false;
+        const announced = !event.quiet && !event.continues;
+        const reports = announced && this.#reportsTurn(task, event);
         this.#progress.delete(task.taskId);
         this.#store.setOutcome(
           task.taskId,
@@ -583,13 +722,15 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
-        if (!event.quiet && !event.continues)
+        if (announced) {
           this.#hooks.emit({
             type: "thread-turn-completed",
             taskId: task.taskId,
             routine: task.routineId !== null,
             turn: event,
           });
+          if (reports) this.#hooks.fork(this.#report(task, event));
+        }
         return true;
       }
       case "queue-changed":
@@ -598,6 +739,50 @@ export class AgentTasks implements TaskLanes {
       default:
         return false;
     }
+  }
+
+  #reportsTurn(task: AgentThreadRecord, event: AgentTurnCompletedEvent): boolean {
+    if (!isStartedTask(task) || task.closedAt !== null || event.origin === "user") return false;
+    if (this.#mailbox.taskAwaitsAgent(task.agentId, task.taskId)) return false;
+    const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
+    return !stopped || this.#userStops.get(task.taskId) === event.turnId;
+  }
+
+  readonly #report = Effect.fn("AgentTasks.report")(function* (
+    this: AgentTasks,
+    ended: AgentThreadRecord,
+    event: AgentTurnCompletedEvent,
+  ): Effect.fn.Return<void> {
+    const task = this.#store.task(ended.taskId) ?? ended;
+    const text = taskReportText(task, event.status, this.#hooks.turnAnswer(task.agentId, task.threadId, event.turnId));
+    const queued = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: task.agentId },
+        requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
+        senderTaskId: task.taskId,
+        recipientAgentIds: [task.agentId],
+        text,
+        replyToMessageId: null,
+        expectsReply: false,
+        idempotencyKey: `task-report:${event.turnId}`,
+      })
+      .pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not queue a task report.", { agentId: task.agentId, error: failure.cause });
+            return false;
+          }),
+        ),
+      );
+    if (queued) this.#hooks.queued(task.agentId);
+  });
+
+  #unfinishedTasks(agentId: string): number {
+    return this.#store
+      .openTaskIds(agentId)
+      .flatMap((taskId) => this.#store.task(taskId) ?? [])
+      .filter((task) => task.routineId === null && !this.#finished(task)).length;
   }
 
   #finished(task: AgentThreadRecord): boolean {
@@ -695,8 +880,33 @@ function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
-    note: "The task runs in its own conversation beside this chat, and the user follows it in the task list. Its result stays in the task: you do not receive it here. Tell the user in one sentence that the task started, and continue with other work or end your turn.",
+    note: "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.",
   });
+}
+
+function messagedTaskResult(task: AgentThreadRecord, running: boolean): OpenBotToolResponse {
+  return openBotToolResult({
+    taskId: task.taskId,
+    title: task.title,
+    state: running ? "queued after the current turn of the task" : "sent",
+    note: "The task answers in its own conversation, and OpenBot sends that answer to your main chat as a task report. Continue with other work or end your turn.",
+  });
+}
+
+function isStartedTask(task: AgentThreadRecord): boolean {
+  return task.origin === "agent" && task.routineId === null && task.branch === null;
+}
+
+function taskReportText(task: AgentThreadRecord, status: string, answer: string | null): string {
+  const trimmed = answer?.trim();
+  if (trimmed) return cutAnswer(trimmed);
+  if (status === "failed" && task.error) return task.error.slice(0, TASK_REPORT_ERROR_LIMIT);
+  return task.title;
+}
+
+function cutAnswer(answer: string): string {
+  if (answer.length <= TASK_REPORT_ANSWER_LIMIT) return answer;
+  return `${answer.slice(0, TASK_REPORT_ANSWER_LIMIT)}\n${TASK_REPORT_CUT_MARK}`;
 }
 
 function taskTitle(text: string): string {

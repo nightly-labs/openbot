@@ -95,7 +95,11 @@ export function AgentModelPickerScreen() {
       ) : options.length === 0 ? (
         <SettingsNote>{t("mobile.agent.runtime.noModels")}</SettingsNote>
       ) : matches.length === 0 ? (
-        <SettingsNote>{t("mobile.agent.runtime.noMatches")}</SettingsNote>
+        <SettingsNote>
+          {request.provider === "openrouter"
+            ? t("mobile.agent.runtime.openrouterNoMatches")
+            : t("mobile.agent.runtime.noMatches")}
+        </SettingsNote>
       ) : (
         <SettingsSection>
           {matches.slice(0, limit).map((option) => {

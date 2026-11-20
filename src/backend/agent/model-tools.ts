@@ -44,6 +44,7 @@ interface ProviderModels {
   models: ToolModel[];
   omittedModels?: number;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
+  noMatchReason?: string;
 }
 
 type ToolModel = Pick<AgentModelOption, "id" | "name"> &
@@ -120,6 +121,8 @@ function emptyCatalogMessage(provider: AgentProvider): string {
 
 const SHORT_LIST_LENGTH = 8;
 const QUERY_RESULT_LIMIT = 20;
+const OPENROUTER_NO_MATCH_REASON =
+  "OpenRouter lists only the models that the privacy, provider and guardrail settings of the key's account on openrouter.ai allow. The user changes them on openrouter.ai.";
 
 export interface ListModelsRequest {
   provider?: AgentProvider | undefined;
@@ -234,6 +237,9 @@ export function listModelsPayload(
           defaultModel: fallback.id,
           models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
+          ...(id === "openrouter" && words.length > 0 && candidates.length === 0
+            ? { noMatchReason: OPENROUTER_NO_MATCH_REASON }
+            : {}),
           ...(rows
             ? {
                 accounts: rows.map((account) => {

@@ -478,6 +478,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",
   "error.backend.taskToolInvalid":
     "Donnez à la tâche un titre de 120 caractères au plus et des consignes qui disent quoi faire.",
+  "error.backend.taskControlInvalid":
+    "Indiquez le taskId d’une tâche que vous avez lancée. Un message doit aussi contenir du texte.",
   "error.backend.taskOwnChatOnly":
     "Lancez une tâche uniquement depuis votre propre discussion. Un canal, une conversation de messagerie ou une autre tâche ne peut pas en lancer.",
   "error.backend.taskUnfinishedLimit":
@@ -485,5 +487,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Cet agent a {count} tâches ouvertes. Fermez une tâche, puis lancez-en ou ouvrez-en une autre.",
   "error.backend.taskRemoteUnsupported": "Les tâches sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.taskMessageFailed": "OpenBot n’a pas pu envoyer le message à la tâche. Réessayez plus tard.",
   "error.backend.taskStartFailed": "OpenBot n’a pas pu lancer la tâche. Faites plutôt le travail dans ce tour.",
 } as const satisfies PartialTranslation<typeof source>;

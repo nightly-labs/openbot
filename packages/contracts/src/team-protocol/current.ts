@@ -137,6 +137,7 @@ import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
@@ -152,6 +153,7 @@ import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
+import { PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
@@ -393,6 +395,7 @@ export {
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -774,6 +777,8 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOWS_STEP_SETTINGS_CAPABILITY, V10],
   [TEAM_USAGE_GROUPS_CAPABILITY, V10],
   [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
+  [PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY, V10],
+  [PENDING_PROMPTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

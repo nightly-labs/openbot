@@ -314,6 +314,7 @@ export class QueueControls {
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              taskReport: this.#drain.taskReport(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",

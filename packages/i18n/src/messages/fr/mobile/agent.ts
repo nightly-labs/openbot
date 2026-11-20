@@ -332,6 +332,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Aucun modèle disponible pour ce fournisseur.",
   "mobile.agent.runtime.searchModels": "Rechercher des modèles",
   "mobile.agent.runtime.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ce fournisseur ne fonctionne pas avec « Espace de travail uniquement » sous Windows et Linux. Pour l’utiliser, modifiez d’abord les « Autorisations ».",
   "mobile.agent.runtime.usageLimit": "Limite d’utilisation atteinte",
@@ -501,6 +503,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Cet hôte ne peut pas publier d’agents depuis un appareil distant.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Jetons hors lectures du cache",
   "mobile.agent.usage.estimatedCost": "Coût estimé",
+  "mobile.agent.usage.noCostEstimate": "Aucune estimation de coût",
   "mobile.agent.usage.daily": "Utilisation quotidienne",
   "mobile.agent.usage.tokens": "Jetons",
   "mobile.agent.usage.cost": "Coût",
@@ -628,7 +631,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Aucune discussion ouverte",
   "mobile.agent.home.noChatOpenBody": "Choisissez une discussion dans la liste.",
   "mobile.agent.home.chatListWidth": "Largeur de la liste des discussions",
-  "mobile.agent.home.serverTitle": "{name}, ouvrir les serveurs",
   "mobile.agent.home.waiting": "En attente de connexion",
   "mobile.agent.home.waitingBody": "La liste des agents se chargera une fois ce serveur connecté.",
   "mobile.agent.home.noAgents": "Aucun agent sur ce serveur",

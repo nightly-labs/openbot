@@ -117,6 +117,8 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "provider.picker.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",

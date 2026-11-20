@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren die Einstellungen von Workflow-Schritten, Ab diesem Schritt ausführen, die Übergabe des Besitzes, die Schaltfläche Alle aktualisieren und viele Korrekturen für Agenten nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Sprich mit einem Agenten per Push-to-Talk. Halte die Sprechtaste oder die Push-to-Talk-Taste gedrückt, während du sprichst. OpenBot sendet, was du gesagt hast, wenn du loslässt. Ändere die Taste unter Einstellungen > Diktat.",
+          "Starte einen Workflow ab einem Schritt neu. Wähle im Menü des Schritts Ab diesem Schritt ausführen. Die Schritte davor behalten ihre Antworten und laufen nicht noch einmal.",
+          "Sieh dir die Einstellungen und Eingaben an, die das Ergebnis eines Workflow-Schritts erzeugt haben. Wähle am Schritt Einstellungen und dann Diese Einstellungen verwenden, um ihn auf die gleiche Weise erneut auszuführen.",
+          "Gib deinen Server an ein anderes OpenBot-Konto weiter. Gib unter Servereinstellungen > Mitglieder die E-Mail-Adresse des neuen Besitzers ein. Der Server wechselt den Besitzer, wenn der neue Besitzer ihn annimmt.",
+          "Aktualisiere alle Anbieter auf einmal. Einstellungen > Anbieter zeigt Alle aktualisieren, wenn ein oder mehrere Anbieter ein Update haben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot aktualisiert die Anbieter-CLIs, die es heruntergeladen hat, jede Stunde, sobald eine neue Version verfügbar ist. Das Update wartet, bis die Agenten im Leerlauf sind.",
+          "Jeder Thread eines Agenten kann die Browser-Tabs nutzen, die der Hauptchat oder ein anderer Thread dieses Agenten geöffnet hat.",
+          "Der Tab Routinen ist aus der Seitenleiste verschwunden. Routinen laufen weiter. Verwalte sie in den Einstellungen des Agenten, auf der Seite Zeitplan und unter Servereinstellungen > Routinen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Neustart für ein heruntergeladenes Update wartet jetzt, bis die Agenten im Leerlauf sind, mit Neustart abbrechen. Vorher schloss sich OpenBot sofort und beendete die Aufgabe des Agenten.",
+          "Ein Agent bleibt nach einem Neustart oder einem Nutzungslimit nicht mehr auf „In Arbeit“ mit wartenden Nachrichten. Der beendete Durchlauf wird als unterbrochen angezeigt, und die wartenden Nachrichten starten.",
+          "Einem ausgelasteten Server mit vielen Agenten und verbundenen Geräten geht nicht mehr der Speicher aus, und er friert nicht mehr ein, wenn er den nächsten Durchlauf auswählt.",
+          "Eine Nachricht, die du nach einer Pause sendest, bleibt nicht mehr auf „Nicht gesendet“ mit „Verbinde Claude, um fortzufahren.“, wenn Claude angemeldet ist.",
+          "Ungenutzte Browser-Tabs von Agenten verbrauchen nach 2 Minuten keine Prozessorleistung mehr."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

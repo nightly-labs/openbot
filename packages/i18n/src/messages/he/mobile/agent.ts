@@ -316,6 +316,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
   "mobile.agent.runtime.searchModels": "חיפוש מודלים",
   "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "הספק הזה לא עובד עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בו, שנו קודם את „הרשאות”.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",
@@ -482,6 +484,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "המארח הזה לא יכול לפרסם סוכנים מהתקן מרוחק.",
   "mobile.agent.usage.tokensWithoutCacheReads": "טוקנים ללא קריאות מטמון",
   "mobile.agent.usage.estimatedCost": "עלות משוערת",
+  "mobile.agent.usage.noCostEstimate": "אין הערכת עלות",
   "mobile.agent.usage.daily": "שימוש יומי",
   "mobile.agent.usage.tokens": "טוקנים",
   "mobile.agent.usage.cost": "עלות",
@@ -611,7 +614,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",
   "mobile.agent.home.noChatOpenBody": "יש לבחור צ'אט ברשימה.",
   "mobile.agent.home.chatListWidth": "רוחב רשימת הצ'אטים",
-  "mobile.agent.home.serverTitle": "{name}, פתיחת שרתים",
   "mobile.agent.home.waiting": "ממתין לחיבור",
   "mobile.agent.home.waitingBody": "רשימת הסוכנים תיטען כשהשרת הזה יתחבר.",
   "mobile.agent.home.noAgents": "אין סוכנים בשרת הזה",

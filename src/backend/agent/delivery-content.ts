@@ -117,6 +117,14 @@ export interface DeliveryPromptSources {
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
   externalChat?: boolean;
+  taskReport?: TaskReportState | null;
+}
+
+export interface TaskReportState {
+  taskId: string;
+  title: string;
+  outcome: "completed" | "failed" | "interrupted" | "stopped" | null;
+  stillRunning: ReadonlyArray<{ taskId: string; title: string }>;
 }
 
 export interface AnsweredRoutine {
@@ -328,6 +336,29 @@ export function routineLocalTime(scheduledFor: string, timeZone: string | undefi
   ];
 }
 
+function taskReportFraming(taskId: string, report: TaskReportState | null): string[] {
+  const name = report ? `"${report.title}" (taskId ${taskId})` : `taskId ${taskId}`;
+  const status =
+    report?.outcome === "failed"
+      ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, failed. The text below is its error or last answer.`
+      : report?.outcome === "stopped"
+        ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
+        : report?.outcome === "interrupted"
+          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, so part of the work can be done.`
+          : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
+  const running = report?.stillRunning.length
+    ? [`Still running: ${report.stillRunning.map((other) => `"${other.title}" (taskId ${other.taskId})`).join(", ")}.`]
+    : [];
+  return [
+    status,
+    `The user can read the whole task in its tab. When the text ends with "${TASK_REPORT_CUT_MARK}", it is cut: openbot.history_read with this taskId gives the rest.`,
+    ...running,
+    "While other tasks still run, tell the user in one line what is done, and give all results together after the last report. To continue a task, call openbot.message_task with {taskId, text}. To stop one, call openbot.close_task with {taskId}.",
+  ];
+}
+
+export const TASK_REPORT_CUT_MARK = "[…]";
+
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
@@ -354,10 +385,20 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   }
   const voice = sources.liveVoice;
   if (delivery.sender.kind === "user" && voice && delivery.text === voice.shown) text = liveVoicePrompt(voice);
-  if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
+  if (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId === delivery.recipientAgentId &&
+    context.senderTaskId
+  ) {
     text = [
-      "You started this task with openbot.start_task from your own chat. It is a separate conversation beside that chat, with this brief as its first message.",
-      "Do the work in the brief here, and end with the result for the user: the user reads it in this task. Do not send it with openbot.send_message.",
+      ...taskReportFraming(context.senderTaskId, sources.taskReport ?? null),
+      COLLABORATOR_SEPARATOR,
+      displayText,
+    ].join("\n");
+  } else if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
+    text = [
+      "This message comes from your own chat, which started this task with openbot.start_task. The task is a separate conversation beside that chat.",
+      "Do the work here, and do not end your turn while background work of yours still runs. End with a compact result that has the data your chat needs, without your steps: OpenBot sends your final answer to your chat. Do not send it with openbot.send_message.",
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");

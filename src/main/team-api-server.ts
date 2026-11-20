@@ -134,6 +134,7 @@ import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
@@ -294,12 +295,14 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { devinSignInPageRelayed } from "../backend/acp-sign-in";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
+import { perfCount } from "../backend/perf-probe-hooks";
 import { canConfineProcesses } from "../backend/process-confinement";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -428,6 +431,7 @@ import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePendingApproval } from "./team-api/route-pending-approval";
+import { routePendingPrompts } from "./team-api/route-pending-prompts";
 import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
@@ -1306,6 +1310,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePendingPrompts(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePhoneFeedback(context, this.#options.agents)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;
@@ -1729,6 +1734,7 @@ export class TeamApiServer {
             : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
         if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
         let encoded: string | null;
+        perfCount("teamapi.encode");
         try {
           encoded = this.#encodeProviderEvent(
             event,
@@ -1867,6 +1873,8 @@ export class TeamApiServer {
       if (Buffer.byteLength(outgoing) > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
+      perfCount(`teamapi.send ${event.type}`);
+      perfCount("teamapi.sendBytes", outgoing.length);
       if (event.type !== "turn-completed" || !supportsRuntimeSnapshots || connection.includeConversationEvents) {
         continue;
       }
@@ -1881,6 +1889,7 @@ export class TeamApiServer {
       if (!completionSnapshot) continue;
       if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
+      perfCount("teamapi.completionSnapshot");
     }
   }
 
@@ -2609,6 +2618,12 @@ export class TeamApiServer {
           return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
         if (capability === SIGN_IN_RELAY_CAPABILITY || capability === SIGN_IN_RELAY_DEEP_LINK_CAPABILITY)
           return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
+        if (capability === PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY)
+          return (
+            this.#options.mcpServers !== undefined &&
+            this.#options.signInRelay !== undefined &&
+            devinSignInPageRelayed()
+          );
         if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
           return (
             this.#options.mcpServers !== undefined &&

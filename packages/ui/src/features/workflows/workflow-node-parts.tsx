@@ -1,6 +1,6 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef } from "@openbot/contracts/ipc";
+import { isAgentProviderRef, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   File,
   Image,
+  Input,
   LabelTooltipTrigger,
   LoaderCircle,
   Lock,
@@ -35,8 +36,10 @@ import { children, createEffect, createSignal, createStore, For, onSettled, Show
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
+import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu } from "./WorkflowPicker";
 import {
+  customStepName,
   Hint,
   PORT_NAME,
   resizeCursor,
@@ -48,6 +51,7 @@ import {
   type WfnPortSide,
   type WfnPortType,
   type WfnResult,
+  type WorkflowAgentProgress,
 } from "./workflow-board";
 import type { WorkflowPlace } from "./workflow-model";
 
@@ -387,7 +391,7 @@ export function NodeShell(props: ShellProps) {
         tabindex={board.resizable ? 0 : undefined}
         data-status={board.status(props.id)}
         data-height={board.size(props.id)?.height === undefined ? undefined : ""}
-        aria-label={props.label}
+        aria-label={customStepName(board.field(props.id, WORKFLOW_STEP_NAME_FIELD)) ?? props.label}
         style={style()}
       >
         <Show when={selected()}>
@@ -396,7 +400,7 @@ export function NodeShell(props: ShellProps) {
         <span class="wfn-label" data-bare={props.bare ? "" : undefined}>
           <Show when={!props.bare}>
             {props.icon}
-            {props.label}
+            <StepName id={props.id} kind={props.label} />
           </Show>
           <Show when={board.isLocked(props.id)}>
             <span class="wfn-lock-badge" role="img" aria-label={t("workflow.node.locked")}>
@@ -474,6 +478,31 @@ export function NodeShell(props: ShellProps) {
   );
 }
 
+function StepName(props: { id: string; kind: string }) {
+  const board = useBoard();
+  const { t } = useText();
+  const [value, setValue] = useTextField(() => props.id, WORKFLOW_STEP_NAME_FIELD, "");
+  return (
+    <Input
+      class="wfn-frame-name wfn-step-name"
+      value={value()}
+      placeholder={props.kind}
+      aria-label={t("workflow.node.name")}
+      spellcheck={false}
+      autocomplete="off"
+      readonly={board.isLocked(props.id)}
+      onValueChange={setValue}
+      onBlur={() => {
+        const trimmed = value().trim();
+        if (trimmed !== value()) setValue(trimmed);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -546,11 +575,15 @@ export function ResultField(props: { id: string; running: boolean }) {
   const { t } = useText();
   const value = () => resultValue(board.shown(props.id)) ?? "";
   const failure = () => resultFailure(board, props.id);
+  const live = () => (props.running ? board.progress(props.id) : undefined);
   return (
     <Show when={value() || failure() || props.running}>
       <Field class="wfn-field-result">
         <div class="wfn-field-head">
           <span>{t("workflow.node.result.title")}</span>
+          <Show when={live()?.done}>
+            {(done) => <span class="wfn-result-count">{t("workflow.node.stepsDone", { count: done() })}</span>}
+          </Show>
           <CopyButton
             value={value()}
             iconOnly
@@ -558,13 +591,14 @@ export function ResultField(props: { id: string; running: boolean }) {
             disabled={props.running || !value()}
           />
         </div>
-        <div class="wfn-result-body" data-running={props.running ? "" : undefined}>
+        <div class="wfn-result-body" data-running={props.running ? "" : undefined} data-live={live() ? "" : undefined}>
           <Show when={value() || failure()}>
             <p data-failed={value() ? undefined : ""}>{value() || failure()}</p>
           </Show>
           <Show when={props.running}>
             <ResultPending />
           </Show>
+          <Show when={live()}>{(progress) => <LiveProgress id={props.id} progress={progress()} />}</Show>
         </div>
       </Field>
     </Show>
@@ -588,6 +622,22 @@ export function FailureAlert(props: { id: string; running: boolean }) {
         </p>
       )}
     </Show>
+  );
+}
+
+function LiveProgress(props: { id: string; progress: WorkflowAgentProgress }) {
+  const board = useBoard();
+  const agent = () => board.catalogs().agents.find((entry) => entry.id === props.progress.agentId);
+  return (
+    <div class="wfn-result-live" role="status" aria-live="polite">
+      <AgentAvatar agent={agent()} mood="working" activity={props.progress.activity} class="wfn-result-live-avatar" />
+      <div class="wfn-result-live-lines">
+        <span class="wfn-result-live-text">{props.progress.detail}</span>
+        <Show when={props.progress.previous}>
+          {(previous) => <span class="wfn-result-live-previous">{previous()}</span>}
+        </Show>
+      </div>
+    </div>
   );
 }
 
