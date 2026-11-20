@@ -120,7 +120,7 @@ export const inspectMcpServer = Effect.fnUntraced(function* (
   );
 });
 
-const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
+export const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
 
 export type McpToolCallResult = Awaited<ReturnType<Client["callTool"]>>;
 export type McpToolArguments = NonNullable<CallToolRequest["params"]["arguments"]>;

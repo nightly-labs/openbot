@@ -1029,9 +1029,15 @@ export class OpenBotToolRouter {
       })
       .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
-    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments)).pipe(
-      Effect.raceFirst(requestAborted(request.signal)),
-    );
+    const relayed =
+      client.callRelayedMcpTool?.(params.threadId, found.config, found.tool, call.arguments) ?? Effect.succeed(null);
+    const outcome = yield* Effect.result(
+      relayed.pipe(
+        Effect.flatMap((answer) =>
+          answer ? Effect.succeed(answer) : servers.callTool(found.config, found.tool, call.arguments),
+        ),
+      ),
+    ).pipe(Effect.raceFirst(requestAborted(request.signal)));
     if (Result.isFailure(outcome))
       return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
     return "error" in outcome.success
