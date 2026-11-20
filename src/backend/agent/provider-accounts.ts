@@ -816,19 +816,20 @@ export class ProviderAccounts {
             .pipe(Effect.flatMap((usage) => this.#storeUsage(account, client, usage)));
           const limit =
             agentProviderDescriptor(provider).reportsUsage && !isKeyAccount(account)
-              ? yield* afterSignIn
-                  ? reading.pipe(
-                      Effect.catch((error) =>
-                        Effect.sync(() => {
-                          logger.warn("A provider account usage reading failed after its sign-in.", {
-                            provider,
-                            message: this.#message(provider, error),
-                          });
-                          return null;
-                        }),
-                      ),
-                    )
-                  : reading
+              ? yield* reading.pipe(
+                  Effect.catchIf(
+                    (error) => afterSignIn || !isSignInError(error),
+                    (error) =>
+                      Effect.sync(() => {
+                        logger.warn("A provider account usage reading failed.", {
+                          provider,
+                          afterSignIn,
+                          message: this.#message(provider, error),
+                        });
+                        return null;
+                      }),
+                  ),
+                )
               : null;
           this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           if (limit) this.#host.usageChanged(limit);
