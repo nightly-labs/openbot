@@ -283,6 +283,8 @@ export const messages = {
     "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Oturum aç'ı seçin.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu bir anahtar istiyor. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın, Düzenle'yi seçin ve Başlıklar altına doğru anahtarı girin.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Bağlantıyı test et'i seçin.",
   "error.backend.mcpServerFailedInProvider":

@@ -1078,6 +1078,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       mcpHandoff: this.#mcp.handoffLog(),
       redactMcp: (text) => this.#mcp.redact(text),
+      reportMcpSignIn: (provider, server, signInText) => this.#mcp.reportSignInFailure(provider, server, signInText),
     });
     this.#endpoints = new CustomEndpoints({
       store,

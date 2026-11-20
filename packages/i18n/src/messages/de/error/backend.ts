@@ -311,6 +311,8 @@ export const messages = {
     "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne {name} unter Marketplace, Apps und wähle Anmelden.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server einen Schlüssel verlangt. Öffne {name} unter Marketplace, Apps, wähle Bearbeiten und gib unter Header den richtigen Schlüssel ein.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} konnte den MCP-Server {name} nicht starten. Öffne {name} unter Marketplace, Apps und wähle Verbindung testen, um die Ursache zu sehen.",
   "error.backend.mcpServerFailedInProvider":

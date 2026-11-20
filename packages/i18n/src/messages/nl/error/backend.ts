@@ -297,6 +297,8 @@ export const messages = {
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om een sleutel vraagt. Open {name} in Marktplaats, Apps, kies Bewerken en vul bij Headers de juiste sleutel in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
   "error.backend.mcpServerFailedInProvider":

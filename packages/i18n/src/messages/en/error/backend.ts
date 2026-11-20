@@ -282,6 +282,8 @@ export const messages = defineMessages("error.backend", {
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open {name} in Marketplace, Apps, and choose Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a key. Open {name} in Marketplace, Apps, choose Edit, and enter the correct key under Headers.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open {name} in Marketplace, Apps, and choose Test connection to see the cause.",
   "error.backend.mcpServerFailedInProvider":

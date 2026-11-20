@@ -300,6 +300,8 @@ export const messages = {
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがキーを求めています。マーケットプレイス、アプリで {name} を開き、「編集」を選択して、「ヘッダー」に正しいキーを入力してください。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":

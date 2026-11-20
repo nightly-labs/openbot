@@ -279,6 +279,8 @@ export const messages = {
     "이 서버의 도구 {tool}의 입력 형식을 이 제공자가 읽을 수 없어요. 다른 제공자의 에이전트는 계속 이 서버를 받아요.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. 마켓플레이스, 앱에서 {name}을(를) 열고 로그인을 선택해 주세요.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 키를 요청해요. 마켓플레이스, 앱에서 {name}을(를) 열고 편집을 선택한 뒤 헤더에 올바른 키를 입력해 주세요.",
   "error.backend.mcpServerFailedForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 마켓플레이스, 앱에서 {name}을(를) 열고 연결 테스트를 선택하면 원인을 확인할 수 있어요.",
   "error.backend.mcpServerFailedInProvider":
