@@ -139,17 +139,15 @@ export function TriggerNode(props: {
   const nextRun = () => {
     if (!props.nextRun) return undefined;
     const timeZone = knownTimeZone(board.field(props.id, "timezone"));
-    const when = format.date(new Date(props.nextRun), {
+    const shown = timeZone && timeZone !== localTimeZone() ? timeZone : undefined;
+    return format.date(new Date(props.nextRun), {
       weekday: "short",
       day: "numeric",
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
-      ...(timeZone ? { timeZone } : {}),
+      ...(shown ? { timeZone: shown, timeZoneName: "short" } : {}),
     });
-    if (!timeZone || timeZone === localTimeZone()) return when;
-    const city = timeZone.split("/").at(-1)?.replaceAll("_", " ") ?? timeZone;
-    return `${when} · ${t("routine.card.timeZone", { city })}`;
   };
   return (
     <NodeShell
