@@ -1,4 +1,5 @@
 import {
+  type AttachmentSummary,
   LIBRARY_FOLDER_LIMITS,
   type LibraryFolder,
   type LibraryFolderAction,
@@ -67,6 +68,7 @@ import {
   isRecentFile,
   type LibraryLocation,
 } from "./library-folders-view";
+import { createLibraryMosaic } from "./library-mosaic";
 import { createLibraryPictureLoader } from "./library-picture-loader";
 import { createMarqueeSelection } from "./marquee-selection";
 
@@ -94,6 +96,7 @@ export interface LibraryPageProps {
   initialFavorites?: readonly string[] | undefined;
   onFavoritesChange?: ((keys: readonly string[]) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   opensFiles?: boolean | undefined;
 }
 
@@ -142,6 +145,8 @@ export function LibraryPage(props: LibraryPageProps) {
     source: untrack(() => props.mediaSource),
     file: (fileId) => untrack(fileById).get(fileId),
   });
+  const pictureUrl = (file: StoredFileRow) => props.pictureUrl?.(file) ?? file.previewUrl;
+  const mosaic = createLibraryMosaic();
   const agents = () => props.agents ?? NO_AGENTS;
   const agentById = createMemo(() => new Map(agents().map((agent) => [agent.id, agent])));
   const agentOf = (agentId: string | null) => (agentId ? agentById().get(agentId) : undefined);
@@ -825,6 +830,11 @@ export function LibraryPage(props: LibraryPageProps) {
     setLightbox({ images, index: Math.max(0, images.indexOf(file)), origin });
   }
 
+  function stripUrl(image: AttachmentSummary): string | null {
+    const file = fileById().get(image.id);
+    return file ? pictureUrl(file) : image.previewUrl;
+  }
+
   function act(file: StoredFileRow, action: StoredFileAction): void {
     if (action === "delete") setPendingDelete(file);
     else void props.onAction(file, action);
@@ -1001,6 +1011,7 @@ export function LibraryPage(props: LibraryPageProps) {
             fileCount={(folderId) => libraryCounts().folder.get(folderId) ?? 0}
             folderCount={(folderId) => childCounts().get(folderId) ?? 0}
             peek={(folderId) => peeks().get(folderId) ?? NO_FILES}
+            pictureUrl={pictureUrl}
             newTarget={newTarget()}
             newMark={drag.newMark}
             dropMark={drag.dropMark}
@@ -1051,12 +1062,13 @@ export function LibraryPage(props: LibraryPageProps) {
                   folderLabel={listFolderLabel()}
                   rowMenu={listRowMenu()}
                   opensFiles={props.opensFiles}
+                  pictureUrl={pictureUrl}
                   onPreview={(file) => open(file, undefined)}
                   onAction={props.onAction}
                 />
               }
             >
-              <ul class="library-grid" data-layout={view()}>
+              <ul ref={mosaic.attach} class="library-grid" data-layout={view()}>
                 <For each={shown()} keyed={(file) => file.id}>
                   {(file) => {
                     const id = untrack(() => file().id);
@@ -1114,7 +1126,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                 ref={(element) => thumbnails.set(id, element)}
                                 onClick={(event) => activate(file(), event)}
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file()) ?? ""} alt="" loading="lazy" draggable="false" />
                               </Button>
                             </Show>
                           }
@@ -1140,7 +1152,7 @@ export function LibraryPage(props: LibraryPageProps) {
                                   </span>
                                 }
                               >
-                                <img src={file().previewUrl ?? ""} alt="" loading="lazy" draggable="false" />
+                                <img src={pictureUrl(file()) ?? ""} alt="" loading="lazy" draggable="false" />
                               </Show>
                             </span>
                             <span class="library-folder-tile-name library-truncate">{file().name}</span>
@@ -1219,6 +1231,7 @@ export function LibraryPage(props: LibraryPageProps) {
             onDownload={(image) => downloadImage(image.id)}
             macWindowControls={props.macWindowControls}
             stripLabel={t("files.library.images")}
+            stripUrl={stripUrl}
             onClose={() => setLightbox(null)}
           />
         )}
