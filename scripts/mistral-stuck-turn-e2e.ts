@@ -125,6 +125,7 @@ const browser: AgentBrowserHost = {
   shareTab: () => undefined,
   unshareThread: () => undefined,
   agentTab: () => null,
+  toolCanUseTab: () => false,
 };
 
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
