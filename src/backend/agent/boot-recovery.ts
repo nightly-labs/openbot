@@ -47,6 +47,7 @@ export interface BootRecoveryHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   turnFailed?(agentId: string, turnId: string): void;
   continuesAfterProviderExit?(agentId: string, turnId: string, deliveryIds: readonly string[]): boolean;
+  retriesAfterRestart?(deliveryId: string): boolean;
 }
 
 export interface BootRecoveryOptions {
@@ -285,6 +286,9 @@ export class BootRecovery {
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
         : recovered;
+    const routineRetries = yield* recoveryStep(
+      () => new Set(deliveryIds.filter((id) => this.#hooks.retriesAfterRestart?.(id) === true)),
+    );
     const requeued = new Set<string>();
     for (const id of deliveryIds) {
       if (continuation && ownChat?.turnId)
@@ -292,7 +296,7 @@ export class BootRecovery {
       else if (
         terminal === "interrupted" &&
         target !== null &&
-        (yield* this.#mailbox.requeueResultAfterRestart(id).pipe(toBootRecoveryFailed))
+        (yield* this.#mailbox.requeueAfterRestart(id, routineRetries.has(id)).pipe(toBootRecoveryFailed))
       )
         requeued.add(id);
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
