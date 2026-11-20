@@ -576,6 +576,7 @@ export const messages = {
   "marketplace.error.installLocalOnHost": "请在运行这些助手的那台电脑上安装 {name}：它的应用在那台电脑上运行服务器。",
   "marketplace.error.installOnHost": "请在运行这些助手的那台电脑上安装 {name}：它的应用需要浏览器登录。",
   "marketplace.error.appInvalid": "无法添加 {name}：{reason}",
+  "marketplace.error.appNotConnected": "无法连接 {name}：{reason}",
   "marketplace.error.uninstallNoServer": "请选择一台本地服务器来卸载插件。",
   "marketplace.error.uninstallPartial": "{name} 的部分内容无法移除。{failures}",
   "marketplace.error.actionFailed": "无法完成该市场操作，请重试。",

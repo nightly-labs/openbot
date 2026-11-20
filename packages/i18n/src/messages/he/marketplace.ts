@@ -633,6 +633,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "יש להתקין את {name} במחשב שמריץ את הסוכנים האלה: האפליקציה שלו דורשת התחברות בדפדפן.",
   "marketplace.error.appInvalid": "לא ניתן להוסיף את {name}: {reason}",
+  "marketplace.error.appNotConnected": "לא ניתן לחבר את {name}: {reason}",
   "marketplace.error.uninstallNoServer": "יש לבחור שרת מקומי כדי להסיר תוסף.",
   "marketplace.error.uninstallPartial": "לא ניתן היה להסיר חלק מ-{name}. {failures}",
   "marketplace.error.actionFailed": "לא ניתן להשלים את פעולת החנות. יש לנסות שוב.",

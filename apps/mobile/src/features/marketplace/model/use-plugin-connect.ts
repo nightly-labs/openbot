@@ -52,6 +52,12 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
 
   const hostFailure = (message: string) => new Error(sourceText(message));
 
+  async function testAndSave(config: McpServerConfig) {
+    const result = await testMcpServer(config, serverId);
+    if (result.error) throw hostFailure(result.error);
+    await save(config);
+  }
+
   async function run(operation: () => Promise<void>) {
     setError(null);
     setState({ phase: "working" });
@@ -71,19 +77,14 @@ export function usePluginConnect(serverId: string, app: MobilePluginApp | null, 
   function connect(values: McpAuthValues = {}) {
     if (!app || !method || state.phase !== "idle") return;
     const base = pluginAppConfig(app);
-    if (method.kind === "none") return run(() => save(base));
+    if (method.kind === "none") return run(() => testAndSave(base));
     if (method.kind === "key") {
       const invalidLink = pluginKeyLinkError(base, method.flow, values);
       if (invalidLink) {
         setError(t("mobile.marketplace.app.linkInvalid", { hostname: new URL(base.url).hostname }));
         return;
       }
-      const config = applyMcpFlow(base, method.flow, values);
-      return run(async () => {
-        const result = await testMcpServer(config, serverId);
-        if (result.error) throw hostFailure(result.error);
-        await save(config);
-      });
+      return run(() => testAndSave(applyMcpFlow(base, method.flow, values)));
     }
     if (method.kind === "link") return run(() => signIn(base));
   }
