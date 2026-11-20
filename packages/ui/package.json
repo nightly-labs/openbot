@@ -94,6 +94,7 @@
     "./features/billing/billing-store": "./src/features/billing/billing-store.ts",
     "./features/billing/billing.css": "./src/features/billing/billing.css",
     "./features/billing/LicenseSection": "./src/features/billing/LicenseSection.tsx",
+    "./features/billing/money": "./src/features/billing/money.ts",
     "./features/billing/OrderForm": "./src/features/billing/OrderForm.tsx",
     "./features/billing/license-store": "./src/features/billing/license-store.ts",
     "./features/billing/StorageTierDialog": "./src/features/billing/StorageTierDialog.tsx",

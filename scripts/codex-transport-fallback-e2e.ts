@@ -20,6 +20,10 @@ const FALLBACK = "Falling back from WebSockets to HTTPS transport.";
 const FINAL_FAILURE = "stream disconnected before completion: Connection refused (os error 61)";
 const UNSTABLE_FEATURES =
   "Under-development features enabled: async_compaction. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /home/user/.codex/config.toml.";
+const SKILL_BUDGET_WARNINGS = [
+  "Exceeded skills context budget. All skill descriptions were removed and 3 additional skills were not included in the model-visible skills list.",
+  "Exceeded skills context budget of 2%. Loaded skill descriptions were truncated by an average of 40 characters per skill.",
+];
 
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
@@ -65,6 +69,8 @@ const answer = (message) => {
     case "thread/resume": {
       const threadId = message.method === "thread/start" ? "thread-" + (++threads) : params.threadId;
       write({ id: message.id, result: { thread: { id: threadId, turns: [] } } });
+      for (const skillBudget of ${JSON.stringify(SKILL_BUDGET_WARNINGS)})
+        write({ method: "warning", params: { threadId, message: skillBudget } });
       return write({ method: "warning", params: { threadId, message: ${JSON.stringify(UNSTABLE_FEATURES)} } });
     }
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
@@ -126,6 +132,7 @@ interface CaseReport {
   errorEvents: { code: string; message: string }[];
   warningLogLines: string[];
   unstableFeaturesLogLines: number;
+  skillBudgetLogLines: number;
   passed: boolean;
 }
 
@@ -238,6 +245,12 @@ try {
         .slice(firstLogLine)
         .filter((line) => line.includes("A provider warning needs no action.") && line.includes("async_compaction"))
         .length,
+      skillBudgetLogLines: logLines
+        .slice(firstLogLine)
+        .filter(
+          (line) =>
+            line.includes("A provider warning needs no action.") && line.includes("Exceeded skills context budget"),
+        ).length,
       passed: false,
     };
     report.cases.push(result);
@@ -250,6 +263,14 @@ try {
     assert.ok(
       errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Under-development features")),
       `${entry.name}: the under-development features warning reached a banner or a toast`,
+    );
+    assert.ok(
+      errorEvents.slice(firstErrorEvent).every((event) => !event.message.includes("Exceeded skills context budget")),
+      `${entry.name}: the skills context budget warning reached a banner or a toast`,
+    );
+    assert.ok(
+      result.skillBudgetLogLines >= SKILL_BUDGET_WARNINGS.length,
+      `${entry.name}: the skills context budget warnings were not logged`,
     );
     assert.ok(
       result.unstableFeaturesLogLines >= 1,
