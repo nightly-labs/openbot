@@ -258,6 +258,8 @@ async function runCase(
     scopes = {},
     registrationForbidden = null,
     storedClient = null,
+    storedClientRedirects = DROPBOX_REDIRECTS,
+    storedClientLost = false,
     relayDeepLink,
     accountRefused = null,
     tokenForbidden = false,
@@ -270,6 +272,8 @@ async function runCase(
     scopes?: ScopeMetadata;
     registrationForbidden?: RegistrationForbidden | null;
     storedClient?: string | null;
+    storedClientRedirects?: string[];
+    storedClientLost?: boolean;
     relayDeepLink?: string | null;
     accountRefused?: AccountRefusal | null;
     tokenForbidden?: boolean;
@@ -293,9 +297,10 @@ async function runCase(
       client: {
         client_id: storedClient,
         token_endpoint_auth_method: "none",
-        redirect_uris: DROPBOX_REDIRECTS,
+        redirect_uris: storedClientRedirects,
         issuer: new URL(server.url).origin,
       },
+      ...(storedClientLost ? { lostAt: Date.now() } : {}),
     });
   if (storedTokens)
     records.set(server.url, {
@@ -529,13 +534,7 @@ async function main(): Promise<void> {
     check(dropbox, dropbox.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
     check(
       dropbox,
-      dropbox.redirects.join() ===
-        [
-          "register http://127.0.0.1:28417/mcp-auth",
-          `register ${callback}`,
-          `page ${callback}`,
-          `token ${callback}`,
-        ].join(),
+      dropbox.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
       `the addresses were ${dropbox.redirects.join()}`,
     );
     check(dropbox, dropbox.storedClient, "no client is stored after the sign-in");
@@ -558,6 +557,34 @@ async function main(): Promise<void> {
     );
     check(dropboxStored, dropboxStored.signedIn, "no token is stored after the sign-in");
     report.cases.push(dropboxStored);
+
+    const unfinished = await runCase("unfinished-client-registers-callback", ["none"], 1, {
+      storedClient: "e2e-unfinished-client",
+      storedClientRedirects: ["http://127.0.0.1:28417/mcp-auth"],
+    });
+    check(unfinished, unfinished.attempts[0]?.error === null, `the sign-in failed: ${unfinished.attempts[0]?.error}`);
+    check(
+      unfinished,
+      unfinished.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${unfinished.redirects.join()}`,
+    );
+    check(unfinished, unfinished.signedIn, "no token is stored after the sign-in");
+    report.cases.push(unfinished);
+
+    const signedInBefore = "http://127.0.0.1:28417/mcp-auth";
+    const lost = await runCase("lost-sign-in-keeps-its-address", ["none"], 1, {
+      storedClient: "e2e-lost-client",
+      storedClientRedirects: [signedInBefore],
+      storedClientLost: true,
+    });
+    check(lost, lost.attempts[0]?.error === null, `the sign-in failed: ${lost.attempts[0]?.error}`);
+    check(
+      lost,
+      lost.redirects.join() === [`page ${signedInBefore}`, `token ${signedInBefore}`].join(),
+      `the addresses were ${lost.redirects.join()}`,
+    );
+    check(lost, lost.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lost);
 
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(
