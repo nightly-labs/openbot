@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Bewegende agentgezichten",
   "settings.movingFaces.description":
     "Agentgezichten knipperen en bewegen. Staan eerst stil op een computer zonder GPU.",
+  "settings.startupAnimation.title": "Startanimatie",
+  "settings.startupAnimation.description": "Toon de agentanimatie terwijl OpenBot opent.",
   "settings.logoColor.title": "Logokleur",
   "settings.logoColor.description": "Te zien in het Dock, de taakbalk en het Dynamic Island.",
   "settings.logoColor.buildNote": "Deze build houdt een eigen logokleur. De keuze geldt voor de release-app.",

@@ -28,6 +28,8 @@ export const messages = {
   "settings.backgroundBlur.description": "تمويه خلف القوائم ومربعات الحوار. يبدأ متوقفًا على جهاز بلا GPU.",
   "settings.movingFaces.title": "وجوه الوكلاء المتحركة",
   "settings.movingFaces.description": "ترمش وجوه الوكلاء وتتحرك. تبدأ ثابتة على جهاز بلا GPU.",
+  "settings.startupAnimation.title": "رسوم البدء المتحركة",
+  "settings.startupAnimation.description": "اعرض رسوم الوكلاء المتحركة أثناء فتح OpenBot.",
   "settings.logoColor.title": "لون الشعار",
   "settings.logoColor.description": "يظهر في Dock وشريط المهام وDynamic Island.",
   "settings.logoColor.buildNote": "يحتفظ هذا الإصدار بلون شعاره الخاص. ينطبق الاختيار على التطبيق الرسمي.",

@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Volti degli agenti animati",
   "settings.movingFaces.description":
     "I volti degli agenti sbattono le palpebre e si muovono. All’inizio sono fermi su un computer senza GPU.",
+  "settings.startupAnimation.title": "Animazione di avvio",
+  "settings.startupAnimation.description": "Mostra l’animazione degli agenti mentre OpenBot si apre.",
   "settings.logoColor.title": "Colore del logo",
   "settings.logoColor.description": "Mostrato nel Dock, nella barra delle applicazioni e nella Dynamic Island.",
   "settings.logoColor.buildNote":

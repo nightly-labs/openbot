@@ -28,6 +28,8 @@ export const messages = {
   "settings.backgroundBlur.description": "טשטוש מאחורי תפריטים ותיבות דו-שיח. כבוי בהתחלה במחשב בלי GPU.",
   "settings.movingFaces.title": "פני סוכנים זזות",
   "settings.movingFaces.description": "פני הסוכנים ממצמצות וזזות. בהתחלה הן נייחות במחשב בלי GPU.",
+  "settings.startupAnimation.title": "אנימציית פתיחה",
+  "settings.startupAnimation.description": "הצגת אנימציית הסוכנים בזמן ש־OpenBot נפתח.",
   "settings.logoColor.title": "צבע הלוגו",
   "settings.logoColor.description": "מוצג ב-Dock, בשורת המשימות וב-Dynamic Island.",
   "settings.logoColor.buildNote": "הגרסה הזו שומרת על צבע לוגו משלה. הבחירה חלה על אפליקציית ההפצה.",

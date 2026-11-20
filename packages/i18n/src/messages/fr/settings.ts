@@ -31,6 +31,8 @@ export const messages = {
   "settings.movingFaces.title": "Visages d’agents animés",
   "settings.movingFaces.description":
     "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
+  "settings.startupAnimation.title": "Animation de démarrage",
+  "settings.startupAnimation.description": "Affiche l’animation des agents pendant l’ouverture d’OpenBot.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":

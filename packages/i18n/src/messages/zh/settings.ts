@@ -27,6 +27,8 @@ export const messages = {
   "settings.backgroundBlur.description": "菜单和对话框背后的模糊效果。在没有 GPU 的电脑上默认关闭。",
   "settings.movingFaces.title": "动态智能体面孔",
   "settings.movingFaces.description": "智能体面孔会眨眼和移动。在没有 GPU 的电脑上默认静止。",
+  "settings.startupAnimation.title": "启动动画",
+  "settings.startupAnimation.description": "在 OpenBot 打开时显示智能体动画。",
   "settings.logoColor.title": "标志颜色",
   "settings.logoColor.description": "显示在 Dock、任务栏和灵动岛中。",
   "settings.logoColor.buildNote": "当前版本使用自己的标志颜色，该选项仅对正式版生效。",

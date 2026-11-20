@@ -29,6 +29,8 @@ export const messages = {
     "메뉴와 대화 상자 뒤의 흐림이에요. GPU가 없는 컴퓨터에서는 처음에 꺼져 있어요.",
   "settings.movingFaces.title": "움직이는 에이전트 얼굴",
   "settings.movingFaces.description": "에이전트 얼굴이 깜빡이고 움직여요. GPU가 없는 컴퓨터에서는 처음에 멈춰 있어요.",
+  "settings.startupAnimation.title": "시작 애니메이션",
+  "settings.startupAnimation.description": "OpenBot이 열리는 동안 에이전트 애니메이션을 보여 줘요.",
   "settings.logoColor.title": "로고 색상",
   "settings.logoColor.description": "Dock, 작업 표시줄, Dynamic Island에 표시돼요.",
   "settings.logoColor.buildNote": "이 빌드는 자체 로고 색상을 유지해요. 선택한 색상은 릴리스 앱에 적용돼요.",
