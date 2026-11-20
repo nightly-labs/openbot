@@ -40,7 +40,7 @@
       "@cloudflare/workers-types": "5.20261023.1",
       "@fontsource-variable/inter": "5.3.0",
       "@kobalte/core": "2.0.0-alpha.0",
-      "@norbert_bodziony/bloub": "0.6.5",
+      "@norbert_bodziony/bloub": "0.6.7",
       "@openpanel/web": "1.4.2",
       "@solidjs/signals": "2.0.0",
       "@solidjs/testing-library": "1.0.0-rc.2",
@@ -636,7 +636,6 @@
     "expo-widgets@58.0.28": "patches/expo-widgets@58.0.28.patch",
     "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
     "@modelcontextprotocol/sdk@1.32.1": "patches/@modelcontextprotocol%2Fsdk@1.32.1.patch",
-    "@norbert_bodziony/bloub@0.6.5": "patches/@norbert_bodziony%2Fbloub@0.6.5.patch",
     "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
     "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
     "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch"
