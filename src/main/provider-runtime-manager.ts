@@ -806,16 +806,19 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
   #updateProviderRuntime(spec: RuntimeSpec, signal: AbortSignal): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      const previous = this.#statuses[spec.runtime].version;
       const installed = yield* this.#readStoreEffect(spec);
-      if (installed.phase === "ready") {
-        yield* this.#activateEffect(spec, signal, false);
-        return;
+      if (installed.phase !== "ready") {
+        if (this.#stopping)
+          return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
+        yield* runtimeSync(() => signal.throwIfAborted());
+        this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
       }
-      if (this.#stopping)
-        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
-      yield* runtimeSync(() => signal.throwIfAborted());
-      this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
-      yield* this.#activateEffect(spec, signal, true);
+      yield* this.#activateEffect(spec, signal, installed.phase !== "ready");
+      if (previous && previous !== spec.version && this.#isBlocked(spec.runtime, previous)) {
+        const blockedRoot = join(dirname(this.#installRoot(spec)), previous);
+        yield* this.#removeOldVersionPathsEffect([blockedRoot], Number.POSITIVE_INFINITY);
+      }
     });
   }
 

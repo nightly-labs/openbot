@@ -24,7 +24,7 @@ interface Scenario {
 interface Report {
   passed: boolean;
   pinnedVersion?: string;
-  blocked?: Scenario & { blockedCopyKeptAfterCleanup: boolean };
+  blocked?: Scenario & { versionAfterRestart: string | null; leftCopyKeptAfterCleanup: boolean };
   notBlocked?: Scenario;
   userCli?: Scenario;
 }
@@ -116,16 +116,21 @@ async function startManager(name: string, blocked: string[]) {
   const blockedRoot = join(dirname(pinnedRoot), BLOCKED_VERSION);
   await writeCopy(pinnedRoot, pinnedVersion, executable, false);
   await writeCopy(blockedRoot, BLOCKED_VERSION, executable, true);
-  const manager = new ProviderRuntimeManager({
-    root: join(root, name),
-    isProviderOn: (provider) => provider === "opencode",
-    lock: lockFor(target),
-    fetchImpl: blocklistFetch(blocked),
-  });
-  managers.push(manager);
-  await runCauseEffect(manager.initialize());
+  const open = async () => {
+    const manager = new ProviderRuntimeManager({
+      root: join(root, name),
+      isProviderOn: (provider) => provider === "opencode",
+      lock: lockFor(target),
+      fetchImpl: blocklistFetch(blocked),
+    });
+    managers.push(manager);
+    await runCauseEffect(manager.initialize());
+    return manager;
+  };
+  const manager = await open();
   assert.ok(await readFile(join(pinnedRoot, "bin", executable), "utf8"), "the pinned copy is on disk");
-  return { manager, blockedRoot };
+  const leaveBlockedCopy = () => writeCopy(blockedRoot, BLOCKED_VERSION, executable, true);
+  return { manager, blockedRoot, open, leaveBlockedCopy };
 }
 
 const version = (manager: ProviderRuntimeManager) => manager.getStatus().providers.opencode.version;
@@ -142,19 +147,29 @@ try {
   );
   blocked.manager.startUpdateChecks();
   await movedBack;
+  await runCauseEffect(blocked.manager.downloadAndWait("opencode"));
+  const versionAfter = version(blocked.manager);
   const blockedCopyKept = await exists(blocked.blockedRoot);
+  await runCauseEffect(blocked.manager.stop());
+  const restarted = await blocked.open();
+  const versionAfterRestart = version(restarted);
+  await blocked.leaveBlockedCopy();
   const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
   await utimes(blocked.blockedRoot, old, old);
-  await runCauseEffect(blocked.manager.removeOldVersions());
+  restarted.startUpdateChecks();
+  await runCauseEffect(restarted.checkForUpdates()).catch(() => undefined);
+  await runCauseEffect(restarted.removeOldVersions());
   report.blocked = {
     versionBefore,
-    versionAfter: version(blocked.manager),
+    versionAfter,
     blockedCopyKept,
-    blockedCopyKeptAfterCleanup: await exists(blocked.blockedRoot),
+    versionAfterRestart,
+    leftCopyKeptAfterCleanup: await exists(blocked.blockedRoot),
   };
-  assert.equal(report.blocked.versionAfter, pinnedVersion, "a copy on a blocked version moves back to the pinned one");
-  assert.equal(report.blocked.blockedCopyKept, true, "the blocked copy waits for the cleanup of old versions");
-  assert.equal(report.blocked.blockedCopyKeptAfterCleanup, false, "the cleanup removes the blocked copy");
+  assert.equal(versionAfter, pinnedVersion, "a copy on a blocked version moves back to the pinned one");
+  assert.equal(blockedCopyKept, false, "the blocked copy goes after the move back");
+  assert.equal(versionAfterRestart, pinnedVersion, "a restart keeps the pinned copy");
+  assert.equal(report.blocked.leftCopyKeptAfterCleanup, false, "the cleanup removes a blocked copy that stayed");
 
   const notBlocked = await startManager("not-blocked", []);
   const notBlockedBefore = version(notBlocked.manager);
