@@ -37,6 +37,7 @@ export const messages = {
     "OpenBot konnte den Anbieter nicht erreichen. Prüfe die Internetverbindung und führe den Schritt dann erneut aus.",
   "error.workflow.modelBusy": "Eine andere Modellanfrage läuft. Führe den Schritt bald erneut aus.",
   "error.workflow.mediaFailed": "Das Modell konnte das Bild oder Video nicht erstellen. Führe den Schritt erneut aus.",
+  "error.workflow.mediaNotMade": "Das Modell hat das Bild oder Video nicht erstellt. Es schrieb: {answer}",
   "error.workflow.pictureMissing": "Das Bild ist nicht mehr auf dem Server. Sende es erneut.",
   "error.workflow.pictureType": "Verwende ein PNG-, JPEG- oder WebP-Bild.",
   "error.workflow.mediaInputMissing":
