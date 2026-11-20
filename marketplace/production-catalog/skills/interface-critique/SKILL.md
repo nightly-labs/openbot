@@ -15,8 +15,8 @@ description: "Review a screen and return ranked, concrete fixes across hierarchy
 
 1. **The screen.** In this order:
    - A page in `openbot_browser`. Call `openbot_browser.list_tabs` first. Use an open tab or open the address.
-   - A Figma frame: an installed Figma plugin (find it with `tool_search` in the `openbot` tools), or a
-     signed-in Figma tab in `openbot_browser`.
+   - A Figma frame: the tools of an installed Figma plugin, which `openbot.tool_search` does not list.
+     Else a signed-in Figma tab in `openbot_browser`.
    - A screenshot or exported image the user uploads.
 2. **The user task.** What must a person do on this screen? If it is not clear, ask once with `ask_user`.
 3. A static image shows layout, type and color. It does not show focus, keyboard or screen-reader behavior.

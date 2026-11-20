@@ -4,6 +4,7 @@ import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
+import { perfCount } from "../backend/perf-probe-hooks";
 import { desktopCall, desktopFailure, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 
 const MAX_LOG_BYTES = 1024 * 1024;
@@ -16,6 +17,7 @@ export const appendRemoteDiagnosticLog = Effect.fn("RemoteDesktop.appendDiagnost
   name: string,
   message: string | Uint8Array,
 ) {
+  perfCount("log.diagnosticAppend");
   const safeName = name.replace(/[^a-zA-Z0-9_-]/gu, "-").slice(0, 80);
   const path = join(directory, `${safeName}.log`);
   const clean = Buffer.from(message).toString("utf8").split("\n").map(redactDiagnosticLine).join("\n");

@@ -225,7 +225,12 @@ class Rig {
         },
         emitConversation: () => {},
       },
-      browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
+      browser: {
+        listTabs: () => [],
+        toolCanUseTab: () => false,
+        beginTakeover: () => Effect.void,
+        endTakeover: () => {},
+      },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
       routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
       approvalAutomation: setup.policy,

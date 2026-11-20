@@ -239,7 +239,7 @@ import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
-import { QUEUE_HOLD_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
@@ -294,11 +294,13 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
 import { AgentThreadLimitError } from "../backend/agent-tasks/agent-tasks";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { McpServerError } from "../backend/mcp-server-store";
+import { perfCount } from "../backend/perf-probe-hooks";
 import { canConfineProcesses } from "../backend/process-confinement";
 import { StoredStateFailure } from "../backend/stored-state-effects";
 import type { TeamChatStore } from "../backend/team-chat-store";
@@ -1369,11 +1371,12 @@ export class TeamApiServer {
         error instanceof McpServerError ||
         error instanceof AnalyticsInputError ||
         error instanceof AgentMemorySelectionError ||
-        error instanceof AgentThreadLimitError;
+        error instanceof AgentThreadLimitError ||
+        error instanceof AgentSettingsRefused;
       const status =
         error instanceof HttpError || error instanceof RemoteScreenError
           ? error.status
-          : error instanceof AgentThreadLimitError
+          : error instanceof AgentThreadLimitError || error instanceof AgentSettingsRefused
             ? 409
             : expected
               ? 400
@@ -1541,6 +1544,7 @@ export class TeamApiServer {
         usageGroups: capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
+        queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -1726,6 +1730,7 @@ export class TeamApiServer {
             : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
         if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
         let encoded: string | null;
+        perfCount("teamapi.encode");
         try {
           encoded = this.#encodeProviderEvent(
             event,
@@ -1767,7 +1772,7 @@ export class TeamApiServer {
                         snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
                       }
                     : event.type === "agent-tasks-changed"
-                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot) }
+                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot, connection.capabilities) }
                       : event,
                   { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
                 );
@@ -1864,6 +1869,8 @@ export class TeamApiServer {
       if (Buffer.byteLength(outgoing) > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
+      perfCount(`teamapi.send ${event.type}`);
+      perfCount("teamapi.sendBytes", outgoing.length);
       if (event.type !== "turn-completed" || !supportsRuntimeSnapshots || connection.includeConversationEvents) {
         continue;
       }
@@ -1878,6 +1885,7 @@ export class TeamApiServer {
       if (!completionSnapshot) continue;
       if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
       client.send(completionSnapshot);
+      perfCount("teamapi.completionSnapshot");
     }
   }
 
@@ -2354,6 +2362,7 @@ export class TeamApiServer {
       usageGroups: route.capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
       queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
+      queueHoldSignIn: route.capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
     };
     const visibleValue =
       status < 400 && route.hiddenAgentIds
@@ -2935,6 +2944,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
+  QUEUE_HOLD_SIGN_IN_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

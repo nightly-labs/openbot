@@ -63,6 +63,8 @@ export const messages = {
   "workflow.node.retry": "Opnieuw",
   "workflow.node.failed": "Mislukt",
   "workflow.node.runTime": "{seconds} s",
+  "workflow.node.name": "Stapnaam",
+  "workflow.node.stepsDone": { one: "{count} stap klaar", other: "{count} stappen klaar" },
   "workflow.node.choice": "{name}: {value}",
   "workflow.node.place.channel": "Kanaal",
   "workflow.node.place.choose": "Kies kanaal",

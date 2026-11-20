@@ -347,6 +347,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Для этого провайдера нет доступных моделей.",
   "mobile.agent.runtime.searchModels": "Поиск моделей",
   "mobile.agent.runtime.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Этот провайдер не работает с режимом «Только рабочее пространство» в Windows и Linux. Чтобы использовать его, сначала измените «Разрешения».",
   "mobile.agent.runtime.usageLimit": "Лимит использования исчерпан",
@@ -428,6 +430,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Управлять профилями",
   "mobile.agent.browserProfile.footer":
     "Каждый профиль хранит свои входы и файлы cookie. Изменение закрывает открытые вкладки агента.",
+  "mobile.agent.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot не удалось изменить профиль браузера агента.",
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":
@@ -524,6 +528,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Этот хост не позволяет публиковать агентов с удалённого устройства.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Токены без чтения из кэша",
   "mobile.agent.usage.estimatedCost": "Оценка стоимости",
+  "mobile.agent.usage.noCostEstimate": "Нет оценки стоимости",
   "mobile.agent.usage.daily": "Использование по дням",
   "mobile.agent.usage.tokens": "Токены",
   "mobile.agent.usage.cost": "Стоимость",

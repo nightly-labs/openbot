@@ -58,6 +58,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Retro gün batımı",
   "settings.chatBackdrop.snowfall": "Kar yağışı",
   "settings.chatBackdrop.fireflies": "Ateş böcekleri",
+  "settings.chatBackdrop.coast": "Neon sahil",
   "settings.chatBackdrop.upload": "Resim yükle…",
   "settings.chatBackdrop.uploadRefused": "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi kullanın.",
   "settings.chatBackdrop.saveFailed": "Arka plan kaydedilmedi.",

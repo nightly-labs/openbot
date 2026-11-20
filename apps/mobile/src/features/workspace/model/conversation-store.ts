@@ -26,6 +26,9 @@ export class MobileConversationStore {
   #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean }>();
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
   #upToDate = new Set<string>();
+  #missedLatest = new Set<string>();
+  #latestReads = new Map<string, number>();
+  #latestLoads = 0;
   #cached = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
@@ -45,6 +48,16 @@ export class MobileConversationStore {
   holdsRevision(agentId: string, revision: number, threadId?: string | null) {
     const entry = this.get(agentId);
     return Boolean(entry && entry.revision >= revision && (threadId === undefined || entry.threadId === threadId));
+  }
+
+  missedLatest(agentId: string) {
+    return this.#missedLatest.has(agentId);
+  }
+
+  #markMissedLatest(agentId: string, load: number) {
+    if ((this.#latestReads.get(agentId) ?? 0) > load) return;
+    this.#upToDate.delete(agentId);
+    this.#missedLatest.add(agentId);
   }
 
   markStale() {
@@ -79,6 +92,8 @@ export class MobileConversationStore {
     this.#entries.delete(agentId);
     this.#latestPages.delete(agentId);
     this.#upToDate.delete(agentId);
+    this.#missedLatest.delete(agentId);
+    this.#latestReads.delete(agentId);
     this.#cached.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
@@ -99,6 +114,7 @@ export class MobileConversationStore {
 
   cancelRequests() {
     this.markStale();
+    for (const agentId of this.#loads.keys()) this.#missedLatest.add(agentId);
     this.#loads.clear();
     this.#olderLoads.clear();
     for (const [id, entry] of this.#entries) {
@@ -259,6 +275,7 @@ export class MobileConversationStore {
       if (attach) pending.attach = true;
       return pending.promise;
     }
+    const serial = ++this.#latestLoads;
     const load: { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean } = {
       dirty: false,
       attach,
@@ -269,11 +286,20 @@ export class MobileConversationStore {
             load.dirty = false;
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
-            if (!isCurrent() || this.#loads.get(agentId) !== load) return page;
+            if (!isCurrent() || this.#loads.get(agentId) !== load) {
+              this.#markMissedLatest(agentId, serial);
+              return page;
+            }
             this.applyPage(page, undefined, load.attach);
           } while (load.dirty);
           this.#upToDate.add(agentId);
+          this.#missedLatest.delete(agentId);
+          this.#latestReads.set(agentId, serial);
           return page;
+        })
+        .catch((error: unknown) => {
+          this.#markMissedLatest(agentId, serial);
+          throw error;
         })
         .finally(() => {
           if (this.#loads.get(agentId) === load) {

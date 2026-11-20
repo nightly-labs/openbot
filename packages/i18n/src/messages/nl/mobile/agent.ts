@@ -324,6 +324,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Deze provider werkt niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig eerst ‘Machtigingen’ om hem te gebruiken.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
@@ -401,6 +403,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profielen beheren",
   "mobile.agent.browserProfile.footer":
     "Elk profiel heeft eigen aanmeldingen en cookies. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot kon het browserprofiel van de agent niet wijzigen.",
   "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
   "mobile.agent.planCard.footer":
@@ -488,6 +492,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Deze host kan geen agents publiceren vanaf een extern apparaat.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens zonder cache-lezingen",
   "mobile.agent.usage.estimatedCost": "Geschatte kosten",
+  "mobile.agent.usage.noCostEstimate": "Geen kostenschatting",
   "mobile.agent.usage.daily": "Dagelijks gebruik",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Kosten",

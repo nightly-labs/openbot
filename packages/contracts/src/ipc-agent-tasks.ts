@@ -40,6 +40,7 @@ export const AGENT_TASK_HOLDS = [
   "server-busy",
   "agent-busy",
   "one-turn",
+  "sign-in",
 ] as const;
 export type AgentTaskHold = (typeof AGENT_TASK_HOLDS)[number];
 

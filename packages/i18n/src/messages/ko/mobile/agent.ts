@@ -319,6 +319,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",
   "mobile.agent.runtime.searchModels": "모델 검색",
   "mobile.agent.runtime.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "이 제공업체는 Windows와 Linux에서 '워크스페이스만'으로 작동하지 않아요. 사용하려면 먼저 '권한'을 바꾸세요.",
   "mobile.agent.runtime.usageLimit": "사용 한도에 도달했어요",
@@ -395,6 +397,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "프로필 관리",
   "mobile.agent.browserProfile.footer":
     "각 프로필은 자체 로그인과 쿠키를 보관합니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.agent.browserProfile.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남아요. 에이전트가 이 사이트에 다시 로그인해야 해요.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot이 에이전트의 브라우저 프로필을 변경하지 못했습니다.",
   "mobile.agent.planCard.label": "긴 작업 전에 계획 표시",
   "mobile.agent.planCard.footer":
@@ -479,6 +483,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "이 호스트는 원격 기기에서 에이전트를 게시할 수 없어요.",
   "mobile.agent.usage.tokensWithoutCacheReads": "캐시 읽기를 제외한 토큰",
   "mobile.agent.usage.estimatedCost": "예상 비용",
+  "mobile.agent.usage.noCostEstimate": "비용 추정치 없음",
   "mobile.agent.usage.daily": "일별 사용량",
   "mobile.agent.usage.tokens": "토큰",
   "mobile.agent.usage.cost": "비용",

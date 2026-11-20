@@ -334,6 +334,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
   "mobile.agent.runtime.searchModels": "Modellerde ara",
   "mobile.agent.runtime.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aramanızla eşleşen model yok. openrouter.ai üzerindeki gizlilik, sağlayıcı ve koruma (guardrail) ayarlarınız bu listedeki bazı modelleri gizleyebilir.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     'Bu sağlayıcı Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için önce "İzinler"i değiştirin.',
   "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
@@ -411,6 +413,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profilleri yönet",
   "mobile.agent.browserProfile.footer":
     "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
   "mobile.agent.planCard.footer":
@@ -498,6 +502,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Bu ana makine uzak bir cihazdan ajan yayımlayamaz.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Önbellek okumaları hariç token'lar",
   "mobile.agent.usage.estimatedCost": "Tahmini maliyet",
+  "mobile.agent.usage.noCostEstimate": "Maliyet tahmini yok",
   "mobile.agent.usage.daily": "Günlük kullanım",
   "mobile.agent.usage.tokens": "Token'lar",
   "mobile.agent.usage.cost": "Maliyet",

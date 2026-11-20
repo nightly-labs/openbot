@@ -231,6 +231,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "En attente. L’hôte exécute autant de tours que sa mémoire le permet.",
   "mobile.server.threads.hold.agentBusy": "En attente de la fin d’un autre travail de cet agent.",
   "mobile.server.threads.hold.oneTurn": "En attente. Le fournisseur de cet agent exécute un seul tour à la fois.",
+  "mobile.server.threads.hold.signIn": "En attente. Le fournisseur de cet agent doit être connecté.",
   "mobile.server.threads.offline": "Connectez-vous à ce serveur pour voir ses fils.",
   "mobile.server.threads.loading": "Chargement des fils…",
   "mobile.server.threads.loadFailed": "Impossible de charger les fils de certains agents.",
@@ -550,6 +551,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Ajouter des agents",
   "mobile.server.browserProfiles.agentsHint":
     "Un appui donne ce profil à l’agent ou le remet dans le profil partagé. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.server.browserProfiles.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. Un agent déplacé doit se reconnecter à ces sites.",
   "mobile.server.browserProfiles.clear": "Effacer les données",
   "mobile.server.browserProfiles.clearTitle": "Effacer les données de {name} ?",
   "mobile.server.browserProfiles.clearBody":
@@ -1704,4 +1707,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Impossible d’accepter le transfert",
   "mobile.server.ownerTransfer.declineFailed": "Impossible de refuser le transfert",
   "mobile.server.ownerTransfer.tryAgain": "Réessayez plus tard.",
+  "mobile.server.providers.updateAll": "Tout mettre à jour",
+  "mobile.server.providers.updateAllFailed": "Certaines mises à jour n’ont pas démarré. Réessayez.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -345,6 +345,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Brak dostępnych modeli dla tego dostawcy.",
   "mobile.agent.runtime.searchModels": "Szukaj modeli",
   "mobile.agent.runtime.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Żaden model nie pasuje do wyszukiwania. Twoje ustawienia prywatności, dostawców i zabezpieczeń (guardrails) w openrouter.ai mogą ukrywać modele na tej liście.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ten dostawca nie działa z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby go użyć, najpierw zmień „Uprawnienia”.",
   "mobile.agent.runtime.usageLimit": "Osiągnięto limit użycia",
@@ -426,6 +428,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Zarządzaj profilami",
   "mobile.agent.browserProfile.footer":
     "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
+  "mobile.agent.browserProfile.movedNote":
+    "Logowania do witryn zostają w starym profilu. Agent musi ponownie zalogować się na tych witrynach.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki agenta.",
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":
@@ -523,6 +527,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Ten host nie może publikować agentów ze zdalnego urządzenia.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokeny bez odczytów z pamięci podręcznej",
   "mobile.agent.usage.estimatedCost": "Szacowany koszt",
+  "mobile.agent.usage.noCostEstimate": "Brak szacunku kosztu",
   "mobile.agent.usage.daily": "Dzienne użycie",
   "mobile.agent.usage.tokens": "Tokeny",
   "mobile.agent.usage.cost": "Koszt",

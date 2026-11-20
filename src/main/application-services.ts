@@ -79,7 +79,8 @@ import { AgentMemoryStore } from "../backend/agent-memory-store";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
 import { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { AgentStore } from "../backend/agent-store";
-import { BrowserHost } from "../backend/browser-host";
+import { AgentThreadStore } from "../backend/agent-threads/agent-thread-store";
+import { type BrowserAgentChat, BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
 import { CodexCliError, resolveClaudeCli, resolveCodexCli } from "../backend/cli";
@@ -102,14 +103,11 @@ import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime"
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { PASSWORD_MANAGER_BRANDS } from "../backend/password-vault";
 import { passwordVaultRouter } from "../backend/password-vault-router";
+import { perfTime } from "../backend/perf-probe-hooks";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import {
-  createRoutineFlows,
-  type RoutineFlowsHandle,
-  routineFlowNoticeEvent,
-} from "../backend/routine-flows/routine-flows";
+import { createRoutineFlows, routineFlowNoticeEvent } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import {
   createRoutineResults,
@@ -358,7 +356,6 @@ import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/pr
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
-import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
@@ -494,7 +491,6 @@ const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.jso
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
-const PROVIDER_CLI_APP_VERSION_FILE = "openbot-provider-cli-app-version-v1.json";
 const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
@@ -635,7 +631,6 @@ export interface ApplicationServiceContext {
 
 export interface ApplicationServices {
   service: AgentService;
-  routineFlows: RoutineFlowsHandle;
   workflows: WorkflowsHandle;
   workflowGitHub: WorkflowGitHubDirectory;
   crm: CrmHandle;
@@ -1308,6 +1303,7 @@ export async function createApplicationServices({
   let browserProxyStatusChanged = () => {};
   let agentBrowserProfiles: BrowserProfileService | null = null;
   let crmHandle: CrmHandle | null = null;
+  const agentThreads = new AgentThreadStore(store.database);
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
@@ -1316,7 +1312,7 @@ export async function createApplicationServices({
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
-    agentChat: (threadId) => store.ownsThread(threadId),
+    agentChat: (threadId) => browserAgentChat(store, agentThreads, threadId),
     profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
     onProxyStatusChanged: () => browserProxyStatusChanged(),
     computerExit: (memberId) => browserEgress.exit(memberId),
@@ -1523,14 +1519,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), "openbot-provider-accounts-v1.json"),
     join(app.getPath("userData"), "provider-accounts"),
   );
-  const providerCliAppVersion = createProviderCliAppVersionStore(
-    join(app.getPath("userData"), PROVIDER_CLI_APP_VERSION_FILE),
-  );
-  await Promise.all([
-    runCauseEffect(providerUse.load()),
-    runCauseEffect(providerAccounts.load()),
-    runCauseEffect(providerCliAppVersion.load()),
-  ]);
+  await Promise.all([runCauseEffect(providerUse.load()), runCauseEffect(providerAccounts.load())]);
   const providerRuntimesRoot =
     localServerChild?.runtimeRoot ??
     providerRuntimeRoot({
@@ -1780,7 +1769,10 @@ export async function createApplicationServices({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
-      onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onStatementSettled: (durationMs, request) => {
+        statementTimings.record(durationMs);
+        perfTime(`agentdb.${request}`, durationMs);
+      },
       onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
         logger.warn(
           `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
@@ -2533,20 +2525,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
-  const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
   if (diskRestoring()) {
     updateCheckWait = Effect.runFork(
-      diskRestoreEnded.pipe(
-        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
-      ),
+      diskRestoreEnded.pipe(Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks()))),
     );
   } else {
-    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+    providerRuntimes.startUpdateChecks();
   }
-  if (appUpgraded)
-    void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
-      logger.warn("The provider CLI app version did not save.", toLogValue(error)),
-    );
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
   });
@@ -3049,6 +3034,7 @@ export async function createApplicationServices({
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
+    signInWaits: service.signInWaits,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3254,7 +3240,7 @@ export async function createApplicationServices({
       if (powerMonitor.getSystemIdleState(awayAfterMs / 1_000) !== "active") return false;
       if (computerIdle.seconds() * 1_000 >= awayAfterMs) return false;
       if (window.isFocused()) return true;
-      if (!Notification.isSupported()) return false;
+      if (!event || !Notification.isSupported()) return false;
       const local = remoteServers.list().find((server) => server.id === LOCAL_SERVER_ID);
       return desktopShowsAgentEvent(
         event,
@@ -4140,7 +4126,6 @@ export async function createApplicationServices({
 
   return {
     service,
-    routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
     workflowGitHub,
     crm,
@@ -4261,4 +4246,11 @@ export async function createApplicationServices({
     appliedAccount: signedInState,
     centralAuthInitialization,
   };
+}
+
+function browserAgentChat(store: AgentStore, threads: AgentThreadStore, threadId: string): BrowserAgentChat | null {
+  const mainAgentId = store.mainThreadAgentId(threadId);
+  if (mainAgentId !== null) return { agentId: mainAgentId, sideThread: null };
+  const thread = threads.taskForThread(threadId);
+  return thread ? { agentId: thread.agentId, sideThread: { taskId: thread.taskId, title: thread.title } } : null;
 }

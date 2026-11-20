@@ -35,9 +35,11 @@ import {
   systemPreferences,
 } from "electron";
 import { localTimezone } from "../backend/agent/routine-tools";
+import { replaceInvalidLinuxSystemLanguages } from "../backend/browser-policy";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
+import { perfTime } from "../backend/perf-probe-hooks";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -115,7 +117,6 @@ import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers"
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { referralIpcHandlers } from "./ipc/referral-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
-import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { routineResultIpcHandlers } from "./ipc/routine-result-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -799,7 +800,6 @@ function registerIpcHandlers({
   trace,
   resourceMonitor,
   startup,
-  routineFlows,
   workflows,
   workflowGitHub,
   crm,
@@ -835,6 +835,7 @@ function registerIpcHandlers({
       appVariant,
       analyticsCaptureUrl,
       analyticsInstallId,
+      dynamicIslandAvailable: dynamicIsland.available,
       getMainWindow: getDialogParent,
       isMainWindow: (sender) => {
         const window = windowHolder.current;
@@ -970,7 +971,6 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
-    ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
     ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
@@ -1404,6 +1404,7 @@ if (!hasSingleInstanceLock) {
     .whenReady()
     .then(async () => {
       performance.mark("openbot:when-ready");
+      replaceInvalidLinuxSystemLanguages();
       powerMonitor.on("suspend", () => runMarker?.suspend());
       powerMonitor.on("resume", () => runMarker?.resume());
       powerMonitor.on("shutdown", () => {
@@ -1507,7 +1508,10 @@ if (!hasSingleInstanceLock) {
       } = built;
 
       crashTrace = trace;
-      setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
+      setIpcCallObserver((call) => {
+        trace.record({ kind: "ipc", ...call });
+        perfTime(`ipc.invoke ${call.name}`, call.durationMs);
+      });
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
       let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));

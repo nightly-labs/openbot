@@ -52,6 +52,11 @@ export const messages = defineMessages("error.agent", {
   "error.agent.modelUnavailable": "The selected agent model is unavailable.",
   "error.agent.modelProviderNotConnected":
     'The selected agent model "{model}" is unavailable: {provider} is not connected.',
+  "error.agent.modelProviderSignInRequired":
+    'The selected agent model "{model}" is unavailable: {provider} needs sign-in. Sign in to {provider}, then try again.',
+  "error.agent.modelProviderNotInstalled":
+    'The selected agent model "{model}" is unavailable: {provider} is not installed.',
+  "error.agent.modelProviderOutdated": 'The selected agent model "{model}" is unavailable: {provider} needs an update.',
   "error.agent.modelListEmpty":
     'The selected agent model "{model}" is unavailable: {provider} listed no models. Last error: {detail}',
   "error.agent.modelListEmptyNoError":

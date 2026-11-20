@@ -107,11 +107,17 @@ export function processMetrics(rows: ProcessTableRow[], footprints: Map<number, 
   return values;
 }
 
-export function cpuMetrics(previous: ProcessTableRow[], current: ProcessTableRow[], elapsedMs: number): MetricValues {
+export function cpuMetrics(
+  previous: ProcessTableRow[],
+  current: ProcessTableRow[],
+  elapsedMs: number,
+  appKinds: ReadonlyMap<number, string> = new Map(),
+): MetricValues {
   if (elapsedMs <= 0) return {};
   const kinds = new Map<number, MemoryProcessKind>(
     summarizeMemory(current, "cpu").processes.map((process) => [process.pid, process.kind]),
   );
+  const byAppKind = new Map<string, number>();
   const before = new Map(previous.map((row) => [row.pid, row.cpuSeconds]));
   const seconds = new Map<MemoryProcessKind, number>();
   for (const row of current) {
@@ -121,6 +127,10 @@ export function cpuMetrics(previous: ProcessTableRow[], current: ProcessTableRow
     const delta = row.cpuSeconds - start;
     if (delta < 0) continue;
     seconds.set(kind, (seconds.get(kind) ?? 0) + delta);
+    if (appKinds.size > 0) {
+      const appKind = kind === "provider" ? "provider" : (appKinds.get(row.pid) ?? kind);
+      byAppKind.set(appKind, (byAppKind.get(appKind) ?? 0) + delta);
+    }
   }
   const values: MetricValues = {};
   let total = 0;
@@ -130,6 +140,8 @@ export function cpuMetrics(previous: ProcessTableRow[], current: ProcessTableRow
     total += percent;
   }
   values["cpu.total"] = round(total);
+  values["cpu.app"] = round(total - (values["cpu.provider"] ?? 0));
+  for (const [kind, used] of byAppKind) values[`cpu.kind.${kind}`] = round((used / (elapsedMs / 1_000)) * 100);
   return values;
 }
 

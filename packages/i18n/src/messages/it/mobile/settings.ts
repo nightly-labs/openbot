@@ -144,6 +144,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Tramonto rétro",
   "mobile.settings.appearance.backdrop.snowfall": "Nevicata",
   "mobile.settings.appearance.backdrop.fireflies": "Lucciole",
+  "mobile.settings.appearance.backdrop.coast": "Costa al neon",
   "mobile.settings.appearance.backdrop.agentPage": "Pagina dell'agente",
   "mobile.settings.appearance.backdrop.agentPageNote": "Impostato da un agente",
   "mobile.settings.appearance.backdrop.photo": "Foto",
@@ -582,6 +583,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Scegli agente",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot è bloccato",
   "mobile.settings.shortcuts.card.locked.action": "Apri OpenBot",
+  "mobile.settings.shortcuts.card.message": "Invia un messaggio a {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Messaggio per {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message nell’app Comandi rapidi invia a questo agente. L’app non si apre. Open Agent apre la sua chat.",
   "mobile.settings.shortcuts.send.sent": "Inviato",

@@ -271,6 +271,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Czekanie. Host wykonuje tyle tur, na ile pozwala jego pamięć.",
   "mobile.server.threads.hold.agentBusy": "Czekanie na zakończenie innej pracy tego agenta.",
   "mobile.server.threads.hold.oneTurn": "Czekanie. Dostawca tego agenta wykonuje jedną turę naraz.",
+  "mobile.server.threads.hold.signIn": "Czekanie. Dostawca tego agenta wymaga zalogowania.",
   "mobile.server.threads.offline": "Połącz się z tym serwerem, aby zobaczyć jego wątki.",
   "mobile.server.threads.loading": "Wczytywanie wątków…",
   "mobile.server.threads.loadFailed": "Nie udało się wczytać wątków niektórych agentów.",
@@ -613,6 +614,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Dodaj agentów",
   "mobile.server.browserProfiles.agentsHint":
     "Dotknięcie daje agentowi ten profil lub przenosi go z powrotem do profilu wspólnego. Zmiana zamyka otwarte karty agenta.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logowania do witryn zostają w starym profilu. Przeniesiony agent musi ponownie zalogować się na tych witrynach.",
   "mobile.server.browserProfiles.clear": "Wyczyść dane",
   "mobile.server.browserProfiles.clearTitle": "Wyczyścić dane profilu {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1881,4 +1884,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować",
   "mobile.server.ownerTransfer.declineFailed": "Nie udało się odrzucić",
   "mobile.server.ownerTransfer.tryAgain": "Spróbuj ponownie później.",
+  "mobile.server.providers.updateAll": "Aktualizuj wszystkie",
+  "mobile.server.providers.updateAllFailed": "Niektóre aktualizacje się nie rozpoczęły. Spróbuj ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

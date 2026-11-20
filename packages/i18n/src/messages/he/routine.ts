@@ -337,7 +337,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "מסירת הסוד",
   "routine.webhook.giveSecretFailed": "לא ניתן למסור את סוד החתימה ל-{name}.",
   "routine.webhook.secretGiven": "ל-{name} יש את סוד החתימה החדש.",
-  "routine.webhook.statusFailed": "לא ניתן לבדוק אם המארח מחובר לממסר.",
   "routine.webhook.stepDone": "בוצע",
   "routine.webhook.stepUrl": "יש להעתיק את נקודת הקצה לשירות השולח",
   "routine.webhook.stepUrlHint": "השולח שולח בקשת POST עם גוף JSON בגודל של עד 64 KiB.",

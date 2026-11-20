@@ -316,6 +316,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
   "mobile.agent.runtime.searchModels": "חיפוש מודלים",
   "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "הספק הזה לא עובד עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בו, שנו קודם את „הרשאות”.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",
@@ -394,6 +396,7 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "ניהול פרופילים",
   "mobile.agent.browserProfile.footer":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.agent.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot לא הצליח לשנות את פרופיל הדפדפן של הסוכן.",
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":
@@ -481,6 +484,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "המארח הזה לא יכול לפרסם סוכנים מהתקן מרוחק.",
   "mobile.agent.usage.tokensWithoutCacheReads": "טוקנים ללא קריאות מטמון",
   "mobile.agent.usage.estimatedCost": "עלות משוערת",
+  "mobile.agent.usage.noCostEstimate": "אין הערכת עלות",
   "mobile.agent.usage.daily": "שימוש יומי",
   "mobile.agent.usage.tokens": "טוקנים",
   "mobile.agent.usage.cost": "עלות",

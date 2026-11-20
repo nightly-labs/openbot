@@ -65,12 +65,7 @@ import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/conte
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
-import {
-  AGENT_HIDDEN_CAPABILITY,
-  AGENT_HIDDEN_WORK_CAPABILITY,
-  AGENT_WELCOME_CAPABILITY,
-  TEAM_AGENT_CREATE_MODEL_CAPABILITY,
-} from "@openbot/contracts/team-protocol/current";
+import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { DISCORD_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -86,8 +81,6 @@ import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/mess
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
-import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -163,7 +156,6 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
-import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
@@ -174,6 +166,7 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
+import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
@@ -185,7 +178,6 @@ import {
   sidebarAgentWaits,
   sidebarChannelWaits,
 } from "@openbot/ui/features/sidebar/sidebar-agent-states";
-import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
 import { useText } from "@openbot/ui/text";
 import { Effect } from "effect";
@@ -216,7 +208,6 @@ import { LayoutProvider, useLayout } from "../../layout";
 import {
   AgentUsagePanel,
   CrmScreen,
-  RoutineFlowsCanvas,
   ScheduleView,
   ServerLibrary,
   ServerOnboarding,
@@ -238,8 +229,7 @@ import {
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
-import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
-import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
+import type { CreationPreference } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
 import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
@@ -288,6 +278,7 @@ import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySet
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
 import type { OwnerTransferCalls } from "../servers/ServerOwnerTransferSection";
+import { ServerPlanReminder } from "../servers/ServerPlanReminder";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
@@ -334,6 +325,7 @@ import {
 } from "../window/SettingsPageFrame";
 import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { workflowAgentProgress } from "../workflows/workflow-agent-progress";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -367,7 +359,6 @@ import { requestWebNotificationPermission } from "./web-notifications";
 import { webOnePasswordConnectorPort } from "./web-onepassword-connector";
 import { webPasswordManagersPort } from "./web-password-managers";
 import { createWebProviderSettings, openWebDestination } from "./web-provider-admin";
-import { webRoutineFlowsHost } from "./web-routine-flows";
 import type { WebAdminRuntime } from "./web-runtime";
 import { webScheduleSource } from "./web-schedule";
 import { createWebServerSettings } from "./web-server-settings";
@@ -644,8 +635,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const server = createMemo(() => servers().find((item) => item.active));
   const blockedServer = createMemo(() => {
     const current = server();
-    return current?.state === "incompatible" ? current : null;
+    if (!current) return null;
+    return current.state === "incompatible" || serverPlanBlocks(current, hostedServers.planDeletesAt(current.id))
+      ? current
+      : null;
   });
+  const planScreenShown = () => serverPlanScreenShown(blockedServer(), hostedServers.planDeletesAt);
+  createEffect(
+    () =>
+      hostedServers.loaded() &&
+      servers().some((item) => item.hostedIssue === "plan_ended" && hostedServers.planDeletesAt(item.id) === null),
+    (dateMissing) => {
+      if (dateMissing) void hostedServers.refresh();
+    },
+  );
   const connectionShown = () => !noHost() && workspace.state.status !== "online" && !blockedServer();
   const frameFirstLoad = () =>
     workspace.state.workspaceLoaded &&
@@ -657,7 +660,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       hostedSleep: workspace.state.hostedSleep,
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
-      loading: workspace.state.status === "connecting",
+      // Signal holds the attempt of a host that is offline. As on desktop, that is not a load: the notice
+      // shows the connect step, not "Loading" with Connect done.
+      loading: workspace.state.status === "connecting" && !workspace.state.hostOffline,
       hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
   const [pageLoad, setPageLoad] = createSignal(true);
@@ -1783,6 +1788,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     canDelete: hostedServers.isHosted,
     onRestart: (hostId, trigger) => setRestartRequest({ hostId, trigger }),
     canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
+    planDeletesAt: hostedServers.planDeletesAt,
+    onRenewPlan: hostedServers.renewPlan,
   } satisfies ServerActionCallbacks;
   let entry: { id: string; offered: boolean } | null = null;
   createEffect(
@@ -1824,11 +1831,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.status === "online" &&
     workspace.state.capabilities.includes(CHANNEL_CHATS_CAPABILITY) &&
     Boolean(workspace.runtime.channels);
-  const routinesSupported = () => workspace.state.capabilities.includes(ROUTINE_FLOWS_CAPABILITY);
-  const routinesView = () => routinesSupported() && layout.sidebarView() === "routines";
-  const channelsListed = () => channelsSupported() && !routinesView();
+  const channelsListed = () => channelsSupported();
   const sidebarChannels = () =>
-    !channels.state.listed && !routinesView() && (workspace.state.status !== "online" || channelsSupported())
+    !channels.state.listed && (workspace.state.status !== "online" || channelsSupported())
       ? workspace.state.frameChannels
       : channelsListed()
         ? channels.state.channels
@@ -1845,15 +1850,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   function sidebarLoading(): boolean {
     return (
       !sidebarWaitOver() &&
-      (workspace.state.panelsLoading ||
-        (channelsSupported() && !routinesView() && !channels.state.listed && !channels.state.error))
+      (workspace.state.panelsLoading || (channelsSupported() && !channels.state.listed && !channels.state.error))
     );
   }
   const savedChannelId = () => {
     const hostId = workspace.state.host?.hostId;
     return hostId ? (readChannelSelection()[props.accountId]?.[hostId] ?? null) : null;
   };
-  const canMarkRead = () => document.hasFocus() && mobilePane() === "conversation" && !pageCovered() && !routinesView();
+  const canMarkRead = () => document.hasFocus() && mobilePane() === "conversation" && !pageCovered();
   let channelBaseline: { scope: string; channels: ChannelSummary[] } | null = null;
   const channels = createChannelsController({
     port: () => channelsPort,
@@ -1954,8 +1958,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const createSupported = () => workspace.state.status === "online" && workspace.state.host !== null;
   const firstAgent = () => workspace.state.agentsLoaded && workspace.profiles().length === 0 && createSupported();
   const agentFormOpen = () => creating() || (firstAgent() && !channelOpen());
-  const agentChatOpen = () =>
-    !tasksOpen() && !agentFormOpen() && !channelOpen() && !noHost() && !hostOffline() && !routinesView();
+  const agentChatOpen = () => !tasksOpen() && !agentFormOpen() && !channelOpen() && !noHost() && !hostOffline();
   const [serverSetupChoices, setServerSetupChoices] = createSignal<Record<string, CreationPreference>>({});
   const serverSetupChoice = () => {
     const id = server()?.id;
@@ -2004,12 +2007,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     ];
   });
-  const routineFlowsHost = webRoutineFlowsHost(
-    workspace.runtime,
-    workspace.onHostEvent,
-    () => (eventsEnabled() ? webhookRoutines : undefined),
-    () => workspace.state.capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY),
-  );
   const openProviderSettings = (trigger: HTMLElement) => {
     const current = server();
     if (current) void openServerSettings(current.id, trigger, "providers");
@@ -2051,30 +2048,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const current = server();
     if (current) void openServerSettings(current.id, trigger, "browser-profiles");
   };
-  const newAgentModels = createMemo((): DiagramModelChoice | undefined => {
-    if (!workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY)) return undefined;
-    const initial = resolveCreationModel(serverSetupChoice(), models(), status());
-    return initial
-      ? { options: models(), status: status(), initial, customProviders: providerSettings()?.customProviders }
-      : undefined;
-  });
-  async function createCanvasAgent(draft: NewAgentDraft): Promise<{ id: string }> {
-    const created = await workspace.runtime.createAgent(
-      newAgentInput(
-        draft,
-        workspace.state.capabilities.includes(TEAM_AGENT_CREATE_MODEL_CAPABILITY),
-        workspace.state.capabilities.includes(AGENT_WELCOME_CAPABILITY),
-      ),
-    );
-    await workspace.refresh();
-    return created;
-  }
-  createEffect(
-    () => routinesView() && channelOpen(),
-    (channelOpenInRoutines) => {
-      if (channelOpenInRoutines) layout.setSidebarView("agents");
-    },
-  );
   const [heldUnreadAgentId, setHeldUnreadAgentId] = createSignal<string | null>(null);
   const readState = () => workspace.conversation()?.page?.readState;
   const readsOpenChat = () =>
@@ -2585,11 +2558,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const others = workspace.state.hosts.filter((item) => item.hostId !== current);
     return others.find((item) => item.hostId === previousHostId())?.hostId ?? others[0]?.hostId;
   };
-  function showSidebarView(view: SidebarView) {
+  function showAgentsPage() {
     showAgents();
     setMobilePane("workspace");
-    if (view === "routines") channels.close();
-    layout.setSidebarView(view);
   }
   function setAgentHidden(agentId: string, hidden: boolean): void {
     const agent = workspace.state.agents.find((candidate) => candidate.id === agentId);
@@ -2646,7 +2617,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   const railPage = (): PageRailPage | null => {
     const current = page();
-    if (current === "agents") return layout.sidebarView();
+    if (current === "agents") return "agents";
     if (current === "server-settings") return serverSettingsShownSection() === "providers" ? "providers" : null;
     return current === "pricing" ? null : current;
   };
@@ -2668,10 +2639,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     setMobilePane("conversation");
     void select(agentId);
     setSettingsRequest({ agentId, nonce: Date.now(), routine: "new" });
-  }
-  function createCanvasRoutine(agentId: string): void {
-    layout.setSidebarView("agents");
-    createRoutine(agentId);
   }
   const unavailable = async (): Promise<never> => {
     throw new Error(t("webClient.error.desktopOnly"));
@@ -2751,8 +2718,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               pinned={layout.railPinned()}
               onPinChange={layout.setRailPinned}
               usageRows={usageRows()}
-              onAgents={() => showSidebarView("agents")}
-              onRoutines={routinesSupported() ? () => showSidebarView("routines") : undefined}
+              onAgents={showAgentsPage}
               onTasks={
                 tasksSupported()
                   ? (button) => {
@@ -2808,6 +2774,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               data-web-mobile-pane={mobilePane()}
               compact={compact()}
               blockedServer={blockedServer()}
+              planDeletesAt={hostedServers.planDeletesAt}
+              onRenewPlan={hostedServers.renewPlan}
               initialLoading={hostOffline()}
               connection={
                 <>
@@ -2836,6 +2804,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }
               onRetryServer={(serverId) =>
                 workspace.run(async () => {
+                  void hostedServers.refresh();
                   const host = workspace.state.hosts.find((item) => item.hostId === serverId);
                   if (host) await workspace.connect(host);
                 })
@@ -2973,6 +2942,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 models={models()}
                                 status={providerAdmin.status()}
                                 self={account().name ?? undefined}
+                                agentProgress={(agentId) =>
+                                  workflowAgentProgress(
+                                    agentId,
+                                    workspace.state.progress[agentId],
+                                    workspace.stepLines(),
+                                  )
+                                }
                               />
                             </Loading>
                           )}
@@ -3049,158 +3025,166 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       {...serverActionCallbacks}
                     />
                   </Show>
-                  <Sidebar
-                    agentsConnecting={!noHost() && !workspace.state.agentsLoaded}
-                    channels={sidebarChannels().filter((channel) => !channel.archived)}
-                    deletedChannels={sidebarChannels().filter((channel) => channel.archived)}
-                    activeChannelId={tasksOpen() ? null : channels.state.selectedId}
-                    onSelectChannel={openChannel}
-                    onEditChannel={(id) => openChannel(id, true)}
-                    onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
-                    onRestoreChannel={channels.deletionSupported() ? channels.restore : undefined}
-                    showingArchivedChannels={channelsListed() && channels.state.archived}
-                    onToggleArchivedChannels={channelsListed() ? channels.toggleArchived : undefined}
-                    onCreateChannel={channelsListed() ? channels.create : undefined}
-                    onMarkAllRead={
-                      workspace.state.status === "online"
-                        ? () => {
-                            void workspace.markAllRead().catch(() =>
-                              actionToast.error(t("chat.unread.markReadFailed"), {
-                                report: { operation: "other", source: "action", cause_code: "unknown" },
-                              }),
-                            );
-                            if (channelsSupported()) void channels.markAllRead();
-                          }
-                        : undefined
-                    }
-                    unreadAgentIds={sidebarUnreadAgentIds()}
-                    onMarkAgentRead={markSidebarAgentRead()}
-                    onMarkAgentUnread={markSidebarAgentUnread()}
-                    hasUnread={
-                      workspace.state.agents.some(
-                        (agent) =>
-                          !pausedAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
-                      ) || channels.hasUnread()
-                    }
-                    view={layout.sidebarView()}
-                    serverName={workspace.state.host?.name ?? "OpenBot"}
-                    serverUpdate={(() => {
-                      const id = server()?.id;
-                      const badge = id ? serverUpdateBadge(id) : null;
-                      return id && badge ? { ...badge, onOpen: () => void showServerUpdate(id) } : undefined;
-                    })()}
-                    serverMenu={{
-                      servers: servers(),
-                      view: layout.serverView(),
-                      onViewChange: layout.setServerView,
-                      onSelect: selectServer,
-                      onAdd: () => hostedServers.openAddServer("server_rail"),
-                      addCreatesServer: hostedServers.available(),
-                      ...serverActionCallbacks,
-                    }}
-                    agents={workspace.profiles()}
-                    activeAgentId={tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")}
-                    agentThreads={sidebarThreads()}
-                    people={[]}
-                    directThreads={[]}
-                    activeDirectMemberId={null}
-                    agentStates={sidebarAgentStates()}
-                    channelWaits={sidebarChannelWaitStates()}
-                    channelPreviewsPending={!channels.state.listed}
-                    agentMoods={sidebarAgentMoods()}
-                    layout={workspace.state.sidebarLayout}
-                    layoutMutable={
-                      workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")
-                    }
-                    foldersSupported={
-                      workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-folders-v1")
-                    }
-                    chatOrder={layout.sidebarChatOrder()}
-                    onChatOrderChange={layout.setSidebarChatOrder}
-                    collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
-                    onMutateLayout={workspace.mutateSidebarLayout}
-                    sectionDuplicateSupported={
-                      workspace.state.status === "online" &&
-                      workspace.state.capabilities.includes("agent-duplication") &&
-                      workspace.state.capabilities.includes("sidebar-layout")
-                    }
-                    duplicatingSectionIds={workspace.duplicatingSectionIds()}
-                    onDuplicateSection={workspace.duplicateSection}
-                    onToggleSection={workspace.preferences.toggleSidebarSection}
-                    pinnedItems={workspace.preferences.pinnedSidebarItems()}
-                    peopleOrder={[]}
-                    onPin={workspace.preferences.pinSidebarItem}
-                    onUnpin={workspace.preferences.unpinSidebarItem}
-                    onReorderPinned={workspace.preferences.reorderPinnedSidebarItems}
-                    onReorderPeople={() => {}}
-                    onSelectAgent={(id) => {
-                      setMobilePane("conversation");
-                      void select(id);
-                    }}
-                    onSelectPerson={() => {}}
-                    onCreateAgent={startCreate}
-                    createSupported={createSupported()}
-                    onEditAgent={(id) => {
-                      setMobilePane("conversation");
-                      void select(id);
-                      setSettingsRequest({ agentId: id, nonce: Date.now() });
-                    }}
-                    duplicateSupported={
-                      workspace.state.status === "online" && workspace.state.capabilities.includes("agent-duplication")
-                    }
-                    duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
-                    onDuplicateAgent={workspace.duplicateAgent}
-                    deleteSupported={
-                      workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role)
-                    }
-                    marketplaceSupported={workspace.state.status === "online"}
-                    onDeleteAgent={workspace.deleteAgent}
-                    userHiddenAgents={workspace.state.userHiddenAgents}
-                    userHiddenAgentsWork={hiddenAgentsWork()}
-                    mutedAgentIds={muteSupported() ? mutedAgentIds(workspace.state.host?.hostId) : undefined}
-                    onSetAgentMuted={muteSupported() ? setAgentMuted : undefined}
-                    onHideAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, true) : undefined}
-                    onRestoreAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, false) : undefined}
-                    compact={compact()}
-                    onExpand={layout.expandSidebar}
-                    onCollapse={collapseSidebar()}
-                    onOpenSearch={() => setSearchOpen(true)}
-                    onOpenMarketplace={openMarketplace}
-                    footer={
-                      <>
-                        <SidebarAlertCards
-                          cards={alertCards}
-                          serverName={server()?.name ?? ""}
-                          members={workspace.state.presence?.members ?? []}
-                          onOpenStorage={(serverId) => void openServerSettings(serverId, null, "storage")}
-                        />
-                        <Show when={!alertCards.shown() && !communityCard.dismissed()}>
-                          <SidebarCommunityCard
-                            onJoinDiscord={() => void openWebDestination("discord")}
-                            onFollowX={() => void openWebDestination("x")}
-                            onDismiss={communityCard.dismiss}
+                  <Show when={!planScreenShown()}>
+                    <Sidebar
+                      agentsConnecting={!noHost() && !workspace.state.agentsLoaded}
+                      channels={sidebarChannels().filter((channel) => !channel.archived)}
+                      deletedChannels={sidebarChannels().filter((channel) => channel.archived)}
+                      activeChannelId={tasksOpen() ? null : channels.state.selectedId}
+                      onSelectChannel={openChannel}
+                      onEditChannel={(id) => openChannel(id, true)}
+                      onDeleteChannel={channels.deletionSupported() ? channels.remove : undefined}
+                      onRestoreChannel={channels.deletionSupported() ? channels.restore : undefined}
+                      showingArchivedChannels={channelsListed() && channels.state.archived}
+                      onToggleArchivedChannels={channelsListed() ? channels.toggleArchived : undefined}
+                      onCreateChannel={channelsListed() ? channels.create : undefined}
+                      onMarkAllRead={
+                        workspace.state.status === "online"
+                          ? () => {
+                              void workspace.markAllRead().catch(() =>
+                                actionToast.error(t("chat.unread.markReadFailed"), {
+                                  report: { operation: "other", source: "action", cause_code: "unknown" },
+                                }),
+                              );
+                              if (channelsSupported()) void channels.markAllRead();
+                            }
+                          : undefined
+                      }
+                      unreadAgentIds={sidebarUnreadAgentIds()}
+                      onMarkAgentRead={markSidebarAgentRead()}
+                      onMarkAgentUnread={markSidebarAgentUnread()}
+                      hasUnread={
+                        workspace.state.agents.some(
+                          (agent) =>
+                            !pausedAgentIds().has(agent.id) && (workspace.state.reads[agent.id]?.unreadCount ?? 0) > 0,
+                        ) || channels.hasUnread()
+                      }
+                      serverName={workspace.state.host?.name ?? "OpenBot"}
+                      serverUpdate={(() => {
+                        const id = server()?.id;
+                        const badge = id ? serverUpdateBadge(id) : null;
+                        return id && badge ? { ...badge, onOpen: () => void showServerUpdate(id) } : undefined;
+                      })()}
+                      serverMenu={{
+                        servers: servers(),
+                        view: layout.serverView(),
+                        onViewChange: layout.setServerView,
+                        onSelect: selectServer,
+                        onAdd: () => hostedServers.openAddServer("server_rail"),
+                        addCreatesServer: hostedServers.available(),
+                        ...serverActionCallbacks,
+                      }}
+                      agents={workspace.profiles()}
+                      activeAgentId={tasksOpen() || channelOpen() ? "" : (workspace.state.selectedId ?? "")}
+                      agentThreads={sidebarThreads()}
+                      people={[]}
+                      directThreads={[]}
+                      activeDirectMemberId={null}
+                      agentStates={sidebarAgentStates()}
+                      channelWaits={sidebarChannelWaitStates()}
+                      channelPreviewsPending={!channels.state.listed}
+                      agentMoods={sidebarAgentMoods()}
+                      layout={workspace.state.sidebarLayout}
+                      layoutMutable={
+                        workspace.state.status === "online" && workspace.state.capabilities.includes("sidebar-layout")
+                      }
+                      foldersSupported={
+                        workspace.state.status === "online" &&
+                        workspace.state.capabilities.includes("sidebar-folders-v1")
+                      }
+                      chatOrder={layout.sidebarChatOrder()}
+                      onChatOrderChange={layout.setSidebarChatOrder}
+                      collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
+                      onMutateLayout={workspace.mutateSidebarLayout}
+                      sectionDuplicateSupported={
+                        workspace.state.status === "online" &&
+                        workspace.state.capabilities.includes("agent-duplication") &&
+                        workspace.state.capabilities.includes("sidebar-layout")
+                      }
+                      duplicatingSectionIds={workspace.duplicatingSectionIds()}
+                      onDuplicateSection={workspace.duplicateSection}
+                      onToggleSection={workspace.preferences.toggleSidebarSection}
+                      pinnedItems={workspace.preferences.pinnedSidebarItems()}
+                      peopleOrder={[]}
+                      onPin={workspace.preferences.pinSidebarItem}
+                      onUnpin={workspace.preferences.unpinSidebarItem}
+                      onReorderPinned={workspace.preferences.reorderPinnedSidebarItems}
+                      onReorderPeople={() => {}}
+                      onSelectAgent={(id) => {
+                        setMobilePane("conversation");
+                        void select(id);
+                      }}
+                      onSelectPerson={() => {}}
+                      onCreateAgent={startCreate}
+                      createSupported={createSupported()}
+                      onEditAgent={(id) => {
+                        setMobilePane("conversation");
+                        void select(id);
+                        setSettingsRequest({ agentId: id, nonce: Date.now() });
+                      }}
+                      duplicateSupported={
+                        workspace.state.status === "online" &&
+                        workspace.state.capabilities.includes("agent-duplication")
+                      }
+                      duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
+                      onDuplicateAgent={workspace.duplicateAgent}
+                      deleteSupported={
+                        workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role)
+                      }
+                      marketplaceSupported={workspace.state.status === "online"}
+                      onDeleteAgent={workspace.deleteAgent}
+                      userHiddenAgents={workspace.state.userHiddenAgents}
+                      userHiddenAgentsWork={hiddenAgentsWork()}
+                      mutedAgentIds={muteSupported() ? mutedAgentIds(workspace.state.host?.hostId) : undefined}
+                      onSetAgentMuted={muteSupported() ? setAgentMuted : undefined}
+                      onHideAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, true) : undefined}
+                      onRestoreAgent={hideSupported() ? (agentId) => setAgentHidden(agentId, false) : undefined}
+                      compact={compact()}
+                      onExpand={layout.expandSidebar}
+                      onCollapse={collapseSidebar()}
+                      onOpenSearch={() => setSearchOpen(true)}
+                      onOpenMarketplace={openMarketplace}
+                      footer={
+                        <>
+                          <SidebarAlertCards
+                            cards={alertCards}
+                            serverName={server()?.name ?? ""}
+                            members={workspace.state.presence?.members ?? []}
+                            onOpenStorage={(serverId) => void openServerSettings(serverId, null, "storage")}
                           />
-                        </Show>
-                      </>
-                    }
-                    emptyAction={
-                      firstAgent()
-                        ? {
-                            label: t("sidebar.empty.firstAgent"),
-                            avatarSeed: agentAvatar().avatarSeed,
-                            avatarHue: agentAvatar().avatarHue,
-                            avatarColor: agentAvatar().avatarColor ?? null,
-                            onSelect: startCreate,
-                          }
-                        : undefined
-                    }
-                  />
-                  <WebMobileNavigation activePane={mobilePane()} routines={routinesView()} onChange={setMobilePane} />
+                          <Show when={!alertCards.shown() && !communityCard.dismissed()}>
+                            <SidebarCommunityCard
+                              onJoinDiscord={() => void openWebDestination("discord")}
+                              onFollowX={() => void openWebDestination("x")}
+                              onDismiss={communityCard.dismiss}
+                            />
+                          </Show>
+                        </>
+                      }
+                      emptyAction={
+                        firstAgent()
+                          ? {
+                              label: t("sidebar.empty.firstAgent"),
+                              avatarSeed: agentAvatar().avatarSeed,
+                              avatarHue: agentAvatar().avatarHue,
+                              avatarColor: agentAvatar().avatarColor ?? null,
+                              onSelect: startCreate,
+                            }
+                          : undefined
+                      }
+                    />
+                  </Show>
+                  <WebMobileNavigation activePane={mobilePane()} onChange={setMobilePane} />
                 </>
               }
               after={
                 <>
                   <ServerUpdateDialogHost hosts={workspace.hostViews()} />
+                  <ServerPlanReminder
+                    servers={servers()}
+                    planDeletesAt={hostedServers.planDeletesAt}
+                    onRenew={hostedServers.renewPlan}
+                  />
                   <HostedServerUpsell
                     accountId={props.accountId}
                     canOffer={
@@ -3502,7 +3486,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       onOpenInChat={(task) => {
                         agentThreads()?.tabs.open(task.agentId, task.id);
-                        layout.setSidebarView("agents");
                         setMobilePane("conversation");
                         void select(task.agentId);
                       }}
@@ -3688,30 +3671,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   }
                   onRefresh={() => void workspace.run(workspace.refreshHosts)}
                 />
-              </Show>
-              <Show
-                when={
-                  !tasksOpen() && !agentFormOpen() && !channelOpen() && !noHost() && !hostOffline() && routinesView()
-                }
-              >
-                <Show when={routineFlowsHost ? workspace.state.host?.hostId : undefined} keyed>
-                  {(_hostId) => (
-                    <Show when={routineFlowsHost}>
-                      {(host) => (
-                        <Loading>
-                          <RoutineFlowsCanvas
-                            host={host()}
-                            agent={conversationAgent()}
-                            agents={workspace.profiles()}
-                            newAgentModels={newAgentModels()}
-                            createAgent={createCanvasAgent}
-                            onCreateRoutine={createCanvasRoutine}
-                          />
-                        </Loading>
-                      )}
-                    </Show>
-                  )}
-                </Show>
               </Show>
               <Show when={agentChatOpen()}>
                 <Conversation

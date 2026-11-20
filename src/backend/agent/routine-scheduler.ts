@@ -222,6 +222,32 @@ export class RoutineScheduler implements RoutineDueSource {
     return run !== null && quietRoutineRun(run);
   }
 
+  retriesAfterRestart(deliveryId: string): boolean {
+    const run = this.#routines.runForDelivery(deliveryId);
+    if (
+      run?.kind !== "scheduled" ||
+      run.source !== undefined ||
+      !["queued", "running", "needs-attention"].includes(run.status)
+    )
+      return false;
+    const routine = this.#routines.getRecord(run.agentId, run.routineId);
+    if (
+      routine?.missedPolicy !== "run-once" ||
+      routine.trigger.kind !== "schedule" ||
+      routine.trigger.id !== run.triggerId ||
+      Date.parse(routine.updatedAt) > Date.parse(run.createdAt)
+    )
+      return false;
+    if (routine.trigger.schedule.kind === "once") return true;
+    return (
+      routine.active &&
+      Date.parse(routine.trigger.nextRunAt) > Date.now() &&
+      !this.#routines
+        .listRuns(run.agentId, run.routineId, 50, true)
+        .some((other) => other.kind === "scheduled" && other.scheduledFor > run.scheduledFor)
+    );
+  }
+
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
     return this.#routines.duplicate(sourceAgentId, targetAgentId, now);
   }

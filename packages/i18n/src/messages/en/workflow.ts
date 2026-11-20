@@ -64,6 +64,8 @@ export const messages = defineMessages("workflow", {
   "workflow.node.retry": "Retry",
   "workflow.node.failed": "Failed",
   "workflow.node.runTime": "{seconds} s",
+  "workflow.node.name": "Step name",
+  "workflow.node.stepsDone": { one: "{count} step done", other: "{count} steps done" },
   "workflow.node.choice": "{name}: {value}",
   "workflow.node.place.channel": "Channel",
   "workflow.node.place.choose": "Choose channel",

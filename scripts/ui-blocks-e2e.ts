@@ -115,7 +115,7 @@ const registry = new AttentionRegistry({
       snapshot.revision += 1;
     },
   },
-  browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
+  browser: { listTabs: () => [], toolCanUseTab: () => false, beginTakeover: () => Effect.void, endTakeover: () => {} },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
   routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
   emit: (event) => events.push(event),

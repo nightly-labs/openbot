@@ -14,8 +14,8 @@ description: "Turn meeting notes or a transcript into decisions, commitments wit
 ## Inputs
 
 1. **Notes or transcript.** First look for a signed-in document tab: call `openbot_browser.list_tabs` and read the
-   notes or transcript page that the user names. An installed plugin such as Notion also works; find it with
-   `tool_search`. Else ask the user to paste the text or upload the file.
+   notes or transcript page that the user names. The tools of an installed plugin such as Notion also work;
+   `openbot.tool_search` does not list them. Else ask the user to paste the text or upload the file.
 2. **Meeting date and time zone.** Take them from the document header or the calendar entry. If they are missing
    and the notes use relative dates ("Friday", "next week"), ask once with `ask_user`.
 3. **Attendees.** Use the names in the notes. Do not add people who are not named.

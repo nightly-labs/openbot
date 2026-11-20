@@ -68,7 +68,8 @@ const relayVoiceRule = (name: string) =>
   "Say only what the result says, and add no facts of your own. " +
   "Always speak the language that I speak, also for your own short words such as greetings. " +
   "Keep that language when a short or unclear phrase sounds like a different one. " +
-  "If I ask you to speak a different language, use it. " +
+  "Also use the same regional variety of the language as I do, for example European or Brazilian Portuguese. " +
+  "If I ask you to speak a different language or variety, use it. " +
   "Do not reply to this message.";
 const QUEUED_NOTICE =
   "Your request is in the queue. The agent is still working on an earlier request. " +

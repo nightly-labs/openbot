@@ -4,6 +4,7 @@ import {
   graphAgentIds,
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_MEDIA_CATALOG_V1_ASPECTS,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowMediaCatalog,
@@ -126,7 +127,10 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
-const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
+const DISPLAY_FIELD_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(WORKFLOW_GROUP_FIELDS),
+  WORKFLOW_STEP_NAME_FIELD,
+]);
 
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
@@ -135,7 +139,7 @@ function adminNodes(graph: WorkflowGraph): Map<string, string> {
     if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
       continue;
     const fields = Object.keys(node.fields)
-      .filter((key) => !GROUP_FIELD_KEYS.has(key))
+      .filter((key) => !DISPLAY_FIELD_KEYS.has(key))
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
     nodes.set(node.id, JSON.stringify([node.kind, fields]));
