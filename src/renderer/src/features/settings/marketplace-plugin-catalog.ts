@@ -6966,51 +6966,6 @@ const MERCURY: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/mercury",
 };
 
-const META_ADS: MarketplacePluginDetail = {
-  id: "plugin-meta-ads",
-  slug: "meta-ads",
-  name: "Meta Ads",
-  tagline: "Facebook and Instagram ad campaigns",
-  description:
-    "Meta Ads lets agents read campaign, ad set, and ad performance and draft changes to campaigns in the ad accounts the user can manage. Each user signs in to their own Meta account through the browser.",
-  category: "data-analytics",
-  creatorName: "Meta",
-  iconUrl:
-    "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ae/e1/2b/aee12bef-5d1f-62dc-1e55-f18ef82c4f93/AppIcon-MetaBrand-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
-  version: "1.0.0",
-  prompts: [
-    {
-      id: "prompt-performance",
-      text: "How did my campaigns perform last week? Show spend, results, and cost per result.",
-    },
-    { id: "prompt-underperform", text: "Which ad sets have the highest cost per result this month?" },
-    { id: "prompt-draft-ad", text: "Draft three headline and primary text options for a new spring sale ad." },
-  ],
-  apps: [
-    {
-      id: "app-meta-ads-mcp",
-      name: "Meta Ads",
-      description: "Campaign reporting and campaign management, over Meta's MCP server with browser sign-in.",
-      iconUrl:
-        "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ae/e1/2b/aee12bef-5d1f-62dc-1e55-f18ef82c4f93/AppIcon-MetaBrand-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
-      server: {
-        name: "meta-ads",
-        transport: "http",
-        url: "https://mcp.facebook.com/ads",
-        auth: [{ id: "meta-ads-oauth", kind: "link", label: "Sign in" }],
-      },
-    },
-  ],
-  websiteUrl: "https://www.facebook.com/business",
-  privacyPolicyUrl: "https://www.facebook.com/privacy/policy/",
-  termsUrl: "https://www.facebook.com/legal/terms",
-  skills: [],
-  installs: 0,
-  featured: false,
-  updatedAt: "2026-11-10T00:00:00.000Z",
-  shareUrl: "https://openbot.run/plugins/meta-ads",
-};
-
 const METRICOOL: MarketplacePluginDetail = {
   id: "plugin-metricool",
   slug: "metricool",
@@ -10786,7 +10741,6 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   MASSIVE,
   MEM,
   MERCURY,
-  META_ADS,
   METRICOOL,
   MIRO,
   MIXPANEL,
