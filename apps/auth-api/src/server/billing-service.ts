@@ -64,7 +64,13 @@ import {
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import { BillingReferral } from "./billing-referral";
-import { type BillingSales, type BillingSalesSynced, paymentReversal, withoutTax } from "./billing-sales";
+import {
+  type BillingSales,
+  type BillingSalesSynced,
+  isDisputeInquiry,
+  paymentReversal,
+  withoutTax,
+} from "./billing-sales";
 import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
 import type { HostedFailure } from "./hosted-server-service";
 import {
@@ -961,6 +967,7 @@ export class BillingService {
         const refunded =
           reversal?.type === "payment_refunded" ||
           (reversal?.type === "payment_disputed" &&
+            !isDisputeInquiry(event) &&
             synced.startedAt !== null &&
             event.created * 1_000 - synced.startedAt < DISPUTE_DELETES_SERVER_MS) ||
           (event.type === "customer.subscription.deleted" &&

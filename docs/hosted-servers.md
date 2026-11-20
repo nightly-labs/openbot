@@ -285,8 +285,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    succeeded does not bring the server back. A dispute (`charge.dispute.created`, an inquiry too)
    cancels the plan of the disputed invoice now, so Stripe does not charge that card again. When the
    subscription started less than 30 days before the dispute (Stripe `start_date`,
-   `DISPUTE_DELETES_SERVER_MS`), the webhook also deletes the server at once, as for a refund. After a
-   later dispute the server stops with `plan_ended` and keeps its disk for 14 days. The Worker finds the plan through
+   `DISPUTE_DELETES_SERVER_MS`), the webhook also deletes the server at once, as for a refund. An
+   inquiry (a dispute `status` that starts with `warning_`, `isDisputeInquiry`) takes no money back,
+   so it never deletes the server. After an inquiry or a later dispute the server stops with
+   `plan_ended` and keeps its disk for 14 days. The Worker finds the plan through
    the invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment
    that is not an OpenBot plan invoice changes nothing.
 8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an

@@ -1978,6 +1978,31 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       oldStripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
       { dispute: oldDisputed.status, stripeStatus: oldStripeSub.status, row: ended },
     );
+    const inquiry = await account.createServer("Dispute inquiry");
+    await account.useCard("pm_card_createDisputeInquiry");
+    const inquirySub = await account.pay(inquiry.server.serverId);
+    const inquiryPaid = await paymentIntent(inquirySub);
+    const inquiryDispute = await waitFor("inquiry", async () => {
+      const list = await stripe("GET", "/v1/disputes", disputeListSchema, { payment_intent: inquiryPaid.intent });
+      return list.data[0] ?? null;
+    });
+    await applied("charge.dispute.created", inquiryDispute.id);
+    const inquiryEnded = await rowWhere(
+      account,
+      inquiry.server.serverId,
+      "plan ended after an inquiry",
+      (row) => row.desired_state === "stopped",
+    );
+    const inquiryStripeSub = await subscription(inquirySub);
+    record(
+      "dispute",
+      "an inquiry in the first 30 days cancels the plan; the server stops with plan_ended and is kept",
+      inquiryDispute.status.startsWith("warning_") &&
+        inquiryStripeSub.status === "canceled" &&
+        inquiryEnded.observed_error === "plan_ended" &&
+        inquiryEnded.deleted_at === null,
+      { dispute: inquiryDispute.status, stripeStatus: inquiryStripeSub.status, row: inquiryEnded },
+    );
     await stripe("POST", `/v1/disputes/${disputed.id}`, idSchema, {
       "evidence[uncategorized_text]": "losing_evidence",
       submit: "true",
