@@ -101,6 +101,7 @@ const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
   "vault-change",
   "context-reset",
   "sign-in-failure",
+  "routine-run",
 ]);
 const NEAR_SCROLL_VIEWS = 2;
 
