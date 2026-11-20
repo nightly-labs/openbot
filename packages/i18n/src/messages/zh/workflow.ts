@@ -65,6 +65,8 @@ export const messages = {
   "workflow.node.retry": "重试",
   "workflow.node.failed": "失败",
   "workflow.node.runTime": "{seconds} 秒",
+  "workflow.node.name": "步骤名称",
+  "workflow.node.stepsDone": { one: "已完成 {count} 步", other: "已完成 {count} 步" },
   "workflow.node.choice": "{name}：{value}",
   "workflow.node.place.channel": "频道",
   "workflow.node.place.choose": "选择频道",

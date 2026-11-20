@@ -1,3 +1,4 @@
+import type { AgentStepActivity } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -11,6 +12,7 @@ import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import { createSignal, onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
 import { createStoryPresence } from "./workflow-presence-story";
@@ -227,6 +229,48 @@ export const Agent: Story = {
       <AgentNode id="result" agentId={AGENT} task={TASK} />
     </NodeGallery>
   ),
+};
+
+const LIVE_STEPS: readonly { detail: string; activity: AgentStepActivity }[] = [
+  { detail: "Searched the web: “Northwind Atlas launch”", activity: "searching" },
+  { detail: "Reading northwind.com/changelog", activity: "reading" },
+  { detail: "Reading northwind.com/pricing", activity: "reading" },
+  { detail: "Opening news.ycombinator.com", activity: "browsing" },
+  { detail: "Searched the web: “Northwind Slack connector”", activity: "searching" },
+  { detail: "Reading northwind.com/blog/atlas", activity: "reading" },
+  { detail: "Reviewing the results", activity: "reviewing" },
+];
+
+function RunningAgentGallery() {
+  const [step, setStep] = createSignal(0);
+  const timer = setInterval(() => setStep((value) => (value + 1) % LIVE_STEPS.length), 1800);
+  onCleanup(() => clearInterval(timer));
+  return (
+    <NodeGallery
+      selected="research"
+      status={{ research: "running" }}
+      fields={{ research: { stepName: "Research competitors" }, summary: { stepName: "Summary for #market" } }}
+      edges={[{ id: "research>summary", from: "research", to: "summary", type: "text" }]}
+      progress={(id) => {
+        const current = LIVE_STEPS[step()];
+        if (id !== "research" || !current) return undefined;
+        return {
+          detail: current.detail,
+          previous: LIVE_STEPS[step() - 1]?.detail,
+          activity: current.activity,
+          done: step(),
+        };
+      }}
+    >
+      <AgentNode id="research" agentId={AGENT} task={TASK} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines for the market team" />
+    </NodeGallery>
+  );
+}
+
+export const AgentRunning: Story = {
+  name: "Agent, running with step names",
+  render: () => <RunningAgentGallery />,
 };
 
 export const Llm: Story = {

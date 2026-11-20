@@ -68,6 +68,12 @@ export const messages = {
   "workflow.node.retry": "ניסיון חוזר",
   "workflow.node.failed": "נכשל",
   "workflow.node.runTime": "{seconds} ש׳",
+  "workflow.node.name": "שם השלב",
+  "workflow.node.stepsDone": {
+    one: "שלב אחד הושלם",
+    two: "שני שלבים הושלמו",
+    other: "{count} שלבים הושלמו",
+  },
   "workflow.node.choice": "{name}: {value}",
   "workflow.node.place.channel": "ערוץ",
   "workflow.node.place.choose": "בחירת ערוץ",

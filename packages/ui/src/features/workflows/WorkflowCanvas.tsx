@@ -105,11 +105,13 @@ import { WorkflowZoomMenu } from "./WorkflowZoomMenu";
 import {
   BoardProvider,
   createBoard,
+  customStepName,
   inCanvas,
   isEditable,
   MOD_KEY,
   type PortRef,
   resizeCursor,
+  STEP_NAME_FIELD,
   takesKeys,
   type WfnAnchor,
   type WfnEdge,
@@ -120,6 +122,7 @@ import {
   type WfnRunStatus,
   type WfnSize,
   type WfnStretch,
+  type WorkflowAgentProgress,
 } from "./workflow-board";
 import { type WorkflowBuild, workflowBuildPlan } from "./workflow-build";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
@@ -206,6 +209,7 @@ export interface WorkflowCanvasProps {
   presence?: WorkflowPresence | undefined;
   build?: WorkflowBuild | undefined;
   frame?: "window" | undefined;
+  agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
   onGraphChange: (graph: WorkflowGraph) => void;
   onRun: (input: { fromNodeId?: string }) => void;
   onRunStep: (nodeId: string) => void;
@@ -420,9 +424,9 @@ function textFont(node: HTMLElement) {
   return input ? Number.parseFloat(getComputedStyle(input).fontSize) : TEXT_FONT.min;
 }
 
-const DRAG_FIELD = "textarea, input.wfn-input";
+const DRAG_FIELD = "textarea, input.wfn-input, input.wfn-step-name";
 
-const ITEM_FIELD = ".wfn-note-input, .wfn-shape-input, .wfn-text-input";
+const ITEM_FIELD = ".wfn-note-input, .wfn-shape-input, .wfn-text-input, .wfn-step-name";
 
 function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number) {
   const position = document.caretPositionFromPoint?.(x, y);
@@ -573,6 +577,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       return kind ? stretchOf(kind) : "x";
     },
     status: statusOf,
+    progress: (id) => {
+      const agentId = statusOf(id) === "running" ? runIndex().get(id)?.step.agentId : null;
+      return agentId ? props.agentProgress?.(agentId) : undefined;
+    },
     error: (id) => runIndex().get(id)?.error,
     resultsOf: (id) => runIndex().get(id)?.results ?? [],
     duplicate: (id) => duplicateNodes([id]),
@@ -1263,6 +1271,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return undefined;
   };
   const stepName = (id: string) => {
+    const custom = customStepName(board.field(id, STEP_NAME_FIELD));
+    if (custom) return custom;
     const [label = t("workflow.canvas.step"), ...fields] = searchTexts(id);
     const words = fields
       .find((field) => field.trim())
@@ -2123,7 +2133,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const value = board.field(id, key);
       return typeof value === "string" ? value : "";
     });
-    return [t(KIND_LABEL[kind]), ...fields];
+    return [customStepName(board.field(id, STEP_NAME_FIELD)) ?? t(KIND_LABEL[kind]), ...fields];
   };
   const matches = () => {
     const words = query().trim().toLowerCase();

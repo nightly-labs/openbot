@@ -122,11 +122,15 @@
   cursor: grabbing;
 }
 
-.wfn-slot :is(textarea, input.wfn-input):not(:focus, [readonly]) {
+.wfn-slot :is(textarea, input.wfn-input, input.wfn-step-name):not(:focus, [readonly]) {
   cursor: grab;
 }
 
-.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input) {
+.wfn-slot .wfn-node[data-selected] input.wfn-step-name:not([readonly]) {
+  cursor: text;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input, input.wfn-step-name) {
   cursor: grabbing;
 }
 

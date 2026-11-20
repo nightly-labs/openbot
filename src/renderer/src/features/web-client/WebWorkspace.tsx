@@ -331,6 +331,7 @@ import {
 } from "../window/SettingsPageFrame";
 import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { workflowAgentProgress } from "../workflows/workflow-agent-progress";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
@@ -2952,6 +2953,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 models={models()}
                                 status={providerAdmin.status()}
                                 self={account().name ?? undefined}
+                                agentProgress={(agentId) =>
+                                  workflowAgentProgress(workspace.state.progress[agentId], workspace.stepLines())
+                                }
                               />
                             </Loading>
                           )}

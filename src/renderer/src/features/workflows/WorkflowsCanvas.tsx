@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowAgentProgress } from "@openbot/ui/features/workflows/workflow-board";
 import {
   WORKFLOW_FEATURES_V1,
   type WorkflowCatalogs,
@@ -32,6 +33,7 @@ export function WorkflowsCanvas(props: {
   self?: WorkflowCatalogs["self"];
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
+  agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
 }) {
   const workflows = createWorkflowsController(
     untrack(() => props.host),
@@ -239,6 +241,7 @@ export function WorkflowsCanvas(props: {
           github={workflows.github}
           frame="window"
           readOnly={workflows.readOnly()}
+          agentProgress={props.agentProgress}
           {...workflows.props}
           onRotateWebhookSecret={props.admin ? workflows.props.onRotateWebhookSecret : undefined}
         />
