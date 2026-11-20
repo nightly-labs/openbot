@@ -5,6 +5,8 @@ import {
   type SkImage,
   Skia,
   type SkTypefaceFontProvider,
+  TextAlign,
+  TextDirection,
 } from "@shopify/react-native-skia";
 import { APP_FONT } from "@/shared/lib/app-font";
 
@@ -29,6 +31,8 @@ export interface InviteStubTextureInput {
   lineWidths: Partial<Record<StubLine, number>>;
   fontScale: number;
   colors: StubColors;
+  locale: string;
+  rtl: boolean;
   fonts: SkTypefaceFontProvider;
 }
 
@@ -76,17 +80,26 @@ function fittedParagraph(
   width: number,
   fontScale: number,
   target: number | undefined,
+  rtl: boolean,
 ) {
   const scaled = { ...style, size: style.size * fontScale, spacing: (style.spacing ?? 0) * fontScale };
-  const first = paragraph(text, fonts, scaled, width);
+  const first = paragraph(text, fonts, scaled, width, rtl);
   const drawn = first.getLongestLine();
   if (!target || drawn <= 0 || Math.abs(target / drawn - 1) < 0.004) return first;
   const ratio = target / drawn;
-  return paragraph(text, fonts, { ...scaled, size: scaled.size * ratio, spacing: scaled.spacing * ratio }, width);
+  return paragraph(text, fonts, { ...scaled, size: scaled.size * ratio, spacing: scaled.spacing * ratio }, width, rtl);
 }
 
-function paragraph(text: string, fonts: SkTypefaceFontProvider, style: LineStyle, width: number) {
-  const builder = Skia.ParagraphBuilder.Make({ maxLines: 1, ellipsis: "…" }, fonts);
+function paragraph(text: string, fonts: SkTypefaceFontProvider, style: LineStyle, width: number, rtl: boolean) {
+  const builder = Skia.ParagraphBuilder.Make(
+    {
+      maxLines: 1,
+      ellipsis: "…",
+      textDirection: rtl ? TextDirection.RTL : TextDirection.LTR,
+      textAlign: TextAlign.Start,
+    },
+    fonts,
+  );
   builder.pushStyle({
     color: Skia.Color(style.color),
     fontSize: style.size,
@@ -136,7 +149,7 @@ export function renderInviteStubTexture(input: InviteStubTextureInput): SkImage 
     {
       key: "admit" as const,
       box: input.parts.admit,
-      text: input.admit.toUpperCase(),
+      text: input.admit.toLocaleUpperCase(input.locale),
       size: 11,
       weight: FontWeight.SemiBold,
       color: input.colors.ink,
@@ -167,6 +180,7 @@ export function renderInviteStubTexture(input: InviteStubTextureInput): SkImage 
       column.width,
       input.fontScale,
       input.lineWidths[line.key],
+      input.rtl,
     );
     text.paint(canvas, left + line.box.x, top + line.box.y);
   }

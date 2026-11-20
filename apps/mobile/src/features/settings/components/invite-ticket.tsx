@@ -15,6 +15,7 @@ import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
 import {
   type AccessibilityActionEvent,
+  I18nManager,
   type LayoutChangeEvent,
   PixelRatio,
   type TextLayoutEvent,
@@ -49,7 +50,7 @@ import { APP_FONT } from "@/shared/lib/app-font";
 import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { useText } from "@/shared/lib/text";
+import { currentLocale, useText } from "@/shared/lib/text";
 
 const NOTCH = 24;
 const NOTCHES = 6;
@@ -161,10 +162,10 @@ export function InviteTicket({
         if (step < NOTCHES) scheduleOnRN(tick);
       }
     })
-    .onEnd(() => {
+    .onEnd((_, success) => {
       notch.set(0);
       if (fall.get() > 0) return;
-      if (progress.get() >= 1) scheduleOnRN(tearOff);
+      if (success && progress.get() >= 1) scheduleOnRN(tearOff);
       else progress.set(withSpring(0, { duration: 420, dampingRatio: 0.8 }));
     });
 
@@ -212,7 +213,12 @@ export function InviteTicket({
   const admitText = t("mobile.settings.invite.admit");
   const hintText = t("mobile.settings.invite.tearHint");
 
+  const drawnText = useRef("");
+  const locale = currentLocale();
+  const textKey = `${admitText}\u0000${linkLabel}\u0000${hintText}\u0000${locale}`;
+
   useEffect(() => {
+    if (drawnText.current !== textKey) imageReady.set(0);
     if (!fonts || !paperLayout || !hasAllParts(stubParts)) return;
     const timer = setTimeout(() => {
       const image = renderInviteStubTexture({
@@ -220,6 +226,8 @@ export function InviteTicket({
         parts: stubParts,
         lineWidths,
         fontScale,
+        locale,
+        rtl: I18nManager.isRTL,
         colors: stub,
         scale: PixelRatio.get(),
         admit: admitText,
@@ -228,10 +236,24 @@ export function InviteTicket({
         fonts,
       });
       setPaperImage(image);
+      drawnText.current = textKey;
       imageReady.set(image ? 1 : 0);
     }, TEXTURE_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [admitText, fontScale, fonts, hintText, imageReady, lineWidths, linkLabel, paperLayout, stub, stubParts]);
+  }, [
+    admitText,
+    fontScale,
+    fonts,
+    hintText,
+    imageReady,
+    lineWidths,
+    linkLabel,
+    locale,
+    paperLayout,
+    stub,
+    stubParts,
+    textKey,
+  ]);
 
   const bend = useDerivedValue(() => {
     if (reduced) return 0;
@@ -328,6 +350,7 @@ export function InviteTicket({
                 <View className="flex-1 gap-0.5" onLayout={measure("column")}>
                   <Typography
                     weight="semibold"
+                    numberOfLines={1}
                     style={{ color: stub.ink, fontSize: 11, letterSpacing: 2, textTransform: "uppercase" }}
                     onLayout={measure("admit")}
                     onTextLayout={measureLine("admit")}
@@ -344,6 +367,7 @@ export function InviteTicket({
                     {linkLabel}
                   </Typography>
                   <Typography
+                    numberOfLines={1}
                     style={{ color: stub.muted, fontSize: 12, marginTop: 2 }}
                     onLayout={measure("hint")}
                     onTextLayout={measureLine("hint")}
