@@ -339,4 +339,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalindeki {provider} CLI kendi oturumunu korur.",
+  "provider.settings.updateAll": "Tümünü güncelle",
 } as const satisfies PartialTranslation<typeof source>;

@@ -39,6 +39,7 @@ import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionReferences } from "../model/use-agent-mention-references";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
+import { ChatProviderSignInRow, useProviderSignInNeeded } from "./chat-provider-sign-in-row";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useAgentBackdrops } from "./use-agent-backdrops";
@@ -210,6 +211,18 @@ export function MobileChatView({
       }
     };
     const load = async () => {
+      if (pending?.unread && stored()) {
+        setFocus((current) => (current?.messageId === pending.messageId ? { ...current, loaded: true } : current));
+        await readLatest();
+        if (
+          request.current === id &&
+          !stored() &&
+          !(await loadConversationAround(agent.id, pending.messageId, agent.serverId)) &&
+          request.current === id
+        )
+          setFocus(null);
+        return;
+      }
       if (pending?.unread) {
         await readLatest();
         if (!stored() && !(await loadConversationAround(agent.id, pending.messageId, agent.serverId))) {
@@ -409,12 +422,18 @@ export function MobileChatView({
     [agent.id, agent.serverId],
   );
   const workActivity = workChannel ? liveActivity : undefined;
+  const signInProvider = useProviderSignInNeeded(agent.serverId, agent.provider) ? agent.provider : undefined;
   const activityAccessory = useMemo(
     () =>
       workChannel && workActivity ? (
-        <ChatChannelWorkRow channel={workChannel} activity={workActivity} serverId={agent.serverId} />
+        <>
+          {signInProvider ? <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} /> : null}
+          <ChatChannelWorkRow channel={workChannel} activity={workActivity} serverId={agent.serverId} />
+        </>
+      ) : signInProvider ? (
+        <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} />
       ) : null,
-    [workChannel, workActivity, agent.serverId],
+    [workChannel, workActivity, agent.serverId, signInProvider],
   );
   return (
     <ChatView

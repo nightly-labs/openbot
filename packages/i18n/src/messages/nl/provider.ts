@@ -387,4 +387,5 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.settings.updateAll": "Alles updaten",
 } as const satisfies PartialTranslation<typeof source>;

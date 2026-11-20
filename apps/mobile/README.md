@@ -957,14 +957,14 @@ of both platforms is required before release.
 ### Event catalog
 
 Every event has `surface=mobile`, `platform=ios|android`, `environment=production`,
-`event_schema_version=3`, `app_version` and `build_number`. Operation outcomes use `result` and,
+`event_schema_version=5`, `app_version` and `build_number`. Operation outcomes use `result` and,
 where available, `duration_ms`. Failure codes are fixed categories, never raw error text.
 
 | Event | Meaning |
 | --- | --- |
 | `mobile_app_opened` | Cold start or return from background, with `signed_in`; iOS inactive overlays do not count as a new visit |
 | `mobile_pairing_action` | Sign-in scanner opened, camera permission result, QR redemption result, scanner cancelled; `entry_point` is `qr` or `link` (a pairing link) |
-| `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage |
+| `mobile_connection_action` | Initial connection attempt, reconnection attempt, or connection lost; result, duration and bounded loading stage. From generation 5, the milliseconds from the start of the attempt to the Signal socket (`signal_socket_ms`), the Signal answer (`signal_ms`), the open data channels (`channels_ms`) and the host sign-in (`auth_ms`), when the attempt made a new peer connection; `route`, the candidate types and transports of the selected WebRTC path (for example `relay/tcp -> host/udp`; for a relay candidate, the transport from the phone to the relay); and `vpn` (`off`, `on`, `proxy` for a tunnel address in `198.18.0.0/15` as Clash-type proxy apps use, or `unknown`), also on `lost`. No address or VPN name is sent |
 | `conversation_opened` | One visible-visit outcome and time to readable conversation, including cached/offline reads; failures when no readable conversation is available |
 | `message_send` | Host receipt or failure, attachment count, reply flag, provider/model/reasoning metadata when known |
 | `agent_input_action` | Submission of a structured prompt answer or an approval decision (`accept` or `decline`); no answer contents, command or path |

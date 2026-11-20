@@ -337,4 +337,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
   "provider.settings.disconnectLocalOnly":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
+  "provider.settings.updateAll": "すべて更新",
 } as const satisfies PartialTranslation<typeof source>;

@@ -222,6 +222,21 @@ export const messages = {
   "server.rail.delete": "サーバーを削除",
   "server.rail.hide": "サーバーを非表示",
   "server.rail.showLocal": "{name} を表示",
+  "server.plan.daysLeft": {
+    other: "{count}日",
+  },
+  "server.plan.ended": "プラン終了",
+  "server.plan.status": "プラン終了、{date}に削除",
+  "server.plan.deletedOn": "{date}に削除",
+  "server.plan.dialogTitle": "エージェントを失わないで",
+  "server.plan.dialogDescription":
+    "{name}はプランの支払いがないため停止しました。{date}に、OpenBotはエージェントとそのすべてのチャットとファイルを削除します。",
+  "server.plan.dialogDaysLeft": {
+    other: "残り{count}日",
+  },
+  "server.plan.later": "あとで",
+  "server.plan.keepAgents": "エージェントを残す",
+  "server.plan.ownerRenews": "サーバーのオーナーがプランを更新するまで、{name} のエージェントは使えません。",
   "server.select.failedTitle": "サーバーを選択できませんでした",
   "server.select.failedDescription": "サーバーを切り替えられませんでした。もう一度お試しください。",
   "server.select.openAgentFailed": "{name} を開けませんでした。サイドバーで探してください。",

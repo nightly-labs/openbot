@@ -374,4 +374,5 @@ export const messages = {
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
+  "provider.settings.updateAll": "全部更新",
 } as const satisfies PartialTranslation<typeof source>;

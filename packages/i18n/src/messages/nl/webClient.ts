@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Het antwoord op het inloggen is ongeldig.",
   "webClient.pane.navigation": "Navigatie in werkruimte",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Werkruimte",
   "webClient.phoneApp.title": "Gebruik de OpenBot-app",
   "webClient.phoneApp.description":

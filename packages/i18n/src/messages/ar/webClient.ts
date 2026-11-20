@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "استجابة تسجيل الدخول غير صالحة.",
   "webClient.pane.navigation": "التنقل في مساحة العمل",
   "webClient.pane.chat": "الدردشة",
-  "webClient.pane.routines": "المهام الدورية",
   "webClient.pane.workspace": "مساحة العمل",
   "webClient.phoneApp.title": "استخدم تطبيق OpenBot",
   "webClient.phoneApp.description":

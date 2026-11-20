@@ -115,7 +115,8 @@ const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
-const LIST_WINDOW_SIZE = 7;
+const LIST_WINDOW_SIZE = 3;
+const LIST_DRAG_WINDOW_SIZE = 21;
 const LIST_BATCH = 10;
 
 interface ChatRowTarget {
@@ -930,7 +931,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 renderItem={renderItem}
                 initialNumToRender={LIST_BATCH}
                 maxToRenderPerBatch={LIST_BATCH}
-                windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
+                windowSize={dragging ? LIST_DRAG_WINDOW_SIZE : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
                   <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
                     <AgentListRowReveal index={0} reveal={listReveal}>

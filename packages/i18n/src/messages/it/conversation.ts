@@ -112,6 +112,7 @@ export const messages = {
     "In attesa. Questo computer esegue tanti turni quanti ne consente la sua memoria.",
   "conversation.threads.hold.agentBusy": "In attesa che finisca altro lavoro di questo agente.",
   "conversation.threads.hold.oneTurn": "In attesa. Il provider di questo agente esegue un turno alla volta.",
+  "conversation.threads.hold.signIn": "In attesa. Il provider di questo agente richiede l’accesso.",
   "conversation.sidePanel.closePanel": "Chiudi il pannello",
   "conversation.threads.view.failedBody": "Il provider non ha indicato un motivo. Invia un messaggio per riprovare.",
   "conversation.threads.deleteUndo.action": "Annulla",

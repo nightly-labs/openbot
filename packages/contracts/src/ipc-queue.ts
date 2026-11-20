@@ -111,7 +111,7 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
   );
 }
 
-export const QUEUE_HOLD_REASONS = ["channel-task", "provider-restart"] as const;
+export const QUEUE_HOLD_REASONS = ["channel-task", "provider-restart", "sign-in"] as const;
 export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
 
 export type QueueHold =
@@ -121,11 +121,12 @@ export type QueueHold =
       channelName: string;
       agentId: string;
     }
-  | { reason: "provider-restart"; provider: AgentProviderRef };
+  | { reason: "provider-restart"; provider: AgentProviderRef }
+  | { reason: "sign-in"; provider: AgentProviderRef };
 
 export function isQueueHold(value: unknown): value is QueueHold {
   if (!isDynamicRecord(value) || !isOneOf(QUEUE_HOLD_REASONS, value.reason)) return false;
-  if (value.reason === "provider-restart") return isAgentProviderRef(value.provider);
+  if (value.reason !== "channel-task") return isAgentProviderRef(value.provider);
   return (
     isIdentifier(value.channelId) &&
     isBoundedString(value.channelName, INPUT_LIMITS.agentTitle) &&
