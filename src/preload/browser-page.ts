@@ -136,6 +136,14 @@ function matchChromePageValues(): void {
     Object.defineProperty(prototype, "get", { ...descriptor, value: get });
   };
 
+  const refusePrintDialogs = (target: typeof globalThis): void => {
+    const descriptor = Object.getOwnPropertyDescriptor(target, "print");
+    if (!descriptor || typeof descriptor.value !== "function") return;
+    const print = nativeProxy(target, descriptor.value, () => undefined);
+    natives.set(print, "print");
+    Object.defineProperty(target, "print", { ...descriptor, value: print });
+  };
+
   const debugVendor = 0x9245; // WEBGL_debug_renderer_info.UNMASKED_VENDOR_WEBGL
   const debugRenderer = 0x9246; // WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL
   const laptopGpu = {
@@ -253,6 +261,7 @@ function matchChromePageValues(): void {
     natives.set(maskedToString, "toString");
     Object.defineProperty(functionPrototype, "toString", { value: maskedToString });
     if (onMac) refusePasskeyDialogs(target);
+    refusePrintDialogs(target);
     if (onLinux) replaceSoftwareGpuName(target);
 
     const chrome = existing ?? {};

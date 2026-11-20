@@ -75,9 +75,20 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>fingerprint</title>
   for (const type of ["keydown", "keyup", "mousemove", "mousedown", "mouseup", "click"]) addEventListener(type, record, true);
 </script>`;
 
-const server = createServer((_request, response) => {
+const PRINT_PAGE = `<!doctype html><meta charset="utf-8"><title>print</title>
+<script>
+  window.__printEvents = 0;
+  addEventListener("beforeprint", () => { window.__printEvents += 1; });
+  window.__printResults = [String(print())];
+  const frame = document.createElement("iframe");
+  document.documentElement.appendChild(frame);
+  frame.contentWindow.addEventListener("beforeprint", () => { window.__printEvents += 1; });
+  window.__printResults.push(String(frame.contentWindow.print()));
+</script>`;
+
+const server = createServer((request, response) => {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
-  response.end(PAGE);
+  response.end(request.url === "/print" ? PRINT_PAGE : PAGE);
 });
 
 let browser: BrowserHost | undefined;
@@ -321,6 +332,21 @@ async function main(): Promise<void> {
         "The evaluate error does not hold the page's message.",
       );
       recordCase("agent-evaluate-reports-page-errors");
+    }
+
+    {
+      const printTab = await runCauseEffect(host.open(`${origin}/print`, THREAD_ID, "fixture-agent"));
+      const printContents = webContents.getAllWebContents().find((item) => item.getURL() === printTab.url);
+      assert(printContents, "Missing print fixture contents.");
+      const printed = await page(
+        printContents,
+        "({ events: window.__printEvents, results: window.__printResults, native: print.toString() })",
+        z.object({ events: z.number(), results: z.array(z.string()), native: z.string() }),
+      );
+      assert.equal(printed.events, 0, "A page in an agent tab started to print.");
+      assert.deepEqual(printed.results, ["undefined", "undefined"]);
+      assert.equal(printed.native, "function print() { [native code] }");
+      recordCase("agent-tab-refuses-page-print");
     }
 
     {
