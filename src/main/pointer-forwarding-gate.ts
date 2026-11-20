@@ -1,4 +1,4 @@
-import type { BrowserWindow, Point, Rectangle } from "electron";
+import type { BrowserWindow, Point } from "electron";
 
 const CURSOR_POLL_MS = 50;
 const POLLS_TO_STOP = 2;
@@ -16,7 +16,6 @@ interface GatedWindow {
   ignoring: boolean;
   forwarding: boolean;
   outside: number;
-  zone: readonly Rectangle[] | null;
 }
 
 export class PointerForwardingGate {
@@ -31,7 +30,7 @@ export class PointerForwardingGate {
   setIgnoring(window: BrowserWindow, ignoring: boolean): void {
     let entry = this.#windows.get(window);
     if (!entry) {
-      entry = { ignoring, forwarding: false, outside: 0, zone: null };
+      entry = { ignoring, forwarding: false, outside: 0 };
       this.#windows.set(window, entry);
       window.on("show", this.#poll);
       window.on("hide", this.#poll);
@@ -42,14 +41,9 @@ export class PointerForwardingGate {
     }
     entry.ignoring = ignoring;
     entry.outside = 0;
-    entry.forwarding = ignoring && this.#inZone(window, entry, this.#readCursor());
+    entry.forwarding = ignoring && this.#inWindow(window, this.#readCursor());
     window.setIgnoreMouseEvents(ignoring, { forward: entry.forwarding });
     this.#schedule();
-  }
-
-  setZone(window: BrowserWindow, zone: readonly Rectangle[] | null): void {
-    const entry = this.#windows.get(window);
-    if (entry) entry.zone = zone;
   }
 
   readonly #poll = (): void => {
@@ -60,7 +54,7 @@ export class PointerForwardingGate {
         continue;
       }
       if (!entry.ignoring) continue;
-      if (this.#inZone(window, entry, cursor)) {
+      if (this.#inWindow(window, cursor)) {
         entry.outside = 0;
         if (!entry.forwarding) {
           this.#forward(window, entry, true);
@@ -93,12 +87,14 @@ export class PointerForwardingGate {
     }
   }
 
-  #inZone(window: BrowserWindow, entry: GatedWindow, cursor: Point): boolean {
+  #inWindow(window: BrowserWindow, cursor: Point): boolean {
     if (!window.isVisible()) return false;
     const bounds = window.getBounds();
-    const x = cursor.x - bounds.x;
-    const y = cursor.y - bounds.y;
-    const parts = entry.zone ?? [{ x: 0, y: 0, width: bounds.width, height: bounds.height }];
-    return parts.some((part) => x >= part.x && y >= part.y && x < part.x + part.width && y < part.y + part.height);
+    return (
+      cursor.x >= bounds.x &&
+      cursor.y >= bounds.y &&
+      cursor.x < bounds.x + bounds.width &&
+      cursor.y < bounds.y + bounds.height
+    );
   }
 }

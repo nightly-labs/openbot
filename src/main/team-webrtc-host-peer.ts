@@ -31,6 +31,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -841,6 +842,7 @@ export class TeamWebRtcHostPeer {
             videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
             memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
             usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+            usageGroups: peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
             agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
             queueHold: peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
           };
@@ -914,6 +916,7 @@ export class TeamWebRtcHostPeer {
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
                 backgroundWork: this.#peerCapabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
                 usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+                usageGroups: this.#peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 queueHold: this.#peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),

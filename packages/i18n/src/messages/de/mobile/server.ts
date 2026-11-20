@@ -562,6 +562,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Agenten hinzufügen",
   "mobile.server.browserProfiles.agentsHint":
     "Ein Tippen gibt dem Agenten dieses Profil oder bringt ihn zurück zum gemeinsamen Profil. Eine Änderung schließt die offenen Tabs des Agenten.",
+  "mobile.server.browserProfiles.movedNote":
+    "Anmeldungen bei Websites bleiben im alten Profil. Ein verschobener Agent muss sich bei diesen Websites erneut anmelden.",
   "mobile.server.browserProfiles.clear": "Daten löschen",
   "mobile.server.browserProfiles.clearTitle": "Daten von {name} löschen?",
   "mobile.server.browserProfiles.clearBody":
@@ -1295,6 +1297,9 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Verbunden · {count} Werkzeug", other: "Verbunden · {count} Werkzeuge" },
   "mobile.server.mcp.signInOnComputer":
     "Dieser MCP-Server verlangt eine Anmeldung. Melde dich in OpenBot auf einem Computer an und teste dann erneut.",
+  "mobile.server.mcp.signIn": "Anmelden",
+  "mobile.server.mcp.signInHere":
+    "Dieser MCP-Server verlangt eine Anmeldung. Tippe auf Anmelden und teste dann erneut.",
   "mobile.server.mcp.signedInDescription": "{server} ist bei diesem MCP-Server angemeldet.",
   "mobile.server.mcp.signOut": "Abmelden",
   "mobile.server.mcp.saveFailed": "Die Änderung konnte nicht gespeichert werden. Versuche es erneut.",
@@ -1346,6 +1351,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 Stunden",
   "mobile.server.planLimits.window.hours": { one: "{count} Stunde", other: "{count} Stunden" },
   "mobile.server.planLimits.window.minutes": "{minutes} Min.",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update verfügbar",
   "mobile.server.route.updates": "Updates",
@@ -1688,4 +1694,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Kopierte Agenten verwenden die Genehmigungsregeln von {server}.",
   "mobile.server.transfer.copyNoServer":
     "Verbinde dich als Eigentümer oder Admin mit einem anderen Server, um Agenten dorthin zu kopieren.",
+  "mobile.server.route.ownerTransfer": "Eigentum übertragen",
+  "mobile.server.ownerTransfer.unavailable":
+    "Verbinde dich als Eigentümer mit diesem Server, um das Eigentum zu übertragen.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hostet diesen Server, daher kann sein Eigentümer nicht wechseln.",
+  "mobile.server.ownerTransfer.lede":
+    "Der neue Eigentümer erhält eine E-Mail und muss annehmen, während er mit dieser E-Mail angemeldet ist. Danach wirst du von diesem Server entfernt.",
+  "mobile.server.ownerTransfer.email": "E-Mail des neuen Eigentümers",
+  "mobile.server.ownerTransfer.send": "Senden",
+  "mobile.server.ownerTransfer.sending": "Wird gesendet…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenten, Chats, Routinen, Anbieter-Anmeldungen, gespeicherte Schlüssel, Vault-Logins, Browser-Anmeldungen und verbundene Apps bleiben auf dem Server. Der neue Eigentümer kann sie nutzen.",
+  "mobile.server.ownerTransfer.expiry": "Die Anfrage läuft nach 7 Tagen ab.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} zum Eigentümer machen?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Wenn {email} annimmt, wird diese Person Eigentümer von {server} und du verlierst den Zugriff. Die Daten bleiben auf dem Server. Die Anfrage läuft nach 7 Tagen ab.",
+  "mobile.server.ownerTransfer.confirm": "Übertragen",
+  "mobile.server.ownerTransfer.sendFailed": "Die Anfrage wurde nicht gesendet.",
+  "mobile.server.ownerTransfer.loadFailed": "Die offene Übertragung konnte nicht gelesen werden.",
+  "mobile.server.ownerTransfer.pending": "Wartet auf den neuen Eigentümer",
+  "mobile.server.ownerTransfer.expires": "Läuft ab am {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} muss annehmen und dabei mit dieser E-Mail angemeldet sein. Bis dahin bleibst du Eigentümer.",
+  "mobile.server.ownerTransfer.cancel": "Abbrechen",
+  "mobile.server.ownerTransfer.cancelTitle": "Übertragung abbrechen?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} kann sie dann nicht mehr annehmen.",
+  "mobile.server.ownerTransfer.keep": "Behalten",
+  "mobile.server.ownerTransfer.cancelFailed": "Die Übertragung wurde nicht abgebrochen.",
+  "mobile.server.ownerTransfer.incomingTitle": "Eigentümer von {server} werden?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} möchte dich zum Eigentümer von {server} machen. Du erhältst die volle Kontrolle über den Server, und seine Agenten, Chats, Routinen und gespeicherten Anmeldungen bleiben darauf. {name} verliert den Zugriff. Wer sich noch an dem Computer anmelden kann, auf dem der Server läuft, kann dein OpenBot-Konto nutzen. Ändere dort die Passwörter und SSH-Schlüssel.",
+  "mobile.server.ownerTransfer.accept": "Annehmen",
+  "mobile.server.ownerTransfer.decline": "Ablehnen",
+  "mobile.server.ownerTransfer.accepted": "Du bist jetzt Eigentümer von {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Übertragung nicht angenommen",
+  "mobile.server.ownerTransfer.declineFailed": "Übertragung nicht abgelehnt",
+  "mobile.server.ownerTransfer.tryAgain": "Versuche es später erneut.",
 } as const satisfies PartialTranslation<typeof source>;

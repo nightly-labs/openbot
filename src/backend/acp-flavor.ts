@@ -132,6 +132,7 @@ export interface AcpFlavor {
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
   mcpConnectLimitMs?: number;
+  mcpListLimit?: { ms: number; since: string };
   relayStdioMcpServers?: true | "unconfined";
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   mcpServerName?(name: string): string;
@@ -219,6 +220,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
   mcpServerName: grokMcpServerName,
+  relayStdioMcpServers: "unconfined",
   restoreFailure: (error) =>
     error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
       ? "confirm-missing"

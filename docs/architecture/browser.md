@@ -116,6 +116,14 @@ the extension list for a host without it.
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+The main chat and each side thread of an agent can use the tabs that the main chat, a side thread
+of that agent, or no chat opened. `list_tabs` and `status` give each tab its `chat` (`this chat`,
+`main chat`, a side thread with its title and `taskId`, `another conversation`, or `none`). They
+set `otherChatWorking` when another chat has a browser call on the tab or used it in the last 2
+minutes. It is a hint to the agent, not a lock. A channel or messaging thread uses only its own
+tabs, and its tabs stay out of the other chats. Any chat also uses the tabs that a person tags
+with @ in it (`sharedThreadIds`).
+`request_takeover`, `submit_secret` and `list_logins` use the same check (`toolCanUseTab`).
 Targeted typing checks that the target still holds focus before the End key, the text, and the
 Enter key. A page focus or input handler that moves focus stops it with an error that says if the
 text is already in the field. The check also reads each frame element that holds the target,
@@ -616,9 +624,10 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Turn succeeds | Stay open unless the agent called `close_tab`. |
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
-| Restart | Restored from the browser's own state file. |
+| Restart | Restored from the browser's own state file. A tab loads its page only when a person shows it or an agent uses it, the selected tab too. |
+| Not shown and idle 2 min | Stays open and loaded, but its page is frozen with `Page.setWebLifecycleState`: timers, animation and scripts stop. The next use (agent call, preview, live view, takeover or recording) makes it active again first. A tab with an open dialog or a pending restore is not frozen. |
 | Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
-| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown, busy, held, recording, playing audio, or with a secret) does not count. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown to a person, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |

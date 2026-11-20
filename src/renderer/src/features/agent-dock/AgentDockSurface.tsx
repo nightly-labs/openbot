@@ -23,19 +23,14 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowShape } from "../../window-shape";
-import {
-  AGENT_DOCK_STRIP_FEEL,
-  AGENT_DOCK_STRIP_REST,
-  AGENT_DOCK_STRIP_WIDTH,
-  AgentDockEdgeStrip,
-} from "./AgentDockEdgeStrip";
+import { AGENT_DOCK_STRIP_REST, AGENT_DOCK_STRIP_WIDTH, AgentDockEdgeStrip } from "./AgentDockEdgeStrip";
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
 const TUCK_DELAY_MS = 900;
 const EDGE_STRIP = 4;
-const SHAPED_WINDOW = currentDevicePlatform() === "linux";
-const POINTER_ZONE_WINDOW = currentDevicePlatform() === "win32";
+const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
+const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
 
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
@@ -108,36 +103,25 @@ export function AgentDockSurface() {
   const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
   function syncShape() {
-    if (!SHAPED_WINDOW && !POINTER_ZONE_WINDOW) return;
+    if (!SHAPED_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
       const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
       const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
       const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
-      const rest = POINTER_ZONE_WINDOW ? 1 : AGENT_DOCK_STRIP_REST;
       parts.push(
         body
           ? {
               x,
-              y: Math.round(body.top + (body.height * (1 - rest)) / 2),
+              y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2),
               width,
-              height: Math.round(body.height * rest),
+              height: Math.round(body.height * AGENT_DOCK_STRIP_REST),
             }
           : { x, y: 0, width, height: window.innerHeight },
       );
     }
-    const feel = AGENT_DOCK_STRIP_FEEL;
-    const shape = windowShape(
-      POINTER_ZONE_WINDOW
-        ? parts.map((part) => ({
-            x: part.x - feel,
-            y: part.y - feel,
-            width: part.width + feel * 2,
-            height: part.height + feel * 2,
-          }))
-        : parts,
-    );
+    const shape = POINTER_ZONE_WHILE_MOVING && dockShape === null && !menuOpen() ? [] : windowShape(parts);
     const key = JSON.stringify(shape);
     if (key === sentShape) return;
     sentShape = key;
@@ -339,7 +323,7 @@ export function AgentDockSurface() {
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={
-              SHAPED_WINDOW || POINTER_ZONE_WINDOW
+              SHAPED_WINDOW
                 ? (parts) => {
                     dockShape = parts;
                     syncShape();

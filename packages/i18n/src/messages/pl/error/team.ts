@@ -124,6 +124,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
   "error.team.hostRestartUnsupported": "To połączenie nie obsługuje ponownego uruchamiania serwera.",
+  "error.team.ownerTransferUnsupported": "Ten serwer nie obsługuje przekazania własności.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
   "error.team.localServersUnsupported": "To połączenie nie obsługuje serwerów na tym komputerze.",
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",

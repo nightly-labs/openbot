@@ -227,6 +227,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "각 프로필은 자체 로그인 정보와 쿠키를 유지해요. 변경하면 에이전트의 열린 탭이 닫혀요.",
   "agentSettings.browserProfile.manage": "관리",
+  "agentSettings.browserProfile.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남아요. 에이전트가 이 사이트에 다시 로그인해야 해요.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} 프로세스 전체가 샌드박스에서 실행되므로 밖에 쓰면 실패해요. macOS에서만 사용할 수 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

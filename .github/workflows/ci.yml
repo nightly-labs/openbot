@@ -216,6 +216,9 @@ jobs:
       - name: Run the browser dialogs E2E
         run: xvfb-run -a bun run test:browser-dialogs
 
+      - name: Run the browser idle freeze E2E
+        run: xvfb-run -a bun run test:browser-idle-freeze
+
       - name: Run the browser fingerprint E2E
         run: xvfb-run -a bun run test:browser-fingerprint
 
@@ -450,6 +453,10 @@ jobs:
       - name: Run the update host takeover E2E test
         if: ${{ !cancelled() }}
         run: bun run test:update-host-takeover
+
+      - name: Run the hosted update idle wait E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hosted-update-idle-wait
 
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
@@ -827,6 +834,7 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
+            .openbot-build/hosted-update-idle-wait-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
