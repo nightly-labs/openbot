@@ -607,6 +607,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plano encerrado",
   "settings.hostedServers.state.creating": "Criando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando dados",
   "settings.hostedServers.state.running": "Em execução",
   "settings.hostedServers.state.stopping": "Parando",
   "settings.hostedServers.state.stopped": "Parado",
@@ -617,6 +618,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "A configuração começa quando a Stripe confirma o pagamento.",
   "settings.hostedServers.planEndedDescription":
     "O plano terminou, então o servidor parou. Seus dados são mantidos. Renove o plano para iniciá-lo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "O plano terminou, então o servidor parou. Seus dados são mantidos até {date}. Renove o plano antes disso para iniciá-lo.",
   "settings.hostedServers.pay": "Abrir página de pagamento",
   "settings.hostedServers.payLabel": "Abrir página de pagamento de {name}",
   "settings.hostedServers.renew": "Renovar plano",
@@ -722,6 +725,13 @@ export const messages = {
   "settings.voice.speech.sample": "Olá. É assim que suas respostas vão soar.",
   "settings.voice.speech.listenFailed": "Não foi possível reproduzir a amostra.",
   "settings.voice.live.section": "Voz ao vivo",
+  "settings.voice.talk.section": "Conversa por voz",
+  "settings.voice.talkKey.title": "Tecla para falar",
+  "settings.voice.talkKey.description": "Mantenha estas teclas pressionadas para falar em uma conversa por voz.",
+  "settings.voice.talkKey.change": "Alterar a tecla para falar",
+  "settings.voice.talkKey.recording": "Pressione as teclas",
+  "settings.voice.talkKey.refused": "Adicione mais uma tecla",
+  "settings.voice.talkKey.reset": "Restaurar",
   "settings.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
   "settings.transfer.title": "Mover este servidor para outro computador",
   "settings.transfer.lede":

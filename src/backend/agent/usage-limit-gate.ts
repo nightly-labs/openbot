@@ -57,6 +57,7 @@ interface UsageLimit extends UsageLimitKey {
 
 interface ReturnHold {
   spent: boolean;
+  resetsAt: number | null;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -128,7 +129,7 @@ export class UsageLimitGate {
     const key = limitKey(limit.provider, limit.accountId, limit.model);
     if (this.#seen.has(key)) return true;
     if (!this.#returnHolds.has(key)) {
-      const hold: ReturnHold = { spent: false, timer: null };
+      const hold: ReturnHold = { spent: false, resetsAt: null, timer: null };
       this.#returnHolds.set(key, hold);
       this.#readReturn(key, limit, hold);
     }
@@ -416,10 +417,13 @@ export class UsageLimitGate {
       Effect.catch(() => Effect.succeed(null)),
     );
     if (this.#returnHolds.get(key) !== hold) return;
-    const resetsAt = usage ? spentWindowReset(usage) : null;
-    if (resetsAt !== null) {
+    const resetsAt = usage?.limits.some((reading) => reading.primary || reading.secondary)
+      ? spentWindowReset(usage)
+      : hold.resetsAt;
+    if (resetsAt !== null && resetsAt * 1_000 + RESET_GRACE_MS > Date.now()) {
       const waited = !hold.spent;
       hold.spent = true;
+      hold.resetsAt = resetsAt;
       const untilReset = resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
       hold.timer = setTimeout(
         () => this.#readReturn(key, limit, hold),

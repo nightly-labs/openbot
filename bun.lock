@@ -132,7 +132,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.11",
+      "version": "1.4.12",
       "dependencies": {
         "@config-plugins/react-native-webrtc": "15.0.2",
         "@expo/metro-runtime": "~58.0.17",
@@ -453,6 +453,9 @@
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
+    "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
+    "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
+    "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
   },
   "catalog": {
     "@cacheable/node-cache": "1.7.6",

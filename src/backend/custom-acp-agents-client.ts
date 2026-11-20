@@ -213,6 +213,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
     this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;
 
+  readonly imageInput = (externalThreadId: string): boolean => {
+    const held = this.#sessions.get(externalThreadId);
+    return held?.child.imageInput?.(held.sessionId) === true;
+  };
+
   readonly catalogAsMcpTools = (model: string): boolean =>
     this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
 

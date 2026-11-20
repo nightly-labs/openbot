@@ -408,6 +408,10 @@ export const messages = {
     "Codex no pudo continuar este chat porque falta un elemento en su historial guardado. OpenBot inició una nueva sesión de Codex con el historial del chat. Inténtalo de nuevo.",
   "error.provider.codexRequestRefused":
     "{provider} rechazó la solicitud de este chat y no indicó la causa. Esto puede ocurrir en un chat largo con muchas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} bloqueó este mensaje por sus reglas de seguridad: {reason} El agente ya no ve este mensaje, así que no detiene tus próximos mensajes. Envía tu solicitud de nuevo con otras palabras.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} bloqueó este mensaje por sus reglas de seguridad: {reason} Si {provider} también bloquea tus próximos mensajes, inicia un nuevo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
   "error.provider.imageTooSmall":

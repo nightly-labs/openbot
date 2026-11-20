@@ -382,6 +382,7 @@ export type TeamApiWorkflows = Pick<
   | "decide"
   | "runs"
   | "run"
+  | "stepSettings"
   | "workflowOf"
   | "githubHistory"
   | "githubLastEvent"

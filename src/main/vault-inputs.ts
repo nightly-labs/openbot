@@ -16,7 +16,7 @@ import {
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, TWO_STEP_KEY_LIMIT } from "@openbot/contracts/two-step-code";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
-import { websiteUrl } from "../backend/password-vault";
+import { isWebProtocol, websiteUrl } from "../backend/password-vault";
 import { isObject } from "./ipc/validation";
 
 const SECRET_FIELDS: readonly VaultSecretField[] = ["password", "number", "securityCode", "key"];
@@ -56,7 +56,7 @@ function id(value: unknown): string | null {
 export function vaultWebsite(value: string): string | null {
   const trimmed = value.trim();
   const url = websiteUrl(trimmed);
-  if (url?.protocol !== "https:" || !url.hostname || url.username || url.password) return null;
+  if (!url || !isWebProtocol(url) || !url.hostname || url.username || url.password) return null;
   return trimmed;
 }
 

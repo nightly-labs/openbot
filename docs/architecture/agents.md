@@ -336,8 +336,11 @@ changed, on this computer and on a joined host.
   (`workflow-walk.ts`). Passes run one at a time; a pass runs after a turn or queue event, after
   each user action, and at startup. A node runs again when a node before it has a newer step, as
   after a retry. A retry uses the node's current settings, so a fix made after the failure applies;
-  it uses the run's copy when the node is gone or is now another kind. An edge back to an earlier node (`workflowLoopEdges` in the contracts) is a loop:
-  when its source is done and newer, the earlier node runs again with that answer as one more
+  it uses the run's copy when the node is gone or is now another kind. An edge back to the start of a group of nodes that each reach the
+  others (`workflowLoopEdges` in the contracts) is a loop. The start is the entry from outside the
+  group; when more than one node is an entry, it is the leftmost entry on the canvas, then the
+  topmost, then the first that the walk reaches. The edge order does not change it. When its source
+  is done and newer, the earlier node runs again with that answer as one more
   input. A loop has no pass limit. It ends when a condition takes the other branch, a step fails or
   is rejected, or the user stops the run. The canvas marks a loop with no condition as endless.
 - An agent step is a routine handoff (`AgentService.enqueueRoutineHandoff`, with the workflow as the
@@ -352,7 +355,9 @@ changed, on this computer and on a joined host.
   posts to a messaging place.
 - `WorkflowTriggers` (`workflow-triggers.ts`) gives schedule triggers to the routine timer as an
   extra due source. An occurrence is skipped while the workflow has an open run, and missed
-  occurrences become one run. A webhook trigger has a route of its own owner kind (`workflow`); see
+  occurrences become one run. A schedule trigger gives the next steps the run time in UTC and in
+  the time zone of the trigger, the same "Local time of this run" line that a routine prompt has.
+  A manual run of a schedule trigger gives its start time. A webhook trigger has a route of its own owner kind (`workflow`); see
   [Route lifecycle](events.md#route-lifecycle).
 - A GitHub trigger starts a run for each event of the OpenBot GitHub App that matches it
   (`github-matching.ts`); see [Workflow GitHub triggers](events.md#workflow-github-triggers). A
@@ -370,8 +375,9 @@ changed, on this computer and on a joined host.
   mailbox. The first pass fails a model step that was running, and ends a run that was stopping. An
   agent step fails with `agentMissing` when its agent is deleted. A post that did not start is sent; a
   post that was on its way fails as uncertain, and the user retries the step.
-- Image, asset, file output and message trigger nodes are kept in the graph but do not run yet; a
-  run that reaches one fails with `nodeUnsupported`.
+- An asset node with no file, a file output node and a message trigger node are kept in the graph but
+  do not run yet (`unsupportedNode` in `workflow-walk.ts`); a run that reaches one fails with
+  `nodeUnsupported`.
 - Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
@@ -380,7 +386,16 @@ changed, on this computer and on a joined host.
   `canvas` or `canvases` also gives the six schemas, but keeps the other results: the word can also
   mean the Routines canvas or a canvas on a web page. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
-  (the agent id, prompt, rule or question), so the agent does not read the workflow again.
+  (the agent id, prompt, rule or question), so the agent does not read the workflow again. Each step
+  also has its id and, when the step saved them, the settings it used (long text cut at 600
+  characters) and its inputs: the node, the port type and the step that gave the text. The newest
+  steps that `run_workflow` with `only` or "Run step" started, with no run, come in `steps`.
+  `run_workflow` with `fromNodeId` and `only: true` runs that one node with the newest answers before
+  it (`Workflows.runStep`), and takes no `input`; the call key is the request id, so a repeated call
+  starts no second step. A separate tool would cost more context bytes for each agent. An agent can add `image` nodes:
+  `media` must be `image` or `video`, and `model` must be empty, a catalog model (`sunra-` or
+  `higgsfield-`), or a `WORKFLOW_MEDIA_MODELS` id that can make that media. The tool refuses any other
+  value and names the ids to use. `asset` nodes stay out: they need a file that the person uploads.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
   them as one graph with `saveGraph`; a `ref` names a new node for later operations in the same call.
   The host places nodes, so the agent sends no coordinates. The layout uses the card width of each
@@ -401,7 +416,7 @@ changed, on this computer and on a joined host.
   while the page is open. A click on the canvas, reduced motion or an agent that the catalog does not
   know stops or skips the play. `workflows-v1` still sends only `workflowId`, and its decoder drops
   the agent id, so a joined desktop reloads the graph with no play.
-- As for channels, only a person's message can use `edit_workflow`, `delete_workflow` or
+- As for channels, only a person's message can use `edit_workflow`, `delete_workflow`,
   `run_workflow`, in the agent's own chat or in a side thread that the person opened or branched
   (`AgentTasks.isPersonThread`: origin `user`, no routine, no messaging link or channel). A routine or
   workflow run, an external chat, a thread that the agent started, an agent message or a team
@@ -936,7 +951,10 @@ Nothing else wakes the requester, so a turn of teammate results that ends with n
 step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
 with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
-by the user. The error waits for the end
+by the user. A turn whose results each repeat, with the same text and files, an answer of the same
+teammate to the same request that an earlier finished turn already took
+(`MailboxStore.repeatsHandledReply`) also ends quietly. The repeated answer stays in the chat. An
+answer with new text to the same request still fails as above (#13130). The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on

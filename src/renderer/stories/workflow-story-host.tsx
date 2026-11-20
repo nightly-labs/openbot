@@ -14,6 +14,7 @@ import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import { WORKFLOW_FEATURES_V1, type WorkflowFeatures } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowPresence } from "@openbot/ui/features/workflows/workflow-presence";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
+import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
@@ -143,6 +144,8 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
     mediaAccountSupported: () => true,
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
+    agentFilesSupported: () => true,
+    stepSettingsSupported: () => true,
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,
@@ -178,9 +181,7 @@ export function WorkflowStory(props: {
 
 const usageRows = accountUsageProviderRows(null);
 
-export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
-  const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
-  const features = () => props.features ?? WORKFLOW_FEATURES_V1;
+function WorkflowAppWindow(props: { children: JSX.Element }) {
   const [page, setPage] = createSignal<PageRailPage | null>("routines");
   const [view, setView] = createSignal<SidebarView>("routines");
   return (
@@ -250,21 +251,29 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
           view={view()}
           onViewChange={setView}
         />
-        <div class="window-page wfn-app-pane">
-          <Show when={story.detail()}>
-            {(workflow) => (
-              <WorkflowCanvas
-                workflow={workflow()}
-                features={features()}
-                catalogs={STORY_CATALOGS}
-                github={story.github}
-                frame="window"
-                {...story.props}
-              />
-            )}
-          </Show>
-        </div>
+        <div class="window-page wfn-app-pane">{props.children}</div>
       </div>
     </div>
+  );
+}
+
+export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
+  const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
+  const features = () => props.features ?? WORKFLOW_FEATURES_V1;
+  return (
+    <WorkflowAppWindow>
+      <Show when={story.detail()}>
+        {(workflow) => (
+          <WorkflowCanvas
+            workflow={workflow()}
+            features={features()}
+            catalogs={STORY_CATALOGS}
+            github={story.github}
+            frame="window"
+            {...story.props}
+          />
+        )}
+      </Show>
+    </WorkflowAppWindow>
   );
 }

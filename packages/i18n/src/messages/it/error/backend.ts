@@ -303,6 +303,12 @@ export const messages = {
     "{provider} non è riuscito ad avviare il server MCP {name}. I suoi strumenti non sono disponibili per {provider}. {provider} avvia il server da solo, quindi la prova di connessione in OpenBot può riuscire. Avvia una nuova chat per riprovare.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} non è riuscito ad avviare il server MCP {name}, perché il server non ha risposto in tempo. Avvia una nuova chat per riprovare.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} non è riuscito ad avviare il server MCP {name}, perché il server ora non è disponibile. Attendi qualche minuto, poi avvia una nuova chat per riprovare.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} non è riuscito a raggiungere il server MCP {name}. Apri {name} in Marketplace, App, e verifica che l’indirizzo sia corretto e che il server sia attivo. Poi avvia una nuova chat per riprovare.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} non è riuscito a ottenere gli strumenti di GitHub, perché GitHub non ha risposto. Apri GitHub in Marketplace, App, e collegalo di nuovo se te lo chiede. Poi avvia una nuova chat per riprovare.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot non è riuscito ad avviare la connessione di accesso locale per questo server. Riavvia OpenBot e riprova.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -373,7 +379,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
-  "error.backend.apiKeyNotAllowed": "Solo il proprietario del server o un amministratore può inserire una chiave API.",
   "error.backend.apiKeySaving": "La chiave API è già in fase di salvataggio.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot non è riuscito a leggere la chiave API. Inserisci una chiave di massimo 8.000 caratteri e scegli chi può usarla.",
@@ -420,7 +425,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Impossibile caricare il popup. Riprova ad accedere dalla pagina originale.",
   "error.backend.browserTabNotFound": "Scheda del browser non trovata.",
   "error.backend.authActive": "L'autenticazione è già attiva.",
-  "error.backend.authHttpsRequired": "L'autenticazione sicura richiede HTTPS.",
+  "error.backend.authWebPageRequired": "L'autenticazione sicura richiede HTTP/HTTPS.",
   "error.backend.authDigitsRange": "I codici di autenticazione richiedono da 4 a 12 cifre.",
   "error.backend.authExpired": "La richiesta di autenticazione è scaduta.",
   "error.backend.authDigitsRequired": "Inserisci il numero di cifre richiesto.",

@@ -166,6 +166,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "Copio OpenBot sulla macchina",
   "server.hosted.detail.create.key": "Aggiungo una chiave di accesso monouso",
   "server.hosted.detail.start.boot": "Accendo la macchina",
+  "server.hosted.detail.start.restore": "Ripristino dei dati",
   "server.hosted.detail.start.app": "Avvio OpenBot",
   "server.hosted.detail.start.wait": "Attendo la risposta di OpenBot",
   "server.hosted.detail.connect.signIn": "Accedo a tuo nome",

@@ -430,10 +430,11 @@ export const messages = {
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour un agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.agent.newChat.title": "Nouvelle discussion",
   "mobile.agent.newChat.starting": "Démarrage de la nouvelle discussion…",
-  "mobile.agent.newChat.footer": "L’agent oublie cette discussion. Sa configuration reste.",
+  "mobile.agent.newChat.footer":
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Sa configuration reste.",
   "mobile.agent.newChat.confirmTitle": "Commencer une nouvelle discussion avec {name} ?",
   "mobile.agent.newChat.confirmBody":
-    "L’agent oublie cette discussion. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
+    "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "mobile.agent.newChat.confirm": "Nouvelle discussion",
   "mobile.agent.newChat.failed": "Impossible de commencer une nouvelle discussion",
   "mobile.agent.newChat.failedBody": "L’hôte n’a pas pu commencer une nouvelle discussion.",

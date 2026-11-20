@@ -24,6 +24,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type AgentContextCategoryUsage, agentProviderName, defaultProviderModel } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -124,6 +125,7 @@ import {
   type AppServerRequest,
   CLAUDE_API_KEY_ACCOUNT_TYPE,
   CLAUDE_CLI_API_KEY_ACCOUNT_TYPE,
+  getArray,
   getString,
   isRecord,
   type RequestId,
@@ -147,6 +149,7 @@ import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-proces
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+const CLAUDE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
 const CLAUDE_NATIVE_SCHEDULING = [
   "CronCreate",
@@ -458,6 +461,7 @@ interface ClaudeStreamMessage {
   error_status?: unknown;
   no_response?: unknown;
   fast_mode_disabled_reason?: unknown;
+  mcp_servers?: unknown;
 }
 
 interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
@@ -465,6 +469,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   supportedModels(): Promise<ModelInfo[]>;
   getContextUsage?(options: { detail: "summary" }): Promise<unknown>;
   initializationResult?(): Promise<unknown>;
+  mcpServerStatus?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
@@ -548,6 +553,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
   readonly turnContext = true;
   readonly userInputNote = true;
+  readonly imageInput = (): boolean => true;
   #queryRestarts = 0;
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
@@ -696,6 +702,34 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return thread !== undefined && (thread.backgroundTasks > 0 || thread.awaitsResultTurn);
     });
   }
+
+  readonly #reportFailedMcpServers = Effect.fnUntraced(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    message: ClaudeStreamMessage,
+  ) {
+    const failed = failedClaudeMcpServers(message.mcp_servers);
+    if (failed.length === 0) return;
+    const query = runtime.query;
+    yield* Effect.forkIn(
+      providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
+        Effect.timeout("2 seconds"),
+        Effect.orElseSucceed(() => null),
+        Effect.flatMap((rows) =>
+          Effect.sync(() => {
+            for (const name of failed) {
+              const row = Array.isArray(rows) ? rows.find((item) => getString(item, "name") === name) : undefined;
+              this.emit("notification", {
+                method: "mcpServer/startupStatus/updated",
+                params: { name, status: "failed", error: getString(row, "error") ?? "" },
+              });
+            }
+          }),
+        ),
+      ),
+      this.#scope,
+    );
+  });
 
   #emitBackgroundWork(runtime: ThreadRuntime): void {
     this.emit("notification", {
@@ -917,27 +951,58 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#serverRequests.reject(id, error);
   }
 
-  #probeOptions(): Options {
-    return {
+  #configDirectory(): string {
+    return this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  }
+
+  readonly #probeOptionsEffect = Effect.fn("ClaudeAgentClient.probeOptions")(function* (this: ClaudeAgentClient) {
+    const userSetup = this.#userSetup();
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(
+          claudeSignInSettings(yield* readClaudeSettingsFile(join(this.#configDirectory(), "settings.json"))),
+          this.#agentEnvironment?.(),
+        );
+    const stateDirectory = this.#stateDirectory;
+    const settingsFile =
+      Object.keys(signInSettings).length > 0 && stateDirectory
+        ? yield* Effect.acquireRelease(
+            writeClaudeFlagSettings(stateDirectory, "probe", signInSettings).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => {
+                  queryLogger.warn("Claude checks its models and usage without the sign-in settings.", {
+                    error: error.cause,
+                  });
+                  return null;
+                }),
+              ),
+            ),
+            removeClaudeQueryFile,
+          )
+        : null;
+    const options: Options = {
       cwd: process.cwd(),
       ...this.#sdkLaunch,
-      settingSources: ["user", "project", "local"],
+      settingSources: userSetup ? ["user", "project", "local"] : [],
+      ...(settingsFile ? { settings: settingsFile } : {}),
       mcpServers: {},
       strictMcpConfig: true,
       persistSession: false,
       env: withClaudeClientLabels({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }),
     };
-  }
+    return options;
+  });
 
   readonly #listModelsEffect = Effect.fn("ClaudeAgentClient.listModels")(function* (
     this: ClaudeAgentClient,
-    timeoutMs?: number,
-  ): Effect.fn.Return<unknown[], ProviderClientOperationError> {
+    timeoutMs: number | undefined,
+  ): Effect.fn.Return<unknown[], ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options,
       }),
     );
     return yield* Effect.gen({ self: this }, function* () {
@@ -996,18 +1061,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readUsageEffect = Effect.fn("ClaudeAgentClient.readUsage")(function* (
     this: ClaudeAgentClient,
     model: string | null,
     timeoutMs: number,
-  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError> {
+  ): Effect.fn.Return<AccountRateLimitsReadResult, ProviderClientOperationError, Scope.Scope> {
+    const options = yield* this.#probeOptionsEffect();
     const input = new AsyncMessageQueue();
     const claudeQuery = yield* providerSync(() =>
       this.#createQuery({
         prompt: input,
-        options: this.#probeOptions(),
+        options,
       }),
     );
     return yield* Effect.gen({ self: this }, function* () {
@@ -1032,7 +1098,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }),
       ),
     );
-  });
+  }, Effect.scoped);
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
@@ -1226,8 +1292,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const userSetup = !config.profileGeneration && this.#userSetup();
     const skillPlugin =
       config.workspaceOnly && stateDirectory ? yield* claudeWorkspaceSkillPlugin(stateDirectory, config.cwd) : null;
-    const configDirectory =
-      this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+    const configDirectory = this.#configDirectory();
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
       usable?.flatMap((server) => (server.url ? [server.config.name] : [])) ?? [],
@@ -1474,6 +1539,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const requestedTurnId = getString(params, "clientTurnId") ?? clientId;
     const turnId = promptUuid(runtime, requestedTurnId);
     const text = readInputText(params);
+    const images = runtime.config.profileGeneration ? yield* readInputImages(params) : [];
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     const turn = this.#beginTurn(runtime, turnId, false);
     const context = this.#turnContext.take(threadId, text.startsWith("/"));
@@ -1483,8 +1549,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       message: {
         role: "user",
         content:
-          context.length > 0
-            ? [...context.map((block) => ({ type: "text" as const, text: block })), { type: "text", text }]
+          context.length > 0 || images.length > 0
+            ? [...context.map((block) => ({ type: "text" as const, text: block })), { type: "text", text }, ...images]
             : text,
       },
       parent_tool_use_id: null,
@@ -1724,6 +1790,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (runtime.resumedUsage && id && model && isRecord(message.message))
         runtime.requestUsage.set(id, { model, usage: message.message.usage });
     }
+    if (message.type === "system" && message.subtype === "init") yield* this.#reportFailedMcpServers(runtime, message);
     if (message.type === "system" && message.subtype === "status") {
       const status =
         message.status === "compacting"
@@ -1775,7 +1842,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.backgroundTasks = Array.isArray(message.tasks)
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
-      if (before > 0 !== runtime.backgroundTasks > 0) this.#emitBackgroundWork(runtime);
+      if (before > 0 !== runtime.backgroundTasks > 0 || runtime.backgroundTasks > before)
+        this.#emitBackgroundWork(runtime);
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
         else if (before > 0 && runtime.backgroundTasks === 0) {
@@ -3087,6 +3155,24 @@ function readInputText(params: unknown): string {
     .join("\n");
 }
 
+const readInputImages = Effect.fnUntraced(function* (params: unknown) {
+  const paths = getArray(params, "input").flatMap((item) =>
+    isRecord(item) && item.type === "localImage" && isString(item.path) ? [item.path] : [],
+  );
+  return yield* Effect.forEach(paths, (path) =>
+    Effect.gen(function* () {
+      const mediaType = attachmentMimeTypeForName(path);
+      if (!isOneOf(CLAUDE_IMAGE_TYPES, mediaType))
+        return yield* providerFailure(new Error(sourceText("error.workflow.modelImageType")));
+      const data = yield* providerCall(() => readFile(path));
+      return {
+        type: "image",
+        source: { type: "base64", media_type: mediaType, data: data.toString("base64") },
+      } as const;
+    }),
+  );
+});
+
 function messageText(message: unknown): string {
   if (!isRecord(message)) return "";
   if (isString(message.content)) return message.content;
@@ -3199,6 +3285,14 @@ function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet
     message.is_error !== true &&
     !message.result
   );
+}
+
+function failedClaudeMcpServers(servers: unknown): string[] {
+  if (!Array.isArray(servers)) return [];
+  return servers.flatMap((server) => {
+    const name = getString(server, "name");
+    return name && getString(server, "status") === "failed" ? [name] : [];
+  });
 }
 
 function isUuid(value: string): value is UUID {

@@ -69,6 +69,7 @@ export const messages = {
   "status.agent.browserActing": "משתמש בדף האינטרנט…",
   "status.agent.browserReviewing": "בודק את דף האינטרנט…",
   "status.agent.memoriesSearching": "מחפש בזיכרונות שלו…",
+  "status.agent.chatsSearching": "מחפש בצ'אטים הקודמים שלו…",
   "status.agent.memoriesSearched": {
     one: "חיפש בזיכרונות שלו: נמצא אחד",
     two: "חיפש בזיכרונות שלו: נמצאו שניים",

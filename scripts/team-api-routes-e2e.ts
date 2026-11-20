@@ -412,6 +412,7 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbo
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "@openbot/contracts/team-protocol/vault-member-save-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
@@ -1951,7 +1952,7 @@ const fakeCipher = {
 const createBitwardenHost = () =>
   new BitwardenConnectorService({
     runCli: fakeBitwardenCli,
-    findCli: async () => "/fixture/bw",
+    findCli: () => Effect.succeed({ executable: "/fixture/bw" }),
     host: {
       store: new BitwardenConnectorStore(bitwardenFile, fakeCipher),
       dataDirectory: bitwardenData,
@@ -3560,6 +3561,7 @@ try {
       ["error.agent.deletionBusy", 409],
       ["error.agent.deleteWhenFolderFree", 409],
       ["error.agent.deleteIncomplete", 500],
+      ["error.agent.deleteFolderLocked", 500],
     ] as const) {
       deleteFailure = sourceText(key);
       const loggedBefore = logged.length;
@@ -6030,6 +6032,12 @@ try {
       "the host advertises routine-quiet-answers-v1 to a protocol 10 peer only",
       decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(ROUTINE_QUIET_ANSWERS_CAPABILITY) &&
         !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    check(
+      "the host advertises vault-member-save-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VAULT_MEMBER_SAVE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(VAULT_MEMBER_SAVE_CAPABILITY),
       [summary(compatibility), summary(older)],
     );
     const ids = (response: Awaited<ReturnType<typeof call>>) =>
@@ -10693,18 +10701,27 @@ try {
       json: answer,
       capabilities: [BROWSER_SECRET_VAULT_CAPABILITY],
     });
+    check(
+      "a save without either capability gets 400 and does not reach the agent",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(noHandoff, 400, sourceText("error.team.secureAuthUnsupported")) &&
+        callsOf("respondToBrowserSecret").length === before,
+      [summary(unsupported), summary(noHandoff)],
+    );
     const member = await call("POST", BROWSER_SECRET_VAULT_ROUTES.respond, {
       token: bobToken,
       json: answer,
       capabilities,
     });
     check(
-      "a save without either capability gets 400, and a member gets 403; none reaches the agent",
-      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
-        errorIs(noHandoff, 400, sourceText("error.team.secureAuthUnsupported")) &&
-        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
-        callsOf("respondToBrowserSecret").length === before,
-      [summary(unsupported), summary(noHandoff), summary(member)],
+      "a member submits the password with a save; the answer does not carry it",
+      member.status === 200 &&
+        !member.text.includes(VAULT_PASSWORD) &&
+        callsOf("respondToBrowserSecret").length === before + 1 &&
+        isDeepStrictEqual(callsOf("respondToBrowserSecret").at(-1), [
+          { requestId: "auth-1", agentId: "agent-ada", decision: "submit", secret: VAULT_PASSWORD, saveToVault: true },
+        ]),
+      summary(member),
     );
     const saved = await call("POST", BROWSER_SECRET_VAULT_ROUTES.respond, {
       token: adaToken,
@@ -10716,6 +10733,7 @@ try {
       saved.status === 200 &&
         isDeepStrictEqual(saved.body, {}) &&
         !saved.text.includes(VAULT_PASSWORD) &&
+        callsOf("respondToBrowserSecret").length === before + 2 &&
         isDeepStrictEqual(callsOf("respondToBrowserSecret").at(-1), [
           { requestId: "auth-1", agentId: "agent-ada", decision: "submit", secret: VAULT_PASSWORD, saveToVault: true },
         ]),
@@ -10730,7 +10748,8 @@ try {
     const csv = [
       "url,username,password",
       `https://mail.example.com,ada,${csvPassword}`,
-      `http://old.example.com,ada,${csvPassword}`,
+      `http://router.example.com,ada,${csvPassword}`,
+      `ftp://old.example.com,ada,${csvPassword}`,
     ].join("\n");
     const unsupported = await importCall(adaToken, { csv }, [VAULT_CAPABILITY]);
     const member = await importCall(bobToken, { csv });
@@ -10745,12 +10764,11 @@ try {
     const imported = await importCall(adaToken, { csv });
     const logins = vault.state().items.filter((item) => item.kind === "login");
     check(
-      "an admin imports a CSV export: the HTTPS login is added, the other row skipped, and only the counts answer",
+      "an admin imports a CSV export: the HTTPS and HTTP logins are added, the FTP row skipped, and only the counts answer",
       imported.status === 200 &&
-        isDeepStrictEqual(imported.body, { imported: 1, skipped: 1 }) &&
-        logins.length === 1 &&
-        logins[0] !== undefined &&
-        vault.reveal({ id: logins[0].id, field: "password" }) === csvPassword &&
+        isDeepStrictEqual(imported.body, { imported: 2, skipped: 1 }) &&
+        logins.length === 2 &&
+        logins.every((login) => vault.reveal({ id: login.id, field: "password" }) === csvPassword) &&
         !imported.text.includes(csvPassword) &&
         !logged.slice(loggedBefore).some((line) => line.includes(csvPassword)),
       summary(imported),

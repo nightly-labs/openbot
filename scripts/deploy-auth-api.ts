@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   if (cloudflareEnvironment === "test") await putOptionalSecret("HOSTED_SERVER_TEMPLATE");
   await putOptionalSecret("GITHUB_APP_PRIVATE_KEY");
   await putOptionalSecret("COMPANY_SIGN_IN_SECRET");
+  await putOptionalSecretSet("HOSTED_ARCHIVE_KEY_SECRET", "B2_WORKER_KEY_ID_EU", "B2_WORKER_APPLICATION_KEY_EU");
   await putOptionalSecret("SERVER_CLAIMS_ADMIN_TOKEN");
   if (!cloudflareEnvironment) await putOptionalSecret("HOSTED_POOL_ALERT_WEBHOOK_URL");
   await putOptionalSecretSet("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_STATE_SECRET");

@@ -72,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Web ページを操作しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
+  "status.agent.chatsSearching": "過去のチャットを検索しています…",
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",

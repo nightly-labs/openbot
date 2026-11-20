@@ -108,6 +108,7 @@ function messageEvent(
     state.rememberMessage({
       id: String(reply.message_id),
       threadKey,
+      authorId: replyAuthor,
       authorName: state.name(replyAuthor) ?? replyAuthor,
       text: (isString(reply.text) ? reply.text : isString(reply.caption) ? reply.caption : "") || fileNames(replyFiles),
       sentAt: sentAt(reply.date),
@@ -119,6 +120,7 @@ function messageEvent(
   state.rememberMessage({
     id: String(messageId),
     threadKey,
+    authorId,
     authorName: state.name(authorId) ?? authorId,
     text: text || fileNames(files),
     sentAt: sentAt(message.date),

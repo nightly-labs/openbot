@@ -11,6 +11,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -18,6 +22,10 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
@@ -44,6 +52,7 @@ import {
   decodeRemoteWorkflowSaveResult,
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
+  decodeRemoteWorkflowStepSettings,
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
@@ -90,7 +99,9 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
+      | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -198,6 +209,14 @@ export function workflowIpcHandlers({
         local: (id) => runCauseEffect(workflows.run(id)),
         remote: (runId, serverId) => remote(serverId, WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
       }),
+      stepSettings: scopedHandler(parseWorkflowStepId, {
+        local: (stepId) => runCauseEffect(workflows.stepSettings(stepId)),
+        remote: (stepId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
+        },
+      }),
       rotateWebhookSecret: scopedHandler(parseWorkflowTrigger, {
         local: (input) => runCauseEffect(events.rotateWorkflowSecret(input)),
         remote: (input, serverId) =>
@@ -280,16 +299,20 @@ export function workflowIpcHandlers({
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
         remote: (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-            : Promise.resolve({ models: [] }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+              : Promise.resolve({ models: [] }),
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
         local: (input) => runCauseEffect(workflows.mediaPrice(input)),
         remote: (input, serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-            : Promise.resolve({ credits: null }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+              : Promise.resolve({ credits: null }),
       }),
     },
   };

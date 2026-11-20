@@ -53,6 +53,7 @@ export function serverSupportsCapability(
       capability === "vault-v2" ||
       capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
+      capability === "vault-member-save-v1" ||
       capability === "provider-host-sign-in-v1" ||
       capability === "storage-v1" ||
       capability === "storage-disk-v1" ||
@@ -148,6 +149,7 @@ export function serverSupportsCapability(
       capability === "workflows-chats-v1" ||
       capability === "workflows-channels-v1" ||
       capability === "workflows-media-v1" ||
+      capability === "workflows-agent-files-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||

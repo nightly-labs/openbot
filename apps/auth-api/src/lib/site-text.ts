@@ -1,9 +1,11 @@
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppTranslate, LayoutDirection } from "@openbot/i18n";
 import { appLanguageOption } from "@openbot/i18n/languages";
 import type { SiteLocale } from "./site-paths";
 import { slot } from "./text-slots";
 
 export function siteText(t: AppTranslate) {
+  const currentLanguage = (locale: SiteLocale) =>
+    t("sitePage.site.language.current", { language: appLanguageOption(locale).label });
   const love = slot("love");
   const [madeBefore = "", madeAfter = ""] = t("sitePage.site.footer.made", { love }).split(love);
   const download = t("sitePage.site.download");
@@ -51,9 +53,21 @@ export function siteText(t: AppTranslate) {
     language: {
       label: t("sitePage.site.language"),
       current: {
-        en: t("sitePage.site.language.current", { language: appLanguageOption("en").label }),
-        pl: t("sitePage.site.language.current", { language: appLanguageOption("pl").label }),
-        pt: t("sitePage.site.language.current", { language: appLanguageOption("pt").label }),
+        en: currentLanguage("en"),
+        ar: currentLanguage("ar"),
+        de: currentLanguage("de"),
+        es: currentLanguage("es"),
+        fr: currentLanguage("fr"),
+        he: currentLanguage("he"),
+        it: currentLanguage("it"),
+        ja: currentLanguage("ja"),
+        ko: currentLanguage("ko"),
+        nl: currentLanguage("nl"),
+        pl: currentLanguage("pl"),
+        pt: currentLanguage("pt"),
+        ru: currentLanguage("ru"),
+        tr: currentLanguage("tr"),
+        zh: currentLanguage("zh"),
       } satisfies Record<SiteLocale, string>,
     },
     latest: t("sitePage.site.latest"),
@@ -134,6 +148,7 @@ export type FooterTextId = keyof SiteText["footer"]["links"];
 
 export interface SiteChrome {
   lang: string;
+  dir: LayoutDirection;
   locale: SiteLocale;
   text: SiteText;
 }

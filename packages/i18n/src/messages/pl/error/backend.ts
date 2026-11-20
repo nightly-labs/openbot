@@ -296,6 +296,12 @@ export const messages = {
     "{provider} nie może uruchomić serwera MCP {name}. Jego narzędzia nie są dostępne dla {provider}. {provider} uruchamia serwer samodzielnie, więc test połączenia w OpenBot może się udać. Rozpocznij nowy czat, aby spróbować ponownie.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer nie odpowiedział na czas. Rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer jest teraz niedostępny. Poczekaj kilka minut, a potem rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} nie może połączyć się z serwerem MCP {name}. Otwórz {name} w Marketplace, Aplikacje, i sprawdź, czy adres jest poprawny i czy serwer działa. Potem rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} nie może pobrać narzędzi GitHub, ponieważ GitHub nie odpowiedział. Otwórz GitHub w Marketplace, Aplikacje, i połącz go ponownie, jeśli o to poprosi. Potem rozpocznij nowy czat, aby spróbować ponownie.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -366,7 +372,6 @@ export const messages = {
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
-  "error.backend.apiKeyNotAllowed": "Klucz API może wpisać tylko właściciel serwera lub administrator.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot nie mógł odczytać klucza API. Wpisz klucz o długości do 8000 znaków i wybierz, kto może go używać.",
@@ -411,7 +416,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Nie udało się wczytać wyskakującego okna. Ponów logowanie na pierwotnej stronie.",
   "error.backend.browserTabNotFound": "Nie znaleziono karty przeglądarki.",
   "error.backend.authActive": "Uwierzytelnianie jest już aktywne.",
-  "error.backend.authHttpsRequired": "Bezpieczne uwierzytelnianie wymaga HTTPS.",
+  "error.backend.authWebPageRequired": "Bezpieczne uwierzytelnianie wymaga HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Kody uwierzytelniające muszą mieć od 4 do 12 cyfr.",
   "error.backend.authExpired": "Żądanie uwierzytelnienia wygasło.",
   "error.backend.authDigitsRequired": "Wpisz wymaganą liczbę cyfr.",

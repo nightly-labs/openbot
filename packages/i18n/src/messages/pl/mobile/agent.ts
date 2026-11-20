@@ -446,10 +446,11 @@ export const messages = {
     "Ten serwer nie może zapisać twojego poziomu powiadomień dla agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "mobile.agent.newChat.title": "Nowy czat",
   "mobile.agent.newChat.starting": "Rozpoczynanie nowego czatu…",
-  "mobile.agent.newChat.footer": "Agent zapomni ten czat. Jego konfiguracja zostanie.",
+  "mobile.agent.newChat.footer":
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Jego konfiguracja zostanie.",
   "mobile.agent.newChat.confirmTitle": "Rozpocząć nowy czat z agentem {name}?",
   "mobile.agent.newChat.confirmBody":
-    "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "mobile.agent.newChat.confirm": "Rozpocznij nowy czat",
   "mobile.agent.newChat.failed": "Nie udało się rozpocząć nowego czatu",
   "mobile.agent.newChat.failedBody": "Host nie mógł rozpocząć nowego czatu.",

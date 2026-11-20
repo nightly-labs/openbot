@@ -154,6 +154,7 @@ const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
 const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
+const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
 
 function signInFileVersion(paths: readonly string[]): string {
   return paths
@@ -280,6 +281,7 @@ export interface ProviderHooks {
   sharedRoot(): string;
   onProviderResumed(provider: AgentProvider): void;
   onProviderHeld?(provider: AgentProvider): void;
+  releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
@@ -374,6 +376,7 @@ export class ProviderRuntime implements ProviderPort {
   #preferredProvider: AgentProvider;
   #preferredModel: AgentModelId | null;
   readonly #restartAttempts = new Map<AgentProvider, number>();
+  readonly #signInRechecks = new Map<AgentProvider, { attempts: number; timer: NodeJS.Timeout | null }>();
   readonly #startFailures = new Map<AgentProvider, number>();
   readonly #startWaitsForUser = new Set<AgentProvider>();
   readonly #slowStarts = new Map<AgentProvider, number>();
@@ -2209,6 +2212,7 @@ export class ProviderRuntime implements ProviderPort {
         recordRestartActivity();
         onWait();
       }
+      this.#hooks.releasePersonWaits?.(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
   });
@@ -2608,6 +2612,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#cliLogin.has(provider) ||
       (provider === "codex" && this.#codexLogin.pending);
     if (waiting) {
+      if (this.#hooks.isProviderBusy(provider)) this.#hooks.releasePersonWaits?.(provider);
       const timer = setTimeout(
         () => Effect.runFork(this.#checkRestartWhenIdle(provider).pipe(Effect.forkIn(this.#scope))),
         PROVIDER_RESTART_POLL_MS,
@@ -2719,6 +2724,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#disposals += 1;
     for (const timer of this.#restartTimers.values()) clearTimeout(timer);
     this.#restartTimers.clear();
+    for (const provider of [...this.#signInRechecks.keys()]) this.#endSignInRecheck(provider);
     for (const timer of this.#restartsWhenIdle.values()) if (timer) clearTimeout(timer);
     this.#restartsWhenIdle.clear();
     if (this.#idleCheck) clearInterval(this.#idleCheck);
@@ -3457,6 +3463,7 @@ export class ProviderRuntime implements ProviderPort {
                 email: null,
               }),
             });
+            if (!disposed()) this.#recheckSignIn(provider, this.#released.has(provider));
             return message;
           }
           const authenticated = account.account;
@@ -3597,6 +3604,7 @@ export class ProviderRuntime implements ProviderPort {
     const primaryAccount = this.#accounts.get(primaryProvider);
     for (const provider of activated) {
       this.#restartAttempts.delete(provider);
+      this.#endSignInRecheck(provider);
       if (options.notifyReady !== false) this.#exitRecovery.delete(provider);
     }
     this.#setStatus({
@@ -3772,10 +3780,19 @@ export class ProviderRuntime implements ProviderPort {
     const rows = this.#credentials.mcpServers();
     const config =
       rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
-      rows.find((row) => key === providerMcpServerName(row.name));
+      rows.find((row) => key === providerMcpServerName(row.name)) ??
+      rows.find((row) => key === row.name);
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
-    stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+    stderrLogger.warn("A provider reported an MCP server failure.", {
+      provider: client.provider,
+      server: server ?? config?.id ?? null,
+      message,
+    });
+    const githubKey =
+      client.provider === "codex" ? `openbot_${providerMcpServerName(config?.name ?? "")}` : config?.name;
+    if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID && key === githubKey)
+      this.#reportGitHubToolsFailure(client.provider);
     if (!server) return;
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
@@ -3936,6 +3953,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #resetRestarts(provider: AgentProvider): void {
     this.#restartAttempts.delete(provider);
+    this.#endSignInRecheck(provider);
     clearTimeout(this.#restartTimers.get(provider));
     this.#restartTimers.delete(provider);
   }
@@ -3964,6 +3982,55 @@ export class ProviderRuntime implements ProviderPort {
       this.#scheduleStartRetry(provider, schedule) ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh",
       { provider: providerLabel(provider) },
     );
+  }
+
+  signInRecheckPending(provider: AgentProvider): boolean {
+    return this.#signInRechecks.has(provider);
+  }
+
+  #recheckSignIn(provider: AgentProvider, woke: boolean): void {
+    const current = this.#signInRechecks.get(provider);
+    if ((!current && !woke) || current?.timer) return;
+    const attempts = current?.attempts ?? 0;
+    const delayMs = SIGN_IN_RECHECK_DELAYS_MS[attempts];
+    if (delayMs === undefined) {
+      this.#signInRechecks.delete(provider);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const recheck = this.#signInRechecks.get(provider);
+      if (recheck?.timer !== timer) return;
+      recheck.timer = null;
+      if (
+        this.#hooks.isStopping() ||
+        this.#clients.has(provider) ||
+        this.#cliLogin.has(provider) ||
+        this.#providerConnectionCommands.has(provider) ||
+        (provider === "codex" && this.#codexLogin.pending)
+      ) {
+        this.#signInRechecks.delete(provider);
+        return;
+      }
+      Effect.runFork(
+        this.#startProvider(provider, { preserveCheckErrors: true }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (this.#signInRechecks.get(provider)?.timer === null) this.#signInRechecks.delete(provider);
+            }),
+          ),
+          Effect.ignore,
+          Effect.forkIn(this.#scope),
+        ),
+      );
+    }, delayMs);
+    timer.unref?.();
+    this.#signInRechecks.set(provider, { attempts: attempts + 1, timer });
+  }
+
+  #endSignInRecheck(provider: AgentProvider): void {
+    const recheck = this.#signInRechecks.get(provider);
+    if (recheck?.timer) clearTimeout(recheck.timer);
+    this.#signInRechecks.delete(provider);
   }
 
   #scheduleStartRetry(provider: AgentProvider, schedule: boolean): boolean {
@@ -4121,6 +4188,16 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError(
       "mcp_server_not_started",
       sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
+    );
+  }
+
+  #reportGitHubToolsFailure(provider: AgentProvider): void {
+    const key = [provider, GITHUB_CONNECTOR_MCP_SERVER_ID].join("\u0000");
+    if (this.#reportedMcpFailures.has(key)) return;
+    this.#reportedMcpFailures.add(key);
+    this.#emitError(
+      "mcp_server_not_started",
+      sourceText("error.backend.githubToolsNotStarted", { provider: providerLabel(provider) }),
     );
   }
 

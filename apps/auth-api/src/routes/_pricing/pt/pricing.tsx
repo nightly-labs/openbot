@@ -3,7 +3,7 @@ import { pricingPageText } from "../../../components/pricing/pricing-page-text";
 import { PRICING_ROUTE, PRICING_SOCIAL_IMAGE_PATH } from "../../../lib/pricing-page";
 import { loadSitePage } from "../../../lib/site-locale";
 import { sitePageHead } from "../../../lib/site-page-head";
-import { LOCALIZED_PAGE_PATHS } from "../../../lib/site-paths";
+import { localizedPagePath } from "../../../lib/site-paths";
 
 export const Route = createFileRoute("/_pricing/pt/pricing")({
   loader: async () => {
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_pricing/pt/pricing")({
     return { ...page, textCatalog: page.locale };
   },
   head: ({ match, loaderData }) => {
-    const path = LOCALIZED_PAGE_PATHS.pt[PRICING_ROUTE];
+    const path = localizedPagePath("pt", PRICING_ROUTE);
     if (!loaderData) return { links: [{ rel: "canonical", href: new URL(path, match.context.siteUrl).toString() }] };
     return sitePageHead(match.context.siteUrl, {
       page: PRICING_ROUTE,

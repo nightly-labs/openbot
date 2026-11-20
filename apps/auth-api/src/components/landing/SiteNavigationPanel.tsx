@@ -88,7 +88,9 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
             </Show>
             <span class="site-panel-feature-badge">{chrome().text.latest}</span>
             <span class="site-panel-feature-copy">
-              <span class="site-panel-feature-title">{article().title}</span>
+              <span class="site-panel-feature-title" dir="auto">
+                {article().title}
+              </span>
               <span class="site-panel-meta">{formatArticleDate(article().publishedAt)}</span>
             </span>
           </Link>
@@ -106,7 +108,9 @@ function ArticlePanelBody(props: { section: ArticleNavigationSection; live: bool
               >
                 <span class="site-panel-row-art" aria-hidden="true" />
                 <span class="site-panel-row-copy">
-                  <span class="site-panel-row-title">{article.title}</span>
+                  <span class="site-panel-row-title" dir="auto">
+                    {article.title}
+                  </span>
                   <span class="site-panel-meta">{formatArticleDate(article.publishedAt)}</span>
                 </span>
               </Link>
@@ -145,7 +149,9 @@ function PluginPanelBody(props: { section: PluginNavigationSection }) {
                 </Show>
               </span>
               <span class="site-panel-row-copy">
-                <span class="site-panel-row-title">{plugin.name}</span>
+                <span class="site-panel-row-title" dir="auto">
+                  {plugin.name}
+                </span>
                 <span class="site-panel-meta">{plugin.tagline}</span>
               </span>
             </Link>

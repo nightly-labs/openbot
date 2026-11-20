@@ -176,11 +176,12 @@ export const messages = {
     "Questa scelta vale solo per te, su tutti i tuoi dispositivi. Se il server è silenziato o impostato su «Niente», anche questo agente resta in silenzio.",
 
   "agentSettings.newChat.title": "Nuova chat",
-  "agentSettings.newChat.description": "L'agente dimentica questa chat. La sua configurazione resta.",
+  "agentSettings.newChat.description":
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. La sua configurazione resta.",
   "agentSettings.newChat.button": "Inizia",
   "agentSettings.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
   "agentSettings.deleteHistory.title": "Elimina cronologia",

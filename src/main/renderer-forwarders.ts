@@ -2,6 +2,7 @@ import { hostname } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   type AgentEvent,
+  type AgentRuntimeSnapshot,
   agentNotificationLevelMap,
   type BrowserDisplayState,
   type ChannelSummary,
@@ -37,6 +38,7 @@ import {
   notificationForAgentEvent,
   notificationForUsageLimit,
   notificationRequestKey,
+  settledRequestKeys,
   teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
@@ -317,13 +319,22 @@ export function createRendererForwarders({
 
   const requestNotifications = new Map<string, Notification | null>();
 
-  function withdrawResolvedNotification(serverId: string, event: AgentEvent): void {
-    if (event.type !== "agent-input-resolved" && event.type !== "browser-takeover-resolved") return;
-    const key = notificationRequestKey(serverId, event);
-    if (!key || !requestNotifications.has(key)) return;
+  function withdrawRequestNotification(key: string): void {
+    if (!requestNotifications.has(key)) return;
     const notification = requestNotifications.get(key);
     requestNotifications.delete(key);
     if (notification) closeRetainedNotification(notification);
+  }
+
+  function withdrawResolvedNotification(serverId: string, event: AgentEvent): void {
+    if (event.type !== "agent-input-resolved" && event.type !== "browser-takeover-resolved") return;
+    const key = notificationRequestKey(serverId, event);
+    if (key) withdrawRequestNotification(key);
+  }
+
+  function withdrawSettledNotifications(serverId: string, snapshot: AgentRuntimeSnapshot): void {
+    for (const key of settledRequestKeys(serverId, snapshot, requestNotifications.keys()))
+      withdrawRequestNotification(key);
   }
 
   async function notifyAgentEvent(serverId: string, received: AgentEvent): Promise<void> {
@@ -656,6 +667,7 @@ export function createRendererForwarders({
   return {
     closeChatNotifications,
     forwardAgentEvent,
+    withdrawSettledNotifications,
     forwardWorkflowNotice,
     forwardMachineAlert,
     forwardBrowserDisplayState,

@@ -1,3 +1,0 @@
-### Fixed
-
-- Server settings > Transfer: an import or a copy into a joined server no longer stops with "The transfer with the server stopped" when it was started two times. When you left the Transfer screen during a long upload and came back, the screen showed "Choose file…" again, and a second choice of the same file started a second upload that stopped the first. The screen now shows the upload that is still in progress, the same file joins the upload that runs, and the same copy joins the copy that runs. A server on this version also completes two uploads of the same file with the same preview.

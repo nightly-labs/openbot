@@ -16,7 +16,12 @@ import type {
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
+import {
+  AGENT_RUNTIME_ATTENTION_LIMIT,
+  AGENT_WELCOME_ITEM_TYPE,
+  BROWSER_TAKEOVER_REASONS,
+  cardBrand,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import {
@@ -46,7 +51,7 @@ import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from
 import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
-import type { AgentClient } from "../agent-client";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
@@ -54,7 +59,13 @@ import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import { type PasswordVault, type PasswordVaultError, type VaultLogin, websiteUrl } from "../password-vault";
+import {
+  isWebProtocol,
+  type PasswordVault,
+  type PasswordVaultError,
+  type VaultLogin,
+  websiteUrl,
+} from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -131,7 +142,7 @@ interface PendingPrompt {
   uiBlock?: SurfacedUiBlock;
   saving?: boolean;
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
-  detach?: { target: LateAnswerTarget; timer: ReturnType<typeof setTimeout> };
+  detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
   detached?: LateAnswerTarget;
   subagent?: true;
 }
@@ -259,7 +270,8 @@ function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentS
     }
     if (!args.website?.trim() || !args.password?.trim()) return VAULT_LOGIN_ADD_FIELDS;
     const url = websiteUrl(args.website);
-    if (url?.protocol !== "https:" || !url.hostname) return "website must be an HTTPS website, such as example.com.";
+    if (!url || !isWebProtocol(url) || !url.hostname)
+      return "website must be an HTTP or HTTPS website, such as example.com or http://192.168.1.1.";
     return {
       kind: "newLogin",
       login: { origin: url.origin, username: args.username ?? "", password: args.password },
@@ -728,7 +740,9 @@ export class AttentionRegistry {
             preview,
           );
         } else {
-          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, answers));
+          const resolution = promptResolution(pending.questions, answers);
+          this.#resolvePersistedPrompt(pending, resolution);
+          this.#showWelcomeAnswer(pending, resolution, responder);
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
@@ -759,8 +773,6 @@ export class AttentionRegistry {
       const value = typeof answered === "string" ? answered.trim() : "";
       const typed = value !== "" || input.answers[API_KEY_FIELD_ID]?.some((answer) => answer.trim() !== "");
       if (!typed) return null;
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
       if (value === "") throw new Error(sourceText("error.backend.apiKeyAnswerUnreadable"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
       const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;
@@ -817,8 +829,6 @@ export class AttentionRegistry {
       const response = uiBlockAnswer(pending.uiBlock.spec, input.answers, responder);
       const item = response?.values ? enteredVaultItem(vault.kind, response.values) : null;
       if (!item) return null;
-      if (responder && !responder.privileged)
-        throw new ForbiddenAttentionAnswer(sourceText("error.backend.vaultItemNotAllowed"));
       if (!this.#vaultItems) throw new Error(sourceText("error.vault.unavailable"));
       pending.saving = true;
       return { pending, vaultItems: this.#vaultItems, item };
@@ -1233,7 +1243,7 @@ export class AttentionRegistry {
             return;
           }
           pending.secret = secret;
-          pending.request.secret = secret.request;
+          if (websiteUrl(secret.request.origin)?.protocol !== "http:") pending.request.secret = secret.request;
         } else yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed);
       });
       const prepared = yield* Effect.result(prepare);
@@ -1250,6 +1260,13 @@ export class AttentionRegistry {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} Correct the call, or use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.secret && websiteUrl(pending.secret.request.origin)?.protocol === "http:") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
@@ -2052,19 +2069,25 @@ export class AttentionRegistry {
   }
 
   #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
-    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    if (deadlines.length === 0) return;
     const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
-    if (target)
-      pending.detach = {
-        target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)),
-      };
+    if (!target) return;
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    pending.detach =
+      deadlines.length === 0
+        ? { target }
+        : { target, timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)) };
+  }
+
+  detachPromptsOf(provider: AgentProvider): void {
+    for (const [requestId, pending] of this.#prompts)
+      if (pending.client.provider === provider && pending.detach && !pending.saving)
+        this.#detachPrompt(requestId, pending);
   }
 
   #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
     const target = pending.detach?.target;
     if (this.#prompts.get(requestId) !== pending || !target) return;
+    clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
     this.#routines.markRunningForTurn(pending.turnId);
@@ -2417,6 +2440,41 @@ export class AttentionRegistry {
       status: resolution.status,
     });
   }
+
+  #showWelcomeAnswer(
+    pending: PendingPrompt,
+    resolution: AgentPromptResolution,
+    responder: PromptResponder | undefined,
+  ): void {
+    if (pending.detached || pending.subagent || pending.responseKind === "mcp-elicitation" || responder?.automatic)
+      return;
+    const text = welcomeAnswerText(pending.questions, resolution);
+    if (!text) return;
+    const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
+    const inTurn = snapshot.messages.filter((message) => message.turnId === pending.turnId);
+    const welcomeTurn = inTurn.some((message) => message.itemType === AGENT_WELCOME_ITEM_TYPE);
+    const firstQuestion = inTurn.find((message) => message.questionPrompt)?.id === pending.messageId;
+    const id = `welcome-answer:${pending.turnId}:${String(pending.id)}`;
+    if (!welcomeTurn || !firstQuestion || inTurn.some((message) => message.id === id)) return;
+    snapshot.messages.push({
+      id,
+      turnId: pending.turnId,
+      author: "user",
+      source: "user",
+      ...(responder?.sender ? { senderMember: structuredClone(responder.sender) } : {}),
+      text,
+      createdAt: new Date().toISOString(),
+      status: "completed",
+    });
+    this.#conversation.emitConversation(snapshot);
+  }
+}
+
+function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
+  const [question] = questions;
+  if (questions.length !== 1 || !question || question.isSecret || resolution.status !== "answered") return "";
+  const response = resolution.responses[question.id];
+  return response?.status === "answered" && response.answers ? response.answers.join(", ").trim() : "";
 }
 
 function uiBlockAnswer(

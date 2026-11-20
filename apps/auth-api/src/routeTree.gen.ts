@@ -32,8 +32,20 @@ import { Route as DotwellKnownAppleAppSiteAssociationRouteImport } from './route
 import { Route as DotwellKnownJwksDotjsonRouteImport } from './routes/[.]well-known/jwks[.]json'
 import { Route as ContactContactRouteImport } from './routes/_contact/contact'
 import { Route as HomeIndexRouteImport } from './routes/_home/index'
+import { Route as HomeArRouteImport } from './routes/_home/ar'
+import { Route as HomeDeRouteImport } from './routes/_home/de'
+import { Route as HomeEsRouteImport } from './routes/_home/es'
+import { Route as HomeFrRouteImport } from './routes/_home/fr'
+import { Route as HomeHeRouteImport } from './routes/_home/he'
+import { Route as HomeItRouteImport } from './routes/_home/it'
+import { Route as HomeJaRouteImport } from './routes/_home/ja'
+import { Route as HomeKoRouteImport } from './routes/_home/ko'
+import { Route as HomeNlRouteImport } from './routes/_home/nl'
 import { Route as HomePlRouteImport } from './routes/_home/pl'
 import { Route as HomePtRouteImport } from './routes/_home/pt'
+import { Route as HomeRuRouteImport } from './routes/_home/ru'
+import { Route as HomeTrRouteImport } from './routes/_home/tr'
+import { Route as HomeZhRouteImport } from './routes/_home/zh'
 import { Route as PricingPricingRouteImport } from './routes/_pricing/pricing'
 import { Route as TeamsTeamsRouteImport } from './routes/_teams/teams'
 import { Route as AgentsTemplateIdRouteImport } from './routes/agents/$templateId'
@@ -69,12 +81,48 @@ import { Route as SlackConnectRouteImport } from './routes/slack/connect'
 import { Route as V1ContactRouteImport } from './routes/v1/contact'
 import { Route as V1FeedbackRouteImport } from './routes/v1/feedback'
 import { Route as V1MeRouteImport } from './routes/v1/me'
+import { Route as ContactArContactRouteImport } from './routes/_contact/ar/contact'
+import { Route as ContactDeContactRouteImport } from './routes/_contact/de/contact'
+import { Route as ContactEsContactRouteImport } from './routes/_contact/es/contact'
+import { Route as ContactFrContactRouteImport } from './routes/_contact/fr/contact'
+import { Route as ContactHeContactRouteImport } from './routes/_contact/he/contact'
+import { Route as ContactItContactRouteImport } from './routes/_contact/it/contact'
+import { Route as ContactJaContactRouteImport } from './routes/_contact/ja/contact'
+import { Route as ContactKoContactRouteImport } from './routes/_contact/ko/contact'
+import { Route as ContactNlContactRouteImport } from './routes/_contact/nl/contact'
 import { Route as ContactPlContactRouteImport } from './routes/_contact/pl/contact'
 import { Route as ContactPtContactRouteImport } from './routes/_contact/pt/contact'
+import { Route as ContactRuContactRouteImport } from './routes/_contact/ru/contact'
+import { Route as ContactTrContactRouteImport } from './routes/_contact/tr/contact'
+import { Route as ContactZhContactRouteImport } from './routes/_contact/zh/contact'
+import { Route as PricingArPricingRouteImport } from './routes/_pricing/ar/pricing'
+import { Route as PricingDePricingRouteImport } from './routes/_pricing/de/pricing'
+import { Route as PricingEsPricingRouteImport } from './routes/_pricing/es/pricing'
+import { Route as PricingFrPricingRouteImport } from './routes/_pricing/fr/pricing'
+import { Route as PricingHePricingRouteImport } from './routes/_pricing/he/pricing'
+import { Route as PricingItPricingRouteImport } from './routes/_pricing/it/pricing'
+import { Route as PricingJaPricingRouteImport } from './routes/_pricing/ja/pricing'
+import { Route as PricingKoPricingRouteImport } from './routes/_pricing/ko/pricing'
+import { Route as PricingNlPricingRouteImport } from './routes/_pricing/nl/pricing'
 import { Route as PricingPlPricingRouteImport } from './routes/_pricing/pl/pricing'
 import { Route as PricingPtPricingRouteImport } from './routes/_pricing/pt/pricing'
+import { Route as PricingRuPricingRouteImport } from './routes/_pricing/ru/pricing'
+import { Route as PricingTrPricingRouteImport } from './routes/_pricing/tr/pricing'
+import { Route as PricingZhPricingRouteImport } from './routes/_pricing/zh/pricing'
+import { Route as TeamsArTeamsRouteImport } from './routes/_teams/ar/teams'
+import { Route as TeamsDeTeamsRouteImport } from './routes/_teams/de/teams'
+import { Route as TeamsEsTeamsRouteImport } from './routes/_teams/es/teams'
+import { Route as TeamsFrTeamsRouteImport } from './routes/_teams/fr/teams'
+import { Route as TeamsHeTeamsRouteImport } from './routes/_teams/he/teams'
+import { Route as TeamsItTeamsRouteImport } from './routes/_teams/it/teams'
+import { Route as TeamsJaTeamsRouteImport } from './routes/_teams/ja/teams'
+import { Route as TeamsKoTeamsRouteImport } from './routes/_teams/ko/teams'
+import { Route as TeamsNlTeamsRouteImport } from './routes/_teams/nl/teams'
 import { Route as TeamsPlTeamsRouteImport } from './routes/_teams/pl/teams'
 import { Route as TeamsPtTeamsRouteImport } from './routes/_teams/pt/teams'
+import { Route as TeamsRuTeamsRouteImport } from './routes/_teams/ru/teams'
+import { Route as TeamsTrTeamsRouteImport } from './routes/_teams/tr/teams'
+import { Route as TeamsZhTeamsRouteImport } from './routes/_teams/zh/teams'
 import { Route as ApiBrowserSplatRouteImport } from './routes/api/browser/$'
 import { Route as DownloadPlatformLatestRouteImport } from './routes/download/$platform_/latest'
 import { Route as MarketplaceAgentsAgentIdRouteImport } from './routes/marketplace/agents/$agentId'
@@ -341,6 +389,51 @@ const HomeIndexRoute = HomeIndexRouteImport.update({
   path: '/',
   getParentRoute: () => HomeRoute,
 } as any)
+const HomeArRoute = HomeArRouteImport.update({
+  id: '/ar',
+  path: '/ar',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeDeRoute = HomeDeRouteImport.update({
+  id: '/de',
+  path: '/de',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeEsRoute = HomeEsRouteImport.update({
+  id: '/es',
+  path: '/es',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeFrRoute = HomeFrRouteImport.update({
+  id: '/fr',
+  path: '/fr',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeHeRoute = HomeHeRouteImport.update({
+  id: '/he',
+  path: '/he',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeItRoute = HomeItRouteImport.update({
+  id: '/it',
+  path: '/it',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeJaRoute = HomeJaRouteImport.update({
+  id: '/ja',
+  path: '/ja',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeKoRoute = HomeKoRouteImport.update({
+  id: '/ko',
+  path: '/ko',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeNlRoute = HomeNlRouteImport.update({
+  id: '/nl',
+  path: '/nl',
+  getParentRoute: () => HomeRoute,
+} as any)
 const HomePlRoute = HomePlRouteImport.update({
   id: '/pl',
   path: '/pl',
@@ -349,6 +442,21 @@ const HomePlRoute = HomePlRouteImport.update({
 const HomePtRoute = HomePtRouteImport.update({
   id: '/pt',
   path: '/pt',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeRuRoute = HomeRuRouteImport.update({
+  id: '/ru',
+  path: '/ru',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeTrRoute = HomeTrRouteImport.update({
+  id: '/tr',
+  path: '/tr',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeZhRoute = HomeZhRouteImport.update({
+  id: '/zh',
+  path: '/zh',
   getParentRoute: () => HomeRoute,
 } as any)
 const PricingPricingRoute = PricingPricingRouteImport.update({
@@ -526,6 +634,51 @@ const V1MeRoute = V1MeRouteImport.update({
   path: '/v1/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactArContactRoute = ContactArContactRouteImport.update({
+  id: '/ar/contact',
+  path: '/ar/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactDeContactRoute = ContactDeContactRouteImport.update({
+  id: '/de/contact',
+  path: '/de/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactEsContactRoute = ContactEsContactRouteImport.update({
+  id: '/es/contact',
+  path: '/es/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactFrContactRoute = ContactFrContactRouteImport.update({
+  id: '/fr/contact',
+  path: '/fr/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactHeContactRoute = ContactHeContactRouteImport.update({
+  id: '/he/contact',
+  path: '/he/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactItContactRoute = ContactItContactRouteImport.update({
+  id: '/it/contact',
+  path: '/it/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactJaContactRoute = ContactJaContactRouteImport.update({
+  id: '/ja/contact',
+  path: '/ja/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactKoContactRoute = ContactKoContactRouteImport.update({
+  id: '/ko/contact',
+  path: '/ko/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactNlContactRoute = ContactNlContactRouteImport.update({
+  id: '/nl/contact',
+  path: '/nl/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
 const ContactPlContactRoute = ContactPlContactRouteImport.update({
   id: '/pl/contact',
   path: '/pl/contact',
@@ -535,6 +688,66 @@ const ContactPtContactRoute = ContactPtContactRouteImport.update({
   id: '/pt/contact',
   path: '/pt/contact',
   getParentRoute: () => ContactRoute,
+} as any)
+const ContactRuContactRoute = ContactRuContactRouteImport.update({
+  id: '/ru/contact',
+  path: '/ru/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactTrContactRoute = ContactTrContactRouteImport.update({
+  id: '/tr/contact',
+  path: '/tr/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const ContactZhContactRoute = ContactZhContactRouteImport.update({
+  id: '/zh/contact',
+  path: '/zh/contact',
+  getParentRoute: () => ContactRoute,
+} as any)
+const PricingArPricingRoute = PricingArPricingRouteImport.update({
+  id: '/ar/pricing',
+  path: '/ar/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingDePricingRoute = PricingDePricingRouteImport.update({
+  id: '/de/pricing',
+  path: '/de/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingEsPricingRoute = PricingEsPricingRouteImport.update({
+  id: '/es/pricing',
+  path: '/es/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingFrPricingRoute = PricingFrPricingRouteImport.update({
+  id: '/fr/pricing',
+  path: '/fr/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingHePricingRoute = PricingHePricingRouteImport.update({
+  id: '/he/pricing',
+  path: '/he/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingItPricingRoute = PricingItPricingRouteImport.update({
+  id: '/it/pricing',
+  path: '/it/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingJaPricingRoute = PricingJaPricingRouteImport.update({
+  id: '/ja/pricing',
+  path: '/ja/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingKoPricingRoute = PricingKoPricingRouteImport.update({
+  id: '/ko/pricing',
+  path: '/ko/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingNlPricingRoute = PricingNlPricingRouteImport.update({
+  id: '/nl/pricing',
+  path: '/nl/pricing',
+  getParentRoute: () => PricingRoute,
 } as any)
 const PricingPlPricingRoute = PricingPlPricingRouteImport.update({
   id: '/pl/pricing',
@@ -546,6 +759,66 @@ const PricingPtPricingRoute = PricingPtPricingRouteImport.update({
   path: '/pt/pricing',
   getParentRoute: () => PricingRoute,
 } as any)
+const PricingRuPricingRoute = PricingRuPricingRouteImport.update({
+  id: '/ru/pricing',
+  path: '/ru/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingTrPricingRoute = PricingTrPricingRouteImport.update({
+  id: '/tr/pricing',
+  path: '/tr/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const PricingZhPricingRoute = PricingZhPricingRouteImport.update({
+  id: '/zh/pricing',
+  path: '/zh/pricing',
+  getParentRoute: () => PricingRoute,
+} as any)
+const TeamsArTeamsRoute = TeamsArTeamsRouteImport.update({
+  id: '/ar/teams',
+  path: '/ar/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsDeTeamsRoute = TeamsDeTeamsRouteImport.update({
+  id: '/de/teams',
+  path: '/de/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsEsTeamsRoute = TeamsEsTeamsRouteImport.update({
+  id: '/es/teams',
+  path: '/es/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsFrTeamsRoute = TeamsFrTeamsRouteImport.update({
+  id: '/fr/teams',
+  path: '/fr/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsHeTeamsRoute = TeamsHeTeamsRouteImport.update({
+  id: '/he/teams',
+  path: '/he/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsItTeamsRoute = TeamsItTeamsRouteImport.update({
+  id: '/it/teams',
+  path: '/it/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsJaTeamsRoute = TeamsJaTeamsRouteImport.update({
+  id: '/ja/teams',
+  path: '/ja/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsKoTeamsRoute = TeamsKoTeamsRouteImport.update({
+  id: '/ko/teams',
+  path: '/ko/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsNlTeamsRoute = TeamsNlTeamsRouteImport.update({
+  id: '/nl/teams',
+  path: '/nl/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
 const TeamsPlTeamsRoute = TeamsPlTeamsRouteImport.update({
   id: '/pl/teams',
   path: '/pl/teams',
@@ -554,6 +827,21 @@ const TeamsPlTeamsRoute = TeamsPlTeamsRouteImport.update({
 const TeamsPtTeamsRoute = TeamsPtTeamsRouteImport.update({
   id: '/pt/teams',
   path: '/pt/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsRuTeamsRoute = TeamsRuTeamsRouteImport.update({
+  id: '/ru/teams',
+  path: '/ru/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsTrTeamsRoute = TeamsTrTeamsRouteImport.update({
+  id: '/tr/teams',
+  path: '/tr/teams',
+  getParentRoute: () => TeamsRoute,
+} as any)
+const TeamsZhTeamsRoute = TeamsZhTeamsRouteImport.update({
+  id: '/zh/teams',
+  path: '/zh/teams',
   getParentRoute: () => TeamsRoute,
 } as any)
 const ApiBrowserSplatRoute = ApiBrowserSplatRouteImport.update({
@@ -1414,8 +1702,20 @@ export interface FileRoutesByFullPath {
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/contact': typeof ContactContactRoute
+  '/ar': typeof HomeArRoute
+  '/de': typeof HomeDeRoute
+  '/es': typeof HomeEsRoute
+  '/fr': typeof HomeFrRoute
+  '/he': typeof HomeHeRoute
+  '/it': typeof HomeItRoute
+  '/ja': typeof HomeJaRoute
+  '/ko': typeof HomeKoRoute
+  '/nl': typeof HomeNlRoute
   '/pl': typeof HomePlRoute
   '/pt': typeof HomePtRoute
+  '/ru': typeof HomeRuRoute
+  '/tr': typeof HomeTrRoute
+  '/zh': typeof HomeZhRoute
   '/pricing': typeof PricingPricingRoute
   '/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
@@ -1451,12 +1751,48 @@ export interface FileRoutesByFullPath {
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/providers/': typeof ProvidersIndexRoute
+  '/ar/contact': typeof ContactArContactRoute
+  '/de/contact': typeof ContactDeContactRoute
+  '/es/contact': typeof ContactEsContactRoute
+  '/fr/contact': typeof ContactFrContactRoute
+  '/he/contact': typeof ContactHeContactRoute
+  '/it/contact': typeof ContactItContactRoute
+  '/ja/contact': typeof ContactJaContactRoute
+  '/ko/contact': typeof ContactKoContactRoute
+  '/nl/contact': typeof ContactNlContactRoute
   '/pl/contact': typeof ContactPlContactRoute
   '/pt/contact': typeof ContactPtContactRoute
+  '/ru/contact': typeof ContactRuContactRoute
+  '/tr/contact': typeof ContactTrContactRoute
+  '/zh/contact': typeof ContactZhContactRoute
+  '/ar/pricing': typeof PricingArPricingRoute
+  '/de/pricing': typeof PricingDePricingRoute
+  '/es/pricing': typeof PricingEsPricingRoute
+  '/fr/pricing': typeof PricingFrPricingRoute
+  '/he/pricing': typeof PricingHePricingRoute
+  '/it/pricing': typeof PricingItPricingRoute
+  '/ja/pricing': typeof PricingJaPricingRoute
+  '/ko/pricing': typeof PricingKoPricingRoute
+  '/nl/pricing': typeof PricingNlPricingRoute
   '/pl/pricing': typeof PricingPlPricingRoute
   '/pt/pricing': typeof PricingPtPricingRoute
+  '/ru/pricing': typeof PricingRuPricingRoute
+  '/tr/pricing': typeof PricingTrPricingRoute
+  '/zh/pricing': typeof PricingZhPricingRoute
+  '/ar/teams': typeof TeamsArTeamsRoute
+  '/de/teams': typeof TeamsDeTeamsRoute
+  '/es/teams': typeof TeamsEsTeamsRoute
+  '/fr/teams': typeof TeamsFrTeamsRoute
+  '/he/teams': typeof TeamsHeTeamsRoute
+  '/it/teams': typeof TeamsItTeamsRoute
+  '/ja/teams': typeof TeamsJaTeamsRoute
+  '/ko/teams': typeof TeamsKoTeamsRoute
+  '/nl/teams': typeof TeamsNlTeamsRoute
   '/pl/teams': typeof TeamsPlTeamsRoute
   '/pt/teams': typeof TeamsPtTeamsRoute
+  '/ru/teams': typeof TeamsRuTeamsRoute
+  '/tr/teams': typeof TeamsTrTeamsRoute
+  '/zh/teams': typeof TeamsZhTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -1631,8 +1967,20 @@ export interface FileRoutesByTo {
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/contact': typeof ContactContactRoute
+  '/ar': typeof HomeArRoute
+  '/de': typeof HomeDeRoute
+  '/es': typeof HomeEsRoute
+  '/fr': typeof HomeFrRoute
+  '/he': typeof HomeHeRoute
+  '/it': typeof HomeItRoute
+  '/ja': typeof HomeJaRoute
+  '/ko': typeof HomeKoRoute
+  '/nl': typeof HomeNlRoute
   '/pl': typeof HomePlRoute
   '/pt': typeof HomePtRoute
+  '/ru': typeof HomeRuRoute
+  '/tr': typeof HomeTrRoute
+  '/zh': typeof HomeZhRoute
   '/pricing': typeof PricingPricingRoute
   '/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
@@ -1668,12 +2016,48 @@ export interface FileRoutesByTo {
   '/news': typeof NewsIndexRoute
   '/plugins': typeof PluginsIndexRoute
   '/providers': typeof ProvidersIndexRoute
+  '/ar/contact': typeof ContactArContactRoute
+  '/de/contact': typeof ContactDeContactRoute
+  '/es/contact': typeof ContactEsContactRoute
+  '/fr/contact': typeof ContactFrContactRoute
+  '/he/contact': typeof ContactHeContactRoute
+  '/it/contact': typeof ContactItContactRoute
+  '/ja/contact': typeof ContactJaContactRoute
+  '/ko/contact': typeof ContactKoContactRoute
+  '/nl/contact': typeof ContactNlContactRoute
   '/pl/contact': typeof ContactPlContactRoute
   '/pt/contact': typeof ContactPtContactRoute
+  '/ru/contact': typeof ContactRuContactRoute
+  '/tr/contact': typeof ContactTrContactRoute
+  '/zh/contact': typeof ContactZhContactRoute
+  '/ar/pricing': typeof PricingArPricingRoute
+  '/de/pricing': typeof PricingDePricingRoute
+  '/es/pricing': typeof PricingEsPricingRoute
+  '/fr/pricing': typeof PricingFrPricingRoute
+  '/he/pricing': typeof PricingHePricingRoute
+  '/it/pricing': typeof PricingItPricingRoute
+  '/ja/pricing': typeof PricingJaPricingRoute
+  '/ko/pricing': typeof PricingKoPricingRoute
+  '/nl/pricing': typeof PricingNlPricingRoute
   '/pl/pricing': typeof PricingPlPricingRoute
   '/pt/pricing': typeof PricingPtPricingRoute
+  '/ru/pricing': typeof PricingRuPricingRoute
+  '/tr/pricing': typeof PricingTrPricingRoute
+  '/zh/pricing': typeof PricingZhPricingRoute
+  '/ar/teams': typeof TeamsArTeamsRoute
+  '/de/teams': typeof TeamsDeTeamsRoute
+  '/es/teams': typeof TeamsEsTeamsRoute
+  '/fr/teams': typeof TeamsFrTeamsRoute
+  '/he/teams': typeof TeamsHeTeamsRoute
+  '/it/teams': typeof TeamsItTeamsRoute
+  '/ja/teams': typeof TeamsJaTeamsRoute
+  '/ko/teams': typeof TeamsKoTeamsRoute
+  '/nl/teams': typeof TeamsNlTeamsRoute
   '/pl/teams': typeof TeamsPlTeamsRoute
   '/pt/teams': typeof TeamsPtTeamsRoute
+  '/ru/teams': typeof TeamsRuTeamsRoute
+  '/tr/teams': typeof TeamsTrTeamsRoute
+  '/zh/teams': typeof TeamsZhTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -1852,8 +2236,20 @@ export interface FileRoutesById {
   '/.well-known/apple-app-site-association': typeof DotwellKnownAppleAppSiteAssociationRoute
   '/.well-known/jwks.json': typeof DotwellKnownJwksDotjsonRoute
   '/_contact/contact': typeof ContactContactRoute
+  '/_home/ar': typeof HomeArRoute
+  '/_home/de': typeof HomeDeRoute
+  '/_home/es': typeof HomeEsRoute
+  '/_home/fr': typeof HomeFrRoute
+  '/_home/he': typeof HomeHeRoute
+  '/_home/it': typeof HomeItRoute
+  '/_home/ja': typeof HomeJaRoute
+  '/_home/ko': typeof HomeKoRoute
+  '/_home/nl': typeof HomeNlRoute
   '/_home/pl': typeof HomePlRoute
   '/_home/pt': typeof HomePtRoute
+  '/_home/ru': typeof HomeRuRoute
+  '/_home/tr': typeof HomeTrRoute
+  '/_home/zh': typeof HomeZhRoute
   '/_pricing/pricing': typeof PricingPricingRoute
   '/_teams/teams': typeof TeamsTeamsRoute
   '/agents/$templateId': typeof AgentsTemplateIdRoute
@@ -1890,12 +2286,48 @@ export interface FileRoutesById {
   '/news/': typeof NewsIndexRoute
   '/plugins/': typeof PluginsIndexRoute
   '/providers/': typeof ProvidersIndexRoute
+  '/_contact/ar/contact': typeof ContactArContactRoute
+  '/_contact/de/contact': typeof ContactDeContactRoute
+  '/_contact/es/contact': typeof ContactEsContactRoute
+  '/_contact/fr/contact': typeof ContactFrContactRoute
+  '/_contact/he/contact': typeof ContactHeContactRoute
+  '/_contact/it/contact': typeof ContactItContactRoute
+  '/_contact/ja/contact': typeof ContactJaContactRoute
+  '/_contact/ko/contact': typeof ContactKoContactRoute
+  '/_contact/nl/contact': typeof ContactNlContactRoute
   '/_contact/pl/contact': typeof ContactPlContactRoute
   '/_contact/pt/contact': typeof ContactPtContactRoute
+  '/_contact/ru/contact': typeof ContactRuContactRoute
+  '/_contact/tr/contact': typeof ContactTrContactRoute
+  '/_contact/zh/contact': typeof ContactZhContactRoute
+  '/_pricing/ar/pricing': typeof PricingArPricingRoute
+  '/_pricing/de/pricing': typeof PricingDePricingRoute
+  '/_pricing/es/pricing': typeof PricingEsPricingRoute
+  '/_pricing/fr/pricing': typeof PricingFrPricingRoute
+  '/_pricing/he/pricing': typeof PricingHePricingRoute
+  '/_pricing/it/pricing': typeof PricingItPricingRoute
+  '/_pricing/ja/pricing': typeof PricingJaPricingRoute
+  '/_pricing/ko/pricing': typeof PricingKoPricingRoute
+  '/_pricing/nl/pricing': typeof PricingNlPricingRoute
   '/_pricing/pl/pricing': typeof PricingPlPricingRoute
   '/_pricing/pt/pricing': typeof PricingPtPricingRoute
+  '/_pricing/ru/pricing': typeof PricingRuPricingRoute
+  '/_pricing/tr/pricing': typeof PricingTrPricingRoute
+  '/_pricing/zh/pricing': typeof PricingZhPricingRoute
+  '/_teams/ar/teams': typeof TeamsArTeamsRoute
+  '/_teams/de/teams': typeof TeamsDeTeamsRoute
+  '/_teams/es/teams': typeof TeamsEsTeamsRoute
+  '/_teams/fr/teams': typeof TeamsFrTeamsRoute
+  '/_teams/he/teams': typeof TeamsHeTeamsRoute
+  '/_teams/it/teams': typeof TeamsItTeamsRoute
+  '/_teams/ja/teams': typeof TeamsJaTeamsRoute
+  '/_teams/ko/teams': typeof TeamsKoTeamsRoute
+  '/_teams/nl/teams': typeof TeamsNlTeamsRoute
   '/_teams/pl/teams': typeof TeamsPlTeamsRoute
   '/_teams/pt/teams': typeof TeamsPtTeamsRoute
+  '/_teams/ru/teams': typeof TeamsRuTeamsRoute
+  '/_teams/tr/teams': typeof TeamsTrTeamsRoute
+  '/_teams/zh/teams': typeof TeamsZhTeamsRoute
   '/api/browser/$': typeof ApiBrowserSplatRoute
   '/download/$platform_/latest': typeof DownloadPlatformLatestRoute
   '/marketplace/agents/$agentId': typeof MarketplaceAgentsAgentIdRoute
@@ -2072,8 +2504,20 @@ export interface FileRouteTypes {
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/contact'
+    | '/ar'
+    | '/de'
+    | '/es'
+    | '/fr'
+    | '/he'
+    | '/it'
+    | '/ja'
+    | '/ko'
+    | '/nl'
     | '/pl'
     | '/pt'
+    | '/ru'
+    | '/tr'
+    | '/zh'
     | '/pricing'
     | '/teams'
     | '/agents/$templateId'
@@ -2109,12 +2553,48 @@ export interface FileRouteTypes {
     | '/news/'
     | '/plugins/'
     | '/providers/'
+    | '/ar/contact'
+    | '/de/contact'
+    | '/es/contact'
+    | '/fr/contact'
+    | '/he/contact'
+    | '/it/contact'
+    | '/ja/contact'
+    | '/ko/contact'
+    | '/nl/contact'
     | '/pl/contact'
     | '/pt/contact'
+    | '/ru/contact'
+    | '/tr/contact'
+    | '/zh/contact'
+    | '/ar/pricing'
+    | '/de/pricing'
+    | '/es/pricing'
+    | '/fr/pricing'
+    | '/he/pricing'
+    | '/it/pricing'
+    | '/ja/pricing'
+    | '/ko/pricing'
+    | '/nl/pricing'
     | '/pl/pricing'
     | '/pt/pricing'
+    | '/ru/pricing'
+    | '/tr/pricing'
+    | '/zh/pricing'
+    | '/ar/teams'
+    | '/de/teams'
+    | '/es/teams'
+    | '/fr/teams'
+    | '/he/teams'
+    | '/it/teams'
+    | '/ja/teams'
+    | '/ko/teams'
+    | '/nl/teams'
     | '/pl/teams'
     | '/pt/teams'
+    | '/ru/teams'
+    | '/tr/teams'
+    | '/zh/teams'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/marketplace/agents/$agentId'
@@ -2289,8 +2769,20 @@ export interface FileRouteTypes {
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/contact'
+    | '/ar'
+    | '/de'
+    | '/es'
+    | '/fr'
+    | '/he'
+    | '/it'
+    | '/ja'
+    | '/ko'
+    | '/nl'
     | '/pl'
     | '/pt'
+    | '/ru'
+    | '/tr'
+    | '/zh'
     | '/pricing'
     | '/teams'
     | '/agents/$templateId'
@@ -2326,12 +2818,48 @@ export interface FileRouteTypes {
     | '/news'
     | '/plugins'
     | '/providers'
+    | '/ar/contact'
+    | '/de/contact'
+    | '/es/contact'
+    | '/fr/contact'
+    | '/he/contact'
+    | '/it/contact'
+    | '/ja/contact'
+    | '/ko/contact'
+    | '/nl/contact'
     | '/pl/contact'
     | '/pt/contact'
+    | '/ru/contact'
+    | '/tr/contact'
+    | '/zh/contact'
+    | '/ar/pricing'
+    | '/de/pricing'
+    | '/es/pricing'
+    | '/fr/pricing'
+    | '/he/pricing'
+    | '/it/pricing'
+    | '/ja/pricing'
+    | '/ko/pricing'
+    | '/nl/pricing'
     | '/pl/pricing'
     | '/pt/pricing'
+    | '/ru/pricing'
+    | '/tr/pricing'
+    | '/zh/pricing'
+    | '/ar/teams'
+    | '/de/teams'
+    | '/es/teams'
+    | '/fr/teams'
+    | '/he/teams'
+    | '/it/teams'
+    | '/ja/teams'
+    | '/ko/teams'
+    | '/nl/teams'
     | '/pl/teams'
     | '/pt/teams'
+    | '/ru/teams'
+    | '/tr/teams'
+    | '/zh/teams'
     | '/api/browser/$'
     | '/download/$platform/latest'
     | '/marketplace/agents/$agentId'
@@ -2509,8 +3037,20 @@ export interface FileRouteTypes {
     | '/.well-known/apple-app-site-association'
     | '/.well-known/jwks.json'
     | '/_contact/contact'
+    | '/_home/ar'
+    | '/_home/de'
+    | '/_home/es'
+    | '/_home/fr'
+    | '/_home/he'
+    | '/_home/it'
+    | '/_home/ja'
+    | '/_home/ko'
+    | '/_home/nl'
     | '/_home/pl'
     | '/_home/pt'
+    | '/_home/ru'
+    | '/_home/tr'
+    | '/_home/zh'
     | '/_pricing/pricing'
     | '/_teams/teams'
     | '/agents/$templateId'
@@ -2547,12 +3087,48 @@ export interface FileRouteTypes {
     | '/news/'
     | '/plugins/'
     | '/providers/'
+    | '/_contact/ar/contact'
+    | '/_contact/de/contact'
+    | '/_contact/es/contact'
+    | '/_contact/fr/contact'
+    | '/_contact/he/contact'
+    | '/_contact/it/contact'
+    | '/_contact/ja/contact'
+    | '/_contact/ko/contact'
+    | '/_contact/nl/contact'
     | '/_contact/pl/contact'
     | '/_contact/pt/contact'
+    | '/_contact/ru/contact'
+    | '/_contact/tr/contact'
+    | '/_contact/zh/contact'
+    | '/_pricing/ar/pricing'
+    | '/_pricing/de/pricing'
+    | '/_pricing/es/pricing'
+    | '/_pricing/fr/pricing'
+    | '/_pricing/he/pricing'
+    | '/_pricing/it/pricing'
+    | '/_pricing/ja/pricing'
+    | '/_pricing/ko/pricing'
+    | '/_pricing/nl/pricing'
     | '/_pricing/pl/pricing'
     | '/_pricing/pt/pricing'
+    | '/_pricing/ru/pricing'
+    | '/_pricing/tr/pricing'
+    | '/_pricing/zh/pricing'
+    | '/_teams/ar/teams'
+    | '/_teams/de/teams'
+    | '/_teams/es/teams'
+    | '/_teams/fr/teams'
+    | '/_teams/he/teams'
+    | '/_teams/it/teams'
+    | '/_teams/ja/teams'
+    | '/_teams/ko/teams'
+    | '/_teams/nl/teams'
     | '/_teams/pl/teams'
     | '/_teams/pt/teams'
+    | '/_teams/ru/teams'
+    | '/_teams/tr/teams'
+    | '/_teams/zh/teams'
     | '/api/browser/$'
     | '/download/$platform_/latest'
     | '/marketplace/agents/$agentId'
@@ -3050,6 +3626,69 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof HomeIndexRouteImport
       parentRoute: typeof HomeRoute
     }
+    '/_home/ar': {
+      id: '/_home/ar'
+      path: '/ar'
+      fullPath: '/ar'
+      preLoaderRoute: typeof HomeArRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/de': {
+      id: '/_home/de'
+      path: '/de'
+      fullPath: '/de'
+      preLoaderRoute: typeof HomeDeRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/es': {
+      id: '/_home/es'
+      path: '/es'
+      fullPath: '/es'
+      preLoaderRoute: typeof HomeEsRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/fr': {
+      id: '/_home/fr'
+      path: '/fr'
+      fullPath: '/fr'
+      preLoaderRoute: typeof HomeFrRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/he': {
+      id: '/_home/he'
+      path: '/he'
+      fullPath: '/he'
+      preLoaderRoute: typeof HomeHeRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/it': {
+      id: '/_home/it'
+      path: '/it'
+      fullPath: '/it'
+      preLoaderRoute: typeof HomeItRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/ja': {
+      id: '/_home/ja'
+      path: '/ja'
+      fullPath: '/ja'
+      preLoaderRoute: typeof HomeJaRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/ko': {
+      id: '/_home/ko'
+      path: '/ko'
+      fullPath: '/ko'
+      preLoaderRoute: typeof HomeKoRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/nl': {
+      id: '/_home/nl'
+      path: '/nl'
+      fullPath: '/nl'
+      preLoaderRoute: typeof HomeNlRouteImport
+      parentRoute: typeof HomeRoute
+    }
     '/_home/pl': {
       id: '/_home/pl'
       path: '/pl'
@@ -3062,6 +3701,27 @@ declare module '@tanstack/solid-router' {
       path: '/pt'
       fullPath: '/pt'
       preLoaderRoute: typeof HomePtRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/ru': {
+      id: '/_home/ru'
+      path: '/ru'
+      fullPath: '/ru'
+      preLoaderRoute: typeof HomeRuRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/tr': {
+      id: '/_home/tr'
+      path: '/tr'
+      fullPath: '/tr'
+      preLoaderRoute: typeof HomeTrRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/zh': {
+      id: '/_home/zh'
+      path: '/zh'
+      fullPath: '/zh'
+      preLoaderRoute: typeof HomeZhRouteImport
       parentRoute: typeof HomeRoute
     }
     '/_pricing/pricing': {
@@ -3309,6 +3969,69 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_contact/ar/contact': {
+      id: '/_contact/ar/contact'
+      path: '/ar/contact'
+      fullPath: '/ar/contact'
+      preLoaderRoute: typeof ContactArContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/de/contact': {
+      id: '/_contact/de/contact'
+      path: '/de/contact'
+      fullPath: '/de/contact'
+      preLoaderRoute: typeof ContactDeContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/es/contact': {
+      id: '/_contact/es/contact'
+      path: '/es/contact'
+      fullPath: '/es/contact'
+      preLoaderRoute: typeof ContactEsContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/fr/contact': {
+      id: '/_contact/fr/contact'
+      path: '/fr/contact'
+      fullPath: '/fr/contact'
+      preLoaderRoute: typeof ContactFrContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/he/contact': {
+      id: '/_contact/he/contact'
+      path: '/he/contact'
+      fullPath: '/he/contact'
+      preLoaderRoute: typeof ContactHeContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/it/contact': {
+      id: '/_contact/it/contact'
+      path: '/it/contact'
+      fullPath: '/it/contact'
+      preLoaderRoute: typeof ContactItContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/ja/contact': {
+      id: '/_contact/ja/contact'
+      path: '/ja/contact'
+      fullPath: '/ja/contact'
+      preLoaderRoute: typeof ContactJaContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/ko/contact': {
+      id: '/_contact/ko/contact'
+      path: '/ko/contact'
+      fullPath: '/ko/contact'
+      preLoaderRoute: typeof ContactKoContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/nl/contact': {
+      id: '/_contact/nl/contact'
+      path: '/nl/contact'
+      fullPath: '/nl/contact'
+      preLoaderRoute: typeof ContactNlContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
     '/_contact/pl/contact': {
       id: '/_contact/pl/contact'
       path: '/pl/contact'
@@ -3322,6 +4045,90 @@ declare module '@tanstack/solid-router' {
       fullPath: '/pt/contact'
       preLoaderRoute: typeof ContactPtContactRouteImport
       parentRoute: typeof ContactRoute
+    }
+    '/_contact/ru/contact': {
+      id: '/_contact/ru/contact'
+      path: '/ru/contact'
+      fullPath: '/ru/contact'
+      preLoaderRoute: typeof ContactRuContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/tr/contact': {
+      id: '/_contact/tr/contact'
+      path: '/tr/contact'
+      fullPath: '/tr/contact'
+      preLoaderRoute: typeof ContactTrContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_contact/zh/contact': {
+      id: '/_contact/zh/contact'
+      path: '/zh/contact'
+      fullPath: '/zh/contact'
+      preLoaderRoute: typeof ContactZhContactRouteImport
+      parentRoute: typeof ContactRoute
+    }
+    '/_pricing/ar/pricing': {
+      id: '/_pricing/ar/pricing'
+      path: '/ar/pricing'
+      fullPath: '/ar/pricing'
+      preLoaderRoute: typeof PricingArPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/de/pricing': {
+      id: '/_pricing/de/pricing'
+      path: '/de/pricing'
+      fullPath: '/de/pricing'
+      preLoaderRoute: typeof PricingDePricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/es/pricing': {
+      id: '/_pricing/es/pricing'
+      path: '/es/pricing'
+      fullPath: '/es/pricing'
+      preLoaderRoute: typeof PricingEsPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/fr/pricing': {
+      id: '/_pricing/fr/pricing'
+      path: '/fr/pricing'
+      fullPath: '/fr/pricing'
+      preLoaderRoute: typeof PricingFrPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/he/pricing': {
+      id: '/_pricing/he/pricing'
+      path: '/he/pricing'
+      fullPath: '/he/pricing'
+      preLoaderRoute: typeof PricingHePricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/it/pricing': {
+      id: '/_pricing/it/pricing'
+      path: '/it/pricing'
+      fullPath: '/it/pricing'
+      preLoaderRoute: typeof PricingItPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/ja/pricing': {
+      id: '/_pricing/ja/pricing'
+      path: '/ja/pricing'
+      fullPath: '/ja/pricing'
+      preLoaderRoute: typeof PricingJaPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/ko/pricing': {
+      id: '/_pricing/ko/pricing'
+      path: '/ko/pricing'
+      fullPath: '/ko/pricing'
+      preLoaderRoute: typeof PricingKoPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/nl/pricing': {
+      id: '/_pricing/nl/pricing'
+      path: '/nl/pricing'
+      fullPath: '/nl/pricing'
+      preLoaderRoute: typeof PricingNlPricingRouteImport
+      parentRoute: typeof PricingRoute
     }
     '/_pricing/pl/pricing': {
       id: '/_pricing/pl/pricing'
@@ -3337,6 +4144,90 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof PricingPtPricingRouteImport
       parentRoute: typeof PricingRoute
     }
+    '/_pricing/ru/pricing': {
+      id: '/_pricing/ru/pricing'
+      path: '/ru/pricing'
+      fullPath: '/ru/pricing'
+      preLoaderRoute: typeof PricingRuPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/tr/pricing': {
+      id: '/_pricing/tr/pricing'
+      path: '/tr/pricing'
+      fullPath: '/tr/pricing'
+      preLoaderRoute: typeof PricingTrPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_pricing/zh/pricing': {
+      id: '/_pricing/zh/pricing'
+      path: '/zh/pricing'
+      fullPath: '/zh/pricing'
+      preLoaderRoute: typeof PricingZhPricingRouteImport
+      parentRoute: typeof PricingRoute
+    }
+    '/_teams/ar/teams': {
+      id: '/_teams/ar/teams'
+      path: '/ar/teams'
+      fullPath: '/ar/teams'
+      preLoaderRoute: typeof TeamsArTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/de/teams': {
+      id: '/_teams/de/teams'
+      path: '/de/teams'
+      fullPath: '/de/teams'
+      preLoaderRoute: typeof TeamsDeTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/es/teams': {
+      id: '/_teams/es/teams'
+      path: '/es/teams'
+      fullPath: '/es/teams'
+      preLoaderRoute: typeof TeamsEsTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/fr/teams': {
+      id: '/_teams/fr/teams'
+      path: '/fr/teams'
+      fullPath: '/fr/teams'
+      preLoaderRoute: typeof TeamsFrTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/he/teams': {
+      id: '/_teams/he/teams'
+      path: '/he/teams'
+      fullPath: '/he/teams'
+      preLoaderRoute: typeof TeamsHeTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/it/teams': {
+      id: '/_teams/it/teams'
+      path: '/it/teams'
+      fullPath: '/it/teams'
+      preLoaderRoute: typeof TeamsItTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/ja/teams': {
+      id: '/_teams/ja/teams'
+      path: '/ja/teams'
+      fullPath: '/ja/teams'
+      preLoaderRoute: typeof TeamsJaTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/ko/teams': {
+      id: '/_teams/ko/teams'
+      path: '/ko/teams'
+      fullPath: '/ko/teams'
+      preLoaderRoute: typeof TeamsKoTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/nl/teams': {
+      id: '/_teams/nl/teams'
+      path: '/nl/teams'
+      fullPath: '/nl/teams'
+      preLoaderRoute: typeof TeamsNlTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
     '/_teams/pl/teams': {
       id: '/_teams/pl/teams'
       path: '/pl/teams'
@@ -3349,6 +4240,27 @@ declare module '@tanstack/solid-router' {
       path: '/pt/teams'
       fullPath: '/pt/teams'
       preLoaderRoute: typeof TeamsPtTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/ru/teams': {
+      id: '/_teams/ru/teams'
+      path: '/ru/teams'
+      fullPath: '/ru/teams'
+      preLoaderRoute: typeof TeamsRuTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/tr/teams': {
+      id: '/_teams/tr/teams'
+      path: '/tr/teams'
+      fullPath: '/tr/teams'
+      preLoaderRoute: typeof TeamsTrTeamsRouteImport
+      parentRoute: typeof TeamsRoute
+    }
+    '/_teams/zh/teams': {
+      id: '/_teams/zh/teams'
+      path: '/zh/teams'
+      fullPath: '/zh/teams'
+      preLoaderRoute: typeof TeamsZhTeamsRouteImport
       parentRoute: typeof TeamsRoute
     }
     '/api/browser/$': {
@@ -4427,28 +5339,76 @@ declare module '@tanstack/solid-router' {
 
 interface ContactRouteChildren {
   ContactContactRoute: typeof ContactContactRoute
+  ContactArContactRoute: typeof ContactArContactRoute
+  ContactDeContactRoute: typeof ContactDeContactRoute
+  ContactEsContactRoute: typeof ContactEsContactRoute
+  ContactFrContactRoute: typeof ContactFrContactRoute
+  ContactHeContactRoute: typeof ContactHeContactRoute
+  ContactItContactRoute: typeof ContactItContactRoute
+  ContactJaContactRoute: typeof ContactJaContactRoute
+  ContactKoContactRoute: typeof ContactKoContactRoute
+  ContactNlContactRoute: typeof ContactNlContactRoute
   ContactPlContactRoute: typeof ContactPlContactRoute
   ContactPtContactRoute: typeof ContactPtContactRoute
+  ContactRuContactRoute: typeof ContactRuContactRoute
+  ContactTrContactRoute: typeof ContactTrContactRoute
+  ContactZhContactRoute: typeof ContactZhContactRoute
 }
 
 const ContactRouteChildren: ContactRouteChildren = {
   ContactContactRoute: ContactContactRoute,
+  ContactArContactRoute: ContactArContactRoute,
+  ContactDeContactRoute: ContactDeContactRoute,
+  ContactEsContactRoute: ContactEsContactRoute,
+  ContactFrContactRoute: ContactFrContactRoute,
+  ContactHeContactRoute: ContactHeContactRoute,
+  ContactItContactRoute: ContactItContactRoute,
+  ContactJaContactRoute: ContactJaContactRoute,
+  ContactKoContactRoute: ContactKoContactRoute,
+  ContactNlContactRoute: ContactNlContactRoute,
   ContactPlContactRoute: ContactPlContactRoute,
   ContactPtContactRoute: ContactPtContactRoute,
+  ContactRuContactRoute: ContactRuContactRoute,
+  ContactTrContactRoute: ContactTrContactRoute,
+  ContactZhContactRoute: ContactZhContactRoute,
 }
 
 const ContactRouteWithChildren =
   ContactRoute._addFileChildren(ContactRouteChildren)
 
 interface HomeRouteChildren {
+  HomeArRoute: typeof HomeArRoute
+  HomeDeRoute: typeof HomeDeRoute
+  HomeEsRoute: typeof HomeEsRoute
+  HomeFrRoute: typeof HomeFrRoute
+  HomeHeRoute: typeof HomeHeRoute
+  HomeItRoute: typeof HomeItRoute
+  HomeJaRoute: typeof HomeJaRoute
+  HomeKoRoute: typeof HomeKoRoute
+  HomeNlRoute: typeof HomeNlRoute
   HomePlRoute: typeof HomePlRoute
   HomePtRoute: typeof HomePtRoute
+  HomeRuRoute: typeof HomeRuRoute
+  HomeTrRoute: typeof HomeTrRoute
+  HomeZhRoute: typeof HomeZhRoute
   HomeIndexRoute: typeof HomeIndexRoute
 }
 
 const HomeRouteChildren: HomeRouteChildren = {
+  HomeArRoute: HomeArRoute,
+  HomeDeRoute: HomeDeRoute,
+  HomeEsRoute: HomeEsRoute,
+  HomeFrRoute: HomeFrRoute,
+  HomeHeRoute: HomeHeRoute,
+  HomeItRoute: HomeItRoute,
+  HomeJaRoute: HomeJaRoute,
+  HomeKoRoute: HomeKoRoute,
+  HomeNlRoute: HomeNlRoute,
   HomePlRoute: HomePlRoute,
   HomePtRoute: HomePtRoute,
+  HomeRuRoute: HomeRuRoute,
+  HomeTrRoute: HomeTrRoute,
+  HomeZhRoute: HomeZhRoute,
   HomeIndexRoute: HomeIndexRoute,
 }
 
@@ -4456,14 +5416,38 @@ const HomeRouteWithChildren = HomeRoute._addFileChildren(HomeRouteChildren)
 
 interface PricingRouteChildren {
   PricingPricingRoute: typeof PricingPricingRoute
+  PricingArPricingRoute: typeof PricingArPricingRoute
+  PricingDePricingRoute: typeof PricingDePricingRoute
+  PricingEsPricingRoute: typeof PricingEsPricingRoute
+  PricingFrPricingRoute: typeof PricingFrPricingRoute
+  PricingHePricingRoute: typeof PricingHePricingRoute
+  PricingItPricingRoute: typeof PricingItPricingRoute
+  PricingJaPricingRoute: typeof PricingJaPricingRoute
+  PricingKoPricingRoute: typeof PricingKoPricingRoute
+  PricingNlPricingRoute: typeof PricingNlPricingRoute
   PricingPlPricingRoute: typeof PricingPlPricingRoute
   PricingPtPricingRoute: typeof PricingPtPricingRoute
+  PricingRuPricingRoute: typeof PricingRuPricingRoute
+  PricingTrPricingRoute: typeof PricingTrPricingRoute
+  PricingZhPricingRoute: typeof PricingZhPricingRoute
 }
 
 const PricingRouteChildren: PricingRouteChildren = {
   PricingPricingRoute: PricingPricingRoute,
+  PricingArPricingRoute: PricingArPricingRoute,
+  PricingDePricingRoute: PricingDePricingRoute,
+  PricingEsPricingRoute: PricingEsPricingRoute,
+  PricingFrPricingRoute: PricingFrPricingRoute,
+  PricingHePricingRoute: PricingHePricingRoute,
+  PricingItPricingRoute: PricingItPricingRoute,
+  PricingJaPricingRoute: PricingJaPricingRoute,
+  PricingKoPricingRoute: PricingKoPricingRoute,
+  PricingNlPricingRoute: PricingNlPricingRoute,
   PricingPlPricingRoute: PricingPlPricingRoute,
   PricingPtPricingRoute: PricingPtPricingRoute,
+  PricingRuPricingRoute: PricingRuPricingRoute,
+  PricingTrPricingRoute: PricingTrPricingRoute,
+  PricingZhPricingRoute: PricingZhPricingRoute,
 }
 
 const PricingRouteWithChildren =
@@ -4471,14 +5455,38 @@ const PricingRouteWithChildren =
 
 interface TeamsRouteChildren {
   TeamsTeamsRoute: typeof TeamsTeamsRoute
+  TeamsArTeamsRoute: typeof TeamsArTeamsRoute
+  TeamsDeTeamsRoute: typeof TeamsDeTeamsRoute
+  TeamsEsTeamsRoute: typeof TeamsEsTeamsRoute
+  TeamsFrTeamsRoute: typeof TeamsFrTeamsRoute
+  TeamsHeTeamsRoute: typeof TeamsHeTeamsRoute
+  TeamsItTeamsRoute: typeof TeamsItTeamsRoute
+  TeamsJaTeamsRoute: typeof TeamsJaTeamsRoute
+  TeamsKoTeamsRoute: typeof TeamsKoTeamsRoute
+  TeamsNlTeamsRoute: typeof TeamsNlTeamsRoute
   TeamsPlTeamsRoute: typeof TeamsPlTeamsRoute
   TeamsPtTeamsRoute: typeof TeamsPtTeamsRoute
+  TeamsRuTeamsRoute: typeof TeamsRuTeamsRoute
+  TeamsTrTeamsRoute: typeof TeamsTrTeamsRoute
+  TeamsZhTeamsRoute: typeof TeamsZhTeamsRoute
 }
 
 const TeamsRouteChildren: TeamsRouteChildren = {
   TeamsTeamsRoute: TeamsTeamsRoute,
+  TeamsArTeamsRoute: TeamsArTeamsRoute,
+  TeamsDeTeamsRoute: TeamsDeTeamsRoute,
+  TeamsEsTeamsRoute: TeamsEsTeamsRoute,
+  TeamsFrTeamsRoute: TeamsFrTeamsRoute,
+  TeamsHeTeamsRoute: TeamsHeTeamsRoute,
+  TeamsItTeamsRoute: TeamsItTeamsRoute,
+  TeamsJaTeamsRoute: TeamsJaTeamsRoute,
+  TeamsKoTeamsRoute: TeamsKoTeamsRoute,
+  TeamsNlTeamsRoute: TeamsNlTeamsRoute,
   TeamsPlTeamsRoute: TeamsPlTeamsRoute,
   TeamsPtTeamsRoute: TeamsPtTeamsRoute,
+  TeamsRuTeamsRoute: TeamsRuTeamsRoute,
+  TeamsTrTeamsRoute: TeamsTrTeamsRoute,
+  TeamsZhTeamsRoute: TeamsZhTeamsRoute,
 }
 
 const TeamsRouteWithChildren = TeamsRoute._addFileChildren(TeamsRouteChildren)

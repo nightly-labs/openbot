@@ -1324,7 +1324,10 @@ try {
         assert.deepEqual(withPath.messages[0]?.files, [{ name: "plan.pdf", path: copy }]);
         const values = credentials.get(id);
         assert.ok(values);
-        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+          connectionId: "whatsapp-e2e",
+          rateLimited: () => {},
+        });
         await runCauseEffect(adapter.identify());
         const destination = join(root, "downloaded-plan.pdf");
         await runCauseEffect(
@@ -1371,6 +1374,30 @@ try {
       },
     );
 
+    await step(
+      "saved history: a group message that first arrives undecryptable is saved when it comes again",
+      async () => {
+        const id = connectionId(agents);
+        const key = { remoteJid: GROUP, fromMe: false, id: "IN-RESENT", participant: `${FRIEND}@s.whatsapp.net` };
+        const messageTimestamp = Math.floor(Date.now() / 1_000);
+        phone.current().receive([
+          {
+            key,
+            messageTimestamp,
+            messageStubType: proto.WebMessageInfo.StubType.CIPHERTEXT,
+            messageStubParameters: ["No SenderKeyRecord found for decryption"],
+          },
+        ]);
+        phone.current().receive([{ key, messageTimestamp, message: { conversation: "coupon 10" }, pushName: "Ewa" }]);
+        const saved = await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === "IN-RESENT"),
+          "the resent message",
+        );
+        assert.equal(saved.text, "coupon 10");
+        return { saved: true };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1398,7 +1425,10 @@ try {
     await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const target = { platformChannelId: `${LID_FRIEND}@s.whatsapp.net`, replyThreadId: null };
       const sentFrom = phone.sent.length;
@@ -1442,7 +1472,10 @@ try {
         await until(() => received(agents, accountJid, saved.key.id ?? ""), "the message of the saved contact");
         const values = credentials.get(connectionId(agents));
         assert.ok(values);
-        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+          connectionId: "whatsapp-e2e",
+          rateLimited: () => {},
+        });
         await runCauseEffect(adapter.identify());
         await runCauseEffect(
           adapter.postAnswer({ platformChannelId: accountJid, replyThreadId: null }, "Resposta", null),
@@ -1524,7 +1557,10 @@ try {
     await step("adapter: a post outside the allowed chats is refused, and a late edit becomes a new post", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const refused = await Effect.runPromise(
         Effect.result(
@@ -1555,7 +1591,10 @@ try {
     await step("adapter: a post that the server refuses in its ack fails, and is not reported as sent", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const contactJid = `${STRANGER}@s.whatsapp.net`;
       phone.refused.set(contactJid, "463");
@@ -1585,7 +1624,10 @@ try {
     await step("adapter: an answer that mentions a person is a new post that notifies them", async () => {
       const values = credentials.get(connectionId(agents));
       assert.ok(values);
-      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, {
+        connectionId: "whatsapp-e2e",
+        rateLimited: () => {},
+      });
       await runCauseEffect(adapter.identify());
       const target = { platformChannelId: OWNER_JID, replyThreadId: null };
       const sentFrom = phone.sent.length;

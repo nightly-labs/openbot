@@ -7,6 +7,10 @@ import type { ContextEntry, HistoryFilter, InboundFile } from "./messaging-types
 const CONTEXT_MESSAGES = 200;
 const QUERY_WORDS = 8;
 
+export interface ThreadedEntry extends ContextEntry {
+  threadKey: string;
+}
+
 export class MessagingHistoryStore {
   readonly #database: OpenBotDatabase;
 
@@ -75,6 +79,19 @@ export class MessagingHistoryStore {
         )
         .all(connectionId, platformChannelId, threadKey, after, before, CONTEXT_MESSAGES),
     );
+  }
+
+  latest(connectionId: string, platformChannelId: string, limit: number): ThreadedEntry[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `SELECT message_id, thread_key, author_name, text, sent_at, files_json FROM projection_messaging_history
+           WHERE connection_id = ? AND platform_channel_id = ? ORDER BY seq DESC LIMIT ?`,
+        )
+        .all(connectionId, platformChannelId, limit),
+    )
+      .map((row) => ({ ...entry(row), threadKey: requiredStringColumn(row, "thread_key") }))
+      .reverse();
   }
 
   recent(

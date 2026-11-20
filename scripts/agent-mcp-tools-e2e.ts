@@ -3,6 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -19,6 +22,7 @@ import {
 } from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { CATALOG_PIN_MOVES, McpServerStore } from "../src/backend/mcp-server-store";
+import { startStdioMcpRelay } from "../src/backend/mcp-stdio-relay";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
 import { catalogPluginSlug, loadCatalogPluginServers } from "../src/main/analytics-plugin-catalog";
@@ -28,6 +32,29 @@ const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
 
 type Mode = "open" | "sign-in" | "key" | "guarded";
+
+function asTransport(inner: {
+  start(): Promise<void>;
+  send: Transport["send"];
+  close(): Promise<void>;
+  onclose?: (() => void) | undefined;
+  onerror?: ((error: Error) => void) | undefined;
+  onmessage?: Transport["onmessage"] | undefined;
+  setProtocolVersion?: ((version: string) => void) | undefined;
+}): Transport {
+  const transport: Transport = {
+    start: () => {
+      inner.onclose = () => transport.onclose?.();
+      inner.onerror = (error) => transport.onerror?.(error);
+      inner.onmessage = (message, extra) => transport.onmessage?.(message, extra);
+      return inner.start();
+    },
+    send: (message, options) => inner.send(message, options),
+    close: () => inner.close(),
+    setProtocolVersion: (version) => inner.setProtocolVersion?.(version),
+  };
+  return transport;
+}
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -157,7 +184,13 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
 const calls: Call[] = [];
 let refreshes = 0;
 let keysFromPerson = true;
-const report: { passed: boolean; calls: Call[]; refreshes: number; failures: string[] } = {
+const report: {
+  passed: boolean;
+  calls: Call[];
+  refreshes: number;
+  failures: string[];
+  relayedStdio?: { pid: string; calls: number };
+} = {
   passed: false,
   calls,
   refreshes: 0,
@@ -614,6 +647,79 @@ process.stdin.on("data", (chunk) => {
     contentItems: [{ type: "inputText", text: "get_messages key=true" }],
   });
   store.remove(stdioRow.id);
+
+  const statefulProgram = join(root, "stateful-mcp-server.js");
+  await writeFile(
+    statefulProgram,
+    `let buffer = "";
+let calls = 0;
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  for (let end = buffer.indexOf("\\n"); end >= 0; end = buffer.indexOf("\\n")) {
+    const message = JSON.parse(buffer.slice(0, end));
+    buffer = buffer.slice(end + 1);
+    if (message.id === undefined) continue;
+    const result =
+      message.method === "initialize"
+        ? { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "stateful", version: "1" } }
+        : message.method === "tools/call"
+          ? { content: [{ type: "text", text: "pid=" + process.pid + " calls=" + ++calls }] }
+          : {};
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
+  }
+});
+`,
+  );
+  const relay = await runCauseEffect(
+    startStdioMcpRelay({
+      command: process.execPath,
+      args: [statefulProgram],
+      env: Object.fromEntries(
+        Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+      cwd: root,
+    }),
+  );
+  try {
+    assert.equal(
+      await runCauseEffect(relay.callTool("figma_execute", {})),
+      null,
+      "no running server before the provider connects",
+    );
+    const provider = new Client({ name: "provider", version: "1" });
+    await provider.connect(
+      asTransport(
+        new StreamableHTTPClientTransport(new URL(relay.url), {
+          requestInit: { headers: { Authorization: `Bearer ${relay.token}` } },
+        }),
+      ),
+    );
+    const first = await provider.callTool({ name: "figma_get_status", arguments: {} });
+    const firstText = mcpToolCallResponse(first).contentItems[0];
+    assert.ok(
+      firstText?.type === "inputText" && firstText.text.endsWith(" calls=1"),
+      "the provider runs the first call",
+    );
+    const [pid = ""] = firstText.text.split(" ");
+    const hidden = await runCauseEffect(relay.callTool("figma_execute", { code: "1" }));
+    assert.ok(hidden && "result" in hidden, "the hidden tool runs through the relay");
+    assert.deepEqual(
+      mcpToolCallResponse(hidden.result).contentItems,
+      [{ type: "inputText", text: `${pid} calls=2` }],
+      "the hidden tool runs in the server process of the provider",
+    );
+    const after = mcpToolCallResponse(await provider.callTool({ name: "figma_get_status", arguments: {} }));
+    assert.deepEqual(
+      after.contentItems,
+      [{ type: "inputText", text: `${pid} calls=3` }],
+      "the provider keeps its session",
+    );
+    report.relayedStdio = { pid, calls: 3 };
+    await provider.close();
+  } finally {
+    await runCauseEffect(relay.close());
+  }
 
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));
   assert.ok(!everything.includes(URL_SECRET), "the address query reached the agent");

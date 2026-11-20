@@ -70,7 +70,7 @@ const GEMINI_REQUEST_FAILURES = [
   ],
   [
     "error.provider.antigravityModelUnavailable",
-    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b|\bunknown model\b/iu,
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable|retired|is no longer (?:available|supported))\b|\bunknown model\b|\bmodels\/\S+ is not found\b|\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}410\b/iu,
   ],
   ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [
@@ -317,6 +317,7 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,

@@ -168,6 +168,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "正在把 OpenBot 复制到机器",
   "server.hosted.detail.create.key": "正在添加一次性登录密钥",
   "server.hosted.detail.start.boot": "正在开机",
+  "server.hosted.detail.start.restore": "正在恢复数据",
   "server.hosted.detail.start.app": "正在启动 OpenBot",
   "server.hosted.detail.start.wait": "正在等待 OpenBot 响应",
   "server.hosted.detail.connect.signIn": "正在以你的身份登录",

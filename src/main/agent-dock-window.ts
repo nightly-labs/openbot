@@ -8,7 +8,12 @@ import type {
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_DOCK_LIMITS, AGENT_DOCK_SIZE_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import {
+  AGENT_DOCK_LIMITS,
+  AGENT_DOCK_SIZE_LIMITS,
+  IPC_ENDPOINTS,
+  sameAgentDockDisplayBounds,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
@@ -214,7 +219,11 @@ export class AgentDockWindowController {
     const offset = this.#offsets.get(entry.displayId);
     const main = this.#options.getMainWindow();
     if (offset !== undefined && main && !main.isDestroyed()) {
-      sendToRenderer(main, IPC_ENDPOINTS.agentDock.moved, { displayId: entry.displayId, offset });
+      sendToRenderer(main, IPC_ENDPOINTS.agentDock.moved, {
+        displayId: entry.displayId,
+        offset,
+        ...(display && { bounds: display.bounds }),
+      });
     }
   }
 
@@ -229,12 +238,17 @@ export class AgentDockWindowController {
   }
 
   #boundsFor(display: Display): Rectangle {
-    return agentDockWindowBounds(
-      display,
-      this.#presentation?.edge ?? "right",
-      this.#offsets.get(display.id) ?? 0.5,
-      this.#zoom(),
+    return agentDockWindowBounds(display, this.#presentation?.edge ?? "right", this.#offsetFor(display), this.#zoom());
+  }
+
+  #offsetFor(display: Display): number {
+    const saved = this.#offsets.get(display.id);
+    if (saved !== undefined) return saved;
+    const connected = new Set(this.#options.screen.getAllDisplays().map(({ id }) => id));
+    const renamed = (this.#presentation?.offsets ?? []).findLast(
+      (item) => !connected.has(item.displayId) && sameAgentDockDisplayBounds(item.bounds, display.bounds),
     );
+    return renamed?.offset ?? 0.5;
   }
 
   #zoom(): number {

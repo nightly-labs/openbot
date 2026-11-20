@@ -404,6 +404,8 @@ export interface OpenBotToolRouterHooks {
   runsTurn(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
+  turnUnfinished(turnId: string): boolean;
+  startedTask(turnId: string): void;
   requestNoUpdate(
     agentId: string,
     threadId: string,
@@ -1027,9 +1029,15 @@ export class OpenBotToolRouter {
       })
       .pipe(Effect.catch(() => Effect.succeed("cancel" as const)));
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.mcpToolDeclined"));
-    const outcome = yield* Effect.result(servers.callTool(found.config, found.tool, call.arguments)).pipe(
-      Effect.raceFirst(requestAborted(request.signal)),
-    );
+    const relayed =
+      client.callRelayedMcpTool?.(params.threadId, found.config, found.tool, call.arguments) ?? Effect.succeed(null);
+    const outcome = yield* Effect.result(
+      relayed.pipe(
+        Effect.flatMap((answer) =>
+          answer ? Effect.succeed(answer) : servers.callTool(found.config, found.tool, call.arguments),
+        ),
+      ),
+    ).pipe(Effect.raceFirst(requestAborted(request.signal)));
     if (Result.isFailure(outcome))
       return openBotToolFailure(servers.redact(profileToolErrorMessage(outcome.failure.cause)));
     return "error" in outcome.success
@@ -2246,7 +2254,12 @@ export class OpenBotToolRouter {
       );
     }
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcpForAgent);
+    const memoryResult = this.#memories.handleTool(
+      params,
+      senderAgentId,
+      this.#hooks.redactMcpForAgent,
+      this.#hooks.turnUnfinished(params.turnId),
+    );
     if (memoryResult) return memoryResult;
 
     const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
@@ -2261,6 +2274,7 @@ export class OpenBotToolRouter {
     if (waitResult) return waitResult;
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
+    if (taskResult?.success) this.#hooks.startedTask(params.turnId);
     if (taskResult) return taskResult;
 
     const tableResult = yield* handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);

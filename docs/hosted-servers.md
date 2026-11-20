@@ -1196,8 +1196,9 @@ server got the machine in that moment.
 
 A machine of the pool is not the boat image:
 
-- It has no agent CLI for all users (`claude`, `codex`, `pi`) and no `node`. A provider shows that
-  its CLI is not downloaded, and the user downloads it in OpenBot.
+- It has no agent CLI for all users (`claude`, `codex`, `pi`) and no `node`. At start, a hosted
+  server downloads the CLI of each provider that an agent uses and that is not off. The user
+  downloads the CLI of another provider in OpenBot.
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
 - It shows the storage of a moved server (25, 75 and 150 GB), which is more than the plan table of
   the pricing page.
@@ -1464,8 +1465,9 @@ The VPS is not the same machine as the sandbox:
 
 - The boat image has commands that npm installed for all users (`claude`, `codex` and `pnpm` on
   2026-11-11). The VPS has none. The move copies the agent CLIs that the customer signed in to, and
-  `import` names each other one that is missing. A provider that used a missing command shows that
-  its CLI is not downloaded, and the user downloads it in OpenBot.
+  `import` names each other one that is missing. At start, a hosted server downloads the CLI of each
+  provider that an agent uses and that is not off. The user downloads the CLI of another provider in
+  OpenBot.
 - `prepare` makes only the primary group of `user`, and the VPS has no Docker. `import` names each
   group that `user` had in the sandbox (`docker` and `ascii-streaming-audio` on 2026-11-11). An
   agent of the customer that used Docker does not have it after the move.
@@ -1738,6 +1740,42 @@ system and goes back to the pool for the next new server or the next move. The W
    host keys.
 4. `prepare` installs OpenBot on the free machine again and offers it for a new server
    ([A new server on a pool machine](#a-new-server-on-a-pool-machine)).
+
+### Archive of an ended pool server
+
+A machine does not wait 14 days with the data of an ended plan. `sync` moves the data into an encrypted
+archive in Backblaze B2 and gives the machine back to the pool ([plan 012](../plans/012-pool-server-archive.md)).
+A renewal before the archive is deleted restores the server on a free pool machine (plan 012 item 4,
+live since 2026-11-19). Run `sync --apply` each day, so that each ended plan frees its machine and each
+restored or due archive is deleted.
+
+1. `sync` finds each server on a machine with `desired_state = 'stopped'`, `plan_ended`, no open
+   subscription and no live archive. It reads the newest subscription at Stripe. It archives only a
+   `canceled` or `incomplete_expired` subscription: at once, or 3 days after `plan_ended_at` when
+   `cancellation_details.reason` is `payment_failed` (`POOL_UNPAID_ARCHIVE_AFTER_MS`).
+2. `sync` makes a new `age` X25519 key, starts a multipart upload in `openbot-pool-archive-eu` with the
+   operator key, and sends the machine only the `age` recipient and a presigned URL for each 100 MiB
+   part. The machine runs `move-from-boat.sh export - | age -r <recipient>`, cuts the result into parts,
+   and uploads each part with `curl`. The data does not go through the operator's computer, and the
+   machine gets no B2 key.
+3. `sync` checks that the ETag of each part is its MD5, completes the upload, and checks the size of
+   the object. Then it writes the row in `hosted_server_archives` with the `age` identity encrypted with
+   `HOSTED_ARCHIVE_KEY_SECRET` (AES-256-GCM, `v1.<IV>.<sealed>`, the server ID and object key as
+   additional data). The write stops when the server changed, for example by a renewal; `sync` then
+   deletes the object and the machine keeps the data.
+4. `sync` sets `operator_host = NULL` only while `desired_state` is still `stopped`, clears the token of
+   the machine, sets its reference to `pool` and reinstalls it. When the reinstall fails, the archive is
+   complete but the machine still has the data: run `prepare --reinstall` for it.
+5. Each `sync` deletes an archive in B2 and then its key in D1 (`deleted_at`, `wrapped_key = NULL`) when
+   `delete_after` (`plan_ended_at` + 14 days) is past, the server is deleted (owner delete, refund
+   delete, account delete), or the restore set `restored_at`. The bucket lifecycle (hide after 15 days,
+   delete 1 day later) removes an archive that `sync` missed.
+
+The 14-day cron of the Worker also deletes a server with a live archive and no machine, as it does a
+server on a machine. Its delete then also deletes the old boat sandbox of a moved server
+(`retired_sandbox_id`). `sync` needs `STRIPE_SECRET_KEY`, `B2_KEY_ID_EU`, `B2_APPLICATION_KEY_EU` and
+`HOSTED_ARCHIVE_KEY_SECRET` from `apps/auth-api/.env.production`. `status` names the servers that
+`sync` would archive and the archives that it would delete.
 
 A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
 so its 14 days start then.

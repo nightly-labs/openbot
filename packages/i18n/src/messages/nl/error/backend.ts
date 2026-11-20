@@ -303,6 +303,12 @@ export const messages = {
     "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server nu niet beschikbaar is. Wacht een paar minuten en begin dan een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} kon de MCP-server {name} niet bereiken. Open {name} in Marktplaats, Apps, en controleer of het adres klopt en of de server draait. Begin daarna een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} kon de GitHub-tools niet ophalen, omdat GitHub niet antwoordde. Open GitHub in Marktplaats, Apps, en verbind het opnieuw als daarom wordt gevraagd. Begin daarna een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -375,12 +381,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
-  "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot kon de API-sleutel niet lezen. Voer een sleutel van maximaal 8.000 tekens in en kies wie hem mag gebruiken.",
-  "error.backend.vaultItemNotAllowed":
-    "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
   "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",
   "error.backend.authRequestInactive": "Dit beveiligde verificatieverzoek is niet meer actief.",
   "error.backend.secureAuthUnavailable": "Beveiligde verificatie is niet beschikbaar.",
@@ -426,7 +429,7 @@ export const messages = {
     "De pop-up kon niet laden. Probeer opnieuw in te loggen vanaf de oorspronkelijke pagina.",
   "error.backend.browserTabNotFound": "Browsertabblad niet gevonden.",
   "error.backend.authActive": "Verificatie is al actief.",
-  "error.backend.authHttpsRequired": "Beveiligde verificatie vereist HTTPS.",
+  "error.backend.authWebPageRequired": "Beveiligde verificatie vereist HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Verificatiecodes moeten 4–12 cijfers hebben.",
   "error.backend.authExpired": "Het verificatieverzoek is verlopen.",
   "error.backend.authDigitsRequired": "Voer het gevraagde aantal cijfers in.",

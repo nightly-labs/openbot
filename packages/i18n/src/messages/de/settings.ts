@@ -616,6 +616,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Tarif abgelaufen",
   "settings.hostedServers.state.creating": "Wird erstellt",
   "settings.hostedServers.state.starting": "Wird gestartet",
+  "settings.hostedServers.state.restoring": "Wiederherstellung",
   "settings.hostedServers.state.running": "Läuft",
   "settings.hostedServers.state.stopping": "Wird gestoppt",
   "settings.hostedServers.state.stopped": "Gestoppt",
@@ -626,6 +627,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Die Einrichtung beginnt, sobald Stripe die Zahlung bestätigt.",
   "settings.hostedServers.planEndedDescription":
     "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben erhalten. Verlängere den Tarif, um ihn zu starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben bis zum {date} erhalten. Verlängere den Tarif vorher, um ihn zu starten.",
   "settings.hostedServers.pay": "Zahlungsseite öffnen",
   "settings.hostedServers.payLabel": "Zahlungsseite für {name} öffnen",
   "settings.hostedServers.renew": "Tarif verlängern",
@@ -739,6 +742,13 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
   "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.talk.section": "Sprachgespräch",
+  "settings.voice.talkKey.title": "Push-to-Talk-Taste",
+  "settings.voice.talkKey.description": "Halte diese Tasten gedrückt, um in einem Sprachgespräch zu sprechen.",
+  "settings.voice.talkKey.change": "Push-to-Talk-Taste ändern",
+  "settings.voice.talkKey.recording": "Drücke die Tasten",
+  "settings.voice.talkKey.refused": "Füge noch eine Taste hinzu",
+  "settings.voice.talkKey.reset": "Zurücksetzen",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":

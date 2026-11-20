@@ -288,6 +288,12 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} could not start the MCP server {name}, because the server is not available now. Wait a few minutes, then start a new chat to try again.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} could not reach the MCP server {name}. Open {name} in Marketplace, Apps, and make sure that its address is correct and that the server is running. Then start a new chat to try again.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} could not get the GitHub tools, because GitHub did not answer. Open GitHub in Marketplace, Apps, and connect it again if it asks you to. Then start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
@@ -370,11 +376,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
-  "error.backend.apiKeyNotAllowed": "Only the server owner or an admin can enter an API key.",
   "error.backend.apiKeySaving": "The API key is already being saved.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot could not read the API key. Enter a key of 8,000 characters or less, and select who can use it.",
-  "error.backend.vaultItemNotAllowed": "Only the server owner or an admin can add an item to the Vault.",
   "error.backend.vaultItemSaving": "The Vault item is already being saved.",
   "error.backend.authRequestInactive": "This secure authentication request is no longer active.",
   "error.backend.secureAuthUnavailable": "Secure authentication is unavailable.",
@@ -416,7 +420,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.popupLoadFailed": "The popup could not load. Retry sign-in from the original page.",
   "error.backend.browserTabNotFound": "Browser tab not found.",
   "error.backend.authActive": "Authentication is already active.",
-  "error.backend.authHttpsRequired": "Secure authentication requires HTTPS.",
+  "error.backend.authWebPageRequired": "Secure authentication requires HTTP or HTTPS.",
   "error.backend.authDigitsRange": "Authentication codes require 4–12 digits.",
   "error.backend.authExpired": "Authentication request expired.",
   "error.backend.authDigitsRequired": "Enter the requested number of digits.",

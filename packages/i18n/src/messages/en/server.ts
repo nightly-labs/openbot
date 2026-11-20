@@ -183,6 +183,7 @@ export const messages = defineMessages("server", {
   "server.hosted.detail.create.copy": "Copying OpenBot to the machine",
   "server.hosted.detail.create.key": "Adding a one-time sign-in key",
   "server.hosted.detail.start.boot": "Turning on the machine",
+  "server.hosted.detail.start.restore": "Restoring data",
   "server.hosted.detail.start.app": "Starting OpenBot",
   "server.hosted.detail.start.wait": "Waiting for OpenBot to answer",
   "server.hosted.detail.connect.signIn": "Signing in as you",

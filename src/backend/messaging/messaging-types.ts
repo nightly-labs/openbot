@@ -309,6 +309,7 @@ export class DiscordApiError extends Error {
 }
 
 export interface MessagingDriverOptions {
+  connectionId: string;
   rateLimited(retryAt: string): void;
 }
 

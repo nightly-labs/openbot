@@ -305,6 +305,12 @@ export const messages = {
     "{provider} no pudo iniciar el servidor MCP {name}. Sus herramientas no están disponibles para {provider}. {provider} inicia el servidor por su cuenta, así que la prueba de conexión en OpenBot puede funcionar. Inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no respondió a tiempo. Inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no está disponible ahora. Espera unos minutos y luego inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} no pudo conectar con el servidor MCP {name}. Abre {name} en Marketplace, Apps, y comprueba que su dirección es correcta y que el servidor está en marcha. Luego inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} no pudo obtener las herramientas de GitHub, porque GitHub no respondió. Abre GitHub en Marketplace, Apps, y vuelve a conectarlo si te lo pide. Luego inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -374,8 +380,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
-  "error.backend.apiKeyNotAllowed":
-    "Solo el propietario del servidor o un administrador puede introducir una clave de API.",
   "error.backend.apiKeySaving": "La clave de API ya se está guardando.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot no pudo leer la clave de API. Introduce una clave de 8000 caracteres o menos y elige quién puede usarla.",
@@ -423,7 +427,7 @@ export const messages = {
     "No se pudo cargar la ventana emergente. Intenta iniciar sesión de nuevo desde la página original.",
   "error.backend.browserTabNotFound": "No se encontró la pestaña del navegador.",
   "error.backend.authActive": "La autenticación ya está activa.",
-  "error.backend.authHttpsRequired": "La autenticación segura requiere HTTPS.",
+  "error.backend.authWebPageRequired": "La autenticación segura requiere HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Los códigos de autenticación requieren entre 4 y 12 dígitos.",
   "error.backend.authExpired": "La solicitud de autenticación caducó.",
   "error.backend.authDigitsRequired": "Introduce el número de dígitos solicitado.",

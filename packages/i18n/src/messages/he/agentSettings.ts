@@ -181,11 +181,11 @@ export const messages = {
     "הבחירה הזו היא רק שלך וחלה בכל המכשירים שלך. כשהשרת מושתק או מוגדר ל״ללא״, גם הסוכן הזה שותק.",
 
   "agentSettings.newChat.title": "צ'אט חדש",
-  "agentSettings.newChat.description": "הסוכן שוכח את הצ'אט הזה. ההגדרות שלו נשארות.",
+  "agentSettings.newChat.description": "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההגדרות שלו נשארות.",
   "agentSettings.newChat.button": "התחלה",
   "agentSettings.newChat.confirmTitle": "להתחיל צ'אט חדש עם {name}?",
   "agentSettings.newChat.confirmDescription":
-    "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
+    "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",

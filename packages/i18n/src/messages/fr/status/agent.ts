@@ -72,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Utilisation de la page web…",
   "status.agent.browserReviewing": "Analyse de la page web…",
   "status.agent.memoriesSearching": "Recherche dans ses souvenirs…",
+  "status.agent.chatsSearching": "Recherche dans ses anciennes discussions…",
   "status.agent.memoriesSearched": {
     one: "Souvenirs consultés : {count} trouvé",
     other: "Souvenirs consultés : {count} trouvés",
