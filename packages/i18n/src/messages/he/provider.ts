@@ -407,4 +407,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
+  "provider.settings.updateAll": "עדכון הכול",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1538,4 +1538,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "无法接受转让",
   "mobile.server.ownerTransfer.declineFailed": "无法拒绝转让",
   "mobile.server.ownerTransfer.tryAgain": "请稍后再试。",
+  "mobile.server.providers.updateAll": "全部更新",
+  "mobile.server.providers.updateAllFailed": "部分更新未能开始。请重试。",
 } as const satisfies PartialTranslation<typeof source>;

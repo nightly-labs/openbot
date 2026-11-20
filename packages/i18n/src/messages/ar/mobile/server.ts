@@ -2265,4 +2265,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "تعذّر قبول النقل",
   "mobile.server.ownerTransfer.declineFailed": "تعذّر رفض النقل",
   "mobile.server.ownerTransfer.tryAgain": "حاول مرة أخرى لاحقًا.",
+  "mobile.server.providers.updateAll": "تحديث الكل",
+  "mobile.server.providers.updateAllFailed": "لم تبدأ بعض التحديثات. حاول مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

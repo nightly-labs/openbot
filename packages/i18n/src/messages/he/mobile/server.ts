@@ -2105,4 +2105,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "לא ניתן לאשר את ההעברה",
   "mobile.server.ownerTransfer.declineFailed": "לא ניתן לדחות את ההעברה",
   "mobile.server.ownerTransfer.tryAgain": "אפשר לנסות שוב מאוחר יותר.",
+  "mobile.server.providers.updateAll": "עדכון הכול",
+  "mobile.server.providers.updateAllFailed": "חלק מהעדכונים לא התחילו. נסו שוב.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -2074,4 +2074,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.ownerTransfer.acceptFailed": "Could not accept the transfer",
   "mobile.server.ownerTransfer.declineFailed": "Could not decline the transfer",
   "mobile.server.ownerTransfer.tryAgain": "Try again later.",
+  "mobile.server.providers.updateAll": "Update all",
+  "mobile.server.providers.updateAllFailed": "Some updates did not start. Try again.",
 });

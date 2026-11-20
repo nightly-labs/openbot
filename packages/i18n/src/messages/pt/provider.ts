@@ -332,4 +332,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
   "provider.settings.disconnectLocalOnly":
     "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
+  "provider.settings.updateAll": "Atualizar tudo",
 } as const satisfies PartialTranslation<typeof source>;

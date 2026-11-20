@@ -1883,4 +1883,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować",
   "mobile.server.ownerTransfer.declineFailed": "Nie udało się odrzucić",
   "mobile.server.ownerTransfer.tryAgain": "Spróbuj ponownie później.",
+  "mobile.server.providers.updateAll": "Aktualizuj wszystkie",
+  "mobile.server.providers.updateAllFailed": "Niektóre aktualizacje się nie rozpoczęły. Spróbuj ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

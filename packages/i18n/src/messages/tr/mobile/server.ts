@@ -1684,4 +1684,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Devir kabul edilemedi",
   "mobile.server.ownerTransfer.declineFailed": "Devir reddedilemedi",
   "mobile.server.ownerTransfer.tryAgain": "Daha sonra tekrar deneyin.",
+  "mobile.server.providers.updateAll": "Tümünü güncelle",
+  "mobile.server.providers.updateAllFailed": "Bazı güncellemeler başlamadı. Tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;
