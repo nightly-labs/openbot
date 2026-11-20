@@ -1,5 +1,10 @@
 import { PROVIDER_ACCOUNT_RELAYS } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_PROVIDERS,
+  PROVIDER_SIGN_IN_RELAY_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-sign-in-relay-v2";
+import {
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_ROUTES,
 } from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
@@ -45,6 +50,15 @@ export async function routeSignInRelay(
         relay.startProviderAccount(member.id, provider, nullableString(body, "accountId"), sessionId),
       ),
     );
+  }
+  if (method === "POST" && url.pathname === PROVIDER_SIGN_IN_RELAY_V2_ROUTES.start) {
+    if (!relay || !capabilities.has(PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
+    requireAdmin(member);
+    const body = await readJson(request);
+    const provider = PROVIDER_SIGN_IN_RELAY_V2_PROVIDERS.find((id) => id === stringField(body, "provider"));
+    if (!provider) throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
+    return json(200, await runCauseEffect(relay.startProvider(member.id, provider, sessionId)));
   }
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
   const deepLink = url.pathname === SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart;

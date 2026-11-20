@@ -55,16 +55,16 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   onLoggedOut?: () => void;
   logoutOnly?: boolean;
   signOutMethod?: AcpExtensionMethod | undefined;
-  openGoogleSignIn?: (url: string) => Promise<void>;
+  openSignInPage?: { site: SignInPageSite; open: (url: string) => Promise<void> };
   privateTemp?: ProviderTempOptions | undefined;
   onSignInUrl?: (url: string) => void;
 }) {
-  if (options.openGoogleSignIn && process.platform === "win32")
+  if (options.openSignInPage?.site === "google" && process.platform === "win32")
     return yield* providerFailure(
       new ProviderSignInError({ message: sourceText("error.provider.antigravityRemoteWindowsSignIn") }),
     );
   const env = { ...process.env, ...options.env };
-  const opener = options.openGoogleSignIn
+  const opener = options.openSignInPage
     ? yield* Effect.acquireRelease(
         Effect.tryPromise({ try: () => makeOpenerFolder(), catch: providerFailure }),
         (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true })),
@@ -102,7 +102,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         resume(error ? Effect.fail(providerFailure(error)) : Effect.void);
       };
       const fail = (error: Error) => settle(error);
-      const openGoogleSignIn = options.openGoogleSignIn;
+      const signInPage = options.openSignInPage;
       let opened = false;
       const signInFailed = (message: string) =>
         fail(
@@ -113,30 +113,26 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       const browserFailed = () =>
         signInFailed(
           sourceText(
-            process.platform === "linux"
-              ? "error.provider.geminiBrowserUnavailable"
-              : "error.provider.geminiBrowserOpenFailed",
+            signInPage?.site === "devin"
+              ? "error.provider.acpSignInFailed"
+              : process.platform === "linux"
+                ? "error.provider.geminiBrowserUnavailable"
+                : "error.provider.geminiBrowserOpenFailed",
           ),
         );
       const readSignInPage = () => {
-        if (settled || opened || !opener || !openGoogleSignIn) return;
+        if (settled || opened || !opener || !signInPage) return;
         void readFile(join(opener, OPENER_PAGE), "utf8").then(
           (text) => {
             const end = text.indexOf("\n");
             if (settled || opened || end < 0) return;
             const url = URL.parse(text.slice(0, end).trim());
-            if (
-              url?.origin !== "https://accounts.google.com" ||
-              !GOOGLE_SIGN_IN_PATHS.has(url.pathname) ||
-              url.username ||
-              url.password
-            )
-              return browserFailed();
+            if (!url || !SIGN_IN_PAGES[signInPage.site](url) || url.username || url.password) return browserFailed();
             opened = true;
             registerSecretValue(url.toString());
             void Promise.resolve()
               .then(() => {
-                if (!settled) return openGoogleSignIn(url.toString());
+                if (!settled) return signInPage.open(url.toString());
               })
               .catch(browserFailed);
           },
@@ -261,6 +257,13 @@ const OPENER_POLL_MS = 250;
 const OPENER_PAGE = "page";
 
 const GOOGLE_SIGN_IN_PATHS = new Set(["/o/oauth2/auth", "/o/oauth2/v2/auth"]);
+
+export type SignInPageSite = "google" | "devin";
+
+const SIGN_IN_PAGES: Record<SignInPageSite, (url: URL) => boolean> = {
+  google: (url) => url.origin === "https://accounts.google.com" && GOOGLE_SIGN_IN_PATHS.has(url.pathname),
+  devin: (url) => url.origin === "https://app.devin.ai",
+};
 
 async function makeOpenerFolder(): Promise<string> {
   const folder = await mkdtemp(join(tmpdir(), "openbot-sign-in-"));

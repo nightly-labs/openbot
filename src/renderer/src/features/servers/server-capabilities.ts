@@ -9,6 +9,7 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelayProviders } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
@@ -41,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
+      capability === "provider-sign-in-relay-v2" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
@@ -202,8 +204,8 @@ export function hostSignInProviders(server: ServerSummary | undefined): readonly
 }
 
 export function relaySignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
-  return server?.kind === "remote" && serverSupportsCapability(server, "sign-in-relay-v1")
-    ? SIGN_IN_RELAY_PROVIDERS
+  return server?.kind === "remote"
+    ? providerSignInRelayProviders((capability) => serverSupportsCapability(server, capability))
     : [];
 }
 
