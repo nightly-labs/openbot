@@ -122,7 +122,8 @@ export const messages = {
     "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
-  "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.noModels":
+    "לא מוצגים כאן מודלים של {name}. מנהל יכול להפעיל אותם בהגדרות השרת ← ספקים ← {name} ← מודלים.",
   "provider.picker.endpointModelsInCustom":
     "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
   "provider.picker.showCustomModels": "הצגת מודלים",

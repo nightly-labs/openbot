@@ -125,7 +125,8 @@ export const messages = {
     "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
-  "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.noModels":
+    "ここには {name} のモデルが表示されていません。管理者が「サーバーの設定」>「プロバイダー」>「{name}」>「モデル」でオンにできます。",
   "provider.picker.endpointModelsInCustom":
     "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
   "provider.picker.showCustomModels": "モデルを表示",

@@ -43,6 +43,7 @@ interface ProviderModels {
   defaultModel: string;
   models: ToolModel[];
   omittedModels?: number;
+  turnedOffModels?: TurnedOffModels;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
   noMatchReason?: string;
 }
@@ -129,6 +130,22 @@ export interface ListModelsRequest {
   query?: string | undefined;
   inUse?: readonly Pick<AgentModelChoice, "provider" | "model">[];
   customEndpoints?: readonly ListedCustomEndpoint[];
+  hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
+}
+
+interface TurnedOffModels {
+  models: string[];
+  omittedModels?: number;
+  reason: string;
+}
+
+function turnedOffModels(provider: AgentProvider, off: readonly AgentModelOption[]): TurnedOffModels {
+  const listed = off.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
+  return {
+    models: listed,
+    ...(off.length > listed.length ? { omittedModels: off.length - listed.length } : {}),
+    reason: `These models are turned off, so the model picker does not show them. An admin turns them on in ${FIX_IN} > ${providerLabel(provider)} > Models.`,
+  };
 }
 
 export interface ListedCustomEndpoint {
@@ -219,24 +236,30 @@ export function listModelsPayload(
     (id) => {
       const fallback = providerDefault(id, models);
       if (!fallback || !providerCanRun(id, statuses)) return [];
-      const own = models.filter((model) => model.provider === id);
+      const inUse = (request.inUse ?? []).filter((choice) => choice.provider === id).map((choice) => choice.model);
+      const hidden = request.hiddenModels?.(id);
+      const turnedOff = (model: AgentModelOption) => hidden?.has(model.id) === true && !inUse.includes(model.id);
+      const own = models.filter((model) => model.provider === id && !turnedOff(model));
       const candidates = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
       let listed: AgentModelOption[];
       if (words.length > 0) {
         listed = candidates.slice(0, resultRoom);
         resultRoom -= listed.length;
       } else {
-        const inUse = (request.inUse ?? []).filter((choice) => choice.provider === id).map((choice) => choice.model);
         listed = shortList(own, new Set([fallback.id, ...inUse]));
       }
       const omitted = candidates.length - listed.length;
       const rows = accounts(id);
+      const off = models.filter(
+        (model) => model.provider === id && turnedOff(model) && (words.length === 0 || matchesQuery(model, words)),
+      );
       return [
         {
           provider: id,
           defaultModel: fallback.id,
           models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
+          ...(off.length > 0 ? { turnedOffModels: turnedOffModels(id, off) } : {}),
           ...(id === "openrouter" && words.length > 0 && candidates.length === 0
             ? { noMatchReason: OPENROUTER_NO_MATCH_REASON }
             : {}),

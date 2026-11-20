@@ -385,6 +385,7 @@ function captureFailure(failure: ScreenCaptureFailed) {
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
+  hiddenModels?(provider: AgentProvider): ReadonlySet<string> | undefined;
   agentModels(choice: Pick<AgentModelChoice, "provider" | "providerAccountId">): AgentModelOption[];
   providerAccounts: ProviderAccountRows;
   providerStatuses(): readonly ProviderStatusRow[];
@@ -2026,8 +2027,11 @@ export class OpenBotToolRouter {
             .flatMap((agent) => [
               { provider: agent.provider, model: agent.model },
               ...(agent.backupModels?.order ?? []),
+              ...(agent.pendingRuntime ? [agent.pendingRuntime] : []),
+              ...(agent.usageLimitReturn ? [agent.usageLimitReturn] : []),
             ]),
           customEndpoints: this.#hooks.customEndpoints(),
+          hiddenModels: (provider) => this.#hooks.hiddenModels?.(provider),
         },
       );
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };

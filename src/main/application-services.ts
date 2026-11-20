@@ -1993,6 +1993,7 @@ export async function createApplicationServices({
       return config ? { config, setupSteps: server.setupSteps } : null;
     },
     mcpAgentAccess: (mcpServerId, agentId) => mcpAccessStore.allowsAgent(mcpServerId, agentId),
+    hiddenModels: (provider) => modelVisibility.hiddenIn(provider),
     prepareMcpTest: (config) =>
       prepareToolRuntimeForTest(config, {
         startToolRuntimes: () => {

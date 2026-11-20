@@ -127,7 +127,8 @@ export const messages = {
     "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
   "provider.picker.olderModelsList": "Ältere {name}-Modelle",
-  "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
+  "provider.picker.noModels":
+    "Hier werden keine Modelle von {name} angezeigt. Ein Administrator kann sie unter Servereinstellungen > Anbieter > {name} > Modelle einschalten.",
   "provider.picker.endpointModelsInCustom":
     "{name} führt deine eigenen Endpunkte aus. Ihre Modelle sind im Tab Benutzerdefiniert.",
   "provider.picker.showCustomModels": "Modelle zeigen",
