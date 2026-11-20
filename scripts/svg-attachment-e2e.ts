@@ -19,7 +19,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
 import { Effect } from "effect";
-import { AttachmentFiles } from "../src/backend/attachment-files";
+import { AttachmentFiles, toAttachmentSummary } from "../src/backend/attachment-files";
 
 const workspace = dirname(dirname(import.meta.filename));
 const artifactPath = join(workspace, ".openbot-build", "svg-attachment-e2e", "report.json");
@@ -87,6 +87,35 @@ async function run() {
     assert.equal(outbound.mimeType, "image/svg+xml");
     assert.equal(outbound.previewKind, "image");
 
+    const shape = '<rect x="1" y="1" width="2" height="2" fill="blue"/>';
+    const hugeDrawing = new TextEncoder().encode(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">${shape.repeat(Math.ceil((11 * 1024 * 1024) / shape.length))}</svg>\n`,
+    );
+    const hugeAgentDrawing = join(root, "sources", "complex_98MB.svg");
+    await writeFile(hugeAgentDrawing, hugeDrawing);
+    const hugeHandle = await open(hugeAgentDrawing, "r");
+    const [hugeOutbound] = await Effect.runPromise(
+      files.stageGenerated({ sources: [{ path: hugeAgentDrawing, handle: hugeHandle }], ownerAgentId: "agent" }),
+    ).finally(() => hugeHandle.close());
+    assert.ok(hugeOutbound);
+    const hugeSummary = toAttachmentSummary(hugeOutbound);
+    const storedBeforeCap = toAttachmentSummary({ ...hugeOutbound, previewKind: "image" });
+    const hugeReport = {
+      size: hugeOutbound.size,
+      stored: hugeOutbound.previewKind,
+      summary: hugeSummary.previewKind,
+      storedBeforeCap: storedBeforeCap.previewKind,
+      smallSummary: toAttachmentSummary(outbound).previewKind,
+    };
+    assert.deepEqual(
+      hugeReport,
+      { size: hugeDrawing.byteLength, stored: "none", summary: "none", storedBeforeCap: "none", smallSummary: "image" },
+      `Huge SVG preview: ${JSON.stringify(hugeReport)}`,
+    );
+    assert.equal(hugeSummary.kind, "file");
+    assert.equal(hugeSummary.mimeType, "image/svg+xml");
+    assert.deepEqual(await readFile(hugeOutbound.path), Buffer.from(hugeDrawing));
+
     assert.equal(isOpenableAttachmentName("chart.svg"), false);
     assert.doesNotThrow(() => assertSupportedAttachmentName("chart.svg"));
     const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: false, anyFile: false };
@@ -112,6 +141,7 @@ async function run() {
       },
       uploads: uploaderTypes.map((sent, index) => ({ sent, stored: uploaded[index]?.mimeType })),
       outbound: { name: outbound.name, kind: outbound.kind, mimeType: outbound.mimeType },
+      hugeOutbound: hugeReport,
     };
   } finally {
     await rm(root, { recursive: true, force: true });
