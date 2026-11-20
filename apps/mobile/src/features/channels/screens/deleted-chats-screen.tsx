@@ -16,7 +16,7 @@ import { ChannelAvatar } from "../components/channel-avatar";
 import { useChannels } from "../components/use-channels";
 
 export function DeletedChatsScreen() {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
@@ -103,7 +103,11 @@ export function DeletedChatsScreen() {
                         {channel.name}
                       </Typography.Paragraph>
                       <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
-                        {channel.lastMessage?.text ?? t("mobile.channel.list.noMessages")}
+                        {channel.lastMessage
+                          ? channel.lastMessage.author?.kind === "coordinator"
+                            ? sourceText(channel.lastMessage.text)
+                            : channel.lastMessage.text
+                          : t("mobile.channel.list.noMessages")}
                       </Typography.Paragraph>
                     </View>
                   </Pressable>

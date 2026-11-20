@@ -21,7 +21,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
     sidebarClickIsSuppressed,
     startChatDragging,
   } = useSidebarScope();
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
   const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
@@ -37,10 +37,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const previewPending = () => props.channelPreviewsPending === true && !rowProps.channel.lastMessage;
   const time = () =>
     previewPending() ? "" : sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format);
+  const lastMessageText = () => {
+    const message = rowProps.channel.lastMessage;
+    if (!message) return undefined;
+    return message.author?.kind === "coordinator" ? sourceText(message.text) : message.text;
+  };
   const preview = () => {
-    const text =
-      wait()?.detail ||
-      (rowProps.channel.lastMessage?.text ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
+    const text = wait()?.detail || (lastMessageText() ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
   const labelPreview = () => (wait()?.detail && rowProps.channel.activeTasks === 0 ? "" : `. ${preview()}`);

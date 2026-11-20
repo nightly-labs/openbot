@@ -26,7 +26,7 @@ export function SidebarPinnedGroup() {
     startNativeItemDragging,
     stopSidebarDragging,
   } = useSidebarScope();
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const chatName = (chat: SidebarChatItem) => (chat.kind === "agent" ? chat.agent.name : chat.channel.name);
   const chatIsActive = (chat: SidebarChatItem) =>
     chat.kind === "agent" ? props.activeAgentId === chat.id : props.activeChannelId === chat.id;
@@ -59,7 +59,8 @@ export function SidebarPinnedGroup() {
               const pinnedPreview = () => {
                 if (item.chat.kind === "agent") return item.chat.agent.preview;
                 const lastMessage = item.chat.channel.lastMessage;
-                if (lastMessage) return lastMessage.text;
+                if (lastMessage)
+                  return lastMessage.author?.kind === "coordinator" ? sourceText(lastMessage.text) : lastMessage.text;
                 return props.channelPreviewsPending === true ? undefined : t("sidebar.channel.noMessages");
               };
               const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);
