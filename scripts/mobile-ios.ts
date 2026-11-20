@@ -1,12 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const mobileRoot = fileURLToPath(new URL("../apps/mobile", import.meta.url));
-// Without node_modules, Bun resolves expo from its global cache, where @expo/cli is missing.
 if (!existsSync(join(mobileRoot, "../../node_modules/expo"))) {
   throw new Error("Dependencies are not installed in this worktree. Run `bun install --frozen-lockfile` first.");
 }
@@ -29,8 +28,6 @@ if (args.includes("--help") || args.includes("-h")) {
 
 if (process.platform !== "darwin") throw new Error("The iOS simulator requires macOS.");
 
-// Expo opens a deep link with simctl openurl, which does not pass launch environment variables.
-// Supply the local framework path to prebuild; the Swift hook is simulator Debug only.
 delete process.env.OPENBOT_ROCKETSIM_FRAMEWORK;
 if (useRocketSim) {
   const app =
@@ -46,22 +43,25 @@ if (useRocketSim) {
   process.env.OPENBOT_ROCKETSIM_FRAMEWORK = framework;
 }
 
-// Keep the Xcode build in the ignored ios/ directory of this worktree. See mobile-ios-bin/xcodebuild.
-// Do not use ios/build: pod install writes codegen and autolinking output there, and removing the
-// Xcode build must not remove that output.
 process.env.OPENBOT_XCODE_DERIVED_DATA ??= join(mobileRoot, "ios/DerivedData");
 process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), process.env.PATH].join(delimiter);
 
-// run:ios skips prebuild when ios/ exists. Apply config plugins to existing projects too.
-// run:ios installs pods only when Podfile.lock changes, and prebuild only when the dependencies of
-// package.json changed. Install them here when their generated output is missing, because Xcode's
-// fallback codegen does not match the Pods project, and when a native dependency changed after the
-// last install: a removed package otherwise stays a Pods target whose source files no longer exist,
-// and a new local module, or a new source file of one, is not built.
+process.env.OPENBOT_KEEP_METRO_CACHE = "1";
+
+const { mobileBuildCacheRoot }: { mobileBuildCacheRoot: (projectRoot: string) => string | undefined } = require(
+  join(mobileRoot, "metro-cache.js"),
+);
+const buildCacheRoot = mobileBuildCacheRoot(mobileRoot);
+if (buildCacheRoot) {
+  const checkout = dirname(dirname(mobileRoot));
+  process.env.OPENBOT_XCODE_COMPILATION_CACHE = join(buildCacheRoot, "xcode");
+  process.env.OPENBOT_XCODE_PREFIX_MAPPINGS = [...new Set([checkout, realpathSync(checkout)])]
+    .map((path) => `"${path}=/^openbot"`)
+    .join(" ");
+}
+
 const podsOutput = join(mobileRoot, "ios/build/generated/autolinking/autolinking.json");
 const podfileLock = join(mobileRoot, "ios/Podfile.lock");
-// CocoaPods does not write Podfile.lock again when it has no change. This file has the time of the
-// last install from here, so a change that keeps the lock file does not install at each build.
 const podsStamp = join(mobileRoot, "ios/Pods/.openbot-installed");
 const modulesRoot = join(mobileRoot, "modules");
 const nativeInputs = [
@@ -70,8 +70,6 @@ const nativeInputs = [
   ...(existsSync(modulesRoot)
     ? readdirSync(modulesRoot).flatMap((name) => {
         const ios = join(modulesRoot, name, "ios");
-        // The Pods project lists the source files of a module. The time of the folder changes when a
-        // file is added or removed.
         return existsSync(ios)
           ? [
               ios,

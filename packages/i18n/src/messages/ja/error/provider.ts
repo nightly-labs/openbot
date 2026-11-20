@@ -186,6 +186,8 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
   "error.provider.stoppedBeforeStart":
     "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
+  "error.provider.sessionStartTimedOut":
+    "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
   "error.provider.serviceUnreachable":
     "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
   "error.provider.serviceUnreachableRefresh":
@@ -241,6 +243,8 @@ export const messages = {
     "エンドポイント「{provider}」がリクエストを拒否しました。API キーまたはヘッダーが正しくないか、アカウントがこのモデルを使用できない可能性があります。サーバー設定 → プロバイダーで確認するか、別のモデルを選んでください。その後、もう一度お試しください。",
   "error.provider.customEndpointKeyMissing":
     "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
+  "error.provider.customEndpointEffortRefused":
+    "エンドポイント「{provider}」がこのモデルの推論の強さを拒否しました。サーバー設定 → プロバイダーで「{provider}」を編集してください。推論の強さでは、このモデルが受け付ける強さだけを残すか、推論なしを選んでください。そのあと、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeKeyRefused":
@@ -269,6 +273,10 @@ export const messages = {
     "このモデルは利用できません。このエージェントに別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "モデルの応答が出力上限を3回超えたため、ターンを停止しました。設定でカスタムプロバイダーを開き、このエンドポイントの編集をクリックして、このモデルの最大出力を大きくしてください。または、推論の強さを下げるか別のモデルを選んでください。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeModelNotServed":
@@ -294,6 +302,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
+  "error.provider.channelNoAnswer":
+    "{provider} が回答なしでターンを終了しました。チャンネルで「続行」をクリックするとタスクをもう一度実行し、「再割り当て」をクリックすると別のメンバーに渡します。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
@@ -399,12 +409,18 @@ export const messages = {
     "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.blankHistoryText":
+    "保存された履歴に空のメッセージがあるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.codexHistoryItemMissing":
     "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.codexRequestRefused":
     "{provider} がこのチャットのリクエストを拒否しましたが、原因は示されていません。画像の多い長いチャットで起こることがあります。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexSafetyBlocked":
+    "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} エージェントにはこのメッセージが見えなくなったため、次のメッセージは止まりません。別の言葉でもう一度リクエストを送ってください。",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} 次のメッセージも {provider} にブロックされる場合は、新しいチャットを開始してください。",
   "error.provider.codexAudioRefused":
-    "モデルはこのチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
+    "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":

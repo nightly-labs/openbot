@@ -1,26 +1,14 @@
-import { Deferred, Effect } from "effect";
-import type { RemoteWorkflowError } from "./remote-service-effects";
-/**
- * A hosted server has nobody to press Retry, so it publishes the host again after a failed start. A
- * start that could not sign in leaves the host idle or unconfigured, so those phases also start again.
- * Nothing here stops the server. The Worker stops it when it reports no use (`HostedServerActivity`).
- * A desktop server uses it too, to publish again after a failed publish at launch or a Signal failure.
- */
-
 import type { HostPhase } from "@openbot/contracts/ipc";
+import { Deferred, Effect } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
+import type { RemoteWorkflowError } from "./remote-service-effects";
 
-/**
- * The check only reads the host phase. It is short because a device that woke a hosted server waits
- * for this retry when the first start fails. The delays between starts keep the account server load low.
- */
 const CHECK_INTERVAL_MS = 5_000;
 const START_RETRY_DELAYS_MS = [10_000, 30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000];
 const RETRY_PHASES: ReadonlySet<HostPhase> = new Set(["error", "idle", "unconfigured"]);
 
 export interface HostedServerStartRetryOptions {
   hostPhase: () => HostPhase;
-  /** Signs in again when the first start could not, then publishes the host. */
   startHost: () => Effect.Effect<unknown, RemoteWorkflowError>;
   onError: (message: string, error: unknown) => void;
   now?: () => number;

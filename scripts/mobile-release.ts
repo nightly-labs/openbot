@@ -1,13 +1,3 @@
-// `bun run mobile:release`: one menu for each step of a mobile release. Press a digit to select.
-// Each step that changes files makes a branch from the main of GitHub, commits, pushes and opens
-// the pull request, then goes back to the branch you were on. The menu never merges, except with
-// the auto-merge choice, which waits for review and CI as a manual merge does.
-//
-// Without a terminal, use the commands under it: `bun scripts/prepare-release.ts <patch|minor|major> --mobile`,
-// `bun run mobile:release:published <ios|android|both>`, `gh workflow run release-ios.yml --ref main`,
-// and `bun scripts/discord-mobile-release-announcement.ts <plan|check|mark-posted>`.
-// See apps/mobile/README.md#release-menu.
-
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { emitKeypressEvents } from "node:readline";
@@ -54,7 +44,6 @@ interface Choice<T> {
   value: T;
 }
 
-/** Reads one key in raw mode. Ctrl+C exits. */
 function readKey(): Promise<string> {
   return new Promise((resolve) => {
     emitKeypressEvents(process.stdin);
@@ -69,7 +58,6 @@ function readKey(): Promise<string> {
   });
 }
 
-/** Shows `choices` and waits for one of their keys. `Enter` selects the first one. */
 async function choose<T>(title: string, choices: readonly Choice<T>[]): Promise<T> {
   process.stdout.write(`\n${BOLD(title)}\n`);
   for (const choice of choices) process.stdout.write(`  ${BOLD(choice.key)}  ${choice.label}\n`);
@@ -99,9 +87,6 @@ function storeChoices(stores: readonly MobileStore[] = MOBILE_STORES): { label: 
   ];
 }
 
-// ---------------------------------------------------------------------------------------------
-// The overview.
-
 async function overview(): Promise<void> {
   const versions = mobileVersions(readText(MOBILE_CHANGELOG)).slice(0, 4);
   let tags: Set<string> | undefined;
@@ -124,10 +109,6 @@ async function overview(): Promise<void> {
   if (tags === undefined) process.stdout.write(DIM("  Could not read the post tags: run gh auth login.\n"));
 }
 
-// ---------------------------------------------------------------------------------------------
-// The steps.
-
-/** Runs `step` on a new branch, then goes back. A step that commits nothing deletes the branch. */
 async function onBranch(name: string, step: (branch: string) => Promise<string | undefined>): Promise<void> {
   assertCleanTree();
   const original = run("git", ["branch", "--show-current"]);
@@ -136,7 +117,6 @@ async function onBranch(name: string, step: (branch: string) => Promise<string |
   try {
     url = await step(branch);
   } finally {
-    // A commit that did not reach a pull request, after a failed push, stays on its branch.
     const committed = run("git", ["rev-parse", "HEAD"]) !== run("git", ["rev-parse", "origin/main"]);
     if (run("git", ["status", "--porcelain"]) === "") {
       run("git", ["switch", "--quiet", original]);
@@ -220,7 +200,6 @@ async function build(): Promise<void> {
   }
 }
 
-/** Opens the highlights file in the editor, with the version set. */
 function editHighlights(version: string): void {
   const current = JSON.parse(readText(MOBILE_ANNOUNCEMENT_FILE));
   if (current?.version !== version) {
@@ -427,7 +406,6 @@ async function live(): Promise<void> {
     process.stdout.write("Started mobile-release-announcement.yml.\n");
   }
   if (action === "mark") {
-    // Only a post that the workflow would send: the version and store that it is due or waits for.
     const posts = [
       ...plan.due.flatMap((post) => post.stores.map((store) => ({ version: post.version, store }))),
       ...plan.waiting.map(({ version, store }) => ({ version, store })),
@@ -448,8 +426,6 @@ async function live(): Promise<void> {
     });
   }
 }
-
-// ---------------------------------------------------------------------------------------------
 
 if (!process.stdin.isTTY) {
   process.stderr.write(

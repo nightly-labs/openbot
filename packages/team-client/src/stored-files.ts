@@ -1,13 +1,8 @@
 import type { AttachmentSummary, StoredFileRow } from "@openbot/contracts/ipc";
 
-/**
- * The file types, search and order of the stored files of a host. The desktop Library and Files views
- * and the phone Library use the same code, so a file has the same type on each of them.
- */
 export type FileType = "images" | "documents" | "code" | "spreadsheets" | "media" | "other";
 export type FileTypeFilter = "all" | FileType;
 
-/** The type filters in the order that the views show them. */
 export const FILE_TYPE_FILTER_VALUES: readonly FileTypeFilter[] = [
   "all",
   "images",
@@ -83,7 +78,6 @@ export function queryFiles(files: readonly StoredFileRow[], query: FileQuery): S
   });
 }
 
-/** Counts per type for the filter chips. Counts ignore the current type filter but follow the search. */
 export function fileTypeCounts(files: readonly StoredFileRow[]): Record<FileTypeFilter, number> {
   const counts: Record<FileTypeFilter, number> = {
     all: files.length,

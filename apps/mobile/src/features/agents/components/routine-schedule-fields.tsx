@@ -32,15 +32,10 @@ const PROBLEM_TEXT = {
   cronTooLong: "mobile.agent.record.problem.cronTooLong",
 } as const satisfies Record<RoutineDraftProblem, MobileTextKey>;
 
-/** The week as a person reads it, from Monday. 0 is Sunday, as in the saved schedule. */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const DEFAULT_WINDOW = { start: "09:00", end: "18:00" };
 
-/**
- * The schedule as the desktop asks for it: on which days and at what time. The trigger picker in
- * `header` sets how often; a cron expression is its last frequency, for a schedule the others cannot say.
- */
 export function RoutineScheduleFields({
   draft,
   disabled,
@@ -50,9 +45,7 @@ export function RoutineScheduleFields({
 }: {
   draft: RoutineScheduleDraft;
   disabled: boolean;
-  /** The first row of the group: the picker that changes the trigger and its frequency. */
   header: ReactNode;
-  /** Rows after the schedule, in the same group, such as the time zone. */
   footer?: ReactNode;
   onChange: (draft: RoutineScheduleDraft) => void;
 }) {
@@ -252,7 +245,6 @@ export function RoutineScheduleFields({
   );
 }
 
-/** The days of a run: seven toggles from Monday, with the name of a common set beside the label. */
 function RoutineDayChips({
   days,
   disabled,

@@ -160,9 +160,6 @@ function updateSkillToken(token: HTMLSpanElement, skill: ComposerSkill): void {
   token.replaceChildren(iconWrap, name);
 }
 
-/* The lucide-solid 1.33.0 `Puzzle`, `Blocks`, `TextQuote`, `AppWindow` and `Split` shapes, drawn without the icon components. A token
-   is built in effects and event handlers, where a production build has no Solid owner, and lucide's
-   `Icon` reads a context there: it throws `NoOwnerError` and halts the renderer. */
 type GlyphShape = ["path" | "rect", Record<string, string>];
 
 const PUZZLE_GLYPH: GlyphShape[] = [
@@ -248,7 +245,6 @@ function updateMcpToken(token: HTMLSpanElement, server: ComposerMcpServer): void
   token.replaceChildren(iconWrap, name);
 }
 
-/** A passage that the user selected in a message. Its id is the id of that message. */
 export function createQuoteToken(messageId: string, text: string): HTMLSpanElement {
   const token = document.createElement("span");
   token.className = `composer-mention-token ${referenceChipClasses.root}`;
@@ -269,24 +265,18 @@ export function createQuoteToken(messageId: string, text: string): HTMLSpanEleme
   return token;
 }
 
-/** A browser tab of the agent. The tag keeps the title that the tab had when the user tagged it. */
 export function createTabToken(tab: ComposerBrowserTab): HTMLSpanElement {
   const token = document.createElement("span");
   updateReferenceToken(token, "tab", tab.id, referenceName(tabTitle(tab)), true);
   return token;
 }
 
-/** A side thread of the agent, by its task id. */
 export function createThreadToken(thread: ComposerThread): HTMLSpanElement {
   const token = document.createElement("span");
   updateReferenceToken(token, "thread", thread.id, referenceName(thread.title), true);
   return token;
 }
 
-/*
- * A tab or a thread that is gone keeps its tag in the draft, drawn with the outline of a removed
- * skill. The provider then reads that it is closed or deleted.
- */
 function updateReferenceToken(
   token: HTMLSpanElement,
   kind: "tab" | "thread",
@@ -329,7 +319,6 @@ function updateReferenceToken(
   token.replaceChildren(iconWrap, nameElement);
 }
 
-/** Draws each tab and thread tag of the draft as available or gone, after the lists change. */
 export function syncReferenceTokens(
   editor: HTMLDivElement,
   tabs: readonly ComposerBrowserTab[],
@@ -384,8 +373,6 @@ function updateUnavailableMcpToken(token: HTMLSpanElement, id: string, name: str
   token.textContent = name;
 }
 
-/* A server the host no longer holds, or one the user turned off, is drawn as a name the agent
-   cannot reach - the same outline a removed skill takes. */
 export function syncMcpTokens(editor: HTMLDivElement, servers: ComposerMcpServer[]): void {
   const available = new Map(servers.filter((server) => server.enabled).map((server) => [server.id, server]));
   for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-mcp-id]")) {
@@ -412,7 +399,6 @@ export function syncSkillTokens(editor: HTMLDivElement, skills: ComposerSkill[])
   }
 }
 
-/** What the editor draws its tags from. */
 export interface EditorTagSources {
   agents: ComposerAgent[];
   skills: ComposerSkill[];

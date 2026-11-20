@@ -1,10 +1,3 @@
-// The registered HTTP adapter of each supported Team API protocol. A caller that holds a negotiated
-// protocol number takes its codec from `teamHttpCodec` instead of choosing an adapter itself. Routes
-// of a side protocol are not here: they use `teamSideRouteCodec`, which a caller checks first.
-//
-// Each entry is its frozen adapter itself. An adapter reads only the options it declares, so V1 and V3
-// ignore `agentCreateModel`. A protocol older than V3 is served by the V1 adapter.
-
 import { TEAM_API_ROUTES } from "../team-api-routes";
 import { decodeAgentCreateOperation } from "./agent-create-operation-v1";
 import { isAgentCreateRoute } from "./current";
@@ -61,24 +54,17 @@ import { decodeTeamProtocolSupportV10, TEAM_PROTOCOL_V10 } from "./v10";
 
 export interface TeamHttpCodecOptions {
   preserveSemanticTags?: boolean;
-  /** Read only by V4 to V8, which accept a model in an agent create request. */
   agentCreateModel?: boolean;
-  /** Read only by V7 and V8 responses: the negotiated history-extent-v1 capability. */
   historyExtent?: boolean;
-  /** Read only by V7 and V8 responses: the negotiated ui-blocks-v1 capability. */
   uiBlocks?: boolean;
-  /** Read only by V7 and V8 responses: the negotiated subagents-v1 capability. */
   subagents?: boolean;
-  /** Read only by V7 responses: the negotiated prompt-multi-select-v1 capability. */
   promptMultiSelect?: boolean;
-  /** Read only by V7 and V8 responses: the negotiated video-generation-v1 capability. */
   videoGeneration?: boolean;
-  /** Read only by V8 responses: the negotiated usage-tertiary-v1 capability. */
   usageTertiary?: boolean;
-  /** Read only by V8 responses: the negotiated agent-pending-runtime-v1 capability. */
+  usageGroups?: boolean;
   agentPendingRuntime?: boolean;
-  /** Read only by V8 responses, for a protocol 9 peer: the negotiated memory-changes-v1 capability. */
   memoryChanges?: boolean;
+  queueHold?: boolean;
 }
 
 type DecodedRequest =
@@ -105,7 +91,6 @@ export interface TeamHttpCodec {
 
 const V1_CODEC: TeamHttpCodec = {
   encodeRequest: encodeTeamProtocolV1CurrentHttpRequest,
-  // The V1 request decoder takes no options.
   decodeRequest: (method, path, value) => decodeTeamProtocolV1CurrentHttpRequest(method, path, value),
   encodeResponse: encodeTeamProtocolV1CurrentHttpResponse,
   decodeResponse: decodeTeamProtocolV1CurrentHttpResponse,
@@ -146,13 +131,8 @@ const V8_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV8CurrentHttpResponse,
 };
 
-/**
- * Protocol 9 is the protocol 8 wire, with two changes: its compatibility response has up to 256
- * capabilities, and its agent create request can carry the `operationId` of agent-create-operation-v1.
- */
 const V9_CODEC: TeamHttpCodec = {
   ...V8_CODEC,
-  // Read off the raw request: the protocol 8 projection drops unknown keys.
   encodeRequest: (method, path, value, options) =>
     isAgentCreateRoute(method, path)
       ? JSON.stringify({
@@ -174,10 +154,6 @@ const V9_CODEC: TeamHttpCodec = {
       : V8_CODEC.decodeResponse(method, path, status, value),
 };
 
-/**
- * Protocol 10: the protocol 9 routes and bodies. Only its compatibility response is new: it has the
- * `absent` list (`v10.ts`).
- */
 const V10_CODEC: TeamHttpCodec = {
   ...V9_CODEC,
   encodeResponse: (method, path, status, value, options) =>
@@ -205,7 +181,6 @@ const V6_CODEC: TeamHttpCodec = {
   decodeResponse: decodeTeamProtocolV6CurrentHttpResponse,
 };
 
-/** The HTTP adapter of a negotiated protocol. No protocol, or one older than V3, gets V1. */
 export function teamHttpCodec(protocol: number | undefined): TeamHttpCodec {
   if (protocol === TEAM_PROTOCOL_V10) return V10_CODEC;
   if (protocol === TEAM_PROTOCOL_V9) return V9_CODEC;

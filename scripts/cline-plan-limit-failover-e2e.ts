@@ -1,14 +1,3 @@
-// Checks that Cline's spent weekly ClinePass plan is a usage limit (#10674). Runs the real agent service
-// on a temporary profile with a fake `cline --acp` 3.0.74 (`provider-fakes/agents/cline-plan-limit.ts`).
-// A prompt with `LIMIT-NOW` on a spent model fails as Cline 3.0.74 fails it: "Internal error" with
-// "You have reached your weekly Clinepass limit. The limit resets in 8h 30m, …" in `data.details`.
-// Each case has its own spent model: a plan limit holds its model for all agents.
-// Checks:
-//   1. Set to switch without asking, with a ready backup: the message runs again on the backup, the
-//      agent moves to it, and no error shows.
-//   2. With no backup: the message waits in the queue, and the limit holds the agent until the reset
-//      that Cline names, 8 h 30 min, and one minute more.
-// `bun run test:cline-plan-limit-failover`. Writes .openbot-build/cline-plan-limit-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -29,15 +18,12 @@ const logPath = join(root, "cline.jsonl");
 const SPENT_FAILOVER = "cline-pass/glm-5.3";
 const SPENT_WAIT = "cline-pass/kimi-k3";
 const BACKUP = "anthropic/claude-sonnet-5.5";
-// Cline's "8h 30m", and the minute that OpenBot adds because the text rounds down.
 const RESET_MS = (8 * 60 + 31) * 60_000;
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
 process.env.OPENBOT_CLINE_PATH = executable;
 mkdirSync(home, { recursive: true });
 
-// Cline's recommended-models endpoint, answered here with no models: the fake lists them.
 const realFetch = globalThis.fetch;
 globalThis.fetch = Object.assign(
   async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> =>
@@ -95,7 +81,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -143,7 +128,6 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Makes an agent on `model` with the backup models in `order`. Resolves after its first turn. */
 async function createAgent(name: string, model: string, order: readonly string[]) {
   const agent = await runCauseEffect(
     agents.createAgent({
@@ -228,7 +212,6 @@ try {
         agents.getRuntimeSnapshot().usageLimits?.find((entry) => entry.agentId === agent.id),
     );
     const result = caseReport(name, agent.id, "queued", before, since);
-    // `resetsAt` is in epoch seconds.
     result.resetsInMs = limit.resetsAt === null ? null : limit.resetsAt * 1_000 - sentAt;
     assert.deepEqual(
       result.prompts.map((prompt) => [prompt.model, prompt.spent]),

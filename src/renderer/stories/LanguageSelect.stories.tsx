@@ -37,7 +37,6 @@ function LanguageRow(props: { initial?: AppLanguage; disabled?: boolean }) {
   );
 }
 
-/** The row as it sits in the Settings list: one section, the same shape as the rows beside it. */
 export const Gallery: Story = {
   render: () => (
     <main class="foundation-story">
@@ -56,7 +55,6 @@ export const Gallery: Story = {
   ),
 };
 
-/** A selected language. Open the list to review the native names and the checked row as a set. */
 export const Expanded: Story = {
   render: () => (
     <main class="foundation-story">

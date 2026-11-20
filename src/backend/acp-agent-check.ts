@@ -1,18 +1,3 @@
-import { Deferred, Effect } from "effect";
-import {
-  type ProviderClientOperationError,
-  providerCall,
-  providerFailure,
-  providerSync,
-} from "./provider-client-effects";
-// "Check agent": one trial start of a custom agent, before the user saves it.
-//
-// `initialize` is sent first. When the caller asks for models, one `session/new` follows, with no
-// MCP servers, to read the models that the session lists; the agent saves nothing for OpenBot to
-// keep, and a failure there gives no models but does not fail the check. The process starts in an
-// empty temporary folder, in a process group of its own on POSIX, and the whole group is stopped
-// when the check ends, however it ends.
-
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,39 +8,34 @@ import { CUSTOM_AGENT_LIMITS, type CustomAgentCheckResult } from "@openbot/contr
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { Deferred, Effect } from "effect";
 import { OPENBOT_ACP_CLIENT_CAPABILITIES, OPENBOT_ACP_CLIENT_INFO } from "./acp-client";
 import { type AcpModel, modelsFromSessionSetup } from "./acp-configuration";
 import { cliSpawnTarget } from "./cli";
+import {
+  type ProviderClientOperationError,
+  providerCall,
+  providerFailure,
+  providerSync,
+} from "./provider-client-effects";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 import { TimeoutError } from "./with-timeout";
 
 const AGENT_CHECK_TIMEOUT_MS = 20_000;
-/** How long the model list may add to a check that has already passed. */
 const MODEL_LIST_TIMEOUT_MS = 10_000;
 const STOP_GRACE_MS = 2_000;
 const DETAIL_LIMIT = 300;
 const OPENBOT_ACP_PROTOCOL_VERSION = 1;
 
 export interface AgentCheckTarget {
-  /** The resolved file, from `resolveAgentCommand`. */
   executable: string;
   args: readonly string[];
   env: Readonly<Record<string, string>>;
-  /**
-   * The `PATH` the agent starts with, from `agentLaunchPath`. Apart from `env`, because it is not a
-   * secret to mask. A `PATH` in `env`, which the user saved on the agent, wins over it.
-   */
   path?: string | null;
   timeoutMs?: number;
-  /** Opens one session to read the models. An install check leaves it out: it needs only an answer. */
   listModels?: boolean;
 }
 
-/**
- * Starts the agent, asks what it is, and stops it. Rejects with a message the user can act on; the
- * agent's last stderr line is added only after `redactText` and after the agent's own environment
- * values are masked, because an agent can print the key it was given.
- */
 export const checkAcpAgent = Effect.fn("AcpAgent.check")((target: AgentCheckTarget) =>
   Effect.acquireUseRelease(
     providerCall(() => mkdtemp(join(tmpdir(), "openbot-agent-check-"))),
@@ -128,7 +108,6 @@ export const checkAcpAgent = Effect.fn("AcpAgent.check")((target: AgentCheckTarg
                 Effect.raceFirst(Deferred.await(ended)),
                 Effect.timeout(MODEL_LIST_TIMEOUT_MS),
                 Effect.map((session) => modelNames(modelsFromSessionSetup(session))),
-                // An agent that lists its models only after sign-in still passed the check.
                 Effect.orElseSucceed(() => []),
               )
             : [];
@@ -142,16 +121,10 @@ export const checkAcpAgent = Effect.fn("AcpAgent.check")((target: AgentCheckTarg
   ),
 );
 
-/** The process ended before it answered. */
 class CheckEnd extends Error {}
 
-/** A reason whose message is already what the user reads. */
 class CheckFailure extends Error {}
 
-/**
- * The one error a check rejects with. An error from the SDK or the process is not passed on as it
- * is: its text can quote what the agent sent, so only the agent's redacted stderr line is added.
- */
 function checkError(error: unknown, lastStderr: string | null, redact: (text: string) => string): Error {
   if (error instanceof CheckFailure || error instanceof TimeoutError) return new Error(error.message);
   const detail = lastStderr ? ` ${redact(lastStderr).slice(0, DETAIL_LIMIT)}` : "";
@@ -173,7 +146,6 @@ function checkResult(initialization: InitializeResponse, executable: string, mod
   };
 }
 
-/** One name per model, in the agent's order, within the IPC limits. */
 function modelNames(models: readonly AcpModel[]): string[] {
   const names = new Set<string>();
   for (const model of models) {
@@ -184,11 +156,6 @@ function modelNames(models: readonly AcpModel[]): string[] {
   return [...names];
 }
 
-/**
- * The capability names an agent reports, as flat tokens: `loadSession`, the prompt content kinds
- * (`image`, `audio`, `embeddedContext`), `mcp:http`, and `session:close`. What a newer agent adds
- * under these groups shows by its own name.
- */
 function capabilityNames(capabilities: InitializeResponse["agentCapabilities"]): string[] {
   if (!capabilities) return [];
   const names: string[] = [];
@@ -215,10 +182,6 @@ function maskValues(text: string, values: readonly string[]): string {
   return result;
 }
 
-/**
- * Web streams over the child's pipes, made here rather than with `Writable.toWeb`, whose Node types
- * do not match the global stream types that the SDK takes.
- */
 function processStreams(
   child: ChildProcessWithoutNullStreams,
 ): [WritableStream<Uint8Array>, ReadableStream<Uint8Array>] {
@@ -249,12 +212,10 @@ function processStreams(
       });
     },
   });
-  // A write to an agent that has exited fails on the pipe; the check reports the exit instead.
   child.stdin.on("error", () => undefined);
   return [output, input];
 }
 
-/** Stops the process group, and waits for the process to exit. SIGKILL after a short wait. */
 const stopGroup = Effect.fn("AcpAgent.stopGroup")(function* (
   child: ChildProcessWithoutNullStreams,
 ): Effect.fn.Return<void, ProviderClientOperationError> {
@@ -266,13 +227,10 @@ const stopGroup = Effect.fn("AcpAgent.stopGroup")(function* (
     try {
       if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, name);
       else child.kill(name);
-    } catch {
-      // The group has already exited.
-    }
+    } catch {}
   };
   child.stdin.destroy();
   if (child.exitCode !== null || child.signalCode !== null) {
-    // The leader is gone; members of its group can still run.
     signal("SIGKILL");
     return;
   }

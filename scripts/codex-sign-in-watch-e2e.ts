@@ -1,11 +1,3 @@
-// Checks issue #11713 on the real Codex driver and `ProviderRuntime`, with a fake Codex app-server
-// that answers `account/read` with an account only while `$CODEX_HOME/auth.json` exists.
-// 1. ChatGPT connects with the sign-in file.
-// 2. The file goes, and an update of the CLI starts the new copy while the old process runs. The
-//    update succeeds, and the row asks for a sign-in.
-// 3. The file comes back, as after `codex login` or a token that another Codex process saved. The
-//    row connects again on the new copy, with no Connect and no restart.
-// `bun run test:codex-sign-in-watch`. Writes .openbot-build/codex-sign-in-watch-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -22,7 +14,6 @@ const codexHome = join(home, ".codex");
 const authPath = join(codexHome, "auth.json");
 const logPath = join(root, "protocol.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = codexHome;
 process.env.OPENBOT_FAKE_CODEX_LOG = logPath;
@@ -36,8 +27,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
-// The version is high, so the managed copy runs and not a Codex on this computer. Codex 0.160.1 and
-// later answer with no account after a refresh that fails for good; a missing file gives the same answer.
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -93,7 +82,6 @@ interface Report {
 
 const report: Report = { passed: false };
 
-/** The executable of each Codex process that started, in order. */
 function starts(): string[] {
   try {
     return readFileSync(logPath, "utf8")
@@ -116,7 +104,6 @@ async function installFakeCodex(directory: string): Promise<string> {
 const executable = await installFakeCodex(join(root, "codex", "1"));
 const updatedExecutable = await installFakeCodex(join(root, "codex", "2"));
 const store = new AgentStore(join(root, "profile"), home, new OpenBotDatabase(join(root, "profile")));
-/** The Codex row state of each status event that changed it, in order. */
 const codexStates: (AgentProviderState | undefined)[] = [];
 let onStatus = () => {};
 const providers = new ProviderRuntime({
@@ -158,7 +145,6 @@ const providers = new ProviderRuntime({
 
 const codexRow = () => providers.status().providers?.find((row) => row.id === "codex");
 
-/** Resolves when the Codex row has gone through `states` in order, counting from `from` in `codexStates`. */
 function waitForCodexStates(from: number, states: readonly AgentProviderState[]): Promise<void> {
   const reached = () => {
     let next = 0;
@@ -180,12 +166,10 @@ function waitForCodexStates(from: number, states: readonly AgentProviderState[])
 }
 
 try {
-  // 1. Connected with the sign-in file.
   writeFileSync(authPath, JSON.stringify({ tokens: { refresh_token: "rt-1" } }));
   await runCauseEffect(providers.start());
   report.connected = { state: codexRow()?.state ?? null, email: codexRow()?.email ?? null };
 
-  // 2. The sign-in is gone, and the update starts the new copy while the old process runs.
   await rm(authPath);
   const update = await Effect.runPromise(
     Effect.result(
@@ -208,7 +192,6 @@ try {
     message: codexRow()?.message ?? null,
   };
 
-  // 3. The sign-in file comes back. The host checks the account again by itself.
   const from = codexStates.length;
   writeFileSync(authPath, JSON.stringify({ tokens: { refresh_token: "rt-2" } }));
   await waitForCodexStates(from, ["available"]);

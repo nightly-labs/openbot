@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate":
     "Mettez à jour le client pour utiliser la configuration du bureau à distance.",
   "error.remote.desktopSetupUnavailable": "La configuration du bureau à distance n’est pas disponible.",
@@ -27,6 +26,8 @@ export const messages = {
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",
   "error.remote.windowsSessionDisconnected":
     "La session Windows de l’hôte est déconnectée : elle n’a aucun écran à partager. Connectez-vous à Windows sur l’écran de l’hôte, puis réessayez.",
+  "error.remote.macScreenLocked":
+    "Le Mac est verrouillé : il ne peut pas partager son écran. Déverrouillez le Mac sur son écran, puis réessayez.",
   "error.remote.streamTooSlowLowerQuality":
     "La connexion à l’hôte est trop lente pour l’image. Réessayez : la prochaine connexion utilisera une qualité inférieure.",
   "error.remote.streamTooSlow":
@@ -193,6 +194,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Impossible d’établir une connexion directe avec l’hôte. Un pare-feu, un VPN ou un proxy peut la bloquer.",
   "error.remote.iceDisconnected": "La connexion directe avec l’hôte a été perdue.",
+  "error.remote.webrtcBlocked":
+    "Cet appareil bloque la connexion dont OpenBot a besoin. Si le mode Isolement est activé, désactivez-le pour OpenBot dans Réglages > Confidentialité et sécurité > Mode Isolement.",
   "error.remote.directoryUnreachable": "OpenBot n’a pas pu joindre le service OpenBot. Vérifiez votre connexion.",
   "error.remote.directoryTimeout": "Le service OpenBot n’a pas répondu à temps. Réessayez.",
   "error.remote.inviteAlreadyUsed": "Cette invitation a déjà été utilisée. Demandez une nouvelle invitation.",
@@ -212,6 +215,11 @@ export const messages = {
   "error.remote.formUnavailable": "Ce formulaire n’est plus disponible.",
   "error.remote.hostedServerRemoval": "Utilisez « Facturation » pour supprimer un serveur hébergé.",
   "error.remote.hostRemoved": "Le propriétaire a retiré ce serveur du compte.",
+  "error.remote.ownerTransferSelf":
+    "Vous êtes déjà propriétaire de ce serveur. Saisissez l'e-mail du nouveau propriétaire.",
+  "error.remote.ownerTransferHosted": "Un serveur hébergé par OpenBot ne peut pas changer de propriétaire.",
+  "error.remote.ownerTransferInvalid":
+    "Ce transfert de propriété n'est plus disponible. Demandez au propriétaire de l'envoyer à nouveau.",
   "error.remote.channelsUnsupported": "Mettez à jour ce serveur de bureau pour utiliser les canaux.",
   "error.remote.channelDeleteUnsupported": "Mettez à jour ce serveur de bureau pour supprimer des canaux.",
   "error.remote.historyRefreshFailed":

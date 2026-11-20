@@ -14,7 +14,6 @@ export function piText(content: unknown): string {
     .join("\n");
 }
 
-/** Converts the authoritative Pi message, never a cumulative streaming snapshot. */
 export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   const role = getString(message, "role");
   if (role === "user")
@@ -38,8 +37,6 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   if (role !== "assistant") return [];
   const items: ThreadItem[] = [];
   const content = getArray(message, "content");
-  // Pi runs the tool calls of a message whatever its stop reason is, and some hosts, such as
-  // OpenRouter, send `stop` with tool calls. The text before them is then a step, not a reply (#12114).
   const step =
     getString(message, "stopReason") === "toolUse" ||
     content.some((block) => isRecord(block) && block.type === "toolCall");
@@ -57,7 +54,6 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
         id: `${id}:thinking:${index}`,
         type: "reasoning",
         text: block.thinking,
-        // `reasoningText` reads a list of strings, as Codex sends it. An object here made the text empty (#9669).
         summary: [block.thinking],
       });
     if (block.type === "toolCall")

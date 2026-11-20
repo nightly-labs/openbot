@@ -20,18 +20,8 @@ export function ApprovalCard(props: {
   approval: AgentApproval;
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
-  /**
-   * Moves this agent from Ask first to Full access, then accepts the request in hand. Absent at any
-   * other level, and where the user may not change the agent's Permissions. The card then reads
-   * exactly as it did before this option existed.
-   */
   onAlwaysAllow?: (() => Promise<boolean>) | undefined;
-  /** The agent this grant would cover, for the confirmation the grant deserves. */
   agentName?: string | undefined;
-  /**
-   * Set while approved feedback is on its way. The approval is answered at once, so the chat keeps the
-   * card with its loader until the thank-you card arrives.
-   */
   sending?: boolean | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
@@ -40,8 +30,6 @@ export function ApprovalCard(props: {
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
-  // A runtime snapshot cut the request. Allow must not cover text that the user cannot see, so the card
-  // offers only Deny until the whole copy comes.
   const cut = () => approvalIsCut(props.approval);
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
@@ -171,15 +159,8 @@ export function ApprovalCard(props: {
   );
 }
 
-/**
- * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
- * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
- * A bug report about the phone app has no Send here: only the phone has its version, its system and
- * its support log, so the card tells the user to send the report from the phone app.
- */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
-  /** The report is only its start, so Send waits for the whole copy. */
   cut: boolean;
   submitting: boolean;
   sending: boolean;
@@ -188,7 +169,6 @@ function FeedbackOffer(props: {
 }) {
   const { t, sourceText } = useText();
   const idea = () => props.report.kind === "idea";
-  // The host writes its notes, such as the recent errors, as source text paragraphs.
   const text = () =>
     props.report.text
       .split("\n\n")
@@ -254,21 +234,13 @@ interface BrowserTakeoverCardProps {
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
   onOpen?: (() => void) | undefined;
-  /** Done. A view that cannot finish the step gives none, so the card offers no Done. */
   onComplete?: (() => Promise<boolean>) | undefined;
   onCancel: () => Promise<boolean>;
-  /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */
   onSignInLocally?: (() => void) | undefined;
-  /**
-   * The agent found that the page refused the sign-in from `server`. The card then asks only for the
-   * sign-in on this computer; `signingIn` is true while that sign-in is open.
-   */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
-  /** The page refused the sign-in from the server, and only the desktop app can send one from the user's device. */
   signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
-    /** Offer "Save to Vault" for a password. */
     vault?: BrowserSecretVault | undefined;
     onRespond: (input: LocalBrowserSecretResponse) => Promise<void>;
   };
@@ -299,8 +271,6 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
-  // The page does not open by itself, so opening it is the main action until the user has done it.
-  // The card can stay mounted for the request of another agent, so it keeps the request it opened.
   const [openedRequest, setOpenedRequest] = createSignal<BrowserTakeoverRequest>();
   const opened = () => {
     const done = openedRequest();

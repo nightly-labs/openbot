@@ -195,6 +195,16 @@ the server ID, because one viewer origin shows all joined servers. The phone app
 from its menu. The host serves this script also when it has no clipboard writer, but then without
 the paste part.
 
+The same script also keeps keys from staying down on the host when the viewer runs on a Mac or an
+iPad (#3766). macOS browsers often send no `keyup` for a key that is released while Cmd is held.
+Moonlight then keeps the key down, and Sunshine repeats it 25 times each second until another key
+goes down. The script sends a key pressed with Cmd as a tap: Moonlight gets the real `keydown`, and
+then a `keyup` at the next task. When Cmd is released, the script releases each other key that it
+still sees as held. When a held key goes down again without `repeat`, the script releases it
+first, so the new press reaches the host. A held Cmd shortcut still repeats, because each browser
+repeat is another tap. The script reads only trusted events and runs after the paste part, so the
+paste key keeps its path. Other viewers do not change.
+
 On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
 sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
@@ -300,3 +310,14 @@ When Computer Use is off for the agent or the driver is unavailable, the thread 
 entry disabled. A registration failure stops the thread with steps to repair the configuration or
 turn off Computer Use. The application-access questions from the driver still use their existing
 approval flow.
+
+### Codex's own Computer Use
+
+Codex loads its bundled Computer Use plugins by default (`computer-use@openai-bundled`, which starts
+`node_repl` and `cua_node`, and `unified-computer-use@openai-bundled`). A session without Computer
+Use sets `plugins.<id>.enabled = false` for both in the thread configuration: an agent with the
+setting off, or a task or channel thread beside the agent's own chat. The thread value wins over the
+user's own Codex file. Codex (0.160 to 0.170) does not read `features.computer_use`, so OpenBot does not use it.
+A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
+session without Computer Use. The next turn replaces a session from before, and a session whose
+setting changed, with the usual handoff.

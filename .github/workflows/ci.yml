@@ -451,6 +451,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:update-host-takeover
 
+      - name: Run the hosted update idle wait E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:hosted-update-idle-wait
+
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:messaging-pause-resume
@@ -727,6 +731,22 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:workflow-join
 
+      - name: Run the workflow agent step E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-agent-step
+
+      - name: Run the workflow schedule E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-schedule
+
+      - name: Run the provider image MIME E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:provider-image-mime
+
+      - name: Run the workflow step settings E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-step-settings
+
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
         run: bun run test:discord-github-files
@@ -811,6 +831,7 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
+            .openbot-build/hosted-update-idle-wait-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
@@ -875,6 +896,9 @@ jobs:
             .openbot-build/workflow-channel-output-e2e/
             .openbot-build/workflow-agent-tools-e2e/
             .openbot-build/workflow-join-e2e/
+            .openbot-build/workflow-agent-step-e2e/
+            .openbot-build/provider-image-mime-e2e/
+            .openbot-build/workflow-step-settings-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
@@ -1481,6 +1505,9 @@ jobs:
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
           COMPANY_SIGN_IN_SECRET: ${{ secrets.COMPANY_SIGN_IN_SECRET }}
+          HOSTED_ARCHIVE_KEY_SECRET: ${{ secrets.HOSTED_ARCHIVE_KEY_SECRET }}
+          B2_WORKER_KEY_ID_EU: ${{ secrets.B2_WORKER_KEY_ID_EU }}
+          B2_WORKER_APPLICATION_KEY_EU: ${{ secrets.B2_WORKER_APPLICATION_KEY_EU }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -1518,6 +1545,7 @@ jobs:
               ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
               // The Live Activity relay stays off until both are set.
               ["APNS_PRIVATE_KEY", "APNS_KEY_ID"],
+              ["HOSTED_ARCHIVE_KEY_SECRET", "B2_WORKER_KEY_ID_EU", "B2_WORKER_APPLICATION_KEY_EU"],
             ]) {
               const present = names.filter((name) => process.env[name]?.trim());
               if (present.length === 0) continue;

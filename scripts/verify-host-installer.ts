@@ -104,15 +104,8 @@ export async function verifyHostPayload(expanded: string, version: string): Prom
   }
 }
 
-// `pkgutil` describes a Developer ID Installer package as issued "for distribution". A Mac
-// Installer Distribution certificate reports "signed by a certificate trusted by" instead: that is
-// the App Store type, it cannot install this package outside the Mac App Store, and it was issued
-// by mistake once already. So the whole status line is the check, not the word "signed".
 const HOST_SIGNATURE_STATUS = "signed by a developer certificate issued by Apple for distribution";
 
-// Takes the text so the accepted and rejected wordings are provable without a signing identity:
-// the release path is the only place this runs, and a status no real package produces would fail
-// there for the first time with the package already built.
 export function verifyHostSignature(signature: string): void {
   if (
     !new RegExp(`^\\s*1[.:] Developer ID Installer:.*\\(${HOST_TEAM_ID}\\)\\s*$`, "m").test(signature) ||

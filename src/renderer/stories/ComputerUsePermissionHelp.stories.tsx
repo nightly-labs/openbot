@@ -28,8 +28,6 @@ function MockedHelp(props: {
     mock.dispose();
     window.openbot = previousApi;
   });
-  // The surface fills its own window, which is 340 by 322. Nothing wraps it here for the same
-  // reason nothing wraps it there.
   return <ComputerUsePermissionHelp permission={props.permission} sunshine={props.sunshine} />;
 }
 
@@ -50,12 +48,10 @@ export const Accessibility: Story = {
   render: () => <MockedHelp permission="accessibility" />,
 };
 
-/** The grant landed while the user was in System Settings, which puts the accent on Done. */
 export const Granted: Story = {
   render: () => <MockedHelp permission="accessibility" granted={["accessibility"]} />,
 };
 
-/** No bundle to drag, which is every build that does not run from an application. */
 export const WithoutApplication: Story = {
   render: () => <MockedHelp permission="screen-recording" app={null} />,
 };

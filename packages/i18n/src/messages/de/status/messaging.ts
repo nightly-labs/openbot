@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Gestoppt.",
   "status.messaging.stop": "Stoppen",
   "status.messaging.approvalTitle": "OpenBot bittet um Genehmigung, um fortzufahren.",
+  "status.messaging.approvalTitleTeammate": "Teamkollege {agent} bittet um Genehmigung, um fortzufahren.",
   "status.messaging.approvalCommand": "Einen Befehl ausführen",
   "status.messaging.approvalFileChange": "Dateien ändern",
   "status.messaging.approvalPermissions": "Weitere Berechtigungen erhalten",
@@ -35,7 +36,7 @@ export const messages = {
   "status.messaging.signInUnknown":
     "OpenBot hat diese Slack-Installation nicht gestartet. Starte sie erneut in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Hier kann noch kein Agent antworten. Füge den Telegram-Orchestrator in OpenBot hinzu.",
+    "Hier kann noch kein Agent antworten. Öffne in OpenBot Marktplatz > Apps > Telegram und klicke auf Agenten hinzufügen.",
   "status.messaging.telegramLinked":
     "OpenBot ist mit diesem Chat verbunden. Erwähne {bot} oder antworte auf eine Nachricht von OpenBot, um die Agenten zu fragen.",
   "status.messaging.telegramOrchestratorName": "Telegram-Orchestrator",

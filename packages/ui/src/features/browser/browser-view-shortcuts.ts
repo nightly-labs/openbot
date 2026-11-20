@@ -1,4 +1,3 @@
-/** Where the keys of the full browser view work. The web client leaves them to the user's browser. */
 export type BrowserShortcutPlatform = "mac" | "pc";
 
 export type BrowserViewCommand =
@@ -21,7 +20,6 @@ interface ShortcutKey {
   shiftKey: boolean;
 }
 
-/** The command of a key press in the full view, as other browsers have them, or undefined. */
 export function browserViewCommand(
   event: ShortcutKey,
   platform: BrowserShortcutPlatform,
@@ -74,12 +72,10 @@ const PC_GLYPHS: Record<BrowserShortcutName, string> = {
   moveRight: "Ctrl+Shift+PgDn",
 };
 
-/** The keys of a command, as a menu shows them on this platform. */
 export function browserShortcutGlyph(name: BrowserShortcutName, platform: BrowserShortcutPlatform): string {
   return (platform === "mac" ? MAC_GLYPHS : PC_GLYPHS)[name];
 }
 
-/** The `aria-keyshortcuts` value of a control. */
 export function browserAriaShortcut(
   name: "newTab" | "back" | "forward" | "reload" | "address",
   platform: BrowserShortcutPlatform | undefined,

@@ -2,11 +2,6 @@ import { SwitchField } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { setMotionEffect, useMotionEffect } from "../../motion-preference";
 
-/**
- * The Background blur and Moving agent faces switches, for the desktop Appearance page and the web
- * client's settings. Each one starts off on a computer with no GPU. The choice stays on this device
- * and browser, as the theme does, so a joined server does not change it.
- */
 export function MotionSwitches() {
   const { t } = useText();
   const backgroundBlur = useMotionEffect("backgroundBlur");

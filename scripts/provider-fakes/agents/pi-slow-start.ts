@@ -1,7 +1,3 @@
-// The Pi of `pi-slow-start-e2e.ts`, on Pi's JSONL RPC. It reads no command for `FAKE_START_DELAY_MS`,
-// as a Pi that starts slowly on a busy computer. With `FAKE_HANG=1`, it never answers. With
-// `FAKE_GATE_FILE`, it answers only while that file exists. It lists one OpenRouter model, with the id
-// in `FAKE_MODEL_FILE` when that is set. `pi update --models` and `pi --version` end at once.
 import { existsSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contracts/runtime-values";
@@ -31,7 +27,6 @@ function modelId(): string {
   return file ? readFileSync(file, "utf8").trim() : "fake/slow-start";
 }
 
-/** Resolves when the gate file exists. A Pi without `FAKE_GATE_FILE` has no gate. */
 function gateOpen(): Promise<void> {
   const gate = process.env.FAKE_GATE_FILE;
   return new Promise((resolve) => {

@@ -8,27 +8,18 @@ interface VideoStageAction {
   onSelect: () => void;
 }
 
-/** The details of a video, which show on hover, and its actions, which show on a right click. */
 export interface VideoStageMenu {
-  /** Short facts for one line, such as the name and the size. */
   details: readonly (string | undefined)[];
   actions: readonly VideoStageAction[];
 }
 
-/**
- * The frame of a video in a chat. The chat shows only the player. The details show at the top of the
- * frame on hover, as on a canvas node, and the actions are in the menu of a right click.
- */
 export function VideoStage(props: {
   class?: string | undefined;
-  /** The shape of the frame, as a CSS ratio such as "16 / 9". */
   ratio: string;
-  /** Absent, a right click does nothing, as while the video is made. */
   menu?: VideoStageMenu | undefined;
   children: JSX.Element;
 }) {
   let stage: HTMLDivElement | undefined;
-  // In full screen the player is in the top layer, so the menu must open in the player.
   const menuMount = () => stage?.querySelector<HTMLElement>(":popover-open") ?? document.body;
   const stageClass = () => ["media-generation-stage", props.class].filter(Boolean).join(" ");
   return (

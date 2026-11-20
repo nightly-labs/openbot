@@ -19,7 +19,6 @@ import {
   type ProviderCredentialStore,
 } from "./provider-credential-store";
 
-/** A variable as the file keeps it. A sensitive value is not here: it is in the provider key file. */
 interface StoredVariable {
   name: string;
   sensitive: boolean;
@@ -30,7 +29,6 @@ interface StoredEnvironment {
   providers: Partial<Record<ProviderEnvironmentProvider, StoredVariable[]>>;
 }
 
-/** The name of a sensitive value in the encrypted provider key file. */
 export function providerEnvironmentSecret(provider: ProviderEnvironmentProvider, name: string): OpenBotSecretName {
   return `openbot:provider-env:${provider}:${name}`;
 }
@@ -42,10 +40,6 @@ function decodeVariable(value: unknown): StoredVariable | null {
   return isString(value.value) ? { name: value.name, sensitive: false, value: value.value } : null;
 }
 
-/**
- * The variables of each provider. A missing file, or a file that does not decode, reads as none. A
- * provider or a variable that this build does not know is left out, and the next save drops it.
- */
 export type ProviderEnvironmentPreferenceStore = PreferenceStore<StoredEnvironment>;
 
 export function createProviderEnvironmentPreferenceStore(path: string): ProviderEnvironmentPreferenceStore {
@@ -67,7 +61,6 @@ export function createProviderEnvironmentPreferenceStore(path: string): Provider
   });
 }
 
-/** A change that the request got wrong. Its message is for the person who made the change. */
 export class ProviderEnvironmentRefused extends Error {
   constructor(message: string) {
     super(message);
@@ -86,22 +79,15 @@ const PROBLEM_TEXT = {
   duplicate: "error.provider.environmentNameDuplicate",
 } as const satisfies Record<ProviderEnvironmentProblem, string>;
 
-/** The variables as Settings and a joined server's admin change them, and as each provider spawn reads them. */
 export type ProviderEnvironmentControl = ReturnType<typeof providerEnvironmentControl>;
 
-/**
- * `changed` runs after a save that changes what the provider's processes get, so the provider starts
- * again when its turns end.
- */
 export function providerEnvironmentControl(
   store: ProviderEnvironmentPreferenceStore,
   credentials: Pick<ProviderCredentialStore, "secret" | "setSecrets">,
   changed: (provider: ProviderEnvironmentProvider) => Effect.Effect<void>,
 ) {
-  // One change at a time: the names and the sensitive values are two files, and each change reads both.
   const changes = Semaphore.makeUnsafe(1);
   const fail = (cause: unknown) => new ProviderEnvironmentChangeFailed({ cause });
-  // Values that would make the key file too large to read are the request's fault, not the host's.
   const failSecrets = (error: CredentialStoreFailure) =>
     fail(
       error.cause instanceof CredentialFileTooLarge
@@ -121,7 +107,6 @@ export function providerEnvironmentControl(
     ),
   });
 
-  /** What each process of the provider gets. A sensitive value that the key file lost is left out. */
   const resolve = (provider: ProviderEnvironmentProvider): Readonly<Record<string, string>> => {
     const environment: Record<string, string> = {};
     for (const variable of stored(provider)) {
@@ -141,8 +126,6 @@ export function providerEnvironmentControl(
           const before = resolve(provider);
           const previous = stored(provider);
           const next = yield* Effect.try({ try: () => checked(update, previous, secret), catch: fail });
-          // New sensitive values first: a failed save of the names then leaves an unused value, never a
-          // name without its value.
           const written = next.flatMap((variable) =>
             variable.sensitive && variable.value !== null
               ? [[providerEnvironmentSecret(provider, variable.name), variable.value] as const]
@@ -170,10 +153,6 @@ export function providerEnvironmentControl(
   };
 }
 
-/**
- * The checked list: trimmed names, each one valid, not reserved and not repeated. `value: null` keeps a
- * sensitive value that the host has; for any other variable it is refused.
- */
 function checked(
   update: ProviderEnvironmentUpdate,
   previous: readonly StoredVariable[],

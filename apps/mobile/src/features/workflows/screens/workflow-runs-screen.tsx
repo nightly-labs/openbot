@@ -7,7 +7,6 @@ import { useWorkflowDetail, useWorkflowRunHistory } from "@/features/workflows/m
 import { LargeTitleScrollView } from "@/shared/components/large-title";
 import { useText } from "@/shared/lib/text";
 
-/** Drawer > Workflows > one workflow > Runs: all its runs, newest first, with older pages on request. */
 export function WorkflowRunsScreen() {
   const { t, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId: string }>();

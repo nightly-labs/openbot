@@ -52,12 +52,6 @@ const RESET_OUTCOME_KEYS = {
   alreadyRedeemed: "mobile.server.providers.resetUsageAlreadyRedeemed",
 } as const satisfies Record<ProviderUsageResetOutcome, string>;
 
-/**
- * Server settings > Providers > a provider > one of its accounts on the host: its name, its sign-in,
- * its place in the pool and its removal. A sign-in runs on the provider page, which has the relayed
- * sign-in. An account that is an API key, such as a Cursor account after the first, has a new key in
- * place of a sign-in, and no usage reset and no place in the pool.
- */
 export function ServerProviderAccountScreen() {
   const { t, errorMessage } = useText();
   const params = useLocalSearchParams<{ serverId: string; provider: string; accountId: string }>();
@@ -67,7 +61,6 @@ export function ServerProviderAccountScreen() {
   const list = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
   const index = list.findIndex((account) => account.id === params.accountId);
   const account = list[index];
-  // The host lists a pool only while it is on, and an older host has no pool.
   const pool = admin?.accounts?.setPool
     ? accounts.list.data?.pools?.find((entry) => entry.provider === provider)?.pool
     : undefined;
@@ -95,7 +88,6 @@ export function ServerProviderAccountScreen() {
       accounts={admin.accounts}
       pool={pool}
       usageResets={admin.usageResets}
-      // The provider's own sign-in signs out on the host, as the desktop account menu offers it.
       signOut={
         account.id === DEFAULT_PROVIDER_ACCOUNT_ID &&
         account.state === "connected" &&
@@ -127,7 +119,6 @@ function AccountPage({
   account: ProviderAccountStatus;
   index: number;
   accounts: NonNullable<ProviderAdmin["accounts"]>;
-  /** The pool of the provider's accounts, while it is on. */
   pool: ProviderAccountPool | undefined;
   usageResets: ProviderAdmin["usageResets"];
   signOut: ProviderAdmin["signOut"];
@@ -139,9 +130,7 @@ function AccountPage({
   const name = accountName(account, index);
   const [label, setLabel] = useState(account.label ?? "");
   const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | "pool" | null>(null);
-  /** How the last usage reset ended, when it did not fail. */
   const [notice, setNotice] = useState<string | null>(null);
-  // An API key has no browser sign-in, no plan usage and no place in a pool.
   const keyAccount = isProviderKeyAccount(provider, account.id);
   const queryScope = useQueryScope();
   const credits = useQuery({
@@ -157,7 +146,6 @@ function AccountPage({
   const openSignIn = useOpenSignIn();
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
-  // A removed account leaves the page before the list without it shows, so the page does not say "gone".
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (!leaving) return;
@@ -175,7 +163,6 @@ function AccountPage({
       await operation();
       void haptics.notification("success");
       if (kind === "remove") setLeaving(true);
-      // A reset changes no account; it reads its credits again.
       else if (kind !== "reset") await onChanged();
     } catch (cause) {
       setError(
@@ -193,13 +180,10 @@ function AccountPage({
 
   const trimmed = label.trim();
   const dirty = trimmed !== (account.label ?? "");
-  // The host keeps the provider's own sign-in, and only the key page removes the Claude API key account.
   const setPool = accounts.setPool;
   const apiKeyAccount = provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID;
-  // A saved key has no plan limit, so it is not a pool member.
   const inPool = pool !== undefined && !apiKeyAccount && !keyAccount && !pool.leftOut.includes(account.id);
   const removable = account.id !== DEFAULT_PROVIDER_ACCOUNT_ID && !apiKeyAccount;
-  // As on desktop: the code sign-in is for an account after the first that is signed out or failed.
   const codeSignIn =
     account.id !== DEFAULT_PROVIDER_ACCOUNT_ID &&
     !apiKeyAccount &&
@@ -247,7 +231,6 @@ function AccountPage({
         ) : null}
       </SettingsSection>
       {keyAccount ? (
-        // Hidden on a host that cannot take the key (`provider-account-keys-v1`).
         accounts.connectKey ? (
           <SettingsSection>
             <SettingsRow
@@ -273,10 +256,7 @@ function AccountPage({
               disclosure={false}
               disabled={pending !== null}
               leading={<RowIcon icon={RefreshCw} tone="accent" />}
-              onPress={() =>
-                // The sign-in page runs the relayed sign-in and comes back here when it ends.
-                openSignIn({ serverId, provider, method: "relay", account: account.id })
-              }
+              onPress={() => openSignIn({ serverId, provider, method: "relay", account: account.id })}
             >
               <Typography.Paragraph className="text-accent">
                 {t("mobile.server.providers.accountSignInAgain")}

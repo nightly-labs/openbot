@@ -276,6 +276,12 @@ export const messages = {
     "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpServerTimedOutInProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم لم يردّ في الوقت المحدد. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم غير متاح الآن. انتظر بضع دقائق، ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "تعذّر على {provider} الوصول إلى خادم MCP {name}. افتح {name} في المتجر، التطبيقات، وتأكد من أن عنوانه صحيح وأن الخادم يعمل. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.githubToolsNotStarted":
+    "تعذّر على {provider} الحصول على أدوات GitHub، لأن GitHub لم يردّ. افتح GitHub في المتجر، التطبيقات، واربطه مرة أخرى إذا طلب منك ذلك. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -345,9 +351,9 @@ export const messages = {
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
-  "error.backend.apiKeyNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إدخال مفتاح API.",
   "error.backend.apiKeySaving": "يتم حفظ مفتاح API بالفعل.",
-  "error.backend.vaultItemNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إضافة عنصر إلى الخزنة.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "تعذّر على OpenBot قراءة مفتاح API. أدخل مفتاحًا من 8000 حرف أو أقل، واختر من يمكنه استخدامه.",
   "error.backend.vaultItemSaving": "يتم حفظ عنصر الخزنة بالفعل.",
   "error.backend.authRequestInactive": "طلب المصادقة الآمنة هذا لم يعد نشطًا.",
   "error.backend.secureAuthUnavailable": "المصادقة الآمنة غير متاحة.",
@@ -388,7 +394,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "تعذّر تحميل النافذة المنبثقة. أعد محاولة تسجيل الدخول من الصفحة الأصلية.",
   "error.backend.browserTabNotFound": "لم يتم العثور على علامة تبويب المتصفح.",
   "error.backend.authActive": "المصادقة نشطة بالفعل.",
-  "error.backend.authHttpsRequired": "تتطلب المصادقة الآمنة HTTPS.",
+  "error.backend.authWebPageRequired": "تتطلب المصادقة الآمنة HTTP/HTTPS.",
   "error.backend.authDigitsRange": "تتطلب رموز المصادقة من 4 إلى 12 رقمًا.",
   "error.backend.authExpired": "انتهت صلاحية طلب المصادقة.",
   "error.backend.authDigitsRequired": "أدخل العدد المطلوب من الأرقام.",

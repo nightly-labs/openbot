@@ -1,9 +1,3 @@
-// What main answers for team servers, the team host, its members and invites, direct messages, and
-// remote desktop sessions.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type DirectConversationPage,
   type DirectConversationReadState,
@@ -335,7 +329,6 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
     ...(capabilitiesPending === undefined ? {} : { capabilitiesPending }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
-    // Only the indicator reads it, so a value from a newer main process shows no indicator.
     ...(hostedSleep === undefined
       ? {}
       : { hostedSleep: hostedSleep === "sleeping" || hostedSleep === "waking" ? hostedSleep : null }),
@@ -350,7 +343,6 @@ function server(summary: DynamicRecord): ServerSummary {
   };
 }
 
-/** Null for the automatic look. Main sends only a checked value, so another value fails closed. */
 function serverAppearance(value: unknown): ServerAppearance | null {
   if (value === null) return null;
   const appearance = serverAppearanceOrNull(value);
@@ -498,6 +490,7 @@ function decodeHostedStart(value: unknown): HostedServerStart | null {
   if (value === null) return null;
   const start = decodeRecord(value, "hosted start");
   const { step } = start;
-  if (step !== "machine" && step !== "openbot" && step !== "provider_limit") throw new Error("Invalid hostedStart.");
+  if (step !== "machine" && step !== "restore" && step !== "openbot" && step !== "provider_limit")
+    throw new Error("Invalid hostedStart.");
   return { step, startedAt: requiredNumber(start, "startedAt") };
 }

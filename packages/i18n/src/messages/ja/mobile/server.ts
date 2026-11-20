@@ -112,8 +112,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "売り切れ",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} に終了",
+  "mobile.server.hosted.serverDataKept": "{plan} · データは{date}まで保持",
   "mobile.server.hosted.state.payment": "支払い待ち",
   "mobile.server.hosted.state.setup": "セットアップ中",
+  "mobile.server.hosted.state.restoring": "データを復元中",
   "mobile.server.hosted.state.starting": "起動中",
   "mobile.server.hosted.state.running": "稼働中",
   "mobile.server.hosted.state.stopped": "停止中",
@@ -1234,6 +1236,9 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "接続済み · ツール {count} 個" },
   "mobile.server.mcp.signInOnComputer":
     "この MCP サーバーはサインインを求めています。コンピューターの OpenBot からサインインして、もう一度テストしてください。",
+  "mobile.server.mcp.signIn": "サインイン",
+  "mobile.server.mcp.signInHere":
+    "この MCP サーバーはサインインを求めています。サインインをタップしてから、もう一度テストしてください。",
   "mobile.server.mcp.signedInDescription": "{server} はこの MCP サーバーにサインインしています。",
   "mobile.server.mcp.signOut": "サインアウト",
   "mobile.server.mcp.saveFailed": "変更を保存できませんでした。もう一度お試しください。",
@@ -1284,6 +1289,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 時間",
   "mobile.server.planLimits.window.hours": { other: "{count} 時間" },
   "mobile.server.planLimits.window.minutes": "{minutes} 分",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "アップデート",
   "mobile.server.settings.updateAvailable": "アップデートあり",
   "mobile.server.route.updates": "アップデート",
@@ -1458,7 +1464,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} を {role} に追加しました",
   "mobile.server.audit.roleMemberRemoved": "{member} を {role} から削除しました",
   "mobile.server.audit.agentLevel": "{role} の {agent}：{change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "エージェントをインポート",
   "mobile.server.route.import": "エージェントをインポート",
   "mobile.server.import.unsupported":
@@ -1536,7 +1541,6 @@ export const messages = {
   "mobile.server.import.channel": "チャンネル",
   "mobile.server.import.notImportedTitle": "インポートされなかった項目",
   "mobile.server.import.resultWarnings": "移行されなかった項目があります",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "移行",
   "mobile.server.route.transfer": "移行",
   "mobile.server.route.transferExport": "エクスポート",
@@ -1624,4 +1628,39 @@ export const messages = {
   "mobile.server.transfer.copyNext": "コピーしたエージェントには、{server} の承認ルールが適用されます。",
   "mobile.server.transfer.copyNoServer":
     "エージェントをコピーするには、オーナーまたは管理者として別のサーバーに接続してください。",
+  "mobile.server.route.ownerTransfer": "所有権を移す",
+  "mobile.server.ownerTransfer.unavailable": "所有権を移すには、所有者としてこのサーバーに接続してください。",
+  "mobile.server.ownerTransfer.hosted": "このサーバーは OpenBot がホストしているため、所有者を変更できません。",
+  "mobile.server.ownerTransfer.lede":
+    "新しい所有者にメールが届きます。そのメールアドレスでサインインした状態で承認する必要があります。その後、あなたはこのサーバーから削除されます。",
+  "mobile.server.ownerTransfer.email": "新しい所有者のメールアドレス",
+  "mobile.server.ownerTransfer.send": "送信",
+  "mobile.server.ownerTransfer.sending": "送信中…",
+  "mobile.server.ownerTransfer.stays":
+    "エージェント、チャット、ルーティン、プロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザのサインイン、接続済みアプリはサーバーに残ります。新しい所有者はそれらを使えます。",
+  "mobile.server.ownerTransfer.expiry": "リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} を所有者にしますか？",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email} が承認すると、{server} の所有者になり、あなたはアクセスできなくなります。データはサーバーに残ります。リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirm": "移す",
+  "mobile.server.ownerTransfer.sendFailed": "リクエストを送信できませんでした。",
+  "mobile.server.ownerTransfer.loadFailed": "保留中の移行を読み込めませんでした。",
+  "mobile.server.ownerTransfer.pending": "新しい所有者の承認待ち",
+  "mobile.server.ownerTransfer.expires": "期限: {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} はこのメールアドレスでサインインした状態で承認する必要があります。それまではあなたが所有者です。",
+  "mobile.server.ownerTransfer.cancel": "取り消す",
+  "mobile.server.ownerTransfer.cancelTitle": "移行を取り消しますか？",
+  "mobile.server.ownerTransfer.cancelBody": "{email} は承認できなくなります。",
+  "mobile.server.ownerTransfer.keep": "残す",
+  "mobile.server.ownerTransfer.cancelFailed": "移行を取り消せませんでした。",
+  "mobile.server.ownerTransfer.incomingTitle": "{server} の所有者になりますか？",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} があなたを {server} の所有者にしようとしています。サーバーを完全に管理でき、エージェント、チャット、ルーティン、保存したサインインはそのまま残ります。{name} はアクセスできなくなります。 サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
+  "mobile.server.ownerTransfer.accept": "承認",
+  "mobile.server.ownerTransfer.decline": "拒否",
+  "mobile.server.ownerTransfer.accepted": "あなたは {server} の所有者になりました。",
+  "mobile.server.ownerTransfer.acceptFailed": "移行を承認できませんでした",
+  "mobile.server.ownerTransfer.declineFailed": "移行を拒否できませんでした",
+  "mobile.server.ownerTransfer.tryAgain": "後でもう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

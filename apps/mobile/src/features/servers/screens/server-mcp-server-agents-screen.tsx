@@ -18,10 +18,6 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * MCP server page > Access > Agents: the agents that get the MCP server. All agents also gives it to
- * each agent that is added later. A tap saves at once; the agents get a new provider session.
- */
 export function ServerMcpServerAgentsScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -59,7 +55,6 @@ export function ServerMcpServerAgentsScreen() {
       const on = agents
         .filter((agent) => (agent.id === agentId ? !mcpAccessAllows(held, agent.id) : mcpAccessAllows(held, agent.id)))
         .map((agent) => agent.id);
-      // An agent that this list does not show keeps its place. Each agent on: also each agent added later.
       const kept = (held.agents ?? []).filter((id) => !shown.has(id));
       return { ...held, agents: on.length === agents.length ? null : [...kept, ...on] };
     });

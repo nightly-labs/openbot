@@ -477,7 +477,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "No se pudo copiar la imagen.",
   "settings.profile.share.createFailed": "No se pudo crear la imagen.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mis últimos seis meses con OpenBot",
   "settings.profile.activity.title": "Actividad en este equipo",
   "settings.profile.activity.activeDays": {
@@ -487,7 +486,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aún no hay actividad",
   "settings.profile.activity.loading": "Cargando actividad…",
   "settings.profile.activity.loadFailed": "No se pudo cargar tu actividad.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} tokens en {count} día activo en el último año",
     other: "{tokens} tokens en {count} días activos en el último año",
@@ -615,6 +613,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan finalizado",
   "settings.hostedServers.state.creating": "Creando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando datos",
   "settings.hostedServers.state.running": "En ejecución",
   "settings.hostedServers.state.stopping": "Deteniendo",
   "settings.hostedServers.state.stopped": "Detenido",
@@ -625,6 +624,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuración comienza cuando Stripe confirma el pago.",
   "settings.hostedServers.planEndedDescription":
     "El plan finalizó y el servidor se detuvo. Sus datos se conservan. Renueva el plan para iniciarlo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "El plan finalizó y el servidor se detuvo. Sus datos se conservan hasta el {date}. Renueva el plan antes para iniciarlo.",
   "settings.hostedServers.pay": "Abrir página de pago",
   "settings.hostedServers.payLabel": "Abrir página de pago de {name}",
   "settings.hostedServers.renew": "Renovar plan",
@@ -667,7 +668,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para un equipo pequeño con rutinas diarias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muchos agentes y trabajo intensivo con el navegador.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictado",
   "settings.voice.model.parakeet.description":
     "Rápido. Detecta el idioma hablado por sí mismo, en 25 idiomas europeos.",
@@ -736,6 +736,13 @@ export const messages = {
   "settings.voice.speech.sample": "Hola. Así sonarán tus respuestas.",
   "settings.voice.speech.listenFailed": "No se pudo reproducir la muestra.",
   "settings.voice.live.section": "Voz en directo",
+  "settings.voice.talk.section": "Conversación por voz",
+  "settings.voice.talkKey.title": "Tecla para hablar",
+  "settings.voice.talkKey.description": "Mantén pulsadas estas teclas para hablar en una conversación por voz.",
+  "settings.voice.talkKey.change": "Cambiar la tecla para hablar",
+  "settings.voice.talkKey.recording": "Pulsa las teclas",
+  "settings.voice.talkKey.refused": "Añade otra tecla",
+  "settings.voice.talkKey.reset": "Restablecer",
   "settings.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",
   "settings.transfer.title": "Trasladar este servidor a otro equipo",
   "settings.transfer.lede": "Tus agentes, sus habilidades, rutinas, recuerdos y archivos van en un solo archivo.",

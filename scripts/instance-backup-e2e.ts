@@ -1,15 +1,3 @@
-// End-to-end check of `openbot-instance backup`, `verify`, `restore` and `backups`
-// (docs/docker.md#backups). It runs the real script as root in a privileged Docker-in-Docker
-// container, with a loop-mounted ext4 data disk, as on a host of `docker/instances`. The instance is
-// a small stand-in container with the release label of an OpenBot image, not the OpenBot image: the
-// check is of the script, its archive and its failure paths. The data has an `openbot.db` of the
-// latest schema and a shared tables database, which the verification opens with sqlite3.
-//
-//   bun scripts/instance-backup-e2e.ts
-//
-// It needs Docker and network access for the images and the Alpine packages. The report is
-// `.openbot-build/instance-backup-e2e/report.json`.
-
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -36,7 +24,6 @@ function run(command: string, args: string[], input?: string): Run {
   return { status: result.status ?? -1, stdout: result.stdout, stderr: result.stderr };
 }
 
-/** A shell command as root in the Docker-in-Docker container. */
 function shell(command: string): Run {
   return run("docker", ["exec", "--interactive", dind, "bash", "-euo", "pipefail", "-c", command]);
 }
@@ -69,7 +56,6 @@ function summary(result: Run): string {
   return `exit ${result.status}: ${(result.stderr || result.stdout).trim().split("\n").slice(-4).join(" | ")}`;
 }
 
-/** The data of one instance: the database, shared tables, keyring, a workspace and an attachment. */
 async function writeFixture(root: string): Promise<void> {
   const config = join(root, ".config/OpenBot");
   const shared = join(root, "OpenBot/Shared/Data");
@@ -108,7 +94,6 @@ async function writeFixture(root: string): Promise<void> {
     tables.exec("INSERT INTO contacts VALUES ('Ada', 'ada@example.com')");
     tables.exec("CREATE TABLE tasks (title TEXT)");
     tables.prepare("INSERT INTO openbot_metadata VALUES ('contacts', ?, ?)").run(agentId, now);
-    // An owner that is not an agent: verification reports it as a warning.
     tables.prepare("INSERT INTO openbot_metadata VALUES ('tasks', 'agent-removed', ?)").run(now);
   } finally {
     tables.close();
@@ -122,8 +107,6 @@ async function writeFixture(root: string): Promise<void> {
   await writeFile(join(root, "OpenBot/Agents/E2E/attachment.bin"), randomBytes(256 * 1024));
 }
 
-// The stand-in for the OpenBot image: it has the release label, runs as UID 1000, and writes a file
-// when it gets the stop signal, as OpenBot closes its database.
 const standIn = `FROM alpine:3.22
 LABEL org.opencontainers.image.version=0.40.0
 RUN printf '#!/bin/sh\\ntrap "date > /data/.e2e-clean-stop; exit 0" TERM\\ndate >> /data/.e2e-starts\\nwhile true; do sleep 1 & wait $!; done\\n' >/app && chmod 0755 /app
@@ -138,8 +121,6 @@ async function main(): Promise<void> {
     await writeFixture(fixture);
     const started = run("docker", ["run", "--detach", "--privileged", "--name", dind, "docker:28-dind"]);
     if (started.status !== 0) throw new Error(`Docker-in-Docker did not start: ${started.stderr}`);
-    // The daemon in the container is ready when `docker info` answers.
-    // Alpine has no bash before the packages are installed.
     const ready = run("docker", [
       "exec",
       dind,
@@ -172,7 +153,6 @@ async function main(): Promise<void> {
     must(`mkdir -p /stand-in && cat >/stand-in/Dockerfile <<'EOF'\n${standIn}EOF`);
     must("docker build --quiet --tag ghcr.io/nightly-labs/openbot:latest /stand-in >/dev/null");
 
-    // The layout of `openbot-instance create`, without systemd: an ext4 image mounted as /data.
     must(`mkdir -p /srv/openbot/main/data /backups
       fallocate --length 256M /srv/openbot/main/data.img
       mkfs.ext4 -q -m 0 /srv/openbot/main/data.img
@@ -238,8 +218,6 @@ async function main(): Promise<void> {
       summary(result),
     );
 
-    // A real backup without --verify can have consistent checksums and invalid SQLite bytes.
-    // Keep both database paths covered by the existing verifier. Reference warnings stay warnings.
     const invalidSources = [
       {
         name: "main database",
@@ -318,7 +296,6 @@ async function main(): Promise<void> {
       must(`rm -rf /backups/main/${invalidBackup}`);
     }
 
-    // Missing key material: the backup fails, the instance runs again, the earlier backup stays.
     must(`mv ${data}/.config/openbot-container/keyring-password /root/keyring-password`);
     result = instance("backup", "main");
     must(`mv /root/keyring-password ${data}/.config/openbot-container/keyring-password`);
@@ -335,7 +312,6 @@ async function main(): Promise<void> {
       result.stdout.trim(),
     );
 
-    // A full destination: the backup fails before it stops the instance.
     must("mkdir -p /small && mount -t tmpfs -o size=64k tmpfs /small");
     must("sed -i 's#^OPENBOT_BACKUP_DIR=.*#OPENBOT_BACKUP_DIR=/small#' /opt/openbot-docker/instances/main.env");
     const startsBefore = must(`wc -l < ${data}/.e2e-starts`);
@@ -355,7 +331,6 @@ async function main(): Promise<void> {
       "no .partial folder",
     );
 
-    // A damaged archive: verification fails.
     must(
       `cp -a /backups/main/${first} /backups/main/damaged && printf 'x' | dd of=/backups/main/damaged/${manifest.archive} bs=1 seek=100 conv=notrunc 2>/dev/null`,
     );
@@ -372,7 +347,6 @@ async function main(): Promise<void> {
       "no openbot-verify folder in /var/tmp",
     );
 
-    // A verification that fails keeps the older backups, also with OPENBOT_BACKUP_KEEP=1.
     const beforeFailedVerify = completeBackups();
     must(
       "sed -i 's/^OPENBOT_BACKUP_KEEP=.*/OPENBOT_BACKUP_KEEP=1/' /opt/openbot-docker/instances/main.env && mv /usr/bin/sqlite3 /usr/bin/sqlite3.off",
@@ -392,7 +366,6 @@ async function main(): Promise<void> {
     );
     must(`rm -rf /backups/main/${afterFailedVerify.find((name) => !beforeFailedVerify.includes(name))}`);
 
-    // Retention: with OPENBOT_BACKUP_KEEP=2, the third backup removes the first.
     instance("backup", "main");
     result = instance("backup", "main");
     const kept = completeBackups();
@@ -402,7 +375,6 @@ async function main(): Promise<void> {
       kept.join(", "),
     );
 
-    // A backup that a kill stopped has no result. The status shows it as a failure.
     must(
       `printf '{\\n  "step": "backup",\\n  "result": "running",\\n  "startedAt": "2026-01-01T00:00:00Z"\\n}\\n' >/srv/openbot/main/backup-status/backup-attempt.json`,
     );
@@ -413,8 +385,6 @@ async function main(): Promise<void> {
       summary(result),
     );
 
-    // The clock went back: the new backup sorts before an existing one. Retention keeps the new one,
-    // and --verify checks the new one.
     must(`cp -a /backups/main/${kept[1]} /backups/main/29991231T000000Z`);
     result = instance("backup", "main", "--verify");
     const made = /^Backup \/backups\/main\/(\S+):/m.exec(result.stdout)?.[1] ?? "";
@@ -431,7 +401,6 @@ async function main(): Promise<void> {
       `verified ${made}`,
     );
 
-    // `down` removes the container. The backup takes the version from the image of the instance.
     must("docker rm --force openbot-main >/dev/null");
     result = instance("backup", "main");
     const removedBackup = completeBackups().at(-1) ?? "";
@@ -448,16 +417,13 @@ async function main(): Promise<void> {
     );
     const latest = completeBackups().at(-1) ?? "";
 
-    // While a backup holds the lock of the instance, `down` waits and does not stop the container.
     const lock = "/run/openbot-instance-update-main.lock";
     const waited = must(
       `flock ${lock} sleep 30 & holder=$!; until ! flock --nonblock ${lock} true; do sleep 0.1; done; set +e; timeout 3 ${script} down main >/dev/null 2>&1; code=$?; set -e; kill $holder; wait $holder 2>/dev/null || true; echo $code`,
     );
     check("down waits for the lock of the instance", waited === "124" && running(), `timeout exit ${waited}`);
 
-    // Restore: the data changes after the backup, and the restore gives back the backup.
     must(`echo changed > ${data}/OpenBot/Agents/E2E/after-backup.md && rm ${data}/OpenBot/Agents/E2E/notes.md`);
-    // An agent can leave links with the names of the restore folders. Root must not follow them.
     must(
       `mkdir -p /trap && ln -s /trap ${data}/.openbot-replaced && ln -s /trap ${data}/.openbot-restore && ln -s /trap ${data}/.openbot-replaced.x && chown -h 1000:1000 ${data}/.openbot-*`,
     );

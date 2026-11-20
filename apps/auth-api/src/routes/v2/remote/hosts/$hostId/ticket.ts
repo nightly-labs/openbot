@@ -20,7 +20,6 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
             const body = yield* readJsonObject(request);
             if (!isString(body.machineToken))
               return apiError(400, "invalid_remote_request", "The host credential is invalid.");
-            // Only the host peer gateway asks for its home Signal. A released host sends neither field.
             if (
               (body.signalHome !== undefined && !isBoolean(body.signalHome)) ||
               (body.failedSignalUrl !== undefined && !isString(body.failedSignalUrl))
@@ -42,13 +41,11 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
   },
 });
 
-/** Where Cloudflare puts the host request, so the host gets a Signal home near it. */
 function requestLocation(request: Request): SignalLocation | null {
   const cf = request.cf;
   return cf && "latitude" in cf && "longitude" in cf ? signalLocation(cf.latitude, cf.longitude) : null;
 }
 
-/** The Cloudflare country code of the host request, for `REMOTE_SIGNAL_HOME_COUNTRIES`. */
 function requestCountry(request: Request): string | null {
   const country = request.cf?.country;
   return typeof country === "string" && country ? country : null;

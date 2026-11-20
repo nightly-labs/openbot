@@ -23,14 +23,12 @@ import { unknownAgentMessage } from "./unknown-agent";
 
 const logger = createOpenBotLogger("update-agents-tool");
 
-/** The settings of one changed agent. Instructions are left out, so a result for many agents stays small. */
 function agentSettings(agent: AgentSummary, models: AgentModelOption[]) {
   return {
     name: agent.name,
     provider: agent.provider,
     model: agent.model,
     ...agentReasoningEffort(agent, models),
-    // A runtime change during work applies before the next turn.
     ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
     access: workspaceAccessEnforced(agent) ? "workspace" : "full",
     computerUse: agentComputerUseEnabled(agent),
@@ -42,11 +40,6 @@ type AgentResult =
   | ({ agentId: string; ok: true } & ReturnType<typeof agentSettings>)
   | { agentId: string; ok: false; error: string };
 
-/**
- * `update_agents`: the settings of `update_profile` that a coordinator sets on many agents at once.
- * Each agent gets the same checks and its own write, in order, so a failure for one agent leaves the
- * others to go on and the result names it.
- */
 export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
   function* (
     params: DynamicToolCallParams,
@@ -71,8 +64,6 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
     if (!hooks.listAgents().some((agent) => agent.id === senderAgentId)) {
       throw new Error("The calling agent no longer exists.");
     }
-    // A provider or model that no account lists is wrong for every agent, so the whole call fails once.
-    // A model that only some accounts serve, and an effort alone, are checked per agent (#6109).
     if (provider !== undefined || model !== undefined) {
       const accountOnly = AGENT_PROVIDERS.flatMap((id) =>
         (hooks.providerAccounts(id) ?? []).flatMap((account) => account.models ?? []),
@@ -91,12 +82,10 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       Effect.gen(function* () {
         const agents = hooks.listAgents();
         const target = agents.find((agent) => agent.id === agentId);
-        // A model that copies an id with a mistake gets the near id, as read_agent gives it (#9771).
         if (!target) return failed(agentId, unknownAgentMessage(agentId, agents));
         if (widensAgentSettings(target, access, computerUse)) {
           return failed(agentId, sourceText("error.agent.onlyUserWidensSettings"));
         }
-        // A provider change moves the agent to the new provider's own sign-in.
         const ownProvider = provider ?? target.provider;
         const models = hooks.agentModels({
           provider: ownProvider,
@@ -121,7 +110,6 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       }).pipe(
         Effect.catch((error) => failure(agentId, error.cause)),
         Effect.catchDefect((defect) => failure(agentId, defect)),
-        // A stop between two agents ends the call; the write of one agent is never cut in half.
         Effect.uninterruptible,
       ),
     );

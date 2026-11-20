@@ -1,12 +1,3 @@
-/**
- * The Chat color setting: a row that opens the chat color picker in a popup. The agent settings use
- * a link row; Settings › General uses a select-like trigger. Only the tint of chat bubbles changes;
- * avatars keep their own colors.
- *
- * The popup keeps a draft while it is open and shows it in the dot of the row. It saves once, when it
- * closes, and only when the color changed, so a drag does not send a save for each frame.
- */
-
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
@@ -34,10 +25,6 @@ export function ChatColorDot(props: {
   );
 }
 
-/**
- * The picker in a popup: the chat color picker, or another one with its own presets. The popup calls
- * it once and gives getters, so a draft change updates the picker and does not build it again.
- */
 export type ColorPopupPicker = (props: {
   label: string;
   value: AvatarColor | null;
@@ -70,10 +57,6 @@ function ChatColorPopup(props: {
   );
 }
 
-/**
- * The open state of a color popup: the draft color and the trigger it opens from. The draft is saved
- * through `save` when the popup closes or the row goes away, and only when it changed.
- */
 export function createChatColorPopup(
   value: () => AvatarColor | null,
   save: (value: AvatarColor | null) => void,
@@ -83,7 +66,6 @@ export function createChatColorPopup(
   const [draft, setDraft] = createSignal<AvatarColor | null>(null);
   let close: (() => void) | undefined;
   let dot: HTMLSpanElement | undefined;
-  /** The value when the popup opened. A keyed row can unmount after its props moved to another agent. */
   let opened: AvatarColor | null = null;
 
   const commit = () => {
@@ -96,7 +78,6 @@ export function createChatColorPopup(
 
   return {
     open: () => anchor() !== null,
-    /** The color to show: the draft while the popup is open, the saved value after. */
     shown: () => (anchor() === null ? value() : draft()),
     dot: (element: HTMLSpanElement) => (dot = element),
     toggle: (trigger: HTMLElement) => {
@@ -129,12 +110,10 @@ export function createChatColorPopup(
 }
 
 export interface ChatColorSettingProps {
-  /** The saved chat color, or null for none. */
   value: AvatarColor | null;
   onChange: (value: AvatarColor | null) => void;
 }
 
-/** The Chat color row of the agent settings: a link row with the color name and dot. */
 export function AgentChatColorRow(props: ChatColorSettingProps & { agentName: string }) {
   const { t } = useText();
   const name = useChatColorName();
@@ -143,7 +122,6 @@ export function AgentChatColorRow(props: ChatColorSettingProps & { agentName: st
     (value) => props.onChange(value),
   );
   let trigger: HTMLButtonElement | undefined;
-  // The link row does not take ARIA props, so the state goes on its button.
   createEffect(popup.open, (open) => trigger?.setAttribute("aria-expanded", open ? "true" : "false"));
   return (
     <SettingsLinkGroup inset>
@@ -168,7 +146,6 @@ export function AgentChatColorRow(props: ChatColorSettingProps & { agentName: st
   );
 }
 
-/** The trigger of the own Chat color row in Settings: it looks like the select triggers beside it. */
 export function OwnChatColorTrigger(props: ChatColorSettingProps) {
   const { t } = useText();
   const name = useChatColorName();

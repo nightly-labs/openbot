@@ -1,10 +1,4 @@
-/**
- * Workflows: the canvas over the preview mock, and the nodes one component at a time, each in its
- * empty and filled states. Press a node to select it and show its toolbar. Drag from a port to a port
- * of the other side, in either direction, to connect two nodes, or press the two ports one after the
- * other. A run in these stories uses the preview mock, not a provider.
- */
-
+import type { WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -25,12 +19,14 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
   STORY_GITHUB,
   STORY_IMAGES,
   STORY_SEED,
+  type StoryWorkflow,
   storyWebhook,
   todayAt,
 } from "./workflow-story-data";
@@ -40,7 +36,6 @@ const TASK = "Check competitor sites, changelogs and launch posts since yesterda
 const RESULT = AGENT_RESULT;
 const AGENT = STORY_SEED.agentId;
 
-/** The story catalogs with a ChatGPT sign-in that the user did not do. */
 const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
   ...STORY_CATALOGS,
   status: {
@@ -54,7 +49,6 @@ const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
 const meta = {
   title: "Workflows",
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
-  // One Toaster for the page, as the app has at its root. A canvas that opens again keeps it.
   decorators: [
     (Story) => (
       <>
@@ -68,12 +62,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Competitor watch has every node type, so its stories offer every node kind. */
 export const Example: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch()]} features={STORY_ALL_FEATURES} />,
 };
 
-/** Two other people of the team work on the same canvas: their cursors move, and they select nodes. */
 export const ExampleWithCollaborators: Story = {
   name: "Example with collaborators",
   render: () => {
@@ -88,10 +80,14 @@ export const ExampleWithCollaborators: Story = {
   },
 };
 
-/** The canvas in the desktop window, where the Routines page shows its board today. */
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {
@@ -99,22 +95,16 @@ export const ExampleAfterRun: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch("done")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** The last run failed at the summary. Retry on it runs the summary and the steps after it again. */
 export const RunWithFailedStep: Story = {
   name: "Run with a failed step",
   render: () => <WorkflowStory workflows={[competitorWatch("failed")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** A run stops at the approval until you decide. The condition of the preview always answers yes. */
 export const BranchAndApproval: Story = {
   name: "Branch and approval",
   render: () => <WorkflowStory workflows={[newCompetitorAlert()]} />,
 };
 
-/**
- * A GitHub trigger that answers new comments. Two runs are open, one for each issue, and a second
- * comment on one issue waits. The run bar lists the open runs; the Events row lists what GitHub sent.
- */
 export const GitHubRuns: Story = {
   name: "GitHub runs",
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
@@ -127,6 +117,48 @@ export const EmptyCanvas: Story = {
       workflows={[{ id: "untitled", title: "Untitled workflow", graph: { nodes: [], edges: [], strokes: [] } }]}
     />
   ),
+};
+
+function moodboardGroup(folded: boolean): StoryWorkflow {
+  const open = { group: "story-moodboard", groupName: "Moodboard" };
+  const group = folded ? { ...open, groupFolded: true } : open;
+  const pictures = ["moodboard-01.jpg", "moodboard-02.jpg", "moodboard-03.jpg"];
+  return {
+    id: "moodboard-group",
+    title: "Moodboard cover",
+    graph: {
+      nodes: [
+        ...pictures.map((file, index) => ({
+          kind: "asset" as const,
+          id: `picture-${index + 1}`,
+          at: { x: index * 300, y: 0 },
+          fields: { file, ...group },
+        })),
+        {
+          kind: "image",
+          id: "cover",
+          at: { x: 1100, y: 0 },
+          fields: { prompt: "Cover image for the note, in the moodboard style", aspect: "16:9" },
+        },
+      ],
+      edges: pictures.map((_, index) => ({
+        id: `picture-${index + 1}>cover:image`,
+        from: `picture-${index + 1}`,
+        to: "cover",
+        type: "image" as const,
+      })),
+      strokes: [],
+    },
+  };
+}
+
+export const Groups: Story = {
+  render: () => <WorkflowStory workflows={[moodboardGroup(false)]} features={STORY_ALL_FEATURES} />,
+};
+
+export const GroupsCollapsed: Story = {
+  name: "Groups, collapsed",
+  render: () => <WorkflowStory workflows={[moodboardGroup(true)]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Text: Story = {
@@ -146,6 +178,47 @@ export const Prompt: Story = {
       <PromptNode id="filled" text={TASK} />
     </NodeGallery>
   ),
+};
+
+const REFERENCES = [
+  { id: "file-1", name: "launch-hero.png" },
+  { id: "file-2", name: "launch-hero-dark.png" },
+];
+
+const agentWithReferences: StoryWorkflow = {
+  id: "agent-references",
+  title: "Launch illustration",
+  graph: {
+    nodes: [
+      ...REFERENCES.map((file, index) => ({
+        kind: "asset" as const,
+        id: `reference-${index + 1}`,
+        at: { x: 0, y: index * 340 },
+        fields: { fileId: file.id, file: file.name },
+      })),
+      {
+        kind: "agent",
+        id: "illustrate",
+        at: { x: 420, y: 120 },
+        fields: {
+          agentId: AGENT,
+          task: "Make one 4:5 illustration that keeps the character and the style of the two pictures. Do not invent a new character.",
+        },
+      },
+    ],
+    edges: REFERENCES.map((_, index) => ({
+      id: `reference-${index + 1}>illustrate:image`,
+      from: `reference-${index + 1}`,
+      to: "illustrate",
+      type: "image" as const,
+    })),
+    strokes: [],
+  },
+};
+
+export const AgentWithPictures: Story = {
+  name: "Agent with connected pictures",
+  render: () => <WorkflowStory workflows={[agentWithReferences]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Agent: Story = {
@@ -182,10 +255,6 @@ export const Llm: Story = {
   ),
 };
 
-/**
- * ChatGPT is not connected. A new LLM step takes a Claude model, and its list has no ChatGPT tab. The
- * agent step keeps ChatGPT, because its agent runs on it.
- */
 export const LlmChatGptNotConnected: Story = {
   name: "LLM, ChatGPT not connected",
   render: () => (
@@ -211,7 +280,6 @@ export const ImageStory: Story = {
   ),
 };
 
-/** A live Higgsfield video model that makes each second from 3 to 15, as the host reads a duration range. */
 const RANGE_VIDEO_MODEL = {
   id: "higgsfield-kling3_0_story",
   provider: "higgsfield",
@@ -226,10 +294,6 @@ const RANGE_VIDEO_MODEL = {
   resolutions: ["720p", "1080p"],
 } as const satisfies WorkflowCatalogs["imageModels"][number];
 
-/**
- * Video steps on a model with more lengths than the Length menu lists: one on a length of the list,
- * and one on Custom, whose seconds chip takes any length of the model.
- */
 export const VideoCustomLength: Story = {
   name: "Video, custom length",
   render: () => (
@@ -247,10 +311,6 @@ export const VideoCustomLength: Story = {
   ),
 };
 
-/**
- * An image step with more results than the list under it fits. The list opens on the newest result,
- * and the arrows scroll it to the result on view.
- */
 export const ImageManyResults: Story = {
   name: "Image, many results",
   render: () => (
@@ -269,7 +329,146 @@ export const ImageManyResults: Story = {
   ),
 };
 
-/** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
+const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
+const REFERENCE = "story-reference-picture";
+const LONG_BRIEF = [
+  "Atlas launched on 22 Oct at €12 a seat, with a Slack connector and a shared inbox for small teams.",
+  "The launch post names three rivals: Relay, Northwind and Harbor. Relay costs €9 a seat but has no connectors.",
+  "Northwind sells only yearly plans. Harbor has a free plan for 3 seats and a Slack connector since September.",
+  "Early users on the forum ask for a Linear connector, an API and a way to export a workspace.",
+].join("\n\n");
+const LONG_PROMPT = [
+  "Read the research notes and write a short brief for the market team.",
+  "1. Start with one line that says what launched, when, and at what price.",
+  "2. Compare the price per seat with each rival that the notes name. Give the numbers, not adjectives.",
+  "3. List the connectors that each product has. Say which connector only Atlas has.",
+  "4. Name the requests from early users that we can answer in our next post.",
+  "5. End with one risk for our product and one action that we can take this week.",
+  "Keep it under 120 words. Use the names of the products as the notes write them. Do not guess numbers that are not in the notes.",
+].join("\n");
+
+const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
+  "llm-saved": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: "Summarize the research in 3 lines for the market team",
+      system: "You write for busy readers. Use short sentences and no adjectives.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-result", attachmentId: null }],
+  },
+  "llm-long": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: LONG_PROMPT,
+      system:
+        "You write for busy readers on a market team. Use short sentences, plain words and no adjectives. Put numbers before opinions. When the notes do not answer a question, say so.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-long", attachmentId: null }],
+  },
+  "image-saved": {
+    settings: {
+      media: "image",
+      model: "gpt-image",
+      account: "a0123456789abcdef",
+      prompt: "Hero image for the Atlas comparison page, one product window",
+      aspect: "16:9",
+      background: "solid",
+      options: JSON.stringify({ quality: "high" }),
+    },
+    sources: [{ from: "reference", type: "image", stepId: null, attachmentId: REFERENCE }],
+  },
+};
+
+const SAVED_CATALOGS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels.map((model) =>
+    model.id === "gpt-image"
+      ? { ...model, options: [{ name: "quality", kind: "choice", values: ["standard", "high"], default: "standard" }] }
+      : model,
+  ),
+  mediaPreview: (attachmentId) => (attachmentId === REFERENCE ? STORY_IMAGES[1]?.previewUrl : undefined),
+  stepSettings: async (stepId) => SAVED_SETTINGS[stepId] ?? { settings: null, sources: null },
+};
+
+export const ResultSettings: Story = {
+  name: "Result settings",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-result", at: todayAt(9, 10), value: BRIEF }],
+        summary: [
+          { id: "llm-old", at: todayAt(8, 2), value: LLM_RESULT },
+          { id: "llm-saved", at: todayAt(9, 14), value: LLM_RESULT },
+        ],
+        hero: [{ id: "image-saved", at: todayAt(9, 20), value: STORY_IMAGES[0]?.name ?? "" }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={BRIEF} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines" />
+      <ImageNode id="hero" prompt="Hero image for the Atlas comparison page" />
+    </NodeGallery>
+  ),
+};
+
+export const ResultSettingsLongPrompt: Story = {
+  name: "Result settings, long prompt",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-long", at: todayAt(9, 10), value: LONG_BRIEF }],
+        summary: [{ id: "llm-long", at: todayAt(9, 14), value: LLM_RESULT }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={LONG_BRIEF} />
+      <LlmNode id="summary" prompt={LONG_PROMPT} />
+    </NodeGallery>
+  ),
+};
+
+const TWO_HIGGSFIELD_ACCOUNTS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels?.map((model) =>
+    model.provider === "higgsfield"
+      ? {
+          ...model,
+          accounts: [
+            { id: "default", label: "Higgsfield", email: null, state: "connected", message: null },
+            { id: "a1b2c3d4", label: "Higgsfield 2", email: null, state: "connected", message: null },
+          ],
+        }
+      : model,
+  ),
+};
+
+export const ImageTwoHiggsfieldAccounts: Story = {
+  name: "Image, two Higgsfield accounts",
+  render: () => {
+    const model = TWO_HIGGSFIELD_ACCOUNTS.imageModels?.find((entry) => entry.provider === "higgsfield")?.id ?? "";
+    return (
+      <NodeGallery
+        selected="second"
+        catalogs={TWO_HIGGSFIELD_ACCOUNTS}
+        fields={{ first: { model, account: "" }, second: { model, account: "a1b2c3d4" } }}
+      >
+        <ImageNode id="first" prompt="Hero image for the Atlas comparison page" />
+        <ImageNode id="second" prompt="Hero image for the Atlas comparison page" />
+      </NodeGallery>
+    );
+  },
+};
+
 function cutOutPicture(): string {
   const canvas = document.createElement("canvas");
   canvas.width = 480;

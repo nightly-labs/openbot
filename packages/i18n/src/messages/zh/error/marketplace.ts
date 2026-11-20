@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/marketplace";
 
 export const messages = {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "本地时区无效。",
   "error.marketplace.installedAgentMissing": "已安装的助手已不存在。",
   "error.marketplace.differentListing": "该本地助手是从另一个市场助手安装的。",
@@ -40,7 +39,6 @@ export const messages = {
     one: "自动化任务“{name}”需要不超过 {count} 个字符的名称和一条指令。",
     other: "自动化任务“{name}”需要不超过 {count} 个字符的名称和一条指令。",
   },
-  // Fills `{name}` above when the routine has no name.
   "error.marketplace.templateRoutineNoName": "未命名",
   "error.marketplace.templateTooLarge": "该助手体积过大无法发布，请精简其指令、技能或自动化任务。",
   "error.marketplace.linkInvalid": "助手链接无效。",

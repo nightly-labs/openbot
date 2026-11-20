@@ -1,6 +1,3 @@
-// The payloads of the CRM endpoints. The contract guards accept only the known keys, so a payload that
-// passes is used as it is. Only a malformed payload fails here, so the text stays English.
-
 import {
   type CrmActivityPageInput,
   type CrmChange,
@@ -34,7 +31,6 @@ export function parseCrmActivityPage(value: unknown): CrmActivityPageInput {
   return value;
 }
 
-/** The key is a secret from here on: logs redact it. */
 export function parseCrmSourceConnect(value: unknown): CrmSourceConnectInput {
   if (!isCrmSourceConnectInput(value)) throw new Error("Invalid CRM source connect request.");
   registerSecretValue(value.key);

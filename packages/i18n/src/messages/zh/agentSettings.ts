@@ -165,11 +165,11 @@ export const messages = {
     "此选择仅对你生效，并应用于你的所有设备。服务器已静音或设为“不提醒”时，此助手也不会提醒。",
 
   "agentSettings.newChat.title": "新对话",
-  "agentSettings.newChat.description": "助手会忘记当前对话，但保留已有设置。",
+  "agentSettings.newChat.description": "助手会重新开始，需要时仍可查找当前对话，已有设置保持不变。",
   "agentSettings.newChat.button": "开始",
   "agentSettings.newChat.confirmTitle": "与 {name} 开始新对话？",
   "agentSettings.newChat.confirmDescription":
-    "助手会忘记当前对话，消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
+    "助手会重新开始，需要时仍可查找当前对话。消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
   "agentSettings.deleteHistory.title": "删除历史记录",
@@ -190,6 +190,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "使用“先询问”",
 
   "agentSettings.links.usage": "用量",
+  "agentSettings.links.apps": "应用",
+  "agentSettings.links.appsScope": "所有助手",
   "agentSettings.links.memories": "记忆",
   "agentSettings.links.memoriesCount": { one: "已保存 {count} 条", other: "已保存 {count} 条" },
   "agentSettings.links.skills": "技能",
