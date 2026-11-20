@@ -9,7 +9,7 @@ const CURATED_ID = "openbot-curated-skill-daily-brief";
 const GITHUB_ID = `github:openbot/skills@${"a".repeat(40)}:skills/openbot-notes`;
 const WORKSPACE_ID = "home:openbot-notes";
 
-function installed(skillId: string, origin: InstalledSkill["origin"]): InstalledSkill {
+function installed(skillId: string, origin: NonNullable<InstalledSkill["origin"]>): InstalledSkill {
   return {
     skillId,
     slug: skillId,
