@@ -231,6 +231,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Warten. Der Host führt so viele Durchläufe aus, wie sein Speicher erlaubt.",
   "mobile.server.threads.hold.agentBusy": "Warten, bis andere Arbeit dieses Agenten abgeschlossen ist.",
   "mobile.server.threads.hold.oneTurn": "Warten. Der Anbieter dieses Agenten führt immer nur einen Durchlauf aus.",
+  "mobile.server.threads.hold.signIn": "Warten. Der Anbieter dieses Agenten muss angemeldet werden.",
   "mobile.server.threads.offline": "Verbinde dich mit diesem Server, um seine Threads zu sehen.",
   "mobile.server.threads.loading": "Threads werden geladen…",
   "mobile.server.threads.loadFailed": "Die Threads einiger Agenten konnten nicht geladen werden.",
@@ -1730,4 +1731,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Übertragung nicht angenommen",
   "mobile.server.ownerTransfer.declineFailed": "Übertragung nicht abgelehnt",
   "mobile.server.ownerTransfer.tryAgain": "Versuche es später erneut.",
+  "mobile.server.providers.updateAll": "Alle aktualisieren",
+  "mobile.server.providers.updateAllFailed": "Einige Updates wurden nicht gestartet. Versuche es erneut.",
 } as const satisfies PartialTranslation<typeof source>;

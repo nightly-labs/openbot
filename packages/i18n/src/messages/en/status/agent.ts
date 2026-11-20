@@ -161,4 +161,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
+  "status.agent.takeoverLateCompleted":
+    "I finished the browser takeover in tab {tabId}. Take a fresh snapshot and continue.",
+  "status.agent.takeoverLateCancelled":
+    "I cancelled the browser takeover in tab {tabId}. Do not try it again until I ask.",
 });

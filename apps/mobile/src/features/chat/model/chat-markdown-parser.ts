@@ -175,7 +175,7 @@ function continueParse(body: string, previous: { body: string; tokens: TokensLis
   return Object.assign([...stable, ...rest], { links: rest.links });
 }
 
-const MAX_CACHED_BODIES = 300;
+const MAX_CACHED_BODIES = 600;
 const parsedBodies = new Map<string, ReturnType<typeof parseChatMarkdown>>();
 
 export function parseFinishedChatMarkdown(body: string) {

@@ -112,6 +112,7 @@ export const messages = {
     "Warten. Dieser Computer führt so viele Durchläufe aus, wie sein Speicher zulässt.",
   "conversation.threads.hold.agentBusy": "Warten, bis andere Arbeit dieses Agenten abgeschlossen ist.",
   "conversation.threads.hold.oneTurn": "Warten. Der Anbieter dieses Agenten führt immer nur einen Durchlauf aus.",
+  "conversation.threads.hold.signIn": "Warten. Der Anbieter dieses Agenten muss angemeldet werden.",
   "conversation.sidePanel.closePanel": "Bereich schließen",
   "conversation.threads.view.failedBody":
     "Der Anbieter hat keinen Grund genannt. Sende eine Nachricht, um es erneut zu versuchen.",

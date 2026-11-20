@@ -110,6 +110,7 @@ export const messages = defineMessages("conversation", {
   "conversation.threads.hold.serverBusy": "Waiting. This computer runs as many turns as its memory allows.",
   "conversation.threads.hold.agentBusy": "Waiting for other work of this agent to finish.",
   "conversation.threads.hold.oneTurn": "Waiting. The provider of this agent runs one turn at a time.",
+  "conversation.threads.hold.signIn": "Waiting. The provider of this agent needs sign-in.",
   "conversation.sidePanel.closePanel": "Close panel",
   "conversation.threads.view.failedBody": "The provider gave no reason. Send a message to try again.",
   "conversation.threads.deleteUndo.action": "Undo",

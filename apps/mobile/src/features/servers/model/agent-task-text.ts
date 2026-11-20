@@ -13,6 +13,7 @@ const HOLD_TEXT = {
   "server-busy": "mobile.server.threads.hold.serverBusy",
   "agent-busy": "mobile.server.threads.hold.agentBusy",
   "one-turn": "mobile.server.threads.hold.oneTurn",
+  "sign-in": "mobile.server.threads.hold.signIn",
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, MobileTextKey>;
 
 export function agentTaskStatus(task: AgentTask, t: MobileTranslate): string {
