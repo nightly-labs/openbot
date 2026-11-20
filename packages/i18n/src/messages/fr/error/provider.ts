@@ -19,6 +19,8 @@ export const messages = {
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
   "error.provider.acpMcpNotLoaded":
     "{provider} n’a pas chargé les outils d’OpenBot : cet agent ne peut donc ni les utiliser ni joindre ses coéquipiers. Une règle d’équipe {provider} peut bloquer les serveurs MCP locaux. Demandez à l’administrateur de votre équipe de les autoriser, puis réessayez.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} a traité ce message sans les outils d’OpenBot : l’agent n’a donc pas pu joindre ses coéquipiers, utiliser le navigateur ni joindre de fichiers. Réessayez.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} n’a pas pu démarrer le serveur MCP {name}, la réponse s’est donc arrêtée. Ce serveur est dans vos propres réglages de {provider}, pas dans OpenBot. Supprimez-le ou réparez-le à cet endroit, puis démarrez une nouvelle conversation.",
   "error.provider.endpointsReadOnly":
@@ -348,6 +350,8 @@ export const messages = {
     "Gemini a refusé cette requête sans en donner la cause. Un élément de l’historique de la conversation peut en être la cause, comme une image que l’agent a ouverte. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini n’a pas pu lire l’historique enregistré de cette conversation. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Renvoyez votre message.",
+  "error.provider.acpTurnStuck":
+    "{provider} n’a pas terminé son tour précédent et n’a donc pas accepté ce message. OpenBot a démarré une nouvelle session {provider} avec l’historique de la conversation. Renvoyez votre message.",
   "error.provider.antigravityLocationUnsupported":
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityConnectionLost":

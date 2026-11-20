@@ -179,6 +179,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       hourCycle: "h23",
     } satisfies AppInfo,
   ],
+  [
+    "app info on a server with no Dynamic Island",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "linux",
+      variant: "production",
+      dynamicIslandUnavailable: true,
+    } satisfies AppInfo,
+  ],
   ["sent message stats", decodeSentMessageStats, { firstSentAt: "2026-11-01T09:30:00.000Z", sentCount: 12 }],
   ["sent message stats before the first message", decodeSentMessageStats, { firstSentAt: null, sentCount: 0 }],
   [
@@ -403,6 +414,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "app info with an unknown hour cycle",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", hourCycle: "h24" },
+  ],
+  [
+    "app info with a Dynamic Island availability that is not a boolean",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", dynamicIslandUnavailable: "yes" },
   ],
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
   [

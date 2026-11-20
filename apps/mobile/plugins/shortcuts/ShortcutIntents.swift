@@ -36,7 +36,9 @@ enum ShortcutNotice: String {
 @available(iOS 26.0, *)
 struct ListAgentsIntent: AppIntent {
   static let title: LocalizedStringResource = "List Agents"
-  static let description = IntentDescription("Shows your OpenBot agents. A tap on an agent opens its chat.")
+  static let description = IntentDescription(
+    "Shows your OpenBot agents. A tap on an agent opens its chat. The message button sends a message, and the app does not open."
+  )
   static let supportedModes: IntentModes = .background
   static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
@@ -78,16 +80,56 @@ struct SendMessageIntent: AppIntent {
     }
     let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { throw $message.needsValueError("What should it say?") }
-    // The intent returns when the server has the message. iOS suspends the app soon after an
-    // intent returns, so a send that continued after it would not end.
-    guard let directory, let agent = directory.agent,
-      let server = directory.server(of: agent),
-      let session = ShortcutSession.read(for: directory)
-    else {
-      return .result(snippetIntent: ShortcutCardSnippetIntent(outcome: .failed, message: text))
+    guard let directory, let agent = directory.agent else {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .noAgent))
     }
-    let outcome = await ShortcutMessageSender.send(text: text, to: agent, on: server, session: session)
-    return .result(snippetIntent: ShortcutCardSnippetIntent(outcome: outcome, message: text))
+    return .result(snippetIntent: await ShortcutCardSnippetIntent.sending(text, to: agent, in: directory))
+  }
+}
+
+@available(iOS 26.0, *)
+struct MessageAgentIntent: AppIntent {
+  static let title: LocalizedStringResource = "Message Agent"
+  static let isDiscoverable = false
+  static let supportedModes: IntentModes = .background
+  static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+  @Parameter(title: "Agent")
+  var agentId: String?
+
+  @Parameter(title: "Server")
+  var serverId: String?
+
+  @Parameter(
+    title: "Message",
+    inputOptions: String.IntentInputOptions(keyboardType: .default, multiline: true)
+  )
+  var message: String?
+
+  init() {}
+
+  init(agent: ShortcutDirectory.Agent) {
+    self.agentId = agent.id
+    self.serverId = agent.serverId
+  }
+
+  func perform() async throws -> some IntentResult & ShowsSnippetIntent {
+    guard let directory = ShortcutDirectory.read() else {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .setUp))
+    }
+    if directory.locked {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .locked))
+    }
+    guard let agentId, let serverId, let agent = directory.agent(id: agentId, serverId: serverId) else {
+      return .result(snippetIntent: AgentListSnippetIntent())
+    }
+    let prompt = ShortcutText.text("mobile.settings.shortcuts.card.messagePrompt", in: directory, name: agent.name)
+    var text = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if text.isEmpty {
+      text = try await $message.requestValue("\(prompt)").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    guard !text.isEmpty else { throw $message.needsValueError("\(prompt)") }
+    return .result(snippetIntent: await ShortcutCardSnippetIntent.sending(text, to: agent, in: directory))
   }
 }
 

@@ -156,6 +156,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "غروب قديم الطراز",
   "mobile.settings.appearance.backdrop.snowfall": "تساقط الثلج",
   "mobile.settings.appearance.backdrop.fireflies": "اليراعات",
+  "mobile.settings.appearance.backdrop.coast": "ساحل النيون",
   "mobile.settings.appearance.backdrop.agentPage": "صفحة الوكيل",
   "mobile.settings.appearance.backdrop.agentPageNote": "عيّنها وكيل",
   "mobile.settings.appearance.backdrop.photo": "صورة",
@@ -598,6 +599,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "اختيار وكيل",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot مقفل",
   "mobile.settings.shortcuts.card.locked.action": "فتح OpenBot",
+  "mobile.settings.shortcuts.card.message": "مراسلة {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "رسالة إلى {name}",
   "mobile.settings.shortcuts.footer":
     "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق. ويفتح Open Agent محادثته.",
   "mobile.settings.shortcuts.send.sent": "تم الإرسال",

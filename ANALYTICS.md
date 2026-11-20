@@ -19,7 +19,7 @@ Every event has these low-cardinality properties:
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `13` on `desktop`,
-  `21` on `desktop_host`, `10` on `landing`, `16` on `account_api`, `4` on `mobile`, `2` on `web`, and `2` on
+  `21` on `desktop_host`, `10` on `landing`, `16` on `account_api`, `5` on `mobile`, `2` on `web`, and `2` on
   `signal`;
 - `app_version` and `platform` on desktop surfaces;
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
@@ -49,7 +49,8 @@ Desktop generation 12 adds `workflow_action`. Host generation 10 adds `provider_
 `skipped` on `onboarding_completed`, two `team_action` actions, and removes `maintenance_action`,
 which had no sender. Web generation 2 sends the desktop product events from `/app`, with
 `surface: web`; generation 1 sent only failure reports. Mobile generation 3 adds sign-in, pairing
-`entry_point`, plans, onboarding, notification, Live Activity, voice and template events. Mobile generation 4 adds
+`entry_point`, plans, onboarding, notification, Live Activity, voice and template events. Mobile generation 5 adds the step times
+(`signal_socket_ms`, `signal_ms`, `channels_ms`, `auth_ms`), `route` and `vpn` on `mobile_connection_action`. Mobile generation 4 adds
 `marketplace_action` for agent, skill and plugin installs and agent updates, without `listing_slug`. Desktop generation 9 adds `voice_conversation_action`, `voice_turn`, `speech_reply`,
 `speech_model_action` and `speech_settings_action`. Desktop generation 8 adds `hosted_server_upsell`. Host generation 9 adds the token
 properties of `system_turn_completed` and `system_token_usage`. Host generation 8 adds `system_resources`. Desktop and host generation 7 adds safe error causes and durable failure delivery. Generation 6 added the usage events below (`system_tool_used`,

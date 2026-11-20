@@ -225,6 +225,23 @@ export const messages = {
   "server.rail.delete": "删除服务器",
   "server.rail.hide": "隐藏服务器",
   "server.rail.showLocal": "显示 {name}",
+  "server.plan.daysLeft": {
+    one: "{count} 天",
+    other: "{count} 天",
+  },
+  "server.plan.ended": "套餐已结束",
+  "server.plan.status": "套餐已结束，将于 {date} 删除",
+  "server.plan.deletedOn": "将于 {date} 删除",
+  "server.plan.dialogTitle": "别让你的智能体离开",
+  "server.plan.dialogDescription":
+    "{name} 已停止，因为套餐未付款。{date}，OpenBot 将删除它的智能体及其所有聊天和文件。",
+  "server.plan.dialogDaysLeft": {
+    one: "还剩 {count} 天",
+    other: "还剩 {count} 天",
+  },
+  "server.plan.later": "稍后",
+  "server.plan.keepAgents": "保留我的智能体",
+  "server.plan.ownerRenews": "在服务器所有者续订套餐之前，{name} 的智能体不可用。",
   "server.select.failedTitle": "无法选择该服务器",
   "server.select.failedDescription": "无法切换服务器，请重试。",
   "server.select.openAgentFailed": "无法打开 {name}，请在侧边栏中找到它。",

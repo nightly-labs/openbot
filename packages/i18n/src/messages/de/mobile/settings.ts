@@ -148,6 +148,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Retro-Sonnenuntergang",
   "mobile.settings.appearance.backdrop.snowfall": "Schneefall",
   "mobile.settings.appearance.backdrop.fireflies": "Glühwürmchen",
+  "mobile.settings.appearance.backdrop.coast": "Neonküste",
   "mobile.settings.appearance.backdrop.agentPage": "Agentenseite",
   "mobile.settings.appearance.backdrop.agentPageNote": "Von einem Agenten festgelegt",
   "mobile.settings.appearance.backdrop.photo": "Foto",
@@ -589,6 +590,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Agent wählen",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot ist gesperrt",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot öffnen",
+  "mobile.settings.shortcuts.card.message": "{name} eine Nachricht senden",
+  "mobile.settings.shortcuts.card.messagePrompt": "Nachricht an {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht. Open Agent öffnet seinen Chat.",
   "mobile.settings.shortcuts.send.sent": "Gesendet",

@@ -426,6 +426,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Zarządzaj profilami",
   "mobile.agent.browserProfile.footer":
     "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
+  "mobile.agent.browserProfile.movedNote":
+    "Logowania do witryn zostają w starym profilu. Agent musi ponownie zalogować się na tych witrynach.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki agenta.",
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":

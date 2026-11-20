@@ -142,6 +142,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.backdrop.sunset": "Old-style sunset",
   "mobile.settings.appearance.backdrop.snowfall": "Snowfall",
   "mobile.settings.appearance.backdrop.fireflies": "Fireflies",
+  "mobile.settings.appearance.backdrop.coast": "Neon coast",
   "mobile.settings.appearance.backdrop.agentPage": "Agent page",
   "mobile.settings.appearance.backdrop.agentPageNote": "Set by an agent",
   "mobile.settings.appearance.backdrop.photo": "Photo",
@@ -571,6 +572,8 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.shortcuts.card.noAgent.action": "Choose agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot is locked",
   "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
+  "mobile.settings.shortcuts.card.message": "Message {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Message to {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message in the Shortcuts app sends to this agent. The app does not open. Open Agent opens its chat.",
   "mobile.settings.shortcuts.send.sent": "Sent",

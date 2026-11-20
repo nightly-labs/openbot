@@ -34,7 +34,7 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import { type ConnectorDetail, ConnectorDetailPanel, connectorDescription } from "../connectors/ConnectorDetailPanel";
 import type { ConnectorId } from "../connectors/connectors";
@@ -631,6 +631,7 @@ function ConnectorInformation(props: { scope: MarketplaceScope; app: ConnectorAp
 function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
+  const serverId = createMemo(() => props.app.server.id);
   const [confirm, setConfirm] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const remove = () => {
@@ -691,7 +692,7 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         </ItemGroup>
       </SettingsSection>
       <Show when={model().canConnectApps() ? model().servers : undefined}>
-        {(slots) => <>{slots().controls({ id: props.app.server.id })}</>}
+        {(slots) => <>{slots().controls({ id: serverId() })}</>}
       </Show>
       <Show when={model().mcpAccess}>
         {(access) => (
