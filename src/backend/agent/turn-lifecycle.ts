@@ -1814,6 +1814,14 @@ export class TurnLifecycle {
     return run !== null && this.#hooks.quietRoutineDelivery(run.delivery.id);
   }
 
+  #answersAgent(deliveries: readonly DeliveryContext[], turnId: string): boolean {
+    return deliveries.every(({ delivery }) => {
+      if (teammateRequest(delivery)) return true;
+      const requestId = answeredRequestId(delivery);
+      return requestId !== null && this.#mailbox.passedAnswerOn(delivery.recipientAgentId, requestId, turnId);
+    });
+  }
+
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
     return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
   }
@@ -2386,6 +2394,9 @@ export class TurnLifecycle {
         origin: deliveries[0]?.delivery.sender.kind ?? "unknown",
         ...(quiet ? { quiet: true as const } : {}),
         ...(continuation ? { continues: true as const } : {}),
+        ...(deliveries[0]?.delivery.sender.kind === "agent"
+          ? { answersAgent: this.#answersAgent(deliveries, turnId) }
+          : {}),
       });
       if (proposed?.kind === "check") this.#hooks.emitRuntimeSnapshot();
       if (!channelTurn && !routineSession) {

@@ -169,6 +169,7 @@ import {
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
+  TEAMMATE_RESULT_TURN_CAPABILITY,
   type TeamCurrentCapability,
   teamCapabilitiesVisibleToProtocol,
   VAULT_CAPABILITY,
@@ -1740,6 +1741,19 @@ export class TeamApiServer {
       };
       let outgoing: string;
       let optional: OptionalTeamEvent | null;
+      const teammateResult =
+        event.type === "turn-completed" &&
+        event.answersAgent === false &&
+        !event.continues &&
+        connection.capabilities.has(TEAMMATE_RESULT_TURN_CAPABILITY)
+          ? {
+              type: "teammate-result-turn-completed" as const,
+              agentId: event.agentId,
+              threadId: event.threadId,
+              turnId: event.turnId,
+              status: event.status,
+            }
+          : null;
       try {
         optional =
           event.type === "turn-completed" && event.quiet && connection.capabilities.has(QUIET_TURN_CAPABILITY)
@@ -1765,7 +1779,7 @@ export class TeamApiServer {
                       }
                     : event.type === "agent-tasks-changed"
                       ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot) }
-                      : event,
+                      : (teammateResult ?? event),
                   { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
                 );
       } catch (error) {

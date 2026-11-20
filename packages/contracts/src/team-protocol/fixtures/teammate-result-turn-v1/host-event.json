@@ -1,0 +1,7 @@
+{
+  "type": "teammate-result-turn-completed",
+  "agentId": "agent-1",
+  "threadId": "thread-1",
+  "turnId": "turn-1",
+  "status": "completed"
+}

@@ -123,7 +123,12 @@ export function settledRequestKeys(
 }
 
 export function teammateTurnCompleted(event: AgentEvent): boolean {
-  return event.type === "turn-completed" && event.status === "completed" && event.origin === "agent";
+  return (
+    event.type === "turn-completed" &&
+    event.status === "completed" &&
+    event.origin === "agent" &&
+    event.answersAgent !== false
+  );
 }
 
 export function agentEventNeedsUser(event: AgentEvent): boolean {

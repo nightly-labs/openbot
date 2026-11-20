@@ -124,14 +124,26 @@ keeps the newest quiet turns and the newest such turns in memory only, so after 
 shows.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
-or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
-desktop, the web client and the phone show no notification for it and play no completion sound
-(`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
-approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
-the same origin, because the agent sends the brief to itself, but it arrives as
-`thread-turn-completed`. The clients decide this from the released
-`origin` field, so it needs no capability and also applies with an older host. The host decides it
-for the phone push.
+or its answer) and whose result goes to an agent is work between agents. Its answer shows in the chat
+and counts as unread, but the desktop, the web client and the phone show no notification for it and
+play no completion sound (`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`).
+The host decides where the result goes from the mailbox, not from the text, and sets `answersAgent` on
+`turn-completed` (`TurnLifecycle.#answersAgent`). It is true when each message of the turn is a
+request from another agent, whose result goes back to it, or a teammate's answer that the turn passed
+on to the agent that asked first: the agent sent the request to the teammate while it worked on that
+agent's request, and this turn replied to it (`MailboxStore.passedAnswerOn`). It is false for the
+answer of an agent with its teammates' results for the user, so a coordinator that asks six
+teammates notifies once, with its answer. A prompt, an approval, a browser step and a failed turn
+still notify. So does the result of a task: its turn has the same origin, because the agent sends the
+brief to itself, but it arrives as `thread-turn-completed`. A turn without the field, from an older
+host, stays quiet.
+
+`answersAgent: false` reaches remote clients through the optional `teammate-result-turn-v1`
+capability (protocol 10 only, `packages/contracts/src/team-protocol/teammate-result-turn-v1.ts`). The
+host sends a client with the capability a `teammate-result-turn-completed` event in place of
+`turn-completed`, and the client transport changes it back to `turn-completed` with `origin: "agent"`
+and `answersAgent: false` (`optional-events.ts`). A client without the capability gets the released
+`turn-completed` event and keeps the turn quiet, as before.
 
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the

@@ -22,6 +22,7 @@ import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
 import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
+import { type TeammateResultTurnCompletedEvent, teammateResultTurnEvent } from "./teammate-result-turn-v1";
 import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
@@ -48,6 +49,7 @@ export type OptionalTeamEvent =
   | SidebarFoldersEvent
   | SkillsEvent
   | QuietTurnCompletedEvent
+  | TeammateResultTurnCompletedEvent
   | RoutineFlowsEvent
   | UsageCreditsEvent
   | VaultEvent
@@ -81,6 +83,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     sidebarFoldersEvent(value) ??
     skillsEvent(value) ??
     quietTurnEvent(value) ??
+    teammateResultTurnEvent(value) ??
     routineFlowsEvent(value) ??
     usageCreditsEvent(value) ??
     vaultEvent(value) ??
@@ -92,6 +95,8 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
 export function optionalTeamEventToCurrent(event: OptionalTeamEvent) {
   if (event.type === "sidebar-folders-changed")
     return { type: "sidebar-layout-changed" as const, layout: event.layout };
+  if (event.type === "teammate-result-turn-completed")
+    return { ...event, type: "turn-completed" as const, origin: "agent" as const, answersAgent: false };
   return event.type === "quiet-turn-completed"
     ? { ...event, type: "turn-completed" as const, quiet: true as const }
     : event;
