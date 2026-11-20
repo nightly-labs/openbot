@@ -14,6 +14,18 @@ const [startupAnimation, setStartupAnimationShown] = createSignal(
   typeof window === "undefined" ? true : readStartupAnimation(),
 );
 
+function readStorageIntoSignal(event: StorageEvent): void {
+  if (event.key !== null && event.key !== STARTUP_ANIMATION_STORAGE_KEY) return;
+  setStartupAnimationShown(readStartupAnimation());
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", readStorageIntoSignal);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener("storage", readStorageIntoSignal);
+  });
+}
+
 export function startupLoadingScene(): "pile" | "quiet" {
   return startupAnimation() ? "pile" : "quiet";
 }

@@ -88,8 +88,9 @@
     animation: app-loading-line-in 280ms var(--openbot-ease-out);
   }
 
-  .app-loading[data-scene="quiet"] .app-loading-stage {
-    animation-delay: 0ms;
+  .app-loading[data-scene="quiet"] .app-loading-stage,
+  .app-loading[data-scene="quiet"] .ui-plush-loader > .ui-plush-mascot {
+    animation: none;
   }
 
   .app-loading[data-scene="quiet"] .ui-plush-eyes {
