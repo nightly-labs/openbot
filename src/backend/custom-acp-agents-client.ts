@@ -97,6 +97,11 @@ function childKey(agentId: string, folder: string | null): string {
   return `${agentId}\0${folder ?? ""}`;
 }
 
+function folderOfChildKey(key: string): string | null {
+  const folder = key.slice(key.indexOf("\0") + 1);
+  return folder === "" ? null : folder;
+}
+
 function requiredCwd(params: unknown): string {
   const cwd = getString(params, "cwd");
   if (!cwd) throw new Error("cwd is required.");
@@ -209,6 +214,30 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       { concurrency: "unbounded", discard: true },
     );
   });
+
+  readonly releaseFolderProcesses = Effect.fn("CustomAcp.releaseFolderProcesses")(function* (
+    this: CustomAcpAgentsClient,
+    folder: string,
+  ) {
+    let matched = false;
+    let kept = false;
+    for (const [key, pending] of [...this.#children]) {
+      if (folderOfChildKey(key) !== folder) continue;
+      matched = true;
+      const started = yield* Effect.exit(Deferred.await(pending));
+      if (Exit.isFailure(started) || this.#children.get(key) !== pending) continue;
+      const child = started.value;
+      if (child.canReleaseProcess?.() === false) {
+        kept = true;
+        continue;
+      }
+      this.#children.delete(key);
+      for (const [threadId, held] of this.#sessions) if (held.child === child) this.#sessions.delete(threadId);
+      for (const [id, request] of this.#requests) if (request.child === child) this.#requests.delete(id);
+      yield* child.stop().pipe(Effect.ignore);
+    }
+    return matched ? kept : null;
+  }, Effect.uninterruptible);
 
   readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
     this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;

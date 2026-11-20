@@ -51,6 +51,7 @@ export interface AgentClient {
   newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  releaseFolderProcesses?(folder: string): Effect.Effect<boolean | null>;
   releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   readSessionSettings?(
     externalThreadId: string,
