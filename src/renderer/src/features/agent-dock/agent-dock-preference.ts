@@ -5,7 +5,6 @@ import {
   type AgentDockEdge,
   type AgentDockOffset,
   type AgentDockSeatRef,
-  sameAgentDockDisplayBounds,
 } from "@openbot/contracts/ipc";
 import { agentDockSeatKey } from "@openbot/ui/features/agent-dock/AgentDock";
 import { createSignal } from "solid-js";
@@ -176,9 +175,7 @@ export function setAgentDockPreference(patch: Partial<AgentDockPreference>): voi
 }
 
 export function saveAgentDockOffset(moved: AgentDockOffset): void {
-  const others = preference().offsets.filter(
-    (item) => item.displayId !== moved.displayId && !sameAgentDockDisplayBounds(item.bounds, moved.bounds),
-  );
+  const others = preference().offsets.filter((item) => item.displayId !== moved.displayId);
   const saved = { displayId: moved.displayId, offset: moved.offset, ...(moved.bounds && { bounds: moved.bounds }) };
   setAgentDockPreference({
     offsets: [...others, saved].slice(-AGENT_DOCK_LIMITS.displays),
