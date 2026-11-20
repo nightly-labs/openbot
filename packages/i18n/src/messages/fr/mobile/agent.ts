@@ -410,6 +410,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gérer les profils",
   "mobile.agent.browserProfile.footer":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur de l’agent.",
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":

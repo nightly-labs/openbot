@@ -55,6 +55,7 @@ export const messages = defineMessages("settings", {
   "settings.chatBackdrop.sunset": "Retro sunset",
   "settings.chatBackdrop.snowfall": "Snowfall",
   "settings.chatBackdrop.fireflies": "Fireflies",
+  "settings.chatBackdrop.coast": "Neon coast",
   "settings.chatBackdrop.upload": "Upload image…",
   "settings.chatBackdrop.uploadRefused": "Use a PNG, JPEG, GIF, WebP or AVIF image of 20 MB or less.",
   "settings.chatBackdrop.saveFailed": "The backdrop was not saved.",

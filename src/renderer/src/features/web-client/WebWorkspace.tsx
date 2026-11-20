@@ -84,6 +84,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
@@ -280,12 +281,14 @@ import { scheduleRoutinePorts } from "../schedule/schedule-routine-create";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { mcpSignInRecord } from "../servers/mcp-servers";
+import { OwnerTransferPrompt } from "../servers/OwnerTransferPrompt";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
+import type { OwnerTransferCalls } from "../servers/ServerOwnerTransferSection";
 import { ServerPlanReminder } from "../servers/ServerPlanReminder";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
@@ -663,7 +666,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       hostedSleep: workspace.state.hostedSleep,
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
-      loading: workspace.state.status === "connecting",
+      // Signal holds the attempt of a host that is offline. As on desktop, that is not a load: the notice
+      // shows the connect step, not "Loading" with Connect done.
+      loading: workspace.state.status === "connecting" && !workspace.state.hostOffline,
       hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
   const [pageLoad, setPageLoad] = createSignal(true);
@@ -1497,6 +1502,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(listHostedSites(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     delete: async ({ siteId }, serverId) =>
       runTeamEffect(deleteHostedSite(hostRequest(serverId), siteId).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const ownerTransferCalls = (): OwnerTransferCalls | undefined => {
+    const transfers = workspace.runtime.ownerTransfers;
+    const target = server();
+    if (
+      !transfers ||
+      !target ||
+      target.hosted === true ||
+      !hostedServers.loaded() ||
+      hostedServers.isHosted(target.id) ||
+      !workspace.state.capabilities.includes(OWNER_TRANSFER_CAPABILITY)
+    )
+      return undefined;
+    return {
+      getOwnerTransfer: (serverId) => transfers.pending(serverId),
+      startOwnerTransfer: (email, serverId) => transfers.start(serverId, email),
+      cancelOwnerTransfer: (serverId) => transfers.cancel(serverId),
+    };
   };
   const agentImportCalls = createWebAgentImportCalls({
     request: hostRequest,
@@ -3243,6 +3266,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     }}
                     onManageServers={() => setBillingOpen(true)}
                   />
+                  <Show when={workspace.runtime.ownerTransfers}>
+                    {(transfers) => (
+                      <OwnerTransferPrompt
+                        calls={{
+                          list: () => transfers().incoming(),
+                          accept: (transferId) => transfers().accept(transferId),
+                          decline: (transferId) => transfers().decline(transferId),
+                        }}
+                        reloadKey={workspace.state.hosts}
+                        onAccepted={() => void workspace.refreshHosts().catch(() => undefined)}
+                      />
+                    )}
+                  </Show>
                   <JoinServerOverlay
                     open={joinOpen()}
                     inviteUrl={props.inviteUrl ?? ""}
@@ -3312,6 +3348,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onSetPublished={unavailable}
                         onRotateHostKey={rotateHostKeyAction()}
                         onCreateInvite={serverSettings.createInvite}
+                        ownerTransfer={ownerTransferCalls()}
                         license={licenseCalls}
                         onDownloadDesktopApp={() => void window.open("/download", "_blank", "noopener")}
                         onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}

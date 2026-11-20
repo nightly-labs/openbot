@@ -148,10 +148,8 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
-  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
-  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -230,7 +228,7 @@ import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
+import { agentFallbackMcpServers, type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
@@ -1949,12 +1947,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agentId) => {
           const agent = this.#store.get(agentId) ?? { access: "workspace" };
           const saved = new Set(this.#mcp.list().map((config) => config.id));
-          return this.enabledMcpServers(agentId).filter(
-            (config) =>
-              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
-                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
-              mcpFallbackRunsServer(config, agent),
-          );
+          return agentFallbackMcpServers(this.enabledMcpServers(agentId), saved, agent);
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
       ),
@@ -2215,6 +2208,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.channels.hasActiveWork()) reasons.push("channel-work");
     if (this.#providers.activeProcessCount() > 0) reasons.push("provider-process");
     return reasons;
+  }
+
+  hasProviderOperation(): boolean {
+    return this.#providers.hasPendingOperation();
   }
 
   instructionsSaving(agentId: string, text: string): (written: boolean) => void {
@@ -3667,7 +3664,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
         const providerMove =
-          (move === null || move === "next-turn") &&
+          (move === null || move === "next-turn" || move === "pool") &&
           previous !== undefined &&
           confinedProvider !== providerForAgent(previous);
         if (
@@ -3831,7 +3828,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 ...(previous.fastMode ? { fastMode: true } : {}),
                 ...(previous.fastMode && previous.ultrafast ? { ultrafast: true } : {}),
               }))
-        : undefined;
+        : move === "pool"
+          ? previous?.usageLimitReturn
+          : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
     const agent = yield* this.#store.updateAgent(
@@ -3930,7 +3929,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           model: pooled.model,
           providerAccountId: pooled.providerAccountId ?? null,
         },
-        move: "next-turn",
+        move: "pool",
       };
     if (!agent.usageLimitReturn && !agent.backupModels) return null;
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
@@ -4243,7 +4242,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
-          if (move.move === "next-turn" && (yield* this.#poolMoveWaits(agentId))) {
+          if (move.move === "pool" && (yield* this.#poolMoveWaits(agentId))) {
             logger.info("A pool move waits: the agent's Claude session still runs background work.", { agentId });
             return false;
           }
@@ -6912,7 +6911,7 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
 
 const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
-type ModelMove = "return" | "provider-error" | "next-turn";
+type ModelMove = "return" | "provider-error" | "next-turn" | "pool";
 
 const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "agentId",

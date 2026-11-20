@@ -1,6 +1,13 @@
-import type { AgentProviderId, AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  AgentSessionSettingsSnapshot,
+  AgentSessionSettingValue,
+  McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
+import type { McpToolArguments } from "./mcp-probe";
+import type { RelayedMcpToolOutcome } from "./mcp-stdio-relay";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 import type { ReadProviderHistory } from "./provider-history";
@@ -31,6 +38,13 @@ export interface AgentClient {
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
   releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
+  callRelayedMcpTool?(
+    externalThreadId: string,
+    config: McpServerConfig,
+    tool: string,
+    args: McpToolArguments,
+  ): Effect.Effect<RelayedMcpToolOutcome | null>;
+  relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;

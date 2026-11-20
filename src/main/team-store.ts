@@ -912,6 +912,62 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
+  readonly transferOwnership = Effect.fn("TeamStore.transferOwnership")(
+    function* (
+      this: TeamStore,
+      serverId: string,
+      user: CentralAuthUser,
+    ): Effect.fn.Return<string[], RemoteWorkflowError, TeamStoreFiles> {
+      const host = this.#file.hosts.find((candidate) => candidate.serverId === serverId);
+      const owner = host ? hostOwner(host) : undefined;
+      if (!host || !owner) {
+        return yield* new RemoteWorkflowError({ cause: new TeamStoreError(sourceText("error.team.serverNotActive")) });
+      }
+      const email = yield* remoteDecode(() => normalizeEmail(user.email));
+      const rollback = structuredClone(this.#file);
+      const activeServerId = this.#state?.serverId ?? null;
+      const previousOwnerId = owner.id;
+      const joined = host.members.find(
+        (member) => member.role !== "owner" && (member.accountId === user.id || member.email === email),
+      );
+      const ownerId = joined?.id ?? previousOwnerId;
+      host.members = host.members.filter((member) => member !== joined);
+      host.sessions = host.sessions.filter(
+        (session) => session.memberId !== previousOwnerId && session.memberId !== joined?.id,
+      );
+      delete owner.passwordSalt;
+      delete owner.passwordHash;
+      owner.id = ownerId;
+      owner.accountId = user.id;
+      owner.email = email;
+      owner.username = email;
+      owner.name = yield* remoteDecode(() => normalizeName(user.name));
+      owner.avatarUrl = yield* remoteDecode(() => normalizeAvatarUrl(user.avatarUrl));
+      applyChatColor(owner, user.chatColor);
+      owner.disabled = false;
+      this.#file.activeAccountId = user.id;
+      const closed: string[] = [];
+      if (this.#state === host) {
+        for (const [tokenHash, session] of this.#remoteSessions) {
+          if (session.member.id !== previousOwnerId && session.member.id !== joined?.id) continue;
+          this.#remoteSessions.delete(tokenHash);
+          closed.push(session.sessionId);
+        }
+      }
+      return yield* this.#persistFileEffect().pipe(
+        Effect.as(closed),
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            this.#file = rollback;
+            this.#state = rollback.hosts.find((candidate) => candidate.serverId === activeServerId) ?? null;
+          }).pipe(Effect.andThen(Effect.fail(error))),
+        ),
+      );
+    },
+    Effect.provide(TeamStoreFiles.layer),
+    Effect.uninterruptible,
+  ).bind(this);
+
   openRemoteSession(input: {
     sessionId: string;
     membershipId: string;

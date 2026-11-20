@@ -1196,8 +1196,9 @@ server got the machine in that moment.
 
 A machine of the pool is not the boat image:
 
-- It has no agent CLI for all users (`claude`, `codex`, `pi`) and no `node`. A provider shows that
-  its CLI is not downloaded, and the user downloads it in OpenBot.
+- It has no agent CLI for all users (`claude`, `codex`, `pi`) and no `node`. At start, a hosted
+  server downloads the CLI of each provider that an agent uses and that is not off. The user
+  downloads the CLI of another provider in OpenBot.
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
 - It shows the storage of a moved server (25, 75 and 150 GB), which is more than the plan table of
   the pricing page.
@@ -1464,8 +1465,9 @@ The VPS is not the same machine as the sandbox:
 
 - The boat image has commands that npm installed for all users (`claude`, `codex` and `pnpm` on
   2026-11-11). The VPS has none. The move copies the agent CLIs that the customer signed in to, and
-  `import` names each other one that is missing. A provider that used a missing command shows that
-  its CLI is not downloaded, and the user downloads it in OpenBot.
+  `import` names each other one that is missing. At start, a hosted server downloads the CLI of each
+  provider that an agent uses and that is not off. The user downloads the CLI of another provider in
+  OpenBot.
 - `prepare` makes only the primary group of `user`, and the VPS has no Docker. `import` names each
   group that `user` had in the sandbox (`docker` and `ascii-streaming-audio` on 2026-11-11). An
   agent of the customer that used Docker does not have it after the move.
@@ -1743,8 +1745,9 @@ system and goes back to the pool for the next new server or the next move. The W
 
 A machine does not wait 14 days with the data of an ended plan. `sync` moves the data into an encrypted
 archive in Backblaze B2 and gives the machine back to the pool ([plan 012](../plans/012-pool-server-archive.md)).
-Do not run `sync --apply` with an archive before the restore (plan 012 item 4) is live: until then, a
-renewal of an archived server gets a new, empty server.
+A renewal before the archive is deleted restores the server on a free pool machine (plan 012 item 4,
+live since 2026-11-19). Run `sync --apply` each day, so that each ended plan frees its machine and each
+restored or due archive is deleted.
 
 1. `sync` finds each server on a machine with `desired_state = 'stopped'`, `plan_ended`, no open
    subscription and no live archive. It reads the newest subscription at Stripe. It archives only a
@@ -1761,7 +1764,7 @@ renewal of an archived server gets a new, empty server.
    additional data). The write stops when the server changed, for example by a renewal; `sync` then
    deletes the object and the machine keeps the data.
 4. `sync` sets `operator_host = NULL` only while `desired_state` is still `stopped`, clears the token of
-   the machine, reinstalls it and sets its reference to `pool`. When the reinstall fails, the archive is
+   the machine, sets its reference to `pool` and reinstalls it. When the reinstall fails, the archive is
    complete but the machine still has the data: run `prepare --reinstall` for it.
 5. Each `sync` deletes an archive in B2 and then its key in D1 (`deleted_at`, `wrapped_key = NULL`) when
    `delete_after` (`plan_ended_at` + 14 days) is past, the server is deleted (owner delete, refund

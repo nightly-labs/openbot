@@ -951,7 +951,10 @@ Nothing else wakes the requester, so a turn of teammate results that ends with n
 step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
 with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
-by the user. The error waits for the end
+by the user. A turn whose results each repeat, with the same text and files, an answer of the same
+teammate to the same request that an earlier finished turn already took
+(`MailboxStore.repeatsHandledReply`) also ends quietly. The repeated answer stays in the chat. An
+answer with new text to the same request still fails as above (#13130). The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
@@ -1023,7 +1026,11 @@ block of a steer. Claude Code shows a steer to its model next to the result of t
 the header and rules of a teammate prompt, Claude Haiku took a steered teammate message for text in
 the tool result and ignored it. For Claude, `QueueControls.steer` therefore sets `steerFramedAsUser`,
 and `deliveryPromptInput` sends a teammate message as plain words (`userFramedTeammateText`): the
-sender, the text, and for a request the `send_message` reply rule. The steer's uuid is the delivery
+sender, the text, and the `send_message` reply rule for a request. A message that needs no answer also
+gets the `routine_no_update` rule when each other delivery of the running turn is a quiet teammate
+delivery, so the tool can end that turn quiet. Without that tool, a turn that ends with no text gets a
+Claude Code prompt for visible output, and the agent writes a filler line. In a request, routine or
+external chat turn the rule is left out: there the turn's answer is still due. The steer's uuid is the delivery
 ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.

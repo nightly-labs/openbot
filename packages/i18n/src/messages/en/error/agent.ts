@@ -123,6 +123,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.deleteIncomplete": "The agent data could not be removed completely. Retry deleting the agent.",
   "error.agent.deleteFolderInUse":
     "Work of another agent still uses this agent's folder. Delete this agent again when that work ends, or after you restart OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Another program still uses this agent's folder, for example a program that the agent started. Close that program or restart the computer that this agent runs on, then delete the agent again.",
   "error.agent.deleteWhenFolderFree":
     "Work of another agent still uses this agent's folder. OpenBot deletes this agent when that work ends.",
   "error.agent.duplicationBusy": "This agent is already being duplicated.",

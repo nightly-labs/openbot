@@ -6,7 +6,7 @@ import type { BitwardenConnectorStatus, BitwardenHostConnectInput } from "@openb
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
-import { cliSpawnTarget } from "../backend/cli";
+import { cliPathEnvironment, cliSpawnTarget, loginSearchPath } from "../backend/cli";
 import { causeHelpers } from "../backend/effect-boundary";
 import {
   type PasswordVault,
@@ -67,6 +67,14 @@ export type BitwardenCliRunner = (
   env: Record<string, string>,
   signal: AbortSignal,
 ) => Promise<string>;
+
+interface BitwardenCli {
+  executable: string;
+  launchPath?: string;
+}
+export type BitwardenCliFinder = (options: {
+  searchLoginShell: boolean;
+}) => Effect.Effect<BitwardenCli, PasswordVaultError>;
 
 export interface BitwardenHostOptions {
   store: BitwardenConnectorStore;
@@ -134,11 +142,15 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
   });
 };
 
-async function firstCli(names: string[], directories: string[]): Promise<string | null> {
+async function firstCli(
+  names: string[],
+  directories: string[],
+  resolve: (path: string) => Promise<string> = realpath,
+): Promise<string | null> {
   for (const directory of new Set(directories.filter(isAbsolute))) {
     for (const name of names) {
       try {
-        const path = await realpath(join(directory, name));
+        const path = await resolve(join(directory, name));
         await access(path, constants.X_OK);
         return path;
       } catch {}
@@ -173,15 +185,21 @@ async function currentWindowsPathFolders(): Promise<string[]> {
   return folders;
 }
 
-async function findCli(): Promise<string> {
+const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(function* ({ searchLoginShell }) {
   const names = process.platform === "win32" ? ["bw.exe", "bw.cmd"] : ["bw"];
   const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
-  const found =
-    (await firstCli(names, directories)) ??
-    (process.platform === "win32" ? await firstCli(names, await currentWindowsPathFolders()) : null);
-  if (found) return found;
-  throw new Error(sourceText("error.connector.bitwardenCliMissing"));
-}
+  const found = yield* Effect.promise(() => firstCli(names, directories));
+  if (found) return { executable: found };
+  if (process.platform === "win32") {
+    const registered = yield* Effect.promise(async () => firstCli(names, await currentWindowsPathFolders()));
+    if (registered) return { executable: registered };
+  } else if (searchLoginShell) {
+    const folders = (yield* loginSearchPath()).filter(isAbsolute);
+    const fromLoginShell = yield* Effect.promise(() => firstCli(names, folders, async (path) => path));
+    if (fromLoginShell) return { executable: fromLoginShell, launchPath: folders.join(delimiter) };
+  }
+  return yield* cliMissing();
+});
 
 function serverAddress(value: string): string | null {
   try {
@@ -212,7 +230,7 @@ function matches(item: Item, folderId: string, origin: string): boolean {
 
 export class BitwardenConnectorService implements PasswordVault {
   readonly #run: BitwardenCliRunner;
-  readonly #find: () => Promise<string>;
+  readonly #find: BitwardenCliFinder;
   readonly #host: BitwardenHostOptions | null;
   readonly #running = new Set<Promise<string>>();
   readonly #queue = Semaphore.makeUnsafe(1);
@@ -227,7 +245,7 @@ export class BitwardenConnectorService implements PasswordVault {
   #attempt = 0;
 
   constructor(
-    options: { runCli?: BitwardenCliRunner; findCli?: () => Promise<string>; host?: BitwardenHostOptions } = {},
+    options: { runCli?: BitwardenCliRunner; findCli?: BitwardenCliFinder; host?: BitwardenHostOptions } = {},
   ) {
     this.#run = options.runCli ?? runBitwardenCli;
     this.#find = options.findCli ?? findCli;
@@ -261,8 +279,13 @@ export class BitwardenConnectorService implements PasswordVault {
     yield* this.disconnect();
     const attempt = this.#attempt;
     registerSecretValue(key);
-    const executable = yield* Effect.tryPromise({ try: this.#find, catch: cliMissing });
-    const session: Session = { executable, env: { BW_SESSION: key }, folderId: "", abort: new AbortController() };
+    const cli = yield* this.#find({ searchLoginShell: true });
+    const session: Session = {
+      executable: cli.executable,
+      env: { ...cliPathEnvironment(cli), BW_SESSION: key },
+      folderId: "",
+      abort: new AbortController(),
+    };
     if (attempt !== this.#attempt) return this.status();
     this.#session = session;
     return yield* this.#openFolder(session).pipe(
@@ -441,8 +464,9 @@ export class BitwardenConnectorService implements PasswordVault {
     const host = this.#host;
     if (!host) return yield* failure();
     const attempt = this.#attempt;
-    const executable = yield* Effect.tryPromise({ try: this.#find, catch: failure }).pipe(
-      Effect.catch((error) => (host.installCli ? host.installCli(signal) : Effect.fail(error))),
+    const executable = yield* this.#find({ searchLoginShell: false }).pipe(
+      Effect.map((cli) => cli.executable),
+      Effect.catch(() => (host.installCli ? host.installCli(signal) : Effect.fail(failure()))),
     );
     if (attempt !== this.#attempt || signal.aborted) return yield* failure();
     const abort = new AbortController();

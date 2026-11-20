@@ -1000,6 +1000,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -1103,6 +1104,25 @@ The host answers, then quits; it does not use `app.relaunch`, which would start 
 `xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
 account service, and a server on this computer through `localServers`. A host that does not answer
 cannot get the request; then the owner runs `sudo openbot restart`.
+
+`owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
+Members (desktop, web client and mobile). The owner enters an email; the account service stores a
+request in `remote_owner_transfers`, sends an email and an `account-servers-changed` event to that
+account, and the new owner accepts or declines in the app while signed in with that email. The
+request expires after 7 days, and a new request replaces it. A server with a `hosted_servers` row
+(OpenBot hosts it) is refused with `owner_transfer_hosted`, when the request is made and when it is
+accepted. Accept changes, in one D1 batch, `remote_hosts.owner_user_id`, the owner membership (the
+earlier owner is removed), the member and site limits, the hosted sites and the Slack, Discord,
+Telegram and webhook routes of the server, and it raises the auth epoch. A server plan stays with
+the earlier owner's Stripe subscription and still counts for the server
+(`subscriptionPaysForOwnerSql`) until someone cancels it. The host notices
+the change when its account registration gets `host_owner_mismatch` or when a renewed Signal ticket
+names another account. It then asks `POST /v2/remote/hosts/:hostId/owner-session` with its machine
+token for a session of the new owner, which revokes the session of the earlier owner on the host,
+rebinds the owner of its team file and signs in as the new owner. Only a host in server mode that
+OpenBot does not host does this, because a desktop app must keep the account of the person at the
+computer.
+Agents, chats, provider sign-ins, saved keys, Vault logins and browser sign-ins stay on the server.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).

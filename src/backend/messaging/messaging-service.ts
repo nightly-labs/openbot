@@ -179,6 +179,7 @@ const FINAL_POST_ATTEMPTS = 5;
 const RECEIVE_NAME_DEADLINE_MS = 5_000;
 const RECEIVE_CONTEXT_DEADLINE_MS = 5_000;
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
+const RESULT_REPORT = /^\s*[*_]*Status:?[*_]*:?\s*(?:done|partial|blocked)\b/i;
 
 export class MessagingService {
   readonly #threads: MessagingThreads;
@@ -1399,17 +1400,18 @@ export class MessagingService {
       Effect.succeed(staging),
       () =>
         Effect.gen({ self: this }, function* () {
-          const gave = (messageId: string) =>
-            Boolean(existing) &&
+          const delivered = (messageId: string) =>
             this.#threads.received(`messaging:${live.record.connectionId}:${message.platformChannelId}:${messageId}`);
+          const gave = (messageId: string) => Boolean(existing) && delivered(messageId);
           const quoted =
             quote?.messageId && !gave(quote.messageId)
               ? (quote.files ?? []).map((file) => ({ file, label: `${quote.authorName}: ${file.name}` }))
               : [];
+          const hasOwnFiles = message.files.length > 0 || quoted.length > 0;
           const earlierFiles = [
             ...quoted,
-            ...earlier
-              .filter((entry) => !gave(entry.id))
+            ...(hasOwnFiles ? [] : earlier)
+              .filter((entry) => !delivered(entry.id))
               .toReversed()
               .flatMap((entry) =>
                 (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
@@ -1852,7 +1854,7 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
-      if (!post?.messageId && this.#withoutStatusPost(live.record.connectionId)) {
+      if (!post?.messageId && (activity.teammateRequest || this.#withoutStatusPost(live.record.connectionId))) {
         this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
         this.#status.restored.delete(key);
         yield* this.#status.save();
@@ -2427,9 +2429,13 @@ function finalPost(
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;
-  if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
+  if (
+    activity.answer &&
+    (isQuietAnswer(activity.answer) || (activity.teammateRequest && RESULT_REPORT.test(activity.answer)))
+  )
+    return { answer: false, text: "", reaction };
   if (activity.answer) return { answer: true, text: redactPostText(activity.answer), reaction };
-  if (answerOnly) return { answer: false, text: "", reaction };
+  if (answerOnly || activity.teammateRequest) return { answer: false, text: "", reaction };
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
   if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };

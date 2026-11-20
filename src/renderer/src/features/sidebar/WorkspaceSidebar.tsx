@@ -108,7 +108,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       : undefined;
   const backTarget = (): { name: string } | null => {
     const pageBack = chatHistory.pageBack();
-    return pageBack ? { name: pageBack.name } : chatName(chatHistory.previous());
+    if (pageBack) return { name: pageBack.name };
+    return chatName(chatHistory.chatUnderPage() ?? chatHistory.previous());
   };
   const chatName = (entry: ChatHistoryEntry | undefined): { name: string } | null => {
     if (!entry) return null;

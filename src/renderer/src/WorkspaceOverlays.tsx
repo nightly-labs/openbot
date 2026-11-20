@@ -7,6 +7,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
@@ -22,7 +23,7 @@ import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerD
 import type { HostedSiteDeleteResult } from "@openbot/ui/features/settings/stores/hosted-sites-store";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, Loading, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Loading, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "./action-toast";
 import { desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
@@ -52,6 +53,7 @@ import {
 } from "./features/servers/hosted-server-upsell-controller";
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import { OwnerTransferPrompt } from "./features/servers/OwnerTransferPrompt";
 import { ServerPlanReminder } from "./features/servers/ServerPlanReminder";
 import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
@@ -119,7 +121,43 @@ export function WorkspaceOverlays(props: AccountProps) {
       <GlobalMessageSearch />
       <RemoteDesktop />
       <ChannelCreateOverlay />
+      <OwnerTransfers />
     </>
+  );
+}
+
+const OWNER_TRANSFER_FOCUS_RELOAD_MS = 60_000;
+
+function OwnerTransfers() {
+  const platform = usePlatform();
+  const { refreshServers } = useServers();
+  const [reloadRequest, setReloadRequest] = createSignal(0);
+  let reloadedAt = Date.now();
+  const reload = () => {
+    reloadedAt = Date.now();
+    setReloadRequest((request) => request + 1);
+  };
+  const unsubscribe = appPort().auth.onOwnerTransfersChanged(reload);
+  const focus = () => {
+    if (Date.now() - reloadedAt >= OWNER_TRANSFER_FOCUS_RELOAD_MS) reload();
+  };
+  window.addEventListener("focus", focus);
+  onCleanup(() => {
+    unsubscribe();
+    window.removeEventListener("focus", focus);
+  });
+  return (
+    <Show when={platform.chatWindow === null}>
+      <OwnerTransferPrompt
+        calls={{
+          list: () => appPort().auth.listOwnerTransfers(),
+          accept: (transferId) => appPort().auth.acceptOwnerTransfer(transferId),
+          decline: (transferId) => appPort().auth.declineOwnerTransfer(transferId),
+        }}
+        reloadKey={reloadRequest()}
+        onAccepted={() => void refreshServers()}
+      />
+    </Show>
   );
 }
 
@@ -833,6 +871,15 @@ function ServerSettings() {
           onCreateInvite={createServerInvite}
           license={appPort().license}
           companySignIn={appPort().auth}
+          ownerTransfer={
+            server().kind === "remote" &&
+            server().hosted !== true &&
+            hostedServersLoaded() &&
+            !hostedServerIds().has(server().id) &&
+            serverSupportsCapability(server(), OWNER_TRANSFER_CAPABILITY)
+              ? appPort().servers
+              : undefined
+          }
           onContactUs={() => void appPort().openExternal("hosted-server-contact")}
           onUpdateMember={updateServerMember}
           onRemoveMember={removeServerMember}

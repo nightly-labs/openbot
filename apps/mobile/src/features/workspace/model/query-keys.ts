@@ -38,6 +38,7 @@ export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
   billing: (...scope: [QueryScope] | []) => ["billing", ...(scope[0] ?? [])],
+  referrals: (...scope: [QueryScope] | []) => ["referrals", ...(scope[0] ?? [])],
   ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
   marketplace: (apiUrl: string | null, ...parts: (string | null)[]) => ["marketplace", apiUrl, ...parts],
@@ -118,6 +119,7 @@ export const queryKeys = {
 
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
+  ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],

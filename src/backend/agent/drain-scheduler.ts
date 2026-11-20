@@ -898,6 +898,7 @@ export class DrainScheduler {
               answeredRoutine: this.answeredRoutine(item.delivery),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
+              externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),

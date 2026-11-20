@@ -122,8 +122,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "voice.dictation": {
     title: "Dictation",
     place: `${APP} > Voice`,
-    about: "Speak a message instead of typing it, and the shortcut that starts dictation.",
-    words: "speech to text voice input microphone talk transcribe whisper hotkey",
+    about: "Speak a message instead of typing it.",
+    words: "speech to text voice input microphone talk transcribe whisper",
   },
   "voice.dictation-language": {
     title: "Dictation language",

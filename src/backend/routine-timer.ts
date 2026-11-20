@@ -6,12 +6,14 @@ export interface RoutineDueSource {
 }
 
 const MAX_DELAY = 60_000;
+const MIN_REFIRE_GAP = 2_000;
 
 export class RoutineTimer {
   #timer: NodeJS.Timeout | null = null;
   #firing = false;
   #suspended = false;
   #held = false;
+  #lastFiredAt = Number.NEGATIVE_INFINITY;
 
   constructor(
     private readonly sources: () => Iterable<RoutineDueSource>,
@@ -27,7 +29,8 @@ export class RoutineTimer {
     const earliest = this.nextDueAt();
     if (!earliest) return;
     const dueAt = new Date(earliest).getTime();
-    const delay = Math.max(0, Math.min(dueAt - Date.now(), MAX_DELAY));
+    const refireGap = this.#lastFiredAt + MIN_REFIRE_GAP - performance.now();
+    const delay = Math.max(0, Math.min(dueAt - Date.now(), MAX_DELAY), refireGap);
     this.#timer = setTimeout(() => {
       this.#timer = null;
       if (Date.now() < dueAt) {
@@ -97,6 +100,7 @@ export class RoutineTimer {
       Effect.ensuring(
         Effect.sync(() => {
           this.#firing = false;
+          this.#lastFiredAt = performance.now();
           this.arm();
         }),
       ),

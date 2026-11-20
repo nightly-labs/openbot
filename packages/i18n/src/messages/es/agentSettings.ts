@@ -246,6 +246,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Cada perfil guarda sus propios inicios de sesión y cookies. Un cambio cierra las pestañas abiertas del agente.",
   "agentSettings.browserProfile.manage": "Gestionar",
+  "agentSettings.browserProfile.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. El agente debe iniciar sesión de nuevo en esos sitios.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo el proceso de {provider} se ejecuta en un entorno aislado, por lo que la escritura fuera falla. Solo disponible en macOS.",
 } as const satisfies PartialTranslation<typeof source>;

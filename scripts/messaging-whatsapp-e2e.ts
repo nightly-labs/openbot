@@ -342,6 +342,7 @@ function message(input: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -1371,6 +1372,30 @@ try {
           sentAt,
         );
         return { saved: all.messages.length, lunch: lunch.messages.length, copy: true };
+      },
+    );
+
+    await step(
+      "saved history: a group message that first arrives undecryptable is saved when it comes again",
+      async () => {
+        const id = connectionId(agents);
+        const key = { remoteJid: GROUP, fromMe: false, id: "IN-RESENT", participant: `${FRIEND}@s.whatsapp.net` };
+        const messageTimestamp = Math.floor(Date.now() / 1_000);
+        phone.current().receive([
+          {
+            key,
+            messageTimestamp,
+            messageStubType: proto.WebMessageInfo.StubType.CIPHERTEXT,
+            messageStubParameters: ["No SenderKeyRecord found for decryption"],
+          },
+        ]);
+        phone.current().receive([{ key, messageTimestamp, message: { conversation: "coupon 10" }, pushName: "Ewa" }]);
+        const saved = await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === "IN-RESENT"),
+          "the resent message",
+        );
+        assert.equal(saved.text, "coupon 10");
+        return { saved: true };
       },
     );
 

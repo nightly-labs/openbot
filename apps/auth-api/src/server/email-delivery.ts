@@ -8,6 +8,7 @@ import {
   prepareContactMessage,
   prepareEmailCode,
   prepareLicenseEmail,
+  prepareOwnerTransferEmail,
   prepareTeamInvite,
   prepareWelcomeEmail,
   RATE_LIMITED_DELIVERY_ERROR,
@@ -19,6 +20,7 @@ import type {
   ContactMessageDelivery,
   EmailCodeDelivery,
   LicenseEmailDelivery,
+  OwnerTransferEmailDelivery,
   TeamInviteEmailDelivery,
   WelcomeEmailDelivery,
   WorkerBindings,
@@ -89,6 +91,16 @@ export function createTeamInviteEmailDelivery(
 ): TeamInviteEmailDelivery | null {
   const senders = readEmailSenders(bindings);
   return senders ? { send: (message) => deliver(analytics, "team_invite", senders, prepareTeamInvite(message)) } : null;
+}
+
+export function createOwnerTransferEmailDelivery(
+  bindings: EmailDeliveryBindings,
+  analytics: AccountAnalytics,
+): OwnerTransferEmailDelivery | null {
+  const senders = readEmailSenders(bindings);
+  return senders
+    ? { send: (message) => deliver(analytics, "owner_transfer", senders, prepareOwnerTransferEmail(message)) }
+    : null;
 }
 
 export function createContactMessageDelivery(
