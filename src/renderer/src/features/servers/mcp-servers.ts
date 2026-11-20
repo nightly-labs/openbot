@@ -13,7 +13,7 @@ export type {
   McpSignInState,
   McpTestResult,
 } from "@openbot/contracts/ipc";
-export { mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
+export { isMcpHeaderName, mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
 
 export type McpStatusVariant = "success-light" | "destructive-light" | "warning-light" | "secondary";
 
