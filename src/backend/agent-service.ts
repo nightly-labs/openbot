@@ -148,10 +148,8 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
-  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
-  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -230,7 +228,7 @@ import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
+import { agentFallbackMcpServers, type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
@@ -1163,7 +1161,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sendLateAnswer: (agentId, target, text, sender) =>
         Effect.runFork(
-          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+          this.#sendUserMessage(
+            { agentId, text, ...target },
+            sender,
+            undefined,
+            undefined,
+            false,
+            false,
+            undefined,
+            true,
+          ).pipe(
             Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
             Effect.forkIn(this.#scope, { startImmediately: true }),
           ),
@@ -1951,12 +1958,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agentId) => {
           const agent = this.#store.get(agentId) ?? { access: "workspace" };
           const saved = new Set(this.#mcp.list().map((config) => config.id));
-          return this.enabledMcpServers(agentId).filter(
-            (config) =>
-              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
-                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
-              mcpFallbackRunsServer(config, agent),
-          );
+          return agentFallbackMcpServers(this.enabledMcpServers(agentId), saved, agent);
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
       ),
@@ -6357,6 +6359,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     welcome = false,
     agentSetup = false,
     relayed?: LiveVoiceRelayed,
+    lateAnswer = false,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6455,7 +6458,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
       if (!targetThreadId) return;
-      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (!welcome && !agentSetup && !lateAnswer) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
       if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });

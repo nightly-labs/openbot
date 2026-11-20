@@ -216,6 +216,9 @@ jobs:
       - name: Run the browser dialogs E2E
         run: xvfb-run -a bun run test:browser-dialogs
 
+      - name: Run the browser idle freeze E2E
+        run: xvfb-run -a bun run test:browser-idle-freeze
+
       - name: Run the browser fingerprint E2E
         run: xvfb-run -a bun run test:browser-fingerprint
 
@@ -438,6 +441,10 @@ jobs:
       - name: Run the agent open-wait tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-waits-tools
+
+      - name: Run the browser takeover deadline E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:browser-takeover-deadline
 
       - name: Run the agent hide and restore E2E test
         if: ${{ !cancelled() }}
@@ -828,6 +835,7 @@ jobs:
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
+            .openbot-build/browser-takeover-deadline-e2e/
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/

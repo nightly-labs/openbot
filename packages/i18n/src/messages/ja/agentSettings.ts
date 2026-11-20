@@ -237,6 +237,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "各プロファイルは専用のサインインと Cookie を保持します。変更すると、エージェントの開いているタブが閉じます。",
   "agentSettings.browserProfile.manage": "管理",
+  "agentSettings.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} のプロセス全体がサンドボックス内で実行されるため、外部への書き込みは失敗します。macOS でのみ利用できます。",
 } as const satisfies PartialTranslation<typeof source>;

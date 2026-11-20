@@ -60,6 +60,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
   "settings.chatBackdrop.snowfall": "Chute de neige",
   "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.coast": "Côte néon",
   "settings.chatBackdrop.upload": "Importer une image…",
   "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
   "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
