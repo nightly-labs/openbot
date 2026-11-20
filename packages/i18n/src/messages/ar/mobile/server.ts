@@ -1793,6 +1793,9 @@ export const messages = {
   "mobile.server.planLimits.window.limit": "الحد",
   "mobile.server.planLimits.window.weekly": "أسبوعي",
   "mobile.server.planLimits.window.monthly": "شهري",
+  "mobile.server.planLimits.window.total": "الإجمالي",
+  "mobile.server.planLimits.window.cursorModels": "نماذج Cursor",
+  "mobile.server.planLimits.window.otherModels": "نماذج أخرى",
   "mobile.server.planLimits.window.daily": "يومي",
   "mobile.server.planLimits.window.fiveHour": "5 ساعات",
   "mobile.server.planLimits.window.hours": {

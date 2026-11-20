@@ -47,7 +47,7 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
                       style={{ fontVariant: ["tabular-nums"] }}
                     >
                       {t("mobile.server.planLimits.windowLeft", {
-                        window: planLimitWindowLabel(window.durationMins, t),
+                        window: planLimitWindowLabel(window.durationMins, t, window.name),
                         percent: window.remainingPercent,
                       })}
                     </Typography>

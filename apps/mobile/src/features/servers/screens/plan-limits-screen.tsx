@@ -53,7 +53,7 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
     <View className="gap-1.5 px-4 py-3">
       <View className="flex-row items-baseline justify-between gap-3">
         <Typography.Paragraph numberOfLines={1} className="shrink">
-          {planLimitWindowLabel(window.durationMins, t)}
+          {planLimitWindowLabel(window.durationMins, t, window.name)}
         </Typography.Paragraph>
         <Typography.Paragraph className={PLAN_LIMIT_TONE_TEXT[window.tone]} style={{ fontVariant: ["tabular-nums"] }}>
           {t("mobile.server.planLimits.left", { percent: window.remainingPercent })}
