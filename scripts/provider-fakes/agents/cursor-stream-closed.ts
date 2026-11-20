@@ -22,6 +22,9 @@ serveFakeAcpAgent({
     if (text.includes("canceled-chunk-case")) {
       peer.say(sessionId, "Checking the webhook.");
       peer.say(sessionId, `\n\nError: ${STREAM_CANCELED}`);
+    } else if (text.includes("canceled-recovered-case")) {
+      peer.say(sessionId, `\n\nError: ${STREAM_CANCELED}`);
+      peer.say(sessionId, "Done.");
     } else if (text.includes("canceled-reject-case")) {
       peer.fail(request, { code: -32603, message: "Internal error", data: { details: STREAM_CANCELED } });
       return;

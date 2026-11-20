@@ -23,6 +23,7 @@ interface Report {
   quote?: TurnResult;
   canceledChunk?: CanceledTurn;
   canceledReject?: CanceledTurn;
+  canceledRecovered?: TurnResult;
   internal?: TurnResult;
 }
 
@@ -79,6 +80,11 @@ try {
     "network",
     "A refused prompt with a canceled stream is a network failure.",
   );
+
+  report.canceledRecovered = await runTurn(client, thread, { text: "canceled-recovered-case" });
+  assert.equal(report.canceledRecovered.reply, "Done.", "Cursor recovered, so the reply is the answer.");
+  assert.equal(report.canceledRecovered.status, "completed", "A turn that continues after the error completes.");
+  assert.equal(report.canceledRecovered.error, null, "A recovered turn reports no error.");
 
   report.internal = await runTurn(client, thread, { text: "internal-case" });
   assert.equal(report.internal.reply.trim(), INTERNAL_FAILURE, "An internal Cursor failure keeps its text.");

@@ -3168,6 +3168,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#completeThought(thread, turn);
         return;
       }
+      if (turn.failureCause === "network" && update.content.text.trim()) {
+        turn.failureCause = null;
+        turn.providerError = null;
+      }
       if (update.content.text) this.#completeThought(thread, turn);
       const messageId = contentMessageId(update);
       let text = update.content.text;
