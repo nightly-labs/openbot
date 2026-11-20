@@ -6,6 +6,16 @@ import type { ConversationRuntime } from "./conversation-runtime";
 const logger = createOpenBotLogger("delta-buffer");
 
 const STORAGE_FAILURE_CODES = new Set([5, 6, 10, 13]);
+const SAVE_INTERVAL_MS = 100;
+const SAVE_INTERVAL_PER_MESSAGE_MS = 10;
+const LONGEST_SAVE_INTERVAL_MS = 500;
+
+function saveInterval(messagesInLastSave: number): number {
+  return Math.min(
+    LONGEST_SAVE_INTERVAL_MS,
+    Math.max(SAVE_INTERVAL_MS, messagesInLastSave * SAVE_INTERVAL_PER_MESSAGE_MS),
+  );
+}
 
 function isStorageFailure(error: unknown): boolean {
   if (!(error instanceof Error) || !("code" in error) || error.code !== "ERR_SQLITE_ERROR") return false;
@@ -44,6 +54,8 @@ export class DeltaBuffer {
   readonly #pending = new Map<string, BufferedDelta>();
   #tick: NodeJS.Timeout | null = null;
   #saveFailing = false;
+  #messagesInLastSave = 0;
+  #lastSaveAt = 0;
 
   constructor(options: DeltaBufferOptions) {
     this.#conversation = options.conversation;
@@ -65,7 +77,9 @@ export class DeltaBuffer {
   }
 
   #schedule(): void {
-    this.#tick ??= setTimeout(() => this.#flushWaiting(), 100);
+    if (this.#tick) return;
+    const recentLoad = Date.now() - this.#lastSaveAt <= LONGEST_SAVE_INTERVAL_MS ? this.#messagesInLastSave : 0;
+    this.#tick = setTimeout(() => this.#flushWaiting(), saveInterval(recentLoad));
   }
 
   flush(key: string): void {
@@ -92,6 +106,8 @@ export class DeltaBuffer {
 
   #flushWaiting(): void {
     this.#tick = null;
+    this.#messagesInLastSave = this.#pending.size;
+    this.#lastSaveAt = Date.now();
     if (this.#pending.size === 0) return;
     const waiting = [...this.#pending].map(([key, pending]) => ({
       key,
