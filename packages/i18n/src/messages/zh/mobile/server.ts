@@ -217,6 +217,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "等待中。这台主机能同时运行的轮次取决于内存。",
   "mobile.server.threads.hold.agentBusy": "正在等待该助手的其他工作结束。",
   "mobile.server.threads.hold.oneTurn": "等待中。该助手的服务商一次只运行一轮。",
+  "mobile.server.threads.hold.signIn": "等待中。该助手的服务商需要登录。",
   "mobile.server.threads.offline": "连接到此服务器以查看其话题。",
   "mobile.server.threads.loading": "正在加载话题…",
   "mobile.server.threads.loadFailed": "无法加载部分助手的话题。",

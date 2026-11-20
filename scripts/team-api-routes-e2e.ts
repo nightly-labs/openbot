@@ -26,6 +26,7 @@ import {
   type AgentStatus,
   type AgentSummary,
   type AgentTask,
+  type AgentTaskHold,
   type AttachmentDataInput,
   type BitwardenConnectorStatus,
   type CentralAuthUser,
@@ -1645,6 +1646,7 @@ const fakeAgents: TeamApiAgents = {
 };
 
 let longThreadQueue = false;
+let queuedTaskHold: AgentTaskHold | null = null;
 const fakeAgentTasks: TeamApiAgentTasks = {
   listAgents: () => agents,
   listTasks: (agentId) => {
@@ -1657,7 +1659,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       title: id,
       state: queue.length > 0 ? "queued" : "idle",
       outcome: null,
-      hold: null,
+      hold: queue.length > 0 ? queuedTaskHold : null,
       activeTurnId: null,
       progress: null,
       error: null,
@@ -13087,6 +13089,29 @@ try {
         field(tasks.body, "tasks", 1, "id") === "task-idle" &&
         field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
       [summary(listed), summary(tasks)],
+    );
+    queuedTaskHold = "sign-in";
+    const olderHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    const signInHold = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+      json: listBody,
+    });
+    queuedTaskHold = null;
+    check(
+      "a task that waits for provider sign-in shows the sign-in hold only to a client that knows it",
+      olderHold.status === 200 &&
+        field(olderHold.body, "tasks", 0, "id") === "task-queued" &&
+        field(olderHold.body, "tasks", 0, "hold") === "agent-busy" &&
+        signInHold.status === 200 &&
+        field(signInHold.body, "tasks", 0, "hold") === "sign-in",
+      [summary(olderHold), summary(signInHold)],
     );
   }
 

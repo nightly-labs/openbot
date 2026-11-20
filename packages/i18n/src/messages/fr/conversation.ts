@@ -114,6 +114,7 @@ export const messages = {
     "En attente. Cet ordinateur exécute autant de tours que sa mémoire le permet.",
   "conversation.threads.hold.agentBusy": "En attente de la fin d’un autre travail de cet agent.",
   "conversation.threads.hold.oneTurn": "En attente. Le fournisseur de cet agent exécute un seul tour à la fois.",
+  "conversation.threads.hold.signIn": "En attente. Le fournisseur de cet agent doit être connecté.",
   "conversation.sidePanel.closePanel": "Fermer le panneau",
   "conversation.threads.view.failedBody": "Le fournisseur n’a donné aucune raison. Envoyez un message pour réessayer.",
   "conversation.threads.deleteUndo.action": "Annuler",

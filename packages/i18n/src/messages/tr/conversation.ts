@@ -112,6 +112,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "Bekleniyor. Bu bilgisayar, belleğinin izin verdiği kadar tur çalıştırır.",
   "conversation.threads.hold.agentBusy": "Bu ajanın diğer işlerinin bitmesi bekleniyor.",
   "conversation.threads.hold.oneTurn": "Bekleniyor. Bu ajanın sağlayıcısı aynı anda tek tur çalıştırır.",
+  "conversation.threads.hold.signIn": "Bekleniyor. Bu ajanın sağlayıcısında oturum açılması gerekiyor.",
   "conversation.sidePanel.closePanel": "Paneli kapat",
   "conversation.threads.view.failedBody": "Sağlayıcı bir neden belirtmedi. Yeniden denemek için mesaj gönder.",
   "conversation.threads.deleteUndo.action": "Geri al",

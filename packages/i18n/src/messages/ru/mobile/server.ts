@@ -270,6 +270,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Ожидание. Хост выполняет столько ходов, сколько позволяет его память.",
   "mobile.server.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "mobile.server.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "mobile.server.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "mobile.server.threads.offline": "Подключитесь к этому серверу, чтобы увидеть его ветки.",
   "mobile.server.threads.loading": "Загрузка веток…",
   "mobile.server.threads.loadFailed": "Не удалось загрузить ветки некоторых агентов.",

@@ -111,6 +111,7 @@ export const messages = {
   "conversation.threads.hold.serverBusy": "Wachten. Deze computer voert zoveel beurten uit als het geheugen toelaat.",
   "conversation.threads.hold.agentBusy": "Wachten tot ander werk van deze agent klaar is.",
   "conversation.threads.hold.oneTurn": "Wachten. De aanbieder van deze agent voert één beurt tegelijk uit.",
+  "conversation.threads.hold.signIn": "Wachten. De aanbieder van deze agent moet worden aangemeld.",
   "conversation.sidePanel.closePanel": "Paneel sluiten",
   "conversation.threads.view.failedBody": "De aanbieder gaf geen reden. Stuur een bericht om het opnieuw te proberen.",
   "conversation.threads.deleteUndo.action": "Ongedaan maken",

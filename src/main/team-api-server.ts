@@ -1768,7 +1768,7 @@ export class TeamApiServer {
                         snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
                       }
                     : event.type === "agent-tasks-changed"
-                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot) }
+                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot, connection.capabilities) }
                       : event,
                   { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
                 );

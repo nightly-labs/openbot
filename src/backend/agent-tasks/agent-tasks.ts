@@ -725,6 +725,8 @@ function publicHold(reason: string | null): AgentTaskHold | null {
       return "server-busy";
     case "one-turn":
       return "one-turn";
+    case "sign-in":
+      return "sign-in";
     default:
       return "agent-busy";
   }

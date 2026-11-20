@@ -87,6 +87,7 @@ const HOLD_TEXT = {
   "server-busy": "conversation.threads.hold.serverBusy",
   "agent-busy": "conversation.threads.hold.agentBusy",
   "one-turn": "conversation.threads.hold.oneTurn",
+  "sign-in": "conversation.threads.hold.signIn",
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, AppTextKey>;
 
 const STICK_DISTANCE = 48;

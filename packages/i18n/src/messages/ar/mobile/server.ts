@@ -297,6 +297,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "في الانتظار. يشغّل المضيف أكبر عدد من الأدوار تسمح به ذاكرته.",
   "mobile.server.threads.hold.agentBusy": "في انتظار انتهاء عمل آخر لهذا الوكيل.",
   "mobile.server.threads.hold.oneTurn": "في الانتظار. يشغّل مزوّد هذا الوكيل دورًا واحدًا في كل مرة.",
+  "mobile.server.threads.hold.signIn": "في الانتظار. يحتاج مزوّد هذا الوكيل إلى تسجيل الدخول.",
   "mobile.server.threads.offline": "اتصل بهذا الخادم لرؤية سلاسله.",
   "mobile.server.threads.loading": "جارٍ تحميل السلاسل…",
   "mobile.server.threads.loadFailed": "تعذّر تحميل سلاسل بعض الوكلاء.",

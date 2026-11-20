@@ -229,6 +229,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "En espera. El host ejecuta tantos turnos como permite su memoria.",
   "mobile.server.threads.hold.agentBusy": "Esperando a que termine otro trabajo de este agente.",
   "mobile.server.threads.hold.oneTurn": "En espera. El proveedor de este agente ejecuta un turno a la vez.",
+  "mobile.server.threads.hold.signIn": "En espera. El proveedor de este agente necesita iniciar sesión.",
   "mobile.server.threads.offline": "Conéctate a este servidor para ver sus hilos.",
   "mobile.server.threads.loading": "Cargando hilos…",
   "mobile.server.threads.loadFailed": "No se pudieron cargar los hilos de algunos agentes.",
