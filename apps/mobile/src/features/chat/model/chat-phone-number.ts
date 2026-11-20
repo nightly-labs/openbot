@@ -1,10 +1,10 @@
-const PHONE_CANDIDATE = /\+?(?:\(\d{1,5}\)|\d)(?:[ -]?(?:\(\d{1,5}\)|\d))*/uy;
+const PHONE_CANDIDATE = /\+?(?:\(\d{1,5}\)|\d)(?:[ -]?(?:\(\d{1,5}\)|\d)){0,23}/uy;
 const PHONE_START = /[+(\d]/gu;
 const BOUNDARY_BEFORE = /[\p{L}\p{N}_+\-./#@=&?%$€£]/u;
 const BOUNDARY_AFTER = /^(?:[\p{L}\p{N}_%°@+]|[-.,:/]\d)/u;
 const NORTH_AMERICAN = /^(?:1[ -])?\d{3}[ -]\d{3}[ -]\d{4}$/u;
 const NATIONAL = /^0[1-9]\d*[ (-]/u;
-const LAST_GROUP = /(\d+)\)?$/u;
+const ENDS_WITH_FULL_GROUP = /\d{3}\)?$/u;
 const AFTER_LENGTH = 2;
 const SCAN_WINDOW = 512;
 const WHITESPACE = /\s/gu;
@@ -31,7 +31,7 @@ function balancedParentheses(text: string): boolean {
 function isPhoneNumber(text: string): boolean {
   const digits = digitsOf(text).length;
   if (!balancedParentheses(text)) return false;
-  if ((LAST_GROUP.exec(text)?.[1]?.length ?? 0) < 3) return false;
+  if (!ENDS_WITH_FULL_GROUP.test(text)) return false;
   if (text.startsWith("+")) return digits >= 8 && digits <= 15;
   if (text.startsWith("(")) return digits >= 10 && digits <= 11;
   if (NORTH_AMERICAN.test(text)) return true;
@@ -45,7 +45,8 @@ function boundaryBefore(before: string | undefined): boolean {
 function candidatePrefixes(candidate: string): string[] {
   const prefixes = [candidate];
   for (let end = candidate.length - 1; end > 0; end -= 1) {
-    if (candidate[end] === " " || candidate[end] === "-") prefixes.push(candidate.slice(0, end));
+    const prefix = candidate.slice(0, end);
+    if ((candidate[end] === " " || candidate[end] === "-") && ENDS_WITH_FULL_GROUP.test(prefix)) prefixes.push(prefix);
   }
   return prefixes;
 }
