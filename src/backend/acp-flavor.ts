@@ -149,6 +149,7 @@ export interface AcpFlavor {
   signInLostChunk?: RegExp;
   signInUnusable?(error: RequestError): string | null;
   planUsedUpChunk?: RegExp;
+  connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
@@ -358,6 +359,14 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   catalogAsMcpTools: true,
 };
 
+const CURSOR_STREAM_FAILURE = /\bRetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] /u;
+
+function cursorTurnFailure(error: unknown, detail: string): string {
+  return CURSOR_STREAM_FAILURE.test(errorText(error))
+    ? sourceText("error.provider.acpServerLost", { provider: agentProviderName("cursor") })
+    : detail;
+}
+
 export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error, sessionId) =>
     error.code === -32602 ? isRecord(error.data) && error.data.message === `Session "${sessionId}" not found` : null,
@@ -369,6 +378,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
       ? sourceText("error.provider.cursorSignInUnusable")
       : null,
   planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
+  connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
+  turnFailure: cursorTurnFailure,
+  failureCause: (error) => (CURSOR_STREAM_FAILURE.test(errorText(error)) ? "network" : null),
   processWideModel: true,
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,

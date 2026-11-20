@@ -3138,6 +3138,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.providerError = sourceText("error.provider.acpPlanUsedUp", { provider: this.#label });
         return;
       }
+      if (this.#flavor.connectionLostChunk?.test(update.content.text)) {
+        turn.receivedOutput = true;
+        turn.failureCause = "network";
+        turn.providerError = sourceText("error.provider.acpServerLost", { provider: this.#label });
+        return;
+      }
       const quota = this.#flavor.sdkHarness?.quota(update.content.text) ?? null;
       if (quota !== null) {
         turn.receivedOutput = true;
@@ -3161,6 +3167,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#appendThought(thread, turn, error);
         this.#completeThought(thread, turn);
         return;
+      }
+      if (turn.failureCause === "network" && update.content.text.trim()) {
+        turn.failureCause = null;
+        turn.providerError = null;
       }
       if (update.content.text) this.#completeThought(thread, turn);
       const messageId = contentMessageId(update);
