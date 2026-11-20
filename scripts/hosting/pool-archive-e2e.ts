@@ -34,14 +34,48 @@ const WAIT_MS = 15 * 60_000;
 const DOWNLOAD_URL_SECONDS = 60 * 60;
 const LEFT_BEHIND = "ls -d /var/tmp/openbot-restore.* /run/openbot-restore-key.* 2>/dev/null | wc -l";
 
+const SEEDED_CACHES = [
+  ".cache/e2e/models.json",
+  ".npm/_npx/e2e/package.json",
+  ".config/OpenBot/Cache/Cache_Data/e2e",
+  ".config/OpenBot/Partitions/openbot-browser/Cache/Cache_Data/e2e",
+  ".config/OpenBot/Partitions/openbot-browser/Code Cache/js/e2e",
+];
+const SEEDED_SITE_DATA = ".config/OpenBot/Partitions/openbot-browser/Service Worker/CacheStorage/e2e";
+const CACHE_NAMES = [
+  "Cache",
+  "Code Cache",
+  "GPUCache",
+  "GrShaderCache",
+  "ShaderCache",
+  "DawnCache",
+  "DawnGraphiteCache",
+  "DawnWebGPUCache",
+  "GraphiteDawnCache",
+  "component_crx_cache",
+  "extensions_crx_cache",
+];
+const NOT_ARCHIVED = ` home/user/(\\.cache|\\.npm/_npx|\\.config/OpenBot/(Partitions/[^/]+/)?(${CACHE_NAMES.join("|")}))(/| |$)`;
+
 const FACTS = `
 set -euo pipefail
 export LC_ALL=C
 cd /
+{
 find home/user srv/openbot-hosted -xdev ! -name '.Xauthority*' ! -path 'home/user/.boat*' -type f -print0 | sort -z | xargs -0 sha256sum | sed 's/^/sha256 /'
 find home/user srv/openbot-hosted -xdev ! -name '.Xauthority*' ! -path 'home/user/.boat*' -printf 'entry %y %m %u:%g %p\\n' | sort
 find home/user srv/openbot-hosted -xdev ! -path 'home/user/.boat*' -type l -printf 'link %p -> %l\\n' | sort
 if command -v crontab >/dev/null; then echo "crontab $(crontab -u user -l 2>/dev/null | sha256sum | cut -c1-64)"; fi
+} | grep -v -E '${NOT_ARCHIVED}'
+`;
+
+const SEED_CACHES = [...SEEDED_CACHES, SEEDED_SITE_DATA]
+  .map((path) => `mkdir -p "$(dirname "${path}")" && head -c 65536 /dev/urandom >"${path}"`)
+  .join("\n");
+
+const CACHES_LEFT = `cd /home/user
+for path in ${SEEDED_CACHES.map((path) => `"${path}"`).join(" ")}; do [ ! -e "$path" ] || echo "$path"; done
+[ -s "${SEEDED_SITE_DATA}" ] || echo "missing ${SEEDED_SITE_DATA}"
 `;
 
 const SEED = (hostId: string, extraGb: number) => `
@@ -61,6 +95,7 @@ head -c 1048576 /dev/urandom >projects/e2e/data.bin
 printf "#!/bin/sh\\necho e2e\\n" >.local/bin/e2e-tool
 chmod 0755 .local/bin/e2e-tool
 ln -s projects/e2e/data.bin e2e-link
+${SEED_CACHES}
 if [ ${extraGb} -gt 0 ]; then
   cp -R /usr/share projects/e2e/share 2>/dev/null || true
   head -c $((${extraGb} * 1024 * 1024 * 1024)) /dev/urandom >projects/e2e/large.bin
@@ -402,6 +437,12 @@ async function main() {
       name: "each file, mode, owner, link and the crontab are the same after the import",
       pass: missing.length === 0 && added.length === 0,
       detail: `${exported.size} facts; missing ${JSON.stringify(missing.slice(0, 20))}; added ${JSON.stringify(added.slice(0, 20))}`,
+    });
+    const cachesLeft = remote(machine, "bash -s", { input: CACHES_LEFT }).trim();
+    checks.push({
+      name: "the import has no browser, npx or home cache, and keeps the site data of the browser",
+      pass: cachesLeft === "",
+      detail: cachesLeft === "" ? `${SEEDED_CACHES.length} caches not restored` : cachesLeft,
     });
 
     await step("start", () => remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh start`));
