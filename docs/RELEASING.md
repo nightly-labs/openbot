@@ -26,7 +26,8 @@ Installed apps do not wait for a release to get a new provider CLI: they offer t
 release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
-blocked version is no longer offered, but it stays on the computers that already installed it.
+blocked version is no longer offered. An OpenBot copy that already runs a blocked version moves to the
+newest version that is not blocked, also when that version is older. A CLI that the user installed stays.
 
 ## One-time GitHub setup
 

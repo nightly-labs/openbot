@@ -463,11 +463,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       this.#declined.get(provider) !== offered &&
       (phase === "ready" || phase === "not-downloaded") &&
       version !== null &&
-      olderVersion(version, offered) &&
+      (olderVersion(version, offered) || (version !== offered && this.#isBlocked(provider, version))) &&
       !this.#systemVersions.has(provider) &&
       !configuredCliPath(provider) &&
       this.#isProviderOn(provider)
     );
+  }
+
+  #isBlocked(runtime: ManagedRuntimeId, version: string): boolean {
+    return !isManagedToolRuntime(runtime) && (this.#blocked.get(runtime)?.has(version) ?? false);
   }
 
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
@@ -602,7 +606,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#tasks.has(runtime)) return this.getStatus();
       const spec = this.#targetSpec(runtime, target);
       const current = this.#statuses[runtime];
-      if (current.version && !olderVersion(current.version, spec.version)) {
+      if (
+        current.version &&
+        !olderVersion(current.version, spec.version) &&
+        !(current.version !== spec.version && this.#isBlocked(runtime, current.version))
+      ) {
         if (current.phase !== "ready") this.#setStatus(runtime, yield* this.#inspectEffect(runtime));
         return this.getStatus();
       }
@@ -1327,7 +1335,13 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       const active = this.#statuses[spec.runtime].version;
       const keep = new Set(
         active
-          ? [active, backup, ...versions.filter((version) => !olderVersion(version, active))]
+          ? [
+              active,
+              backup,
+              ...versions.filter(
+                (version) => !(olderVersion(version, active) || this.#isBlocked(spec.runtime, version)),
+              ),
+            ]
           : [spec.version, ...versions.sort((a, b) => compareReleases(b, a)).slice(0, 1)],
       );
       const paths = versions.filter((version) => !keep.has(version)).map((version) => join(targetRoot, version));
