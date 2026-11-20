@@ -66,7 +66,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { visibleDynamicTools, withCatalogTools } from "./agent/tool-catalog";
+import { visibleDynamicTools, withCatalogTools, withChannelTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
@@ -1606,7 +1606,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new Error(`Unknown ACP session: ${requestedThreadId}`));
     }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
-    const given = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const listed = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const given = isRecord(params) && params.channelTools === true ? withChannelTools(listed) : listed;
     const dynamicTools = this.#flavor.catalogAsMcpTools ? withCatalogTools(given, this.provider) : given;
     const computerUse = computerUseParam(params);
     const agentId = mcpAgentParam(params);
