@@ -718,6 +718,8 @@ export const messages = {
   "settings.voice.talkKey.refused": "הוסיפו מקש נוסף",
   "settings.voice.talkKey.reset": "איפוס",
   "settings.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
+  "settings.voice.live.account": "חשבון",
+  "settings.voice.live.accountDescription": "חשבון ChatGPT שבו משתמש הקול החי. יש לבחור חשבון שהמינוי שלו כולל קול.",
   "settings.voice.server.section": "שרת קול",
   "settings.voice.server.title": "שרת תואם OpenAI",
   "settings.voice.server.notSetUp": "לא הוגדר",

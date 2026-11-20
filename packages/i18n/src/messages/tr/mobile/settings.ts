@@ -459,6 +459,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Sunucular",
   "mobile.settings.voice.gptLive.serversFooter":
     "Codex'i bir ChatGPT hesabına bağlamak için oturum açması gereken bir sunucuya dokunun. Bir sunucunun oturumunu yalnızca sahip veya yönetici görür.",
+  "mobile.settings.voice.gptLive.account": "GPT canlı ses hesabı",
   "mobile.settings.voice.gptLive.status.ready": "Hazır",
   "mobile.settings.voice.gptLive.status.supported": "Destekleniyor",
   "mobile.settings.voice.gptLive.status.offline": "Çevrimdışı",

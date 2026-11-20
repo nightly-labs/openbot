@@ -147,6 +147,7 @@ export interface LiveVoiceHooks {
   summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
   emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
+  otherAccounts(): boolean;
 }
 
 interface LiveSession {
@@ -489,7 +490,8 @@ export class LiveVoice {
   }
 
   #plainText(message: string): string | null {
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+    if (UNAUTHORIZED.test(message))
+      return sourceText(this.#hooks.otherAccounts() ? "error.voice.live.chooseAccount" : "error.voice.live.signIn");
     const key = CALL_NOT_FOUND.test(message)
       ? "error.voice.live.unavailable"
       : FORBIDDEN.test(message)

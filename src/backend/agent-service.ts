@@ -1766,6 +1766,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       summarize: (agentId, prompt) => this.#liveVoiceSummary(agentId, prompt),
       emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
+      otherAccounts: () => this.#providers.otherCodexAccounts(),
     });
     this.#browser.onControlChanged((state) => {
       this.#emit({ type: "browser-control-changed", state });
@@ -5144,6 +5145,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  setLiveVoiceAccount(accountId: string | null): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers.setLiveVoiceAccount(accountId).pipe(
+      Effect.map(() => this.getStatus()),
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "setLiveVoiceAccount", cause: failure.cause }),
+      ),
+    );
+  }
+
+  #liveVoiceAccountId(agent: Pick<AgentSummary, "provider" | "providerAccountId"> | undefined): string | undefined {
+    return this.#providers.liveVoiceAccount() ?? (agent?.provider === "codex" ? agent.providerAccountId : undefined);
+  }
+
   providerUsageResets(provider: AgentProvider): Effect.Effect<ProviderUsageResets[]> {
     return this.#providers.usageResets(provider);
   }
@@ -5737,8 +5751,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
-      try: () =>
-        this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
+      try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
       catch: signIn,
     });
     return { client, model: model.id, effort: model.defaultReasoningEffort };
@@ -5840,8 +5853,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!model) return yield* Effect.fail(failed("No Codex model."));
     const agent = this.#store.get(agentId);
     const client = yield* Effect.try({
-      try: () =>
-        this.#providers.createProfileClient("codex", agent?.provider === "codex" ? agent.providerAccountId : undefined),
+      try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
       catch: (cause) => ({ cause }),
     });
     return yield* this.#profileClients

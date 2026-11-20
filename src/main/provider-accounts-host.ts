@@ -25,6 +25,7 @@ export interface ProviderAccountsHostDependencies {
     | "renameProviderAccount"
     | "removeProviderAccount"
     | "setProviderAccountPool"
+    | "setLiveVoiceAccount"
   >;
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
@@ -91,6 +92,15 @@ export class ProviderAccountsHost {
 
   setPool(provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) {
     return this.#dependencies.service.setProviderAccountPool(provider, enabled, leftOut).pipe(Effect.asVoid);
+  }
+
+  liveVoiceAccount() {
+    const codex = this.#dependencies.service.getStatus().providers?.find((row) => row.id === "codex");
+    return { accountId: codex?.accounts ? (codex.liveVoiceAccount ?? null) : null };
+  }
+
+  setLiveVoiceAccount(accountId: string | null) {
+    return this.#dependencies.service.setLiveVoiceAccount(accountId).pipe(Effect.asVoid);
   }
 
   readonly usage = Effect.fn("ProviderAccountsHost.usage")(function* (this: ProviderAccountsHost) {

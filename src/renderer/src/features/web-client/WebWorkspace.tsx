@@ -932,6 +932,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     agents: () => workspace.profiles(),
   });
   const providerSettings = providerAdmin.settings;
+  const liveVoiceAccount = () => {
+    const choose = providerSettings()?.accountActions?.setLiveVoiceAccount;
+    const codex = providerAdmin.status().providers?.find((row) => row.id === "codex");
+    if (!choose || !codex?.accounts) return undefined;
+    return { accounts: codex.accounts, accountId: codex.liveVoiceAccount ?? null, choose };
+  };
   const accountUsage = () => withHostAccountUsage(usageReading.accountUsage(), providerAdmin.hostAccounts.limits());
   const agentAccountChoice = createMemo(
     () => workspace.runtime.admin !== undefined && serverCanAdminister(server(), PROVIDER_ACCOUNTS_CAPABILITY),
@@ -3250,6 +3256,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onOpenChange={setAccountSettingsOpen}
                         account={account()}
                         calls={accountCalls}
+                        liveVoiceAccount={liveVoiceAccount()}
                         language={props.language}
                         onChangeLanguage={props.onChangeLanguage}
                         appearance={props.appearance}

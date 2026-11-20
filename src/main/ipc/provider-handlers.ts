@@ -16,6 +16,7 @@ import {
   type RemoveProviderAccountInput,
   type RenameProviderAccountInput,
   type ResetProviderUsageInput,
+  type SetLiveVoiceAccountInput,
   type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
@@ -151,6 +152,9 @@ export function providerIpcHandlers({
       setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
         runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
       ),
+      setLiveVoiceAccount: payloadHandler(parseSetLiveVoiceAccountInput, ({ accountId }) =>
+        runCauseEffect(service.setLiveVoiceAccount(accountId)),
+      ),
       signOutProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.signOutProvider(provider))),
       providerUsageResets: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.providerUsageResets(provider)),
@@ -249,6 +253,12 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
   )
     throw new Error("Invalid provider account pool.");
   return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
+}
+
+export function parseSetLiveVoiceAccountInput(value: unknown): SetLiveVoiceAccountInput {
+  if (!isDynamicRecord(value) || (value.accountId !== null && !isProviderAccountId(value.accountId)))
+    throw new Error("Invalid live voice account.");
+  return { accountId: value.accountId };
 }
 
 export function parseResetProviderUsageInput(value: unknown): ResetProviderUsageInput {

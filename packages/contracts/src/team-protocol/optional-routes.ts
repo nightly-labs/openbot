@@ -85,6 +85,7 @@ import { INSTANCE_TRANSFER_FULL_COPY_CODECS } from "./instance-transfer-full-cop
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_CODECS } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_CODECS } from "./live-voice-account-v1";
 import { LIVE_VOICE_CODECS } from "./live-voice-v1";
 import { LOCAL_SERVERS_CODECS } from "./local-servers-v1";
 import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
@@ -322,6 +323,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREAD_PAGES_CODECS,
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,
+  ...LIVE_VOICE_ACCOUNT_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
   ...CRM_CODECS,

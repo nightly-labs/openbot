@@ -218,6 +218,7 @@ import {
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import {
@@ -431,6 +432,7 @@ import { routePendingApproval } from "./team-api/route-pending-approval";
 import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
+  routeLiveVoiceAccount,
   routeProviderAccountCode,
   routeProviderAccountKeys,
   routeProviderAccountModels,
@@ -1163,6 +1165,7 @@ export class TeamApiServer {
       if ((await routeProviderAccounts(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeLiveVoiceAccount(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
@@ -2634,6 +2637,8 @@ export class TeamApiServer {
         if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
+        if (capability === LIVE_VOICE_ACCOUNT_CAPABILITY)
+          return this.#options.providerAccounts !== undefined && this.#options.liveVoice !== undefined;
         if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_CODE_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;

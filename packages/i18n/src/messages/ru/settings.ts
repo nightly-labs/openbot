@@ -760,6 +760,9 @@ export const messages = {
   "settings.voice.talkKey.refused": "Добавьте ещё одну клавишу",
   "settings.voice.talkKey.reset": "Сбросить",
   "settings.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "settings.voice.live.account": "Аккаунт",
+  "settings.voice.live.accountDescription":
+    "Аккаунт ChatGPT, который использует живой голос. Выберите аккаунт, тариф которого включает голос.",
   "settings.transfer.title": "Перенос сервера на другой компьютер",
   "settings.transfer.lede": "Ваши агенты, их навыки, регулярные задачи, память и файлы сохраняются в один файл.",
   "settings.transfer.flow.label": "Как проходит перенос",

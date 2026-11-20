@@ -55,6 +55,7 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
 import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
+import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "./LiveVoiceAccountRow";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import {
   type ModelChoice,
@@ -198,6 +199,7 @@ interface SettingsVoiceTabProps {
   selectMount: HTMLElement | undefined;
   codexLiveAccess?: CodexLiveAccess | undefined;
   onConnectCodex?: (() => void) | undefined;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   platform?: "darwin" | "win32" | "linux" | undefined;
 }
 
@@ -666,6 +668,15 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                 </Select>
               </ItemActions>
             </Item>
+            <Show when={props.liveVoiceAccount}>
+              {(choice) => (
+                <LiveVoiceAccountRow
+                  choice={choice()}
+                  disabled={!speech().settings?.codexLive}
+                  selectMount={props.selectMount}
+                />
+              )}
+            </Show>
           </Show>
         </ItemGroup>
       </SettingsSection>

@@ -759,6 +759,8 @@ export const messages = {
   "settings.voice.talkKey.refused": "أضف مفتاحًا آخر",
   "settings.voice.talkKey.reset": "إعادة تعيين",
   "settings.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "settings.voice.live.account": "الحساب",
+  "settings.voice.live.accountDescription": "حساب ChatGPT الذي يستخدمه الصوت المباشر. اختر حسابًا تتضمن خطته الصوت.",
   "settings.voice.server.section": "خادم الصوت",
   "settings.voice.server.title": "خادم متوافق مع OpenAI",
   "settings.voice.server.notSetUp": "غير مُعدّ",

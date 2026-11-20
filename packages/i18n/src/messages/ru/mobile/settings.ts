@@ -482,6 +482,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Серверы",
   "mobile.settings.voice.gptLive.serversFooter":
     "Нажмите на сервер, которому нужен вход, чтобы подключить Codex к аккаунту ChatGPT. Вход сервера видят только владелец и администратор.",
+  "mobile.settings.voice.gptLive.account": "Аккаунт для живого голоса GPT",
   "mobile.settings.voice.gptLive.status.ready": "Готово",
   "mobile.settings.voice.gptLive.status.supported": "Поддерживается",
   "mobile.settings.voice.gptLive.status.offline": "Не в сети",

@@ -522,6 +522,28 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
+  liveVoiceAccount(): string | null {
+    if (!this.#support("codex")) return null;
+    const accountId = this.#store.liveVoiceAccount();
+    if (accountId === DEFAULT_PROVIDER_ACCOUNT_ID) return accountId;
+    return accountId && this.#store.get("codex", accountId) ? accountId : null;
+  }
+
+  readonly setLiveVoiceAccount = Effect.fn("ProviderAccounts.setLiveVoiceAccount")(function* (
+    this: ProviderAccounts,
+    accountId: string | null,
+  ) {
+    const name = providerLabel("codex");
+    if (!this.#support("codex"))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    if (accountId !== null && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && !this.#store.get("codex", accountId))
+      return yield* accountFailure(sourceText("error.provider.accountNotFound", { provider: name }));
+    yield* this.#store
+      .setLiveVoiceAccount(accountId)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    this.#host.changed();
+  }).bind(this);
+
   planAccounts(provider: AgentProviderId): string[] {
     if (!this.#support(provider)) return [];
     return this.#store

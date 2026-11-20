@@ -26,6 +26,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -93,6 +94,7 @@ import {
   saveCustomAgent,
   saveCustomProvider,
   setHostProviderDefault,
+  setLiveVoiceAccount,
   setProviderAccountPool,
   setProviderApiKey,
   setProviderUse,
@@ -168,6 +170,7 @@ function webProviderAdmin(
   accountRelay: () => ProviderAccountRelay | null,
   accountModels: () => boolean,
   accountPools: () => boolean,
+  liveVoiceAccount: () => boolean,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -255,7 +258,7 @@ function webProviderAdmin(
       ),
     accounts: async (serverId) =>
       runTeamEffect(
-        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools()).pipe(
+        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools(), liveVoiceAccount()).pipe(
           Effect.mapError((error) => error.cause),
         ),
       ),
@@ -295,6 +298,8 @@ function webProviderAdmin(
       runTeamEffect(removeProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     setAccountPool: async (input, serverId) =>
       runTeamEffect(setProviderAccountPool(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    setLiveVoiceAccount: async (input, serverId) =>
+      runTeamEffect(setLiveVoiceAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     hostDefaultProvider: async (serverId) =>
       knownHostDefault(
         await runTeamEffect(getHostProviderDefault(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -403,6 +408,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
+    () => serverSupportsCapability(options.server(), LIVE_VOICE_ACCOUNT_CAPABILITY),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -611,6 +617,11 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         ? {
             setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
               changed(admin.setAccountPool({ provider, enabled, leftOut: [...leftOut] }, id)),
+          }
+        : {}),
+      ...(remoteAdminServer(options.server(), LIVE_VOICE_ACCOUNT_CAPABILITY)?.id === id
+        ? {
+            setLiveVoiceAccount: (accountId: string | null) => changed(admin.setLiveVoiceAccount({ accountId }, id)),
           }
         : {}),
       ...(accountCodeServerId() === id

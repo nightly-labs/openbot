@@ -719,6 +719,9 @@ export const messages = {
   "settings.voice.talkKey.refused": "키를 하나 더 추가하세요",
   "settings.voice.talkKey.reset": "재설정",
   "settings.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "settings.voice.live.account": "계정",
+  "settings.voice.live.accountDescription":
+    "라이브 음성이 사용하는 ChatGPT 계정입니다. 요금제에 음성이 포함된 계정을 선택하세요.",
   "settings.transfer.title": "이 서버를 다른 컴퓨터로 옮기기",
   "settings.transfer.lede": "에이전트와 스킬, 루틴, 메모리, 파일이 하나의 파일에 담겨요.",
   "settings.transfer.flow.label": "이전 방법",

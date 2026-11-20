@@ -32,6 +32,8 @@ export const messages = {
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "error.voice.live.chooseAccount":
+    "Bu ChatGPT hesabı canlı sesi kullanamaz. Ayarlar → Ses bölümünde planı sesi içeren bir hesap seçin.",
   "error.voice.live.unavailable": "OpenAI canlı sesi başlatamadı. Sorun OpenAI tarafında. Daha sonra yeniden deneyin.",
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",

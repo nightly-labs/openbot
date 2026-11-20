@@ -292,6 +292,11 @@ import {
   LIBRARY_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/library-folders-v1";
 import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
+import {
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_ROUTES,
   type LiveVoiceEvent,
@@ -904,6 +909,7 @@ const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
 const ACCOUNT_KEY = "key_e2e_accepted";
 
 let antigravityPool: ProviderAccountPool | undefined;
+let codexLiveVoiceAccount: string | null = null;
 let codeSignInAccount: string | null = null;
 let agentStatus: AgentStatus | null = null;
 let deleteFailure: string | null = null;
@@ -928,6 +934,18 @@ function accountModelsStatus(): AgentStatus {
         accounts: [account("default"), account(ULTRA_ACCOUNT, [ARGON_MODEL]), account(FREE_ACCOUNT, [])],
         ...(antigravityPool ? { accountPool: antigravityPool } : {}),
       },
+      ...(codexLiveVoiceAccount
+        ? [
+            {
+              id: "codex" as const,
+              state: "available" as const,
+              version: null,
+              message: null,
+              accounts: [account("default"), account(ULTRA_ACCOUNT)],
+              liveVoiceAccount: codexLiveVoiceAccount,
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -2846,6 +2864,12 @@ try {
               : undefined;
             return accountModelsStatus();
           }),
+        setLiveVoiceAccount: (accountId) =>
+          Effect.sync(() => {
+            record("setLiveVoiceAccount", accountId);
+            codexLiveVoiceAccount = accountId;
+            return accountModelsStatus();
+          }),
         getProviderAccountUsage: unused("providerAccounts.getProviderAccountUsage"),
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
@@ -4267,6 +4291,71 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  {
+    const v10 = { capabilities: [LIVE_VOICE_CAPABILITY, LIVE_VOICE_ACCOUNT_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const route = LIVE_VOICE_ACCOUNT_ROUTES;
+    const unsupported = await call("POST", route.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: [LIVE_VOICE_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the live voice account route without live-voice-account-v1 gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setLiveVoiceAccount").length;
+    const memberRead = await call("POST", route.settings, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", route.update, {
+      token: bobToken,
+      json: { accountId: ULTRA_ACCOUNT },
+      ...v10,
+    });
+    check(
+      "a member cannot read or change the live voice account, and the host writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setLiveVoiceAccount").length === writes,
+      [summary(memberRead), summary(memberUpdate)],
+    );
+    const automatic = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "with no choice, the live voice account is automatic",
+      automatic.status === 200 && isDeepStrictEqual(automatic.body, { accountId: null }),
+      summary(automatic),
+    );
+    const badAccount = await call("POST", route.update, {
+      token: adaToken,
+      json: { accountId: "not-an-account" },
+      ...v10,
+    });
+    check(
+      "an account id that is not one gets 400, and the host writes nothing",
+      badAccount.status === 400 && callsOf("setLiveVoiceAccount").length === writes,
+      summary(badAccount),
+    );
+    const chosen = await call("POST", route.update, { token: adaToken, json: { accountId: ULTRA_ACCOUNT }, ...v10 });
+    const read = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin chooses the Codex account for live voice, and the client decodes it",
+      chosen.status === 200 &&
+        isDeepStrictEqual(callsOf("setLiveVoiceAccount").at(-1), [ULTRA_ACCOUNT]) &&
+        read.status === 200 &&
+        decodeLiveVoiceAccount(read.body) === ULTRA_ACCOUNT,
+      [summary(chosen), summary(read)],
+    );
+    const reset = await call("POST", route.update, { token: adaToken, json: { accountId: null }, ...v10 });
+    const cleared = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin sets the live voice account back to automatic",
+      reset.status === 200 &&
+        isDeepStrictEqual(callsOf("setLiveVoiceAccount").at(-1), [null]) &&
+        isDeepStrictEqual(cleared.body, { accountId: null }),
+      [summary(reset), summary(cleared)],
     );
   }
 

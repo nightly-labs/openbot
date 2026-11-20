@@ -456,6 +456,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "שרתים",
   "mobile.settings.voice.gptLive.serversFooter":
     "הקישו על שרת שצריך כניסה כדי לחבר את Codex לחשבון ChatGPT. רק בעלים או מנהל רואים את הכניסה של שרת.",
+  "mobile.settings.voice.gptLive.account": "חשבון לקול חי של GPT",
   "mobile.settings.voice.gptLive.status.ready": "מוכן",
   "mobile.settings.voice.gptLive.status.supported": "נתמך",
   "mobile.settings.voice.gptLive.status.offline": "לא מחובר",
