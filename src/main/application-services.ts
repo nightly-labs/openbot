@@ -9,6 +9,7 @@ import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contr
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
+  AgentProviderStatus,
   AgentStatus,
   AppVariant,
   BrowserDisplayState,
@@ -2479,20 +2480,25 @@ export async function createApplicationServices({
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
   );
 
-  const replacedOutdatedSystemClis = new Set<ManagedProviderId>();
+  const hostedCliDownloads = new Set<ManagedProviderId>();
+  const hasNoCli = (provider: AgentProviderStatus) =>
+    (provider.state === "not-installed" || provider.state === "error") &&
+    provider.cliSource === undefined &&
+    provider.version === null;
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
+    const agentProviders = hostedServer === null ? null : new Set(service.listAgents().map((agent) => agent.provider));
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
       if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
       if (
-        hostedServer !== null &&
-        provider.state === "outdated" &&
-        !replacedOutdatedSystemClis.has(provider.id) &&
+        agentProviders !== null &&
+        (provider.state === "outdated" || (hasNoCli(provider) && agentProviders.has(provider.id))) &&
+        !hostedCliDownloads.has(provider.id) &&
         !providerUse.off().includes(provider.id)
       ) {
-        replacedOutdatedSystemClis.add(provider.id);
+        hostedCliDownloads.add(provider.id);
         Effect.runFork(providerRuntimes.download(provider.id).pipe(Effect.ignore));
       }
     }
