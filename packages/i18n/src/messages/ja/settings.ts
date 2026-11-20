@@ -729,6 +729,10 @@ export const messages = {
   "settings.voice.talkKey.refused": "キーをもう 1 つ追加",
   "settings.voice.talkKey.reset": "リセット",
   "settings.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
+  "settings.voice.live.account": "アカウント",
+  "settings.voice.live.accountAutomatic": "自動",
+  "settings.voice.live.accountDescription":
+    "ライブ音声が使う ChatGPT アカウントです。プランに音声が含まれるアカウントを選んでください。",
   "settings.transfer.title": "このサーバーを別のコンピューターに移動",
   "settings.transfer.lede": "エージェントとそのスキル、ルーティン、メモリー、ファイルを 1 つのファイルにまとめます。",
   "settings.transfer.flow.label": "移行の流れ",

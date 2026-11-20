@@ -32,6 +32,8 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.hostFailed":
     "Codex on the server could not start live voice. Ask its owner to update Codex on that computer and sign in with ChatGPT, then try again.",
   "error.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
+  "error.voice.live.chooseAccount":
+    "This ChatGPT account cannot use live voice. In Settings → Voice, choose an account whose plan includes voice.",
   "error.voice.live.unavailable":
     "OpenAI could not start live voice. The problem is on OpenAI's side. Try again later.",
   "error.voice.live.refused":

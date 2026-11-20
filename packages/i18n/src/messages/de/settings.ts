@@ -751,6 +751,10 @@ export const messages = {
   "settings.voice.talkKey.refused": "Füge noch eine Taste hinzu",
   "settings.voice.talkKey.reset": "Zurücksetzen",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
+  "settings.voice.live.account": "Konto",
+  "settings.voice.live.accountAutomatic": "Automatisch",
+  "settings.voice.live.accountDescription":
+    "Das ChatGPT-Konto, das Live-Sprache nutzt. Wähle ein Konto, dessen Abo Sprache enthält.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":
     "Deine Agenten mit ihren Fähigkeiten, Routinen, Erinnerungen und Dateien kommen in eine Datei.",

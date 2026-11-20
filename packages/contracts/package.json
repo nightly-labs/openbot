@@ -322,6 +322,7 @@
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",
     "./team-protocol/provider-detection-v1": "./src/team-protocol/provider-detection-v1.ts",
     "./team-protocol/live-voice-v1": "./src/team-protocol/live-voice-v1.ts",
+    "./team-protocol/live-voice-account-v1": "./src/team-protocol/live-voice-account-v1.ts",
     "./team-protocol/reasoning-efforts-v1": "./src/team-protocol/reasoning-efforts-v1.ts",
     "./team-protocol/sidebar-folders-v1": "./src/team-protocol/sidebar-folders-v1.ts",
     "./team-protocol/library-folders-events-v1": "./src/team-protocol/library-folders-events-v1.ts",

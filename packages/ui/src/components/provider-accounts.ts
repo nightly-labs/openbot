@@ -26,6 +26,7 @@ export interface ProviderAccountActions {
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
   setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
+  setLiveVoiceAccount?: ((accountId: string | null) => Promise<void>) | undefined;
   local?: boolean | undefined;
 }
 

@@ -1592,6 +1592,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       };
       return clone(agentStatus);
     },
+    setLiveVoiceAccount: async ({ accountId }) => {
+      agentStatus = {
+        ...agentStatus,
+        providers: agentStatus.providers?.map((row) => {
+          if (row.id !== "codex") return row;
+          const { liveVoiceAccount: _old, ...rest } = row;
+          return accountId ? { ...rest, liveVoiceAccount: accountId } : rest;
+        }),
+      };
+      return clone(agentStatus);
+    },
     signOutProvider: async (provider) => {
       agentStatus = {
         ...agentStatus,
@@ -1845,6 +1856,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         pools: (agentStatus.providers ?? []).flatMap((row) =>
           row.accounts && row.accountPool ? [{ provider: row.id, pool: clone(row.accountPool) }] : [],
         ),
+        liveVoiceAccount: agentStatus.providers?.find((row) => row.id === "codex")?.liveVoiceAccount ?? null,
         agents: [],
       }),
       accountUsage: async () => ({ limits: [] }),
@@ -1878,6 +1890,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       setAccountPool: async (input) => {
         await api.setProviderAccountPool(input);
+      },
+      setLiveVoiceAccount: async (input) => {
+        await api.setLiveVoiceAccount(input);
       },
       hostDefaultProvider: async () => ({
         preferredProvider: setupState.preferredProvider,
