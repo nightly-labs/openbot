@@ -54,8 +54,8 @@ export function OpenBotHostedServers() {
       <ArticleImage
         src={pricing}
         alt="Starter, Standard, and Pro plans with monthly prices in US dollars, billed yearly."
-        width={1158}
-        height={444}
+        width={1078}
+        height={574}
         caption="Prices are in US dollars and billed yearly. Starter has 25 GB of storage, Standard has 75 GB, and Pro has 150 GB."
       />
       <p>
