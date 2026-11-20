@@ -177,6 +177,7 @@ import {
 import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
+import { singleInstanceExitMessage, singleInstanceOwnerPid } from "./single-instance-owner";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
 import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
@@ -1376,6 +1377,7 @@ app.on("continue-activity", (event, type, _userInfo, details) => {
 });
 
 if (!hasSingleInstanceLock) {
+  logger.warn(singleInstanceExitMessage(singleInstanceOwnerPid(app.getPath("userData"))));
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
