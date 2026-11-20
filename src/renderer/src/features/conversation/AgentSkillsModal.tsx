@@ -2,6 +2,7 @@ import {
   type AgentProviderRef,
   agentProviderDescriptor,
   isKnownAgentProvider,
+  MANAGED_SKILL_FOLDERS,
 } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { FilePreview, InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
@@ -718,11 +719,10 @@ function hostSkillPaths(skill: InstalledSkill, provider: AgentProviderRef): stri
 }
 
 function installedSkillFolders(provider: AgentProviderRef): string[] {
-  const installed = [".agents/skills", ".claude/skills"];
-  if (!isKnownAgentProvider(provider)) return installed;
+  if (!isKnownAgentProvider(provider)) return [...MANAGED_SKILL_FOLDERS];
   const reads = agentProviderDescriptor(provider).skillFolders;
   const rank = (folder: string) => (reads.includes(folder) ? reads.indexOf(folder) : reads.length);
-  return installed.toSorted((left, right) => rank(left) - rank(right));
+  return MANAGED_SKILL_FOLDERS.toSorted((left, right) => rank(left) - rank(right));
 }
 
 async function hostSkillDetail(

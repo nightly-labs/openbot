@@ -48,6 +48,8 @@ export function isKnownAgentProvider(provider: AgentProviderRef): provider is Ag
   return isAgentProvider(provider);
 }
 
+export const MANAGED_SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
+
 export function foreignProvider(provider: AgentProviderRef): ForeignProviderId | undefined {
   return isKnownAgentProvider(provider) ? undefined : provider;
 }
