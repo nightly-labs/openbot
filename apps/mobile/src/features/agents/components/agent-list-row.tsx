@@ -1,3 +1,4 @@
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { BlurView } from "expo-blur";
@@ -123,7 +124,11 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const agentChatPreview = useAgentChatPreview(agent);
   const activity = useAgentListActivity(agent.id);
   const waitingChannel = useWaitingChannel(activity, agent.serverId);
-  const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
+  const lastMessage = useMemo(() => {
+    if (isAgentStoredEmptyPreview(agent.preview)) return t("mobile.agent.noMessages");
+    return markdownPreviewText(agent.preview);
+  }, [agent.preview, t]);
+
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;

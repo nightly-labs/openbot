@@ -1,3 +1,4 @@
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import { AppWindow, Badge, buttonVariants, Clock3, ContextMenu, Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
@@ -45,7 +46,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     const current = state();
     return rowProps.waiting && current?.kind === "waiting" ? current : undefined;
   };
-  const detail = () => hiddenDetail() || wait()?.detail || rowProps.agent.preview;
+  const detail = () => {
+    const hidden = hiddenDetail();
+    if (hidden) return hidden;
+    const waiting = wait()?.detail;
+    if (waiting) return waiting;
+    const preview = rowProps.agent.preview;
+    return isAgentStoredEmptyPreview(preview) ? t("app.agent.noMessages") : preview;
+  };
   const labelDetail = () => (wait()?.detail ? "" : `. ${hiddenLabel()}${detail()}`);
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [rowElement, setRowElement] = createSignal<HTMLElement>();
