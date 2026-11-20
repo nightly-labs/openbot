@@ -285,6 +285,7 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       referralCoupon: (userId) => this.#referral.couponFor(userId),
+      keptReferralCoupon: (subscriptionId) => this.#referral.keptCoupon(subscriptionId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),

@@ -3191,11 +3191,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
   },
 
   async invite(account) {
-    const referrer = `${account.id}-referrer`;
+    const referrers = quote(`${account.id}-referrer%`);
+    const referrer = `${account.id}-referrer-${randomBytes(4).toString("hex")}`;
     const friend = quote(account.id);
     const now = Date.now();
     const leftCustomers = d1(
-      `SELECT stripe_customer_id FROM billing_customers WHERE user_id = ${quote(referrer)}`,
+      `SELECT stripe_customer_id FROM billing_customers WHERE user_id LIKE ${referrers}`,
       z.object({ stripe_customer_id: z.string() }),
     );
     for (const row of leftCustomers)
@@ -3206,8 +3207,9 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
            SELECT invoice_id FROM referral_credits WHERE referred_user_id = ${friend})`,
         `DELETE FROM referral_credits WHERE referred_user_id = ${friend}`,
         `DELETE FROM referrals WHERE referred_user_id = ${friend}`,
-        `DELETE FROM referral_codes WHERE user_id = ${quote(referrer)}`,
-        `DELETE FROM billing_customers WHERE user_id = ${quote(referrer)}`,
+        `DELETE FROM referral_codes WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM billing_customers WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM users WHERE id LIKE ${referrers}`,
         `INSERT OR IGNORE INTO users(id, identity_key, email, name, created_at, updated_at)
          VALUES (${quote(referrer)}, ${quote(`e2e:${referrer}`)}, ${quote(`${referrer}@example.com`)},
                  'Stripe e2e referrer', ${now}, ${now})`,

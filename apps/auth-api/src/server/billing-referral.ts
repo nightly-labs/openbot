@@ -28,6 +28,9 @@ const paidInvoiceSchema = Schema.Struct({
   total: Schema.optional(Schema.NullOr(Schema.Number)),
   total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  status_transitions: Schema.optional(
+    Schema.NullOr(Schema.Struct({ paid_at: Schema.optional(Schema.NullOr(Schema.Number)) })),
+  ),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(Schema.Unknown))),
   lines: Schema.optional(
     Schema.NullOr(
@@ -112,6 +115,14 @@ export class BillingReferral {
       );
   }).bind(this);
 
+  readonly keptCoupon = Effect.fn("BillingReferral.keptCoupon")(function* (
+    this: BillingReferral,
+    subscriptionId: string,
+  ): Effect.fn.Return<string | null, Failure> {
+    const couponIds = yield* this.#stripeCall(() => this.#stripe.subscriptionCouponIds(subscriptionId));
+    return couponIds.includes(REFERRAL_COUPON_ID) ? REFERRAL_COUPON_ID : null;
+  }).bind(this);
+
   readonly credit = Effect.fn("BillingReferral.credit")(function* (
     this: BillingReferral,
     userId: string,
@@ -150,10 +161,13 @@ export class BillingReferral {
     const due = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT DISTINCT referrer_user_id AS referrer FROM referral_credits
-           WHERE balance_transaction_id IS NULL
-             AND ((released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?1) OR queued_at IS NOT NULL)
-           LIMIT ?2`,
+          `SELECT referrer FROM (
+             SELECT referrer_user_id AS referrer FROM referral_credits
+             WHERE released_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ?1 AND balance_transaction_id IS NULL
+             UNION
+             SELECT referrer_user_id FROM referral_credits
+             WHERE queued_at IS NOT NULL AND balance_transaction_id IS NULL
+           ) ORDER BY RANDOM() LIMIT ?2`,
         )
         .bind(this.#now(), DUE_REFERRERS_PER_RUN)
         .all<{ referrer: string }>(),
@@ -193,7 +207,7 @@ export class BillingReferral {
     this: BillingReferral,
     invoice: PaidInvoice,
   ): Effect.fn.Return<void, Failure> {
-    if (invoice.amount_paid <= 0 || (invoice.discounts ?? []).length === 0) return;
+    if ((invoice.total ?? invoice.amount_paid) <= 0 || (invoice.discounts ?? []).length === 0) return;
     const referred = yield* billingCall(() =>
       this.#database
         .prepare(
@@ -243,6 +257,8 @@ export class BillingReferral {
       const parts = splitAmount(share, invoiceParts(invoice));
       const split = parts.length > 1;
       const now = this.#now();
+      const paidAt = invoice.status_transitions?.paid_at;
+      const start = typeof paidAt === "number" && paidAt > 0 ? paidAt * 1_000 : now;
       yield* billingCall(() =>
         this.#database.batch(
           parts.map((source, index) =>
@@ -262,7 +278,7 @@ export class BillingReferral {
                 currency,
                 convertReferralAmount(source, sourceCurrency, currency),
                 split ? invoice.id : null,
-                split ? now + (index + 1) * PART_MS : null,
+                split ? start + (index + 1) * PART_MS : null,
                 now,
               ),
           ),
@@ -726,10 +742,9 @@ export class BillingReferral {
     this: BillingReferral,
     referrer: string | undefined,
   ): Effect.fn.Return<Map<string, number>, Failure> {
-    const customerId = referrer ? yield* this.#customerId(referrer) : null;
-    if (!customerId) return new Map();
-    const customer = yield* this.#stripeCall(() => this.#stripe.getCustomerCredit(customerId));
-    return new Map(Object.entries(customer?.credit ?? {}));
+    if (!referrer) return new Map();
+    const credit = yield* this.credit(referrer);
+    return new Map(credit.map((money) => [money.currency, money.amountMinor]));
   }).bind(this);
 
   readonly #invoiceCredits = Effect.fn("BillingReferral.invoiceCredits")(function* (
