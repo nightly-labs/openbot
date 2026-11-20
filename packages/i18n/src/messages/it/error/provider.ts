@@ -406,6 +406,10 @@ export const messages = {
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} L'agente non vede più questo messaggio, quindi non blocca i tuoi prossimi messaggi. Invia di nuovo la richiesta con parole diverse.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
   "error.provider.codexAudioRefused":
     "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":

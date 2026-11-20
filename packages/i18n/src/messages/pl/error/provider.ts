@@ -395,6 +395,10 @@ export const messages = {
     "Codex nie mógł kontynuować tego czatu, ponieważ w jego zapisanej historii brakuje elementu. OpenBot rozpoczął nową sesję Codex z historią czatu. Spróbuj ponownie.",
   "error.provider.codexRequestRefused":
     "{provider} odrzucił żądanie tego czatu i nie podał przyczyny. Może się to zdarzyć w długim czacie z wieloma obrazami. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa: {reason} Agent już nie widzi tej wiadomości, więc nie zatrzyma ona twoich kolejnych wiadomości. Wyślij prośbę ponownie innymi słowami.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa: {reason} Jeśli {provider} zablokuje także twoje kolejne wiadomości, rozpocznij nowy czat.",
   "error.provider.codexAudioRefused":
     "Ten model nie może słuchać dźwięku, więc nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Aby kontynuować, wyślij prośbę ponownie i poproś agenta, aby pracował bez dźwięku. Aby sprawdzić dźwięk, wybierz w menu modeli agenta model, który może słuchać dźwięku.",
   "error.provider.imageTooSmall":
