@@ -2134,36 +2134,7 @@ export class ChannelService {
           continue;
         if (context?.delivery.status === "queued")
           yield* this.mailbox.cancel(assignment.agentId, context.delivery.id).pipe(Effect.mapError(channelFailure));
-        if (
-          context?.delivery.status === "completed" &&
-          context.delivery.turnId &&
-          assignment.pendingRevision === null
-        ) {
-          assignment = { ...assignment, turnId: context.delivery.turnId };
-          yield* channelSync(() =>
-            this.store.update(this.store.get(channelId), {
-              assignments: [assignment],
-              tasks: task?.revision === assignment.taskRevision ? [{ ...task, state: "running" }] : [],
-            }),
-          );
-          yield* this.complete(channelId, context.delivery.turnId, "completed");
-        } else {
-          yield* channelSync(() =>
-            this.store.update(this.store.get(channelId), {
-              assignments: [{ ...assignment, state: "interrupted" }],
-              tasks:
-                task && (task.revision === assignment.taskRevision || task.revision === assignment.pendingRevision)
-                  ? [
-                      {
-                        ...task,
-                        state: "paused",
-                        error: "The previous turn has no confirmed result. Check its work before you resume.",
-                      },
-                    ]
-                  : [],
-            }),
-          );
-        }
+        yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
       }
       if (!archived.has(channelId)) {
         const stopped = (yield* channelSync(() => this.store.tasks(channelId)))
@@ -2175,6 +2146,63 @@ export class ChannelService {
     }
     yield* this.wake();
   }).bind(this);
+
+  readonly settleAgentDeliveries = Effect.fn("ChannelService.settleAgentDeliveries")(function* (
+    this: ChannelService,
+    agentId: string,
+  ): Effect.fn.Return<void, ChannelOperationError> {
+    if (this.#stopped) return;
+    for (const channelId of yield* channelSync(() => this.store.ids())) {
+      let settled = false;
+      for (const assignment of (yield* channelSync(() => this.store.assignments(channelId))).filter(activeAssignment)) {
+        if (assignment.agentId !== agentId || !assignment.deliveryId) continue;
+        const context = this.mailbox.getDelivery(assignment.deliveryId);
+        if (!context || ["queued", "starting", "running"].includes(context.delivery.status)) continue;
+        const task = (yield* channelSync(() => this.store.tasks(channelId))).find(
+          (item) => item.id === assignment.taskId,
+        );
+        yield* this.#settleUnrunAssignment(channelId, assignment, context, task);
+        settled = true;
+      }
+      if (settled) this.publish(channelId);
+    }
+    yield* this.#releaseHeldAgents([agentId]);
+  });
+
+  readonly #settleUnrunAssignment = Effect.fn("ChannelService.settleUnrunAssignment")(function* (
+    this: ChannelService,
+    channelId: string,
+    assignment: ChannelAssignment,
+    context: DeliveryContext | null | undefined,
+    task: ChannelTask | undefined,
+  ): Effect.fn.Return<void, ChannelOperationError> {
+    if (context?.delivery.status === "completed" && context.delivery.turnId && assignment.pendingRevision === null) {
+      const completed = { ...assignment, turnId: context.delivery.turnId };
+      yield* channelSync(() =>
+        this.store.update(this.store.get(channelId), {
+          assignments: [completed],
+          tasks: task?.revision === completed.taskRevision ? [{ ...task, state: "running" }] : [],
+        }),
+      );
+      yield* this.complete(channelId, context.delivery.turnId, "completed");
+      return;
+    }
+    yield* channelSync(() =>
+      this.store.update(this.store.get(channelId), {
+        assignments: [{ ...assignment, state: "interrupted" }],
+        tasks:
+          task && (task.revision === assignment.taskRevision || task.revision === assignment.pendingRevision)
+            ? [
+                {
+                  ...task,
+                  state: "paused",
+                  error: "The previous turn has no confirmed result. Check its work before you resume.",
+                },
+              ]
+            : [],
+      }),
+    );
+  });
 
   resumesAfterSubtasks(deliveryId: string): boolean {
     return this.#resumedDeliveries.has(deliveryId);
