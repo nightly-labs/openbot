@@ -402,6 +402,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
     keyMove = false;
     return moved;
   };
+  // While arrow keys drive the highlight, Chromium can still fire mouseenter on a
+  // row that scrolls under a stationary pointer. Ignore hover until the pointer
+  // really moves; scroll hit-test changes do not emit pointermove/mousemove.
+  let ignoreHoverUntilPointerMove = false;
+  const resumeHoverSelection = () => {
+    ignoreHoverUntilPointerMove = false;
+  };
   let releasePickerList: (() => void) | undefined;
   const bindPickerList = (list: HTMLElement) => {
     releasePickerList?.();
@@ -410,7 +417,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
       trackEnteringPickerRows(list),
       trackPickerHighlight(list, takeKeyMove),
     ];
+    list.addEventListener("pointermove", resumeHoverSelection);
+    list.addEventListener("mousemove", resumeHoverSelection);
     releasePickerList = () => {
+      list.removeEventListener("pointermove", resumeHoverSelection);
+      list.removeEventListener("mousemove", resumeHoverSelection);
       for (const stop of stops) stop();
     };
   };
@@ -818,6 +829,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   function moveActiveOption(delta: number, optionCount: number) {
     keyMove = true;
+    ignoreHoverUntilPointerMove = true;
     setActiveOption((current) => {
       const next = (current + delta + optionCount) % optionCount;
       const option = matchingOptions()[next];
@@ -1222,6 +1234,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                         event.stopPropagation();
                       }}
                       onMouseEnter={() => {
+                        if (ignoreHoverUntilPointerMove) return;
                         keyMove = false;
                         setActiveOption(optionIndex());
                       }}
