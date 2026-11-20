@@ -922,6 +922,7 @@ export class BrowserCdpEngine {
   #ownsDebugger = false;
   #idleDetach: NodeJS.Immediate | undefined;
   #idleFocusOff = false;
+  #frozen = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -2284,6 +2285,25 @@ export class BrowserCdpEngine {
     this.#idleFocusOff = !enabled;
     if (!this.#mayEmulateIdleFocus()) return;
     yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled }));
+  });
+
+  get frozen(): boolean {
+    return this.#frozen;
+  }
+
+  readonly setFrozen = Effect.fn("BrowserCdp.setFrozen")(function* (
+    this: BrowserCdpEngine,
+    frozen: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if ((!frozen && !this.#frozen) || this.#disposed || this.#closing || this.#contents.isDestroyed()) return;
+    this.#frozen = frozen;
+    if (!this.#contents.debugger.isAttached()) {
+      yield* browserSync(() => this.#contents.debugger.attach("1.3"));
+      this.#ownsDebugger = true;
+    }
+    yield* browserCall(() =>
+      this.#contents.debugger.sendCommand("Page.setWebLifecycleState", { state: frozen ? "frozen" : "active" }),
+    ).pipe(Effect.ensuring(Effect.sync(() => this.#releaseIdleDebugger())));
   });
 
   readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (

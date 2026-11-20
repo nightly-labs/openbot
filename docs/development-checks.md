@@ -209,8 +209,10 @@ check, the lint, the desktop typecheck, the build and `verify:preload`, followed
 smoke test. CI is
 the only caller that splits them. The smoke test starts the real Electron binary, so it runs under
 xvfb on Ubuntu rather than on a macOS runner, and reads nothing the build writes, so the order
-between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner,
-where it checks the machine that builds the release.
+between the halves is free. `release.yml` keeps the whole of `check:desktop` on one macOS runner of
+the same image that builds the release. It is the `repository-check` job, which runs in parallel
+with the platform builds, so the check does not make the signed macOS build wait. The publish job
+needs it.
 
 `bun run knip:check` fails on unused files, unused exports and exported types, unused or unlisted
 dependencies, unresolved imports and unlisted binaries in every workspace. It takes about 6 seconds. `knip.config.ts` names the entry

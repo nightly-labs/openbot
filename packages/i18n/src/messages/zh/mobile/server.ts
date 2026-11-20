@@ -509,6 +509,7 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "添加助手",
   "mobile.server.browserProfiles.agentsHint":
     "轻点即可把此配置文件分配给助手,或将其移回共享配置文件。更改会关闭助手打开的标签页。",
+  "mobile.server.browserProfiles.movedNote": "网站登录状态保留在旧配置文件中。移动后的助手必须重新登录这些网站。",
   "mobile.server.browserProfiles.clear": "清除数据",
   "mobile.server.browserProfiles.clearTitle": "清除 {name} 的数据?",
   "mobile.server.browserProfiles.clearBody":

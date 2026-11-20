@@ -250,6 +250,13 @@ const fills: string[] = [];
 let takeoverRequests = 0;
 const browser: AgentBrowserHost = {
   listTabs: () => (tab ? [tab] : []),
+  toolCanUseTab: (params, tabId) =>
+    (tab ? [tab] : []).some(
+      (candidate) =>
+        candidate.id === tabId &&
+        candidate.ownerAgentId === params.ownerAgentId &&
+        candidate.ownerThreadId === params.threadId,
+    ),
   prepareSecret: (params) =>
     Effect.sync(() => {
       assert.equal(params.ownerAgentId, tab?.ownerAgentId);

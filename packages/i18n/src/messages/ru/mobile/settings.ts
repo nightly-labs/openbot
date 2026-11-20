@@ -153,6 +153,7 @@ export const messages = {
   "mobile.settings.appearance.backdrop.sunset": "Ретро-закат",
   "mobile.settings.appearance.backdrop.snowfall": "Снегопад",
   "mobile.settings.appearance.backdrop.fireflies": "Светлячки",
+  "mobile.settings.appearance.backdrop.coast": "Неоновое побережье",
   "mobile.settings.appearance.backdrop.agentPage": "Страница агента",
   "mobile.settings.appearance.backdrop.agentPageNote": "Установлен агентом",
   "mobile.settings.appearance.backdrop.photo": "Фото",
@@ -600,6 +601,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Выбрать агента",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
   "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
+  "mobile.settings.shortcuts.card.message": "Написать {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "Сообщение для {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается. Open Agent открывает его чат.",
   "mobile.settings.shortcuts.send.sent": "Отправлено",

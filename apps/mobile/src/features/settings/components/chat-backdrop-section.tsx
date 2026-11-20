@@ -34,6 +34,7 @@ const SCENE_LABELS = {
   sunset: "mobile.settings.appearance.backdrop.sunset",
   snowfall: "mobile.settings.appearance.backdrop.snowfall",
   fireflies: "mobile.settings.appearance.backdrop.fireflies",
+  coast: "mobile.settings.appearance.backdrop.coast",
 } as const satisfies Record<ChatBackdropScene, MobileTextKey>;
 
 const DOT = 28;

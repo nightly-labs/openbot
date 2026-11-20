@@ -17,6 +17,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} says that your plan is used up. Choose another model, or upgrade your {provider} plan.",
   "error.provider.acpMcpNotLoaded":
     "{provider} did not load OpenBot's tools, so this agent cannot use them or reach its teammates. A {provider} team policy can block local MCP servers. Ask your team admin to allow them, then try again.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} ran this message without OpenBot's tools, so the agent could not reach its teammates, use the browser or attach files. Try again.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} could not start the MCP server {name}, so the reply stopped. This server is in your own {provider} settings, not in OpenBot. Remove the server there or repair it, then start a new chat.",
   "error.provider.endpointsReadOnly":
@@ -320,6 +322,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini refused this request and did not give the cause. An item in the chat history can cause this, such as an image that the agent opened. OpenBot started a new Gemini session with the chat history. Try again. If the error continues, choose another model.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
+  "error.provider.acpTurnStuck":
+    "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityConnectionLost":

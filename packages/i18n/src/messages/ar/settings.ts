@@ -55,6 +55,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "غروب قديم الطراز",
   "settings.chatBackdrop.snowfall": "تساقط الثلج",
   "settings.chatBackdrop.fireflies": "اليراعات",
+  "settings.chatBackdrop.coast": "ساحل النيون",
   "settings.chatBackdrop.upload": "رفع صورة…",
   "settings.chatBackdrop.uploadRefused": "استخدم صورة PNG أو JPEG أو GIF أو WebP أو AVIF حجمها 20 ميغابايت أو أقل.",
   "settings.chatBackdrop.saveFailed": "لم يتم حفظ الخلفية.",

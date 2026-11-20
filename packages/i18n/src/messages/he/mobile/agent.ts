@@ -394,6 +394,7 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "ניהול פרופילים",
   "mobile.agent.browserProfile.footer":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.agent.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot לא הצליח לשנות את פרופיל הדפדפן של הסוכן.",
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":

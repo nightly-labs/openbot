@@ -835,6 +835,7 @@ function registerIpcHandlers({
       appVariant,
       analyticsCaptureUrl,
       analyticsInstallId,
+      dynamicIslandAvailable: dynamicIsland.available,
       getMainWindow: getDialogParent,
       isMainWindow: (sender) => {
         const window = windowHolder.current;

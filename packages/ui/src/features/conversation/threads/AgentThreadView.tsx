@@ -15,6 +15,7 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
   AgentProfile,
+  ChatActionMarkerModel,
   ComposerBrowserTab,
   ComposerMcpServer,
   ComposerThread,
@@ -90,6 +91,17 @@ const HOLD_TEXT = {
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, AppTextKey>;
 
 const STICK_DISTANCE = 48;
+
+const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
+  "skill-lifecycle",
+  "instructions-change",
+  "plan-continuation",
+  "model-switch",
+  "channel-change",
+  "vault-change",
+  "context-reset",
+  "sign-in-failure",
+]);
 const NEAR_SCROLL_VIEWS = 2;
 
 function shownInThread(message: AgentMessage): boolean {
@@ -432,7 +444,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   };
   const changeMarker = (message: AgentMessage) => {
     const marker = message.actionMarker;
-    return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
+    return marker && MARKER_ROW_KINDS.has(marker.kind) ? marker : undefined;
   };
   const sharedFileOpener = (agentId: string | undefined) => {
     const open = props.onOpenFile;
