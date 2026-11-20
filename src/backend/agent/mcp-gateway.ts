@@ -291,8 +291,11 @@ export class McpGateway {
       oauth,
       options.signInPlace ?? null,
     ).pipe(toMcpGatewayFailed);
-    if (!options.interactive) yield* this.#refreshForTestedTools(config, outcome);
-    return { toolCount: outcome.toolCount, error: outcome.error };
+    if (options.interactive) return { toolCount: outcome.toolCount, error: outcome.error };
+    yield* this.#refreshForTestedTools(config, outcome);
+    const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
+    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    return { toolCount: outcome.toolCount, error };
   });
 
   readonly #refreshForTestedTools = Effect.fnUntraced(function* (
