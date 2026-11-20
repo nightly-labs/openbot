@@ -598,6 +598,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "اختيار وكيل",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot مقفل",
   "mobile.settings.shortcuts.card.locked.action": "فتح OpenBot",
+  "mobile.settings.shortcuts.card.message": "مراسلة {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "رسالة إلى {name}",
   "mobile.settings.shortcuts.footer":
     "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق. ويفتح Open Agent محادثته.",
   "mobile.settings.shortcuts.send.sent": "تم الإرسال",

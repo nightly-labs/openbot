@@ -564,6 +564,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "בחירת סוכן",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot נעול",
   "mobile.settings.shortcuts.card.locked.action": "פתיחת OpenBot",
+  "mobile.settings.shortcuts.card.message": "שליחת הודעה אל {name}",
+  "mobile.settings.shortcuts.card.messagePrompt": "הודעה אל {name}",
   "mobile.settings.shortcuts.footer":
     "Send Message באפליקציית הקיצורים שולח לסוכן הזה. האפליקציה לא נפתחת. Open Agent פותח את הצ׳אט שלו.",
   "mobile.settings.shortcuts.send.sent": "נשלח",

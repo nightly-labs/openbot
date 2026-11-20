@@ -573,6 +573,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "エージェントを選ぶ",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot はロックされています",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot を開く",
+  "mobile.settings.shortcuts.card.message": "{name} にメッセージ",
+  "mobile.settings.shortcuts.card.messagePrompt": "{name} へのメッセージ",
   "mobile.settings.shortcuts.footer":
     "ショートカットアプリの Send Message はこのエージェントに送信します。アプリは開きません。Open Agent はこのエージェントのチャットを開きます。",
   "mobile.settings.shortcuts.send.sent": "送信済み",
