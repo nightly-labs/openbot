@@ -48,6 +48,8 @@ import { McpServerError, type McpServerStore } from "../mcp-server-store";
 import type { ProviderClientContext } from "../provider-drivers";
 import { providerLabel } from "./thread-items";
 
+const SIGN_IN_FAILURE_CHECK_MS = 5_000;
+
 export interface TestMcpServerOptions {
   interactive?: boolean;
   storedCredentials?: boolean;
@@ -550,9 +552,11 @@ export class McpGateway {
     const keyText = sourceText("error.backend.mcpServerKeyForProvider", { provider: providerLabel(provider), name });
     Effect.runFork(
       this.inspect(config).pipe(
-        Effect.map((outcome) => (outcome.needs === "key" ? keyText : signInText)),
-        Effect.orElseSucceed(() => signInText),
-        Effect.flatMap((text) => Effect.sync(() => emit(text))),
+        Effect.timeoutOrElse({ duration: SIGN_IN_FAILURE_CHECK_MS, orElse: () => Effect.succeed(null) }),
+        Effect.exit,
+        Effect.flatMap((exit) =>
+          Effect.sync(() => emit(Exit.isSuccess(exit) && exit.value?.needs === "key" ? keyText : signInText)),
+        ),
         Effect.forkIn(this.#scope),
       ),
     );
