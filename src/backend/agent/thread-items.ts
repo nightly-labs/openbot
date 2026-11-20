@@ -42,7 +42,12 @@ import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
 export function isNonActionableCodexWarning(message: string): boolean {
   return (
+    // Codex before 36b84c8 (September 2026) sent this when it shortened the skill descriptions.
     message.startsWith("Skill descriptions were shortened to fit") ||
+    // Codex sends this on each turn when the skill list does not fit its budget, 2% of the context
+    // window (`codex-rs/ext/skills/src/render.rs`). The turn continues, and the banner showed the raw
+    // Codex text with no step that the user could take (#5994).
+    message.startsWith("Exceeded skills context budget.") ||
     // Codex sends this when it changes transport, and the same turn continues over HTTPS
     // (`codex-rs/core/src/responses_retry.rs`). A final failure comes as an `error` (#2559).
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
