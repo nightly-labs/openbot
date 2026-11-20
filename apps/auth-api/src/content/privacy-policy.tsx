@@ -410,7 +410,7 @@ export function PrivacyPolicy() {
           <strong>Service Providers</strong> – third-party providers that support the operation, maintenance, and
           security of the Services, including cloud infrastructure, hosted servers, authentication, payment processing,
           email delivery, technical support, and communication services. These providers include Cloudflare, Dedale AI,
-          Corp. (operating as boat), and Stripe.
+          Corp. (operating as boat), Leaseweb, Backblaze, and Stripe.
         </li>
         <li>
           <strong>Third-Party AI Providers</strong> – external AI providers, including OpenAI, Anthropic, Google, xAI,
@@ -470,6 +470,14 @@ export function PrivacyPolicy() {
         <li>
           <strong>Dedale AI, Corp. (operating as boat)</strong> – provides cloud-based virtual server infrastructure
           used to host OpenBot Hosted Server environments.
+        </li>
+        <li>
+          <strong>Leaseweb Netherlands B.V. and Leaseweb USA, Inc.</strong> – provide virtual servers in the Netherlands
+          and in the United States used to host OpenBot Hosted Server environments.
+        </li>
+        <li>
+          <strong>Backblaze, Inc.</strong> – stores encrypted archives of Hosted Servers whose subscription ended, in
+          its European Union region, until the archive is deleted. Backblaze does not receive the key to the archive.
         </li>
         <li>
           <strong>Stripe</strong> – processes payments and manages subscriptions for paid Services.
