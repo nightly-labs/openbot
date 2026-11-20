@@ -1715,7 +1715,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "Die Übertragung wurde nicht abgebrochen.",
   "mobile.server.ownerTransfer.incomingTitle": "Eigentümer von {server} werden?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} möchte dich zum Eigentümer von {server} machen. Du erhältst die volle Kontrolle über den Server, und seine Agenten, Chats, Routinen und gespeicherten Anmeldungen bleiben darauf. {name} verliert den Zugriff.",
+    "{name} möchte dich zum Eigentümer von {server} machen. Du erhältst die volle Kontrolle über den Server, und seine Agenten, Chats, Routinen und gespeicherten Anmeldungen bleiben darauf. {name} verliert den Zugriff. Wer sich noch an dem Computer anmelden kann, auf dem der Server läuft, kann dein OpenBot-Konto nutzen. Ändere dort die Passwörter und SSH-Schlüssel.",
   "mobile.server.ownerTransfer.accept": "Annehmen",
   "mobile.server.ownerTransfer.decline": "Ablehnen",
   "mobile.server.ownerTransfer.accepted": "Du bist jetzt Eigentümer von {server}.",

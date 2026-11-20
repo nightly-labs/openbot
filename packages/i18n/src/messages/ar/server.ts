@@ -849,6 +849,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "يفقد {name} الوصول إلى الخادم.",
   "server.ownerTransfer.incomingStays":
     "تبقى تسجيلات الدخول إلى المزوّدين والمفاتيح المحفوظة وبيانات دخول الخزنة وتسجيلات الدخول في المتصفح والتطبيقات المتصلة على الخادم، ويمكنك استخدامها.",
+  "server.ownerTransfer.incomingMachine":
+    "يمكن لأي شخص لا يزال يستطيع تسجيل الدخول إلى الكمبيوتر الذي يشغّل الخادم أن يستخدم حسابك في OpenBot. غيّر كلمات المرور ومفاتيح SSH على ذلك الكمبيوتر.",
   "server.ownerTransfer.later": "لاحقًا",
   "server.ownerTransfer.decline": "رفض",
   "server.ownerTransfer.accept": "قبول",

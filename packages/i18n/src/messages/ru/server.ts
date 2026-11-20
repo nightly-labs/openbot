@@ -720,6 +720,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "{name} потеряет доступ к серверу.",
   "server.ownerTransfer.incomingStays":
     "Входы в провайдеры, сохранённые ключи, логины Vault, входы в браузере и подключённые приложения на сервере останутся там, и вы сможете ими пользоваться.",
+  "server.ownerTransfer.incomingMachine":
+    "Любой, кто ещё может войти на компьютер, где работает сервер, может пользоваться вашим аккаунтом OpenBot. Смените на нём пароли и SSH-ключи.",
   "server.ownerTransfer.later": "Позже",
   "server.ownerTransfer.decline": "Отклонить",
   "server.ownerTransfer.accept": "Принять",

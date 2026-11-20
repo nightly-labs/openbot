@@ -1650,7 +1650,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "移行を取り消せませんでした。",
   "mobile.server.ownerTransfer.incomingTitle": "{server} の所有者になりますか？",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} があなたを {server} の所有者にしようとしています。サーバーを完全に管理でき、エージェント、チャット、ルーティン、保存したサインインはそのまま残ります。{name} はアクセスできなくなります。",
+    "{name} があなたを {server} の所有者にしようとしています。サーバーを完全に管理でき、エージェント、チャット、ルーティン、保存したサインインはそのまま残ります。{name} はアクセスできなくなります。 サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
   "mobile.server.ownerTransfer.accept": "承認",
   "mobile.server.ownerTransfer.decline": "拒否",
   "mobile.server.ownerTransfer.accepted": "あなたは {server} の所有者になりました。",

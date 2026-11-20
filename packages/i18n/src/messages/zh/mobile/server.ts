@@ -1525,7 +1525,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "转让未取消。",
   "mobile.server.ownerTransfer.incomingTitle": "成为 {server} 的所有者？",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} 想让你成为 {server} 的所有者。你将完全控制该服务器，其助手、对话、自动化任务和已保存的登录都会保留。{name} 将失去访问权限。",
+    "{name} 想让你成为 {server} 的所有者。你将完全控制该服务器，其助手、对话、自动化任务和已保存的登录都会保留。{name} 将失去访问权限。 仍能登录运行该服务器的计算机的任何人都可以使用你的 OpenBot 账户。请更改该计算机的密码和 SSH 密钥。",
   "mobile.server.ownerTransfer.accept": "接受",
   "mobile.server.ownerTransfer.decline": "拒绝",
   "mobile.server.ownerTransfer.accepted": "你现在是 {server} 的所有者。",

@@ -1669,7 +1669,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "Devir iptal edilmedi.",
   "mobile.server.ownerTransfer.incomingTitle": "{server} sunucusunun sahibi olunsun mu?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} sizi {server} sunucusunun sahibi yapmak istiyor. Sunucunun tam denetimini alırsınız; ajanları, sohbetleri, rutinleri ve kayıtlı oturumları sunucuda kalır. {name} erişimi kaybeder.",
+    "{name} sizi {server} sunucusunun sahibi yapmak istiyor. Sunucunun tam denetimini alırsınız; ajanları, sohbetleri, rutinleri ve kayıtlı oturumları sunucuda kalır. {name} erişimi kaybeder. Sunucuyu çalıştıran bilgisayarda hâlâ oturum açabilen herkes OpenBot hesabınızı kullanabilir. O bilgisayarın parolalarını ve SSH anahtarlarını değiştirin.",
   "mobile.server.ownerTransfer.accept": "Kabul et",
   "mobile.server.ownerTransfer.decline": "Reddet",
   "mobile.server.ownerTransfer.accepted": "Artık {server} sunucusunun sahibisiniz.",

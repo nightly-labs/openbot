@@ -2250,7 +2250,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "لم يُلغَ النقل.",
   "mobile.server.ownerTransfer.incomingTitle": "هل تصبح مالك {server}؟",
   "mobile.server.ownerTransfer.incomingBody":
-    "يريد {name} أن يجعلك مالك {server}. ستتحكم في الخادم بالكامل، وتبقى عليه وكلاؤه ودردشاته ومهامه الدورية وتسجيلات الدخول المحفوظة. ويفقد {name} الوصول.",
+    "يريد {name} أن يجعلك مالك {server}. ستتحكم في الخادم بالكامل، وتبقى عليه وكلاؤه ودردشاته ومهامه الدورية وتسجيلات الدخول المحفوظة. ويفقد {name} الوصول. يمكن لأي شخص لا يزال يستطيع تسجيل الدخول إلى الكمبيوتر الذي يشغّل الخادم أن يستخدم حسابك في OpenBot. غيّر كلمات المرور ومفاتيح SSH على ذلك الكمبيوتر.",
   "mobile.server.ownerTransfer.accept": "قبول",
   "mobile.server.ownerTransfer.decline": "رفض",
   "mobile.server.ownerTransfer.accepted": "أنت الآن مالك {server}.",

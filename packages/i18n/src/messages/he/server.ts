@@ -789,6 +789,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "הגישה של {name} לשרת תוסר.",
   "server.ownerTransfer.incomingStays":
     "התחברויות לספקים, מפתחות שמורים, פרטי כניסה בכספת, התחברויות בדפדפן ואפליקציות מחוברות בשרת נשארים שם, ואפשר להשתמש בהם.",
+  "server.ownerTransfer.incomingMachine":
+    "כל מי שעדיין יכול להתחבר למחשב שמריץ את השרת יכול להשתמש בחשבון OpenBot שלך. כדאי להחליף את הסיסמאות ואת מפתחות ה-SSH שלו.",
   "server.ownerTransfer.later": "אחר כך",
   "server.ownerTransfer.decline": "דחייה",
   "server.ownerTransfer.accept": "אישור",

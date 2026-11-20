@@ -2059,7 +2059,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.ownerTransfer.cancelFailed": "The transfer was not cancelled.",
   "mobile.server.ownerTransfer.incomingTitle": "Become the owner of {server}?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} wants to make you the owner of {server}. You get full control of the server, and its agents, chats, routines, and saved sign-ins stay on it. {name} loses access.",
+    "{name} wants to make you the owner of {server}. You get full control of the server, and its agents, chats, routines, and saved sign-ins stay on it. {name} loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account. Change its passwords and SSH keys.",
   "mobile.server.ownerTransfer.accept": "Accept",
   "mobile.server.ownerTransfer.decline": "Decline",
   "mobile.server.ownerTransfer.accepted": "You are now the owner of {server}.",

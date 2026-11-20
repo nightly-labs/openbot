@@ -1610,7 +1610,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "이전을 취소하지 못했어요.",
   "mobile.server.ownerTransfer.incomingTitle": "{server}의 소유자가 될까요?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name}님이 나를 {server}의 소유자로 지정하려고 해요. 서버를 완전히 관리할 수 있고, 에이전트, 채팅, 루틴, 저장된 로그인은 그대로 남아요. {name}님은 접근 권한을 잃어요.",
+    "{name}님이 나를 {server}의 소유자로 지정하려고 해요. 서버를 완전히 관리할 수 있고, 에이전트, 채팅, 루틴, 저장된 로그인은 그대로 남아요. {name}님은 접근 권한을 잃어요. 서버를 실행하는 컴퓨터에 아직 로그인할 수 있는 사람은 회원님의 OpenBot 계정을 사용할 수 있어요. 그 컴퓨터의 비밀번호와 SSH 키를 바꾸세요.",
   "mobile.server.ownerTransfer.accept": "수락",
   "mobile.server.ownerTransfer.decline": "거절",
   "mobile.server.ownerTransfer.accepted": "이제 {server}의 소유자예요.",

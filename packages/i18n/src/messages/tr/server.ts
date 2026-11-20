@@ -700,6 +700,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "{name} sunucuya erişimini kaybeder.",
   "server.ownerTransfer.incomingStays":
     "Sunucudaki sağlayıcı oturumları, kayıtlı anahtarlar, Vault girişleri, tarayıcı oturumları ve bağlı uygulamalar orada kalır ve bunları kullanabilirsiniz.",
+  "server.ownerTransfer.incomingMachine":
+    "Sunucuyu çalıştıran bilgisayarda hâlâ oturum açabilen herkes OpenBot hesabınızı kullanabilir. O bilgisayarın parolalarını ve SSH anahtarlarını değiştirin.",
   "server.ownerTransfer.later": "Sonra",
   "server.ownerTransfer.decline": "Reddet",
   "server.ownerTransfer.accept": "Kabul et",

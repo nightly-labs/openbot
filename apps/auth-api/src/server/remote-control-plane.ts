@@ -82,7 +82,6 @@ const MAX_OUTSTANDING_INVITES_PER_HOST = 50;
 const MAX_PERMANENT_INVITES_PER_HOST = 5;
 const MAX_TELEGRAM_LINK_CODES_PER_HOST = 10;
 const OWNER_TRANSFER_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
-const OWNER_TRANSFER_SESSION_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 const OWNER_TRANSFER_COLUMNS = `t.transfer_id, t.host_id, h.name AS host_name, t.from_user_id, u.email AS from_email,
   u.name AS from_name, t.to_email, t.created_at, t.expires_at`;
 const NOT_HOSTED_SQL = "NOT EXISTS(SELECT 1 FROM hosted_servers WHERE server_id = ?)";
@@ -1927,10 +1926,10 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT transfer_id, from_user_id, host_session_id FROM remote_owner_transfers
-           WHERE host_id = ? AND status = 'accepted' AND to_user_id = ? AND updated_at > ?
+           WHERE host_id = ? AND status = 'accepted' AND to_user_id = ?
            ORDER BY updated_at DESC LIMIT 1`,
           )
-          .bind(hostId, host.owner_user_id, now - OWNER_TRANSFER_SESSION_WINDOW_MS)
+          .bind(hostId, host.owner_user_id)
           .first<{ transfer_id: string; from_user_id: string; host_session_id: string | null }>(),
       );
       if (!transfer) {

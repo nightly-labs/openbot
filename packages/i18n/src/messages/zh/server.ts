@@ -712,6 +712,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "{name} 将失去对该服务器的访问权限。",
   "server.ownerTransfer.incomingStays":
     "服务器上的服务商登录、已保存的密钥、Vault 登录、浏览器登录和已连接的应用会保留，你可以使用它们。",
+  "server.ownerTransfer.incomingMachine":
+    "仍能登录运行该服务器的计算机的任何人都可以使用你的 OpenBot 账户。请更改该计算机的密码和 SSH 密钥。",
   "server.ownerTransfer.later": "稍后",
   "server.ownerTransfer.decline": "拒绝",
   "server.ownerTransfer.accept": "接受",

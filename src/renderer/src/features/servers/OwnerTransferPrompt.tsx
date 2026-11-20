@@ -126,6 +126,7 @@ export function OwnerTransferPrompt(props: {
                         <li>{t("server.ownerTransfer.incomingYours")}</li>
                         <li>{t("server.ownerTransfer.incomingPrevious", { name: sender(transfer()) })}</li>
                         <li>{t("server.ownerTransfer.incomingStays")}</li>
+                        <li>{t("server.ownerTransfer.incomingMachine")}</li>
                       </ul>
                     </div>
                     <Show when={state.error}>

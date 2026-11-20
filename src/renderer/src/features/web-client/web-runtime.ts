@@ -325,7 +325,7 @@ type WebMessageDelete =
 
 type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
 
-export interface WebOwnerTransfers {
+interface WebOwnerTransfers {
   pending(hostId: string): Promise<OwnerTransfer | null>;
   start(hostId: string, email: string): Promise<OwnerTransfer>;
   cancel(hostId: string): Promise<void>;

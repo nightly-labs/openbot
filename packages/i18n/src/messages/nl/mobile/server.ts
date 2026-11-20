@@ -1648,7 +1648,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "De overdracht is niet geannuleerd.",
   "mobile.server.ownerTransfer.incomingTitle": "Eigenaar van {server} worden?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} wil jou eigenaar van {server} maken. Je krijgt volledige controle over de server, en de agents, chats, routines en opgeslagen aanmeldingen blijven erop. {name} verliest de toegang.",
+    "{name} wil jou eigenaar van {server} maken. Je krijgt volledige controle over de server, en de agents, chats, routines en opgeslagen aanmeldingen blijven erop. {name} verliest de toegang. Iedereen die nog kan inloggen op de computer waarop de server draait, kan je OpenBot-account gebruiken. Wijzig de wachtwoorden en SSH-sleutels ervan.",
   "mobile.server.ownerTransfer.accept": "Accepteren",
   "mobile.server.ownerTransfer.decline": "Weigeren",
   "mobile.server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}.",

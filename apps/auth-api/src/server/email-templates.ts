@@ -180,7 +180,7 @@ export function renderOwnerTransferEmail(input: OwnerTransferEmailInput): Render
         "Open OpenBot and sign in with this email address to accept or decline:",
         input.appUrl,
         "",
-        "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access. The request expires after 7 days.",
+        "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account, so change its passwords and SSH keys. The request expires after 7 days.",
       ],
       footer,
     ),
@@ -193,7 +193,7 @@ export function renderOwnerTransferEmail(input: OwnerTransferEmailInput): Render
           `<strong style="color:${COLOR.text};font-weight:600;">${escapeHtml(input.fromEmail)}</strong> wants to make you the owner of a server on OpenBot.`,
         ),
         paragraph(
-          "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access.",
+          "When you accept, the server and its agents, routines and data become yours, and the previous owner loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account, so change its passwords and SSH keys.",
         ),
         button("Open OpenBot", input.appUrl),
         paragraph("Sign in with this email address to accept or decline. The request expires after 7 days.", {

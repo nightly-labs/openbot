@@ -2091,7 +2091,7 @@ export const messages = {
   "mobile.server.ownerTransfer.cancelFailed": "ההעברה לא בוטלה.",
   "mobile.server.ownerTransfer.incomingTitle": "להפוך לבעלים של {server}?",
   "mobile.server.ownerTransfer.incomingBody":
-    "{name} רוצה להפוך אותך לבעלים של {server}. תהיה לך שליטה מלאה בשרת, והסוכנים, הצ'אטים, השגרות וההתחברויות השמורות נשארים בו. הגישה של {name} תוסר.",
+    "{name} רוצה להפוך אותך לבעלים של {server}. תהיה לך שליטה מלאה בשרת, והסוכנים, הצ'אטים, השגרות וההתחברויות השמורות נשארים בו. הגישה של {name} תוסר. כל מי שעדיין יכול להתחבר למחשב שמריץ את השרת יכול להשתמש בחשבון OpenBot שלך. כדאי להחליף את הסיסמאות ואת מפתחות ה-SSH שלו.",
   "mobile.server.ownerTransfer.accept": "אישור",
   "mobile.server.ownerTransfer.decline": "דחייה",
   "mobile.server.ownerTransfer.accepted": "עכשיו הבעלות על {server} שלך.",

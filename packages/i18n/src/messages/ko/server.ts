@@ -738,6 +738,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "{name}님은 서버에 액세스할 수 없게 돼요.",
   "server.ownerTransfer.incomingStays":
     "서버의 제공자 로그인, 저장된 키, Vault 로그인, 브라우저 로그인, 연결된 앱은 그대로 남고 회원님이 사용할 수 있어요.",
+  "server.ownerTransfer.incomingMachine":
+    "서버를 실행하는 컴퓨터에 아직 로그인할 수 있는 사람은 회원님의 OpenBot 계정을 사용할 수 있어요. 그 컴퓨터의 비밀번호와 SSH 키를 바꾸세요.",
   "server.ownerTransfer.later": "나중에",
   "server.ownerTransfer.decline": "거절",
   "server.ownerTransfer.accept": "수락",

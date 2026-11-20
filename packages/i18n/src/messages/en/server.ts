@@ -803,6 +803,8 @@ export const messages = defineMessages("server", {
   "server.ownerTransfer.incomingPrevious": "{name} loses access to the server.",
   "server.ownerTransfer.incomingStays":
     "Provider sign-ins, saved keys, Vault logins, browser sign-ins and connected apps on the server stay there, and you can use them.",
+  "server.ownerTransfer.incomingMachine":
+    "Anyone who can still sign in to the computer that runs the server can use your OpenBot account. Change its passwords and SSH keys.",
   "server.ownerTransfer.later": "Later",
   "server.ownerTransfer.decline": "Decline",
   "server.ownerTransfer.accept": "Accept",

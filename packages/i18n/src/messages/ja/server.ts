@@ -687,6 +687,8 @@ export const messages = {
   "server.ownerTransfer.incomingPrevious": "{name} はサーバーにアクセスできなくなります。",
   "server.ownerTransfer.incomingStays":
     "サーバー上のプロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザーのサインイン、接続したアプリはそのまま残り、あなたが使えます。",
+  "server.ownerTransfer.incomingMachine":
+    "サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
   "server.ownerTransfer.later": "後で",
   "server.ownerTransfer.decline": "拒否",
   "server.ownerTransfer.accept": "承認",
