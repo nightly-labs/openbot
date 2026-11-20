@@ -302,7 +302,9 @@ start, and iOS suspends the app soon after the intent returns.
   (`src/features/shortcuts/model/shortcut-directory.ts`): the agents, the agent of Settings >
   Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
   keys and the agent pictures are the ones that the app writes for the share extension.
-- List Agents reads that file. A tap on an agent opens its chat.
+- List Agents reads that file. A tap on an agent opens its chat. The message button of an agent runs
+  the hidden intent Message Agent: it asks for the text and sends it to that agent as Send Message
+  does, and the app does not open.
 - Open Agent opens the app on the chat of the agent of Settings > Shortcuts. With no agent, it opens
   Settings > Shortcuts. It uses the same `ShortcutBridge` path as the card buttons.
 - Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension

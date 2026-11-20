@@ -879,10 +879,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     tool: string,
     args: McpToolArguments,
   ): Effect.Effect<RelayedMcpToolOutcome | null> {
+    return this.#relayFor(externalThreadId, config)?.callTool(tool, args) ?? Effect.succeed(null);
+  }
+
+  relaysMcpServer(externalThreadId: string, config: McpServerConfig): boolean {
+    return this.#relayFor(externalThreadId, config) !== undefined;
+  }
+
+  #relayFor(externalThreadId: string, config: McpServerConfig): StdioMcpRelay | undefined {
     const thread = this.#threads.get(externalThreadId);
-    if (!thread || thread.relayed.byName.size === 0) return Effect.succeed(null);
-    const name = acpMcpServerName(config, thread.relayed.own, this.#flavor.mcpServerName);
-    return thread.relayed.byName.get(name)?.callTool(tool, args) ?? Effect.succeed(null);
+    if (!thread || thread.relayed.byName.size === 0) return undefined;
+    return thread.relayed.byName.get(acpMcpServerName(config, thread.relayed.own, this.#flavor.mcpServerName));
   }
 
   readonly releaseThread = Effect.fn("AcpAgentClient.releaseThread")(function* (

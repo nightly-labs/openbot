@@ -266,6 +266,7 @@ const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
 const IDLE_TAB_SWEEP_MS = 60_000;
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
+const IDLE_TAB_FREEZE_MS = 2 * 60_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
@@ -480,6 +481,19 @@ function drivenByAgent(state: BrowserControlState, tab: BrowserHostTab): boolean
   );
 }
 
+const THIS_CHAT = "this chat";
+const NO_CHAT = "none";
+const OTHER_CHAT_TABS_NOTE =
+  'A tab whose chat is not "this chat" belongs to another chat of this agent, and this chat can use it. When otherChatWorking is true, another chat used the tab in the last 2 minutes and can still work in it: do not navigate, type in, or close it. Open a new tab instead, or wait.';
+const OTHER_CHAT_WORKING_MS = 120_000;
+
+type ToolTab = BrowserTab & { chat: string; otherChatWorking?: true };
+
+export interface BrowserAgentChat {
+  agentId: string;
+  sideThread: { taskId: string; title: string } | null;
+}
+
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = BrowserControlSessions.IDLE_GRACE_MS;
   readonly #window: BrowserWindow;
@@ -487,7 +501,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
-  readonly #agentChat: (threadId: string) => boolean;
+  readonly #agentChat: (threadId: string) => BrowserAgentChat | null;
   readonly #profileProxy: (profileId: string) => BrowserProxyConnection | null;
   readonly #onProxyStatusChanged: () => void;
   readonly #computerExit: (memberId: string) => RelayExit;
@@ -541,6 +555,7 @@ export class BrowserHost {
   readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
+  readonly #idleTabFreezeMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
 
   constructor(
@@ -555,13 +570,13 @@ export class BrowserHost {
       tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
-      agentChat?: (threadId: string) => boolean;
+      agentChat?: (threadId: string) => BrowserAgentChat | null;
       profileProxy?: (profileId: string) => BrowserProxyConnection | null;
       onProxyStatusChanged?: () => void;
       computerExit?: (memberId: string) => RelayExit;
       quitShortcut?: (input: Input) => boolean;
       pagePreload?: string;
-      tabSleep?: { sweepMs: number; awakeGraceMs: number };
+      tabSleep?: { sweepMs: number; awakeGraceMs: number; freezeMs?: number };
       siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
       userBrowsing?: BrowserUserBrowsing;
       hideFromWindowSwitchers?: (window: BaseWindow) => void;
@@ -581,9 +596,10 @@ export class BrowserHost {
     this.#memoryLow = options.memoryLow ?? (() => false);
     this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
+    this.#idleTabFreezeMs = options.tabSleep?.freezeMs ?? IDLE_TAB_FREEZE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
-    this.#agentChat = options.agentChat ?? (() => false);
+    this.#agentChat = options.agentChat ?? (() => null);
     this.#profileProxy = options.profileProxy ?? (() => null);
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
@@ -663,7 +679,7 @@ export class BrowserHost {
 
     for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (activeTab) yield* this.#wake(activeTab);
+    if (activeTab && this.#visible) yield* this.#wake(activeTab);
   }).bind(this);
 
   readonly #wake = Effect.fn("BrowserHost.wake")(function* (this: BrowserHost, tab: BrowserHostTab) {
@@ -683,8 +699,8 @@ export class BrowserHost {
   });
 
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
-    this.#throttleHiddenTabs();
     const now = Date.now();
+    this.#throttleHiddenTabs(now);
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
     const awake: BrowserHostTab[] = [];
     for (const tab of this.#tabs.values()) {
@@ -699,20 +715,50 @@ export class BrowserHost {
     }
   });
 
-  #throttleHiddenTabs(): void {
+  #throttleHiddenTabs(now: number): void {
     for (const tab of this.#tabs.values()) {
-      if (tab.closing || tab.contents.isDestroyed() || tab.contents.getBackgroundThrottling()) continue;
-      if (this.#viewShown(tab.view)) continue;
-      if (this.#tabBusy(tab)) continue;
-      tab.contents.setBackgroundThrottling(true);
-      this.#setIdleFocus(tab, false);
+      if (tab.closing || tab.contents.isDestroyed() || this.#viewShown(tab.view) || this.#tabBusy(tab)) continue;
+      if (!tab.contents.getBackgroundThrottling()) {
+        tab.contents.setBackgroundThrottling(true);
+        this.#setIdleFocus(tab, false);
+      }
+      if (this.#mayFreeze(tab) && now - tab.lastUsedAt >= this.#idleTabFreezeMs) this.#setFrozen(tab, true);
     }
   }
 
   #unthrottle(tab: BrowserHostTab): void {
-    if (tab.contents.isDestroyed() || !tab.contents.getBackgroundThrottling()) return;
+    if (tab.contents.isDestroyed()) return;
+    this.#thaw(tab);
+    if (!tab.contents.getBackgroundThrottling()) return;
     tab.contents.setBackgroundThrottling(false);
     this.#setIdleFocus(tab, true);
+  }
+
+  #mayFreeze(tab: BrowserHostTab): boolean {
+    return !tab.pendingRestore && !tab.engine.dialog && this.#maySleep(tab);
+  }
+
+  #thaw(tab: BrowserHostTab): void {
+    if (!tab.engine.frozen) return;
+    this.#setFrozen(tab, false);
+    if (!tab.view.getVisible()) return;
+    tab.view.setVisible(false);
+    tab.view.setVisible(true);
+  }
+
+  #setFrozen(tab: BrowserHostTab, frozen: boolean): void {
+    if (tab.closing) return;
+    Effect.runFork(
+      tab.engine.setFrozen(frozen).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() =>
+            logger.warn("Unable to change the lifecycle state of a browser tab", { error: toLogValue(error) }),
+          ),
+        ),
+        Effect.ignore,
+        Effect.forkIn(tab.scope, { startImmediately: true }),
+      ),
+    );
   }
 
   #setIdleFocus(tab: BrowserHostTab, enabled: boolean): void {
@@ -735,7 +781,7 @@ export class BrowserHost {
   }
 
   #tabInUse(tab: BrowserHostTab): boolean {
-    return this.#activeTabId === tab.id || this.#tabBusy(tab);
+    return (this.#activeTabId === tab.id && this.#viewShown(tab.view)) || this.#tabBusy(tab);
   }
 
   #tabBusy(tab: BrowserHostTab): boolean {
@@ -1893,7 +1939,7 @@ export class BrowserHost {
     input: BrowserVisibilityInput,
   ) {
     const active = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (active) yield* this.#wake(active);
+    if (active && input.visible) yield* this.#wake(active);
     yield* browserSync(() => {
       const restoreRendererFocus = !input.visible && this.#attachedView?.webContents.isFocused();
       this.#visible = input.visible;
@@ -2061,6 +2107,7 @@ export class BrowserHost {
     tab: BrowserHostTab,
   ) {
     if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
+    this.#thaw(tab);
     const page = currentPreviewPage(tab);
     const frame = Deferred.makeUnsafe<BrowserPreview, BrowserOperationError>();
     const capture = { ...page, frame };
@@ -2630,16 +2677,36 @@ export class BrowserHost {
   }
 
   #toolTabs(params: DynamicToolCallParams): {
-    tabs: BrowserTab[];
+    tabs: ToolTab[];
     activeTabId: string | null;
     otherChatTabs?: number;
     note?: string;
   } {
-    const tabs = this.listTabs()
-      .filter((tab) => this.#canUseToolTab(params, tab))
-      .map((tab) => {
-        const engine = this.#tabs.get(tab.id)?.engine;
-        return engine ? { ...tab, title: engine.scrubText(tab.title), url: engine.scrubText(tab.url) } : tab;
+    const chatOf = this.#cachedAgentChat();
+    const otherChatTabIds = new Set(
+      this.getControlState()
+        .sessions.filter((session) => session.threadId !== params.threadId)
+        .map((session) => session.tabId),
+    );
+    const now = Date.now();
+    const allTabs = this.listTabs();
+    const tabs = allTabs
+      .filter((tab) => this.#canUseToolTab(params, tab, chatOf))
+      .map((tab): ToolTab => {
+        const hostTab = this.#tabs.get(tab.id);
+        const engine = hostTab?.engine;
+        const scrubbed = engine ? { ...tab, title: engine.scrubText(tab.title), url: engine.scrubText(tab.url) } : tab;
+        const lastChat = hostTab?.lastToolChat;
+        const working =
+          otherChatTabIds.has(tab.id) ||
+          (lastChat !== undefined &&
+            lastChat.threadId !== params.threadId &&
+            now - lastChat.at < OTHER_CHAT_WORKING_MS);
+        return {
+          ...scrubbed,
+          chat: this.#tabChat(params, tab, chatOf),
+          ...(working ? { otherChatWorking: true as const } : {}),
+        };
       });
     const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
       ? this.#activeTabId
@@ -2648,15 +2715,46 @@ export class BrowserHost {
     const otherChatTabs =
       ownerAgentId === null
         ? 0
-        : this.listTabs().filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab))
+        : allTabs.filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab, chatOf))
             .length;
-    if (otherChatTabs === 0) return { tabs, activeTabId };
+    const notes = [
+      ...(tabs.some((tab) => tab.chat !== THIS_CHAT && tab.chat !== NO_CHAT) ? [OTHER_CHAT_TABS_NOTE] : []),
+      ...(otherChatTabs === 0
+        ? []
+        : [
+            `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+          ]),
+    ];
     return {
       tabs,
       activeTabId,
-      otherChatTabs,
-      note: `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+      ...(otherChatTabs === 0 ? {} : { otherChatTabs }),
+      ...(notes.length === 0 ? {} : { note: notes.join(" ") }),
     };
+  }
+
+  #cachedAgentChat(): (threadId: string) => BrowserAgentChat | null {
+    const known = new Map<string, BrowserAgentChat | null>();
+    return (threadId) => {
+      const cached = known.get(threadId);
+      if (cached !== undefined) return cached;
+      const chat = this.#agentChat(threadId);
+      known.set(threadId, chat);
+      return chat;
+    };
+  }
+
+  #tabChat(
+    params: DynamicToolCallParams,
+    tab: BrowserTab,
+    chatOf: (threadId: string) => BrowserAgentChat | null,
+  ): string {
+    if (tab.ownerThreadId === params.threadId) return THIS_CHAT;
+    if (tab.ownerThreadId === null) return NO_CHAT;
+    const owner = chatOf(tab.ownerThreadId);
+    if (owner === null || owner.agentId !== tab.ownerAgentId) return "another conversation";
+    if (owner.sideThread === null) return "main chat";
+    return `side thread ${JSON.stringify(owner.sideThread.title)} (taskId ${owner.sideThread.taskId})`;
   }
 
   readonly #fillCard = Effect.fn("BrowserHost.fillCard")(function* (
@@ -4124,7 +4222,9 @@ export class BrowserHost {
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
-    const engine = this.#tabs.get(tabId)?.engine;
+    const hostTab = this.#tabs.get(tabId);
+    if (hostTab) hostTab.lastToolChat = { threadId: params.threadId, at: Date.now() };
+    const engine = hostTab?.engine;
     const dialog = engine?.dialog;
     if (!dialog || dialogTool) return;
     if (engine?.dialogOwnedBy({ threadId: params.threadId, turnId: params.turnId }))
@@ -4139,12 +4239,14 @@ export class BrowserHost {
   #canUseToolTab(
     params: DynamicToolCallParams,
     tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
+    chatOf: (threadId: string) => BrowserAgentChat | null = this.#agentChat,
   ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    if (tab.ownerThreadId === null && this.#agentChat(params.threadId)) return true;
-    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
+    if ((tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId)) return true;
+    if (chatOf(params.threadId)?.agentId !== ownerAgentId) return false;
+    return tab.ownerThreadId === null || chatOf(tab.ownerThreadId)?.agentId === ownerAgentId;
   }
 
   #notePageClosedTab(tab: BrowserHostTab): void {
@@ -4157,6 +4259,11 @@ export class BrowserHost {
     });
     const oldest = this.#pageClosedTabs.keys().next().value;
     if (this.#pageClosedTabs.size > PAGE_CLOSED_TAB_LIMIT && oldest !== undefined) this.#pageClosedTabs.delete(oldest);
+  }
+
+  toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean {
+    const tab = this.listTabs().find((candidate) => candidate.id === tabId);
+    return tab !== undefined && this.#canUseToolTab(params, tab);
   }
 
   shareTab(tabId: string, target: { agentId: string; threadId: string }): void {

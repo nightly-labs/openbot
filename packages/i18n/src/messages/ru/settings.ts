@@ -57,6 +57,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Ретро-закат",
   "settings.chatBackdrop.snowfall": "Снегопад",
   "settings.chatBackdrop.fireflies": "Светлячки",
+  "settings.chatBackdrop.coast": "Неоновое побережье",
   "settings.chatBackdrop.upload": "Загрузить изображение…",
   "settings.chatBackdrop.uploadRefused":
     "Используйте изображение PNG, JPEG, GIF, WebP или AVIF размером не больше 20 МБ.",

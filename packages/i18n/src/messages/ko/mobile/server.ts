@@ -522,6 +522,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "에이전트 추가",
   "mobile.server.browserProfiles.agentsHint":
     "탭하면 에이전트에게 이 프로필을 주거나 공유 프로필로 되돌립니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.server.browserProfiles.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남습니다. 옮긴 에이전트는 이 사이트에 다시 로그인해야 합니다.",
   "mobile.server.browserProfiles.clear": "데이터 지우기",
   "mobile.server.browserProfiles.clearTitle": "{name}의 데이터를 지울까요?",
   "mobile.server.browserProfiles.clearBody":
