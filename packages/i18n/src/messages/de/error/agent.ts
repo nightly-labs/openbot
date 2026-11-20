@@ -144,6 +144,8 @@ export const messages = {
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
   "error.agent.deleteFolderInUse":
     "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Ein anderes Programm nutzt noch den Ordner dieses Agenten, zum Beispiel ein Programm, das der Agent gestartet hat. Schließe dieses Programm oder starte deinen Computer neu und lösche den Agenten dann erneut.",
   "error.agent.deleteWhenFolderFree":
     "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. OpenBot löscht diesen Agenten, wenn diese Arbeit endet.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",

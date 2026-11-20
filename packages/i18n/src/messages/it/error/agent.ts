@@ -133,6 +133,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Non è stato possibile rimuovere del tutto i dati dell'agente. Riprova a eliminarlo.",
   "error.agent.deleteFolderInUse":
     "Il lavoro di un altro agente usa ancora la cartella di questo agente. Eliminalo di nuovo quando quel lavoro finisce, o dopo aver riavviato OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Un altro programma usa ancora la cartella di questo agente, per esempio un programma avviato dall'agente. Chiudi quel programma o riavvia il computer, poi elimina di nuovo l'agente.",
   "error.agent.deleteWhenFolderFree":
     "Il lavoro di un altro agente usa ancora la cartella di questo agente. OpenBot elimina questo agente quando quel lavoro finisce.",
   "error.agent.duplicationBusy": "Questo agente è già in fase di duplicazione.",
