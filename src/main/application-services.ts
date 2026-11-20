@@ -102,6 +102,7 @@ import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime"
 import { OpenBotDatabase } from "../backend/openbot-database";
 import { PASSWORD_MANAGER_BRANDS } from "../backend/password-vault";
 import { passwordVaultRouter } from "../backend/password-vault-router";
+import { perfTime } from "../backend/perf-probe-hooks";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
@@ -1780,7 +1781,10 @@ export async function createApplicationServices({
     sharedRoot: store.sharedRoot,
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
-      onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onStatementSettled: (durationMs, request) => {
+        statementTimings.record(durationMs);
+        perfTime(`agentdb.${request}`, durationMs);
+      },
       onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
         logger.warn(
           `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,

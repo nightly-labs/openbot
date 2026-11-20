@@ -10,7 +10,9 @@ import { resolveDevelopmentAppDataRoot } from "../development-state-paths";
 import { readScriptArguments } from "../script-arguments";
 import { cleanupSeedOwnedTransfers, seedDevelopmentState } from "../seed-dev-state";
 import { ensureBenchAuthApi, signInBenchAccount } from "./bench-auth";
+import { checkBudget, parseBudget } from "./bench-budget";
 import { type BenchApp, launchBenchApp } from "./bench-launch";
+import { assertBenchBuild, PROBES_ENVIRONMENT, startProbes } from "./bench-probes";
 import { SCENARIOS, type Scenario, SECOND, type SeedPlan } from "./bench-scenarios";
 import {
   type BenchReport,
@@ -189,12 +191,40 @@ interface RunOptions {
   cpuProfile: boolean;
   frames: boolean;
   callCounts: boolean;
+  probes: boolean;
+  solidCauses: boolean;
+  mainProfile: boolean;
+}
+
+async function startMainProfile(inspector: InspectorClient): Promise<() => Promise<unknown>> {
+  await inspector.send("Profiler.enable");
+  await inspector.send("Profiler.start");
+  return async () => {
+    const result = await inspector.send("Profiler.stop");
+    await inspector.send("Profiler.disable").catch(() => undefined);
+    return isDynamicRecord(result) ? result.profile : null;
+  };
+}
+
+async function writeFailureScreenshot(page: Page, path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const written = await page
+    .screenshot({ path, timeout: 10 * SECOND })
+    .then(() => true)
+    .catch(() => false);
+  if (written) logger.info(`failure screenshot written to ${path}`);
+  const rows = await page
+    .evaluate<string[]>(
+      `[...document.querySelectorAll(".sidebar-agent-item")].map((row) => row.getAttribute("data-chat-id") ?? "(none)")`,
+    )
+    .catch(() => []);
+  logger.info(`sidebar rows: ${rows.join(", ")}`);
 }
 
 async function runOnce(
   scenario: Scenario,
   index: number,
-  { label, authApiUrl, cpuProfile, frames, callCounts }: RunOptions,
+  { label, authApiUrl, cpuProfile, frames, callCounts, probes, solidCauses, mainProfile }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
   const scenarioEnvironment = scenario.prepare
@@ -205,7 +235,11 @@ async function runOnce(
     projectRoot: PROJECT_ROOT,
     instanceId: INSTANCE_ID,
     logger,
-    environment: { ...scenarioEnvironment, OPENBOT_AUTH_API_URL: authApiUrl },
+    environment: {
+      ...scenarioEnvironment,
+      ...(probes ? PROBES_ENVIRONMENT : {}),
+      OPENBOT_AUTH_API_URL: authApiUrl,
+    },
     logPath: join(BENCH_ROOT, "logs", `${label}-${scenario.id}-${index + 1}.log`),
   });
   let browser: Browser | null = null;
@@ -236,6 +270,8 @@ async function runOnce(
     const appWindow = page;
     const startup = await readStartupMarks(appWindow, inspector);
     const recorded: MetricValues = {};
+    const probeRecording = probes ? await startProbes(inspector, connected.browser, logger, { solidCauses }) : null;
+    const stopMainProfile = mainProfile && index === 0 && inspector ? await startMainProfile(inspector) : null;
     const stopRenderRecording = await startRenderRecording(appWindow, { frames, callCounts });
     const actStarted = Date.now();
     await scenario.act({
@@ -250,6 +286,8 @@ async function runOnce(
     });
     const actMs = Date.now() - actStarted;
     const renderWork = await stopRenderRecording();
+    const mainCpuProfile = stopMainProfile ? await stopMainProfile() : null;
+    const probeReport = probeRecording ? await probeRecording.stop(recorded) : null;
     await appWindow.mouse.move(-1, -1);
     const samples = await sampler.stop();
     const settled: MetricValues = {
@@ -257,6 +295,7 @@ async function runOnce(
       ...recorded,
       ...startup,
       ...renderWork.values,
+      ...probeReport?.metrics,
       "time.readyMs": readyMs,
       "time.actMs": actMs,
       "errors.page": pageErrors.length,
@@ -268,6 +307,17 @@ async function runOnce(
       await mkdir(dirname(base), { recursive: true });
       await writeFile(`${base}-call-counts.json`, `${JSON.stringify(renderWork.topCalls, null, 2)}\n`);
       for (const call of renderWork.topCalls.slice(0, 10)) logger.info(`calls: ${call.calls}× ${call.function}`);
+    }
+    if (mainCpuProfile) {
+      await mkdir(dirname(base), { recursive: true });
+      await writeFile(`${base}-main.cpuprofile`, JSON.stringify(mainCpuProfile));
+      logger.info(`main CPU profile written to ${base}-main.cpuprofile`);
+    }
+    if (probeReport) {
+      const probePath = join(BENCH_ROOT, "probes", `${label}-${scenario.id}-${index + 1}-probes.json`);
+      await mkdir(dirname(probePath), { recursive: true });
+      await writeFile(probePath, `${JSON.stringify(probeReport, null, 2)}\n`);
+      logger.info(`probe report written to ${probePath}`);
     }
     if (cpuProfile && index === 0) await writeCpuProfile(connected.browser, appWindow, `${base}-renderer.cpuprofile`);
     if (scenario.snapshots && index === 0) {
@@ -283,6 +333,13 @@ async function runOnce(
       series: seriesStats(samples.map((sample) => sample.values)),
       settled,
     };
+  } catch (error) {
+    if (page)
+      await writeFailureScreenshot(
+        page,
+        join(BENCH_ROOT, "snapshots", `${label}-${scenario.id}-${index + 1}-failed.png`),
+      );
+    throw error;
   } finally {
     await sampler.stop();
     inspector?.close();
@@ -293,7 +350,8 @@ async function runOnce(
 
 const USAGE = [
   "Usage: bun run dev:bench --scenario=<id|prefix|all> [--runs=<n>] [--label=<name>] [--compare=<report.json>]",
-  "                         [--cpu-profile] [--frames] [--call-counts]",
+  "                         [--cpu-profile] [--frames] [--call-counts] [--probes] [--solid-causes] [--main-profile]",
+  "                         [--budget=<perf-budgets.json>]",
   "",
   "Scenarios:",
   ...SCENARIOS.map((one) => `- ${one.id}: ${one.description}`),
@@ -307,6 +365,10 @@ const OPTIONS = {
   "cpu-profile": { type: "boolean" },
   frames: { type: "boolean" },
   "call-counts": { type: "boolean" },
+  probes: { type: "boolean" },
+  "solid-causes": { type: "boolean" },
+  "main-profile": { type: "boolean" },
+  budget: { type: "string" },
 } as const;
 
 function selectScenarios(selector: string): Scenario[] {
@@ -336,6 +398,14 @@ async function main(): Promise<void> {
   const cpuProfile = parsed.values["cpu-profile"] ?? false;
   const frames = parsed.values.frames ?? false;
   const callCounts = parsed.values["call-counts"] ?? false;
+  const probes = parsed.values.probes ?? false;
+  const mainProfile = parsed.values["main-profile"] ?? false;
+  const solidCauses = parsed.values["solid-causes"] ?? false;
+  if (solidCauses && !probes) throw new Error("--solid-causes needs --probes.");
+  if (probes) assertBenchBuild(PROJECT_ROOT);
+  const budgetPath = parsed.values.budget;
+  const budget = budgetPath ? parseBudget(JSON.parse(await readFile(budgetPath, "utf8"))) : null;
+  if (budgetPath && !budget) throw new Error(`${budgetPath} is not a perf budget file.`);
   const baseline = comparePath ? parseBenchReport(JSON.parse(await readFile(comparePath, "utf8"))) : null;
   if (comparePath && !baseline) throw new Error(`${comparePath} is not a dev:bench report.`);
 
@@ -343,7 +413,7 @@ async function main(): Promise<void> {
   const report = (): BenchReport => ({
     label,
     createdAt: new Date().toISOString(),
-    build: "built bundle (out/), unpackaged Electron",
+    build: probes ? "bench bundle (out/, probes on), unpackaged Electron" : "built bundle (out/), unpackaged Electron",
     scenarios,
   });
   await mkdir(BENCH_ROOT, { recursive: true });
@@ -357,7 +427,16 @@ async function main(): Promise<void> {
         for (let index = 0; index < runs; index += 1) {
           logger.info(`${scenario.id}: run ${index + 1} of ${runs}`);
           results.push(
-            await runOnce(scenario, index, { label, authApiUrl: authApi.url, cpuProfile, frames, callCounts }),
+            await runOnce(scenario, index, {
+              label,
+              authApiUrl: authApi.url,
+              cpuProfile,
+              frames,
+              callCounts,
+              probes,
+              solidCauses,
+              mainProfile,
+            }),
           );
         }
       } catch (error) {
@@ -385,6 +464,12 @@ async function main(): Promise<void> {
     process.stdout.write(`\n${comparison}\n`);
   }
   logger.info(`report written to ${jsonPath}`);
+  if (budget) {
+    const result = checkBudget(budget, report());
+    await writeFile(join(BENCH_ROOT, `${label}.budget.md`), `${result.markdown}\n`);
+    process.stdout.write(`\n${result.markdown}\n`);
+    if (result.failures > 0) process.exitCode = 1;
+  }
   if (failed.length > 0) {
     logger.error(`scenarios with no report: ${failed.join(", ")}`);
     process.exitCode = 1;

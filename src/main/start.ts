@@ -32,6 +32,11 @@ async function showDamagedInstallation(): Promise<void> {
   if (response === 0) await shell.openExternal(DOWNLOAD_URL);
 }
 
+if (__OPENBOT_PERF_PROBES__ && !app.isPackaged && process.env.OPENBOT_PERF_PROBES === "1") {
+  const { installPerfProbes } = await import("./perf-probes-install");
+  installPerfProbes();
+}
+
 try {
   await import("./index");
 } catch (error) {
