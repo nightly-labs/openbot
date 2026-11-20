@@ -325,6 +325,7 @@ interface Mention {
   authorName: string;
   roles?: string[];
   content: string;
+  attachments?: { id: string; filename: string; content_type: string; size: number; url: string }[];
   replyTo?: {
     id: string;
     authorId: string;
@@ -348,7 +349,7 @@ async function mention(message: Mention) {
       author: { id: message.authorId, username: message.authorName },
       ...(message.roles ? { member: { nick: null, roles: message.roles } } : {}),
       mentions: [{ id: APP }],
-      attachments: [],
+      attachments: message.attachments ?? [],
       ...(message.replyTo
         ? {
             message_reference: { type: 0, message_id: message.replyTo.id },
@@ -855,6 +856,85 @@ try {
           [],
         );
         return { earlierImage: true };
+      } finally {
+        globalThis.fetch = realFetch;
+        channelOne.length = 0;
+      }
+    });
+
+    await step("a new mention gets only its own image, and never an image that an earlier mention gave", async () => {
+      const image = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      const attachment = (messageId: string, filename: string) => ({
+        id: nextId(),
+        filename,
+        content_type: "image/png",
+        size: image.byteLength,
+        url: `https://cdn.discordapp.com/attachments/${CHANNEL_ONE}/${messageId}/${filename}`,
+      });
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = Object.assign(
+        (input: string | URL | Request, init?: RequestInit) =>
+          String(input).startsWith(`https://cdn.discordapp.com/attachments/${CHANNEL_ONE}/`)
+            ? Promise.resolve(new Response(image, { headers: { "content-type": "image/png" } }))
+            : realFetch(input, init),
+        realFetch,
+      );
+      const record = services.threads.store.connectionForWorkspace("discord", GUILD_ONE);
+      assert.ok(record);
+      const filesOf = (messageId: string) =>
+        services.mailbox
+          .deliveryForKey(`messaging:${record.connectionId}:${CHANNEL_ONE}:${messageId}`)
+          ?.managedAttachments.map((file) => file.name);
+      const photoMention = async (id: string, authorId: string, filename: string, sentAt: string) => {
+        const files = [attachment(id, filename)];
+        await mention({
+          id,
+          guildId: GUILD_ONE,
+          channelId: CHANNEL_ONE,
+          authorId,
+          authorName: authorId,
+          roles: [MAINTAINERS],
+          content: "zapisz przelew",
+          attachments: files,
+        });
+        await received(id);
+        channelOne.push({
+          id,
+          content: `<@${APP}> zapisz przelew`,
+          timestamp: sentAt,
+          author: { id: authorId, username: authorId },
+          attachments: files,
+        });
+      };
+      try {
+        const first = nextId();
+        await photoMention(first, "500000000000000015", "first.png", "2026-10-19T11:45:00.000Z");
+        assert.deepEqual(filesOf(first), ["first.png"]);
+        const posted = nextId();
+        channelOne.push({
+          id: posted,
+          content: "",
+          timestamp: "2026-10-19T11:45:30.000Z",
+          author: { id: TOMEK, username: "tomek" },
+          attachments: [attachment(posted, "posted.png")],
+        });
+        const second = nextId();
+        await photoMention(second, "500000000000000016", "second.png", "2026-10-19T11:46:00.000Z");
+        assert.deepEqual(filesOf(second), ["second.png"], "A mention with its own image got earlier images too.");
+        assert.doesNotMatch(await promptOf(services, GUILD_ONE, second, CHANNEL_ONE), /Files of earlier messages/u);
+        const third = nextId();
+        await mention({
+          id: third,
+          guildId: GUILD_ONE,
+          channelId: CHANNEL_ONE,
+          authorId: "500000000000000017",
+          authorName: "500000000000000017",
+          roles: [MAINTAINERS],
+          content: "co jest na zdjeciu?",
+        });
+        await received(third);
+        assert.deepEqual(filesOf(third), ["posted.png"], "A mention got an image that an earlier mention gave.");
+        return { ownImageOnly: true };
       } finally {
         globalThis.fetch = realFetch;
         channelOne.length = 0;
