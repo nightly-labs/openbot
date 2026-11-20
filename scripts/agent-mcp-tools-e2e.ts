@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
@@ -26,8 +27,9 @@ import { catalogPluginSlug, loadCatalogPluginServers } from "../src/main/analyti
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-mcp-tools-e2e");
 const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
+const HTML_LOGIN_TOKEN = "html-login-token-4b6e12";
 
-type Mode = "open" | "sign-in" | "key" | "guarded";
+type Mode = "open" | "sign-in" | "key" | "guarded" | "html-login" | "html-direct";
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -59,6 +61,26 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
           token_endpoint: `${origin}/token`,
           response_types_supported: ["code"],
         });
+      }
+      if (mode === "html-login") {
+        const address = server.address();
+        if (address === null || typeof address !== "object") return json(response, 500, { error: "no address" });
+        if (path === "/login") {
+          response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+          response.end("<!doctype html><title>login</title>");
+          return;
+        }
+        const authorization = request.headers.authorization ?? "";
+        if (path === "/mcp" && !authorization.startsWith("Bearer ")) {
+          response.writeHead(302, { location: `http://127.0.0.1:${address.port}/login` });
+          response.end();
+          return;
+        }
+      }
+      if (mode === "html-direct" && path === "/mcp") {
+        response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        response.end("<!doctype html><title>login</title>");
+        return;
       }
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
       if (mode === "sign-in")
@@ -153,6 +175,8 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
   guarded: await mcpServer("guarded"),
+  "html-login": await mcpServer("html-login"),
+  "html-direct": await mcpServer("html-direct"),
 };
 const calls: Call[] = [];
 let refreshes = 0;
@@ -285,6 +309,40 @@ try {
   assert.equal(guarded.result.status, "needs_key");
   assert.equal(guarded.signInCards.length, 0);
   assert.ok(row("billing"), "a server that wants its key on every path is saved for the user to add it");
+
+  const htmlLogin = await call("add a server that returns a login page", "save_mcp_server", {
+    name: "coolify",
+    url: servers["html-login"].url,
+  });
+  assert.equal(htmlLogin.result.status, "needs_key");
+  assert.equal(htmlLogin.signInCards.length, 0);
+  assert.equal(htmlLogin.result.error, sourceText("error.backend.mcpHtmlLogin"));
+  assert.ok(row("coolify"), "a server that returns a login page is saved for the user to add a token");
+
+  const coolify = row("coolify");
+  assert.ok(coolify);
+  store.save({ ...coolify, headers: [{ key: "Authorization", value: "Basic e2e" }] });
+  const rejected = await call("a non-bearer header still gets the login page", "test_mcp_server", { name: "coolify" });
+  assert.equal(rejected.result.status, "needs_key");
+  assert.equal(rejected.signInCards.length, 0);
+  assert.equal(rejected.result.error, sourceText("error.backend.mcpHtmlLoginRejected"));
+
+  store.save({ ...coolify, headers: [{ key: "Authorization", value: `Bearer ${HTML_LOGIN_TOKEN}` }] });
+  const accepted = await call("a bearer header reaches the login server", "test_mcp_server", { name: "coolify" });
+  assert.equal(accepted.result.status, "ready");
+  assert.deepEqual(accepted.result.tools, ["search", "read_page", "create_page"]);
+
+  const htmlDirect = await call("a page answers with HTML and no redirect", "save_mcp_server", {
+    name: "html-direct",
+    url: servers["html-direct"].url,
+  });
+  assert.equal(htmlDirect.success, false);
+  assert.equal(htmlDirect.signInCards.length, 0);
+  assert.ok(
+    String(htmlDirect.result.error).includes(sourceText("error.backend.mcpServerIncompatible")),
+    "the 200 HTML page keeps the not-an-MCP-server answer",
+  );
+  assert.equal(row("html-direct"), undefined, "a page that is not an MCP server is not saved");
 
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
@@ -618,6 +676,7 @@ process.stdin.on("data", (chunk) => {
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));
   assert.ok(!everything.includes(URL_SECRET), "the address query reached the agent");
   assert.ok(!everything.includes(HEADER_SECRET), "a header value reached the agent");
+  assert.ok(!everything.includes(HTML_LOGIN_TOKEN), "a bearer token reached the agent");
   report.passed = true;
 } catch (error) {
   report.failures.push(error instanceof Error ? (error.stack ?? error.message) : String(error));
@@ -625,9 +684,9 @@ process.stdin.on("data", (chunk) => {
   report.refreshes = refreshes;
   await Promise.all(Object.values(servers).map((server) => server.close()));
   database.close();
-  await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  await rm(root, { recursive: true, force: true }).catch(() => undefined);
 }
 
 process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${calls.length} calls. Report: ${join(OUT, "report.json")}\n`);

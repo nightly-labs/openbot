@@ -179,6 +179,7 @@ interface McpChallenge {
   resourceMetadata: boolean;
   keyOnly?: boolean;
   insufficientScope?: boolean;
+  html: boolean;
   url: string;
 }
 
@@ -275,6 +276,10 @@ function describeProbeFailure(
     return sourceText("error.backend.mcpSignInNotAccepted");
   if (challenge?.status === 401 && challenge.bearer && (challenge.keyOnly || authorizationWithoutScheme(config)))
     return BEARER_KEY;
+  if (challenge?.html)
+    return hasCredentialHeader(config)
+      ? sourceText("error.backend.mcpHtmlLoginRejected")
+      : sourceText("error.backend.mcpHtmlLogin");
   if (challenge?.bearer && !hasCredentialHeader(config)) {
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
     if (described) return described;
@@ -309,6 +314,7 @@ function httpsAddress(finalUrl: string, url: string): string {
 }
 
 function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): McpProbeNeed | null {
+  if (challenge?.html) return "key";
   if (!challenge || !isAccessRefusal(challenge.status)) return null;
   if (!challenge.bearer || challenge.keyOnly || hasCredentialHeader(config)) return "key";
   return normalizeResource(config.url) ? "sign_in" : null;
@@ -522,20 +528,48 @@ function createTransport(
   });
 }
 
+function htmlMediaType(header: string | null): boolean {
+  const media = (header ?? "").split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return media === "text/html" || media === "application/xhtml+xml";
+}
+
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
+
+function sameOrigin(url: string, finalUrl: string): boolean {
+  try {
+    return new URL(finalUrl).origin === new URL(url).origin;
+  } catch {
+    return false;
+  }
+}
+
 function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void): FetchLike {
   return async (input, init) => {
     const response = await fetch(input, init);
-    if (response.status === 401 || response.status === 403) {
+    let status = response.status;
+    let url = response.url || input.toString();
+    let html =
+      response.redirected && sameOrigin(input.toString(), url) && htmlMediaType(response.headers.get("content-type"));
+    if (!html && REDIRECT_STATUS.has(response.status)) {
+      const login = await loginPage(response, url, init?.signal);
+      if (login) {
+        html = true;
+        status = login.status;
+        url = login.url;
+      }
+    }
+    if (response.status === 401 || response.status === 403 || html) {
       const challenge = response.headers.get("www-authenticate") ?? "";
       const bearer = /(?:^|,)\s*bearer\b/iu.test(challenge);
       const insufficientScope =
         response.status === 403 && bearer && /\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge);
       onChallenge({
-        status: response.status,
+        status,
         bearer: (response.status === 401 && bearer) || insufficientScope,
         insufficientScope,
         resourceMetadata: /\bresource_metadata\s*=/iu.test(challenge),
-        url: response.url || input.toString(),
+        html,
+        url,
       });
     }
     return response;
@@ -548,6 +582,32 @@ function signInMetadata(url: string): string[] {
   const path = new URL(url).pathname.replace(/\/+$/u, "");
   const resource = path ? [`/.well-known/oauth-protected-resource${path}`] : [];
   return [...resource, ...ORIGIN_METADATA, "/.well-known/openid-configuration"];
+}
+
+async function loginPage(
+  response: Response,
+  url: string,
+  signal: AbortSignal | null | undefined,
+): Promise<{ status: number; url: string } | null> {
+  const location = response.headers.get("location");
+  if (!location) return null;
+  let next: URL;
+  try {
+    next = new URL(location, url);
+  } catch {
+    return null;
+  }
+  if (next.origin !== new URL(url).origin) return null;
+  try {
+    const followed = await fetch(next, { method: "GET", redirect: "manual", ...(signal ? { signal } : {}) });
+    const stayed = !followed.url || new URL(followed.url).origin === next.origin;
+    const html = stayed && !REDIRECT_STATUS.has(followed.status) && htmlMediaType(followed.headers.get("content-type"));
+    const found = html ? { status: followed.status, url: followed.url || next.toString() } : null;
+    await followed.body?.cancel();
+    return found;
+  } catch {
+    return null;
+  }
 }
 
 const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number, paths: readonly string[]) {
