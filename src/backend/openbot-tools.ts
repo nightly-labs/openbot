@@ -638,19 +638,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: START_TASK_TOOL,
     description:
-      "Start a task: a separate conversation of yours that runs beside this chat, at the same time, with its own context. Use it for each independent part of a request that takes more than a few steps. The brief is the task's first message: write everything the task needs, because it does not see this chat, and say which result to give. When the task's turn ends, OpenBot sends its final answer to this chat as a task report. Only your own chat can start a task.",
+      "Start a task: a separate conversation of yours that runs beside this chat, at the same time, with its own context. The brief is its first message: write everything it needs, because it does not see this chat. Its final answer comes back to this chat as a task report. Only your own chat can start a task.",
     shape: startTaskToolSchema.shape,
   },
   {
     name: MESSAGE_TASK_TOOL,
     description:
-      "Send a follow-up to a task that you started: more work, a correction, or a question about its result. It runs after the task's current turn, and its answer comes back as a task report. An archived task opens again.",
+      "Send a follow-up to a task that you started. It runs after the task's current turn, and its answer comes back as a task report. An archived task opens again.",
     shape: messageTaskToolSchema.shape,
   },
   {
     name: CLOSE_TASK_TOOL,
-    description:
-      "Stop a task that you started and archive it. Use it when its work is no longer needed or the user asks. The user can still read an archived task.",
+    description: "Stop a task that you started and archive it. The user can still read it.",
     shape: closeTaskToolSchema.shape,
   },
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
