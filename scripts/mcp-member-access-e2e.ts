@@ -12,22 +12,27 @@ import {
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol";
 import {
-  TEAM_APP_VERSION_HEADER,
-  TEAM_CAPABILITIES_HEADER,
-  TEAM_PROTOCOL_VERSION_HEADER,
-} from "@openbot/contracts/team-protocol";
-import { MCP_MEMBER_ACCESS_CAPABILITY, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+  MCP_MEMBER_ACCESS_CAPABILITY,
+  teamCapabilitiesForProtocol,
+  teamCapabilityHeaders,
+} from "@openbot/contracts/team-protocol/current";
 import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-sign-in-relay-v2";
 import {
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_ROUTES,
 } from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { plugin } from "bun";
 import { Effect } from "effect";
@@ -197,7 +202,11 @@ const relay: TeamApiSignInRelay = {
       );
       return { flowId: `flow-${memberId}`, expiresAt: Date.now() + 60_000 };
     }),
-  startProvider: unused,
+  startProvider: (memberId, provider) =>
+    Effect.sync(() => {
+      calls.push(`relay-provider ${provider}`);
+      return { flowId: `flow-${memberId}`, expiresAt: Date.now() + 60_000 };
+    }),
   startProviderAccount: unused,
   startLink: () => assert.fail("Not used by this check."),
   status: () => assert.fail("Not used by this check."),
@@ -283,13 +292,13 @@ const RELEASED = CURRENT.filter(
 async function call(
   method: string,
   path: string,
-  input: { token?: string; body?: unknown; capabilities?: readonly string[] } = {},
+  input: { token?: string; body?: unknown; capabilities?: readonly string[]; protocol?: number } = {},
 ): Promise<{ status: number; body: unknown }> {
   const headers: Record<string, string> = {
     Accept: "application/json",
-    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V9),
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(input.protocol ?? TEAM_PROTOCOL_V9),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? CURRENT).join(","),
+    ...teamCapabilityHeaders(input.protocol ?? TEAM_PROTOCOL_V9, input.capabilities ?? CURRENT),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -505,6 +514,32 @@ try {
     });
     refused(provider, ADMIN_REQUIRED, "provider");
     return { provider: provider.status };
+  });
+
+  await step("Devin's sign-in is relayed only on the provider-sign-in-relay-v2 route", async () => {
+    calls.length = 0;
+    const devin = { provider: "devin" };
+    const v10 = { protocol: TEAM_PROTOCOL_V10, capabilities: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10) };
+    const route = PROVIDER_SIGN_IN_RELAY_V2_ROUTES.start;
+    const member = await call("POST", route, { ...v10, token: memberToken, body: devin });
+    refused(member, ADMIN_REQUIRED, "member Devin relay");
+    const v1 = await call("POST", SIGN_IN_RELAY_ROUTES.providerStart, { ...v10, token: ownerToken, body: devin });
+    assert.equal(v1.status, 400, `The v1 route took Devin: ${v1.status}.`);
+    const older = await call("POST", route, {
+      ...v10,
+      token: ownerToken,
+      body: devin,
+      capabilities: v10.capabilities.filter((capability) => capability !== PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY),
+    });
+    assert.equal(older.status, 400, `A client without the capability got ${older.status}.`);
+    const v9 = await call("POST", route, { token: ownerToken, body: devin });
+    assert.equal(v9.status, 400, `A protocol 9 client got ${v9.status}.`);
+    assert.deepEqual(calls, [], "A refused call reached the relay.");
+    const owner = await call("POST", route, { ...v10, token: ownerToken, body: devin });
+    assert.equal(owner.status, 200, `The owner's Devin relay returned ${owner.status}: ${JSON.stringify(owner.body)}.`);
+    assert.deepEqual(calls, ["relay-provider devin"], "The host did not start Devin's sign-in.");
+    calls.length = 0;
+    return { member: member.status, v1: v1.status, older: older.status, v9: v9.status, owner: owner.status };
   });
 
   await step("who added each server stays after a restart; the owner still changes any row", async () => {

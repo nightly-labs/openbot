@@ -134,6 +134,7 @@ import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDERS_ADMIN_CAPABILITY,
@@ -294,6 +295,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Scope } from "effect";
 import type * as Ws from "ws";
+import { devinSignInPageRelayed } from "../backend/acp-sign-in";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { AgentDuplicationFailed, duplicateAgentIntoLayout } from "../backend/agent/duplication-gate";
 import { AgentMemorySelectionError } from "../backend/agent-memory-store";
@@ -2614,6 +2616,12 @@ export class TeamApiServer {
           return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
         if (capability === SIGN_IN_RELAY_CAPABILITY || capability === SIGN_IN_RELAY_DEEP_LINK_CAPABILITY)
           return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
+        if (capability === PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY)
+          return (
+            this.#options.mcpServers !== undefined &&
+            this.#options.signInRelay !== undefined &&
+            devinSignInPageRelayed()
+          );
         if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
           return (
             this.#options.mcpServers !== undefined &&
