@@ -386,6 +386,7 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   authRequiredSignsOut: true,
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpToolsFixedAtStart: true,
+  turnStallMs: 12 * 60_000,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
