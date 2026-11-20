@@ -1,10 +1,19 @@
-import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { AgentProvider } from "../agent-client";
 import { providerLabel } from "./thread-items";
 
 const PROVIDER_REASON_LIMIT = 300;
+
+const PROVIDER_ONLY_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "billing",
+  "usage_limit",
+  "permission",
+  "content_blocked",
+  "context_too_long",
+  "invalid_request",
+]);
 
 export function workflowGenerationError(
   cause: unknown,
@@ -18,8 +27,10 @@ export function workflowGenerationError(
   )
     return failure.message;
   const providerCause = failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown";
-  const reason = providerReason(failure, redact);
-  const found: CauseCode = providerCause === "unknown" ? classifyFailure(failure) : providerCause;
+  const ownCause = classifyFailure(failure);
+  const found: CauseCode =
+    providerCause !== "unknown" ? providerCause : PROVIDER_ONLY_CAUSES.has(ownCause) ? "unknown" : ownCause;
+  const reason = failure?.message === sourceText("error.agent.profileFailed") ? providerReason(failure, redact) : null;
   switch (found) {
     case "authentication":
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
@@ -70,13 +81,13 @@ export function workflowGenerationError(
   return reason ? sourceText("error.workflow.providerRefused", { reason }) : sourceText("error.workflow.modelFailed");
 }
 
-function providerReason(failure: Error | null, redact: (text: string) => string): string | null {
-  const said = failure?.cause instanceof Error ? failure.cause.message : "";
+function providerReason(failure: Error, redact: (text: string) => string): string | null {
+  const said = failure.cause instanceof Error ? failure.cause.message : "";
   const text = redact(said)
     .replace(/\s+/gu, " ")
     .trim()
     .replace(/^(?:[A-Za-z]*Error:\s*)+/u, "");
-  if (!text || matchingSourceKeys(text).length > 0) return null;
+  if (!text || isFixedSourceText(text)) return null;
   const characters = Array.from(text);
   return characters.length > PROVIDER_REASON_LIMIT
     ? `${characters.slice(0, PROVIDER_REASON_LIMIT - 1).join("")}…`
