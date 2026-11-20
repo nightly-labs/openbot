@@ -24,6 +24,8 @@ EXCLUDED=(
   "--exclude=./home/$SERVICE_USER/.boatignore"
   "--exclude=./home/$SERVICE_USER/.Xauthority*"
   "--exclude=./home/$SERVICE_USER/.npm/_cacache"
+  "--exclude=./home/$SERVICE_USER/.npm/_npx"
+  "--exclude=./home/$SERVICE_USER/.cache"
 )
 BROWSER_HOMES=".config/chromium .config/google-chrome .config/BraveSoftware/Brave-Browser"
 BROWSER_CACHES=("Cache" "Code Cache" "GPUCache" "GrShaderCache" "ShaderCache" "DawnCache" "DawnGraphiteCache"
@@ -32,6 +34,10 @@ for browser in $BROWSER_HOMES; do
   for cache in "${BROWSER_CACHES[@]}"; do
     EXCLUDED+=("--exclude=./home/$SERVICE_USER/$browser/*/$cache")
   done
+done
+for cache in "${BROWSER_CACHES[@]}"; do
+  EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/$cache"
+    "--exclude=./home/$SERVICE_USER/.config/OpenBot/Partitions/*/$cache")
 done
 unset browser cache
 BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b09885d2
