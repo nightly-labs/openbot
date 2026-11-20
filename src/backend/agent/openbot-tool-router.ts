@@ -2197,6 +2197,7 @@ export class OpenBotToolRouter {
         senderAgentId,
         `${params.threadId}:${params.turnId}:${params.callId}`,
         new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+        this.#routines.turnSenderTimezone(senderAgentId, params.turnId),
         (title) =>
           this.#attention
             .awaitToolApproval(
