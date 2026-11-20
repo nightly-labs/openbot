@@ -385,11 +385,14 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
   };
 }
 
-export function detachedPromptResult(): DynamicToolResult {
-  const value = {
-    status: "waiting",
-    next: "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.",
-  };
+const DETACHED_PROMPT_NOTE =
+  "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.";
+
+export function detachedPromptResult(
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
+): DynamicToolResult | { answers: Record<string, never>; note: string } {
+  if (responseKind === "user-input") return { answers: {}, note: DETACHED_PROMPT_NOTE };
+  const value = { status: "waiting", next: DETACHED_PROMPT_NOTE };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 

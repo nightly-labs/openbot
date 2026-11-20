@@ -51,6 +51,10 @@ class RecordingClient extends CodexAppServerClient {
 }
 
 const client = new RecordingClient("/nonexistent/codex");
+
+class NoteClient extends RecordingClient {
+  readonly userInputNote = true;
+}
 const snapshot: ConversationSnapshot = {
   agentId: AGENT,
   threadId: THREAD,
@@ -565,6 +569,44 @@ try {
     assert.equal(routine.runtimeAttention().pendingPrompts.length, 0, "the question card stayed open");
     assert.equal(routine.hasAttentionForTurn(THREAD, "turn-limit-8"), false, "the turn still waits");
     return answer;
+  });
+
+  await step("a question of a client with answer notes detaches at the limit and gets the answer late", async () => {
+    const noteClient = new NoteClient("/nonexistent/claude");
+    const id = nextRequest++;
+    limited.surfacePrompt(noteClient, {
+      id,
+      method: "item/tool/requestUserInput",
+      params: {
+        threadId: THREAD,
+        turnId: "turn-limit-10",
+        questions: [
+          {
+            id: "color",
+            header: "Color",
+            question: "Which color?",
+            options: [
+              { label: "Red", description: "Choose red" },
+              { label: "Blue", description: "Choose blue" },
+            ],
+          },
+        ],
+      },
+    });
+    const result: { answers?: Record<string, string[]>; note?: string } = JSON.parse(
+      JSON.stringify(await noteClient.answered(id)),
+    );
+    assert.deepEqual(result.answers, {});
+    assert.match(result.note ?? "", /answer arrives as the user's next message/);
+    assert.equal(limited.runtimeAttention().pendingPrompts[0]?.detached, true, "the card closed at the limit");
+    assert.equal(limited.hasAttentionForTurn(THREAD, "turn-limit-10"), false, "the turn still waits");
+    limited.clearForTurn(THREAD, "turn-limit-10", true);
+    const late = releasedAnswers.length;
+    await runCauseEffect(limited.respondToPrompt({ requestId: id, answers: { color: ["Blue"] } }));
+    assert.equal(releasedAnswers.length, late + 1, "the late answer did not reach the agent once");
+    assert.match(releasedAnswers.at(-1) ?? "", /Blue/);
+    assert.equal(noteClient.answers.size, 1, "the provider got a second answer");
+    return { note: result.note, lateAnswer: releasedAnswers.at(-1) };
   });
 
   await step("a secret question expires at the limit", async () => {

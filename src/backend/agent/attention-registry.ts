@@ -586,7 +586,9 @@ export class AttentionRegistry {
     return (
       [...this.#prompts.values()].some(
         (pending) =>
-          getString(pending.params, "threadId") === threadId && getString(pending.params, "turnId") === turnId,
+          !pending.detached &&
+          getString(pending.params, "threadId") === threadId &&
+          getString(pending.params, "turnId") === turnId,
       ) ||
       [...this.#approvals.values()].some(
         (pending) =>
@@ -1901,7 +1903,7 @@ export class AttentionRegistry {
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     this.#expireDetachedInChat(agentId, publicThreadId);
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "user-input",
@@ -1911,7 +1913,9 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    });
+    };
+    if (client.userInputNote) this.#limitQuestion(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -2164,7 +2168,7 @@ export class AttentionRegistry {
     this.#routines.markRunningForTurn(pending.turnId);
     if (pending.client.running) {
       try {
-        pending.client.respond(pending.id, detachedPromptResult());
+        pending.client.respond(pending.id, detachedPromptResult(pending.responseKind));
       } catch (error) {
         logger.warn("Unable to answer a detached prompt", { error: toLogValue(error) });
       }
