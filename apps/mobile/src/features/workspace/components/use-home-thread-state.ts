@@ -2,7 +2,6 @@ import type { AgentTasksSnapshot } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useAgentThreadUnreadCounts } from "@/features/chat/components/use-agent-thread-reads";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -13,15 +12,13 @@ function isOnline(servers: readonly { id: string; state: string }[], serverId: s
   return servers.some((server) => server.id === serverId && server.state === "online");
 }
 
-export function useHomeThreadState(serverId: string, agentIds: readonly string[]): void {
+export function useHomeThreadState(serverId: string, _agentIds: readonly string[]): void {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const workspace = useMobileWorkspaceReader();
   const tasksEnabled = useMobileWorkspaceSelector(
     (current) => isOnline(current.servers, serverId) && current.canUseTasks(serverId),
   );
-
-  useAgentThreadUnreadCounts(serverId, agentIds);
 
   useEffect(() => {
     if (!tasksEnabled) return;

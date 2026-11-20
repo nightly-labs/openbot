@@ -27,6 +27,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
+import type { HomeListAgentLiveSlice } from "@/features/agents/components/home-list-live-snapshot";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import {
   agentListWaitReason,
@@ -35,6 +36,7 @@ import {
   useAgentListUnreadThreads,
 } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
+import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -103,9 +105,23 @@ interface AgentListRowProps {
   agent: MobileAgent;
   leftInset?: number;
   rightInset?: number;
+  liveSlice?: HomeListAgentLiveSlice;
 }
 
-export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
+type AgentListRowBodyProps = Omit<AgentListRowProps, "liveSlice"> & {
+  activity: MobileAgentActivity | undefined;
+  unreadCount: number;
+  unreadThreads: boolean;
+};
+
+const AgentListRowBody = memo(function AgentListRowBody({
+  agent,
+  leftInset = 20,
+  rightInset = 20,
+  activity,
+  unreadCount,
+  unreadThreads,
+}: AgentListRowBodyProps) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
   const pinBlocked = useMobileWorkspaceSelector(
@@ -121,14 +137,12 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
-  const activity = useAgentListActivity(agent.id);
   const waitingChannel = useWaitingChannel(activity, agent.serverId);
   const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
+
   const previewLine = waitingChannel
     ? t("mobile.chat.channelWork.waiting", { channel: waitingChannel.name })
     : lastMessage;
-  const unreadCount = useAgentListUnreadCount(agent.id);
-  const unreadThreads = useAgentListUnreadThreads(agent.id);
   const waitReason = agentListWaitReason(activity);
   const isUnpinTarget = transition?.chatId === agent.id && transition.target === "row";
   const bloub = (
@@ -244,4 +258,25 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       )}
     </AgentPinSwipeRow>
   );
+});
+
+function AgentListRowWithHooks(props: Omit<AgentListRowProps, "liveSlice">) {
+  const activity = useAgentListActivity(props.agent.id);
+  const unreadCount = useAgentListUnreadCount(props.agent.id);
+  const unreadThreads = useAgentListUnreadThreads(props.agent.id);
+  return <AgentListRowBody {...props} activity={activity} unreadCount={unreadCount} unreadThreads={unreadThreads} />;
+}
+
+export const AgentListRow = memo(function AgentListRow({ liveSlice, ...props }: AgentListRowProps) {
+  if (liveSlice) {
+    return (
+      <AgentListRowBody
+        {...props}
+        activity={liveSlice.activity}
+        unreadCount={liveSlice.unreadCount}
+        unreadThreads={liveSlice.threadUnread}
+      />
+    );
+  }
+  return <AgentListRowWithHooks {...props} />;
 });

@@ -49,6 +49,11 @@ import {
   HomeCardTop,
   useHomeCard,
 } from "@/features/agents/components/home-backdrop-card";
+import {
+  HomeListLiveSnapshotProvider,
+  HomeThreadReadsPrefetch,
+  useHomeListAgentSlice,
+} from "@/features/agents/components/home-list-live-snapshot";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -199,6 +204,19 @@ function CollapsingRow({ collapsed, children }: { collapsed: boolean; children: 
   );
 }
 
+const HomeAgentListRow = memo(function HomeAgentListRow({
+  agent,
+  leftInset,
+  rightInset,
+}: {
+  agent: MobileAgent;
+  leftInset: number;
+  rightInset: number;
+}) {
+  const liveSlice = useHomeListAgentSlice(agent.id);
+  return <AgentListRow agent={agent} leftInset={leftInset} rightInset={rightInset} liveSlice={liveSlice} />;
+});
+
 const TransitioningChatRow = memo(function TransitioningChatRow({
   agent,
   channel,
@@ -220,7 +238,7 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
       <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
         <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
           {agent ? (
-            <AgentListRow agent={agent} leftInset={15} rightInset={24} />
+            <HomeAgentListRow agent={agent} leftInset={15} rightInset={24} />
           ) : channel && serverId && channelAgents ? (
             <ChannelListRow
               channel={channel}
@@ -426,6 +444,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   }, [agents, activeServer.id, unreadAgentIds, channels.channels]);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const activeServerOnline = showsOnline(activeServer);
+  const homeThreadReadsEnabled = useMobileWorkspaceSelector(
+    (current) =>
+      current.servers.some((server) => server.id === activeServer.id && server.state === "online") &&
+      current.canReadThreads(activeServer.id),
+  );
   const canMarkAllRead = hasUnread && !markingAllRead && activeServerOnline;
   const markAllChatsRead = () => {
     if (!canMarkAllRead) return;
@@ -897,162 +920,170 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               afterWelcome={welcomeHandOff}
             />
           ) : listReady ? (
-            <ChatDragProvider screen={dragScreen}>
-              <Animated.FlatList
-                key={activeServer.id}
-                ref={listRef}
-                scrollEnabled={!dragging}
-                onLayout={(event) => {
-                  dragScroll.current.viewport = event.nativeEvent.layout.height;
-                  listReveal.onLayout();
-                }}
-                onContentSizeChange={(_width, height) => {
-                  dragScroll.current.content = height;
-                }}
-                itemLayoutAnimation={
-                  listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined
-                }
-                skipEnteringExitingAnimations
-                removeClippedSubviews={false}
-                className={homeCard ? "flex-1" : "flex-1 bg-background"}
-                style={{ marginLeft: insets.left, marginRight: insets.right }}
-                alwaysBounceVertical={false}
-                contentContainerClassName={items.length > 0 ? undefined : "grow"}
-                contentContainerStyle={{
-                  paddingTop: scroll.ownsInset ? headerHeight : 0,
-                  paddingBottom: insets.bottom + HOME_SEARCH_HEIGHT + 24,
-                }}
-                scrollEventThrottle={16}
-                onScroll={scroll.onScroll}
-                contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-                data={items}
-                keyExtractor={listItemKey}
-                renderItem={renderItem}
-                initialNumToRender={LIST_BATCH}
-                maxToRenderPerBatch={LIST_BATCH}
-                windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
-                ListHeaderComponent={
-                  <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
-                    <AgentListRowReveal index={0} reveal={listReveal}>
-                      {hasSelectedServer ? (
-                        <LargeTitle
-                          scroll={scroll}
-                          title={activeServer.name}
-                          above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
-                          accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
-                          onPress={openDrawer}
-                        />
-                      ) : null}
-                      {sidebar?.error ? (
-                        <View className="gap-2 px-4">
-                          <Typography.Paragraph className="text-danger-text">
-                            {sourceText(sidebar.error)}
-                          </Typography.Paragraph>
-                          <Button
-                            variant="secondary"
-                            onPress={() =>
-                              void workspace()
-                                .refreshServer(activeServer.id)
-                                .catch(() => undefined)
-                            }
-                          >
-                            <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
-                          </Button>
-                        </View>
-                      ) : null}
-                    </AgentListRowReveal>
-                    <PinnedAgentsGrid
-                      agents={pinnedAgents}
-                      animateLayout={!updateHeader.moving}
-                      dropZone={dragging && !hasPins}
-                      reveal={listReveal}
-                      revealOffset={1}
-                    >
-                      {pinnedChannels.length > 0
-                        ? pinnedChannels.map((channel) => (
-                            <ChannelListRow
-                              key={channel.id}
-                              channel={channel}
-                              serverId={activeServer.id}
-                              agents={channelAgents}
-                              pinned
-                            />
-                          ))
-                        : null}
-                    </PinnedAgentsGrid>
-                    <HomeCardTop
-                      card={homeCard}
-                      background={cardBackground}
-                      serverId={activeServer.id}
-                      cardServer={cardServer}
-                      settled={listReveal.finished}
-                    />
-                  </View>
-                }
-                ListEmptyComponent={
-                  serverDirectoryState === "error" && servers.length === 0 ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <View className="size-16 items-center justify-center rounded-3xl bg-control">
-                        <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
-                      </View>
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.serversFailed")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {serverDirectoryError
-                            ? sourceText(serverDirectoryError)
-                            : t("mobile.agent.home.serversFailedBody")}
-                        </Typography.Paragraph>
-                      </View>
-                      <Button
-                        size="md"
-                        variant="secondary"
-                        onPress={() =>
-                          void workspace()
-                            .refreshServers()
-                            .catch(() => undefined)
-                        }
+            <HomeListLiveSnapshotProvider
+              serverId={activeServer.id}
+              online={activeServerOnline}
+              agentIds={activeAgentIds}
+              threadReadsEnabled={homeThreadReadsEnabled}
+            >
+              <HomeThreadReadsPrefetch serverId={activeServer.id} agentIds={activeAgentIds} />
+              <ChatDragProvider screen={dragScreen}>
+                <Animated.FlatList
+                  key={activeServer.id}
+                  ref={listRef}
+                  scrollEnabled={!dragging}
+                  onLayout={(event) => {
+                    dragScroll.current.viewport = event.nativeEvent.layout.height;
+                    listReveal.onLayout();
+                  }}
+                  onContentSizeChange={(_width, height) => {
+                    dragScroll.current.content = height;
+                  }}
+                  itemLayoutAnimation={
+                    listReveal.finished && sidebar?.layout !== collapseLayout ? LIST_REFLOW : undefined
+                  }
+                  skipEnteringExitingAnimations
+                  removeClippedSubviews={false}
+                  className={homeCard ? "flex-1" : "flex-1 bg-background"}
+                  style={{ marginLeft: insets.left, marginRight: insets.right }}
+                  alwaysBounceVertical={false}
+                  contentContainerClassName={items.length > 0 ? undefined : "grow"}
+                  contentContainerStyle={{
+                    paddingTop: scroll.ownsInset ? headerHeight : 0,
+                    paddingBottom: insets.bottom + HOME_SEARCH_HEIGHT + 24,
+                  }}
+                  scrollEventThrottle={16}
+                  onScroll={scroll.onScroll}
+                  contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
+                  data={items}
+                  keyExtractor={listItemKey}
+                  renderItem={renderItem}
+                  initialNumToRender={LIST_BATCH}
+                  maxToRenderPerBatch={LIST_BATCH}
+                  windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
+                  ListHeaderComponent={
+                    <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
+                      <AgentListRowReveal index={0} reveal={listReveal}>
+                        {hasSelectedServer ? (
+                          <LargeTitle
+                            scroll={scroll}
+                            title={activeServer.name}
+                            above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
+                            accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
+                            onPress={openDrawer}
+                          />
+                        ) : null}
+                        {sidebar?.error ? (
+                          <View className="gap-2 px-4">
+                            <Typography.Paragraph className="text-danger-text">
+                              {sourceText(sidebar.error)}
+                            </Typography.Paragraph>
+                            <Button
+                              variant="secondary"
+                              onPress={() =>
+                                void workspace()
+                                  .refreshServer(activeServer.id)
+                                  .catch(() => undefined)
+                              }
+                            >
+                              <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
+                            </Button>
+                          </View>
+                        ) : null}
+                      </AgentListRowReveal>
+                      <PinnedAgentsGrid
+                        agents={pinnedAgents}
+                        animateLayout={!updateHeader.moving}
+                        dropZone={dragging && !hasPins}
+                        reveal={listReveal}
+                        revealOffset={1}
                       >
-                        <Button.Label>{t("common.tryAgain")}</Button.Label>
-                      </Button>
+                        {pinnedChannels.length > 0
+                          ? pinnedChannels.map((channel) => (
+                              <ChannelListRow
+                                key={channel.id}
+                                channel={channel}
+                                serverId={activeServer.id}
+                                agents={channelAgents}
+                                pinned
+                              />
+                            ))
+                          : null}
+                      </PinnedAgentsGrid>
+                      <HomeCardTop
+                        card={homeCard}
+                        background={cardBackground}
+                        serverId={activeServer.id}
+                        cardServer={cardServer}
+                        settled={listReveal.finished}
+                      />
                     </View>
-                  ) : servers.length === 0 ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <View className="size-16 items-center justify-center rounded-3xl bg-control">
-                        <Layers3 color={mutedColor} size={28} strokeWidth={1.6} />
+                  }
+                  ListEmptyComponent={
+                    serverDirectoryState === "error" && servers.length === 0 ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <View className="size-16 items-center justify-center rounded-3xl bg-control">
+                          <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
+                        </View>
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.serversFailed")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {serverDirectoryError
+                              ? sourceText(serverDirectoryError)
+                              : t("mobile.agent.home.serversFailedBody")}
+                          </Typography.Paragraph>
+                        </View>
+                        <Button
+                          size="md"
+                          variant="secondary"
+                          onPress={() =>
+                            void workspace()
+                              .refreshServers()
+                              .catch(() => undefined)
+                          }
+                        >
+                          <Button.Label>{t("common.tryAgain")}</Button.Label>
+                        </Button>
                       </View>
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.noServers")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {t("mobile.agent.home.noServersBody")}
-                        </Typography.Paragraph>
+                    ) : servers.length === 0 ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <View className="size-16 items-center justify-center rounded-3xl bg-control">
+                          <Layers3 color={mutedColor} size={28} strokeWidth={1.6} />
+                        </View>
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.noServers")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {t("mobile.agent.home.noServersBody")}
+                          </Typography.Paragraph>
+                        </View>
+                        <Button size="md" variant="secondary" onPress={openDrawer}>
+                          <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
+                        </Button>
                       </View>
-                      <Button size="md" variant="secondary" onPress={openDrawer}>
-                        <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
-                      </Button>
-                    </View>
-                  ) : !hasSelectedServer ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <Typography.Heading type="h4">{t("mobile.agent.home.chooseServer")}</Typography.Heading>
-                      <Button size="md" variant="secondary" onPress={openDrawer}>
-                        <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
-                      </Button>
-                    </View>
-                  ) : activeAgents.length === 0 && !activeServerOnline ? (
-                    <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
-                      <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
-                      <View className="items-center gap-1.5">
-                        <Typography.Heading type="h4">{t("mobile.agent.home.waiting")}</Typography.Heading>
-                        <Typography.Paragraph align="center" className="text-text-secondary">
-                          {t("mobile.agent.home.waitingBody")}
-                        </Typography.Paragraph>
+                    ) : !hasSelectedServer ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <Typography.Heading type="h4">{t("mobile.agent.home.chooseServer")}</Typography.Heading>
+                        <Button size="md" variant="secondary" onPress={openDrawer}>
+                          <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
+                        </Button>
                       </View>
-                    </View>
-                  ) : activeAgents.length === 0 ? (
-                    <EmptyAgentsScene onAddAgent={addAgent} />
-                  ) : undefined
-                }
-              />
-            </ChatDragProvider>
+                    ) : activeAgents.length === 0 && !activeServerOnline ? (
+                      <View className="flex-1 items-center justify-center gap-5 px-8 py-16">
+                        <WifiOff color={mutedColor} size={28} strokeWidth={1.6} />
+                        <View className="items-center gap-1.5">
+                          <Typography.Heading type="h4">{t("mobile.agent.home.waiting")}</Typography.Heading>
+                          <Typography.Paragraph align="center" className="text-text-secondary">
+                            {t("mobile.agent.home.waitingBody")}
+                          </Typography.Paragraph>
+                        </View>
+                      </View>
+                    ) : activeAgents.length === 0 ? (
+                      <EmptyAgentsScene onAddAgent={addAgent} />
+                    ) : undefined
+                  }
+                />
+              </ChatDragProvider>
+            </HomeListLiveSnapshotProvider>
           ) : null}
         </HomeSearchList>
       </AndroidBlurTarget>
