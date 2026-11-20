@@ -989,6 +989,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               Effect.catch((failure) =>
                 Effect.sync(() => this.#emitError("delivery_reconcile_failed", failure.cause, agentId)),
               ),
+              Effect.andThen(
+                this.channels
+                  .settleAgentDeliveries(agentId)
+                  .pipe(
+                    Effect.catch((failure) =>
+                      Effect.sync(() => this.#emitError("delivery_reconcile_failed", failure.cause, agentId)),
+                    ),
+                  ),
+              ),
               Effect.ensuring(
                 Effect.sync(() => {
                   this.#drain.scheduleDrain(agentId);
