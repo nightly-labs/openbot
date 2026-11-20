@@ -1,6 +1,8 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, readdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -10,6 +12,9 @@ const logger = createOpenBotLogger("linux-desktop-entry");
 const DESKTOP_FILE_NAME = "openbot.desktop";
 const ICON_FILE_NAME = "openbot.png";
 const WM_CLASS = "openbot";
+const LAUNCHER_READ_CONCURRENCY = 16;
+const GSETTINGS_TIMEOUT_MS = 2_000;
+const execFileAsync = promisify(execFile);
 
 function linuxDesktopEntry(appImagePath: string, iconPath: string, ownsWindow: boolean): string {
   return `${[
@@ -43,24 +48,64 @@ function execProgram(exec: string): string {
   return exec.split(/\s/u)[0] ?? "";
 }
 
-function launchesAppImageWithOurWindow(entry: string, appImagePath: string): boolean {
+function programsOfVisibleLauncherWithOurWindow(entry: string): string[] {
   const keys = desktopEntryKeys(entry);
-  if (keys.get("StartupWMClass") !== WM_CLASS) return false;
-  if (keys.get("NoDisplay") === "true" || keys.get("Hidden") === "true") return false;
-  return keys.get("TryExec") === appImagePath || execProgram(keys.get("Exec") ?? "") === appImagePath;
+  if (keys.get("StartupWMClass") !== WM_CLASS) return [];
+  if (keys.get("NoDisplay") === "true" || keys.get("Hidden") === "true") return [];
+  return [keys.get("TryExec") ?? "", execProgram(keys.get("Exec") ?? "")].filter((program) => program !== "");
 }
 
-const otherLauncherOwnsWindow = Effect.fn("LinuxDesktopEntry.otherLauncherOwnsWindow")(function* (
+function resolvedPath(path: string): Effect.Effect<string> {
+  return desktopEntryIO(() => realpath(path)).pipe(Effect.catch(() => Effect.succeed(path)));
+}
+
+const otherLauncherStartsAppImage = Effect.fn("LinuxDesktopEntry.otherLauncherStartsAppImage")(function* (
   directory: string,
   appImagePath: string,
 ) {
   const names = yield* desktopEntryIO(() => readdir(directory)).pipe(Effect.catch(() => Effect.succeed<string[]>([])));
-  for (const name of names) {
-    if (!name.endsWith(".desktop") || name === DESKTOP_FILE_NAME) continue;
-    const entry = yield* readEntry(join(directory, name));
-    if (entry !== null && launchesAppImageWithOurWindow(entry, appImagePath)) return true;
-  }
-  return false;
+  const appImage = yield* resolvedPath(appImagePath);
+  const matches = yield* Effect.forEach(
+    names.filter((name) => name.endsWith(".desktop") && name !== DESKTOP_FILE_NAME),
+    (name) =>
+      Effect.gen(function* () {
+        const entry = yield* readEntry(join(directory, name));
+        for (const program of entry === null ? [] : programsOfVisibleLauncherWithOurWindow(entry)) {
+          if (program === appImagePath || (yield* resolvedPath(program)) === appImage) return true;
+        }
+        return false;
+      }),
+    { concurrency: LAUNCHER_READ_CONCURRENCY },
+  );
+  return matches.includes(true);
+});
+
+function runsGnomeShell(environment: NodeJS.ProcessEnv): boolean {
+  return (environment.XDG_CURRENT_DESKTOP ?? "").split(":").some((desktop) => desktop.trim().toUpperCase() === "GNOME");
+}
+
+const gnomeFavoritesLeaveOutOurLauncher = Effect.fn("LinuxDesktopEntry.gnomeFavoritesLeaveOutOurLauncher")(function* (
+  environment: NodeJS.ProcessEnv,
+) {
+  if (!runsGnomeShell(environment)) return false;
+  return yield* desktopEntryIO(() =>
+    execFileAsync("gsettings", ["get", "org.gnome.shell", "favorite-apps"], {
+      encoding: "utf8",
+      timeout: GSETTINGS_TIMEOUT_MS,
+    }),
+  ).pipe(
+    Effect.map(({ stdout }) => stdout.trim().startsWith("[") && !stdout.includes(`'${DESKTOP_FILE_NAME}'`)),
+    Effect.catch(() => Effect.succeed(false)),
+  );
+});
+
+const anotherLauncherShouldOwnWindow = Effect.fn("LinuxDesktopEntry.anotherLauncherShouldOwnWindow")(function* (
+  directory: string,
+  appImagePath: string,
+  environment: NodeJS.ProcessEnv,
+) {
+  if (!(yield* otherLauncherStartsAppImage(directory, appImagePath))) return false;
+  return yield* gnomeFavoritesLeaveOutOurLauncher(environment);
 });
 
 interface DesktopEntryOptions {
@@ -81,7 +126,7 @@ export const installLinuxDesktopEntry = Effect.fn("LinuxDesktopEntry.install")(f
   const directory = join(dataDirectory, "applications");
   const path = join(directory, DESKTOP_FILE_NAME);
   const iconPath = yield* installIcon(dataDirectory, options.iconPath);
-  const ownsWindow = !(yield* otherLauncherOwnsWindow(directory, appImagePath));
+  const ownsWindow = !(yield* anotherLauncherShouldOwnWindow(directory, appImagePath, options.environment));
   const entry = linuxDesktopEntry(appImagePath, iconPath, ownsWindow);
   const result = yield* Effect.result(
     Effect.gen(function* () {
@@ -91,7 +136,7 @@ export const installLinuxDesktopEntry = Effect.fn("LinuxDesktopEntry.install")(f
       logger.info(
         ownsWindow
           ? `Installed the desktop entry at ${path}.`
-          : `Installed a hidden desktop entry at ${path}, because another launcher starts this AppImage.`,
+          : `Installed a hidden desktop entry at ${path}, because another launcher starts this AppImage and the dock does not pin this entry.`,
       );
       return path;
     }),
