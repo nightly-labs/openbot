@@ -58,6 +58,7 @@ export class AgentInterruptTool {
     this: AgentInterruptTool,
     params: DynamicToolCallParams,
     callerAgentId: string,
+    requesterIds: readonly string[],
   ) {
     const { agentId, reason } = yield* toolStep(() => interruptAgentToolSchema.parse(params.arguments));
     if (agentId === callerAgentId) return openBotToolFailure(sourceText("error.backend.interruptSelf"));
@@ -126,7 +127,14 @@ export class AgentInterruptTool {
     if (!(yield* this.#hooks.interrupt(agentId, turnId, mayStop).pipe(toToolOperationFailed))) {
       return openBotToolResult({ interruptedTurnId: null, cancelledMessages });
     }
-    yield* this.#notifyEffect(params, callerAgentId, agentId, deliveries[0]?.delivery.messageId ?? null, reason);
+    yield* this.#notifyEffect(
+      params,
+      callerAgentId,
+      requesterIds,
+      agentId,
+      deliveries[0]?.delivery.messageId ?? null,
+      reason,
+    );
     return openBotToolResult({ interruptedTurnId: turnId, cancelledMessages });
   }, Effect.uninterruptible);
 
@@ -168,6 +176,7 @@ export class AgentInterruptTool {
     this: AgentInterruptTool,
     params: DynamicToolCallParams,
     callerAgentId: string,
+    requesterIds: readonly string[],
     agentId: string,
     messageId: string | null,
     reason: string | undefined,
@@ -184,6 +193,7 @@ export class AgentInterruptTool {
     yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: callerAgentId },
+        requesterIds,
         recipientAgentIds: [agentId],
         text,
         replyToMessageId: null,
