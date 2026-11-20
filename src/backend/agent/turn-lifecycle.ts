@@ -2336,30 +2336,27 @@ export class TurnLifecycle {
       if (memoryLine) snapshot.messages.push(memoryLine);
       if (instructionsChange) snapshot.messages.push(instructionsChangeMessage(turnId, instructionsChange));
       if (continuation) {
-        snapshot.messages.push({
-          id: `${turnId}:plan-continuation`,
-          author: "system",
-          source: "system",
-          status: "completed",
-          createdAt: new Date().toISOString(),
-          itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text:
-            continuation.kind === "compaction"
-              ? sourceText("status.agent.compactionContinues")
-              : continuation.kind === "providerExit"
-                ? sourceText("status.agent.providerExitContinues")
-                : sourceText(
-                    continuation.kind === "plan"
-                      ? "status.agent.planContinues"
-                      : continuation.kind === "finishCheck"
-                        ? "status.agent.finishCheckContinues"
-                        : "status.agent.nextStepContinues",
-                    {
-                      current: continuation.current,
-                      limit: continuation.limit,
-                    },
-                  ),
-        });
+        if (continuation.kind !== "finishCheck")
+          snapshot.messages.push({
+            id: `${turnId}:plan-continuation`,
+            author: "system",
+            source: "system",
+            status: "completed",
+            createdAt: new Date().toISOString(),
+            itemType: PLAN_CONTINUATION_ITEM_TYPE,
+            text:
+              continuation.kind === "compaction"
+                ? sourceText("status.agent.compactionContinues")
+                : continuation.kind === "providerExit"
+                  ? sourceText("status.agent.providerExitContinues")
+                  : sourceText(
+                      continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+                      {
+                        current: continuation.current,
+                        limit: continuation.limit,
+                      },
+                    ),
+          });
       } else if (planStopped) {
         snapshot.messages.push({
           id: `${turnId}:plan-stopped`,
