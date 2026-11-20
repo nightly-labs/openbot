@@ -75,14 +75,18 @@ function builtInResourceKey(url: string): string | null {
   return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
 }
 
+function builtInMcpClients(resource: string): readonly BuiltInMcpClient[] {
+  const key = builtInResourceKey(resource);
+  return key === null ? [] : BUILT_IN_MCP_CLIENTS.filter((client) => builtInResourceKey(client.resource) === key);
+}
+
 function builtInMcpClient(resource: string, issuer: string | undefined): BuiltInMcpClient | undefined {
   if (!issuer) return undefined;
-  const key = builtInResourceKey(resource);
-  return key === null
-    ? undefined
-    : BUILT_IN_MCP_CLIENTS.find(
-        (client) => builtInResourceKey(client.resource) === key && issuersMatch(client.issuer, issuer),
-      );
+  return builtInMcpClients(resource).find((client) => issuersMatch(client.issuer, issuer));
+}
+
+function signInAppRedirectUrl(resource: string, own: string): string {
+  return builtInMcpClients(resource)[0]?.redirectUrl ?? own;
 }
 
 export const MCP_OAUTH_CALLBACK_PATH = "/callback";
@@ -182,6 +186,7 @@ export interface McpOAuthAuthority {
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   forget: (url: string) => Effect.Effect<void, McpOperationError>;
   readonly redirectUrl: string;
+  signInAppRedirectUrl: (url: string) => string;
   signInApp: (url: string) => McpOAuthAppSummary | null;
   saveSignInApp: (url: string, app: McpOAuthAppInput) => Effect.Effect<boolean, McpOperationError>;
   removeSignInApp: (url: string) => Effect.Effect<boolean, McpOperationError>;
@@ -484,6 +489,10 @@ export class McpOAuth implements McpOAuthAuthority {
     return this.#options.redirectUrl;
   }
 
+  signInAppRedirectUrl(url: string): string {
+    return signInAppRedirectUrl(url, this.#options.redirectUrl);
+  }
+
   readonly forget = Effect.fn("McpOAuth.forget")(function* (this: McpOAuth, url: string) {
     const key = mcpOAuthAccountKey(url);
     if (!key) return;
@@ -698,7 +707,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   get redirectUrl(): string {
     const record = this.#record();
     const own = this.#options.redirectUrl;
-    if (record.app) return own;
+    if (record.app) return signInAppRedirectUrl(this.#options.resource, own);
     const builtIn = builtInMcpClient(this.#options.resource, this.#activeIssuer);
     if (builtIn) return builtIn.redirectUrl;
     const client = this.#registeredClient ?? record.client;
@@ -755,7 +764,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       return {
         client_id: record.app.clientId,
         ...(record.app.clientSecret ? { client_secret: record.app.clientSecret } : {}),
-        redirect_uris: [this.#options.redirectUrl],
+        redirect_uris: [signInAppRedirectUrl(this.#options.resource, this.#options.redirectUrl)],
         ...(issuer ? { issuer } : {}),
       };
     }
