@@ -376,6 +376,20 @@ export function createWebWorkspace(
   const wholeApprovalReads = new Set<string>();
   let promptListRead: "idle" | "reading" | "again" = "idle";
   const resolvedDuringPromptListRead = new Set<string>();
+  let listedPrompts: { generation: number; prompts: Array<Extract<AgentEvent, { type: "prompt" }>> } = {
+    generation,
+    prompts: [],
+  };
+  function withListedPrompts(prompts: Array<Extract<AgentEvent, { type: "prompt" }>>) {
+    if (listedPrompts.generation !== generation) return prompts;
+    const known = new Set(prompts.map((item) => String(item.requestId)));
+    const missing = listedPrompts.prompts.filter((prompt) => !known.has(String(prompt.requestId)));
+    return missing.length > 0 ? [...prompts, ...missing] : prompts;
+  }
+  function forgetListedPrompt(requestId: string | number): void {
+    if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(requestId));
+    listedPrompts.prompts = listedPrompts.prompts.filter((prompt) => String(prompt.requestId) !== String(requestId));
+  }
   function readListedPrompts(): void {
     const list = runtime.listPendingPrompts;
     if (!list) return;
@@ -386,25 +400,24 @@ export function createWebWorkspace(
     promptListRead = "reading";
     resolvedDuringPromptListRead.clear();
     const current = generation;
-    const isCurrent = () => !disposed && current === generation;
     void list()
       .then((prompts) => {
-        if (!isCurrent()) return;
+        if (disposed || current !== generation) return;
+        listedPrompts = {
+          generation: current,
+          prompts: prompts
+            .filter((prompt) => !resolvedDuringPromptListRead.has(String(prompt.requestId)))
+            .map((prompt) => ({ ...prompt, type: "prompt" as const })),
+        };
         setState((draft) => {
-          const known = new Set(draft.prompts.map((item) => String(item.requestId)));
-          const open = prompts.filter((prompt) => {
-            const requestId = String(prompt.requestId);
-            return !known.has(requestId) && !resolvedDuringPromptListRead.has(requestId);
-          });
-          if (open.length > 0)
-            draft.prompts = [...draft.prompts, ...open.map((prompt) => ({ ...prompt, type: "prompt" as const }))];
+          draft.prompts = withListedPrompts(draft.prompts);
         });
       })
       .catch(() => undefined)
       .finally(() => {
         const again = promptListRead === "again";
         promptListRead = "idle";
-        if (again && isCurrent()) readListedPrompts();
+        if (again && !disposed) readListedPrompts();
       });
   }
   function readWholeApprovals(): void {
@@ -583,6 +596,8 @@ export function createWebWorkspace(
               event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
               attentionComplete,
             );
+            if (attentionComplete) listedPrompts = { generation, prompts: [] };
+            else draft.prompts = withListedPrompts(draft.prompts);
             draft.takeovers = reconcilePendingRequests(
               draft.takeovers,
               event.snapshot.pendingBrowserTakeovers,
@@ -615,7 +630,7 @@ export function createWebWorkspace(
             ];
           });
         } else if (event.type === "agent-input-resolved") {
-          if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(event.requestId));
+          forgetListedPrompt(event.requestId);
           setState((draft) => {
             draft.approvals = draft.approvals.filter((item) => String(item.requestId) !== String(event.requestId));
             draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(event.requestId));
@@ -2315,7 +2330,7 @@ export function createWebWorkspace(
       const current = generation;
       await runtime.answer(input);
       if (disposed || current !== generation) return;
-      if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(input.requestId));
+      forgetListedPrompt(input.requestId);
       setState((draft) => {
         draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(input.requestId));
       });

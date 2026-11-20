@@ -19,6 +19,7 @@ import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits
 import {
   type AccountUsageLimit,
   AGENT_PROVIDERS,
+  AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   type AgentEvent,
   type AgentModelId,
   type AgentModelOption,
@@ -940,6 +941,7 @@ let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: n
 
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+let largePendingPrompts = false;
 let importFreeBytes: number | null = null;
 const accessListeners = new Set<(serverId: string, state: AgentAccessState) => void>();
 const agentAccess: TeamApiAgentAccess = {
@@ -1618,6 +1620,20 @@ const fakeAgents: TeamApiAgents = {
   agentIdForRequest: (requestId) => (requestId === 7 ? "agent-ada" : undefined),
   pendingPrompts: () => {
     record("pendingPrompts");
+    if (largePendingPrompts)
+      return Array.from({ length: 300 }, (_, index) => ({
+        requestId: `prompt-large-${index}`,
+        agentId: "agent-ada",
+        threadId: `thread-large-${index}`,
+        turnId: `turn-large-${index}`,
+        questions: Array.from({ length: 32 }, (_, question) => ({
+          id: `question-${question}`,
+          header: "h".repeat(80),
+          question: "q".repeat(240),
+          isSecret: false,
+          options: null,
+        })),
+      }));
     return [
       ...Array.from({ length: 5 }, (_, index) => ({
         requestId: `prompt-ada-${index}`,
@@ -12547,6 +12563,18 @@ try {
         prompts.every((prompt) => field(prompt, "agentId") === "agent-ada") &&
         field(prompts[4], "requestId") === "prompt-ada-4",
       { status: listed.status, prompts: prompts.length },
+    );
+    largePendingPrompts = true;
+    const large = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    largePendingPrompts = false;
+    const largeCount = list(field(large.body, "prompts")).length;
+    check(
+      "a list of large questions stops at the byte limit of a runtime snapshot",
+      large.status === 200 &&
+        largeCount > 0 &&
+        largeCount < 300 &&
+        Buffer.byteLength(JSON.stringify(large.body)) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT + 64,
+      { status: large.status, prompts: largeCount },
     );
     accessLevels = { revision: 95, everyone: { "agent-ada": "none" }, roles: [] };
     const blocked = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });

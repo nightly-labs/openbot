@@ -85,12 +85,18 @@ export function withListedPrompts(
   current: PendingAttentionPrompts,
   prompts: readonly AgentRuntimePrompt[],
   submittedRequests: Record<string, string | undefined>,
+  askedDuringRead: ReadonlySet<string>,
 ): PendingAttentionPrompts {
   const next: PendingAttentionPrompts = { ...current };
   for (const prompt of prompts) {
     const key = attentionKey(prompt.agentId, prompt.threadId);
-    if (next[key] === undefined && !promptAnswerInFlight(prompt, submittedRequests))
-      next[key] = { type: "prompt", ...prompt };
+    const shown = next[key];
+    const replaceable =
+      shown === undefined ||
+      (shown.type === "prompt" &&
+        String(shown.requestId) !== String(prompt.requestId) &&
+        !askedDuringRead.has(String(shown.requestId)));
+    if (replaceable && !promptAnswerInFlight(prompt, submittedRequests)) next[key] = { type: "prompt", ...prompt };
   }
   return keepEqualRecord(current, next);
 }

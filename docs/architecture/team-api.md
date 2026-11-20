@@ -472,11 +472,13 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 another agent, gets 409.
 
 The optional `pending-prompts-v1` capability (protocol 10 only) adds `POST /v1/agent-prompts/list`
-(empty body). It returns `{ prompts }`: every question that an agent waits on, oldest first, up to 200,
-in the form of a runtime snapshot entry. A runtime snapshot holds at most 4 questions, approvals and
+(empty body). It returns `{ prompts }`: every question that an agent waits on, oldest first, up to 200
+and up to the byte limit of a runtime snapshot (`pendingPromptsWithinLimits`), in the form of a runtime
+snapshot entry. A runtime snapshot holds at most 4 questions, approvals and
 browser takeovers of all agents together, and sets `attentionComplete: false` when it leaves some out.
-A client that gets such a snapshot reads this list, and adds each question whose chat has no question
-yet. Without the read, a question that came while the client was away had no card after a restart, a
+A client that gets such a snapshot reads this list. It shows each listed question in its chat, in
+place of an older question that the list does not confirm, and keeps the listed questions until a
+complete snapshot comes. Without the read, a question that came while the client was away had no card after a restart, a
 reload or a reconnect, and the agent waited (#13486). `src/main/team-api/route-pending-prompts.ts`
 leaves out the questions of a hidden or missing agent and of an agent that the member cannot see.
 The phone draws a question card from the chat messages, so it does not read this list.

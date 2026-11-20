@@ -1,8 +1,8 @@
 import { agentAccessRank } from "@openbot/contracts/ipc";
 import {
   PENDING_PROMPTS_CAPABILITY,
-  PENDING_PROMPTS_LIMIT,
   PENDING_PROMPTS_ROUTES,
+  pendingPromptsWithinLimits,
 } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiAgents } from "./dependencies";
@@ -24,9 +24,8 @@ export async function routePendingPrompts(
       .map((agent) => agent.id)
       .filter((agentId) => !hiddenAgentIds.has(agentId) && agentAccessRank(context.agentLevel(agentId)) > 0),
   );
-  const prompts = agents
-    .pendingPrompts()
-    .filter((prompt) => shownAgentIds.has(prompt.agentId))
-    .slice(0, PENDING_PROMPTS_LIMIT);
+  const prompts = pendingPromptsWithinLimits(
+    agents.pendingPrompts().filter((prompt) => shownAgentIds.has(prompt.agentId)),
+  );
   return json(200, { prompts });
 }

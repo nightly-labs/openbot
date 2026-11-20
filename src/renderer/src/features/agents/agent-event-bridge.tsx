@@ -161,7 +161,9 @@ export function AgentEventBridge() {
   let readRefresh = 0;
   let snapshotReceived = false;
   let promptListRead: "idle" | "reading" | "again" = "idle";
+  let promptListScope = 0;
   const endedDuringPromptListRead = new Set<string>();
+  const askedDuringPromptListRead = new Set<string>();
   let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
@@ -381,6 +383,7 @@ export function AgentEventBridge() {
           playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
+        if (promptListRead !== "idle") askedDuringPromptListRead.add(String(event.requestId));
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
         if (agentList().some((agent) => agent.id === event.agentId && agent.threadId === event.threadId)) {
           setPresentedPromptResolutions((current) => ({ ...current, [event.agentId]: undefined }));
@@ -502,25 +505,30 @@ export function AgentEventBridge() {
     }
     promptListRead = "reading";
     endedDuringPromptListRead.clear();
-    const refresh = readRefresh;
+    askedDuringPromptListRead.clear();
+    const scope = promptListScope;
     const serverId = activeServerId();
-    const current = () => refresh === readRefresh && serverId === activeServerId();
+    const local = serverId === LOCAL_SERVER_ID;
     void agentsPort()
       .agent.listPendingPrompts(serverId)
       .then((prompts) => {
-        if (!current()) return;
+        if (scope !== promptListScope || serverId !== activeServerId()) return;
         const open = prompts.filter(
           (prompt) =>
             !endedDuringPromptListRead.has(`request:${prompt.requestId}`) &&
-            (prompt.detached === true || !endedDuringPromptListRead.has(`turn:${prompt.turnId}`)),
+            (!local || prompt.detached === true || !endedDuringPromptListRead.has(`turn:${prompt.turnId}`)),
         );
-        flush(() => setPendingPrompts((pending) => withListedPrompts(pending, open, submittedPromptRequests())));
+        flush(() =>
+          setPendingPrompts((pending) =>
+            withListedPrompts(pending, open, submittedPromptRequests(), askedDuringPromptListRead),
+          ),
+        );
       })
       .catch(() => undefined)
       .finally(() => {
         const again = promptListRead === "again";
         promptListRead = "idle";
-        if (again && current()) readListedPrompts();
+        if (again && scope === promptListScope) readListedPrompts();
       });
   }
 
@@ -605,6 +613,7 @@ export function AgentEventBridge() {
       .catch(() => undefined);
     return () => {
       readRefresh += 1;
+      promptListScope += 1;
       unsubscribe();
       completedTurnByAgent.clear();
     };

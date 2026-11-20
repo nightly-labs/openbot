@@ -160,6 +160,7 @@ import {
   decodePendingPromptsResponse,
   PENDING_PROMPTS_CAPABILITY,
   PENDING_PROMPTS_ROUTES,
+  pendingPromptsWithinLimits,
 } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -1589,7 +1590,7 @@ export function agentIpcHandlers({
         },
       }),
       listPendingPrompts: scopedQueryHandler({
-        local: () => service.pendingPrompts(),
+        local: () => pendingPromptsWithinLimits(service.pendingPrompts()),
         remote: (serverId) => {
           if (!remoteServers.supportsCapability(serverId, PENDING_PROMPTS_CAPABILITY)) return [];
           return runCauseEffect(
