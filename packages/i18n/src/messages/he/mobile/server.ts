@@ -650,6 +650,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "הוספת סוכנים",
   "mobile.server.browserProfiles.agentsHint":
     "נגיעה נותנת לסוכן את הפרופיל הזה, או מחזירה אותו לפרופיל המשותף. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.server.browserProfiles.movedNote":
+    "ההתחברויות לאתרים נשארות בפרופיל הישן. סוכן שהועבר צריך להתחבר שוב לאתרים האלה.",
   "mobile.server.browserProfiles.clear": "ניקוי נתונים",
   "mobile.server.browserProfiles.clearTitle": "לנקות את הנתונים של {name}?",
   "mobile.server.browserProfiles.clearBody":

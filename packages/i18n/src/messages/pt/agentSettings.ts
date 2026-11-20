@@ -235,6 +235,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Cada perfil mantém logins e cookies próprios. Uma mudança fecha as abas abertas do agente.",
   "agentSettings.browserProfile.manage": "Gerenciar",
+  "agentSettings.browserProfile.movedNote":
+    "Os logins nos sites ficam no perfil antigo. O agente precisa entrar nesses sites novamente.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo o processo do {provider} é executado em um ambiente isolado, por isso a gravação fora desses locais falha. Disponível somente no macOS.",
 } as const satisfies PartialTranslation<typeof source>;

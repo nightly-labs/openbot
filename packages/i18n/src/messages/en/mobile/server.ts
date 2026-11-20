@@ -629,6 +629,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.browserProfiles.addAgents": "Add agents",
   "mobile.server.browserProfiles.agentsHint":
     "A tap gives the agent this profile, or moves it back to the shared profile. A change closes the agent's open tabs.",
+  "mobile.server.browserProfiles.movedNote":
+    "Site sign-ins stay in the old profile. A moved agent must sign in to these sites again.",
   "mobile.server.browserProfiles.clear": "Clear data",
   "mobile.server.browserProfiles.clearTitle": "Clear the data of {name}?",
   "mobile.server.browserProfiles.clearBody":

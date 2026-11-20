@@ -548,6 +548,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Ajan ekle",
   "mobile.server.browserProfiles.agentsHint":
     "Dokunmak ajana bu profili verir veya onu ortak profile geri taşır. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.server.browserProfiles.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Taşınan bir ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.server.browserProfiles.clear": "Verileri temizle",
   "mobile.server.browserProfiles.clearTitle": "{name} verileri temizlensin mi?",
   "mobile.server.browserProfiles.clearBody":

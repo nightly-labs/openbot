@@ -613,6 +613,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Dodaj agentów",
   "mobile.server.browserProfiles.agentsHint":
     "Dotknięcie daje agentowi ten profil lub przenosi go z powrotem do profilu wspólnego. Zmiana zamyka otwarte karty agenta.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logowania do witryn zostają w starym profilu. Przeniesiony agent musi ponownie zalogować się na tych witrynach.",
   "mobile.server.browserProfiles.clear": "Wyczyść dane",
   "mobile.server.browserProfiles.clearTitle": "Wyczyścić dane profilu {name}?",
   "mobile.server.browserProfiles.clearBody":

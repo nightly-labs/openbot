@@ -402,6 +402,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "プロファイルを管理",
   "mobile.agent.browserProfile.footer":
     "各プロファイルは独自のサインインと Cookie を保持します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.agent.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.agent.browserProfile.saveFailed": "OpenBot はエージェントのブラウザープロファイルを変更できませんでした。",
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":

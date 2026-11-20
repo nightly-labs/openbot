@@ -638,6 +638,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "إضافة وكلاء",
   "mobile.server.browserProfiles.agentsHint":
     "تمنح النقرة الوكيلَ ملف التعريف هذا، أو تعيده إلى الملف المشترك. يُغلق التغيير علامات التبويب المفتوحة للوكيل.",
+  "mobile.server.browserProfiles.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل المنقول الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.server.browserProfiles.clear": "مسح البيانات",
   "mobile.server.browserProfiles.clearTitle": "هل تريد مسح بيانات {name}؟",
   "mobile.server.browserProfiles.clearBody":

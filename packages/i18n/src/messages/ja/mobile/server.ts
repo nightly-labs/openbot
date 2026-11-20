@@ -540,6 +540,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "エージェントを追加",
   "mobile.server.browserProfiles.agentsHint":
     "タップすると、エージェントにこのプロファイルを割り当てるか、共有プロファイルに戻します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.server.browserProfiles.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。移動したエージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.server.browserProfiles.clear": "データを消去",
   "mobile.server.browserProfiles.clearTitle": "{name} のデータを消去しますか?",
   "mobile.server.browserProfiles.clearBody":

@@ -431,6 +431,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "إدارة ملفات التعريف",
   "mobile.agent.browserProfile.footer":
     "يحتفظ كل ملف تعريف بتسجيلات الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة للوكيل.",
+  "mobile.agent.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.agent.browserProfile.saveFailed": "تعذّر على OpenBot تغيير ملف تعريف المتصفح للوكيل.",
   "mobile.agent.planCard.label": "عرض الخطة قبل المهام الطويلة",
   "mobile.agent.planCard.footer": "قبل مهمة طويلة، يعرض الوكيل خطته. يبدأ بعد 10 ث، أو عندما تضغط «بدء».",
