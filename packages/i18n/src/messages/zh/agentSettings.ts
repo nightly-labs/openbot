@@ -224,6 +224,7 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "每个配置都有各自的登录状态和 Cookie。更改后，助手已打开的标签页会关闭。",
   "agentSettings.browserProfile.manage": "管理",
+  "agentSettings.browserProfile.movedNote": "网站登录状态保留在旧配置中。助手必须重新登录这些网站。",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "整个 {provider} 进程运行在沙盒中，因此工作区外的写入会失败。仅在 macOS 上可用。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -325,6 +325,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.threads.hold.serverBusy": "Waiting. The host runs as many turns as its memory allows.",
   "mobile.server.threads.hold.agentBusy": "Waiting for other work of this agent to finish.",
   "mobile.server.threads.hold.oneTurn": "Waiting. The provider of this agent runs one turn at a time.",
+  "mobile.server.threads.hold.signIn": "Waiting. The provider of this agent needs sign-in.",
   "mobile.server.threads.offline": "Connect to this server to see its threads.",
   "mobile.server.threads.loading": "Loading threads…",
   "mobile.server.threads.loadFailed": "Could not load the threads of some agents.",
@@ -629,6 +630,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.browserProfiles.addAgents": "Add agents",
   "mobile.server.browserProfiles.agentsHint":
     "A tap gives the agent this profile, or moves it back to the shared profile. A change closes the agent's open tabs.",
+  "mobile.server.browserProfiles.movedNote":
+    "Site sign-ins stay in the old profile. A moved agent must sign in to these sites again.",
   "mobile.server.browserProfiles.clear": "Clear data",
   "mobile.server.browserProfiles.clearTitle": "Clear the data of {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -2072,4 +2075,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.ownerTransfer.acceptFailed": "Could not accept the transfer",
   "mobile.server.ownerTransfer.declineFailed": "Could not decline the transfer",
   "mobile.server.ownerTransfer.tryAgain": "Try again later.",
+  "mobile.server.providers.updateAll": "Update all",
+  "mobile.server.providers.updateAllFailed": "Some updates did not start. Try again.",
 });

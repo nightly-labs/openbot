@@ -311,7 +311,7 @@
   }
 
   .app-window > .app-frame-edge > .sidebar,
-  .app-window > .app-frame-edge :is(.conversation-panel, .direct-conversation, .diagram-view),
+  .app-window > .app-frame-edge :is(.conversation-panel, .direct-conversation, .workflows-notice),
   .app-window > .app-frame-edge :is(.settings-panel, .browser-panel) {
     background: transparent;
   }
@@ -538,13 +538,6 @@
   .app-window > .app-frame-edge .side-panel-maximized > :is(.settings-panel, .browser-panel) {
     border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
     background: var(--openbot-bg-canvas);
-  }
-
-  .app-window > .app-frame-edge .diagram-view-body {
-    border-top: 0;
-    border-inline-end: 0;
-    border-radius: 0;
-    border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
   .app-window > .app-frame-edge .conversation-header-actions {

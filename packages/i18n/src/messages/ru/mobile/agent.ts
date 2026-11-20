@@ -428,6 +428,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Управлять профилями",
   "mobile.agent.browserProfile.footer":
     "Каждый профиль хранит свои входы и файлы cookie. Изменение закрывает открытые вкладки агента.",
+  "mobile.agent.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot не удалось изменить профиль браузера агента.",
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":

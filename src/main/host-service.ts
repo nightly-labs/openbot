@@ -241,7 +241,8 @@ interface HostServiceOptions {
     request: NotificationRelayRequest,
   ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
   pushNotificationStore?: PushNotificationStore;
-  hostComputerInUse?: (event: AgentEvent) => boolean;
+  hostComputerInUse?: (event: AgentEvent | null) => boolean;
+  signInWaits?: ConstructorParameters<typeof PushNotificationService>[0]["signInWaits"];
   awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
@@ -417,6 +418,7 @@ export class HostService extends EventEmitter<HostEvents> {
       sendPushNotification && pushNotificationStore
         ? new PushNotificationService({
             agents: options.agents,
+            ...(options.signInWaits === undefined ? {} : { signInWaits: options.signInWaits }),
             store: pushNotificationStore,
             send: (request) => {
               const hostId = options.store.getIdentity()?.serverId;

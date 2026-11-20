@@ -502,16 +502,6 @@ import type {
   RemoteSessionReusePreference,
 } from "./ipc-remote-sessions";
 import type {
-  ConnectRoutineFlowInput,
-  DisconnectRoutineFlowInput,
-  RemoveRoutineFlowPositionInput,
-  RoutineFlowCanvas,
-  RoutineFlowLink,
-  SaveRoutineFlowPositionInput,
-  StopRoutineFlowRunInput,
-  UpdateRoutineFlowLinkInput,
-} from "./ipc-routine-flows";
-import type {
   ResendRoutineResultInput,
   RoutineResultConnectionOption,
   RoutineResultDelivery,
@@ -1607,15 +1597,6 @@ export const IPC_ENDPOINTS = {
       "agent:channel-routines:runs",
     ),
   },
-  routineFlows: {
-    canvas: scopedRequest<string, RoutineFlowCanvas>()("routine-flows:canvas"),
-    savePosition: scopedRequest<SaveRoutineFlowPositionInput, void>()("routine-flows:save-position"),
-    removePosition: scopedRequest<RemoveRoutineFlowPositionInput, void>()("routine-flows:remove-position"),
-    connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
-    disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
-    updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
-    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
-  },
   workflows: {
     list: scopedQuery<WorkflowSummary[]>()("workflows:list"),
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
@@ -2010,7 +1991,6 @@ export const IPC_GROUP_PATHS = {
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
-  routineFlows: "routineFlows",
   workflows: "workflows",
   crm: "crm",
   routineResults: "routineResults",

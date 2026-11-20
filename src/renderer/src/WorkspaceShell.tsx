@@ -7,6 +7,7 @@ import {
   ServerPanelLoadNotice,
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
+import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
@@ -24,10 +25,10 @@ import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agen
 import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
-import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
+import { renewServerPlan } from "./features/servers/server-actions";
 import { serverCanAdminister } from "./features/servers/server-capabilities";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
@@ -74,6 +75,8 @@ export function WorkspaceShell(props: {
     serversLoaded,
     serversLoadFailed,
     refreshServers,
+    refreshHostedServersAvailable,
+    planDeletesAt,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
   const agentDockPlacement = useAgentDockPlacement();
@@ -88,7 +91,7 @@ export function WorkspaceShell(props: {
     if (agentSetupOpen()) return "agent-setup";
     if (channelOpen()) return "channel";
     if (activeDirectMember()) return "direct";
-    return layout.sidebarView() === "routines" ? "routines" : "agent";
+    return "agent";
   });
   const agentChatOpen = () => middlePane() === "agent";
   if (chatWindow) {
@@ -139,10 +142,17 @@ export function WorkspaceShell(props: {
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     if (server?.kind !== "remote" || server.hostedSleep) return null;
-    return server.state === "incompatible" || (server.issue && server.issue.code !== "network_unavailable")
+    return server.state === "incompatible" ||
+      serverPlanBlocks(server, planDeletesAt(server.id)) ||
+      (server.issue && server.issue.code !== "network_unavailable")
       ? server
       : null;
   });
+  const planScreenShown = () => serverPlanScreenShown(blockedRemoteServer(), planDeletesAt);
+  const retryBlockedServer = (serverId: string) => {
+    void refreshHostedServersAvailable();
+    return retryServerConnection(serverId);
+  };
   const activePeopleEnabled = createMemo(
     () => platform.peopleEnabled && activeServerSupportsCapability("direct-messages"),
   );
@@ -336,12 +346,16 @@ export function WorkspaceShell(props: {
           }
           hidden={remoteDesktopWorkspaceVisible()}
           blockedServer={blockedRemoteServer()}
-          onRetryServer={retryServerConnection}
+          onRetryServer={retryBlockedServer}
+          planDeletesAt={planDeletesAt}
+          onRenewPlan={renewServerPlan}
           windowPage={windowPage.page()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
-              <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              <Show when={!planScreenShown()}>
+                <WorkspaceSidebar peopleEnabled={activePeopleEnabled()} />
+              </Show>
             </Show>
           }
           page={<WindowPageView />}
@@ -375,9 +389,6 @@ export function WorkspaceShell(props: {
           </Show>
           <Show when={agentChatOpen() && !chatHeld()}>
             <WorkspaceConversation account={props.account} />
-          </Show>
-          <Show when={middlePane() === "routines"}>
-            <WorkspaceRoutineFlows />
           </Show>
           <Show when={middlePane() === "channel"}>
             <WorkspaceChannelConversation account={props.account} />

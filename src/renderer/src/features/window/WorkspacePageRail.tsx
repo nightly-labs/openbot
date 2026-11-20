@@ -2,7 +2,6 @@ import { isUpdateActivePhase } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
-import type { SidebarView } from "@openbot/ui/features/sidebar/sidebar-types";
 import { PageRail, type PageRailPage } from "@openbot/ui/features/window/PageRail";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
@@ -10,7 +9,6 @@ import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
 import { WorkflowsPage } from "../../lazy-views";
 import { usePlatform } from "../../platform";
-import { useChannels } from "../channels/channels-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { serverHasStorage } from "../files/storage-usage";
 import { useServerActions } from "../servers/server-actions";
@@ -38,7 +36,6 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const usage = useUsage();
   const updates = useUpdates();
   const layout = useLayout();
-  const channels = useChannels();
   const whatsNew = useWhatsNew();
   const { activeServer } = useServers();
   const platform = usePlatform();
@@ -48,11 +45,6 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
     const info = platform.appInfo();
     return info && info.platform !== "darwin" ? { variant: info.variant } : undefined;
   };
-  function showSidebarView(view: SidebarView) {
-    windowPage.showAgents();
-    if (view === "routines") channels.close();
-    layout.setSidebarView(view);
-  }
   const usageRows = usePlanLimitRows();
   const mediaCredits = createWorkflowMediaCredits(
     () => (windowPage.page() === "workflows" ? usage.state.serverId : null),
@@ -84,7 +76,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   }
   const current = (): PageRailPage | null => {
     const page = windowPage.page();
-    if (page === "agents") return layout.sidebarView();
+    if (page === "agents") return "agents";
     if (page === "server-settings") {
       const providers =
         serverSettingsShownSection() === "providers" && serverSettingsTarget()?.id === activeServer()?.id;
@@ -107,8 +99,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
         setPendingPluginSlug(provider);
         setSkillsMarketplaceOpen(true);
       }}
-      onAgents={() => showSidebarView("agents")}
-      onRoutines={() => showSidebarView("routines")}
+      onAgents={() => windowPage.showAgents()}
       onWorkflows={() => windowPage.openWorkflows(null)}
       onPreloadWorkflows={() => void WorkflowsPage.preload()}
       onSchedule={windowPage.openSchedule}

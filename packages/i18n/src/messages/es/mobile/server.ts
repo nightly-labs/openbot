@@ -229,6 +229,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "En espera. El host ejecuta tantos turnos como permite su memoria.",
   "mobile.server.threads.hold.agentBusy": "Esperando a que termine otro trabajo de este agente.",
   "mobile.server.threads.hold.oneTurn": "En espera. El proveedor de este agente ejecuta un turno a la vez.",
+  "mobile.server.threads.hold.signIn": "En espera. El proveedor de este agente necesita iniciar sesión.",
   "mobile.server.threads.offline": "Conéctate a este servidor para ver sus hilos.",
   "mobile.server.threads.loading": "Cargando hilos…",
   "mobile.server.threads.loadFailed": "No se pudieron cargar los hilos de algunos agentes.",
@@ -547,6 +548,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Añadir agentes",
   "mobile.server.browserProfiles.agentsHint":
     "Un toque da este perfil al agente o lo devuelve al perfil compartido. Un cambio cierra las pestañas abiertas del agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. Un agente movido debe iniciar sesión de nuevo en esos sitios.",
   "mobile.server.browserProfiles.clear": "Borrar datos",
   "mobile.server.browserProfiles.clearTitle": "¿Borrar los datos de {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1705,4 +1708,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "No se pudo aceptar la transferencia",
   "mobile.server.ownerTransfer.declineFailed": "No se pudo rechazar la transferencia",
   "mobile.server.ownerTransfer.tryAgain": "Inténtalo más tarde.",
+  "mobile.server.providers.updateAll": "Actualizar todo",
+  "mobile.server.providers.updateAllFailed": "Algunas actualizaciones no se iniciaron. Inténtalo de nuevo.",
 } as const satisfies PartialTranslation<typeof source>;

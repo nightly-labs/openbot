@@ -442,6 +442,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-waits-tools
 
+      - name: Run the browser takeover deadline E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:browser-takeover-deadline
+
       - name: Run the agent hide and restore E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-hide-restore
@@ -498,9 +502,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:provider-update-busy
 
-      - name: Run the provider update after an app upgrade E2E test
+      - name: Run the automatic provider update E2E test
         if: ${{ !cancelled() }}
-        run: bun run test:provider-update-after-app-upgrade
+        run: bun run test:provider-update-automatic
 
       - name: Run the provider CLI removal E2E test
         if: ${{ !cancelled() }}
@@ -831,6 +835,7 @@ jobs:
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
+            .openbot-build/browser-takeover-deadline-e2e/
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/agent-create-retry-e2e/
             .openbot-build/update-host-takeover-e2e/
@@ -844,7 +849,7 @@ jobs:
             .openbot-build/turn-input-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/
-            .openbot-build/provider-update-after-app-upgrade-e2e/
+            .openbot-build/provider-update-automatic-e2e/
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
             .openbot-build/acp-subagents-e2e/

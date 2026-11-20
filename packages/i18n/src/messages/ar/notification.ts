@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "يحتاج إلى إدخالك.",
   "notification.needsApproval": "يحتاج إلى موافقتك.",
   "notification.needsBrowserStep": "يحتاج إلى أن تُكمل خطوة في المتصفح.",
+  "notification.waitsForSignIn": "ينتظر تسجيل الدخول إلى {provider}.",
   "notification.needsApprovalFor": "يحتاج إلى موافقتك: {action}",
   "notification.finished": "انتهى من العمل.",
   "notification.workflowApproval": "تنتظر خطوة موافقتك.",

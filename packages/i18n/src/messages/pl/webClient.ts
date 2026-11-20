@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Odpowiedź logowania jest nieprawidłowa.",
   "webClient.pane.navigation": "Nawigacja obszaru roboczego",
   "webClient.pane.chat": "Czat",
-  "webClient.pane.routines": "Rutyny",
   "webClient.pane.workspace": "Obszar roboczy",
   "webClient.phoneApp.title": "Użyj aplikacji OpenBot",
   "webClient.phoneApp.description":

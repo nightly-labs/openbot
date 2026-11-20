@@ -4,6 +4,7 @@ export const messages = defineMessages("notification", {
   "notification.needsInput": "Needs your input.",
   "notification.needsApproval": "Needs your approval.",
   "notification.needsBrowserStep": "Needs you to finish a step in the browser.",
+  "notification.waitsForSignIn": "Waits for {provider} sign-in.",
   "notification.needsApprovalFor": "Needs your approval: {action}",
   "notification.finished": "Finished working.",
   "notification.workflowApproval": "A step waits for your approval.",

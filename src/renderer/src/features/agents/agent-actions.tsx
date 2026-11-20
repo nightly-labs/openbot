@@ -84,19 +84,6 @@ const AgentActions = createSimpleContext({
       return newAgent;
     }
 
-    async function createAgentInPlace(draft: Parameters<typeof requestNewAgent>[0]) {
-      const analytics = desktopAnalytics.scope();
-      try {
-        const newAgent = addNewAgent(await requestNewAgent(draft));
-        const properties = analyticsAgentProperties(newAgent.id);
-        analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
-        return newAgent;
-      } catch (error) {
-        analytics.track("agent_action", { action: "create", result: "failed", failure_code: "create_failed" });
-        throw error;
-      }
-    }
-
     async function createAgent(draft: FirstAgentDraft = agentSetupDraft()) {
       if (creatingAgent()) return;
       const analytics = desktopAnalytics.scope();
@@ -434,7 +421,6 @@ const AgentActions = createSimpleContext({
 
     return {
       createAgent,
-      createAgentInPlace,
       editAgent,
       duplicateAgent,
       duplicateSection,

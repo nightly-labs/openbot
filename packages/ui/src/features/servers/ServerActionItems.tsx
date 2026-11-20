@@ -54,6 +54,8 @@ export interface ServerActionCallbacks {
   canRestart?: ((serverId: string) => boolean) | undefined;
   onHide?: ((serverId: string) => void) | undefined;
   canHide?: ((serverId: string) => boolean) | undefined;
+  planDeletesAt?: ((serverId: string) => number | null) | undefined;
+  onRenewPlan?: ((serverId: string) => Promise<void>) | undefined;
 }
 
 export function ServerActionItems(

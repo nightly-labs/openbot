@@ -236,6 +236,24 @@ export const messages = {
   "server.rail.delete": "Server wissen",
   "server.rail.hide": "Server verbergen",
   "server.rail.showLocal": "{name} tonen",
+  "server.plan.daysLeft": {
+    one: "{count} dag",
+    other: "{count} dagen",
+  },
+  "server.plan.ended": "Abonnement beëindigd",
+  "server.plan.status": "abonnement beëindigd, verwijderd op {date}",
+  "server.plan.deletedOn": "Verwijderd op {date}",
+  "server.plan.dialogTitle": "Laat je agents niet gaan",
+  "server.plan.dialogDescription":
+    "{name} is gestopt omdat het abonnement niet is betaald. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
+  "server.plan.dialogDaysLeft": {
+    one: "Nog {count} dag",
+    other: "Nog {count} dagen",
+  },
+  "server.plan.later": "Later",
+  "server.plan.keepAgents": "Agents houden",
+  "server.plan.ownerRenews":
+    "De agents van {name} zijn niet beschikbaar tot de eigenaar van de server het abonnement verlengt.",
   "server.select.failedTitle": "Kan de server niet kiezen",
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",

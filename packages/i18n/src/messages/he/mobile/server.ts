@@ -342,6 +342,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "ממתין. המארח מריץ כמה תורות שהזיכרון שלו מאפשר.",
   "mobile.server.threads.hold.agentBusy": "ממתין לסיום עבודה אחרת של הסוכן הזה.",
   "mobile.server.threads.hold.oneTurn": "ממתין. הספק של הסוכן הזה מריץ תור אחד בכל פעם.",
+  "mobile.server.threads.hold.signIn": "ממתין. הספק של הסוכן הזה דורש התחברות.",
   "mobile.server.threads.offline": "יש להתחבר לשרת הזה כדי לראות את השרשורים שלו.",
   "mobile.server.threads.loading": "טוען שרשורים…",
   "mobile.server.threads.loadFailed": "לא ניתן לטעון את השרשורים של חלק מהסוכנים.",
@@ -650,6 +651,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "הוספת סוכנים",
   "mobile.server.browserProfiles.agentsHint":
     "נגיעה נותנת לסוכן את הפרופיל הזה, או מחזירה אותו לפרופיל המשותף. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.server.browserProfiles.movedNote":
+    "ההתחברויות לאתרים נשארות בפרופיל הישן. סוכן שהועבר צריך להתחבר שוב לאתרים האלה.",
   "mobile.server.browserProfiles.clear": "ניקוי נתונים",
   "mobile.server.browserProfiles.clearTitle": "לנקות את הנתונים של {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -2103,4 +2106,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "לא ניתן לאשר את ההעברה",
   "mobile.server.ownerTransfer.declineFailed": "לא ניתן לדחות את ההעברה",
   "mobile.server.ownerTransfer.tryAgain": "אפשר לנסות שוב מאוחר יותר.",
+  "mobile.server.providers.updateAll": "עדכון הכול",
+  "mobile.server.providers.updateAllFailed": "חלק מהעדכונים לא התחילו. נסו שוב.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -239,6 +239,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.browserProfile.manageDescription":
     "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
   "agentSettings.browserProfile.manage": "Manage",
+  "agentSettings.browserProfile.movedNote":
+    "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });
