@@ -194,7 +194,7 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #exchanges = new Map<string, Deferred.Deferred<boolean>>();
   readonly #attempts = new Map<string, () => void>();
   readonly #pages = new Map<string, McpOAuthClientProvider>();
-  readonly #unanswered = new Map<string, string>();
+  readonly #unanswered = new Map<string, { url: string; openedElsewhere: boolean }>();
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<McpRefreshOutcome>>();
   readonly #generations = new Map<string, number>();
@@ -297,8 +297,9 @@ export class McpOAuth implements McpOAuthAuthority {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
     this.#attempts.get(key)?.();
-    const unanswered = this.#unanswered.get(key);
+    const previous = this.#unanswered.get(key);
     this.#unanswered.delete(key);
+    const unanswered = previous?.openedElsewhere === (open !== undefined) ? previous.url : undefined;
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
     let refused = false;
@@ -319,7 +320,8 @@ export class McpOAuth implements McpOAuthAuthority {
     const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
     const abandon = () => {
       const unansweredNow = provider.openedRedirectUrl ?? unanswered;
-      if (!abandoned && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
+      if (!abandoned && this.#waiting.has(state) && unansweredNow)
+        this.#unanswered.set(key, { url: unansweredNow, openedElsewhere: open !== undefined });
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
@@ -813,7 +815,6 @@ class McpOAuthClientProvider implements OAuthClientProvider {
 
   #registersFirstAddress(client: OAuthClientInformationFull): boolean {
     const first = this.#options.firstRedirectUrl;
-    if (first === this.#options.redirectUrl) return true;
     const localhost = localhostRedirectUrl(first);
     return (
       registersAddress(client.redirect_uris, first) ||
@@ -914,9 +915,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const deepLink = this.#deepLinkRedirectUrl;
     const first = this.#options.firstRedirectUrl;
     const firstNames = [first, localhostRedirectUrl(first)];
-    const names = deepLink && sent === deepLink ? firstNames : [this.#otherRedirectName(sent)];
-    if (sent && first !== this.#options.redirectUrl && firstNames.includes(sent))
-      names.push(this.#options.redirectUrl, localhost);
+    const ownNames = first === this.#options.redirectUrl ? [] : [this.#options.redirectUrl, localhost];
+    const names = deepLink && sent === deepLink ? [...firstNames, ...ownNames] : [this.#otherRedirectName(sent)];
+    if (sent && firstNames.includes(sent)) names.push(...ownNames);
     return names
       .filter((name) => name !== null)
       .map((name) => ({ ...init, body: JSON.stringify({ ...body, redirect_uris: [name] }) }));

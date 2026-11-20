@@ -586,6 +586,26 @@ async function main(): Promise<void> {
     check(lost, lost.signedIn, "no token is stored after the sign-in");
     report.cases.push(lost);
 
+    const ownListener = "http://127.0.0.1:28417/mcp-auth";
+    const openedElsewhere = await runCase("opened-elsewhere-keeps-mcp-auth", ["none"], 1, {
+      storedClient: "e2e-unfinished-callback-client",
+      storedClientRedirects: [callback],
+      relayDeepLink: null,
+    });
+    check(
+      openedElsewhere,
+      openedElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${openedElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      openedElsewhere,
+      openedElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${openedElsewhere.redirects.join()}`,
+    );
+    check(openedElsewhere, openedElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(openedElsewhere);
+
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(
       forbidden,
