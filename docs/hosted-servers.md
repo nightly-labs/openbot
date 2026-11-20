@@ -1865,6 +1865,8 @@ Each message is one line: an emoji and a bold word for the event, then the parts
 | A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `🔴 **Pool** <location> <product> · 0 free left` (`🟠` for 1) | Buy and `prepare` machines. |
 | A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `⛵ **Boat start** · <plan> server · <currency> · <server ID prefix> · <reason>` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
 | A pool start is lost (no sign-in in 4 minutes) | `🛠️ **Pool start lost** · <plan> server · <server ID prefix> · machine <host ID> · prepare it again` | `prepare --reinstall` the machine. |
+| `sync` puts the data of an ended plan in B2 and frees its machine | ``📦 **Archived** · <plan> server · `<email>` · <server ID prefix> · <size> in B2 · VPS <VPS ID> free · <cancelled or payment failed> · <time>`` | `prepare` the machine. |
+| A machine reports a finished restore | `♻️ **Restored** · <plan> server · <server ID prefix> · machine <host ID> · <time>` | None. |
 | A server plan starts (a new subscription) | ``🆕 **New** server · `<email>` · <plan> · <amount>`` | None. |
 | A license starts (a new subscription) | ``🆕 **New** license · `<email>` · <tier> · <n> users · <amount>`` | None. |
 | A subscription starts with a free trial | ``🧪 **Trial** <server or license> · `<email>` · ...`` | None. |
@@ -1874,9 +1876,10 @@ Each message is one line: an emoji and a bold word for the event, then the parts
 | A paid Checkout page has a billing address in another country than the saved billing country | `🧾 **VAT check** · Checkout page <session ID> took the VAT of <country> (<treatment>), but its billing address is in <country>. ...` | Check the VAT of its invoice. |
 | Paid sales to consumers in other EU countries reach EUR 9,000 (net) in a calendar year, once a year | `🧾 **VAT limit** · in <year>, sales to consumers in other EU countries reached <amount> (net). ...` | Register for the EU One Stop Shop and charge the VAT of the buyer's country before EUR 10,000. |
 
-A purchase message (the 6 rows with an email) and a payment message (below) have the email of the
-account, on a developer decision, so keep the webhook in a private channel. A pool message has no
-account, email or name. A VAT message is the text of its log line with the emoji; the log line stays
+A purchase message (the 6 rows with an email), the `Archived` message and a payment message (below)
+have the email of the account, on a developer decision, so keep the webhook in a private channel.
+`Archived` comes from `leaseweb-pool.ts sync`, not from the Worker, and shows `unknown account` when
+the account is gone. The other pool messages have no account, email or name. A VAT message is the text of its log line with the emoji; the log line stays
 plain.
 
 The same webhook also gets one payment message for each invoice line of a server plan or a license

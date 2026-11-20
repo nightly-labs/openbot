@@ -896,6 +896,10 @@ your account email, the plan or the license tier and its number of users, the bi
 currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
 server ID. Discord keeps the message under its own policy.
 
+When your hosted server plan ends and the OpenBot team stores the data of the server in its archive,
+the same channel gets one message with your account email, the plan, the first 8 characters of the
+server ID, the size of the archive and the ID of the machine.
+
 ## Data stored on the OpenBot computer
 
 Saved agent memories, their inclusion settings, and their full-text search index stay in the local

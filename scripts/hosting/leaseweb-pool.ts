@@ -152,6 +152,7 @@ const workRowSchema = z.object({
 type WorkRow = z.infer<typeof workRowSchema>;
 const archiveRowSchema = workRowSchema.extend({
   plan: z.string(),
+  email: z.string().nullable(),
   plan_ended_at: z.number().int(),
   subscription: z.string().regex(SUBSCRIPTION_PATTERN).nullable(),
 });
@@ -327,6 +328,7 @@ function referenceLabel(reference: string) {
     .join(" ");
 }
 
+const alertCode = (value: string) => `\`${value.replaceAll("`", "'")}\``;
 const gigabytes = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
 const elapsedText = (milliseconds: number) => {
   const seconds = Math.max(0, Math.round(milliseconds / 1000));
@@ -482,6 +484,7 @@ class Pool {
       reinstall: query("desired_state = 'deleted' AND observed_state = 'deleted'"),
       archive: this.#rows(
         `SELECT h.server_id, h.operator_host, h.plan, h.plan_ended_at,
+           (SELECT u.email FROM users u WHERE u.id = h.owner_user_id) AS email,
            (SELECT s.stripe_subscription_id FROM billing_subscriptions s WHERE s.server_id = h.server_id
             ORDER BY COALESCE(s.current_period_end, 0) DESC, s.updated_at DESC LIMIT 1) AS subscription
          FROM hosted_servers h
@@ -864,7 +867,8 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
     logger.info(`VPS ${machine.id} is free. Run prepare to offer it for a new server.`);
     await this.#alert(
       [
-        `📦 **Archived** · ${row.plan} server · ${row.server_id.slice(0, 8)} · ${gigabytes(archivedBytes)} in B2`,
+        `📦 **Archived** · ${row.plan} server · ${row.email === null ? "unknown account" : alertCode(row.email)}`,
+        `${row.server_id.slice(0, 8)} · ${gigabytes(archivedBytes)} in B2`,
         `VPS ${machine.id} free`,
         end === "payment_failed" ? "payment failed" : "cancelled",
         elapsedText(Date.now() - started),
