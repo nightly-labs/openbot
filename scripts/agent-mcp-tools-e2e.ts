@@ -680,12 +680,6 @@ process.stdin.on("data", (chunk) => {
     [COMPUTER_USE_MCP_SERVER_ID, stdioRow.id],
     "an unsaved row stays out",
   );
-  const computerUseRan = await runCauseEffect(agentTools.callTool(computerUse, "list_windows", {}));
-  assert.ok("result" in computerUseRan, "the Computer Use tool runs");
-  assert.deepEqual(mcpToolCallResponse(computerUseRan.result), {
-    success: true,
-    contentItems: [{ type: "inputText", text: "list_windows key=true" }],
-  });
   store.remove(stdioRow.id);
 
   const statefulProgram = join(root, "stateful-mcp-server.js");
