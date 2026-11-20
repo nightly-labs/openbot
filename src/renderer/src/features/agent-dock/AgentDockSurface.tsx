@@ -228,6 +228,7 @@ export function AgentDockSurface() {
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
+        thread: chat.thread ?? null,
         messages,
         working: chat.working,
         wait: chat.wait,
@@ -365,7 +366,16 @@ export function AgentDockSurface() {
                   ? failed.clientMessageId
                   : crypto.randomUUID();
               try {
-                await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
+                const taskId = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey)?.thread
+                  ?.taskId;
+                await perform({
+                  type: "send",
+                  serverId: server,
+                  seat: contractSeat(seat),
+                  ...(taskId ? { taskId } : {}),
+                  text,
+                  clientMessageId,
+                });
                 failed = null;
                 return { messageId: clientMessageId };
               } catch (error) {

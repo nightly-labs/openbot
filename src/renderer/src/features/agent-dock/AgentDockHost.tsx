@@ -19,12 +19,14 @@ import {
   type AgentDockTakeover,
   type AgentDockTakeoverPage,
   type AgentDockUsageLimit,
+  type AgentTask,
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
   sameAgentModelChoice,
   withOpenBotSource,
 } from "@openbot/contracts/ipc";
+import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import {
@@ -44,12 +46,15 @@ import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/si
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
+import { toAgentMessages } from "../../app-message-projection";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
+import { agentTasksPort } from "../agent-tasks/agent-tasks-port";
+import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { createAgentActivity } from "../agents/agent-activity";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
@@ -156,10 +161,30 @@ export function AgentDockHost() {
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
   const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
     useAgents();
-  const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
-    useConversation();
+  const {
+    conversations,
+    markAgentMessagesRead,
+    loadLatestAgentMessages,
+    clearRecentReply,
+    presentPromptResolution,
+    sendMessage,
+  } = useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
   const agentTasks = useAgentTasks();
+  const agentThreads = useAgentThreads();
+  const openThread = (agentId: string): AgentTask | undefined => {
+    const shown = agentThreads.activeId(agentId);
+    return agentTasks.snapshot(agentId)?.tasks.find((task) => task.id === shown);
+  };
+  const threadMessages = (agentId: string, thread: AgentTask): AgentMessage[] => {
+    const messages = agentTasks.conversation(thread.id)?.messages;
+    return messages
+      ? toAgentMessages(
+          messages.filter((message) => message.questionPrompt?.resolution !== null),
+          agentId,
+        )
+      : [];
+  };
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const channels = useChannels();
   const {
@@ -359,10 +384,11 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     );
   });
   const agentMessages = (agentId: string): AgentMessage[] => {
-    const running = workingTurns()[agentId];
+    const thread = openThread(agentId);
+    const running = thread ? thread.activeTurnId : workingTurns()[agentId];
     const asking = promptOf({ kind: "agent", id: agentId })?.turnId;
     return withStepAnswers(
-      (conversations[agentId]?.messages ?? []).map(asOwn),
+      (thread ? threadMessages(agentId, thread) : (conversations[agentId]?.messages ?? [])).map(asOwn),
       new Set(running && running !== asking ? [running] : []),
       () => agentList().find((agent) => agent.id === agentId)?.provider,
     );
@@ -373,12 +399,14 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const failed = (key: string) => {
     if (!disposed) setFailedAnswers((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
   };
-  const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] =>
-    seat.kind === "agent"
-      ? shownAgents().flatMap((agent) =>
-          agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
-        )
-      : (shownChannels().find((channel) => channel.id === seat.id)?.threads ?? []);
+  const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] => {
+    if (seat.kind === "channel") return shownChannels().find((channel) => channel.id === seat.id)?.threads ?? [];
+    const own = shownAgents().flatMap((agent) =>
+      agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
+    );
+    const thread = openThread(seat.id);
+    return thread ? [{ agentId: seat.id, threadId: thread.threadId }, ...own] : own;
+  };
   const approvalOf = (seat: AgentDockSeatRef): AgentDockApproval | null => {
     const threads = threadsOf(seat);
     const approval = approvals().find((item) =>
@@ -499,9 +527,16 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       };
     }
     const state = agentStates()[seat.id];
+    const thread = openThread(seat.id);
     return {
+      thread: thread
+        ? {
+            taskId: thread.id,
+            title: thread.title.slice(0, INPUT_LIMITS.agentTaskTitle) || t("conversation.threads.new"),
+          }
+        : null,
       messages: agentMessages(seat.id),
-      working: Boolean(workingTurns()[seat.id]),
+      working: thread ? isAgentTaskActive(thread) : Boolean(workingTurns()[seat.id]),
       wait: state?.kind === "waiting" ? state.reason : null,
       approval: approvalOf(seat),
       prompt: promptOf(seat),
@@ -514,12 +549,24 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   createEffect(
     () => {
       const seat = openSeat();
-      return seat?.kind === "agent"
-        ? { agentId: seat.id, latest: latestVisibleAgentMessageId(conversations[seat.id]?.messages) }
-        : null;
+      if (seat?.kind !== "agent") return null;
+      const thread = openThread(seat.id);
+      if (thread)
+        return agentTasks.unreadCount(thread) > 0
+          ? {
+              agentId: seat.id,
+              taskId: thread.id,
+              latest: latestVisibleAgentMessageId(threadMessages(seat.id, thread)),
+            }
+          : null;
+      return { agentId: seat.id, latest: latestVisibleAgentMessageId(conversations[seat.id]?.messages) };
     },
     (open) => {
       if (!open?.latest || !readable()) return;
+      if (open.taskId !== undefined) {
+        agentTasks.markTaskRead(open.agentId, open.taskId, open.latest);
+        return;
+      }
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
     },
@@ -606,7 +653,21 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     openSeat,
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
-      if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
+      if (seat?.kind !== "agent") return;
+      const thread = openThread(seat.id);
+      if (thread && !agentTasks.conversation(thread.id)) agentTasks.openTask(seat.id, thread.id);
+      if (!thread && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
+    },
+    async sendToAgent(agentId: string, text: string): Promise<AgentDockSendResult> {
+      const thread = openThread(agentId);
+      if (!thread) return sendMessage(text, [], null, { agentId, serverId });
+      const clientMessageId = crypto.randomUUID();
+      try {
+        await agentTasksPort(serverId).sendToTask({ agentId, taskId: thread.id, text, clientMessageId });
+        return { messageId: clientMessageId };
+      } catch (error) {
+        return { error: errorMessage(error, t("conversation.threads.error.send")) };
+      }
     },
     mainTabOf(agentId: string): string | undefined {
       const state = agentStates()[agentId];
@@ -706,7 +767,6 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 }
 
 function WindowAgentDock(props: { serverId: string }) {
-  const { sendMessage } = useConversation();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const { openAppSettings } = useSettings();
@@ -733,9 +793,7 @@ function WindowAgentDock(props: { serverId: string }) {
       onRemove={dock.remove}
       onMove={dock.move}
       onSend={(seat, text) =>
-        seat.kind === "channel"
-          ? dock.sendToChannel(seat.id, text)
-          : sendMessage(text, [], null, { agentId: seat.id, serverId: props.serverId })
+        seat.kind === "channel" ? dock.sendToChannel(seat.id, text) : dock.sendToAgent(seat.id, text)
       }
       onOpenInMain={(seat) =>
         seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id, dock.mainTabOf(seat.id))
@@ -964,6 +1022,7 @@ function openChats(
   return [
     {
       seat: { kind: seat.kind, id: seat.id },
+      thread: model.thread ? { taskId: model.thread.taskId, title: model.thread.title } : null,
       messages: messages(seat).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
       working: model.working,
       wait: model.wait,
