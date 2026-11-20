@@ -17,7 +17,7 @@ import {
   useField,
   useLocked,
 } from "./workflow-node-parts";
-import { CardPicture, CardPictureLoading } from "./workflow-picture";
+import { CardPicture, CardPictureLoading, VideoFrame } from "./workflow-picture";
 
 type AssetFilter = "recent" | "images" | "files";
 
@@ -93,32 +93,53 @@ export function assetPicture(board: WfnBoard, id: string): string | undefined {
   return file?.previewKind === "image" ? (thumbUrl(board, file) ?? undefined) : undefined;
 }
 
+const LIBRARY_VIDEO_FRAME_BYTES = 32 * 1024 * 1024;
+
+const isVideoFile = (file: StoredFileRow | undefined) => WORKFLOW_ASSET_VIDEO_TYPES.has(file?.mimeType ?? "");
+
+function videoFrameUrl(board: WfnBoard, file: StoredFileRow, card: boolean): string | undefined {
+  if (!isVideoFile(file) || (!card && file.size > LIBRARY_VIDEO_FRAME_BYTES)) return undefined;
+  return board.catalogs().media?.(file.id, "video") ?? undefined;
+}
+
+function AssetGlyph(props: { name: string }) {
+  return (
+    <span class="wfn-asset-glyph" aria-hidden="true">
+      <File />
+      <span>{fileExtension(props.name)}</span>
+    </span>
+  );
+}
+
 function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   const board = useBoard();
   return (
     <Show
-      when={thumbUrl(board, props.file)}
+      when={videoFrameUrl(board, props.file, props.card === true)}
+      keyed
       fallback={
         <Show
-          when={props.card && thumbUrl(board, props.file) === undefined}
+          when={thumbUrl(board, props.file)}
           fallback={
-            <span class="wfn-asset-glyph" aria-hidden="true">
-              <File />
-              <span>{fileExtension(props.file.name)}</span>
-            </span>
+            <Show
+              when={props.card && thumbUrl(board, props.file) === undefined}
+              fallback={<AssetGlyph name={props.file.name} />}
+            >
+              <CardPictureLoading />
+            </Show>
           }
         >
-          <CardPictureLoading />
+          {(url) =>
+            props.card ? (
+              <CardPicture src={url()} alt="" />
+            ) : (
+              <img class="wfn-media" src={url()} alt="" decoding="async" draggable="false" />
+            )
+          }
         </Show>
       }
     >
-      {(url) =>
-        props.card ? (
-          <CardPicture src={url()} alt="" />
-        ) : (
-          <img class="wfn-media" src={url()} alt="" decoding="async" draggable="false" />
-        )
-      }
+      {(src) => <VideoFrame src={src} card={props.card} fallback={<AssetGlyph name={props.file.name} />} />}
     </Show>
   );
 }
@@ -343,6 +364,7 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
+  const isVideo = () => isVideoFile(file());
   const shape = usePictureShape(() => {
     const current = file();
     return current && isImage() ? (thumbUrl(board, current) ?? undefined) : undefined;
@@ -373,7 +395,7 @@ export function AssetNode(props: { id: string; file?: string }) {
         id={props.id}
         label={t("workflow.asset.title")}
         kind="asset"
-        media={isImage()}
+        media={isImage() || isVideo()}
         clear={clear()}
         style={{ "--wfn-aspect": clear() ? String(shape()?.ratio ?? 4 / 3) : "4 / 3" }}
         output={file() ? (isImage() ? "image" : "file") : undefined}
@@ -442,7 +464,7 @@ export function AssetNode(props: { id: string; file?: string }) {
             >
               {(current) => (
                 <Show
-                  when={isImage()}
+                  when={isImage() || isVideo()}
                   fallback={
                     <span class="wfn-asset-file">
                       <AssetThumb file={current()} />
