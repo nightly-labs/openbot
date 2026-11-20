@@ -44,6 +44,8 @@ const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-sonnet-5", reason
 
 const CPU_PROFILE_MS = 15 * SECOND;
 const TRACE_MS = 5 * SECOND;
+const ACT_TRACE_DELAY_MS = 5 * SECOND;
+const ACT_TRACE_MS = 8 * SECOND;
 const TRACE_CATEGORIES = ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink", "cc", "v8.execute"];
 
 const wait = (milliseconds: number) => new Promise<void>((resolveWait) => setTimeout(resolveWait, milliseconds));
@@ -185,6 +187,25 @@ async function writeCpuProfile(browser: Browser, page: Page, path: string): Prom
   }
 }
 
+async function writeActTrace(browser: Browser, page: Page, base: string, actDone: Promise<void>): Promise<void> {
+  const started = await Promise.race([wait(ACT_TRACE_DELAY_MS).then(() => true), actDone.then(() => false)]);
+  if (!started) return;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await mkdir(dirname(base), { recursive: true });
+    await session.send("Profiler.enable");
+    await session.send("Profiler.start");
+    await browser.startTracing(page, { path: `${base}-act.trace.json`, categories: TRACE_CATEGORIES });
+    await Promise.race([wait(ACT_TRACE_MS), actDone]);
+    await browser.stopTracing();
+    const { profile } = await session.send("Profiler.stop");
+    await writeFile(`${base}-act-renderer.cpuprofile`, JSON.stringify(profile));
+    logger.info(`act trace and CPU profile written to ${base}-act.trace.json and ${base}-act-renderer.cpuprofile`);
+  } finally {
+    await session.detach().catch(() => undefined);
+  }
+}
+
 interface RunOptions {
   label: string;
   authApiUrl: string;
@@ -194,6 +215,7 @@ interface RunOptions {
   probes: boolean;
   solidCauses: boolean;
   mainProfile: boolean;
+  traceAct: boolean;
 }
 
 async function startMainProfile(inspector: InspectorClient): Promise<() => Promise<unknown>> {
@@ -224,7 +246,7 @@ async function writeFailureScreenshot(page: Page, path: string): Promise<void> {
 async function runOnce(
   scenario: Scenario,
   index: number,
-  { label, authApiUrl, cpuProfile, frames, callCounts, probes, solidCauses, mainProfile }: RunOptions,
+  { label, authApiUrl, cpuProfile, frames, callCounts, probes, solidCauses, mainProfile, traceAct }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
   const scenarioEnvironment = scenario.prepare
@@ -274,16 +296,27 @@ async function runOnce(
     const stopMainProfile = mainProfile && index === 0 && inspector ? await startMainProfile(inspector) : null;
     const stopRenderRecording = await startRenderRecording(appWindow, { frames, callCounts });
     const actStarted = Date.now();
-    await scenario.act({
-      app,
-      browser,
-      page: appWindow,
-      inspector,
-      logger,
-      evaluate: <T>(expression: string) => appWindow.evaluate<T>(expression),
-      wait,
-      record: (values) => Object.assign(recorded, values),
+    let finishAct = () => {};
+    const actDone = new Promise<void>((resolve) => {
+      finishAct = resolve;
     });
+    const actTrace =
+      traceAct && index === 0
+        ? writeActTrace(connected.browser, appWindow, join(BENCH_ROOT, "snapshots", `${label}-${scenario.id}`), actDone)
+        : null;
+    await scenario
+      .act({
+        app,
+        browser,
+        page: appWindow,
+        inspector,
+        logger,
+        evaluate: <T>(expression: string) => appWindow.evaluate<T>(expression),
+        wait,
+        record: (values) => Object.assign(recorded, values),
+      })
+      .finally(finishAct);
+    await actTrace;
     const actMs = Date.now() - actStarted;
     const renderWork = await stopRenderRecording();
     const mainCpuProfile = stopMainProfile ? await stopMainProfile() : null;
@@ -351,6 +384,7 @@ async function runOnce(
 const USAGE = [
   "Usage: bun run dev:bench --scenario=<id|prefix|all> [--runs=<n>] [--label=<name>] [--compare=<report.json>]",
   "                         [--cpu-profile] [--frames] [--call-counts] [--probes] [--solid-causes] [--main-profile]",
+  "                         [--trace-act]",
   "                         [--budget=<perf-budgets.json>]",
   "",
   "Scenarios:",
@@ -368,6 +402,7 @@ const OPTIONS = {
   probes: { type: "boolean" },
   "solid-causes": { type: "boolean" },
   "main-profile": { type: "boolean" },
+  "trace-act": { type: "boolean" },
   budget: { type: "string" },
 } as const;
 
@@ -401,6 +436,7 @@ async function main(): Promise<void> {
   const probes = parsed.values.probes ?? false;
   const mainProfile = parsed.values["main-profile"] ?? false;
   const solidCauses = parsed.values["solid-causes"] ?? false;
+  const traceAct = parsed.values["trace-act"] ?? false;
   if (solidCauses && !probes) throw new Error("--solid-causes needs --probes.");
   if (probes) assertBenchBuild(PROJECT_ROOT);
   const budgetPath = parsed.values.budget;
@@ -436,6 +472,7 @@ async function main(): Promise<void> {
               probes,
               solidCauses,
               mainProfile,
+              traceAct,
             }),
           );
         }
