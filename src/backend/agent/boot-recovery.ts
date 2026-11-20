@@ -121,8 +121,19 @@ export class BootRecovery {
     }
   }
 
+  hasOrphanedOwnChatDelivery(agentId: string): boolean {
+    return this.#mailbox
+      .unresolvedDeliveries()
+      .some(({ delivery }) => this.#inOwnChatOf(delivery, agentId) && this.#orphanedDeliveryIds.has(delivery.id));
+  }
+
+  #inOwnChatOf(delivery: UnresolvedDelivery, agentId: string): boolean {
+    return delivery.recipientAgentId === agentId && this.#mailbox.laneIdForDelivery(delivery.id) === null;
+  }
+
   readonly reconcileUnresolvedDeliveries = Effect.fn("BootRecovery.reconcileUnresolvedDeliveries")(function* (
     this: BootRecovery,
+    ownChatAgentId?: string,
   ) {
     const unresolved = yield* recoveryStep(() => this.#mailbox.unresolvedDeliveries());
     const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
@@ -138,6 +149,7 @@ export class BootRecovery {
       unconfirmedStarts.set(laneOf(delivery), ids.add(delivery.id));
     }
     for (const { delivery } of unresolved) {
+      if (ownChatAgentId !== undefined && !this.#inOwnChatOf(delivery, ownChatAgentId)) continue;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
       const batchIds = delivery.turnId ? null : (unconfirmedStarts.get(laneOf(delivery)) ?? null);
       yield* this.#reconcileOrphanedDelivery(delivery, batchIds).pipe(

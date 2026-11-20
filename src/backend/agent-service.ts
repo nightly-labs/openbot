@@ -1670,6 +1670,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         staleTurnSettlement: (agentId, threadId, turnId) =>
           this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
+        orphanedDeliveryRecovery: (agentId) =>
+          this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
@@ -3586,6 +3588,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#turn.workingCodexChildren(agentId, turnId).length === 0
     );
   }
+
+  #mayRecoverOrphanedDeliveries(agentId: string): boolean {
+    if (this.#stopping || !this.#boot.hasOrphanedOwnChatDelivery(agentId)) return false;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    return agent !== undefined && this.#providers.clientForAgent(agent) !== null;
+  }
+
+  readonly #recoverOrphanedDeliveries = Effect.fn("AgentService.recoverOrphanedDeliveries")(function* (
+    this: AgentService,
+    agentId: string,
+  ) {
+    if (!this.#mayRecoverOrphanedDeliveries(agentId)) return;
+    logger.warn("A message that no provider runs held the agent's queue. OpenBot settles it again.", { agentId });
+    yield* this.#boot
+      .reconcileUnresolvedDeliveries(agentId)
+      .pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#emitError("delivery_reconcile_failed", failure.cause, agentId)),
+        ),
+      );
+    if (!this.#boot.hasOrphanedOwnChatDelivery(agentId)) this.#drain.scheduleDrain(agentId);
+  });
 
   readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
     this: AgentService,
