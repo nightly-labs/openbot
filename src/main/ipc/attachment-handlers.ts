@@ -38,12 +38,14 @@ import {
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Schema } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, shell } from "electron";
 import { type Zippable, zip } from "fflate";
 import type { AgentService } from "../../backend/agent-service";
 import { causeHelpers, runCauseEffect } from "../../backend/effect-boundary";
 import type { MailboxStore } from "../../backend/mailbox-store";
+import { openWithXdg } from "../external-link-opener";
 import { filePreviewFromBytes, localFilePreview, mimeTypeForName } from "../file-preview";
 import { filePreviewPages } from "../file-preview-pages";
 import { AttachmentDownloadStopped } from "../remote-attachment-cache";
@@ -68,6 +70,8 @@ import {
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
 import { scopedHandler } from "./scoped-handler";
+
+const logger = createOpenBotLogger("attachments");
 
 export interface AttachmentIpcDependencies {
   service: Pick<
@@ -397,6 +401,13 @@ async function cacheRemoteFile(
 }
 
 async function openPath(path: string): Promise<void> {
+  if (process.platform === "linux") {
+    await openWithXdg(path).catch((cause: unknown) => {
+      logger.warn("No app on this computer opened the file.", toLogValue(cause));
+      throw new Error(sourceText("error.attachment.noApp"));
+    });
+    return;
+  }
   const error = await shell.openPath(path);
   if (error) throw new Error(error);
 }
