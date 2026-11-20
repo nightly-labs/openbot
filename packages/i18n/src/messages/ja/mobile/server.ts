@@ -1666,4 +1666,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "移行を承認できませんでした",
   "mobile.server.ownerTransfer.declineFailed": "移行を拒否できませんでした",
   "mobile.server.ownerTransfer.tryAgain": "後でもう一度お試しください。",
+  "mobile.server.providers.updateAll": "すべて更新",
+  "mobile.server.providers.updateAllFailed": "一部の更新を開始できませんでした。もう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

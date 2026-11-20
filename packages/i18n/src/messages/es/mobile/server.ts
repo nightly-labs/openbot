@@ -1708,4 +1708,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "No se pudo aceptar la transferencia",
   "mobile.server.ownerTransfer.declineFailed": "No se pudo rechazar la transferencia",
   "mobile.server.ownerTransfer.tryAgain": "Inténtalo más tarde.",
+  "mobile.server.providers.updateAll": "Actualizar todo",
+  "mobile.server.providers.updateAllFailed": "Algunas actualizaciones no se iniciaron. Inténtalo de nuevo.",
 } as const satisfies PartialTranslation<typeof source>;

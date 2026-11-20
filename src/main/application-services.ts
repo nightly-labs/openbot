@@ -359,7 +359,6 @@ import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/pr
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
-import { createProviderCliAppVersionStore } from "./provider-cli-app-version-store";
 import { ProviderCredentialStore } from "./provider-credential-store";
 import { createProviderDetection, type ProviderDetection } from "./provider-detection";
 import { PROVIDER_DETECTION_SETTINGS_FILE, ProviderDetectionSettingsStore } from "./provider-detection-settings-store";
@@ -495,7 +494,6 @@ const INTERFACE_SIZE_PREFERENCE_FILE = "openbot-interface-size-preference-v1.jso
 const NOTIFICATION_PREFERENCE_FILE = "openbot-notification-preference-v1.json";
 const PUSH_NOTIFICATION_FILE = "openbot-push-notifications-v1.json";
 const BUSY_MESSAGE_MODE_PREFERENCE_FILE = "openbot-busy-message-mode-v1.json";
-const PROVIDER_CLI_APP_VERSION_FILE = "openbot-provider-cli-app-version-v1.json";
 const AGENT_DEFAULTS_PREFERENCE_FILE = "openbot-agent-defaults-v1.json";
 const AGENT_MEMORY_LIMIT_PREFERENCE_FILE = "openbot-agent-memory-limit-v1.json";
 const MEMORY_REVIEW_PREFERENCE_FILE = "openbot-memory-review-v1.json";
@@ -1525,14 +1523,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), "openbot-provider-accounts-v1.json"),
     join(app.getPath("userData"), "provider-accounts"),
   );
-  const providerCliAppVersion = createProviderCliAppVersionStore(
-    join(app.getPath("userData"), PROVIDER_CLI_APP_VERSION_FILE),
-  );
-  await Promise.all([
-    runCauseEffect(providerUse.load()),
-    runCauseEffect(providerAccounts.load()),
-    runCauseEffect(providerCliAppVersion.load()),
-  ]);
+  await Promise.all([runCauseEffect(providerUse.load()), runCauseEffect(providerAccounts.load())]);
   const providerRuntimesRoot =
     localServerChild?.runtimeRoot ??
     providerRuntimeRoot({
@@ -2535,20 +2526,13 @@ export async function createApplicationServices({
     if (event.type === "status") trackSystemCliVersions(event.status);
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
-  const appUpgraded = providerCliAppVersion.get().appVersion !== app.getVersion();
   if (diskRestoring()) {
     updateCheckWait = Effect.runFork(
-      diskRestoreEnded.pipe(
-        Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded }))),
-      ),
+      diskRestoreEnded.pipe(Effect.andThen(Effect.sync(() => providerRuntimes.startUpdateChecks()))),
     );
   } else {
-    providerRuntimes.startUpdateChecks({ updateInstalled: appUpgraded });
+    providerRuntimes.startUpdateChecks();
   }
-  if (appUpgraded)
-    void runCauseEffect(providerCliAppVersion.set({ appVersion: app.getVersion() })).catch((error) =>
-      logger.warn("The provider CLI app version did not save.", toLogValue(error)),
-    );
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
   });

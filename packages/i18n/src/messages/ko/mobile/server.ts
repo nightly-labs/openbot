@@ -1625,4 +1625,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "이전을 수락하지 못했어요",
   "mobile.server.ownerTransfer.declineFailed": "이전을 거절하지 못했어요",
   "mobile.server.ownerTransfer.tryAgain": "나중에 다시 시도해 주세요.",
+  "mobile.server.providers.updateAll": "모두 업데이트",
+  "mobile.server.providers.updateAllFailed": "일부 업데이트를 시작하지 못했습니다. 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1663,4 +1663,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren",
   "mobile.server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren",
   "mobile.server.ownerTransfer.tryAgain": "Probeer het later opnieuw.",
+  "mobile.server.providers.updateAll": "Alles updaten",
+  "mobile.server.providers.updateAllFailed": "Sommige updates zijn niet gestart. Probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;
