@@ -53,6 +53,7 @@ interface ScrollStickyState {
   setStickToLatest: (value: boolean) => void;
   getCurrentUnreadCount: () => number;
   followLatest: (element: HTMLDivElement) => void;
+  followReaderScroll: (element: HTMLDivElement) => void;
 }
 
 export interface ScrollStoreDeps {
@@ -364,6 +365,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     stickToLatest: deps.sticky.getStickToLatest,
     followLatest: deps.sticky.followLatest,
     drawLatestFirst: true,
+    onRowsDrawn: deps.sticky.followReaderScroll,
     onChange: (instance) => {
       const first = instance.getVirtualItems()[0];
       if (!first) return;

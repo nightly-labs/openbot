@@ -19,6 +19,7 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
   drawLatestFirst?: boolean;
+  onRowsDrawn?: (element: TScrollElement) => void;
 }
 
 export interface ChatVirtualizer<TItemElement extends Element> {
@@ -31,6 +32,7 @@ export interface ChatVirtualizer<TItemElement extends Element> {
   scrollToIndex: (index: number, options?: { smooth?: boolean }) => void;
   scrollToOffset: (offset: number) => void;
   firstDrawnIndex: () => number;
+  drawAllRows: () => void;
 }
 
 const STATIC_CHAT_LIMIT = 100;
@@ -112,16 +114,50 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     drawFrom = 0;
   };
 
+  const unmeasuredRows = new Set<TItemElement>();
+  let measureQueued = false;
+
+  const measureNewRows = (): void => {
+    measureQueued = false;
+    for (const element of unmeasuredRows) if (element.isConnected) virtualizer.measureElement(element);
+    unmeasuredRows.clear();
+  };
+
+  const drawRowsFrom = (index: number): void => {
+    const element = options.getScrollElement();
+    const distanceFromEnd = element ? element.scrollHeight - element.scrollTop : undefined;
+    drawFrom = index;
+    flush(refresh);
+    const drawnRows = [...unmeasuredRows];
+    measureNewRows();
+    for (const row of drawnRows)
+      if (row.isConnected)
+        virtualizer.resizeItem(virtualizer.indexFromElement(row), Math.round(row.getBoundingClientRect().height));
+    if (element && distanceFromEnd !== undefined) {
+      element.scrollTop = element.scrollHeight - distanceFromEnd;
+      untrack(() => options.onRowsDrawn?.(element));
+    }
+    untrack(() => options.onChange?.(virtualizer));
+  };
+
   const drawEarlierRows = (): void => {
     drawFrame = undefined;
     if (drawFrom === 0) return;
-    const element = options.getScrollElement();
-    const distanceFromEnd = element ? element.scrollHeight - element.scrollTop : undefined;
-    drawFrom = options.stickToLatest?.() === false ? 0 : Math.max(0, drawFrom - EARLIER_ROWS_PER_FRAME);
-    flush(refresh);
-    if (element && distanceFromEnd !== undefined) element.scrollTop = element.scrollHeight - distanceFromEnd;
-    untrack(() => options.onChange?.(virtualizer));
+    drawRowsFrom(Math.max(0, drawFrom - EARLIER_ROWS_PER_FRAME));
     if (drawFrom > 0) drawFrame = requestAnimationFrame(drawEarlierRows);
+  };
+
+  const drawAllRows = (then?: () => void): void => {
+    if (drawFrom === 0) {
+      then?.();
+      return;
+    }
+    if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = undefined;
+      if (drawFrom > 0) drawRowsFrom(0);
+      then?.();
+    });
   };
 
   const opensOtherRows = (count: number): boolean => {
@@ -243,25 +279,20 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         virtualizer.measureElement(null);
         return;
       }
-      queueMicrotask(() => {
-        if (element.isConnected) virtualizer.measureElement(element);
-      });
+      unmeasuredRows.add(element);
+      if (measureQueued) return;
+      measureQueued = true;
+      queueMicrotask(measureNewRows);
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
-    scrollToIndex: (index, scroll) => {
-      const scrollToRow = () =>
-        virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" });
-      if (drawFrom === 0) {
-        scrollToRow();
-        return;
-      }
-      stopDrawingEarlierRows();
-      scheduleRefresh();
-      requestAnimationFrame(scrollToRow);
-    },
+    scrollToIndex: (index, scroll) =>
+      drawAllRows(() =>
+        virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+      ),
     scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
     firstDrawnIndex: () => drawFrom,
+    drawAllRows: () => drawAllRows(),
   };
 }
 
