@@ -7,6 +7,7 @@
   --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-canvas));
   --wfn-glass: color-mix(in srgb, var(--openbot-bg-surface-raised) 75%, transparent);
   --wfn-glass-blur: blur(40px) saturate(1.4);
+  --wfn-glass-clear-blur: blur(16px) saturate(1.6);
   --wfn-radius-card: calc(var(--openbot-radius-lg) + var(--openbot-space-1));
   --wfn-small: calc(var(--openbot-text-sm) - 1px);
   --wfn-tiny: calc(var(--openbot-text-sm) - 2px);
@@ -2333,7 +2334,7 @@ fieldset.wfn-picker-group {
   scale: calc(1 / var(--wfn-scale, 1));
   z-index: 2;
   display: flex;
-  gap: var(--openbot-space-1);
+  gap: var(--openbot-space-1-5);
   align-items: center;
   min-inline-size: 0;
   margin: 0;
@@ -2344,20 +2345,36 @@ fieldset.wfn-picker-group {
     calc(var(--wfn-snap-y, 0px) / var(--wfn-scale, 1));
 }
 
+.wfn-strip > button {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  -webkit-backdrop-filter: var(--wfn-glass-clear-blur);
+  backdrop-filter: var(--wfn-glass-clear-blur);
+}
+
+.wfn-strip > button:disabled {
+  opacity: 0.5;
+}
+
 .wfn-strip-list {
   position: relative;
   display: flex;
-  gap: var(--openbot-space-1-5);
+  gap: var(--openbot-space-2);
   align-items: center;
-  max-width: calc(7 * 36px + 6 * var(--openbot-space-1-5) + 16px);
-  height: 52px;
+  max-width: calc(7 * 48px + 6 * var(--openbot-space-2) + 24px);
+  height: 68px;
   overflow-x: auto;
   padding: 0 var(--openbot-space-1);
   scrollbar-width: none;
 }
 
 .wfn-strip-item {
-  --wfn-strip-size: 36px;
+  --wfn-strip-size: 48px;
+  --wfn-strip-ring: color-mix(in srgb, var(--wfn-kind) 45%, transparent);
 
   display: grid;
   flex: none;
@@ -2365,31 +2382,29 @@ fieldset.wfn-picker-group {
   width: var(--wfn-strip-size);
   height: var(--wfn-strip-size);
   overflow: hidden;
-  padding: 2px;
-  border: 2px solid color-mix(in srgb, var(--wfn-kind) 40%, transparent);
+  padding: 0;
+  border: 2px solid var(--wfn-strip-ring);
   border-radius: var(--openbot-radius-pill);
-  background: var(--wfn-glass);
-  color: var(--openbot-text-secondary);
+  background: transparent;
+  color: var(--openbot-text-primary);
   font-size: var(--wfn-small);
   font-variant-numeric: tabular-nums;
   font-weight: var(--openbot-weight-semibold);
   cursor: pointer;
-  backdrop-filter: var(--wfn-glass-blur);
+  -webkit-backdrop-filter: var(--wfn-glass-clear-blur);
+  backdrop-filter: var(--wfn-glass-clear-blur);
   transition-property: width, height, border-color, color, scale;
   transition-duration: var(--openbot-duration-fast);
   transition-timing-function: var(--openbot-ease-out);
 }
 
 .wfn-strip-item:hover {
-  border-color: color-mix(in srgb, var(--wfn-kind) 72%, transparent);
-  color: var(--openbot-text-primary);
+  scale: 1.06;
 }
 
 .wfn-strip-item[aria-pressed="true"] {
-  --wfn-strip-size: 44px;
-
-  border-color: var(--wfn-kind);
-  color: var(--openbot-text-primary);
+  --wfn-strip-size: 58px;
+  --wfn-strip-ring: color-mix(in srgb, var(--wfn-kind) 75%, transparent);
 }
 
 .wfn-strip-item:active {
@@ -2401,11 +2416,48 @@ fieldset.wfn-picker-group {
   outline-offset: 1px;
 }
 
-.wfn-strip-item img {
+.wfn-strip-item:has(.wfn-strip-picture) {
+  position: relative;
+  isolation: isolate;
+  padding: 2px;
+  border: 0;
+}
+
+.wfn-strip-picture {
   width: 100%;
   height: 100%;
   border-radius: var(--openbot-radius-pill);
   object-fit: cover;
+}
+
+.wfn-strip-tint {
+  --wfn-strip-tint-zoom: 2.5;
+  --wfn-strip-tint-edge: calc(100% / var(--wfn-strip-tint-zoom) - 2px / var(--wfn-strip-tint-zoom));
+
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  filter: blur(3px) saturate(1.8);
+  scale: var(--wfn-strip-tint-zoom);
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent var(--wfn-strip-tint-edge),
+    var(--openbot-text-primary) var(--wfn-strip-tint-edge)
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    transparent var(--wfn-strip-tint-edge),
+    var(--openbot-text-primary) var(--wfn-strip-tint-edge)
+  );
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-strip-item[aria-pressed="true"] .wfn-strip-tint {
+  opacity: 1;
 }
 
 .wfn-strip-item[data-failed] {
@@ -2731,7 +2783,29 @@ fieldset.wfn-picker-group {
     --wfn-fade-size: var(--openbot-space-6);
     --wfn-fade-side: to right;
 
-    animation-timeline: scroll(self inline), scroll(self inline);
+    mask-image: none;
+    animation:
+      wfn-fade-start linear both,
+      wfn-fade-end linear both,
+      wfn-fade-mask linear both;
+    animation-timeline: scroll(self inline), scroll(self inline), scroll(self inline);
+    animation-range:
+      0 var(--wfn-fade-size),
+      calc(100% - var(--wfn-fade-size)) 100%,
+      0 100%;
+  }
+}
+
+@keyframes wfn-fade-mask {
+  from,
+  to {
+    mask-image: linear-gradient(
+      var(--wfn-fade-side),
+      transparent,
+      var(--openbot-text-primary) var(--wfn-fade-start),
+      var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
+      transparent
+    );
   }
 }
 
