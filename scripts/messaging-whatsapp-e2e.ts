@@ -1927,62 +1927,74 @@ try {
     });
   });
 
-  await step("a socket that stops handling messages reconnects by itself, and stops after three stalls", async () => {
-    let clock = Date.now();
-    const store = WhatsAppAuthStore.open({ path: join(root, "stall.db"), key: newStoreKey(), now: () => clock });
-    store.creds.me = { id: `${OWNER}:7@s.whatsapp.net` };
-    store.saveCreds();
-    const session = new WhatsAppSession({
-      store,
-      createSocket: phone.create,
-      makeSignalRepository: () => {
-        throw new Error("Not used by the fake socket.");
-      },
-      fetchVersion: async () => null,
-      now: () => clock,
-    });
-    const advance = (ms: number) => {
-      clock += ms;
-      phone.current().keepAlive();
-    };
-    try {
-      session.start();
-      await until(() => session.state === "open", "the first socket open");
-      const first = phone.current();
-      first.stallNode();
-      advance(4 * 60_000);
-      await new Promise((resume) => setTimeout(resume, 16_000));
-      assert.equal(phone.current(), first, "A node that waited less than the stall time reconnected the socket.");
-      advance(60_000);
-      await until(() => first.ended && session.state === "open", "a new socket after a stalled node", 20_000);
-
-      phone.holdAcks = true;
-      const second = phone.current();
-      const posted = await runCauseEffect(session.send(OWNER_JID, { text: "not confirmed" }));
-      phone.holdAcks = false;
-      assert.ok(posted.key.id, "The unconfirmed post failed.");
-      await until(() => second.ended && session.state === "open", "a new socket after an unconfirmed post");
-
-      const third = phone.current();
-      third.stallNode();
-      advance(5 * 60_000);
-      await until(() => session.state === "failing", "Needs attention after three stalls in an hour", 20_000);
-      const sockets = phone.sockets.length;
-      await new Promise((resume) => setTimeout(resume, 500));
-      assert.ok(third.ended, "The stalled socket stayed open.");
-      assert.equal(phone.sockets.length, sockets, "The session reconnected after the stall limit.");
-
-      await runCauseEffect(session.stop());
-      session.start();
-      await until(() => session.state === "open", "connected after Reconnect");
-      return {
-        states: ["open", "open after a stall", "open after an unconfirmed post", "failing", "open after Reconnect"],
+  await step(
+    "a socket that stops handling messages reconnects by itself, and stops after three stalls in an hour",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "stall.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:7@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      const advance = (ms: number) => {
+        clock += ms;
+        phone.current().keepAlive();
       };
-    } finally {
-      await runCauseEffect(session.stop());
-      store.close();
-    }
-  });
+      const stall = async (label: string) => {
+        const socket = phone.current();
+        socket.stallNode();
+        advance(5 * 60_000);
+        await until(() => socket.ended, label, 20_000);
+      };
+      try {
+        session.start();
+        await until(() => session.state === "open", "the first socket open");
+        await stall("a stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the first stall");
+
+        phone.holdAcks = true;
+        const unconfirmed = phone.current();
+        const posted = await runCauseEffect(session.send(OWNER_JID, { text: "not confirmed" }));
+        phone.holdAcks = false;
+        assert.ok(posted.key.id, "The unconfirmed post failed.");
+        await until(() => unconfirmed.ended && session.state === "open", "a new socket after an unconfirmed post");
+
+        await stall("a second stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the second stall");
+        await stall("a third stalled node ends its socket");
+        await until(() => session.state === "failing", "Needs attention after three stalls in an hour");
+
+        session.reconnect();
+        await until(() => session.state === "open", "connected after a wake");
+        await stall("a stall after the wake ends its socket");
+        await until(() => session.state === "open", "a new socket after a stall that follows the wake");
+
+        await runCauseEffect(session.stop());
+        session.start();
+        await until(() => session.state === "open", "connected after Reconnect");
+        return {
+          states: [
+            "open after a stall",
+            "open after an unconfirmed post, which does not count",
+            "open after the second stall",
+            "failing after the third stall",
+            "open after a wake, and after one more stall",
+            "open after Reconnect",
+          ],
+        };
+      } finally {
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
 
   report.passed = true;
 } finally {

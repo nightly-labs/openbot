@@ -247,6 +247,7 @@ export class WhatsAppSession {
 
   reconnect(): void {
     if (!this.#started || this.#state === "logged_out" || this.#state === "replaced") return;
+    if (this.#state === "failing") this.#stalls = [];
     this.#attempt = 0;
     this.#dropSocket();
     this.#setState("reconnecting");
@@ -464,16 +465,19 @@ export class WhatsAppSession {
         return;
       }
       const oldest = this.#handling.values().next();
-      if (!this.#pairing && !oldest.done && this.#now() - oldest.value >= STALL_MS) this.#stalled("message_stalled");
+      if (this.#historySentAtOpen && !oldest.done && this.#now() - oldest.value >= STALL_MS) this.#stalled();
     }, WATCHDOG_INTERVAL_MS);
     this.#watchdog.unref?.();
   }
 
-  #stalled(reason: "message_stalled" | "post_unconfirmed"): void {
+  #stalled(): void {
     const now = this.#now();
     this.#stalls = [...this.#stalls.filter((at) => now - at < STALL_WINDOW_MS), now];
     const stop = this.#stalls.length >= STALL_LIMIT;
-    logger.warn("A WhatsApp socket stopped delivering messages.", { reason, action: stop ? "stop" : "reconnect" });
+    logger.warn("A WhatsApp socket stopped delivering messages.", {
+      reason: "message_stalled",
+      action: stop ? "stop" : "reconnect",
+    });
     if (!stop) {
       this.reconnect();
       return;
@@ -544,7 +548,13 @@ export class WhatsAppSession {
         this.#lastSend.set(jid, this.#now());
         if (!sent?.key.id) throw new Error("no_message_id");
         const result = await ack.wait();
-        if (result === "timeout" && this.#socket === socket) this.#stalled("post_unconfirmed");
+        if (result === "timeout" && this.#socket === socket && this.#acks.size === 1) {
+          logger.warn("A WhatsApp socket stopped delivering messages.", {
+            reason: "post_unconfirmed",
+            action: "reconnect",
+          });
+          this.reconnect();
+        }
         if (result === "closed" && this.#started) {
           if (attempt >= SEND_ATTEMPTS) throw new Error("not_confirmed");
           continue;

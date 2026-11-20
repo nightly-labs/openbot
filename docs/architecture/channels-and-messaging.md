@@ -891,9 +891,11 @@ is one linked number (`workspace_id` is the number in digits).
   prove that WhatsApp still delivers messages: a Baileys handler that stalls holds its ack, and
   WhatsApp then holds the messages (Baileys issue #2491). So the vendored Baileys reports when each
   node handler starts and ends (`openbot:node`), and the session also reconnects when a handler runs
-  for 5 minutes, or when WhatsApp does not confirm a post within 10 seconds after the send. After the
-  third such stall in an hour, the session drops the socket and shows `error` until Reconnect or a
-  wake of the computer. Posts wait up to 5 minutes
+  for 5 minutes. The first socket after a link is not checked: its history and app-state sync can take
+  that long. After the third stalled handler in an hour, the session drops the socket and shows
+  `error` until Reconnect or a wake of the computer. When WhatsApp does not confirm a post within 10
+  seconds after the send, and no other post waits for its ack, the session reconnects too; this does
+  not count as a stall. Posts wait up to 5 minutes
   for the socket, keep at least a second between posts to one chat, and get their message id before
   the send, so an echo in the owner's own chat is never read as a request.
 - **Link.** `WhatsAppConnect` pairs a new device in a new store (QR code, or a pairing code for a
