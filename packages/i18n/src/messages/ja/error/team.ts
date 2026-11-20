@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "このホストは OpenBot のオーナーアカウントにリンクされていません。",
   "error.team.ownerEmailRequired": "このホストを作成した OpenBot のメールアドレスでサインインしてください。",
   "error.team.hostNotConfigured": "チームのホストが設定されていません。",
@@ -53,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらくしてから再試行してください。",
   "error.team.clientUpdateRequired": "このホストに接続する前に、この OpenBot クライアントを更新してください。",
   "error.team.hostUpdateRequired": "接続する前に、ホストの OpenBot を更新してください。",
+  "error.team.serverSafeMode": "このサーバーでは OpenBot が起動しないため、セーフモードになっています。",
+  "error.team.serverSafeModeNewerDatabase":
+    "このサーバーの OpenBot {version} はデータを開けません。より新しいバージョンの OpenBot がデータを保存したためです。サーバーに新しい OpenBot リリースを入れると解決します。",
+  "error.team.serverSafeModeStartFailed":
+    "このサーバーの OpenBot {version} は、起動に何度も失敗したため停止しました。サーバーに新しい OpenBot リリースを入れると解決します。",
   "error.team.sidebarLayoutUnavailable": "サイドバーのレイアウトを利用できません。",
   "error.team.providersUnsupported": "この接続ではプロバイダーの設定を利用できません。",
   "error.team.providerNotManaged": "OpenBot はこのプロバイダーの CLI を管理していません。",
@@ -119,6 +123,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
+  "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",

@@ -220,6 +220,13 @@ export const messages = {
     "현재 시크릿은 더 이상 사용할 수 없어요. 호스트가 해당 시크릿을 사용한 요청을 거부해요.",
   "mobile.agent.webhook.rotateConfirm": "재생성",
   "mobile.agent.webhook.rotateFailed": "시크릿을 재생성할 수 없어요. 다시 시도해 주세요.",
+  "mobile.agent.webhook.giveToAgent": "{name}에게 서명 시크릿 전달",
+  "mobile.agent.webhook.giveTitle": "{name}에게 새 서명 시크릿을 전달할까요?",
+  "mobile.agent.webhook.giveBody":
+    "현재 시크릿은 작동하지 않게 돼요. {name}이(가) 새 시크릿을 API 키로 저장하고 보낸 쪽에 추가할 수 있어요.",
+  "mobile.agent.webhook.giveConfirm": "전달",
+  "mobile.agent.webhook.giveFailed": "에이전트에게 서명 시크릿을 전달하지 못했어요. 다시 시도해 주세요.",
+  "mobile.agent.webhook.given": "{name}에게 새 서명 시크릿을 전달했어요.",
   "mobile.agent.webhook.activity": "활동",
   "mobile.agent.webhook.activityFailed": "활동을 불러올 수 없어요. 다시 시도해 주세요.",
   "mobile.agent.webhook.activity.ignored": "무시됨",
@@ -390,6 +397,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "프로필 관리",
   "mobile.agent.browserProfile.footer":
     "각 프로필은 자체 로그인과 쿠키를 보관합니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.agent.browserProfile.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남아요. 에이전트가 이 사이트에 다시 로그인해야 해요.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot이 에이전트의 브라우저 프로필을 변경하지 못했습니다.",
   "mobile.agent.planCard.label": "긴 작업 전에 계획 표시",
   "mobile.agent.planCard.footer":
@@ -409,10 +418,10 @@ export const messages = {
     "이 서버는 에이전트별 내 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "mobile.agent.newChat.title": "새 채팅",
   "mobile.agent.newChat.starting": "새 채팅 시작 중…",
-  "mobile.agent.newChat.footer": "에이전트가 이 채팅을 잊어요. 설정은 유지돼요.",
+  "mobile.agent.newChat.footer": "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 설정은 유지돼요.",
   "mobile.agent.newChat.confirmTitle": "{name}과(와) 새 채팅을 시작할까요?",
   "mobile.agent.newChat.confirmBody":
-    "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "mobile.agent.newChat.confirm": "새 채팅 시작",
   "mobile.agent.newChat.failed": "새 채팅을 시작할 수 없어요",
   "mobile.agent.newChat.failedBody": "호스트가 새 채팅을 시작하지 못했어요.",

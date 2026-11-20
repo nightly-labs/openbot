@@ -1,12 +1,3 @@
-// Starts the built app (`bun run build` output in `out/`) for one `dev:bench`
-// run, on a profile only the bench uses, and stops it again. The Electron
-// binary is spawned directly rather than through `electron-vite preview`, so
-// the process tree under the recorded pid is the app and nothing else.
-//
-// The run publishes a stack record like `bun run dev` does: its ports stay
-// reserved against sibling worktrees, and `bun run dev:stop` can stop an app a
-// crashed bench left behind.
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -32,17 +23,11 @@ export interface LaunchBenchAppOptions {
   projectRoot: string;
   instanceId: string;
   logger: Logger;
-  // Extra environment for the app, such as `OPENBOT_CLAUDE_PATH`.
   environment?: Record<string, string>;
-  // The app's stdout and stderr, which carry its log. They hold conversation
-  // metadata, so the file is owner-only and stays under the build directory.
   logPath?: string;
 }
 
 function electronExecutable(projectRoot: string): string {
-  // The `electron` package's main export is the path of the binary it
-  // downloaded. Its `.bin` shim is a Node wrapper, which would add a process
-  // the packaged app does not have to every reading.
   const resolved = createRequire(join(projectRoot, "package.json"))("electron");
   if (!isString(resolved) || !existsSync(resolved)) {
     throw new Error("The electron package did not name an installed binary. Run `bun install --frozen-lockfile`.");
@@ -61,16 +46,11 @@ async function waitForExit(child: ChildProcess, timeoutMs: number): Promise<bool
   });
 }
 
-// The whole group, because the app's helpers and provider CLIs are its
-// children. The group is the one this process created with `detached`, so the
-// signal reaches nothing it did not start.
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   if (child.pid === undefined) return;
   try {
     process.kill(-child.pid, signal);
-  } catch {
-    // Already gone.
-  }
+  } catch {}
 }
 
 export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<BenchApp> {
@@ -97,7 +77,6 @@ export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<Be
       stdio: logFile === null ? "ignore" : ["ignore", logFile, logFile],
       env: {
         ...withoutElectronRuntimeFlags(process.env),
-        // The packaged look and name, on the bench's own profile.
         OPENBOT_APP_VARIANT: "preview",
         OPENBOT_DEV_PROFILE: "app",
         OPENBOT_DEV_INSTANCE_ID: instanceId,
@@ -105,7 +84,6 @@ export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<Be
         ...options.environment,
       },
     });
-    // The child holds its own copy of the descriptor.
     if (logFile !== null) closeSync(logFile);
     if (spawned.pid === undefined) throw new Error("Electron did not start.");
     const stack: DevStackRecord = {
@@ -133,15 +111,12 @@ export async function launchBenchApp(options: LaunchBenchAppOptions): Promise<Be
     stop: async () => {
       if (stopped) return;
       stopped = true;
-      // SIGTERM to the main process first: an unpackaged build quits through
-      // `app.quit()` on it, which closes SQLite and stops provider CLIs.
       child.kill("SIGTERM");
       if (!(await waitForExit(child, 15_000))) {
         logger.warn("the bench app did not quit in 15 s; stopping its process group");
         signalGroup(child, "SIGKILL");
         await waitForExit(child, 5_000);
       }
-      // Helpers and provider CLIs that outlived the main process.
       signalGroup(child, "SIGTERM");
       removeDevStackRecord(record);
     },

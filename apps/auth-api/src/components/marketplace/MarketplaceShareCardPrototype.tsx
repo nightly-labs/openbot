@@ -9,18 +9,6 @@ const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
 
-/*
- * Prototype of the image a shared `openbot.run/marketplace/agents/<id>` link shows: 1200 × 630, the
- * shape X, iMessage and Slack crop to. The background is flat, so the avatar's own colour is the only
- * colour on the card. The shield after the name marks a verified agent; the line under the role names
- * the creator, as the rows and pages do. The apps print the page title and the host beside the image,
- * so the card carries no description and no button: at the size a chat shows it, that text cannot be
- * read.
- *
- * The card is drawn in the DOM here and scales with its frame. A real card is a PNG that the Worker
- * serves; how it is drawn is a later step.
- */
-
 const SHARE_HOST = "openbot.run";
 
 function shareTitle(agent: MarketplaceAgentSummary): string {
@@ -49,7 +37,6 @@ export function ShareCard(props: { agent: MarketplaceAgentSummary }): JSX.Elemen
   );
 }
 
-/** The browser draws the avatar after hydration, as on the agent page. */
 function CardAvatar(props: { agent: MarketplaceAgentSummary }): JSX.Element {
   const [mounted, setMounted] = createSignal(false);
   onSettled(() => {
@@ -71,8 +58,6 @@ function CardAvatar(props: { agent: MarketplaceAgentSummary }): JSX.Element {
     </span>
   );
 }
-
-/* The frames: close copies of how each app shows a link with a large image, not screenshots of them. */
 
 export function XFrame(props: { agent: MarketplaceAgentSummary }): JSX.Element {
   return (

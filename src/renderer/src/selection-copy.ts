@@ -1,38 +1,14 @@
-/**
- * Copying selected page text writes clean HTML. Chromium's own HTML gives each element its computed
- * style, so a paste into a mail or a document got the theme colors (white text on a dark background)
- * and the markup of the app buttons. Here the HTML keeps only the structure: headings, lists, tables,
- * links, code and line breaks. The plain text is the selection text, as before. The message box gets
- * the same copy; its own paste reads only the plain text. A text field copies only plain text, so it
- * keeps the native copy.
- *
- * A copy that an earlier listener handled stays as it is, such as a draft with attachments or the
- * nodes of the workflow canvas. A formula is the exception: `katex/contrib/copy-tex` writes its TeX
- * plain text, and its HTML has the KaTeX classes, inline styles and each formula two times. Here the
- * HTML is replaced, with the TeX source of each formula.
- *
- * A cut in the message box gets the same clean copy, and then deletes the selection, as the native
- * cut does.
- *
- * Import this module for its effect. The listeners are on the window, so that the listeners on the
- * document and on the elements, such as `katex/contrib/copy-tex`, run first.
- */
 for (const type of ["copy", "cut"] as const) window.addEventListener(type, writeSelection);
 
 function writeSelection(event: ClipboardEvent): void {
   if (!event.clipboardData || isTextField(event.target)) return;
   const cut = event.type === "cut";
-  // A cut changes only text that can be edited.
   if (cut && !isEditable(event.target)) return;
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
   const handled = event.defaultPrevented;
   if (handled && !event.clipboardData.getData("text/html").includes("katex-mathml")) return;
-  // As the native copy: without unselectable text, which `toString` also skips, and with no-break spaces as spaces.
   const native = selection.toString().replace(/\u00a0/gu, " ");
-  // A triple-click, or a drag past the end of a block, selects to the start of the next block, so the
-  // text gets empty lines at its ends. A paste then gives these empty lines. Text that can be edited
-  // keeps them, because its user can select them on purpose.
   const text = isEditable(event.target) ? native : native.replace(/^\s*\n|\n\s*$/gu, "");
   if (!text) return;
   const container = document.createElement("div");
@@ -45,15 +21,10 @@ function writeSelection(event: ClipboardEvent): void {
   if (cut) document.execCommand("delete", false);
 }
 
-/**
- * A line of text whose spaces the page keeps, for HTML. HTML joins a run of spaces and a tab into one
- * space, so the leading spaces, all but the last space of a run, and each tab become no-break spaces.
- */
 export function keptSpaces(line: string): string {
   return line.replace(/\t/gu, "\u00a0".repeat(4)).replace(/^ +| (?= )/gu, (spaces) => "\u00a0".repeat(spaces.length));
 }
 
-/** Tags that keep their meaning in a paste. All other elements become a `div` or only their content. */
 const KEPT_TAGS = new Set([
   "a",
   "b",
@@ -88,7 +59,6 @@ const KEPT_TAGS = new Set([
   "u",
   "ul",
 ]);
-/** Elements with no text to paste: controls, media and icons. */
 const SKIPPED_TAGS = new Set([
   "audio",
   "canvas",
@@ -121,7 +91,6 @@ function isEditable(target: EventTarget | null): boolean {
   return element instanceof HTMLElement && element.isContentEditable;
 }
 
-/** The selected part of a range, inside its kept ancestors, so text selected in a code block or a cell keeps its block. */
 function rangeFragment(range: Range): Node {
   const common = range.commonAncestorContainer;
   const root = common instanceof Element ? common : common.parentElement;
@@ -157,7 +126,6 @@ function copyElement(element: Element, parent: Node, range: Range): void {
   const style = getComputedStyle(element);
   if (style.display === "none") return;
   if (style.visibility !== "visible") {
-    // A child can be visible in a hidden element. Its text stays; the hidden text does not.
     copyChildren(element, parent, range, null);
     return;
   }
@@ -166,14 +134,12 @@ function copyElement(element: Element, parent: Node, range: Range): void {
     return;
   }
   if (element.classList.contains("katex")) {
-    // The delimiters of the plain text from `katex/contrib/copy-tex`.
     const tex = element.querySelector(".katex-mathml annotation")?.textContent;
     const display = element.parentElement?.classList.contains("katex-display") === true;
     if (tex) parent.appendChild(document.createTextNode(display ? `$$${tex}$$` : `$${tex}$`));
     return;
   }
   if (!KEPT_TAGS.has(tag) && element.parentElement?.closest("pre")) {
-    // The content of `pre` is text, so a line of a code block gives a line break, not a `div`.
     const line = BLOCK_DISPLAY.test(style.display) && element.parentElement.matches("pre, code");
     if (line && parent.hasChildNodes()) parent.appendChild(document.createTextNode("\n"));
     copyChildren(element, parent, range, null);
@@ -185,16 +151,13 @@ function copyElement(element: Element, parent: Node, range: Range): void {
       ? document.createElement("div")
       : null;
   copyChildren(element, copy ?? parent, range, null);
-  // An empty cell stays, so that the next cells keep their columns.
   if (copy && (copy.hasChildNodes() || EMPTY_KEPT_TAGS.has(tag))) parent.appendChild(copy);
 }
 
-/** A text node, cut at the range ends. Text that the page shows on several lines keeps its breaks. */
 function copyText(node: Text, parent: Node, range: Range): void {
   const owner = node.parentElement;
   if (!owner) return;
   const style = getComputedStyle(owner);
-  // Text that cannot be selected, such as a button label, is not in the plain text either.
   if (style.userSelect === "none" || style.visibility !== "visible") return;
   const start = node === range.startContainer ? range.startOffset : 0;
   const end = node === range.endContainer ? range.endOffset : node.data.length;
@@ -211,7 +174,6 @@ function copyText(node: Text, parent: Node, range: Range): void {
   });
 }
 
-/** An empty copy of a kept element, with only the attributes that a paste can use. */
 function keptElement(source: Element): HTMLElement {
   const element = document.createElement(source.localName);
   const href = source.localName === "a" ? source.getAttribute("href") : null;

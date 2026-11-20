@@ -5,18 +5,13 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; an old memory gets a site; a failed
-// upgrade leaves the column, the index or the marker; a retry adds the column twice or drops a development
-// value; a newer or incomplete history is accepted; the CHECK accepts a site that the app cannot read.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-// Every released schema from the first registry version to the one before this migration.
 const SOURCES = Array.from({ length: 52 }, (_, index) => index + 8);
 
-// Migration 61 runs after 60 and adds this empty table.
 const LATER_TABLES = {
   projection_messaging_history: [],
   projection_pinned_thread_messages: [],
@@ -39,7 +34,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** Two memories of two agents, in the columns every release has. */
 function seed(db: DatabaseSync): void {
   const insert = db.prepare(`INSERT INTO projection_agent_memories
     (memory_id, agent_id, text, normalized_text, origin, source_turn_id, created_at, updated_at, last_event_sequence)
@@ -58,7 +52,6 @@ function seed(db: DatabaseSync): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -70,7 +63,6 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** The source rows, and each memory has no site, as before the column. */
 function withNoSite(before: Contents): Contents {
   return {
     ...before,
@@ -90,7 +82,7 @@ function siteIndex(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 66 });
   expect(siteIndex(db)).toEqual([{ name: "agent_memories_site" }]);
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -102,13 +94,11 @@ describe("agent memory site migration", () => {
     it(`keeps every row from released schema ${source}, and each memory has no site`, () => {
       const db = databaseAt(source);
       seed(db);
-      // The earlier migrations run first; the rows after them are what v60 must keep.
       if (source < 59) migrateUpTo(db, 59);
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({ ...withNoSite(before), ...LATER_TABLES });
       expect(columns(db)).toContain("site");
-      // Search still finds an old memory, so the column did not break the full-text index.
       expect(
         db
           .prepare(
@@ -159,9 +149,9 @@ describe("agent memory site migration", () => {
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(67,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=57");
+    db.exec("DELETE FROM schema_migrations WHERE version=67; DELETE FROM schema_migrations WHERE version=57");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 57");
     expect(contents(db)).toEqual(before);
     expect(columns(db)).toEqual(columnsBefore);
@@ -173,8 +163,7 @@ describe("agent memory site migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // An application one release newer than an older one adds 65: this one is the older application for it.
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(67,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

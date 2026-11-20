@@ -34,7 +34,6 @@ import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
 
-/** Where the user opened the plans. Another value is not sent. */
 function plansEntryPoint(value: unknown): "drawer" | "onboarding" | undefined {
   return value === "drawer" || value === "onboarding" ? value : undefined;
 }
@@ -44,15 +43,9 @@ interface PlansData {
   list: HostedServerList;
 }
 
-/**
- * The plans of a hosted server and the servers of the account, with their plans. App store rules do
- * not allow a purchase outside the store, so this screen has no prices and no purchase: the user
- * buys and changes a plan in OpenBot on the computer.
- */
 export function HostedServerPlansScreen() {
   const { t, errorMessage } = useText();
   const { entryPoint } = useLocalSearchParams<{ entryPoint?: string }>();
-  // The sheet opens and closes once. Its inner pages do not close it.
   useEffect(() => {
     const scope = mobileAnalytics.scope();
     const entry_point = plansEntryPoint(entryPoint);
@@ -65,8 +58,6 @@ export function HostedServerPlansScreen() {
   const apiUrl = session?.apiUrl ?? null;
   const cloudServersOn = useMobileFeature(apiUrl ?? "", "cloudServers");
   const listedIds = useMemo(() => new Set(servers.map((server) => server.id)), [servers]);
-  // The last answer stays for the life of the app, one for each account, so the sheet opens with it
-  // at once and reads again in the background. A failed read keeps the last answer on screen.
   const load = useQuery({
     queryKey: queryKeys.hostedServerPlans(queryScope),
     queryFn: session ? () => readPlans(session) : skipToken,
@@ -75,8 +66,6 @@ export function HostedServerPlansScreen() {
     retry: false,
   });
 
-  // Android: one scroll view for every state. The sheet finds its scroll view only when it lays out, so
-  // a new scroll view after the load leaves the sheet with the old one, and an upward drag closes it.
   return (
     <PlansContent>
       {load.data ? (
@@ -116,11 +105,8 @@ function PlansReady({
   const { t } = useText();
   const owned = ownedHostedServers(list);
   const showPlans = (devFeatureOverride("cloudServers") ?? (list.available && cloudServersOn)) && plans.length > 0;
-  // A plan that a server of the account uses, so its row shows "Your plan".
   const ownedPlans = new Set(owned.map((server) => server.plan));
 
-  // With the flag off, an account that has hosted servers still manages them here, with no plans
-  // and no text about how to get one.
   return (
     <>
       {showPlans ? (
@@ -166,7 +152,6 @@ function PlansContent({ children }: { children: ReactNode }) {
   );
 }
 
-/** The plans, the account's servers and the feature flags, read together. */
 async function readPlans(session: MobileSession): Promise<PlansData> {
   const calls = hostedServerCalls(session);
   const [catalog, list] = await Promise.all([calls.plans(), calls.list(), refreshMobileFeatures(session.apiUrl, true)]);
@@ -178,7 +163,6 @@ async function readPlans(session: MobileSession): Promise<PlansData> {
   return { plans: catalog.plans, list };
 }
 
-/** The first opening only: the shape of the header and the plan rows, until the first answer. */
 function PlansLoading() {
   const { t } = useText();
   return (
@@ -207,7 +191,6 @@ function PlansLoading() {
   );
 }
 
-/** What a hosted server gives. The native header already names the sheet, so this text stays short. */
 function PlansHeader({ description }: { description: string }) {
   const { t } = useText();
   return (
@@ -222,11 +205,12 @@ function PlansHeader({ description }: { description: string }) {
   );
 }
 
-type OwnedServerState = "payment" | "setup" | "starting" | "running" | "stopped" | "planEnded" | "failed";
+type OwnedServerState = "payment" | "setup" | "restoring" | "starting" | "running" | "stopped" | "planEnded" | "failed";
 
 const OWNED_STATE_TEXT = {
   payment: "mobile.server.hosted.state.payment",
   setup: "mobile.server.hosted.state.setup",
+  restoring: "mobile.server.hosted.state.restoring",
   starting: "mobile.server.hosted.state.starting",
   running: "mobile.server.hosted.state.running",
   stopped: "mobile.server.hosted.state.stopped",
@@ -236,6 +220,7 @@ const OWNED_STATE_TEXT = {
 
 function ownedServerState(server: HostedServerSummary): OwnedServerState {
   if (server.error === "plan_ended") return "planEnded";
+  if (server.restoring) return "restoring";
   switch (server.state) {
     case "awaiting_payment":
       return "payment";
@@ -254,7 +239,6 @@ function ownedServerState(server: HostedServerSummary): OwnedServerState {
   }
 }
 
-/** One server of the account: its plan and billing period, and its state. A server in setup opens its setup page. */
 function OwnedServerRow({ server, listed }: { server: HostedServerSummary; listed: boolean }) {
   const { t, format } = useText();
   const [muted] = useThemeColor(["muted"]);
@@ -262,13 +246,18 @@ function OwnedServerRow({ server, listed }: { server: HostedServerSummary; liste
   const plan = t(PLAN_TEXT[server.plan].name);
   const interval = server.interval === "year" ? t("mobile.server.hosted.yearly") : t("mobile.server.hosted.monthly");
   const supportingText =
-    server.deletionScheduledAt != null
-      ? t("mobile.server.hosted.serverPlanEnds", {
+    state === "planEnded" && server.dataKeptUntil
+      ? t("mobile.server.hosted.serverDataKept", {
           plan,
-          interval,
-          date: format.date(server.deletionScheduledAt, DATE_FORMAT),
+          date: format.date(server.dataKeptUntil, DATE_FORMAT),
         })
-      : t("mobile.server.hosted.serverPlan", { plan, interval });
+      : server.deletionScheduledAt != null
+        ? t("mobile.server.hosted.serverPlanEnds", {
+            plan,
+            interval,
+            date: format.date(server.deletionScheduledAt, DATE_FORMAT),
+          })
+        : t("mobile.server.hosted.serverPlan", { plan, interval });
   const inSetup = hostedServerInSetup(server, listed);
   const label = (
     <Typography.Paragraph
@@ -313,7 +302,6 @@ function OwnedServerRow({ server, listed }: { server: HostedServerSummary; liste
   );
 }
 
-/** The other way to get a server, as a grouped row like Settings. */
 function OtherOptions() {
   const { t } = useText();
   const [foreground] = useThemeColor(["foreground"]);
@@ -330,13 +318,11 @@ function OtherOptions() {
   );
 }
 
-/** One plan: what it gives, with no price and no purchase action. */
 function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: boolean }) {
   const { t } = useText();
   const facts = t("mobile.server.hosted.planFacts", {
     members: t("mobile.server.hosted.members", { count: plan.memberLimit }),
     storage: t("mobile.server.hosted.storage", { count: plan.diskGb }),
-    // The catalog does not send the site limit, so it comes from the plan.
     sites: t("mobile.server.hosted.sites", { count: siteLimitForPlan(plan.id) }),
     speed:
       plan.relativeSpeed === 1
@@ -363,10 +349,6 @@ function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: bo
   );
 }
 
-/**
- * Where the user gets a server and changes a plan: the desktop app. App store rules do not allow a
- * purchase outside the store, so the steps are text only, with no link and no button.
- */
 function ComputerSteps() {
   const { t } = useText();
   const [foreground] = useThemeColor(["foreground"]);

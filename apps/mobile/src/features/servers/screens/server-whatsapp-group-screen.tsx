@@ -16,10 +16,6 @@ import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-w
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Marketplace › Apps › WhatsApp › Add group: one group of a linked number whose people can
- * give work. The host reads the groups of the number from WhatsApp when the page opens.
- */
 export function ServerWhatsAppGroupScreen() {
   const { t, errorMessage } = useText();
   const { serverId, workspaceId } = useLocalSearchParams<{ serverId: string; workspaceId: string }>();

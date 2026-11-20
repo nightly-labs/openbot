@@ -1,13 +1,3 @@
-/**
- * The Routines view of the open agent: its canvas, as one host keeps it. The host answers the
- * canvas; every edit goes back to it, and the canvas reloads when the host says it changed or a
- * routine run moved. A moved node is drawn where the user left it at once and saved a moment later.
- * The chat panel sends requests to the open agent, which edits the canvas with its tools.
- *
- * It reads no application context, so the desktop app and the web client give it their host and
- * their agents.
- */
-
 import {
   type RoutineFlowCanvas,
   type RoutineFlowLink,
@@ -26,41 +16,30 @@ import { createRoutineFlowAssistant } from "./routine-flow-assistant";
 import { agentIdOfNode, isRoutineStartEdge, routineFlowDiagram, routineIdOfNode } from "./routine-flow-diagram";
 import type { RoutineFlowsHost } from "./routine-flows-port";
 
-/** Coalesces the bursts of events one run sends: a turn ends, a queue moves, a routine changes. */
 const RELOAD_DELAY_MS = 250;
-/** A drag writes a position on every pointer move; only where it stops is saved. */
 const SAVE_DELAY_MS = 400;
-/** A connection drawn here and not yet saved by the host. It cannot be removed until it is. */
 const PENDING_LINK_PREFIX = "pending:";
 
 interface RoutineFlowState {
   canvas: RoutineFlowCanvas | null;
   error: string | null;
-  /** Positions moved here and not yet answered by a reload. */
   moved: Record<string, DiagramPoint>;
-  /** Connections drawn here, shown at once while the host saves them. */
   pendingLinks: RoutineFlowLink[];
-  /** Whether the host reaches the webhook relay. Null until it answers. */
   webhookConnected: boolean | null;
 }
 
 export interface RoutineFlowsCanvasProps {
   host: RoutineFlowsHost;
-  /** The open agent, whose canvas this is. */
   agent: AgentProfile | undefined;
   agents: AgentProfile[];
-  /** The models a new agent may start on. Without them, the host picks the model. */
   newAgentModels?: DiagramModelChoice | undefined;
-  /** Creates an agent from the canvas's right-click menu. Without it, the menu offers only existing agents. */
   createAgent?: ((draft: DiagramNewAgentDraft) => Promise<{ id: string }>) | undefined;
-  /** Opens the agent's routine settings on a new routine, from the empty canvas. */
   onCreateRoutine?: ((agentId: string) => void) | undefined;
 }
 
 export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
   const { t, errorMessage } = useText();
   const host = () => props.host;
-  // The web gives a new agent object on each agent update; only a new id loads another canvas.
   const agentId = createMemo(() => props.agent?.id ?? null);
   const [state, setState] = createStore<RoutineFlowState>({
     canvas: null,
@@ -72,9 +51,7 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
   const assistant = createRoutineFlowAssistant(host, agentId);
   let generation = 0;
   let reloadTimer: number | undefined;
-  /** Moves waiting to be saved, by node: the timer, and the save it runs. */
   const pendingSaves = new Map<string, { timer: number; save: () => void }>();
-  /** Position saves sent and not yet answered, by node. */
   const savesInFlight = new Map<string, number>();
   const trackSave = <A,>(nodeKey: string, save: Promise<A>): Promise<A> => {
     savesInFlight.set(nodeKey, (savesInFlight.get(nodeKey) ?? 0) + 1);
@@ -85,7 +62,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
     });
   };
 
-  /** A load for an agent the user has left, such as one after a slow write, changes nothing. */
   const load = async (id: string) => {
     if (id !== agentId()) return;
     const current = ++generation;
@@ -96,7 +72,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
       setState((draft) => {
         draft.canvas = canvas;
         draft.error = null;
-        // The host now has every saved move, and another client may have moved the same node since.
         for (const nodeKey of Object.keys(draft.moved)) {
           if (!pendingSaves.has(nodeKey) && !savesInFlight.has(nodeKey)) delete draft.moved[nodeKey];
         }
@@ -146,7 +121,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
     return () => {
       stopEvents();
       window.clearTimeout(reloadTimer);
-      // A move the user made just before leaving the canvas is saved now, not dropped.
       for (const pending of pendingSaves.values()) {
         window.clearTimeout(pending.timer);
         pending.save();
@@ -169,13 +143,11 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
     );
     return routineFlowDiagram({ ...canvas, links: [...canvas.links, ...pending] }, props.agents, state.moved);
   });
-  /** An agent with routines of its own stays: removing it would remove the routine, which belongs to settings. */
   const owners = createMemo(() => new Set(state.canvas?.routines.map((entry) => entry.routine.agentId) ?? []));
   const onCanvas = createMemo(
     () => new Set(diagram()?.nodes.flatMap((node) => (node.kind === "agent" ? [node.agentId] : [])) ?? []),
   );
 
-  /** Puts an agent on the canvas at once, and takes it off again when the host does not save it. */
   const placeAgent = (canvasAgentId: string, placed: string, position: DiagramPoint) => {
     const key = routineFlowAgentKey(placed);
     setState((draft) => {
@@ -193,7 +165,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
       });
   };
 
-  /** The open agent edits its own canvas from the chat panel. */
   const assistantOf = (agent: AgentProfile | undefined) =>
     agent
       ? {
@@ -213,16 +184,11 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
     return state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine ?? null;
   };
   const ownerOf = (routine: RoutineFlowRoutineInfo) => ({ kind: "agent" as const, id: routine.agentId });
-  /** A webhook routine changes only through the events API, which answers an owner or admin. */
   const webhooksOrRefuse = () => {
     const webhooks = host().webhooks;
     if (!webhooks) toast.error(t("diagram.flows.webhookAdminOnly"));
     return webhooks;
   };
-  /**
-   * Saves a webhook routine through the events API, as its settings do, with one change: its
-   * instruction, or the events that start it. The host keeps the endpoint and the secret.
-   */
   const saveWebhookRoutine = (
     routine: RoutineFlowRoutineInfo,
     change: { instruction?: string; eventType?: string | null; filters?: EventFilter[] },
@@ -334,7 +300,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
               onRemoveNode={(nodeId, routineNodeId) => {
                 const removed = agentIdOfNode(nodeId);
                 if (!removed) return;
-                // A move still waiting to be saved would put the agent back after its removal.
                 const nodeKey = routineFlowAgentKey(removed);
                 window.clearTimeout(pendingSaves.get(nodeKey)?.timer);
                 pendingSaves.delete(nodeKey);
@@ -377,8 +342,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
                 const routineId = routineIdOfNode(routineNodeId);
                 const routine = state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine;
                 if (!editedAgentId || !routine) return;
-                // The routine's own agent does what the routine asks; every other agent, what the
-                // links that reach it in this routine ask.
                 const saved =
                   routine.agentId === editedAgentId
                     ? routine.trigger.kind === "webhook"
@@ -395,7 +358,6 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
                 const routineId = routineIdOfNode(nodeId);
                 const routine = state.canvas?.routines.find((entry) => entry.routine.id === routineId)?.routine;
                 if (!routine) return;
-                // A webhook routine runs a test the way its settings do: through the events API.
                 let started: Promise<unknown>;
                 if (routine.trigger.kind === "webhook") {
                   const webhooks = webhooksOrRefuse();

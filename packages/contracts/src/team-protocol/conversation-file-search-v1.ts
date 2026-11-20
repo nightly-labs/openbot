@@ -1,13 +1,3 @@
-// Frozen optional conversation-file-search-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: any member of a server can
-// search the files that messages in the agent chats of the host carry, by file name. The member can
-// already read each of these chats and download each of these files. An empty query lists the newest
-// files. Each result names the agent, the message, the time and the attachment summary, as a
-// conversation page sends it: `previewUrl` is the host's own attachment address, and the client
-// rewrites it as it rewrites the attachments of a page. The host leaves out the files of an agent that
-// the client cannot see, and channel threads. At most 100 results cross in one page; `nextCursor` is
-// opaque and only this route reads it. Widening any of it needs a second capability string.
 import { isAttachmentSummary } from "../ipc-attachments";
 import { isBoundedString, isIdentifier } from "../ipc-bounded-values";
 import type { ConversationFileSearchPage, ConversationFileSearchResult } from "../ipc-conversations";
@@ -30,10 +20,8 @@ export const CONVERSATION_FILE_SEARCH_ROUTES = {
   search: "/v1/conversation-files/search",
 } as const;
 
-/** The most results one page carries. The host also uses it as the largest `limit`. */
 export const CONVERSATION_FILE_SEARCH_PAGE_LIMIT = 100;
 
-/** The body a client sends. An absent `limit` gives the host's default page size. */
 export type ConversationFileSearchRequest = { query: string; cursor: string | null; limit?: number };
 
 const QUERY_LIMIT = 255;
@@ -83,10 +71,6 @@ function decodeResult(value: unknown): ConversationFileSearchResult {
   };
 }
 
-/**
- * The page a host answers, as the client type. The transport has already run the response through
- * the codec above; this gives it the type that the client reads.
- */
 export function decodeConversationFileSearchResponse(value: unknown): ConversationFileSearchPage {
   if (
     !isDynamicRecord(value) ||

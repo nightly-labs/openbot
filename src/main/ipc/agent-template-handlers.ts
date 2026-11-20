@@ -1,5 +1,3 @@
-// Link-only agent templates: publishing a local agent, and previewing and installing a shared one.
-
 import {
   type InstallAgentTemplateInput,
   isAgentTemplateCardPng,
@@ -13,14 +11,9 @@ import { isObject, requireString, stringPayload } from "./validation";
 
 export interface AgentTemplateIpcDependencies {
   agentTemplates: AgentTemplateService;
-  /** The id of an agent link that arrived before a window could be told, taken exactly once. */
   takePendingLink: () => string | null;
 }
 
-/**
- * There is no endpoint that installs from a link. A link names a template; installing it is still
- * a press of Install in the dialog that shows its content.
- */
 export function agentTemplateIpcHandlers({
   agentTemplates,
   takePendingLink,

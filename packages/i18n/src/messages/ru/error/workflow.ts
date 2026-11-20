@@ -17,12 +17,17 @@ export const messages = {
   "error.workflow.agentMissing": "Выберите агента для этого шага.",
   "error.workflow.handoffFailed": "OpenBot не смог отправить этот шаг агенту.",
   "error.workflow.agentStepEnded": "Сообщение агенту было удалено до его ответа.",
+  "error.workflow.agentStepStopped": "Агент остановился, не ответив на этот шаг. Запустите шаг снова.",
   "error.workflow.conditionUnclear": "Модель не ответила «да» или «нет».",
   "error.workflow.modelFailed": "Модель не смогла ответить. Запустите шаг снова.",
   "error.workflow.modelTimedOut":
     "Модель не ответила вовремя. Выберите меньшее усилие или более быструю модель для этого шага и запустите его снова.",
   "error.workflow.modelToolUse":
     "Модель попыталась использовать инструмент, но этот шаг может отвечать только текстом. Запустите шаг снова или выберите для него другую модель.",
+  "error.workflow.modelImageUnsupported":
+    "Модель этого шага не умеет читать изображения. Выберите модель, которая умеет, или удалите связь с изображением.",
+  "error.workflow.modelImageType":
+    "Шаг модели читает только изображения PNG, JPEG, GIF и WebP. Подключите изображение одного из этих типов.",
   "error.workflow.modelUnavailable": "Модель этого шага недоступна. Выберите другую модель для этого шага.",
   "error.workflow.providerBusy": "Провайдер занят. Подождите несколько минут и запустите шаг снова.",
   "error.workflow.providerOffline":
@@ -35,6 +40,7 @@ export const messages = {
   "error.workflow.mediaEmptyRequest":
     "Напишите описание или запустите предыдущие шаги, чтобы пришёл текст или изображение.",
   "error.workflow.mediaInputNotImage": "Этот шаг принимает только изображения, не видео. Удалите связь от видео.",
+  "error.workflow.mediaInputNotClip": "Этот вход принимает только видео и аудиофайлы. Удалите связь от файла.",
   "error.workflow.stepMissing": "Этого шага больше нет.",
   "error.workflow.nodeMissing": "Этого шага нет в рабочем процессе.",
   "error.workflow.runMissing": "Этого запуска больше нет.",

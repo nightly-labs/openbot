@@ -1,6 +1,5 @@
 import { defineMessages } from "../../../message";
 
-/** Errors that the CRM service and the agent CRM tools send. */
 export const messages = defineMessages("error.crm", {
   "error.crm.serverTooOld": "This server does not support the CRM. Update OpenBot on the computer that runs it.",
   "error.crm.tooLargeToSend": "This CRM page is too large to send to this client.",

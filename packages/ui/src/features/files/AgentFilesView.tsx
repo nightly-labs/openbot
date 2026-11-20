@@ -18,16 +18,13 @@ export interface AgentFilesViewProps {
   loading?: boolean | undefined;
   error?: string | null;
   onRetry?: () => void;
-  /** This agent's share of each storage location. */
   breakdown: readonly StorageBreakdown[];
   conversations: readonly ConversationStorageRow[];
   files: readonly StoredFileRow[];
   now?: Date;
   onBack: () => void;
   onClose: () => void;
-  /** Opens the workspace folder in the file manager. Leave it out for a remote server: the folder is on the host. */
   onOpenWorkspace?: (() => void) | undefined;
-  /** The viewer can delete this agent's files. */
   canDelete?: boolean;
   onOpenConversation: (conversationId: string) => void;
   onPreviewFile: (file: StoredFileRow) => void;
@@ -36,15 +33,10 @@ export interface AgentFilesViewProps {
 
 const CHAT_ROWS = 4;
 
-/** The value on the Files row of the agent settings, such as "1.4 GB". */
 export function agentFilesLinkValue(breakdown: readonly StorageBreakdown[]): string {
   return currentText().format.fileSize(storageTotal(breakdown));
 }
 
-/**
- * Agent settings > Files: what this agent keeps on the computer. It opens over the settings like
- * Routines and uses the same header, so Back returns to the settings.
- */
 export function AgentFilesView(props: AgentFilesViewProps) {
   const { t, format } = useText();
   const headingId = `agent-files-${createUniqueId()}`;

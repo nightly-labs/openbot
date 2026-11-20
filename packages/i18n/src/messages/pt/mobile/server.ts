@@ -111,8 +111,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Esgotado",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Termina em {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Dados mantidos até {date}",
   "mobile.server.hosted.state.payment": "Pagamento pendente",
   "mobile.server.hosted.state.setup": "Configurando",
+  "mobile.server.hosted.state.restoring": "Restaurando dados",
   "mobile.server.hosted.state.starting": "Iniciando",
   "mobile.server.hosted.state.running": "Em execução",
   "mobile.server.hosted.state.stopped": "Parado",
@@ -547,6 +549,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Adicionar agentes",
   "mobile.server.browserProfiles.agentsHint":
     "Um toque dá este perfil ao agente ou o devolve ao perfil compartilhado. Uma alteração fecha as abas abertas do agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Os logins nos sites ficam no perfil antigo. Um agente movido precisa entrar nesses sites novamente.",
   "mobile.server.browserProfiles.clear": "Apagar dados",
   "mobile.server.browserProfiles.clearTitle": "Apagar os dados de {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -718,6 +722,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "No Proton Pass, crie uma chave de acesso que só possa ler o cofre que você compartilha com o OpenBot e cole-a aqui. {host} guarda a chave; este telefone não.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Seu plano Proton não inclui a ferramenta de linha de comando do Proton Pass. Ela precisa de um plano do Proton que inclua o Pass Plus. Outros planos pagos, como o Mail Plus, não a incluem. Mude o plano da sua conta e conecte novamente.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} não está disponível neste servidor.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Entre no {name} neste telefone. Depois, {host} cria um cofre compartilhado e uma chave de acesso somente leitura para ele, e guarda apenas essa chave. Os agentes nunca veem uma senha.",
@@ -746,8 +752,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Somente leitura",
   "mobile.server.connectors.passwordManager.keyExpires": "Somente leitura. Expira em {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Expirou em {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "A ferramenta de linha de comando do {name} exige um plano pago. Mude o plano da sua conta e conecte novamente.",
   "mobile.server.connectors.passwordManager.expiredTitle": "A chave do {name} expirou",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Os agentes em {host} não podem entrar com seus logins compartilhados até você conectar novamente.",
@@ -997,7 +1001,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.add": "Adicionar",
   "mobile.server.connectors.whatsapp.groupTitle": "Adicionar um grupo",
   "mobile.server.connectors.whatsapp.groupDescription":
-    "As pessoas deste grupo podem passar trabalho para seus agentes.",
+    "As pessoas deste grupo podem passar trabalho para seus agentes quando mencionam o número ou respondem às mensagens dele.",
   "mobile.server.connectors.whatsapp.groupSearch": "Buscar grupos",
   "mobile.server.connectors.whatsapp.groupsLoading": "Lendo os grupos…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "O OpenBot não conseguiu ler os grupos",
@@ -1273,6 +1277,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Conectado · {count} ferramenta", other: "Conectado · {count} ferramentas" },
   "mobile.server.mcp.signInOnComputer":
     "Este servidor MCP pede login. Entre pelo OpenBot em um computador e teste de novo.",
+  "mobile.server.mcp.signIn": "Entrar",
+  "mobile.server.mcp.signInHere": "Este servidor MCP pede que você entre. Toque em Entrar e teste de novo.",
   "mobile.server.mcp.signedInDescription": "{server} está conectado a este servidor MCP.",
   "mobile.server.mcp.signOut": "Sair",
   "mobile.server.mcp.saveFailed": "Não foi possível salvar a alteração. Tente de novo.",
@@ -1323,6 +1329,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 horas",
   "mobile.server.planLimits.window.hours": { one: "{count} hora", other: "{count} horas" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Atualizações",
   "mobile.server.settings.updateAvailable": "Atualização disponível",
   "mobile.server.route.updates": "Atualizações",
@@ -1497,7 +1504,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Adicionou {member} a {role}",
   "mobile.server.audit.roleMemberRemoved": "Removeu {member} de {role}",
   "mobile.server.audit.agentLevel": "{agent} para {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importar agentes",
   "mobile.server.route.import": "Importar agentes",
   "mobile.server.import.unsupported": "Atualize o OpenBot neste servidor para importar agentes aqui.",
@@ -1571,7 +1577,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Não importado",
   "mobile.server.import.resultWarnings": "Alguns itens não foram transferidos",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transferência",
   "mobile.server.route.transfer": "Transferência",
   "mobile.server.route.transferExport": "Exportar",
@@ -1649,6 +1654,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copiar agentes duplicados?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} já tem agentes com estes nomes: {names}. A cópia adiciona um segundo agente para cada um. Cada cópia é um agente separado com seus próprios chats, arquivos e memórias.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copiar duplicados",
   "mobile.server.transfer.copying": "Copiando…",
   "mobile.server.transfer.copyFailed": "A cópia não terminou.",
   "mobile.server.transfer.copied": {
@@ -1659,4 +1668,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Os agentes copiados usam as regras de aprovação de {server}.",
   "mobile.server.transfer.copyNoServer":
     "Conecte-se a outro servidor como proprietário ou administrador para copiar agentes para ele.",
+  "mobile.server.route.ownerTransfer": "Transferir propriedade",
+  "mobile.server.ownerTransfer.unavailable":
+    "Conecte-se a este servidor como proprietário para transferir a propriedade.",
+  "mobile.server.ownerTransfer.hosted": "O OpenBot hospeda este servidor, então o proprietário não pode mudar.",
+  "mobile.server.ownerTransfer.lede":
+    "O novo proprietário recebe um e-mail e precisa aceitar com a sessão iniciada nesse e-mail. Depois disso, você é removido deste servidor.",
+  "mobile.server.ownerTransfer.email": "E-mail do novo proprietário",
+  "mobile.server.ownerTransfer.send": "Enviar",
+  "mobile.server.ownerTransfer.sending": "Enviando…",
+  "mobile.server.ownerTransfer.stays":
+    "Agentes, chats, rotinas, logins de provedores, chaves salvas, logins do Vault, logins do navegador e apps conectados ficam no servidor. O novo proprietário pode usá-los.",
+  "mobile.server.ownerTransfer.expiry": "O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirmTitle": "Tornar {email} o proprietário?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quando {email} aceitar, essa pessoa passa a ser proprietária de {server} e você perde o acesso. Os dados ficam no servidor. O pedido expira após 7 dias.",
+  "mobile.server.ownerTransfer.confirm": "Transferir",
+  "mobile.server.ownerTransfer.sendFailed": "O pedido não foi enviado.",
+  "mobile.server.ownerTransfer.loadFailed": "Não foi possível ler a transferência pendente.",
+  "mobile.server.ownerTransfer.pending": "Aguardando o novo proprietário",
+  "mobile.server.ownerTransfer.expires": "Expira em {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} precisa aceitar com a sessão iniciada neste e-mail. Até lá, você continua como proprietário.",
+  "mobile.server.ownerTransfer.cancel": "Cancelar",
+  "mobile.server.ownerTransfer.cancelTitle": "Cancelar a transferência?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} não poderá mais aceitá-la.",
+  "mobile.server.ownerTransfer.keep": "Manter",
+  "mobile.server.ownerTransfer.cancelFailed": "A transferência não foi cancelada.",
+  "mobile.server.ownerTransfer.incomingTitle": "Ser proprietário de {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} quer tornar você proprietário de {server}. Você terá controle total do servidor, e os agentes, chats, rotinas e logins salvos continuam nele. {name} perde o acesso. Quem ainda consegue entrar no computador que executa o servidor pode usar sua conta OpenBot. Troque as senhas e chaves SSH dele.",
+  "mobile.server.ownerTransfer.accept": "Aceitar",
+  "mobile.server.ownerTransfer.decline": "Recusar",
+  "mobile.server.ownerTransfer.accepted": "Agora você é proprietário de {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Não foi possível aceitar a transferência",
+  "mobile.server.ownerTransfer.declineFailed": "Não foi possível recusar a transferência",
+  "mobile.server.ownerTransfer.tryAgain": "Tente novamente mais tarde.",
 } as const satisfies PartialTranslation<typeof source>;

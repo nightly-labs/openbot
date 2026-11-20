@@ -11,20 +11,14 @@ import type { MobileAgent } from "./workspace-types";
 
 export type MobileSidebarItem =
   | { kind: "waiting"; id: string; count: number }
-  /** The heading of the "Unread" group of the `unread-group` order. */
   | { kind: "unread"; id: string; count: number }
   | {
       kind: "section";
       id: string;
-      /** The path, such as "Acme / Engineering", for menus and accessibility. */
       name: string;
-      /** The own name of the folder, which the header shows after `parentName`. */
       title: string;
-      /** The name of the folder that holds this one, or null at the top of the list. */
       parentName: string | null;
-      /** The folders that hold this one, from the top folder down. */
       ancestorIds: readonly string[];
-      /** A folder of the user, not the "Agents" group of the chats in no folder. */
       custom: boolean;
       empty: boolean;
     }
@@ -33,18 +27,6 @@ export type MobileSidebarItem =
 
 type MobileChatItem = Extract<MobileSidebarItem, { kind: "agent" | "channel" }>;
 
-/**
- * How the list orders the chats in the sections, as on the desktop. Pins and "Needs you" come first in
- * each order, and none of them changes the saved `agentOrder`. The phone keeps the choice; it is not
- * synced.
- * - `manual`: the saved order of the layout.
- * - `recent`: each section shows its chats by last activity, the most recent first. Chats do not move
- *   in the list by drag in this order, because the order is not manual.
- * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
- *   back to their place when they are read.
- * - `unread-first`: each section shows its unread chats first, then the others, both by last
- *   activity. Chats do not move in the list by drag in this order, because the order is not manual.
- */
 export type MobileChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
 
 export const MOBILE_CHAT_ORDERS = [
@@ -54,19 +36,16 @@ export const MOBILE_CHAT_ORDERS = [
   "unread-first",
 ] as const satisfies readonly MobileChatOrder[];
 
-/** True when the order sorts the chats of each section itself, so a drag in the list cannot place a chat. */
 export function mobileChatOrderSortsSections(order: MobileChatOrder): boolean {
   return order === "recent" || order === "unread-first";
 }
 
-/** When a chat last had activity, in epoch milliseconds: the agent's last update, or the channel's last message. */
 function chatActivity(chat: MobileChatItem): number {
   const at = chat.kind === "agent" ? chat.agent.updatedAt : (chat.channel.lastMessage?.at ?? chat.channel.createdAt);
   const time = at ? Date.parse(at) : Number.NaN;
   return Number.isNaN(time) ? 0 : time;
 }
 
-/** The most recent chat first. The sort is stable, so chats with the same time keep their order. */
 function byRecent<Item extends MobileChatItem>(chats: readonly Item[]): Item[] {
   return [...chats].sort((a, b) => chatActivity(b) - chatActivity(a));
 }
@@ -81,13 +60,6 @@ function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], 
   return chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
 }
 
-/**
- * `order.recent`: each section shows its chats by last activity, for the `recent` order.
- * `order.unreadFirst`: the unread chats, for the `unread-first` order. Each section then shows them
- * first and then the other chats, both by last activity. Null keeps the saved order.
- * `order.aside`: the chats that show in another group, such as "Unread". A folder leaves them out,
- * but a folder that holds only such chats is not empty.
- */
 export function mobileSidebarItems(
   layout: SidebarLayoutSnapshot | null,
   agents: MobileAgent[],
@@ -116,8 +88,6 @@ export function mobileSidebarItems(
     group.push(chat);
     groups.set(sectionId, group);
   }
-  // As on the desktop, folders do not indent: a folder in a folder shows "Parent / Name", and a closed
-  // folder hides the folders in it too.
   const parents = sidebarFolderParents(layout);
   return layout.order.flatMap((id) => {
     const ancestorIds = sidebarFolderAncestors(parents, id);
@@ -141,7 +111,6 @@ export function mobileSidebarItems(
         parentName: (parentId && names.get(parentId)) ?? null,
         ancestorIds,
         custom,
-        // An open folder with only folders in it is not empty.
         empty: all.length === 0 && ![...parents.values()].includes(id),
       },
       ...(collapsedSectionIds.has(id) ? [] : group),
@@ -149,11 +118,6 @@ export function mobileSidebarItems(
   });
 }
 
-/**
- * "Needs you": the agents that wait for the user, above the sections, in layout order. As on the
- * desktop, the group is not a section of the layout. The layout keeps each agent's place, so an
- * agent returns to its section when the wait ends.
- */
 export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[]): MobileSidebarItem[] {
   if (agents.length === 0) return [];
   const positions = new Map(layout?.agentOrder.map((id, index) => [id, index]));
@@ -166,7 +130,6 @@ export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents:
   ];
 }
 
-/** The "Unread" group of the `unread-group` order, above the sections, by last activity. */
 export function mobileUnreadItems(
   layout: SidebarLayoutSnapshot | null,
   agents: MobileAgent[],
@@ -177,10 +140,6 @@ export function mobileUnreadItems(
   return [{ kind: "unread", id: "unread", count: chats.length }, ...chats];
 }
 
-/**
- * The layout after a `move-agent` action, as the host applies it. The phone shows the move before the
- * host answers; the answer of the host then replaces this layout.
- */
 export function moveSidebarChat(
   layout: SidebarLayoutSnapshot,
   action: Extract<SidebarLayoutAction, { type: "move-agent" }>,

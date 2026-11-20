@@ -6,11 +6,6 @@ import { createMachineCard } from "./machine-card";
 import { type SidebarCardsPort, sidebarPort } from "./sidebar-port";
 import { createStorageCard } from "./storage-card";
 
-/**
- * The machine and storage warning cards of the selected server, on desktop and on the web. One card
- * shows at a time. A disk machine card covers the disk, so it replaces the storage card. A memory or
- * CPU card gives way to a full disk, unless it is critical itself.
- */
 export function createSidebarAlertCards(
   server: () => ServerSummary | undefined,
   port: () => SidebarCardsPort = sidebarPort,
@@ -27,7 +22,6 @@ export function createSidebarAlertCards(
   return {
     storageCard,
     machineCard,
-    /** True while a warning card shows, so the other footer cards wait. */
     shown: () => footerCard() !== null,
     machine: () => {
       const shown = footerCard();
@@ -37,7 +31,6 @@ export function createSidebarAlertCards(
       const shown = footerCard();
       return shown?.kind === "storage" ? shown.card : null;
     },
-    /** A clear in Server settings frees space and can change an alert level, so both cards read again. */
     refresh: () => {
       storageCard.refresh();
       machineCard.refresh();
@@ -55,7 +48,6 @@ interface SidebarAlertCardsProps {
 }
 
 export function SidebarAlertCards(props: SidebarAlertCardsProps) {
-  // As the host picks it: the responsible member while an active admin, otherwise the owner.
   const machineRecipient = (memberId: string | null) => {
     const member =
       props.members.find(

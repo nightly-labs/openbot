@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/provider";
 
 export const messages = {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "在这台电脑上可用",
   "provider.availableOnHost": "在 {name} 上运行",
   "provider.custom.name": "自定义服务商",
@@ -17,8 +16,6 @@ export const messages = {
   "provider.refreshingLabel": "正在检查服务商",
   "provider.refreshing": "检查中…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "连接中",
   "provider.status.updateAvailable": "有可用更新",
   "provider.status.settingUp": "配置中",
@@ -37,12 +34,8 @@ export const messages = {
   "provider.gemini.hostSignIn":
     "要连接 Gemini，请在主机上打开 OpenBot，然后在“服务器设置 > 服务商”中选择“连接”。Google 登录需要该主机上有浏览器，不支持远程登录。",
 
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "免费",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "连接",
   "provider.action.reconnect": "重新连接",
   "provider.action.restart": "重启",
@@ -73,15 +66,12 @@ export const messages = {
   "provider.aria.codeFallback": "用验证码登录 {name}",
   "provider.aria.moreActions": "{name} 的更多操作",
 
-  // The switch that turns a provider on or off in OpenBot. While an agent uses the provider, the
-  // switch stays on and a toast names the agent, or counts the agents when there are more.
   "provider.aria.use": "在 OpenBot 中使用 {name}",
   "provider.use.inUseOne": "{agent} 正在使用 {name}。请先更改该助手的模型，再关闭 {name}。",
   "provider.use.inUse": {
     other: "{count} 个助手正在使用 {name}。请先更改这些助手的模型，再关闭 {name}。",
   },
 
-  // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "用验证码登录 {name}",
   "provider.codeLogin.description": "在你的手机或另一个浏览器上完成，OpenBot 会在这里等待。",
   "provider.codeLogin.starting": "正在从 {name} 获取验证码…",
@@ -108,13 +98,11 @@ export const messages = {
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
-  // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "在 OpenBot 应用中连接 {name}",
   "provider.useApp.description":
     "{name} 的登录结果会返回发起登录的电脑，浏览器标签页无法接收。请在 OpenBot 应用中连接 {name}，应用会自动完成登录。",
   "provider.useApp.download": "获取应用",
 
-  // The agent model picker.
   "provider.picker.noEndpoints": "还没有端点",
   "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "助手模型",
@@ -213,7 +201,6 @@ export const messages = {
     "在主机上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.label": "OpenRouter API 密钥",
 
-  // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "登录 OpenCode Go",
   "provider.openCodeKey.description": "免费模型无需账号，填写密钥可解锁付费的 Go 模型。",
   "provider.openCodeKey.unreadable": "已保存的密钥无法读取，请重新粘贴或移除。",
@@ -263,7 +250,6 @@ export const messages = {
   "provider.account.poolCount": "{accounts}的账号池",
   "provider.account.poolInUse": "{pool} · 正在使用 {name}",
 
-  // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "已连接",
   "provider.settings.other": "其他服务商",
   "provider.settings.search": "搜索服务商",
@@ -312,6 +298,7 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · 由 OpenBot 下载",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 你自己安装的",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · 由 OpenBot 下载",
+  "provider.settings.installedVersionIncomplete": "部分模型需要此版本缺少的组件。下载 OpenBot 的版本即可使用它们。",
   "provider.settings.useInstalledVersion": "使用已安装的版本",
   "provider.settings.useDownloadedVersion": "使用 OpenBot 的版本",
   "provider.settings.update": "更新",

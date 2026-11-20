@@ -5,12 +5,6 @@ import type { ComposerAgent, ComposerBrowserTab, ComposerMcpServer, ComposerSkil
 import type { TextValue } from "../../text";
 import { browserDisplayUrl } from "../browser/browser-suggestions";
 
-/**
- * Where the picker hangs, and from which element. Like the queue panel, it is a child of
- * `.composer-wrap` that hangs from the composer's top edge, so the composer paints over its
- * bottom and it grows out from under the input. `mount` is undefined for an editor rendered
- * without a composer around it, which leaves the panel where Solid puts an unmounted portal.
- */
 export interface PickerFrame {
   mount: HTMLElement | undefined;
   bottom: number;
@@ -18,24 +12,13 @@ export interface PickerFrame {
 
 export type PickerOption =
   | { type: "agent"; agent: ComposerAgent }
-  /** Addresses every member of a channel. It inserts the text `@everyone`. */
   | { type: "everyone" }
-  /** `showSlug` is set when another listed skill has the same name: the slug tells them apart. */
   | { type: "skill"; skill: ComposerSkill; showSlug: boolean }
   | { type: "mcp"; server: ComposerMcpServer }
   | { type: "attachment"; attachment: DraftAttachment }
-  /** A browser tab of the agent. The agent gets its tab id and can use it with its browser tool. */
   | { type: "tab"; tab: ComposerBrowserTab }
-  /**
-   * A side thread of the agent. The agent gets its task id and can read its history. `snippet` is set
-   * when a message of the thread, not its title, has the query: it shows that message.
-   */
   | { type: "thread"; thread: ComposerThread; snippet?: string | undefined };
 
-/**
- * A group of the `@` list. When the list has more than one group, each group shows its title and
- * its count over its rows.
- */
 export interface PickerSection {
   id: string;
   title: AppTextKey | null;
@@ -88,19 +71,16 @@ export function pickerOptionDescription(
   return option.agent.description.trim() || option.agent.title.trim() || undefined;
 }
 
-/** A tab that has no title yet shows its address. */
 export function tabTitle(tab: ComposerBrowserTab): string {
   return tab.title.trim() || browserDisplayUrl(tab.url) || tab.url;
 }
 
-/** What a running thread does now, or why the last turn failed. */
 function threadDetail(thread: ComposerThread): string | undefined {
   if (thread.state === "running") return thread.progress?.trim() || undefined;
   if (thread.outcome === "failed") return thread.error?.trim() || undefined;
   return undefined;
 }
 
-/* The words of the task list, so a thread has the same state in both places. */
 const THREAD_STATE_LABELS = {
   running: "conversation.tasks.state.running",
   queued: "conversation.tasks.state.queued",
@@ -115,23 +95,17 @@ function threadStateLabel(thread: ComposerThread): keyof typeof THREAD_STATE_LAB
   return thread.outcome ?? "new";
 }
 
-/**
- * How well a tab or a thread answers the `@` query: the title, and for a tab its address too.
- * Plain text, so the match marks show the same span.
- */
 export function referenceMatches(option: { tab: ComposerBrowserTab } | { thread: ComposerThread }, query: string) {
   if (!query) return true;
   const text = "tab" in option ? `${tabTitle(option.tab)} ${browserDisplayUrl(option.tab.url)}` : option.thread.title;
   return text.toLocaleLowerCase().includes(query);
 }
 
-/** Where the server answers: the address for an http server, the command for a stdio one. */
 function mcpServerDescription(server: ComposerMcpServer): string | undefined {
   const source = server.transport === "stdio" ? [server.command, ...server.args].join(" ") : server.url;
   return source.trim() || undefined;
 }
 
-/** Hangs the picker off the composer's top edge, inside the wrap the queue panel also sits in. */
 export function measurePickerFrame(editor: HTMLElement): PickerFrame {
   const wrap = editor.closest(".composer-wrap");
   const composer = editor.closest(".composer");
@@ -139,15 +113,10 @@ export function measurePickerFrame(editor: HTMLElement): PickerFrame {
   return { mount: wrap, bottom: wrap.getBoundingClientRect().bottom - composer.getBoundingClientRect().top };
 }
 
-/*
- * The badge carries the option type, and for a skill where it came from. Every row in a skill list
- * is a skill, so the badge names only the source.
- */
 export function pickerOptionBadge(
   option: PickerOption,
   t: TextValue["t"],
 ): { label: string; icon?: typeof Puzzle } | null {
-  // The section title says that a row is a tab, so a tab row needs no badge.
   if (option.type === "tab") return null;
   if (option.type === "thread") return { label: t(THREAD_STATE_LABELS[threadStateLabel(option.thread)]) };
   if (option.type === "agent") return { label: t("composer.picker.badge.agent"), icon: Bot };
@@ -166,13 +135,8 @@ export function pickerOptionBadge(
   }
 }
 
-/** The protocol name. It is not translated. */
 const MCP_BADGE = "MCP";
 
-/**
- * How well a skill answers the query, lower first; null when it does not. A hit in the name
- * outranks one in the description, so the skill the user names is at the top.
- */
 export function skillMatchRank(skill: ComposerSkill, query: string): number | null {
   if (!query) return 0;
   const name = skill.name.toLocaleLowerCase();

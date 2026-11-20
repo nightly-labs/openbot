@@ -4,12 +4,10 @@ import { Effect, Schema } from "effect";
 import { causeHelpers } from "../../effect-boundary";
 import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
 
-// These operations deliberately have no tracing span: provider payloads and URLs can contain secrets.
 const { io: slackIo } = causeHelpers(MessagingAdapterError);
 
 const SLACK_API_ORIGIN = "https://slack.com";
 
-/** Slack's error codes that mean the token no longer works. */
 const AUTH_ERRORS = new Set(["invalid_auth", "not_authed", "token_revoked", "token_expired", "account_inactive"]);
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_NOTICE_MS = 5_000;
@@ -29,18 +27,11 @@ export class SlackApiError extends Error {
 
 export interface SlackWebApiOptions {
   token: string;
-  /** Only tests change this. The token is never sent to another origin. */
   origin?: string | undefined;
   rateLimited?(retryAt: string): void;
-  /** Waits between rate-limit retries. Only tests replace it. */
   delay?(milliseconds: number): Promise<void>;
 }
 
-/**
- * The Slack Web API over `fetch`, with one token. A form-encoded body works for every method, so
- * each call uses it and sends a nested value as JSON text. Nothing here logs a request or a response:
- * both carry message text, and a failure names only the method and Slack's error code.
- */
 export class SlackWebApi {
   readonly #token: string;
   readonly #origin: string;
@@ -54,10 +45,6 @@ export class SlackWebApi {
     this.#delay = options.delay;
   }
 
-  /**
-   * `rateLimitRetries: 0` fails a rate-limited call at once and leaves the connection state alone,
-   * for a read that the agent asked for and can try again later.
-   */
   readonly call = Effect.fnUntraced(function* (
     this: SlackWebApi,
     method: string,
@@ -239,7 +226,6 @@ export class SlackWebApi {
     }
   });
 
-  /** A Slack https host, or the test origin this client was built for. */
   #trusted(value: string): boolean {
     let url: URL;
     try {

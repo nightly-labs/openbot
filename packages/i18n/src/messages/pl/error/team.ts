@@ -53,6 +53,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Zbyt wiele prób logowania. Spróbuj ponownie później.",
   "error.team.clientUpdateRequired": "Zaktualizuj tego klienta OpenBot przed połączeniem z tym hostem.",
   "error.team.hostUpdateRequired": "Zaktualizuj OpenBot na hoście przed połączeniem.",
+  "error.team.serverSafeMode": "Ten serwer działa w trybie awaryjnym, ponieważ OpenBot się na nim nie uruchamia.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} na tym serwerze nie może otworzyć swoich danych, ponieważ zapisała je nowsza wersja OpenBot. Nowsze wydanie OpenBot na serwerze rozwiąże ten problem.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} na tym serwerze zatrzymał się po wielu nieudanych próbach uruchomienia. Nowsze wydanie OpenBot na serwerze rozwiąże ten problem.",
   "error.team.sidebarLayoutUnavailable": "Układ paska bocznego jest niedostępny.",
   "error.team.providersUnsupported": "To połączenie nie obsługuje ustawień dostawców.",
   "error.team.providerNotManaged": "OpenBot nie zarządza CLI tego dostawcy.",
@@ -119,6 +124,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
   "error.team.hostRestartUnsupported": "To połączenie nie obsługuje ponownego uruchamiania serwera.",
+  "error.team.ownerTransferUnsupported": "Ten serwer nie obsługuje przekazania własności.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
   "error.team.localServersUnsupported": "To połączenie nie obsługuje serwerów na tym komputerze.",
   "error.team.routineResultsUnsupported": "To połączenie nie obsługuje miejsc docelowych rutyn.",

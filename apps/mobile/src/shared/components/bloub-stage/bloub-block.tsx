@@ -7,13 +7,8 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { BloubEyes, EYES_HEIGHT, EYES_WIDTH } from "./bloub-eyes";
 import { BLOUB_MOVE, BLOUB_RADIUS, bloubEyesFrame, bloubGradient, useBloubColors } from "./bloub-look";
 
-/** Where the lower edge of the block is: over the whole screen, at a point, or above the screen. */
 export type BloubEdge = "cover" | "gone" | number;
 
-/**
- * The lilac block with the eyes, for a window that draws above the stage, such as the app lock.
- * It starts covered, as the stage does, and moves its edge to `edge` on the UI thread.
- */
 export function BloubBlock({ edge, dimmed }: { edge: BloubEdge; dimmed: boolean }) {
   const window = useWindowDimensions();
   const [height, setHeight] = useState(window.height);
@@ -31,7 +26,6 @@ export function BloubBlock({ edge, dimmed }: { edge: BloubEdge; dimmed: boolean 
 
   const top = insets.top;
   const blockStyle = useAnimatedStyle(() => ({ transform: [{ translateY: position.get() - span }] }));
-  // The gradient stays still on the screen while the block's edge moves over it.
   const lightStyle = useAnimatedStyle(() => ({ transform: [{ translateY: span - position.get() }] }));
   const eyesStyle = useAnimatedStyle(() => {
     const frame = bloubEyesFrame(position.get(), height, top);

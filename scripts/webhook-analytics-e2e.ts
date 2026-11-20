@@ -1,13 +1,3 @@
-// Checks the webhook analytics of the host: one `system_webhook_delivery` for each inbound request,
-// and `system_routine_run` with `trigger_type: webhook` and `run_source: webhook` for the run that a
-// request starts. Runs the real agent service, events service and host analytics on a temporary
-// profile with a fake Codex app-server, a fake relay and a capture OpenPanel client.
-// The check sends signed and refused requests and a test event, and asserts the result, status,
-// owner kind, format and timings of each event; that no event has a route ID, a delivery ID, a
-// secret, a routine name or body text; and that at most 60 delivery events go each minute, the next
-// one with the count of those that did not go. The minute is moved forward through `Date.now`.
-// It also checks that the renderer gives `webhook_route_limit` for the host's route limit failure.
-// `bun scripts/webhook-analytics-e2e.ts`. Writes .openbot-build/webhook-analytics-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -27,7 +17,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -46,7 +35,6 @@ const RELAY_ORIGIN = "https://signal.example.test";
 const ROUTINE_NAME = "Failed builds webhook";
 const BODY_MARK = "secret-build-log-text";
 
-/** A Codex app-server with the methods that the service calls. Each turn answers "Done.". */
 const FAKE_CODEX = `#!/usr/bin/env node
 if (process.argv.includes("--version")) {
   process.stdout.write("codex-cli 0.160.1\\n");
@@ -143,6 +131,7 @@ const routineRuns = () => sent.filter((event) => event.name === "system_routine_
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -161,7 +150,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of the capture client. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -177,7 +165,6 @@ function pass(name: string, condition: boolean, detail?: unknown) {
   assert.ok(condition, detail === undefined ? name : `${name}: ${JSON.stringify(detail)}`);
 }
 
-// `profileId` is the account that the analytics service sends each event for.
 const DELIVERY_KEYS = new Set([
   "profileId",
   "owner_kind",
@@ -203,10 +190,8 @@ const agents = new AgentService({
   browser,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
-  // As in the app: the events service is built after the agent service.
   webhookRoutines: () => agentWebhookRoutineWriter(events),
 });
-// As in the app: the analytics service is built after the events service, so the report is bound late.
 let reportDelivery:
   | ((report: Parameters<InstanceType<typeof HostAnalytics>["handleWebhookDelivery"]>[0]) => void)
   | null = null;
@@ -236,7 +221,6 @@ const analytics = new HostAnalytics(
     platform: "darwin",
     resolveOwner: () => ({ id: "account-1", email: "owner@example.test" }),
     resolveAgent: () => null,
-    // The same resolver as `application-services.ts`.
     resolveRoutineRun: (agentId, routineId, runId) => {
       const run = agents.listRoutineRuns({ agentId, routineId }).find((item) => item.id === runId);
       const routine = agents.routineRecords.get({ kind: "agent", id: agentId }, routineId);
@@ -320,7 +304,6 @@ try {
     return deliveries()[count - 1] ?? {};
   };
 
-  // 1. A signed request starts the routine.
   pass("A signed request starts the routine", (await deliver("started")) === 202);
   const started = await lastDelivery(1);
   pass(
@@ -340,7 +323,6 @@ try {
     started,
   );
 
-  // 2. The run that the request started reports its trigger and source.
   const run = await waitFor("the finished webhook run event", () =>
     routineRuns().find((event) => event.status !== "running"),
   );
@@ -350,7 +332,6 @@ try {
     run,
   );
 
-  // 3. Each refusal reports its result and status.
   pass("Another event type is ignored", (await deliver("ignored", { type: "build.passed" })) === 202);
   const ignored = await lastDelivery(2);
   pass(
@@ -407,7 +388,6 @@ try {
     signedOut,
   );
 
-  // 4. A test event from Routines settings is a delivery with `test: true`.
   const test = await Effect.runPromise(events.sendTestEvent({ owner, id: saved.routine.id }));
   pass("The test event starts the routine", test.status === "started");
   const testEvent = await lastDelivery(8);
@@ -417,7 +397,6 @@ try {
     () => routineRuns().filter((event) => event.status !== "running").length >= 2,
   );
 
-  // 5. At most 60 delivery events go each minute; the next one counts the others.
   clockOffset += 61_000;
   const windowStart = deliveries().length;
   for (let index = 0; index < 65; index += 1) await deliver("capped", { route: randomUUID() });
@@ -430,7 +409,6 @@ try {
   pass("Only 60 delivery events go in one minute", sentInWindow === 60, sentInWindow);
   pass("The next event counts the 5 that did not go", afterCap.skipped_count === 5, afterCap);
 
-  // 6. The events carry only the allowed keys, and no ID, secret, name or body text.
   report.deliveries = deliveries();
   report.routineRuns = routineRuns();
   pass(
@@ -443,7 +421,6 @@ try {
   );
   pass("No event has a route ID, delivery ID, secret, routine name or body text", leaks.length === 0, leaks);
 
-  // 7. The route limit failure gets its own failure code in the renderer, as it crosses IPC.
   for (let index = agents.routineRecords.routes.list().length; index < WEBHOOK_ROUTES_LIMIT; index += 1) {
     await Effect.runPromise(
       events.saveRoutine({
@@ -456,7 +433,6 @@ try {
       }),
     );
   }
-  // The IPC handler runs the save with `runCauseEffect`, which throws the wrapped catalog error.
   const limitError = await runCauseEffect(
     events.saveRoutine({
       owner,

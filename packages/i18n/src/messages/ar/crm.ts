@@ -269,7 +269,7 @@ export const messages = {
   "crm.customer.paidOn": "دُفعت في {date}",
   "crm.customer.billing": "الفوترة",
   "crm.customer.details": "التفاصيل",
-  "crm.customer.since": "عميل منذ",
+  "crm.customer.added": "تاريخ الإضافة",
   "crm.customer.activity": "النشاط",
   "crm.customer.loading": "جارٍ التحميل…",
 

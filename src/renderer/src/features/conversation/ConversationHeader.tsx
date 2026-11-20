@@ -19,7 +19,6 @@ import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
-/** The runtime of the running turn, or of the next one, as the "After this turn" badge names it. */
 interface BadgeRuntime {
   provider: AgentProviderRef;
   model: AgentModelId;
@@ -29,7 +28,6 @@ interface BadgeRuntime {
 
 import { useText } from "@openbot/ui/text";
 
-/** @internal Stable HMR boundary for conversation header. */
 export function ConversationHeader() {
   const { t } = useText();
   const {
@@ -54,22 +52,15 @@ export function ConversationHeader() {
     replyJump,
     toggleSidePanel,
     moveThreadToPanel,
+    startNewThread,
   } = useConversationViewScope();
   const runningThreads = () => props.threads?.running ?? 0;
-  /** While a side thread is open, the agent's name goes back to the agent's own chat. */
   const openMainChat = () => {
     const header = props.threads?.header;
     return header && sideThreadOpen() ? () => header.onOpen(MAIN_THREAD_ID) : undefined;
   };
-  /** With thread tabs, the agent's name is the tab of the agent's own chat. */
   const titleSelected = () => (props.threads ? !sideThreadOpen() : undefined);
-  /** The chat in the main view: the open side thread, a new thread, or undefined for the agent's own chat. */
   const viewTaskId = () => (sideThreadOpen() ? (props.threads?.open?.id ?? DRAFT_THREAD_ID) : undefined);
-  /**
-   * Opens a pin in its chat: in place in the agent's own chat, else in the tab of its thread, which
-   * reads the part around it. A pin whose message or thread is gone shows a toast, and the list reads again.
-   * A later click replaces an earlier one that is still loading, so the earlier one shows no toast.
-   */
   let pinOpens = 0;
   async function openPin(key: string): Promise<void> {
     const pin = messagePins.pin(key);
@@ -83,7 +74,6 @@ export function ConversationHeader() {
     actionToast.error(t("chat.pins.missing"));
     messagePins.load();
   }
-  /** The pins of all chats of the agent. The pins of the chat in view come first. */
   const pinnedMessages = () => {
     if (!messagePins.available()) return undefined;
     return {
@@ -109,7 +99,6 @@ export function ConversationHeader() {
       props.agentStatus?.providers?.find((status) => status.id === runtime.provider)?.accounts ?? [],
       accountId(runtime),
     );
-  /** Each part shows only where the two runtimes differ, so a model change alone names only the models. */
   const runtimeLabel = (runtime: BadgeRuntime, other: BadgeRuntime) => {
     const parts = [
       findModelOption(props.modelOptions, props.agentStatus?.providers, runtime.provider, runtime.model)?.name ??
@@ -120,7 +109,6 @@ export function ConversationHeader() {
     if (runtime.reasoningEffort !== other.reasoningEffort) parts.push(reasoningLabel(runtime.reasoningEffort, t));
     return parts.join(" · ");
   };
-  /** A change chosen during a turn, in any thread. It applies from the next turn. */
   const pendingModel = () => {
     const agent = props.agent;
     if (!agent || !(working() || runningThreads() > 0)) return undefined;
@@ -164,7 +152,6 @@ export function ConversationHeader() {
         onConnectProvider: props.onConnectProvider,
         canConnectProvider: props.canConnectProvider,
         onManageProviders: props.onManageProviders,
-        // A model, effort, provider or account chosen during a turn applies from the next turn.
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
@@ -191,7 +178,7 @@ export function ConversationHeader() {
       }
       threads={
         <Show when={props.threads}>
-          {(threads) => <ThreadHeader {...threads().header} onMoveToSide={moveThreadToPanel} />}
+          {(threads) => <ThreadHeader {...threads().header} onNew={startNewThread} onMoveToSide={moveThreadToPanel} />}
         </Show>
       }
       pinnedMessages={pinnedMessages()}

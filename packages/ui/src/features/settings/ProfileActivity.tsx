@@ -16,7 +16,6 @@ import { usageCompact, usageCost, usageProviderName, usageSeriesColor } from "..
 
 export type ProfileActivityPhase = "loading" | "ready" | "error" | "unsupported";
 
-/** A day of the report as the user reads it: the date is in the report's zone, not in UTC. */
 function reportDate(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }
@@ -37,16 +36,10 @@ export function useProfileDates() {
             start: start.slice(0, 4) === end.slice(0, 4) ? short(start) : long(start),
             end: long(end),
           }),
-    // 1 January 2023 is a Sunday, so the date of each weekday is that day plus its number.
     weekday: (weekday: number) => format.date(Date.UTC(2023, 0, 1 + weekday), { weekday: "long", timeZone: "UTC" }),
   };
 }
 
-/**
- * A year of days: one column for each week, Sunday at the top. A screen reader reads the summary
- * label. A pointer over a day shows its date and tokens in the chart tooltip. The cells stay in
- * place when a later report arrives, so a reload does not play the entrance again.
- */
 export function ProfileHeatmap(props: { days: ProfileDay[]; label: string }) {
   const { t } = useText();
   const dates = useProfileDates();
@@ -203,10 +196,6 @@ function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-/**
- * The year of the user's work on this computer, under the profile header: five tiles, the year of
- * days, the insights, the teammates and the models. Nothing shows when the host has no analytics.
- */
 export function ProfileActivity(props: {
   phase: ProfileActivityPhase;
   stats: ProfileStats | null;

@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Обновите OpenBot на {name}",
   "server.compatibility.unsafeDataTitle": "Хост вернул небезопасные данные",
   "server.compatibility.cannotConnectTitle": "Не удаётся подключиться к {name}",
+  "server.compatibility.safeModeTitle": "{name} не запускается",
   "server.compatibility.updateClientDescription":
     "Это приложение поддерживает только более старые протоколы, чем хост. Обновите приложение и повторите попытку.",
   "server.compatibility.updateHostDescription":
@@ -118,6 +119,8 @@ export const messages = {
   "server.local.create": "Создать сервер",
   "server.local.creating": "Создание сервера…",
   "server.local.createFailed": "Не удалось создать сервер.",
+  "server.local.createFailedRetry":
+    "Что-то пошло не так. Повторите попытку. Если ошибка повторится, перезапустите OpenBot.",
   "server.local.limitReached":
     "На этом компьютере может быть не больше {limit} серверов. Удалите один, чтобы создать новый.",
   "server.local.deleteConfirmTitle": "Удалить {name}?",
@@ -170,6 +173,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "Копирование OpenBot на машину",
   "server.hosted.detail.create.key": "Добавление одноразового ключа входа",
   "server.hosted.detail.start.boot": "Включение машины",
+  "server.hosted.detail.start.restore": "Восстановление данных",
   "server.hosted.detail.start.app": "Запуск OpenBot",
   "server.hosted.detail.start.wait": "Ожидание ответа OpenBot",
   "server.hosted.detail.connect.signIn": "Вход от вашего имени",
@@ -691,4 +695,38 @@ export const messages = {
   "server.settings.responseStyleNatural": "Естественный",
   "server.settings.responseStyleClassic": "Классический",
   "server.settings.personalityLoadFailed": "Не удалось загрузить характер сервера.",
+  "server.ownerTransfer.title": "Владение",
+  "server.ownerTransfer.ownerTitle": "Вы владелец этого сервера",
+  "server.ownerTransfer.ownerDescription":
+    "Сделайте владельцем другого человека. Вы потеряете доступ, когда он примет запрос.",
+  "server.ownerTransfer.start": "Передать владение…",
+  "server.ownerTransfer.pending": "Передача владения {email} ожидает ответа",
+  "server.ownerTransfer.expires": "Истекает {date}",
+  "server.ownerTransfer.cancel": "Отменить запрос",
+  "server.ownerTransfer.emailTitle": "Передать владение сервером {server}",
+  "server.ownerTransfer.emailDescription":
+    "Введите email нового владельца. Он должен принять запрос, войдя с этим email.",
+  "server.ownerTransfer.email": "Email нового владельца",
+  "server.ownerTransfer.confirmTitle": "Сделать {email} владельцем?",
+  "server.ownerTransfer.confirmDescription": "Когда {email} примет запрос:",
+  "server.ownerTransfer.confirmLoseAccess": "Вы потеряете доступ к серверу {server}.",
+  "server.ownerTransfer.confirmStays":
+    "Агенты, регулярные задачи, чаты, входы в провайдеры, сохранённые ключи, логины Vault, входы в браузере и подключённые приложения останутся на сервере. Новый владелец сможет ими пользоваться.",
+  "server.ownerTransfer.confirmExpiry": "Запрос истекает через 7 дней.",
+  "server.ownerTransfer.send": "Отправить",
+  "server.ownerTransfer.sendFailed": "Не удалось отправить запрос на передачу.",
+  "server.ownerTransfer.incomingTitle": "Стать владельцем сервера {server}?",
+  "server.ownerTransfer.incomingDescription": "{name} хочет сделать вас владельцем сервера {server}.",
+  "server.ownerTransfer.incomingYours": "Сервер, его агенты, регулярные задачи и данные станут вашими.",
+  "server.ownerTransfer.incomingPrevious": "{name} потеряет доступ к серверу.",
+  "server.ownerTransfer.incomingStays":
+    "Входы в провайдеры, сохранённые ключи, логины Vault, входы в браузере и подключённые приложения на сервере останутся там, и вы сможете ими пользоваться.",
+  "server.ownerTransfer.incomingMachine":
+    "Любой, кто ещё может войти на компьютер, где работает сервер, может пользоваться вашим аккаунтом OpenBot. Смените на нём пароли и SSH-ключи.",
+  "server.ownerTransfer.later": "Позже",
+  "server.ownerTransfer.decline": "Отклонить",
+  "server.ownerTransfer.accept": "Принять",
+  "server.ownerTransfer.accepted": "Теперь вы владелец сервера {server}",
+  "server.ownerTransfer.acceptFailed": "Не удалось принять передачу.",
+  "server.ownerTransfer.declineFailed": "Не удалось отклонить передачу.",
 } as const satisfies PartialTranslation<typeof source>;

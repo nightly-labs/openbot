@@ -314,6 +314,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
   "provider.settings.otherVersionInstalledByUser": "사용 안 함: {version} · 직접 설치함",
   "provider.settings.otherVersionDownloaded": "사용 안 함: {version} · OpenBot이 다운로드함",
+  "provider.settings.installedVersionIncomplete":
+    "일부 모델에는 이 버전에 없는 구성 요소가 필요합니다. 사용하려면 OpenBot 버전을 다운로드하세요.",
   "provider.settings.useInstalledVersion": "설치한 버전 사용",
   "provider.settings.useDownloadedVersion": "OpenBot 버전 사용",
   "provider.settings.update": "업데이트",

@@ -1,18 +1,11 @@
-# boat stop and resume work like a reboot. This moves a staged release into place before OpenBot
-# starts, so an update never stops work in progress. While boat still restores the disk after a wake,
-# the release stays, and OpenBot asks for the install when no client uses it. OpenBot does not require
-# this unit, so it starts after a failure too. The next boot does the update again.
 [Unit]
 Description=Apply a staged OpenBot update
 Before=openbot.service
 
 [Service]
 Type=oneshot
-# openbot.service wants this unit, and boat starts each enabled unit after a wake too. The second
-# start must not copy a release under a running OpenBot.
 RemainAfterExit=yes
 ExecStart=/opt/OpenBot/hosted/openbot-hosted-update boot
-# At most 4 minutes of restore wait when a stop interrupted a copy, then the copy.
 TimeoutStartSec=15min
 
 [Install]

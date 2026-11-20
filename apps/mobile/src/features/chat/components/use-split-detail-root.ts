@@ -3,11 +3,6 @@ import { type ParamListBase, useNavigation, useNavigationState, useRoute } from 
 import { useEffect } from "react";
 import { useSplitLayout } from "@/shared/components/adaptive-split";
 
-/**
- * Whether the chat is the first screen of the detail column on a wide window, beside the chat list
- * pane. It has no Back there, as the list beside it opens the other chats, and the edge swipe, in the
- * middle of the window, does not close it. A chat that another chat opened keeps both.
- */
 export function useSplitDetailRoot(): boolean {
   const split = useSplitLayout() !== null;
   const route = useRoute();

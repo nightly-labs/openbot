@@ -293,6 +293,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",
   "provider.settings.otherVersionDownloaded": "Не используется: {version} · загружена OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Некоторым моделям нужен компонент, которого нет в этой версии. Загрузите версию OpenBot, чтобы использовать их.",
   "provider.settings.useInstalledVersion": "Использовать свою",
   "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",

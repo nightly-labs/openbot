@@ -10,13 +10,6 @@ import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/*
- * The routine schedule as one row of chips, after grok.com/automations. These stories are the
- * design step: the row edits a UI draft, not the saved `RoutineSchedule`, so it is not wired
- * into the routine settings yet.
- */
-
-/** A fixed day, so the calendar and the default dates do not move with the clock. */
 const STORY_TODAY = new Date(2026, 8, 24, 10, 0);
 
 interface PickerArgs {
@@ -27,14 +20,12 @@ interface PickerArgs {
 }
 
 function PickerStage(props: PickerArgs) {
-  // Derived, so a change in the Controls panel resets the row.
   const [schedule, setSchedule] = createSignal(() => props.schedule);
   return (
     <main
       style={{
         display: "grid",
         gap: "var(--openbot-space-3)",
-        // 296px is the settings panel's default width.
         width: props.width === "panel" ? "296px" : "640px",
         padding: "var(--openbot-space-4)",
         background: "var(--openbot-bg-canvas)",
@@ -97,10 +88,8 @@ export const Yearly: Story = { args: { schedule: { kind: "yearly", month: 9, day
 
 export const Custom: Story = { args: { schedule: { kind: "custom", expression: "*/15 9-17 * * 1-5" } } };
 
-/** The old "Weekdays" kind is a Daily run on Monday to Friday. */
 export const WeekdaysFolded: Story = { args: { schedule: { kind: "daily", days: ROUTINE_WORKDAYS, time: "07:00" } } };
 
-/** The old "Interval" kind is an Hourly run every N hours through the whole day. */
 export const EveryTwoHours: Story = {
   args: { schedule: { kind: "hourly", everyHours: 2, days: ROUTINE_EVERY_DAY, window: null } },
 };

@@ -1,14 +1,12 @@
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import type { ChatMessage } from "./chat-messages";
 
-/** The user cancelled the upload. A caller that shows the error uses `mobile.chat.upload.cancelled`. */
 export class ChatUploadCancelledError extends Error {
   constructor() {
     super("Attachment upload cancelled.");
   }
 }
 
-/** Keep the ordered draft IDs together until send commits them to one message. */
 export async function uploadChatAttachments<T extends RemoteFileUpload, R = string>(
   files: T[],
   actions: {
@@ -17,7 +15,6 @@ export async function uploadChatAttachments<T extends RemoteFileUpload, R = stri
     send: (ids: string[]) => Promise<R>;
     cancelled?: () => boolean;
     progress?: (completed: number) => void;
-    /** The sent fraction of the file uploading now, which is file number `completed`. */
     fileProgress?: (fraction: number) => void;
   },
 ): Promise<R> {
@@ -34,13 +31,11 @@ export async function uploadChatAttachments<T extends RemoteFileUpload, R = stri
     return await actions.send(ids);
   } catch (error) {
     await Promise.allSettled(ids.map(actions.discard));
-    // Cancel stops a large file in the middle, and the upload then fails with its own error.
     if (actions.cancelled?.()) throw new ChatUploadCancelledError();
     throw error;
   }
 }
 
-/** The host replaces upload draft IDs when it commits a message, preserving file order. */
 export function retainConfirmedAttachments(
   messages: ChatMessage[],
   receiptId: string,
@@ -51,7 +46,6 @@ export function retainConfirmedAttachments(
   if (!message || message.kind !== "message") return false;
   for (const [index, attachment] of (message.attachments ?? []).entries()) {
     const file = files[index];
-    // A large file has no bytes in memory. Its message downloads it when the user taps it.
     if (file && !file.file)
       retain(attachment.id, { name: file.name, mimeType: file.mimeType, base64: file.base64, localUri: file.uri });
   }

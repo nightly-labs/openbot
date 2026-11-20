@@ -1,12 +1,3 @@
-// Checks that a custom provider on Anthropic's API host gets prompt caching. Builds the OpenCode
-// config layer with `openCodeConfigEnv` for an endpoint at `https://api.anthropic.com/v1/`, then runs
-// the real OpenCode CLI with that layer against a fake Anthropic server on loopback (only the base
-// URL changes), and reads the request that OpenCode sends. `--standalone` (OpenCode 2) keeps each
-// run off the shared background service. Cases: the Anthropic adapter, which must
-// send `cache_control` breakpoints to `/v1/messages`, and the OpenAI-compatible adapter that such an
-// endpoint used before, which sends none to `/v1/chat/completions`.
-// `bun scripts/opencode-anthropic-cache-e2e.ts [<opencode binary>]`. Without an argument it uses
-// `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-anthropic-cache-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -98,7 +89,6 @@ const address = server.address();
 assert.ok(address && typeof address === "object", "the fake server has no port");
 const local = `http://127.0.0.1:${address.port}/v1`;
 
-/** The layer OpenBot sends for one endpoint, with only the base URL moved to the fake server. */
 function configFor(baseUrl: string): { readonly npm: string; readonly baseURL: string; readonly content: string } {
   const env = openCodeConfigEnv(
     {},
@@ -151,7 +141,6 @@ async function runOpenCode(
   return { code, stderr: stderr.slice(-2000) };
 }
 
-/** Each `cache_control` value in a request body. */
 function breakpoints(value: unknown): unknown[] {
   if (Array.isArray(value)) return value.flatMap(breakpoints);
   if (!value || typeof value !== "object") return [];

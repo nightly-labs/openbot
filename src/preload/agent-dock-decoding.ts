@@ -1,6 +1,3 @@
-// What main sends for the agent dock window: the presentation it shows and the actions that the main
-// renderer does.
-
 import {
   type AgentDockAction,
   type AgentDockDisplayInfo,
@@ -12,7 +9,6 @@ import {
   isAgentDockPresentation,
 } from "@openbot/contracts/ipc";
 
-/** Null hides the dock window. */
 export function decodeAgentDockPresentation(value: unknown): AgentDockPresentation | null {
   if (value === null) return null;
   if (!isAgentDockPresentation(value)) throw new Error("Invalid agent dock presentation.");

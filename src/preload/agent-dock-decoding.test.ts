@@ -312,7 +312,14 @@ describe("agent dock decoding", () => {
   it("accepts a dock position and rejects one outside the display", () => {
     expect(decodeAgentDockOffset({ displayId: 1, offset: 1 })).toEqual({ displayId: 1, offset: 1 });
     expect(decodeAgentDockOffset({ displayId: 1, offset: 0 })).toEqual({ displayId: 1, offset: 0 });
+    const bounds = { x: -1920, y: 0, width: 1920, height: 1080 };
+    expect(decodeAgentDockOffset({ displayId: 1, offset: 0, bounds })).toEqual({ displayId: 1, offset: 0, bounds });
     for (const value of [
+      { displayId: 1, offset: 0, bounds: { ...bounds, width: 0 } },
+      { displayId: 1, offset: 0, bounds: { ...bounds, x: 0.5 } },
+      { displayId: 1, offset: 0, bounds: { ...bounds, y: 100_001 } },
+      { displayId: 1, offset: 0, bounds: { x: 0, y: 0, width: 1920 } },
+      { displayId: 1, offset: 0, bounds: null },
       { displayId: 1, offset: -0.1 },
       { displayId: 1, offset: 1.1 },
       { displayId: 1, offset: Number.POSITIVE_INFINITY },

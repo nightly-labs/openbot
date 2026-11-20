@@ -1,4 +1,3 @@
-// Frozen optional session settings contract. Bounds and semantics do not follow IPC changes.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,

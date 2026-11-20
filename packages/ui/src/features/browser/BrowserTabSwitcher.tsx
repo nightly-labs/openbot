@@ -7,7 +7,6 @@ import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { useBrowserPageCover } from "./browser-page-cover";
 import { browserDisplayUrl } from "./browser-suggestions";
 
-/** On a narrow window the top row has no room for the chips: one button names the tab and opens the list. */
 export function BrowserTabSwitcher(props: {
   view: BrowserFullViewProps;
   onNewTab: () => void;
@@ -17,7 +16,6 @@ export function BrowserTabSwitcher(props: {
   const tabTitle = useBrowserTabTitle();
   const [open, setOpen] = createSignal(false);
   useBrowserPageCover(open);
-  // A new tab puts the focus in the address field, so the popover does not give it back to its button.
   let keepFocus = false;
   const active = () => props.view.activeTab;
   const canClose = () => props.view.canCloseTabs !== false;
@@ -34,7 +32,6 @@ export function BrowserTabSwitcher(props: {
   };
 
   return (
-    // Modal, so the focus goes into the list and Escape closes the list, not the browser view.
     <Popover.Root modal open={open()} onOpenChange={setOpen} placement="bottom-start" gutter={4}>
       <Popover.Trigger
         class={`${buttonVariants({ variant: "ghost", size: "sm" })} browser-full-switch no-drag`}

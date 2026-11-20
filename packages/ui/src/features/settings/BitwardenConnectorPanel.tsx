@@ -14,7 +14,6 @@ import {
   vaultHeader,
 } from "./VaultParts";
 
-/** The hosted Bitwarden service. A self-hosted Vaultwarden server replaces it in the form. */
 const DEFAULT_SERVER_URL = "https://vault.bitwarden.com";
 
 export interface BitwardenConnectorPanelProps extends IntegrationPageSlots {
@@ -22,19 +21,9 @@ export interface BitwardenConnectorPanelProps extends IntegrationPageSlots {
   busy: boolean;
   onConnect: (sessionKey: string) => void;
   onDisconnect: () => void;
-  /**
-   * The joined server whose connection this is, or undefined for this computer's. A server signs in
-   * with its own CLI, so the page asks for an API key and the master password, not a session key.
-   */
   hostName?: string | undefined;
-  /** Connects a joined server's Bitwarden. Set together with `hostName`. */
   onConnectHost?: ((input: BitwardenHostConnectInput) => void) | undefined;
-  /**
-   * Why the last status read failed, when no newer status came. The state is not known: the page
-   * shows the reason and Retry, not the session key form of a connection that may be there.
-   */
   statusError?: string | null | undefined;
-  /** Reads the status again. */
   onRetry?: (() => void) | undefined;
 }
 
@@ -44,7 +33,6 @@ const BITWARDEN_STATUS = {
   connected: { status: "connected", label: "connector.bitwarden.connected" },
 } as const satisfies Record<"disconnected" | "connecting" | "connected", VaultStatus>;
 
-/** The status of the connection, as its page header and every list of connectors show it. */
 export function bitwardenStatus(props: Pick<BitwardenConnectorPanelProps, "status" | "statusError">) {
   const state = props.status.connecting ? "connecting" : props.status.connected ? "connected" : "disconnected";
   return vaultHeader(props.statusError, BITWARDEN_STATUS[state]);
@@ -65,7 +53,6 @@ export function BitwardenConnectorPanel(props: BitwardenConnectorPanelProps) {
     props.hostName ? t("connector.bitwarden.scopeHost", { host: props.hostName }) : t("connector.bitwarden.scope");
   const sessionText = () =>
     props.hostName ? t("connector.bitwarden.sessionHost", { host: props.hostName }) : t("connector.bitwarden.session");
-  /** What agents can use, and how long the access lasts: the last lines of the card. */
   const Notes = () => (
     <>
       <Text class="integration-card-note" variant="caption" tone="muted">
@@ -94,7 +81,6 @@ export function BitwardenConnectorPanel(props: BitwardenConnectorPanelProps) {
       tagline={props.tagline}
       intro={props.intro}
       details={props.details}
-      // With the state not known, the page offers neither the connect form nor Disconnect.
       danger={
         <VaultDangerZone
           show={!props.statusError && props.status.connected}

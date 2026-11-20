@@ -1,8 +1,3 @@
-// Checks Discord embeds in the agent's `messaging_post` tool. The tool call goes through the real
-// messaging threads, messaging service and Discord driver on a temporary profile, then through
-// Signal's request decoder and API (`remote/api/src/discord-api.ts`) to a fake Discord REST client,
-// which records the body that Discord would get. No provider, Gateway or network runs.
-// `bun scripts/messaging-discord-embeds-e2e.ts`. Writes .openbot-build/messaging-discord-embeds-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -82,6 +77,7 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -100,7 +96,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** The requests that the host sent to Signal, and the bodies that Signal sent to Discord. */
 const hostRequests: DiscordApiRequest[] = [];
 const posts: DynamicRecord[] = [];
 let nextMessageId = 600000000000000000n;
@@ -136,7 +131,6 @@ signal.handle(
 );
 const signalApi = makeDiscordApi(rest, signal);
 
-/** The relay as Signal drives it: the request goes over JSON and through Signal's own decoder. */
 const ingress: MessagingIngress = {
   acquire: () => () => {},
   state: () => "online",
@@ -221,11 +215,9 @@ function record(value: unknown): DynamicRecord {
   return value;
 }
 
-/** One `messaging_post` call, as the tool router makes it. Returns the result and the new bodies. */
 async function post(threads: MessagingThreads, connection: string, args: DynamicRecord) {
   const before = { requests: hostRequests.length, posts: posts.length };
   const response = await runCauseEffect(
-    // The router passes the calling agent; a Discord post records no pings, so any id does.
     threads.outboundTool(
       "agent-embeds-e2e",
       { threadId: "thread-embeds-e2e", turnId: "turn-embeds-e2e" },
@@ -325,7 +317,6 @@ try {
 
     await step("Signal refuses the embeds of a long text, and nothing is posted", async () => {
       const long = Array.from({ length: 60 }, (_, index) => `Line ${index} ${"x".repeat(60)}`).join("\n");
-      // A link that the host accepts and that a mask breaks, as `redactEmbed` can.
       const sent = await post(threads, connection, {
         text: long,
         embeds: [{ title: "Report", url: `https://openbot.run/${SECRET}` }],

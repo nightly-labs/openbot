@@ -294,6 +294,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",
   "provider.settings.otherVersionDownloaded": "Nieużywana: {version} · pobrana przez OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Niektóre modele potrzebują części, której brakuje w tej wersji. Pobierz wersję OpenBot, aby ich używać.",
   "provider.settings.useInstalledVersion": "Użyj zainstalowanej",
   "provider.settings.useDownloadedVersion": "Użyj wersji OpenBot",
   "provider.settings.cache": "Pamięć podręczna",

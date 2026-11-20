@@ -307,6 +307,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
   "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Sommige modellen hebben een onderdeel nodig dat deze versie niet heeft. Download de versie van OpenBot om ze te gebruiken.",
   "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
   "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",

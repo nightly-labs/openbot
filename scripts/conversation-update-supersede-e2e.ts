@@ -1,13 +1,3 @@
-// Checks that a chat update that the next update replaces whole leaves the event log, and that a
-// replay of the log then gives the same chat (bx_b4pehphr: a queue that moved every 0.4 s for a day
-// wrote 1.7 million `conversation.snapshot-updated` events, 66 GB). Runs the real agent store and
-// SQLite on a temporary profile. Each case writes updates, reads the chat, rebuilds the chat from its
-// events (`rebuildThreadProjection`), and compares the two reads and the number of update events.
-// No app, provider, account or network is started.
-//
-// Run: bun scripts/conversation-update-supersede-e2e.ts
-// Writes .openbot-build/conversation-update-supersede-e2e/report.json and exits non-zero on a failure.
-
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -48,7 +38,6 @@ function message(id: string, minute: number, extra: Partial<ConversationMessage>
   };
 }
 
-/** A teammate message that waits in a queue at `position`, as mailbox sync writes it. */
 function queued(id: string, minute: number, position: number): ConversationMessage {
   return message(id, minute, { delivery: { id, status: "queued", position } });
 }
@@ -63,7 +52,6 @@ type Write = (input: {
 
 const cases: Array<{ name: string; expectedUpdateEvents: number; run: (write: Write) => void }> = [
   {
-    // The incident: the same queued messages, written again with their positions moving by one.
     name: "a moving queue keeps one update",
     expectedUpdateEvents: 1,
     run: (write) => {
@@ -100,7 +88,6 @@ const cases: Array<{ name: string; expectedUpdateEvents: number; run: (write: Wr
     },
   },
   {
-    // With no delivery, a replay keeps the time of the message that came first.
     name: "a later time with no delivery keeps the earlier update",
     expectedUpdateEvents: 2,
     run: (write) => {
@@ -166,7 +153,6 @@ async function runCase(name: string, expectedUpdateEvents: number, run: (write: 
         ...(input.commandId === undefined ? {} : { commandId: input.commandId }),
       });
     });
-    // Before the replay, which writes the activity rows again.
     const updateActivities = requiredNumberColumn(
       databaseRows(
         database.connection
@@ -197,7 +183,6 @@ async function runCase(name: string, expectedUpdateEvents: number, run: (write: 
       expectedUpdateEvents,
       updateActivities,
       replayMatches,
-      // Each removed update takes its activity row with it.
       passed: replayMatches && updateEvents === expectedUpdateEvents && updateActivities === updateEvents,
     };
   } finally {

@@ -1,15 +1,3 @@
-// Checks that an agent can read a connected place from any turn, such as a routine that summarizes a
-// chat (#7793). The `messaging_history` call with a connection and a place goes through the real
-// messaging threads, messaging service and Discord driver on a temporary profile, then through
-// Signal's request decoder and API (`remote/api/src/discord-api.ts`) to a fake Discord REST client.
-// No provider, Gateway or network runs.
-//
-// 1. The call reads a place that `messaging_list_places` shows, oldest message first.
-// 2. The call refuses a place that the list does not show, and sends no read to Discord, also when
-//    the connection's adapter could read that place.
-// 3. The call refuses wrong arguments, an unknown connection and a connection that is off.
-// 4. Only a call that names a connection or a place leaves the conversation of the turn.
-// `bun scripts/messaging-place-history-e2e.ts`. Writes .openbot-build/messaging-place-history-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -83,6 +71,7 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -101,7 +90,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** The requests that the host sent to Signal, and the message reads that Signal sent to Discord. */
 const hostRequests: DiscordApiRequest[] = [];
 const reads: string[] = [];
 const VIEW_CHANNEL = 1n << 10n;
@@ -134,7 +122,6 @@ const rest = {
       if (input.route === `/guilds/${GUILD}/channels`)
         return Effect.succeed([
           { id: CHANNEL, type: 0, name: "general" },
-          // `@everyone` cannot view this channel, so the place list leaves it out.
           {
             id: HIDDEN,
             type: 0,
@@ -179,7 +166,6 @@ signal.handle(
 );
 const signalApi = makeDiscordApi(rest, signal);
 
-/** The relay as Signal drives it: the request goes over JSON and through Signal's own decoder. */
 const ingress: MessagingIngress = {
   acquire: () => () => {},
   state: () => "online",
@@ -264,7 +250,6 @@ function record(value: unknown): DynamicRecord {
   return value;
 }
 
-/** One outbound tool call, as the tool router makes it. Returns the result and the new traffic. */
 const AGENT = "agent-place-history-e2e";
 const SECOND_AGENT = "agent-second-e2e";
 
@@ -382,7 +367,6 @@ try {
       assert.match(String(read.result.error), /cannot read a place by name/u);
       assert.deepEqual(read.reads, [], "Discord was read for an external chat turn.");
       assert.equal(read.requests.length, 0, "The refused call reached Signal.");
-      // The same thread still posts and lists: only the read of another place is closed.
       const places = await call(threads, "messaging_list_places", { connection }, externalTurn);
       assert.equal(places.success, true);
       return read.result;
@@ -391,7 +375,6 @@ try {
     await step("a teammate's turn on a request from an external chat cannot read a named place", async () => {
       const link = threads.store.linkByKey(connection, CHANNEL, "external-conversation");
       assert.ok(link, "The external conversation has no link.");
-      // The orchestrator's send_message from the external chat turn: the answer goes back to that chat.
       const receipt = await runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "agent", agentId: "agent-orchestrator-e2e" },
@@ -408,8 +391,6 @@ try {
       const read = await call(threads, "messaging_history", { connection, place: CHANNEL }, teammateTurn);
       assert.equal(read.success, false, "A teammate read a named place for an external chat.");
       assert.deepEqual(read.reads, [], "Discord was read for a request from an external chat.");
-      // The teammate gives the work to a second teammate from that turn. The router's idempotency key
-      // holds the sending turn.
       const second = await runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "agent", agentId: AGENT },
@@ -431,8 +412,6 @@ try {
       );
       assert.equal(secondRead.success, false, "A teammate of a teammate read a named place for an external chat.");
       assert.deepEqual(secondRead.reads, []);
-      // The first teammate continues its plan in a new turn. The second request still comes from a turn
-      // that worked for the external chat.
       await runCauseEffect(mailbox.requeueForPlan(delivery.id, "turn-teammate-e2e"));
       await runCauseEffect(mailbox.markStarting(delivery.id));
       await runCauseEffect(mailbox.markRunning(delivery.id, "turn-teammate-later-e2e"));
@@ -445,7 +424,6 @@ try {
       );
       assert.equal(afterContinuation.success, false, "A plan continuation of the sender opened the named place read.");
       assert.deepEqual(afterContinuation.reads, []);
-      // A different turn of the same agent, such as a routine run, still reads.
       const routine = await call(threads, "messaging_history", { connection, place: CHANNEL, limit: 1 });
       assert.equal(routine.success, true, JSON.stringify(routine.result));
       return read.result;

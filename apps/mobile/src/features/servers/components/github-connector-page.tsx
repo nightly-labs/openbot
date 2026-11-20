@@ -5,16 +5,11 @@ import { router } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { Typography } from "heroui-native";
 import { Alert } from "react-native";
-import { ConnectorError, ConnectorHeader } from "@/features/servers/components/connector-header";
+import { ConnectorError, ConnectorHeader, ConnectorLoading } from "@/features/servers/components/connector-header";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { platformPage } from "@/features/servers/model/connectors";
 import { useConnectorAction, useGitHubRepositories } from "@/features/servers/model/use-server-connectors";
-import {
-  SettingsContent,
-  SettingsNote,
-  SettingsRow,
-  SettingsSection,
-} from "@/features/settings/components/settings-content";
+import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import type { GitHubConnectorRoute, MobileServer } from "@/features/workspace/model/workspace-types";
 import { currentText, useText } from "@/shared/lib/text";
@@ -26,17 +21,12 @@ const STATUS_KEYS = {
   expired: "mobile.server.connectors.statusExpired",
 } as const;
 
-/** Opens a GitHub page that the host named. The host opens no page of its own. */
 async function openGitHub(address: string | null): Promise<void> {
   const page = platformPage("github", address);
   if (!page) throw new Error(currentText().t("mobile.server.connectors.openFailed"));
   await openBrowserAsync(page);
 }
 
-/**
- * Marketplace › Apps › GitHub of a joined server. The host runs the device flow: the phone
- * shows the code and opens GitHub's page, where the user types it. The host sees the sign-in by itself.
- */
 export function GitHubConnectorPage({
   server,
   query,
@@ -50,16 +40,7 @@ export function GitHubConnectorPage({
   const status = query.data;
   const repositories = useGitHubRepositories(server.id, status?.state === "connected");
   const host = server.name;
-  if (!status)
-    return (
-      <SettingsContent>
-        <SettingsNote>
-          {query.isError
-            ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
-            : t("mobile.server.connectors.loading")}
-        </SettingsNote>
-      </SettingsContent>
-    );
+  if (!status) return <ConnectorLoading query={query} />;
   const send = (route: GitHubConnectorRoute) => githubConnector(route, server.id);
   const connect = () =>
     void action.perform(async () => {
@@ -82,7 +63,6 @@ export function GitHubConnectorPage({
           style: "destructive",
           onPress: () =>
             void action.perform(async () => {
-              // GitHub's revoke page opens only when a sign-in was stored, as on the desktop.
               const signedIn = status.state === "connected" || status.state === "expired";
               const next = await send("githubDisconnect");
               if (signedIn && next.revokeUrl) await openGitHub(next.revokeUrl);
@@ -174,7 +154,6 @@ export function GitHubConnectorPage({
                 onPress={() =>
                   void action.perform(async () => {
                     await openGitHub(status.installUrl);
-                    // The user can change the repositories on GitHub's page, so the list is read again.
                     await repositories.refetch();
                   })
                 }

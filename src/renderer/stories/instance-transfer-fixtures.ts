@@ -18,7 +18,6 @@ function transferAgent(
   return { id, name, title, avatarSeed: id, avatarHue: null, avatarUrl: null, ...counts };
 }
 
-/** This computer, as `instanceTransfer.summary` answers it. */
 export const INSTANCE_TRANSFER_SUMMARY: InstanceTransferSummary = {
   agents: [
     transferAgent("research", "Research", "Market research analyst", {
@@ -59,7 +58,6 @@ export const INSTANCE_TRANSFER_SUMMARY: InstanceTransferSummary = {
   ],
 };
 
-/** A transfer file, as `instanceTransfer.choose` answers it. */
 export const INSTANCE_TRANSFER_PREVIEW: InstanceTransferPreview = {
   token: "transfer-preview",
   appVersion: "0.9.4",

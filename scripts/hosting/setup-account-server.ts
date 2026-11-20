@@ -1,25 +1,3 @@
-/**
- * Sets up Stripe and boat for the hosted servers of one account server, and stores each secret that
- * it makes. Run it again at any time: it changes only what differs.
- *
- *   read -rs STRIPE_SECRET_KEY && read -rs BOAT_API_KEY && export STRIPE_SECRET_KEY BOAT_API_KEY
- *   bun run hosting:setup --target=production
- *
- *   bun run hosting:setup --target=test
- *
- * - Stripe: the catalog, the Customer Portal and the webhook endpoint (`scripts/stripe-bootstrap.ts`).
- * - boat: the webhook to `<api>/v2/hosting/boat/webhook` with each event that the Worker reads.
- *
- * Stripe and boat show a webhook signing secret only when they make it. When the store does not have
- * that secret, or with `--replace-webhooks`, the script makes a new one: it replaces the Stripe
- * endpoint and rotates the boat secret. Until the Worker has the new secret, it refuses the
- * deliveries; Stripe retries them, and the Worker cron repairs a missed boat event.
- *
- * The production store is the `cloudflare-production` GitHub Environment (`gh` must be signed in),
- * and the keys come from the shell. The test store is the encrypted `apps/auth-api/.env.dev`,
- * and the keys come from the shared development environment. The script shows no secret value.
- */
-
 import { execFile } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,7 +13,6 @@ import { bootstrapStripe } from "../stripe-bootstrap";
 const logger = createOpenBotLogger("hosting-setup");
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BOAT_API_URL = "https://boat.dev/api/v1";
-/** The events that `HostedServerService` reads from a boat webhook delivery. */
 const BOAT_EVENTS = ["sandbox.ready", "sandbox.error", "sandbox.archived", "sandbox.hydrated"];
 const GITHUB_ENVIRONMENT = "cloudflare-production";
 const TARGETS = {
@@ -45,7 +22,6 @@ const TARGETS = {
 
 interface SecretStore {
   readonly label: string;
-  /** The value, or null when the store cannot show it or does not have it. */
   read(name: string): Promise<string | null>;
   has(name: string): Promise<boolean>;
   put(name: string, value: string): Promise<void>;
@@ -54,7 +30,6 @@ interface SecretStore {
 function run(command: string, args: string[], input = ""): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(command, args, { cwd: repoRoot }, (error, stdout, stderr) => {
-      // A value goes on standard input, so the command line and the error hold no secret.
       if (error)
         reject(new Error(`${command} ${args.slice(0, 2).join(" ")} failed: ${stderr.trim() || error.message}`));
       else resolve(stdout);
@@ -158,7 +133,6 @@ function boatSecret(value: z.infer<typeof boatSecretSchema>): string {
   return secret;
 }
 
-/** Returns a new signing secret, or null when the webhook keeps the secret that the store has. */
 async function ensureBoatWebhook(apiKey: string, url: string, name: string, rotate: boolean): Promise<string | null> {
   const { webhooks } = await boat(apiKey, "GET", "/webhooks", undefined, boatWebhookListSchema);
   const current = webhooks.find((webhook) => webhook.url === url);
@@ -212,13 +186,11 @@ async function main(args: string[]): Promise<void> {
   const stripeKey = await requiredKey(store, "STRIPE_SECRET_KEY");
   if (live && !/^(sk|rk)_live_/u.test(stripeKey)) throw new Error("STRIPE_SECRET_KEY is not a live-mode key.");
   const boatKey = await requiredKey(store, "BOAT_API_KEY");
-  // The production keys come from the shell. The CI deploy refuses a pair with one value.
   if (live) {
     await put("STRIPE_SECRET_KEY", stripeKey);
     await put("BOAT_API_KEY", boatKey);
   }
 
-  // Each secret is stored at once: Stripe and boat do not show it again.
   const stripeSecret = await bootstrapStripe({
     secretKey: stripeKey,
     live,

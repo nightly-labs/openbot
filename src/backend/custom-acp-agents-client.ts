@@ -1,20 +1,3 @@
-// The one client of the provider `acp`: a router over the ACP processes of the custom agents.
-//
-// The rest of the backend sees one provider with one catalogue. A model id names the custom agent
-// (`<customAgentId>/<agentModel>`), and a session id that leaves here names it and its folder too
-// (`<customAgentId>:<folderTag>:<agentSessionId>`), so a turn, a resume or an answer finds the
-// process that owns it. Two agents, or two folders of one agent, can give the same session id; the
-// prefix keeps them apart. A session saved before folders had processes of their own has no folder
-// tag (`<customAgentId>:<agentSessionId>`), and keeps that id when it is resumed.
-//
-// A process serves one agent in one working folder, and starts when that pair is first needed. An
-// agent can refuse a session in a second folder (Command Code serves one folder for each process),
-// so two folders never share a process. The models come from one more process for each agent, in a
-// folder apart from every workspace, so a model list never opens a session on a process that serves
-// a thread. The list is kept, so a list that fails later answers with the last one, and an agent
-// that never listed stays out of the catalogue: an empty answer would move the agents on it to
-// another model.
-
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { CUSTOM_AGENT_DEFAULT_MODEL, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
@@ -54,18 +37,11 @@ export interface CustomAgentConfig {
   readonly command: string;
   readonly args: readonly string[];
   readonly env: readonly { readonly name: string; readonly value: string }[];
-  /** Sent in a private session to read the plan usage, or null for none. */
   readonly usagePrompt: string | null;
 }
 
-/** The saved custom agents, read when a process starts. */
 export type CustomAgentSource = () => readonly CustomAgentConfig[];
 
-/**
- * Builds the ACP client of one agent, on the file its command resolved to, for the sessions of one
- * working folder. `null` is the process that lists the agent's models. `launchPath` is the `PATH`
- * the process starts with, or null to leave the `PATH` of OpenBot unchanged.
- */
 export type CustomAgentChildFactory = (
   config: CustomAgentConfig,
   executable: string,
@@ -76,7 +52,6 @@ export type CustomAgentChildFactory = (
 
 const MODEL_LIST_TIMEOUT_MS = 5_000;
 
-/** What a write that the macOS sandbox denied looks like: `EPERM`, and SQLite's read-only fallback (#4324). */
 const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
 const WORKSPACE_ONLY_HINT = sourceText("error.provider.customAgentWorkspaceOnly", { reason: "" });
 
@@ -93,7 +68,6 @@ interface ClientEvents {
 
 type ModelEntry = ModelListResponse["data"][number];
 
-/** The custom agent that a routed session id names, or null for an id that no custom agent gave. */
 function sessionAgent(value: string): string | null {
   const colon = value.indexOf(":");
   if (colon <= 0 || colon === value.length - 1) return null;
@@ -101,35 +75,24 @@ function sessionAgent(value: string): string | null {
   return customAgentIdOfModel(`${agentId}/x`) === agentId ? agentId : null;
 }
 
-/**
- * A stable tag of one working folder. Each folder has a process of its own, and two processes can
- * give the same session id, so a new session id names the folder too: `<agentId>:<tag>:<sessionId>`.
- */
 function folderTag(folder: string): string {
   return createHash("sha256").update(folder).digest("hex").slice(0, 12);
 }
 
-/**
- * The agent's own id of a routed session in `folder`. A session saved when one process served every
- * folder has no tag: `<agentId>:<sessionId>`.
- */
 function ownSessionId(threadId: string, agentId: string, folder: string): string {
   const tagged = `${agentId}:${folderTag(folder)}:`;
   return threadId.startsWith(tagged) ? threadId.slice(tagged.length) : threadId.slice(agentId.length + 1);
 }
 
-/** The process that holds a session, and the session's id in that process. */
 interface HeldSession {
   readonly child: AgentClient;
   readonly sessionId: string;
 }
 
-/** Read as a missing session by `isMissingProviderSessionError`, so the caller opens a new one. */
 function unknownSession(threadId: string): Error {
   return new Error(`Unknown ACP session: ${threadId}`);
 }
 
-/** The key of one agent's process for one folder, or for its model list when `folder` is null. */
 function childKey(agentId: string, folder: string | null): string {
   return `${agentId}\0${folder ?? ""}`;
 }
@@ -143,21 +106,14 @@ function requiredCwd(params: unknown): string {
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "unsupported";
   readonly provider = "acp" as const;
-  /** Each child is an ACP client, which sends the memories and section-mates with the prompts. */
   readonly turnContext = true;
   readonly #source: CustomAgentSource;
   readonly #createChild: CustomAgentChildFactory;
   readonly #resolve: typeof resolveAgentCommand;
   readonly #history: AcpHistoryPersistence | undefined;
-  /** Whether the processes run in the Workspace only sandbox (`process-confinement.ts`). */
   readonly #confined: boolean;
   readonly #children = new Map<string, Deferred.Deferred<AgentClient, ProviderClientOperationError>>();
-  /** The process that opened or loaded each session, by the routed id that the caller knows. */
   readonly #sessions = new Map<string, HeldSession>();
-  /**
-   * Which process sent each request that waits for an answer, and its own id. Two processes can use
-   * the same id, so the router gives each request an id of its own.
-   */
   readonly #requests = new Map<RequestId, { child: AgentClient; id: RequestId }>();
   #nextRequestId = 0;
   readonly #lastModels = new Map<string, ModelEntry[]>();
@@ -182,13 +138,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#running;
   }
 
-  /** Keep a custom ACP process alive when one of its held sessions cannot resume or load. */
   canReleaseProcess(): boolean {
     const children = new Set([...this.#sessions.values()].map(({ child }) => child));
     return [...children].every((child) => child.canReleaseProcess?.() !== false);
   }
 
-  /** Routes durable history reads to the process that owns the custom session. */
   readonly readHistory = Effect.fn("CustomAcp.readHistory")(function* (
     this: CustomAcpAgentsClient,
     request: ProviderHistoryRequest,
@@ -230,7 +184,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     const child = yield* this.#child(agentId, request.cwd).pipe(toProviderClientOperationError);
     if (!child.readHistory) return;
     const sessionId = ownSessionId(request.threadId, agentId, request.cwd);
-    // Call it on the child: a client's reader uses its own instance state.
     yield* child
       .readHistory({ ...request, threadId: sessionId, ...(durableReplay ? { providerOnly: true } : {}) }, consume)
       .pipe(toProviderClientOperationError);
@@ -257,15 +210,17 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     );
   });
 
-  /** The rule of the custom agent that the session belongs to, from its command, as its process uses. */
   readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
     this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;
 
-  /** The rule of the custom agent that `model` names, from its command, as its process uses. */
+  readonly imageInput = (externalThreadId: string): boolean => {
+    const held = this.#sessions.get(externalThreadId);
+    return held?.child.imageInput?.(held.sessionId) === true;
+  };
+
   readonly catalogAsMcpTools = (model: string): boolean =>
     this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
 
-  /** The flavor of a saved custom agent, from its command, or undefined for an agent that is not saved. */
   #flavorOf(agentId: string | null): AcpFlavor | undefined {
     const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
     return config ? customAgentFlavor(config.command) : undefined;
@@ -306,10 +261,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return yield* held.child.setSessionSetting(held.sessionId, configId, value);
   });
 
-  /**
-   * Runs on the process that lists the agent's models, in its folder apart from every workspace, so
-   * the prompt never waits for a turn or opens a session where a thread works.
-   */
   readonly readUsageText = Effect.fn("CustomAcp.readUsageText")(function* (
     this: CustomAcpAgentsClient,
     model: string,
@@ -376,8 +327,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           const cwd = yield* customStep(() => requiredCwd(params));
           const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
           const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
-          // Held before the agent answers, so what it sends while it loads the session reaches the
-          // caller under the id the caller knows, a saved id with no folder tag included.
           this.#sessions.set(threadId, held);
           return yield* child.request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs).pipe(
             toProviderClientOperationError,
@@ -424,19 +373,16 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
               decoder({
                 thread: {
                   id: threadId,
-                  // readHistory is newest-first; the released response is chronological.
                   turns: [...turns.values()].reverse(),
                 },
               }),
             );
           }
           const agentId = sessionAgent(threadId);
-          // A read has nothing to recover: a session of an agent that is gone has no turns to show.
           if (!agentId || !this.#source().some((config) => config.id === agentId)) {
             return yield* customStep(() => decoder({ thread: { id: threadId, turns: [] } }));
           }
           const cwd = getString(params, "cwd");
-          // Only the process of the session's folder can load it. With no folder, nothing can.
           const held =
             this.#sessions.get(threadId) ??
             (cwd
@@ -455,7 +401,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         case "turn/steer": {
           const threadId = getString(params, "threadId") ?? "";
           yield* customStep(() => this.#routedAgent(params));
-          // A session that no process holds is missing, and the caller resumes it in its folder.
           const held = this.#sessions.get(threadId);
           if (!held) return yield* new ProviderClientOperationError({ cause: unknownSession(threadId) });
           return yield* held.child
@@ -478,9 +423,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#publicError(error.cause) })),
   );
 
-  notify(): void {
-    // The processes are initialized when they start. There is nothing to send to all of them.
-  }
+  notify(): void {}
 
   respond(id: RequestId, result: unknown): void {
     const pending = this.#requests.get(id);
@@ -494,18 +437,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     pending?.child.respondError(pending.id, error);
   }
 
-  /** The custom agent that the model in `params` names. */
   #modelAgent(params: unknown): string {
     const agentId = customAgentIdOfModel(getString(params, "model") ?? "");
     if (!agentId) throw new Error(sourceText("error.provider.customAgentMissing"));
     return agentId;
   }
 
-  /**
-   * The agent that the session in `params` belongs to. A session of another agent than the model
-   * names is missing for this turn: the user switched agents, and the caller opens a session on the
-   * new one, with the conversation handed over.
-   */
   #routedAgent(params: unknown): string {
     const threadId = getString(params, "threadId") ?? "";
     const agentId = sessionAgent(threadId);
@@ -515,10 +452,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return agentId;
   }
 
-  /**
-   * The id that the caller knows for a session of `child`. A session that the router does not hold
-   * yet, such as one that `session/new` is still opening, gets the id that `thread/start` gives it.
-   */
   #routedSessionId(child: AgentClient, prefix: string, sessionId: string): string {
     for (const [threadId, held] of this.#sessions) {
       if (held.child === child && held.sessionId === sessionId) return threadId;
@@ -526,10 +459,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return `${prefix}:${sessionId}`;
   }
 
-  /**
-   * One started, initialized process for each agent and folder, however many callers ask for it at
-   * once. The folder `null` is the process that lists the agent's models.
-   */
   readonly #child = Effect.fn("CustomAcp.child")(function* (
     this: CustomAcpAgentsClient,
     agentId: string,
@@ -612,11 +541,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     Effect.mapError((error) => new ProviderClientOperationError({ cause: this.#publicError(error.cause) })),
   );
 
-  /**
-   * One agent's process ended on its own. The runtime replaces the whole router, which is how the
-   * other providers recover as well: the threads of every custom agent are loaded again. A process
-   * that only lists models holds no thread, so it is forgotten, and the next list starts another.
-   */
   #childExited(key: string, folder: string | null, child: AgentClient, error: Error): void {
     const pending = this.#children.get(key);
     if (!pending) return;
@@ -638,10 +562,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     );
   }
 
-  /**
-   * The saved environment values of every custom agent, masked. An agent can quote one in an RPC
-   * error, and the router's errors and diagnostics go to the log and to the renderer.
-   */
   #redact(text: string): string {
     let result = text;
     for (const config of this.#source()) {
@@ -652,19 +572,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return result;
   }
 
-  /** The same error when it holds no value, so its type and fields stay for the callers that read them. */
   #redactError<E>(error: E): E | Error {
     if (!(error instanceof Error)) return error;
     const message = this.#redact(error.message);
     return message === error.message ? error : new Error(message);
   }
 
-  /**
-   * Whether this text reports a write that the sandbox denied. A custom agent gets no state folder in
-   * the sandbox (`customAgentStatePaths`), so most agents fail when they write in their home folder,
-   * and their own text does not name the cause. A start error passes here twice, through
-   * `#startChild` and `request`, so the cause is added once.
-   */
   #deniedWrite(message: string): boolean {
     return this.#confined && WRITE_DENIED.test(message) && !message.includes(WORKSPACE_ONLY_HINT);
   }
@@ -673,11 +586,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#deniedWrite(message) ? withWorkspaceOnlyHint(message) : message;
   }
 
-  /**
-   * The error a caller may show: saved values masked, and the cause of a denied write named. The
-   * denial of an exit is only in its stderr line. That line is read here but stays apart from the
-   * message: the runtime adds it after it masks the MCP values, which this client does not know.
-   */
   #publicError<E>(error: E): E | Error {
     const redacted = this.#redactError(error);
     if (!(redacted instanceof Error)) return redacted;
@@ -740,14 +648,6 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   });
 }
 
-/**
- * The agent's models under its id. An agent with no list gets the one model `default`.
- * `steersTurns` marks each model of an agent that takes a message in its running turn (#4977).
- *
- * ACP lets an agent report any string as a model value, so a value that the contract charset refuses
- * is encoded (see `encodedModelId`), and `forChild` gives the agent its own value back. An id that is
- * still refused, as one too long, is dropped alone.
- */
 function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[], steersTurns: boolean): ModelEntry[] {
   const steering = steersTurns ? { steersTurns: true } : {};
   if (data.length === 0) {
@@ -757,14 +657,12 @@ function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[], st
     const model = item.model?.trim();
     if (!model) return [];
     const id = encodedModelId(`${config.id}/`, model);
-    // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
     return isAgentModel(id)
       ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}`, ...steering }]
       : [];
   });
 }
 
-/** The params as the agent's own process takes them: its session id, and its model with no prefix. */
 function forChild(params: unknown, sessionId: string | null): DynamicRecord {
   const record: DynamicRecord = isRecord(params) ? params : {};
   const { model, ...rest } = record;
@@ -783,7 +681,6 @@ function withRoutedThreadId<T extends { params: unknown }>(message: T, route: (s
   return threadId === null ? message : { ...message, params: { ...params, threadId: route(threadId) } };
 }
 
-/** The response with the routed id of the session that the agent named. */
 function withThreadId(response: DynamicRecord, route: (sessionId: string) => string): DynamicRecord {
   const thread = getRecord(response, "thread");
   const id = getString(thread, "id");

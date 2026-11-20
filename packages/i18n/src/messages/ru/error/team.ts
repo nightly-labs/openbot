@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Слишком много попыток входа. Повторите попытку позже.",
   "error.team.clientUpdateRequired": "Обновите этот клиент OpenBot, прежде чем подключаться к этому хосту.",
   "error.team.hostUpdateRequired": "Обновите OpenBot на хосте, прежде чем подключаться.",
+  "error.team.serverSafeMode": "Этот сервер находится в безопасном режиме, потому что OpenBot на нём не запускается.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} на этом сервере не может открыть свои данные, потому что их сохранила более новая версия OpenBot. Более новый выпуск OpenBot на сервере устранит проблему.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} на этом сервере остановлен после многих неудачных запусков. Более новый выпуск OpenBot на сервере устранит проблему.",
   "error.team.sidebarLayoutUnavailable": "Структура боковой панели недоступна.",
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
@@ -121,6 +126,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
+  "error.team.ownerTransferUnsupported": "Этот сервер не поддерживает передачу владения.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
   "error.team.localServersUnsupported": "Это подключение не поддерживает серверы на этом компьютере.",
   "error.team.routineResultsUnsupported": "Это подключение не поддерживает места отправки рутин.",

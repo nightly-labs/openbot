@@ -59,6 +59,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "Pôr do sol retrô",
   "settings.chatBackdrop.snowfall": "Neve caindo",
   "settings.chatBackdrop.fireflies": "Vaga-lumes",
+  "settings.chatBackdrop.coast": "Costa neon",
   "settings.chatBackdrop.upload": "Enviar imagem…",
   "settings.chatBackdrop.uploadRefused": "Use uma imagem PNG, JPEG, GIF, WebP ou AVIF de até 20 MB.",
   "settings.chatBackdrop.saveFailed": "O fundo não foi salvo.",
@@ -476,7 +477,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Não foi possível copiar a imagem.",
   "settings.profile.share.createFailed": "Não foi possível criar a imagem.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Meus últimos seis meses com o OpenBot",
   "settings.profile.activity.title": "Atividade neste computador",
   "settings.profile.activity.activeDays": {
@@ -486,7 +486,6 @@ export const messages = {
   "settings.profile.activity.empty": "Nenhuma atividade ainda",
   "settings.profile.activity.loading": "Carregando atividade…",
   "settings.profile.activity.loadFailed": "Não foi possível carregar sua atividade.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} tokens em {count} dia ativo no último ano",
     other: "{tokens} tokens em {count} dias ativos no último ano",
@@ -609,6 +608,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plano encerrado",
   "settings.hostedServers.state.creating": "Criando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando dados",
   "settings.hostedServers.state.running": "Em execução",
   "settings.hostedServers.state.stopping": "Parando",
   "settings.hostedServers.state.stopped": "Parado",
@@ -619,6 +619,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "A configuração começa quando a Stripe confirma o pagamento.",
   "settings.hostedServers.planEndedDescription":
     "O plano terminou, então o servidor parou. Seus dados são mantidos. Renove o plano para iniciá-lo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "O plano terminou, então o servidor parou. Seus dados são mantidos até {date}. Renove o plano antes disso para iniciá-lo.",
   "settings.hostedServers.pay": "Abrir página de pagamento",
   "settings.hostedServers.payLabel": "Abrir página de pagamento de {name}",
   "settings.hostedServers.renew": "Renovar plano",
@@ -658,7 +660,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para uma equipe pequena com rotinas diárias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muitos agentes e uso intenso do navegador.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Ditado",
   "settings.voice.model.parakeet.description": "Rápido. Detecta sozinho o idioma falado, em 25 idiomas europeus.",
   "settings.voice.model.parakeetUnified.description":
@@ -725,6 +726,13 @@ export const messages = {
   "settings.voice.speech.sample": "Olá. É assim que suas respostas vão soar.",
   "settings.voice.speech.listenFailed": "Não foi possível reproduzir a amostra.",
   "settings.voice.live.section": "Voz ao vivo",
+  "settings.voice.talk.section": "Conversa por voz",
+  "settings.voice.talkKey.title": "Tecla para falar",
+  "settings.voice.talkKey.description": "Mantenha estas teclas pressionadas para falar em uma conversa por voz.",
+  "settings.voice.talkKey.change": "Alterar a tecla para falar",
+  "settings.voice.talkKey.recording": "Pressione as teclas",
+  "settings.voice.talkKey.refused": "Adicione mais uma tecla",
+  "settings.voice.talkKey.reset": "Restaurar",
   "settings.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
   "settings.transfer.title": "Mover este servidor para outro computador",
   "settings.transfer.lede":
@@ -830,6 +838,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "settings.transfer.copy.duplicatesTitle": "Copiar agentes duplicados?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} já tem agentes com estes nomes: {names}. A cópia adiciona um segundo agente para cada um. Cada cópia é um agente separado com seus próprios chats, arquivos e memórias.",
+  "settings.transfer.copy.duplicatesConfirm": "Copiar duplicados",
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiado para {server}.",

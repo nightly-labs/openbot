@@ -16,12 +16,17 @@ export const messages = {
   "error.workflow.agentMissing": "Bu adım için bir ajan seçin.",
   "error.workflow.handoffFailed": "OpenBot bu adımı ajanına gönderemedi.",
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
+  "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
     "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelToolUse":
     "Model bir araç kullanmaya çalıştı, ancak bu adım yalnızca metinle yanıt verebilir. Adımı yeniden çalıştırın veya başka bir model seçin.",
+  "error.workflow.modelImageUnsupported":
+    "Bu adımın modeli resimleri okuyamaz. Okuyabilen bir model seçin veya resim bağlantısını kaldırın.",
+  "error.workflow.modelImageType":
+    "Model adımı yalnızca PNG, JPEG, GIF ve WebP resimlerini okuyabilir. Bu türlerden birinde bir resim bağlayın.",
   "error.workflow.modelUnavailable": "Bu adımın modeli kullanılamıyor. Bu adım için başka bir model seçin.",
   "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerOffline":
@@ -34,6 +39,8 @@ export const messages = {
   "error.workflow.mediaEmptyRequest":
     "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
   "error.workflow.mediaInputNotImage": "Bu adım yalnızca görsel alır, video almaz. Videodan gelen bağlantıyı kaldırın.",
+  "error.workflow.mediaInputNotClip":
+    "Bu giriş yalnızca video ve ses dosyası alır. Dosyadan gelen bağlantıyı kaldırın.",
   "error.workflow.stepMissing": "Bu adım artık yok.",
   "error.workflow.nodeMissing": "Bu adım iş akışında yok.",
   "error.workflow.runMissing": "Bu çalıştırma artık yok.",

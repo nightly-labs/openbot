@@ -7,7 +7,6 @@ const localEndpoint: CustomProviderDraft = {
   providerId: "studio-local",
   displayName: "Studio Local",
   baseUrl: "http://127.0.0.1:11434/v1",
-  // Never a shape that could be mistaken for a live key, here or in any other story.
   apiKey: "story-placeholder-not-a-key",
   models: [
     { id: "qwen3-coder:30b", name: "Qwen3 Coder 30B" },
@@ -38,7 +37,6 @@ export const DialogFilled: Story = {
   args: { draft: localEndpoint, onBack: fn() },
 };
 
-/** An endpoint on this computer: each model can set its context window, max output, efforts and inputs. */
 export const DialogContextWindows: Story = {
   args: {
     contextWindows: true,
@@ -59,8 +57,6 @@ export const DialogContextWindows: Story = {
   },
 };
 
-/** This computer: the endpoint can run on each provider that can run it now. */
-/** Models of a large endpoint, with the limits that the model catalog gives for them. */
 const MANY_MODELS: readonly (readonly [string, string, string, string])[] = [
   ["relace/relace-search", "Relace Search", "256,000", "128,000"],
   ["moondream/moondream3-preview", "Moondream 3 Preview", "32,000", "4,096"],
@@ -88,7 +84,6 @@ const MANY_MODELS: readonly (readonly [string, string, string, string])[] = [
   ["bytedance-seed/seed-2.0-lite", "Seed 2.0 Lite", "262,144", "131,072"],
 ];
 
-/** The model table with many models: the rows scroll and the footer stays in view. */
 export const DialogContextWindowsMany: Story = {
   args: {
     contextWindows: true,
@@ -110,7 +105,6 @@ export const DialogRunsOn: Story = {
   },
 };
 
-/** Pi is not downloaded: a choice of it chooses it and downloads it. */
 export const DialogRunsOnDownload: Story = {
   args: {
     contextWindows: true,
@@ -123,7 +117,6 @@ export const DialogRunsOnDownload: Story = {
   },
 };
 
-/** Pi is chosen and downloads: the field shows the progress. */
 export const DialogRunsOnDownloading: Story = {
   args: {
     contextWindows: true,
@@ -136,7 +129,6 @@ export const DialogRunsOnDownloading: Story = {
   },
 };
 
-/** The download of the chosen Pi failed: its item retries, and the field says why. */
 export const DialogRunsOnDownloadError: Story = {
   args: {
     contextWindows: true,
@@ -193,7 +185,6 @@ export const DialogSubmitError: Story = {
   args: { draft: localEndpoint, submitError: "OpenBot could not reach http://127.0.0.1:11434/v1." },
 };
 
-/** Long enough to scroll, which is the only way to see the top and bottom fades. */
 export const DialogScrolls: Story = {
   args: {
     draft: {
@@ -217,7 +208,6 @@ const ollama: CustomProviderDraft = {
 
 const discovered = [{ id: "qwen3-coder:30b" }, { id: "gpt-oss:120b" }, { id: "devstral:24b" }, { id: "llama3.3:70b" }];
 
-/** The find control appears only when the host can ask the endpoint for its models. */
 export const DiscoveryIdle: Story = {
   args: { draft: ollama, onDiscoverModels: fn() },
 };
@@ -226,7 +216,6 @@ export const DiscoveryLoading: Story = {
   args: { draft: ollama, onDiscoverModels: fn(), discovery: { status: "loading" } },
 };
 
-/** Two of the four models are already rows, so their boxes open selected. */
 export const DiscoveryFound: Story = {
   args: {
     draft: { ...ollama, models: localEndpoint.models },
@@ -235,7 +224,6 @@ export const DiscoveryFound: Story = {
   },
 };
 
-/** An endpoint that lists more models than one endpoint can hold: the search narrows what Select all adds. */
 export const DiscoveryFoundMany: Story = {
   args: {
     draft: ollama,
@@ -249,10 +237,6 @@ export const DiscoveryFoundMany: Story = {
   },
 };
 
-/**
- * After Find models, the list gives a window, a max output and input kinds (#3946): they fill the empty
- * fields of the rows that it names, and a line says where they come from.
- */
 export const DiscoveryFoundValues: Story = {
   args: {
     contextWindows: true,

@@ -23,6 +23,12 @@ export const messages = {
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
   "error.remote.windowsSessionDisconnected":
     "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
+  "error.remote.macScreenLocked":
+    "Il Mac è bloccato, quindi non può condividere lo schermo. Sblocca il Mac dal suo schermo, poi riprova.",
+  "error.remote.streamTooSlowLowerQuality":
+    "La connessione all'host è troppo lenta per l'immagine. Riprova: la prossima connessione userà una qualità più bassa.",
+  "error.remote.streamTooSlow":
+    "La connessione all'host è troppo lenta per l'immagine. Usa una rete più veloce, poi riprova.",
   "error.remote.teamSessionExpired": "La sessione del team è scaduta.",
   "error.remote.finishTestBeforeSwitch": "Termina il test del desktop remoto prima di cambiare schermo.",
   "error.remote.displayNotFound": "Schermo remoto non trovato.",
@@ -81,7 +87,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Solo il proprietario può rimuovere questo server.",
   "error.remote.requestTimeout": "La richiesta remota è scaduta.",
   "error.remote.requestFailed": "La richiesta remota non è riuscita.",
-  "error.remote.pinnedKeyMissing": "L'host remoto non ha una chiave del dispositivo fissata.",
+  "error.remote.hostKeyMissing":
+    "OpenBot non può verificare questo server perché la sua chiave di sicurezza manca o è cambiata. Chiedi al proprietario del server di controllarlo.",
+  "error.remote.connectionNotStarted":
+    "OpenBot non è riuscito ad avviare la connessione a questo server. Se il problema continua, chiudi OpenBot e riaprilo.",
   "error.remote.hostDidNotConnect": "L'host WebRTC non si è collegato.",
   "error.remote.connectionCancelled": "La connessione remota è stata annullata.",
   "error.remote.hostDisconnected":
@@ -182,6 +191,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Non è stato possibile stabilire una connessione diretta con l'host. Un firewall, una VPN o un proxy possono bloccarla.",
   "error.remote.iceDisconnected": "La connessione diretta con l'host è andata persa.",
+  "error.remote.webrtcBlocked":
+    "Questo dispositivo blocca la connessione di cui OpenBot ha bisogno. Se la modalità di isolamento è attiva, disattivala per OpenBot in Impostazioni > Privacy e sicurezza > Modalità di isolamento.",
   "error.remote.directoryUnreachable":
     "OpenBot non è riuscito a raggiungere il servizio OpenBot. Controlla la connessione.",
   "error.remote.directoryTimeout": "Il servizio OpenBot non ha risposto in tempo. Riprova.",
@@ -202,12 +213,19 @@ export const messages = {
   "error.remote.formUnavailable": "Questo modulo non è più disponibile.",
   "error.remote.hostedServerRemoval": "Usa Fatturazione per eliminare un server ospitato.",
   "error.remote.hostRemoved": "Il proprietario ha rimosso questo server dall'account.",
+  "error.remote.ownerTransferSelf": "Questo server è già tuo. Inserisci l'email del nuovo proprietario.",
+  "error.remote.ownerTransferHosted": "Un server ospitato da OpenBot non può cambiare proprietario.",
+  "error.remote.ownerTransferInvalid":
+    "Questo trasferimento di proprietà non è più disponibile. Chiedi al proprietario di inviarlo di nuovo.",
   "error.remote.channelsUnsupported": "Aggiorna questo server desktop per usare i canali.",
   "error.remote.channelDeleteUnsupported": "Aggiorna questo server desktop per eliminare i canali.",
   "error.remote.historyRefreshFailed":
     "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
   "error.remote.taskHistoryRefreshFailed":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.serverNotLoaded": "OpenBot non è riuscito a caricare il server. Riprova.",
+  "error.remote.localServerNotStarted":
+    "Il server su questo computer non si è avviato. Riprova. Se non si avvia, riavvia OpenBot su questo computer.",
   "error.remote.localServerAccountRemovalFailed":
     "Il server è eliminato sul suo computer, ma l’account lo elenca ancora. Eliminalo di nuovo per rimuoverlo dall’account.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -53,6 +53,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "محاولات تسجيل دخول كثيرة جدًا. أعد المحاولة لاحقًا.",
   "error.team.clientUpdateRequired": "حدّث عميل OpenBot هذا قبل الاتصال بهذا المضيف.",
   "error.team.hostUpdateRequired": "حدّث OpenBot على المضيف قبل الاتصال.",
+  "error.team.serverSafeMode": "هذا الخادم في الوضع الآمن لأن OpenBot لا يبدأ عليه.",
+  "error.team.serverSafeModeNewerDatabase":
+    "لا يستطيع OpenBot {version} على هذا الخادم فتح بياناته، لأن إصدارًا أحدث من OpenBot حفظها. يحل إصدار أحدث من OpenBot على الخادم هذه المشكلة.",
+  "error.team.serverSafeModeStartFailed":
+    "توقف OpenBot {version} على هذا الخادم بعد فشل بدئه مرات عديدة. يحل إصدار أحدث من OpenBot على الخادم هذه المشكلة.",
   "error.team.sidebarLayoutUnavailable": "تخطيط الشريط الجانبي غير متاح.",
   "error.team.providersUnsupported": "إعدادات المزوّد غير مدعومة في هذا الاتصال.",
   "error.team.providerNotManaged": "لا يدير OpenBot واجهة CLI لهذا المزوّد.",
@@ -117,6 +122,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
+  "error.team.ownerTransferUnsupported": "لا يدعم هذا الخادم نقل الملكية.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",
