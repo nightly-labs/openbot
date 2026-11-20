@@ -440,8 +440,6 @@ export class ChannelService {
   ) {
     const channel = yield* channelSync(() => this.store.get(channelId));
     if (channel.archived) return yield* channelFailure(new Error(sourceText("error.backend.channelArchived")));
-    if (yield* channelSync(() => this.compactionBlocked(channelId)))
-      return yield* channelFailure(new Error(sourceText("error.backend.channelWaitBeforeCompact")));
     return yield* channelSync(() => this.store.contexts(channelId));
   });
 
