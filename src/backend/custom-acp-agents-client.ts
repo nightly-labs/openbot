@@ -12,7 +12,6 @@ import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { encodedModelId, providerModelValue } from "./encoded-model-id";
-import { isPathInside } from "./path-containment";
 import {
   type AppServerNotification,
   type AppServerRequest,
@@ -220,10 +219,11 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this: CustomAcpAgentsClient,
     folder: string,
   ) {
+    let matched = false;
     let kept = false;
     for (const [key, pending] of [...this.#children]) {
-      const childFolder = folderOfChildKey(key);
-      if (!childFolder || !isPathInside(folder, childFolder)) continue;
+      if (folderOfChildKey(key) !== folder) continue;
+      matched = true;
       const started = yield* Effect.exit(Deferred.await(pending));
       if (Exit.isFailure(started) || this.#children.get(key) !== pending) continue;
       const child = started.value;
@@ -236,7 +236,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       for (const [id, request] of this.#requests) if (request.child === child) this.#requests.delete(id);
       yield* child.stop().pipe(Effect.ignore);
     }
-    return kept;
+    return matched ? kept : null;
   }, Effect.uninterruptible);
 
   readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>

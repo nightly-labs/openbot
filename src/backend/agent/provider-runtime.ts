@@ -875,6 +875,7 @@ export class ProviderRuntime implements ProviderPort {
     const client = this.#clients.get(provider);
     if (!client?.releaseFolderProcesses || this.#hooks.isStopping() || this.#status.phase !== "ready") return null;
     const kept = yield* client.releaseFolderProcesses(folder);
+    if (kept === null) return null;
     logger.info(
       kept
         ? "Kept a provider process that holds a deleted agent's folder, because work uses it."
