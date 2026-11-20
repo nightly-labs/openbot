@@ -192,6 +192,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
   "error.team.pendingApprovalUnsupported": "이 연결에서는 승인 요청 전체를 읽을 수 없어요.",
+  "error.team.pendingPromptsUnsupported": "이 연결에서는 답변을 기다리는 질문을 읽을 수 없습니다.",
   "error.team.phoneFeedbackUnsupported": "이 연결에서는 휴대폰 앱에서 신고를 보낼 수 없어요.",
   "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",

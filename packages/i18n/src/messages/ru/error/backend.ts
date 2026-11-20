@@ -455,6 +455,7 @@ export const messages = {
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
+  "error.backend.taskControlInvalid": "Укажите taskId задачи, которую вы запустили. Сообщению также нужен текст.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
   "error.backend.taskUnfinishedLimit":
@@ -462,5 +463,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",
+  "error.backend.taskMessageFailed": "OpenBot не удалось отправить сообщение задаче. Повторите попытку позже.",
   "error.backend.taskStartFailed": "OpenBot не удалось запустить задачу. Выполните работу в этом ходе.",
 } as const satisfies PartialTranslation<typeof source>;

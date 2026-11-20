@@ -37,6 +37,7 @@ import {
   restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
+  type TaskReportState,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
 import { handoffHasHistory } from "./handoff-history";
@@ -120,6 +121,7 @@ export interface TaskLanes {
   limit(agentId: string): number;
   oneTurnAtATime(agentId: string): boolean;
   isRoutineThread(taskId: string): boolean;
+  taskReport(taskId: string): TaskReportState | null;
 }
 
 interface Lane {
@@ -925,6 +927,7 @@ export class DrainScheduler {
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
+              taskReport: this.taskReport(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
@@ -1346,6 +1349,12 @@ export class DrainScheduler {
     const taskId = this.#mailbox.taskIdForDelivery(id);
     if (taskId !== null) return this.#tasks.isRoutineThread(taskId);
     return !this.#channels?.store.assignmentForDelivery(id) && !this.#messaging?.ownsDelivery(id);
+  }
+
+  taskReport(context: DeliveryContext): TaskReportState | null {
+    const { sender, recipientAgentId } = context.delivery;
+    const ownTask = sender.kind === "agent" && sender.agentId === recipientAgentId;
+    return ownTask && context.senderTaskId ? this.#tasks.taskReport(context.senderTaskId) : null;
   }
 
   answeredRoutine(delivery: DeliveryContext["delivery"]): AnsweredRoutine | null {

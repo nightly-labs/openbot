@@ -52,7 +52,14 @@ import {
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
 import { readVideoToolShape } from "./agent/video-reader";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
-import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
+import {
+  CLOSE_TASK_TOOL,
+  closeTaskToolSchema,
+  MESSAGE_TASK_TOOL,
+  messageTaskToolSchema,
+  START_TASK_TOOL,
+  startTaskToolSchema,
+} from "./agent-tasks/agent-tasks";
 import {
   AWAIT_EVENT_TOOL,
   awaitEventToolSchema,
@@ -631,8 +638,19 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: START_TASK_TOOL,
     description:
-      "Start a task: a separate conversation of yours that runs beside this chat, with its own context, progress and stop. Use it only for long, independent work that the user asked for and that need not block this chat. The brief is the task's first message: write everything the task needs, because it does not see this chat. The task result stays in the task; you do not receive it. Only your own chat can start a task.",
+      "Start a task: a separate conversation of yours that runs beside this chat, at the same time, with its own context. The brief is its first message: write everything it needs, because it does not see this chat. Its final answer comes back to this chat as a task report. Only your own chat can start a task.",
     shape: startTaskToolSchema.shape,
+  },
+  {
+    name: MESSAGE_TASK_TOOL,
+    description:
+      "Send a follow-up to a task that you started. It runs after the task's current turn, and its answer comes back as a task report. An archived task opens again.",
+    shape: messageTaskToolSchema.shape,
+  },
+  {
+    name: CLOSE_TASK_TOOL,
+    description: "Stop a task that you started and archive it. The user can still read it.",
+    shape: closeTaskToolSchema.shape,
   },
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {

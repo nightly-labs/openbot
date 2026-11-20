@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, los ajustes de los pasos del flujo de trabajo, Ejecutar desde este paso, la transferencia de propiedad, el botón Actualizar todo y muchas correcciones para agentes solo funcionan cuando el servidor tiene esta versión.",
+      "Tras esta actualización, una versión anterior de OpenBot no puede abrir tus datos."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Habla con un agente pulsando para hablar. Mantén pulsado el botón de hablar o la tecla para hablar mientras hablas. OpenBot envía lo que dijiste cuando sueltas. Cambia la tecla en Ajustes > Voz.",
+          "Vuelve a ejecutar un flujo de trabajo desde un paso. En el menú del paso, selecciona Ejecutar desde este paso. Los pasos anteriores conservan sus respuestas y no se vuelven a ejecutar.",
+          "Consulta los ajustes y las entradas que produjeron el resultado de un paso del flujo de trabajo. Selecciona Ajustes en el paso y, después, Usar estos ajustes para ejecutarlo de nuevo del mismo modo.",
+          "Transfiere tu servidor a otra cuenta de OpenBot. En Ajustes del servidor > Miembros, escribe el correo electrónico del nuevo propietario. El servidor cambia de manos cuando lo acepta.",
+          "Actualiza todos los proveedores a la vez. Ajustes > Proveedores muestra Actualizar todo cuando uno o más proveedores tienen una actualización."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot actualiza cada hora las CLI de proveedor que descargó, cuando hay una versión nueva disponible. La actualización espera a que los agentes estén inactivos.",
+          "Cada hilo de un agente puede usar las pestañas del navegador que abrió el chat principal u otro hilo de ese agente.",
+          "La pestaña Rutinas ha desaparecido de la barra lateral. Las rutinas siguen ejecutándose. Gestiónalas en los ajustes del agente, en la página Programación y en Ajustes del servidor > Rutinas."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "El reinicio por una actualización descargada ahora espera a que los agentes estén inactivos, con Cancelar reinicio. Antes, OpenBot se cerraba de inmediato y detenía la tarea del agente.",
+          "Un agente ya no se queda en “Trabajando” con sus mensajes en espera tras un reinicio o un límite de uso. El turno detenido aparece como interrumpido, y los mensajes en espera empiezan.",
+          "Un servidor ocupado con muchos agentes y dispositivos unidos ya no se queda sin memoria, ni se congela al seleccionar el siguiente turno.",
+          "Un mensaje que envías tras una pausa ya no se queda en “No enviado” con “Conecta Claude para continuar.” cuando Claude tiene sesión iniciada.",
+          "Las pestañas del navegador de los agentes que nadie usa dejan de consumir procesador tras 2 minutos."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

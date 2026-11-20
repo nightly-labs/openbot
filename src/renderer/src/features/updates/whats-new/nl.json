@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken de instellingen van workflowstappen, Uitvoeren vanaf deze stap, eigendomsoverdracht, de knop Alles updaten en veel fixes voor agents alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Praat met een agent met Indrukken om te praten. Houd de spreekknop of de spreektoets ingedrukt terwijl je spreekt. OpenBot stuurt wat je zei zodra je loslaat. Wijzig de toets in Instellingen > Spraak.",
+          "Start een workflow opnieuw vanaf één stap. Selecteer in het stapmenu Uitvoeren vanaf deze stap. De stappen ervoor behouden hun antwoorden en worden niet opnieuw uitgevoerd.",
+          "Bekijk de instellingen en invoer die het resultaat van een workflowstap hebben gemaakt. Selecteer Instellingen op de stap, en daarna Deze instellingen gebruiken om hem op dezelfde manier opnieuw uit te voeren.",
+          "Geef je server over aan een ander OpenBot-account. Vul in Serverinstellingen > Leden het e-mailadres van de nieuwe eigenaar in. De server wisselt van eigenaar zodra die het accepteert.",
+          "Update alle aanbieders tegelijk. Instellingen > Aanbieders toont Alles updaten wanneer een of meer aanbieders een update hebben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot werkt de provider-CLI's die het heeft gedownload elk uur bij, als er een nieuwe versie beschikbaar is. De update wacht tot de agents inactief zijn.",
+          "Elke thread van een agent kan de browsertabbladen gebruiken die de hoofdchat of een andere thread van die agent heeft geopend.",
+          "Het tabblad Routines is uit de zijbalk verdwenen. Routines blijven draaien. Beheer ze in de instellingen van de agent, op de pagina Planning en bij Serverinstellingen > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Herstart voor een gedownloade update wacht nu tot de agents inactief zijn, met Herstart annuleren. Eerder sloot OpenBot meteen af en stopte het de taak van de agent.",
+          "Een agent blijft na een herstart of een gebruikslimiet niet meer op «Bezig» staan met wachtende berichten. De onderbroken beurt wordt als onderbroken getoond, en de wachtende berichten starten.",
+          "Een drukke server met veel agents en verbonden apparaten raakt niet meer door zijn geheugen heen, en bevriest niet meer wanneer hij de volgende beurt selecteert.",
+          "Een bericht dat je na een pauze verstuurt, blijft niet meer op «Niet verstuurd» staan met «Verbind Claude om door te gaan.» wanneer Claude is aangemeld.",
+          "Agent-browsertabbladen die niemand gebruikt, stoppen na 2 minuten met het gebruik van de processor."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

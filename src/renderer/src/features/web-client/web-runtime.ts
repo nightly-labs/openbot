@@ -10,6 +10,7 @@ import type {
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
+  AgentRuntimePrompt,
   AgentStatus,
   AgentWaitsSnapshot,
   AttachmentSummary,
@@ -180,6 +181,11 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import {
   PROVIDER_MODEL_SOURCE_CAPABILITY,
@@ -370,6 +376,7 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
   send(
     agentId: string,
@@ -1420,6 +1427,10 @@ export function createWebWorkspaceRuntime(
     async readPendingApproval(input) {
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
+    },
+    async listPendingPrompts() {
+      if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
+      return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
     },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))

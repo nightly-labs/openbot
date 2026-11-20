@@ -1731,9 +1731,7 @@ if (!hasSingleInstanceLock) {
         }
       });
       interfaceSize.subscribe((preference) => {
-        windows.getMainWindow()?.webContents.setZoomFactor(interfaceSize.zoomFactor);
-        for (const chatWindow of windows.getChatWindows())
-          chatWindow.webContents.setZoomFactor(interfaceSize.zoomFactor);
+        windows.applyInterfaceSize(interfaceSize.zoomFactor);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appInterfaceSizePreference, preference);
         }

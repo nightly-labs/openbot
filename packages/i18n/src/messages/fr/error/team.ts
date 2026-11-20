@@ -217,6 +217,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Cette connexion ne prend pas en charge la personnalité du serveur.",
   "error.team.agentWaitsUnsupported": "Cette connexion ne prend pas en charge les attentes ouvertes.",
   "error.team.pendingApprovalUnsupported": "Cette connexion ne permet pas de lire une approbation complète.",
+  "error.team.pendingPromptsUnsupported": "Cette connexion ne permet pas de lire les questions ouvertes.",
   "error.team.phoneFeedbackUnsupported":
     "Cette connexion ne permet pas d'envoyer un rapport depuis l'app du téléphone.",
   "error.team.messagePinsUnsupported": "Cette connexion ne prend pas en charge les messages épinglés.",
