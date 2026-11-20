@@ -2033,7 +2033,12 @@ export class OpenBotToolRouter {
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
     }
 
-    if (params.tool === "interrupt_agent") return yield* this.#interruptTool.handle(params, senderAgentId);
+    if (params.tool === "interrupt_agent")
+      return yield* this.#interruptTool.handle(
+        params,
+        senderAgentId,
+        this.#memberRequesters(senderAgentId, params.turnId),
+      );
 
     if (params.tool === "read_agent") {
       const args = readAgentToolSchema.parse(params.arguments ?? {});
