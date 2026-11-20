@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
   WORKFLOW_GROUP_FIELDS,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowMediaAccountCredits,
@@ -968,7 +969,7 @@ try {
     return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
   });
 
-  await step("groups: a member groups a channel output, and its settings still need an owner", async () => {
+  await step("names: a member groups and names a channel output, and its settings still need an owner", async () => {
     const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
     const output: WorkflowNode = {
       id: "chat-channel-output",
@@ -995,18 +996,28 @@ try {
     const after = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
     const nodes = JSON.stringify(record(after.graph, "graph").nodes);
     assert.ok(nodes.includes("group-e2e") && nodes.includes("Posts"), nodes);
+    const name = { [WORKFLOW_STEP_NAME_FIELD]: "Post to the team" };
+    const named = await ok(WORKFLOWS_ROUTES.saveGraph, member, {
+      workflowId: ids.open,
+      baseRevision: Number(after.revision),
+      graph: grouped({ ...output.fields, ...name }),
+    });
+    assert.equal(named.ok, true);
+    const renamed = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const namedNodes = record(renamed.graph, "graph").nodes;
+    assert.ok(JSON.stringify(namedNodes).includes("Post to the team"), JSON.stringify(namedNodes));
     const denied = await refused(
       WORKFLOWS_ROUTES.saveGraph,
       member,
       {
         workflowId: ids.open,
-        baseRevision: Number(after.revision),
-        graph: grouped({ ...output.fields, channelId: "other" }),
+        baseRevision: Number(renamed.revision),
+        graph: grouped({ ...output.fields, ...name, channelId: "other" }),
       },
       403,
       "error.team.adminRequired",
     );
-    return { grouped: 200, denied };
+    return { grouped: 200, named: 200, denied };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {

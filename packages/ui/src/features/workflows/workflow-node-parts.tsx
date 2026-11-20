@@ -1,6 +1,6 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef } from "@openbot/contracts/ipc";
+import { isAgentProviderRef, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -45,7 +45,6 @@ import {
   resizeCursor,
   resizeHandles,
   resultValue,
-  STEP_NAME_FIELD,
   useBoard,
   type WfnBoard,
   type WfnFieldValue,
@@ -387,7 +386,7 @@ export function NodeShell(props: ShellProps) {
         tabindex={board.resizable ? 0 : undefined}
         data-status={board.status(props.id)}
         data-height={board.size(props.id)?.height === undefined ? undefined : ""}
-        aria-label={customStepName(board.field(props.id, STEP_NAME_FIELD)) ?? props.label}
+        aria-label={customStepName(board.field(props.id, WORKFLOW_STEP_NAME_FIELD)) ?? props.label}
         style={style()}
       >
         <Show when={selected()}>
@@ -477,10 +476,7 @@ export function NodeShell(props: ShellProps) {
 function StepName(props: { id: string; kind: string }) {
   const board = useBoard();
   const { t } = useText();
-  const value = () => {
-    const name = board.field(props.id, STEP_NAME_FIELD);
-    return typeof name === "string" ? name : "";
-  };
+  const [value, setValue] = useTextField(() => props.id, WORKFLOW_STEP_NAME_FIELD, "");
   return (
     <Input
       class="wfn-frame-name wfn-step-name"
@@ -490,10 +486,10 @@ function StepName(props: { id: string; kind: string }) {
       spellcheck={false}
       autocomplete="off"
       readonly={board.isLocked(props.id)}
-      onValueChange={(next) => board.setField(props.id, STEP_NAME_FIELD, next, true)}
+      onValueChange={setValue}
       onBlur={() => {
         const trimmed = value().trim();
-        if (trimmed !== value()) board.setField(props.id, STEP_NAME_FIELD, trimmed, true);
+        if (trimmed !== value()) setValue(trimmed);
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
@@ -626,10 +622,7 @@ export function FailureAlert(props: { id: string; running: boolean }) {
 
 function LiveProgress(props: { id: string; progress: WorkflowAgentProgress }) {
   const board = useBoard();
-  const agent = () => {
-    const agentId = board.field(props.id, "agentId");
-    return board.catalogs().agents.find((entry) => entry.id === agentId);
-  };
+  const agent = () => board.catalogs().agents.find((entry) => entry.id === props.progress.agentId);
   return (
     <div class="wfn-result-live" role="status" aria-live="polite">
       <AgentAvatar agent={agent()} mood="working" activity={props.progress.activity} class="wfn-result-live-avatar" />

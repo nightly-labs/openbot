@@ -68,7 +68,7 @@ function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; a
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
       request={request}
-      agentProgress={(agentId) => workflowAgentProgress(turnProgress()[agentId], turnStepLines())}
+      agentProgress={(agentId) => workflowAgentProgress(agentId, turnProgress()[agentId], turnStepLines())}
     />
   );
 }

@@ -235,7 +235,7 @@ try {
   const built = await call("create", "edit_workflow", {
     title: "Morning news",
     ops: [
-      { op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual" } },
+      { op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual", stepName: " Morning start " } },
       {
         op: "add",
         ref: "news",
@@ -261,6 +261,11 @@ try {
   const read = await call("read", "read_workflow", { workflowId });
   const graph = workflowRead.parse(read.value);
   check("read_workflow has the 6 nodes and 4 edges", graph.nodes.length === 6 && graph.edges.length === 4, graph);
+  check(
+    "read_workflow gives the step name, trimmed",
+    graph.nodes.some((node) => node.id === ids.start && node.fields.stepName === "Morning start"),
+    graph,
+  );
   const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
   check(
     "tool_call gives a boolean sent as text its type",
@@ -593,6 +598,13 @@ try {
     runRead
       .parse(runs.value)
       .steps.some((step) => step.nodeId === ids.news && step.kind === "agent" && step.label === "agent-research"),
+    runs.value,
+  );
+  check(
+    "a run read gives the step name as the label of a named step",
+    runRead
+      .parse(runs.value)
+      .steps.some((step) => step.nodeId === ids.start && step.kind === "trigger" && step.label === "Morning start"),
     runs.value,
   );
   const triggerInput = "Shipment 4418: review the packet from the supplier in Poznan.";

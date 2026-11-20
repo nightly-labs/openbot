@@ -10,6 +10,7 @@ interface TurnProgress {
 }
 
 export function workflowAgentProgress(
+  agentId: string,
   progress: TurnProgress | undefined,
   lines: TurnStepLines,
 ): WorkflowAgentProgress | undefined {
@@ -17,8 +18,12 @@ export function workflowAgentProgress(
   const turn = lines[progress.turnId] ?? [];
   const current = turn.at(-1)?.text === progress.detail ? turn.length - 1 : turn.length;
   return {
+    agentId,
     detail: progress.detail,
-    previous: turn[current - 1]?.text,
+    previous: turn
+      .slice(0, current)
+      .reverse()
+      .find((line) => line.text !== progress.detail)?.text,
     activity: agentStepActivity(progress.activity),
     done: progress.running ? current : turn.length,
   };

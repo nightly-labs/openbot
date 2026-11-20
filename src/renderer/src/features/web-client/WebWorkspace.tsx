@@ -2954,7 +2954,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 status={providerAdmin.status()}
                                 self={account().name ?? undefined}
                                 agentProgress={(agentId) =>
-                                  workflowAgentProgress(workspace.state.progress[agentId], workspace.stepLines())
+                                  workflowAgentProgress(
+                                    agentId,
+                                    workspace.state.progress[agentId],
+                                    workspace.stepLines(),
+                                  )
                                 }
                               />
                             </Loading>

@@ -27,13 +27,12 @@ export type WfnPortSide = "in" | "out";
 export type WfnRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
 
 export interface WorkflowAgentProgress {
+  agentId: string;
   detail: string;
   previous: string | undefined;
   activity: AgentStepActivity | null;
   done: number;
 }
-
-export const STEP_NAME_FIELD = "stepName";
 
 export function customStepName(value: WfnFieldValue | undefined): string | undefined {
   const name = typeof value === "string" ? value.trim() : "";

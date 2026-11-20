@@ -3,6 +3,7 @@ import {
   type StoredFileRow,
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_PICTURE_TYPES,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowNodeKind,
@@ -111,7 +112,6 @@ import {
   MOD_KEY,
   type PortRef,
   resizeCursor,
-  STEP_NAME_FIELD,
   takesKeys,
   type WfnAnchor,
   type WfnEdge,
@@ -1271,7 +1271,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return undefined;
   };
   const stepName = (id: string) => {
-    const custom = customStepName(board.field(id, STEP_NAME_FIELD));
+    const custom = customStepName(board.field(id, WORKFLOW_STEP_NAME_FIELD));
     if (custom) return custom;
     const [label = t("workflow.canvas.step"), ...fields] = searchTexts(id);
     const words = fields
@@ -2133,7 +2133,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const value = board.field(id, key);
       return typeof value === "string" ? value : "";
     });
-    return [customStepName(board.field(id, STEP_NAME_FIELD)) ?? t(KIND_LABEL[kind]), ...fields];
+    return [t(KIND_LABEL[kind]), ...fields];
   };
   const matches = () => {
     const words = query().trim().toLowerCase();
@@ -2141,9 +2141,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return live()
       .flatMap((node) => {
         const [label = "", ...fields] = searchTexts(node.id);
-        const hit = fields.find((field) => field.toLowerCase().includes(words));
+        const name = customStepName(board.field(node.id, WORKFLOW_STEP_NAME_FIELD));
+        const texts = name ? [name, ...fields] : fields;
+        const hit = texts.find((text) => text.toLowerCase().includes(words));
         if (!hit && !label.toLowerCase().includes(words)) return [];
-        return [{ node, text: hit ?? fields.find((field) => field.trim()) ?? "" }];
+        return [{ node, text: hit ?? texts.find((text) => text.trim()) ?? "" }];
       })
       .slice(0, 8);
   };

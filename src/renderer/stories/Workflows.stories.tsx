@@ -255,6 +255,7 @@ function RunningAgentGallery() {
         const current = LIVE_STEPS[step()];
         if (id !== "research" || !current) return undefined;
         return {
+          agentId: AGENT,
           detail: current.detail,
           previous: LIVE_STEPS[step() - 1]?.detail,
           activity: current.activity,
