@@ -2969,22 +2969,25 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  requeueResultAfterRestart = Effect.fn("MailboxStore.requeueResultAfterRestart")(function* (
+  requeueAfterRestart = Effect.fn("MailboxStore.requeueAfterRestart")(function* (
     this: MailboxStore,
     deliveryId: string,
+    routineRetry: boolean,
   ): Effect.fn.Return<boolean, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const message = delivery && this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
     const key = `${RESTARTED_RESULT_KEY_PREFIX}${deliveryId}`;
+    const teammateResult =
+      message?.sender.kind === "agent" &&
+      message.sender.agentId !== delivery?.recipientAgentId &&
+      message.replyToMessageId !== null &&
+      message.expectsReply === false &&
+      !message.channelId;
     if (
       !delivery ||
       !message ||
       (delivery.status !== "starting" && delivery.status !== "running") ||
-      message.sender.kind !== "agent" ||
-      message.sender.agentId === delivery.recipientAgentId ||
-      message.replyToMessageId === null ||
-      message.expectsReply !== false ||
-      message.channelId ||
+      !(routineRetry ? message.sender.kind === "routine" : teammateResult) ||
       this.#state.idempotency[key] !== undefined
     )
       return false;

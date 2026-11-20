@@ -194,8 +194,11 @@ export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
 const RESTARTED_RESULT_NOTE =
   "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
 
-export function restartedResultInput(input: readonly DeliveryInputItem[]): DeliveryInputItem[] {
-  const note = `${HANDOFF_START}\n\n${RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+const RESTARTED_ROUTINE_NOTE =
+  "OpenBot note, not from the user: OpenBot or its provider restarted while you did the routine below, so that run stopped before it ended. Do the routine again now. You can have done part of it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
+
+export function restartedResultInput(input: readonly DeliveryInputItem[], routine = false): DeliveryInputItem[] {
+  const note = `${HANDOFF_START}\n\n${routine ? RESTARTED_ROUTINE_NOTE : RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
   return input.map((item, index) =>
     index === 0 && item.type === "text" ? { ...item, text: `${note}${item.text}` } : item,
   );

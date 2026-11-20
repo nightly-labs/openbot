@@ -1334,6 +1334,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return run === null || quietRoutineRun(run);
         },
         quietRunDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        retriesAfterRestart: (deliveryId) => this.#routines.retriesAfterRestart(deliveryId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         executionThreads: () => [...this.channels.store.executionThreads(), ...this.messaging.store.executionThreads()],
         taskThreads: () => this.#tasks.executionThreads(),
