@@ -30,6 +30,7 @@ export function LiveVoiceAccountRow(props: {
 }) {
   const { t, errorMessage } = useText();
   const [error, setError] = createSignal<string | null>(null);
+  const [saving, setSaving] = createSignal(false);
   const choices = () => {
     const ids = props.choice.accounts
       .filter((account) => !isApiKeyAccount(account.id, "codex"))
@@ -38,14 +39,16 @@ export function LiveVoiceAccountRow(props: {
   };
   const name = (accountId: string) =>
     accountId === AUTOMATIC_ACCOUNT
-      ? t("settings.voice.language.automatic")
+      ? t("settings.voice.live.accountAutomatic")
       : providerAccountName(t, props.choice.accounts, accountId);
   const choose = (accountId: string) => {
-    if (accountId === (props.choice.accountId ?? AUTOMATIC_ACCOUNT)) return;
+    if (saving() || accountId === (props.choice.accountId ?? AUTOMATIC_ACCOUNT)) return;
     setError(null);
+    setSaving(true);
     props.choice
       .choose(accountId === AUTOMATIC_ACCOUNT ? null : accountId)
-      .catch((failure: unknown) => setError(errorMessage(failure, t("error.team.requestFailed"))));
+      .catch((failure: unknown) => setError(errorMessage(failure, t("error.team.requestFailed"))))
+      .finally(() => setSaving(false));
   };
   return (
     <Show when={choices().length > 0}>
@@ -61,7 +64,7 @@ export function LiveVoiceAccountRow(props: {
             options={choices()}
             value={props.choice.accountId ?? AUTOMATIC_ACCOUNT}
             onChange={(next) => next && choose(next)}
-            disabled={props.disabled}
+            disabled={props.disabled || saving()}
             placement="bottom-end"
             itemComponent={(selectProps) => (
               <SelectItem item={selectProps.item}>{name(selectProps.item.rawValue)}</SelectItem>

@@ -26,6 +26,7 @@ export interface ProviderAccountsHostDependencies {
     | "removeProviderAccount"
     | "setProviderAccountPool"
     | "setLiveVoiceAccount"
+    | "liveVoiceAccount"
   >;
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
@@ -95,8 +96,7 @@ export class ProviderAccountsHost {
   }
 
   liveVoiceAccount() {
-    const codex = this.#dependencies.service.getStatus().providers?.find((row) => row.id === "codex");
-    return { accountId: codex?.accounts ? (codex.liveVoiceAccount ?? null) : null };
+    return { accountId: this.#dependencies.service.liveVoiceAccount() };
   }
 
   setLiveVoiceAccount(accountId: string | null) {

@@ -1734,8 +1734,15 @@ export class ProviderRuntime implements ProviderPort {
     return this.#providerAccounts?.liveVoiceAccount() ?? null;
   }
 
-  otherCodexAccounts(): boolean {
-    return (this.#providerAccounts?.planAccounts("codex").length ?? 0) > 0;
+  otherCodexAccounts(inUse: string): boolean {
+    const ownSignIn =
+      this.status().providers?.find((row) => row.id === "codex")?.state === "available" &&
+      !this.ownSignInUsesKey("codex");
+    const accounts = [
+      ...(ownSignIn ? [DEFAULT_PROVIDER_ACCOUNT_ID] : []),
+      ...(this.#providerAccounts?.planAccounts("codex") ?? []),
+    ];
+    return accounts.some((accountId) => accountId !== inUse);
   }
 
   accountPool(provider: AgentProvider): ProviderAccountPool | null {

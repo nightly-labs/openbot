@@ -685,6 +685,7 @@ export const messages = {
   "settings.voice.talkKey.reset": "重置",
   "settings.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
   "settings.voice.live.account": "账号",
+  "settings.voice.live.accountAutomatic": "自动",
   "settings.voice.live.accountDescription": "实时语音使用的 ChatGPT 账号。请选择套餐包含语音的账号。",
   "settings.transfer.title": "把这台服务器迁移到另一台电脑",
   "settings.transfer.lede": "你的助手、它们的技能、自动化任务、记忆和文件都会打包进一个文件。",

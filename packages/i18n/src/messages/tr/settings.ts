@@ -736,6 +736,7 @@ export const messages = {
   "settings.voice.talkKey.reset": "Sıfırla",
   "settings.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
   "settings.voice.live.account": "Hesap",
+  "settings.voice.live.accountAutomatic": "Otomatik",
   "settings.voice.live.accountDescription": "Canlı sesin kullandığı ChatGPT hesabı. Planı sesi içeren bir hesap seçin.",
   "settings.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
   "settings.transfer.lede": "Ajanlarınız, becerileri, rutinleri, bellekleri ve dosyaları tek bir dosyada toplanır.",

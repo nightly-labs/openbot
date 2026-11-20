@@ -749,6 +749,7 @@ export const messages = {
   "settings.voice.talkKey.reset": "Rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.voice.live.account": "Compte",
+  "settings.voice.live.accountAutomatic": "Automatique",
   "settings.voice.live.accountDescription":
     "Le compte ChatGPT qu'utilise la voix en direct. Choisissez un compte dont l'abonnement inclut la voix.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",

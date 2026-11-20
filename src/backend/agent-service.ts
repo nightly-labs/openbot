@@ -1766,7 +1766,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       summarize: (agentId, prompt) => this.#liveVoiceSummary(agentId, prompt),
       emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
-      otherAccounts: () => this.#providers.otherCodexAccounts(),
+      otherAccounts: (agentId) =>
+        this.#providers.otherCodexAccounts(
+          this.#liveVoiceAccountId(this.#store.get(agentId)) ?? DEFAULT_PROVIDER_ACCOUNT_ID,
+        ),
     });
     this.#browser.onControlChanged((state) => {
       this.#emit({ type: "browser-control-changed", state });
@@ -5152,6 +5155,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (failure) => new AgentLifecycleFailed({ operation: "setLiveVoiceAccount", cause: failure.cause }),
       ),
     );
+  }
+
+  liveVoiceAccount(): string | null {
+    return this.#providers.liveVoiceAccount();
   }
 
   #liveVoiceAccountId(agent: Pick<AgentSummary, "provider" | "providerAccountId"> | undefined): string | undefined {

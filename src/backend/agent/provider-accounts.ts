@@ -536,8 +536,12 @@ export class ProviderAccounts {
     const name = providerLabel("codex");
     if (!this.#support("codex"))
       return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
-    if (accountId !== null && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && !this.#store.get("codex", accountId))
+    const stored =
+      accountId === null || accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? null : this.#store.get("codex", accountId);
+    if (accountId !== null && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && !stored)
       return yield* accountFailure(sourceText("error.provider.accountNotFound", { provider: name }));
+    if (stored && isKeyAccount(stored))
+      return yield* accountFailure(sourceText("error.provider.accountUsesKey", { provider: name }));
     yield* this.#store
       .setLiveVoiceAccount(accountId)
       .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));

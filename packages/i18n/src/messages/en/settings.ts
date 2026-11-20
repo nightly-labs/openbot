@@ -743,6 +743,7 @@ export const messages = defineMessages("settings", {
   "settings.voice.talkKey.reset": "Reset",
   "settings.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
   "settings.voice.live.account": "Account",
+  "settings.voice.live.accountAutomatic": "Automatic",
   "settings.voice.live.accountDescription":
     "The ChatGPT account that live voice uses. Choose an account whose plan includes voice.",
   "settings.voice.server.section": "Voice server",

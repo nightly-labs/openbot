@@ -934,18 +934,6 @@ function accountModelsStatus(): AgentStatus {
         accounts: [account("default"), account(ULTRA_ACCOUNT, [ARGON_MODEL]), account(FREE_ACCOUNT, [])],
         ...(antigravityPool ? { accountPool: antigravityPool } : {}),
       },
-      ...(codexLiveVoiceAccount
-        ? [
-            {
-              id: "codex" as const,
-              state: "available" as const,
-              version: null,
-              message: null,
-              accounts: [account("default"), account(ULTRA_ACCOUNT)],
-              liveVoiceAccount: codexLiveVoiceAccount,
-            },
-          ]
-        : []),
     ],
   };
 }
@@ -2864,6 +2852,7 @@ try {
               : undefined;
             return accountModelsStatus();
           }),
+        liveVoiceAccount: () => codexLiveVoiceAccount,
         setLiveVoiceAccount: (accountId) =>
           Effect.sync(() => {
             record("setLiveVoiceAccount", accountId);
