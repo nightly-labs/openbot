@@ -1376,8 +1376,10 @@ export function ConversationTimeline() {
                     if (currentMessage) void copyMessage(currentMessage);
                   },
                 };
-                const stepsInRow = () =>
-                  author().kind === "agent" && !message()?.questionPrompt && (Boolean(channel) || !showAgentSteps());
+                // A channel shows an agent's actions beside the answer, and its steps open only the
+                // trace. An agent chat shows the steps above the answer, as a side thread does, so the
+                // reasoning list can open there with or without "Show agent steps".
+                const stepsInRow = () => author().kind === "agent" && !message()?.questionPrompt && Boolean(channel);
                 const actionsBeside = () => stepsInRow() || author().kind === "you";
                 const stepsDisclosure = () => (
                   <Show when={turnSteps.stepsAbove(message()?.id)}>
