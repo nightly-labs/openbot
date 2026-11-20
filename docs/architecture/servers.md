@@ -239,7 +239,8 @@ advertises it.
 answers from the end of that side thread, not from the agent's chat, and answers 409 when the agent has
 no such thread. A host without the capability drops the field and reads the chat, so a client sends
 `taskId` only when the host advertises it. Without it, the desktop and the web client hide the side
-question in a side thread.
+question actions in a side thread. A question pane that is already open there shows the chat's side
+question.
 
 ### Live voice
 

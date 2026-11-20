@@ -228,7 +228,8 @@
   justify-content: flex-start;
   align-self: stretch;
   gap: var(--openbot-space-1-5);
-  padding-inline: calc(var(--openbot-space-1-5) * 2 + var(--openbot-icon-md)) var(--openbot-space-2);
+  padding-inline: calc(var(--openbot-space-1-5) * 2 + var(--side-panel-tab-mark, var(--openbot-icon-md)))
+    var(--openbot-space-2);
   border-radius: inherit;
   text-align: start;
 }
@@ -238,12 +239,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (pointer: coarse) {
-  .side-panel-header .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
-    pointer-events: none;
-  }
 }
 
 .side-panel-hidden-tabs {
@@ -357,6 +352,21 @@
   height: 12px;
 }
 
+@media (pointer: coarse) {
+  .side-panel-header .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
+    pointer-events: none;
+  }
+
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-icon,
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-icon:has(.agent-threads-state) {
+    opacity: 0;
+  }
+
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-x {
+    opacity: 1;
+  }
+}
+
 .side-panel-tabs[data-dragging],
 .side-panel-tabs[data-dragging] .side-panel-tab-select {
   cursor: grabbing;
@@ -431,4 +441,8 @@
   .side-panel-header .side-panel-tab {
     transition: none;
   }
+}
+
+.side-panel-header .side-panel-tab:has(.agent-threads-state-working) {
+  --side-panel-tab-mark: var(--openbot-space-6);
 }

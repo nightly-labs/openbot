@@ -31,7 +31,6 @@ export interface SideQuestionStoreDeps {
 export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
   const { questions, setQuestions } = deps;
 
-  const openTaskId = () => deps.props.threads?.open?.id;
   const stateKey = (agentId: string, taskId: string | undefined) =>
     taskId === undefined ? agentId : `${agentId}/${taskId}`;
   const currentKey = () => {
@@ -42,11 +41,12 @@ export function createSideQuestionStore(deps: SideQuestionStoreDeps) {
     deps.props.runtime
       ? deps.props.runtime.sideQuestionThreads === true
       : serverSupportsCapability(deps.props.server, SIDE_QUESTION_THREADS_CAPABILITY);
+  const openTaskId = () => (threadsAvailable() ? deps.props.threads?.open?.id : undefined);
   const sideQuestionAvailable = () =>
     (deps.props.runtime
       ? Boolean(deps.props.runtime.askSideQuestion)
       : serverSupportsCapability(deps.props.server, SIDE_QUESTION_CAPABILITY)) &&
-    (openTaskId() === undefined || threadsAvailable());
+    (deps.props.threads?.open?.id === undefined || threadsAvailable());
   const sideQuestion = (): SideQuestionState => {
     const key = currentKey();
     return (key && questions[key]) || SIDE_QUESTION_EMPTY;
