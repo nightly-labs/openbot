@@ -1448,13 +1448,15 @@ export class ChannelService {
               decision = { agentId: lead.id };
             }
           }
-          if ("taskId" in decision) {
-            const existing = channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
-              (item) => item.id === decision.taskId && item.id !== task?.id && !terminal(item),
-            );
-            if (!existing?.ownerAgentId)
-              throw new ChannelRoutingError(sourceText("error.backend.channelRequestMemberRequired"));
-            const ownerAgentId = existing.ownerAgentId;
+          const continuedTaskId = "taskId" in decision ? decision.taskId : null;
+          const existing =
+            continuedTaskId === null
+              ? undefined
+              : channelResult(yield* Effect.result(channelSync(() => this.store.tasks(channelId)))).find(
+                  (item) => item.id === continuedTaskId && item.id !== task?.id && !terminal(item),
+                );
+          const ownerAgentId = existing?.ownerAgentId;
+          if (existing && ownerAgentId) {
             channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, ownerAgentId))));
             const source = task
               ? channelResult(
@@ -1504,6 +1506,14 @@ export class ChannelService {
             channelResult(yield* Effect.result(this.interruptTasks(channelId, affected)));
             this.#wakeAgain.add(channelId);
             continue;
+          }
+          if ("taskId" in decision) {
+            logger.warn("A routing answer named no open task with an owner, so the lead takes the request.", {
+              channelId,
+              provider: lead.provider,
+              model: lead.model,
+            });
+            decision = { agentId: lead.id };
           }
           const eligible = this.eligibleMembers(channel);
           const tags = chatTagReferences(task.instruction);
