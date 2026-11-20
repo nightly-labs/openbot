@@ -53,6 +53,7 @@ import type {
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import {
+  agentAccessRank,
   agentComputerUseEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
@@ -1978,7 +1979,8 @@ export class OpenBotToolRouter {
     if (params.tool === "list_agents") {
       const unresolved = new Set(this.#mailbox.unresolvedDeliveries().map(({ delivery }) => delivery.recipientAgentId));
       const openWaits = this.#waits.countByAgent();
-      const agents = this.#hooks.listAgents().map((agent) => {
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds).map((agent) => {
         const deliveries = this.#mailbox.listQueue(agent.id).deliveries;
         const queuedMessages = deliveries.filter((delivery) => delivery.status === "queued").length;
         const working = this.#hooks.runsTurn(agent.id) || unresolved.has(agent.id);
@@ -2275,6 +2277,7 @@ export class OpenBotToolRouter {
       inExecutionThread:
         this.#conversation.isExecutionThread(callerThreadId) &&
         !(callerTaskId !== null && this.#tasks.isRoutineThread(callerTaskId)),
+      requesterIds: this.#memberRequesters(senderAgentId, params.turnId),
     };
     const waitResult = this.#waits.handleTool(params, caller);
     if (waitResult) return waitResult;
@@ -2901,6 +2904,33 @@ export class OpenBotToolRouter {
     return [...ids];
   }
 
+  #memberRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind === "agent") {
+        for (const id of this.#mailbox.requesterIds(delivery.messageId)) ids.add(id);
+        continue;
+      }
+      const member = this.#mailbox.senderMember(delivery.messageId);
+      if (member && this.#remoteMember(delivery.messageId)) ids.add(member.id);
+    }
+    return [...ids];
+  }
+
+  #reachableAgents(senderAgentId: string, requesterIds: readonly string[]): AgentSummary[] {
+    return this.#hooks
+      .listAgents()
+      .filter(
+        (agent) =>
+          agent.id === senderAgentId ||
+          requesterIds.every(
+            (personId) =>
+              agentAccessRank(this.#channels.hooks.personAgentLevel?.(personId, agent.id) ?? "manage") >=
+              agentAccessRank("chat"),
+          ),
+      );
+  }
+
   #fromRemoteMember(agentId: string, turnId: string): boolean {
     return this.#mailbox
       .findDeliveriesByTurn(agentId, turnId)
@@ -3338,7 +3368,8 @@ export class OpenBotToolRouter {
         throw new Error("Duplicate recipients are not allowed.");
       }
       if (recipientValues.includes(senderAgentId)) throw new Error("An agent cannot message itself.");
-      const agents = this.#hooks.listAgents();
+      const requesterIds = this.#memberRequesters(senderAgentId, params.turnId);
+      const agents = this.#reachableAgents(senderAgentId, requesterIds);
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
@@ -3422,6 +3453,7 @@ export class OpenBotToolRouter {
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
+          ...(requesterIds.length > 0 ? { requesterIds } : {}),
           recipientAgentIds: recipientValues,
           text,
           sourcePaths: paths,

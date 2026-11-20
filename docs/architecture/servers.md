@@ -1359,6 +1359,16 @@ member IDs (`TeamMemberSummary.id`). A member gets the highest level of Everyone
 names them. An owner or an admin always gets `manage`. So a server with no roles works as before, and
 a new agent is open to every member until an admin closes it.
 
+An agent that works for a member keeps to the member's levels too. In a turn that a member's message
+started, `list_agents` lists, and `send_message` reaches, only the agents where the member has `chat`
+or more (`OpenBotToolRouter.#reachableAgents`). An agent that the member cannot use reads as an
+unknown id, so the refusal does not name it. The message that such an agent sends to another agent,
+its automatic result, the note about a failed request and a task that it starts keep the IDs of those
+members (`requesterIds` in the stored message), so each next agent in the chain keeps to the same
+levels. The field is optional JSON in `message_json`: there is no migration, and an older build ignores
+it. This is a routing rule for the OpenBot tools, not a wall between agents: an agent with Full access
+can still read the files of other agents on the host.
+
 The host keeps the roles in `openbot-agent-access-v1.json`, by server ID (`src/main/agent-access-store.ts`).
 It is a preference file, not the database: there is no migration, and an older build ignores it, so a
 downgrade keeps the roles. A file that does not decode closes every agent to members until the next

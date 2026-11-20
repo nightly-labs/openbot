@@ -2817,6 +2817,7 @@ export class TurnLifecycle {
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId },
+        requesterIds: this.#mailbox.requesterIds(messageId),
         recipientAgentIds: [recipientAgentId],
         text,
         replyToMessageId: messageId,
