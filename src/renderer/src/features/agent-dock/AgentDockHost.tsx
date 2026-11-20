@@ -27,6 +27,7 @@ import {
   withOpenBotSource,
 } from "@openbot/contracts/ipc";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import {
@@ -176,6 +177,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const shown = agentThreads.activeId(agentId);
     return agentTasks.snapshot(agentId)?.tasks.find((task) => task.id === shown);
   };
+  const threadSendIds = retryOperationIds(() => crypto.randomUUID());
   const threadMessages = (agentId: string, thread: AgentTask): AgentMessage[] => {
     const messages = agentTasks.conversation(thread.id)?.messages;
     return messages
@@ -670,12 +672,13 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     async sendToAgent(agentId: string, text: string): Promise<AgentDockSendResult> {
       const thread = openThread(agentId);
       if (!thread) return sendMessage(text, [], null, { agentId, serverId });
-      const clientMessageId = crypto.randomUUID();
+      const message = threadSendIds([agentId, thread.id, text]);
       void agentTasks.loadLatest(agentId, thread.id);
       try {
-        await agentTasksPort(serverId).sendToTask({ agentId, taskId: thread.id, text, clientMessageId });
-        return { messageId: clientMessageId };
+        await agentTasksPort(serverId).sendToTask({ agentId, taskId: thread.id, text, clientMessageId: message.id });
+        return { messageId: message.id };
       } catch (error) {
+        message.failed();
         return { error: errorMessage(error, t("conversation.threads.error.send")) };
       }
     },
