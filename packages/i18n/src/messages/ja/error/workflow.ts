@@ -35,6 +35,7 @@ export const messages = {
     "OpenBot がプロバイダーに接続できませんでした。インターネット接続を確認してから、ステップをもう一度実行してください。",
   "error.workflow.modelBusy": "別のモデルリクエストが実行中です。しばらくしてからステップを再実行してください。",
   "error.workflow.mediaFailed": "モデルが画像または動画を作成できませんでした。ステップをもう一度実行してください。",
+  "error.workflow.mediaNotMade": "モデルは画像または動画を作成しませんでした。モデルの回答: {answer}",
   "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
   "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
   "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",

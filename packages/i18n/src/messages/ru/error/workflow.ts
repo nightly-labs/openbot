@@ -34,6 +34,7 @@ export const messages = {
     "OpenBot не смог связаться с провайдером. Проверьте подключение к интернету и запустите шаг снова.",
   "error.workflow.modelBusy": "Выполняется другой запрос к модели. Скоро запустите шаг снова.",
   "error.workflow.mediaFailed": "Модели не удалось создать изображение или видео. Запустите шаг снова.",
+  "error.workflow.mediaNotMade": "Модель не создала изображение или видео. Её ответ: {answer}",
   "error.workflow.pictureMissing": "Изображения больше нет на сервере. Отправьте его снова.",
   "error.workflow.pictureType": "Используйте изображение PNG, JPEG или WebP.",
   "error.workflow.mediaInputMissing": "Изображение из предыдущего шага недоступно. Запустите этот шаг снова.",

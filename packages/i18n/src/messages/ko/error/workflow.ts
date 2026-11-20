@@ -33,6 +33,7 @@ export const messages = {
     "OpenBot이 제공자에 연결할 수 없었어요. 인터넷 연결을 확인한 다음 단계를 다시 실행해 주세요.",
   "error.workflow.modelBusy": "다른 모델 요청이 실행 중이에요. 잠시 후 단계를 다시 실행해 주세요.",
   "error.workflow.mediaFailed": "모델이 이미지나 동영상을 만들 수 없었어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaNotMade": "모델이 이미지나 동영상을 만들지 않았어요. 모델의 답변: {answer}",
   "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
   "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
   "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",

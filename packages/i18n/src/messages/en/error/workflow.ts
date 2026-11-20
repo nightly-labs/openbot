@@ -31,6 +31,7 @@ export const messages = defineMessages("error.workflow", {
     "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
+  "error.workflow.mediaNotMade": "The model did not make the image or video. It said: {answer}",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",

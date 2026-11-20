@@ -222,6 +222,7 @@ import {
   generatedMediaKind,
   generatedVideoName,
   imageGenerationFailure,
+  imageGenerationUsageLimited,
 } from "./agent/image-generation";
 import type { ImageFitter } from "./agent/image-reader";
 import { InstructionsChanges } from "./agent/instructions-changes";
@@ -293,7 +294,11 @@ import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/u
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
 import { removeWebhookSecretKey, type WebhookRoutineWriter } from "./agent/webhook-routine-tool";
-import { workflowGenerationError } from "./agent/workflow-generation-error";
+import {
+  workflowGenerationError,
+  workflowMediaAnswerError,
+  workflowMediaError,
+} from "./agent/workflow-generation-error";
 import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
@@ -3103,7 +3108,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const item: ThreadItem = { ...record, type };
         if (generatedMediaKind(item) === input.kind) made.item = item;
       };
-      yield* this.#profileClients
+      const answer = yield* this.#profileClients
         .run(client, (cancelled) =>
           generateTextWithoutTools(
             client,
@@ -3123,15 +3128,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             failed(
               failure instanceof GenerationUsageLimitError
                 ? sourceText("error.provider.usageLimitReached")
-                : sourceText("error.workflow.mediaFailed"),
+                : workflowMediaError(failure.cause, provider),
             ),
           ),
         );
       const item = made.item;
-      if (!item) return yield* failed(sourceText("error.workflow.mediaFailed"));
+      if (!item) return yield* failed(workflowMediaAnswerError(answer));
+      if (imageGenerationUsageLimited(item)) return yield* failed(sourceText("error.provider.usageLimitReached"));
       const failure = imageGenerationFailure(item);
-      if (failure || item.status === "failed")
-        return yield* failed(failure ?? sourceText("error.workflow.mediaFailed"));
+      if (failure) return yield* failed(failure);
+      if (item.status === "failed") return yield* failed(workflowMediaAnswerError(answer));
       const savedPath = getString(item, "saved_path");
       const result = input.kind === "image" ? getString(item, "result") : null;
       const clear = this.#clearPictureBackground;

@@ -27,6 +27,7 @@ export const messages = {
   "error.workflow.providerOffline": "OpenBot 无法连接到提供商。请检查网络连接，然后再次运行该步骤。",
   "error.workflow.modelBusy": "另一个模型请求正在运行，请稍后再次运行该步骤。",
   "error.workflow.mediaFailed": "模型无法生成图片或视频，请再次运行该步骤。",
+  "error.workflow.mediaNotMade": "模型没有生成图片或视频。模型的回答：{answer}",
   "error.workflow.pictureMissing": "服务器上已没有这张图片，请重新发送。",
   "error.workflow.pictureType": "请使用 PNG、JPEG 或 WebP 图片。",
   "error.workflow.mediaInputMissing": "前一步的图片不可用，请再次运行该步骤。",
