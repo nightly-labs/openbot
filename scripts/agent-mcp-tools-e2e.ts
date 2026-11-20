@@ -5,6 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -31,6 +32,29 @@ const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
 
 type Mode = "open" | "sign-in" | "key" | "guarded";
+
+function asTransport(inner: {
+  start(): Promise<void>;
+  send: Transport["send"];
+  close(): Promise<void>;
+  onclose?: (() => void) | undefined;
+  onerror?: ((error: Error) => void) | undefined;
+  onmessage?: Transport["onmessage"] | undefined;
+  setProtocolVersion?: ((version: string) => void) | undefined;
+}): Transport {
+  const transport: Transport = {
+    start: () => {
+      inner.onclose = () => transport.onclose?.();
+      inner.onerror = (error) => transport.onerror?.(error);
+      inner.onmessage = (message, extra) => transport.onmessage?.(message, extra);
+      return inner.start();
+    },
+    send: (message, options) => inner.send(message, options),
+    close: () => inner.close(),
+    setProtocolVersion: (version) => inner.setProtocolVersion?.(version),
+  };
+  return transport;
+}
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -665,9 +689,11 @@ process.stdin.on("data", (chunk) => {
     );
     const provider = new Client({ name: "provider", version: "1" });
     await provider.connect(
-      new StreamableHTTPClientTransport(new URL(relay.url), {
-        requestInit: { headers: { Authorization: `Bearer ${relay.token}` } },
-      }),
+      asTransport(
+        new StreamableHTTPClientTransport(new URL(relay.url), {
+          requestInit: { headers: { Authorization: `Bearer ${relay.token}` } },
+        }),
+      ),
     );
     const first = await provider.callTool({ name: "figma_get_status", arguments: {} });
     const firstText = mcpToolCallResponse(first).contentItems[0];
