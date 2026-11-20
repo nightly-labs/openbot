@@ -1,4 +1,5 @@
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
+import { Spinner } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { useTurns } from "../../turns";
@@ -29,7 +30,7 @@ export function WorkflowsPage(props: { serverId: string }) {
       keyed
       fallback={
         <main class="window-page workflows-notice">
-          <Show when={!checking()}>
+          <Show when={!checking()} fallback={<Spinner size="lg" label={t("common.loading")} />}>
             <p>{t("error.workflow.serverTooOld")}</p>
           </Show>
         </main>

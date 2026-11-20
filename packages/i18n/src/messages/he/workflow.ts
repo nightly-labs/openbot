@@ -444,6 +444,7 @@ export const messages = {
   "workflow.shape.star": "כוכב",
   "workflow.canvas.label": "קנבס תהליך העבודה: {name}",
   "workflow.canvas.untitled": "תהליך עבודה ללא שם",
+  "workflow.canvas.opening": "פותח את תהליך העבודה…",
   "workflow.canvas.copyOf": "עותק של {name}",
   "workflow.canvas.step": "שלב",
   "workflow.canvas.kind.note": "פתק דביק",

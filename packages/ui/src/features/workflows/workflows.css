@@ -995,6 +995,23 @@
   pointer-events: auto;
 }
 
+.wfn-opening {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: var(--openbot-bg-frame);
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) var(--openbot-duration-fast) both;
+}
+
+:is(.wfn-opening, .wfn-media-spinner) .ui-spinner {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+  border-width: 2px;
+  color: var(--openbot-text-primary);
+}
+
 .wfn-stage .wfn-empty-icon {
   width: var(--openbot-control-lg);
   height: var(--openbot-control-lg);
@@ -1510,8 +1527,12 @@
   background: transparent;
 }
 
-.wfn-canvas[data-frame="window"] :is(.wfn-viewport, .wfn-empty) {
+.wfn-canvas[data-frame="window"] :is(.wfn-viewport, .wfn-empty, .wfn-opening) {
   top: var(--left-header-height);
+}
+
+.wfn-canvas[data-frame="window"] .wfn-opening {
+  border-radius: var(--wfn-card-inner-radius);
 }
 
 .wfn-canvas[data-frame="window"] .wfn-viewport {
