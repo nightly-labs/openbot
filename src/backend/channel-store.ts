@@ -453,6 +453,15 @@ export class ChannelStore {
     return this.messages(channelId, undefined, 1)[0]?.sequence ?? 0;
   }
 
+  private storedSequence(channelId: string): number {
+    const row = databaseRow(
+      this.database.connection
+        .prepare("SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ?")
+        .get(channelId),
+    );
+    return row && typeof row.sequence === "number" ? row.sequence : 0;
+  }
+
   withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
     if (!tasks.some((task) => task.state === "waiting")) return tasks;
     const started = new Map<string, number>();
@@ -570,13 +579,7 @@ export class ChannelStore {
   }
 
   deleteHistory(channel: Channel): boolean {
-    const db = this.database.connection;
-    const last = databaseRow(
-      db
-        .prepare("SELECT MAX(sequence) AS sequence FROM projection_channel_messages WHERE channel_id = ?")
-        .get(channel.id),
-    );
-    const throughSequence = last && typeof last.sequence === "number" ? last.sequence : 0;
+    const throughSequence = this.storedSequence(channel.id);
     if (throughSequence === 0) return false;
     const updated = { ...channel, revision: channel.revision + 1 };
     const change: ChannelChange = { channel: updated, messages: [], tasks: [], assignments: [] };
@@ -969,9 +972,8 @@ export class ChannelStore {
     }
   }
 
-  markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
-    const maximum = this.latestSequence(channelId);
-    if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
+  markRead(channelId: string, memberId: string, requestedSequence: number, operationId: string): Channel {
+    const throughSequence = Math.min(requestedSequence, this.storedSequence(channelId));
     return this.database.dispatch(
       `channel-read:${memberId}:${operationId}`,
       [

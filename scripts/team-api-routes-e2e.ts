@@ -32,6 +32,7 @@ import {
   type BitwardenConnectorStatus,
   type CentralAuthUser,
   CHANNEL_CHATS_CAPABILITY,
+  type ChannelMessage,
   type ChannelRoutine,
   type ConversationMessage,
   type CustomAgentResult,
@@ -8889,6 +8890,57 @@ try {
         Buffer.from(visibleRead.bytes).equals(Buffer.from(png)) &&
         pictures.store.get(channelId).imageUrl === field(visible.body, "imageUrl"),
       [summary(hidden), summary(hiddenRead), summary(visible), { status: visibleRead.status, body: visibleRead.type }],
+    );
+
+    const alert = (id: string, author: ChannelMessage["author"]): ChannelMessage => ({
+      id,
+      channelId,
+      taskId: null,
+      author,
+      sequence: 0,
+      superseded: false,
+      message: {
+        id,
+        text: id,
+        author: author.kind === "member" ? "user" : "assistant",
+        createdAt: new Date(clock).toISOString(),
+        status: "completed",
+      },
+    });
+    const postAlert = (id: string, author: ChannelMessage["author"]) =>
+      pictures.store.commit(`alert:${id}`, {
+        channel: pictures.store.get(channelId),
+        messages: [alert(id, author)],
+        tasks: [],
+        assignments: [],
+      });
+    const alertMember = { kind: "member" as const, id: "member-alerts", name: "Alerts" };
+    postAlert("alert-first", alertMember);
+    postAlert("alert-second", alertMember);
+    const alertPage = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const heldSequence = field(alertPage.body, "throughSequence");
+    const deletedAlert = pictures.store.message(channelId, "alert-second");
+    if (deletedAlert) pictures.store.deleteMessage(pictures.store.get(channelId), deletedAlert);
+    const shownSequence = pictures.store.page(channelId).throughSequence;
+    const alertLogStart = logged.length;
+    const markRead = (throughSequence: unknown, operationId: string) =>
+      call("POST", CHANNEL_ROUTES.command, { ...use, json: { type: "read", operationId, channelId, throughSequence } });
+    const readAfterDelete = await markRead(heldSequence, "alert-read-after-delete");
+    const readPastHistory = await markRead(999, "alert-read-past-history");
+    postAlert("alert-third", { kind: "agent", id: "agent-ada", name: "Ada" });
+    const alertRow = list((await call("GET", CHANNEL_ROUTES.list, use)).body).find(
+      (row) => field(row, "id") === channelId,
+    );
+    check(
+      "a read through a deleted newest message and a read past the history both answer 200, and a later message stays unread",
+      typeof heldSequence === "number" &&
+        deletedAlert !== null &&
+        shownSequence < heldSequence &&
+        readAfterDelete.status === 200 &&
+        readPastHistory.status === 200 &&
+        field(alertRow, "unreadCount") === 1 &&
+        logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
+      [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
     );
   }
 
