@@ -84,6 +84,11 @@ const PRINT_PAGE = `<!doctype html><meta charset="utf-8"><title>print</title>
   document.documentElement.appendChild(frame);
   frame.contentWindow.addEventListener("beforeprint", () => { window.__printEvents += 1; });
   window.__printResults.push(String(frame.contentWindow.print()));
+  const written = document.createElement("iframe");
+  document.documentElement.appendChild(written);
+  const view = written.contentDocument.defaultView;
+  view.addEventListener("beforeprint", () => { window.__printEvents += 1; });
+  window.__printResults.push(String(view.print()));
 </script>`;
 
 const server = createServer((request, response) => {
@@ -344,9 +349,10 @@ async function main(): Promise<void> {
         z.object({ events: z.number(), results: z.array(z.string()), native: z.string() }),
       );
       assert.equal(printed.events, 0, "A page in an agent tab started to print.");
-      assert.deepEqual(printed.results, ["undefined", "undefined"]);
+      assert.deepEqual(printed.results, Array(3).fill("undefined"));
       assert.equal(printed.native, "function print() { [native code] }");
       recordCase("agent-tab-refuses-page-print");
+      await runCauseEffect(host.close(printTab.id));
     }
 
     {

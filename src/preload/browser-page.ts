@@ -296,6 +296,15 @@ function matchChromePageValues(): void {
       }
       return value;
     });
+    wrapGetter(target, target.HTMLIFrameElement.prototype, "contentDocument", (value) => {
+      const view = value?.defaultView ?? null;
+      if (isGlobal(view)) {
+        try {
+          install(view);
+        } catch {}
+      }
+      return value;
+    });
   };
 
   install(globalThis);
