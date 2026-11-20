@@ -68,7 +68,7 @@ export type BitwardenCliRunner = (
   signal: AbortSignal,
 ) => Promise<string>;
 
-export interface BitwardenCli {
+interface BitwardenCli {
   executable: string;
   launchPath?: string;
 }
@@ -142,11 +142,15 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
   });
 };
 
-async function firstCli(names: string[], directories: string[]): Promise<string | null> {
+async function firstCli(
+  names: string[],
+  directories: string[],
+  resolve: (path: string) => Promise<string> = realpath,
+): Promise<string | null> {
   for (const directory of new Set(directories.filter(isAbsolute))) {
     for (const name of names) {
       try {
-        const path = await realpath(join(directory, name));
+        const path = await resolve(join(directory, name));
         await access(path, constants.X_OK);
         return path;
       } catch {}
@@ -191,7 +195,7 @@ const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(func
     if (registered) return { executable: registered };
   } else if (searchLoginShell) {
     const folders = (yield* loginSearchPath()).filter(isAbsolute);
-    const fromLoginShell = yield* Effect.promise(() => firstCli(names, folders));
+    const fromLoginShell = yield* Effect.promise(() => firstCli(names, folders, async (path) => path));
     if (fromLoginShell) return { executable: fromLoginShell, launchPath: folders.join(delimiter) };
   }
   return yield* cliMissing();
