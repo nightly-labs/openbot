@@ -369,7 +369,12 @@ export function AgentEventBridge() {
           return pending ? withoutAttention(current, (candidate) => attentionEventKey(candidate) === key) : current;
         });
         setApprovals((current) =>
-          current.filter((approval) => approval.agentId !== event.agentId || approval.threadId !== event.threadId),
+          current.filter(
+            (approval) =>
+              approval.agentId !== event.agentId ||
+              approval.threadId !== event.threadId ||
+              approval.turnId !== event.turnId,
+          ),
         );
         if (event.status === "completed") {
           markReplyCompleted(event.agentId);
