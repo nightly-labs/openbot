@@ -180,6 +180,11 @@ export function agentThreadTitle(value: unknown): string | null {
   return title && title.length <= INPUT_LIMITS.agentTaskTitle && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(title) ? title : null;
 }
 
+export function fitAgentTaskTitle(title: string): string {
+  const limit = INPUT_LIMITS.agentTaskTitle;
+  return title.length > limit ? `${title.slice(0, limit - 1)}…` : title;
+}
+
 function isAgentTaskQueuedMessage(value: unknown): value is AgentTaskQueuedMessage {
   return (
     isDynamicRecord(value) &&
