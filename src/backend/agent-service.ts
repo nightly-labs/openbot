@@ -2217,6 +2217,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return reasons;
   }
 
+  hasProviderOperation(): boolean {
+    return this.#providers.hasPendingOperation();
+  }
+
   instructionsSaving(agentId: string, text: string): (written: boolean) => void {
     return this.#instructionChanges.saving(agentId, text);
   }
