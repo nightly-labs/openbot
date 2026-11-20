@@ -81,6 +81,7 @@ import { AgentStore } from "../backend/agent-store";
 import { BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
+import { CodexCliError, resolveClaudeCli, resolveCodexCli } from "../backend/cli";
 import { type CrmHandle, createCrm } from "../backend/crm/crm";
 import { CrmError } from "../backend/crm/crm-handle";
 import { stripeSource } from "../backend/crm/crm-stripe";
@@ -2481,10 +2482,23 @@ export async function createApplicationServices({
   );
 
   const hostedCliDownloads = new Set<ManagedProviderId>();
-  const hasNoCli = (provider: AgentProviderStatus) =>
-    (provider.state === "not-installed" || provider.state === "error") &&
-    provider.cliSource === undefined &&
-    provider.version === null;
+  const resolvesAsMissing = (provider: "claude" | "codex") =>
+    (provider === "claude" ? resolveClaudeCli : resolveCodexCli)({
+      bundledExecutable: providerRuntimes.executablePath(provider),
+    }).pipe(
+      Effect.as(false),
+      Effect.catch((failure) =>
+        Effect.succeed(failure.cause instanceof CodexCliError && failure.cause.code === "missing"),
+      ),
+    );
+  const hostedCliDownload = (provider: AgentProviderStatus, agentProviders: ReadonlySet<string>) => {
+    if (provider.state === "outdated") return Effect.succeed(true);
+    if (!agentProviders.has(provider.id) || provider.cliSource !== undefined || provider.version !== null) return null;
+    if (provider.state === "not-installed") return Effect.succeed(true);
+    if (provider.state === "error" && (provider.id === "claude" || provider.id === "codex"))
+      return resolvesAsMissing(provider.id);
+    return null;
+  };
   const trackSystemCliVersions = (status: AgentStatus): void => {
     let copyInUse = false;
     const agentProviders = hostedServer === null ? null : new Set(service.listAgents().map((agent) => agent.provider));
@@ -2492,14 +2506,16 @@ export async function createApplicationServices({
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
       if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
-      if (
-        agentProviders !== null &&
-        (provider.state === "outdated" || (hasNoCli(provider) && agentProviders.has(provider.id))) &&
-        !hostedCliDownloads.has(provider.id) &&
-        !providerUse.off().includes(provider.id)
-      ) {
+      const needsDownload = agentProviders === null ? null : hostedCliDownload(provider, agentProviders);
+      if (needsDownload !== null && !hostedCliDownloads.has(provider.id) && !providerUse.off().includes(provider.id)) {
         hostedCliDownloads.add(provider.id);
-        Effect.runFork(providerRuntimes.download(provider.id).pipe(Effect.ignore));
+        const runtime = provider.id;
+        Effect.runFork(
+          needsDownload.pipe(
+            Effect.flatMap((download) => (download ? providerRuntimes.download(runtime) : Effect.void)),
+            Effect.ignore,
+          ),
+        );
       }
     }
     if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
