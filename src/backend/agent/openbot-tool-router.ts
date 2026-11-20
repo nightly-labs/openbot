@@ -2297,11 +2297,31 @@ export class OpenBotToolRouter {
           app: args.app,
           next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
-      const connection = this.#messaging.store
+      const appId = args.app;
+      const suggestCard = () =>
+        this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
+          itemType: marketplaceSuggestionItemType({ appId }),
+          text: sourceText("status.agent.marketplaceSuggested", { app: appId }),
+          eventType: "marketplace.suggested",
+          detail: { appId },
+        });
+      const connected = this.#messaging.store
         .connections()
-        .find((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+        .filter((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      const connection = connected[0];
       if (connection) {
         const name = PLATFORM_NAMES[connection.platform];
+        const agentIds = new Set(this.#hooks.listAgents().map((agent) => agent.id));
+        // Without its orchestrator, nobody answers the people there. The card opens the app's page,
+        // where the user adds it (#12216).
+        if (connected.some((record) => !record.orchestratorAgentId || !agentIds.has(record.orchestratorAgentId))) {
+          suggestCard();
+          return openBotToolResult({
+            status: "no_agent",
+            app: args.app,
+            next: `${name} is connected for every agent of this server, so openbot.messaging_post can post there. But no agent answers the messages that people send there: the ${name} Orchestrator is missing. Only the user can add it. Tell the user to open the card in the chat, or Marketplace > Apps > ${name}, and click Add agent.`,
+          });
+        }
         return openBotToolResult({
           status: "connected",
           app: args.app,
@@ -2313,12 +2333,7 @@ export class OpenBotToolRouter {
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
           toolStep(() => this.#postMcpSignInCard(senderAgentId, executionThreadId, params.turnId, config)),
         );
-      this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
-        itemType: marketplaceSuggestionItemType({ appId: args.app }),
-        text: sourceText("status.agent.marketplaceSuggested", { app: args.app }),
-        eventType: "marketplace.suggested",
-        detail: { appId: args.app },
-      });
+      suggestCard();
       return openBotToolResult({
         status: "suggested",
         app: args.app,
@@ -2337,6 +2352,9 @@ export class OpenBotToolRouter {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
         const found = matches.length > 0 || serverPlaces.length > 0;
+        // A connected app's fix, such as a missing Telegram Orchestrator, is on its Marketplace page (#12216).
+        const apps =
+          "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
           status: found ? "matches" : "not_found",
           matches,
@@ -2349,11 +2367,12 @@ export class OpenBotToolRouter {
                 serverPlaces.length > 0
                   ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
                   : "",
+                apps,
                 "When none fits, try other English words once, then say that you found no setting for it.",
               ]
                 .filter(Boolean)
                 .join(" ")
-            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
+            : `No setting matches. ${apps} For a setting, try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.`,
         });
       }
       const shown = settingLinkSummary(setting);
