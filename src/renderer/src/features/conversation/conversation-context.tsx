@@ -148,13 +148,15 @@ const Conversation = createSimpleContext({
     } = useTurns();
     const { clearUiErrors } = useUiErrors();
     const { centralAuth } = useAuth();
+    const prefetchedConversationPages = new Map<string, ConversationPage>();
     const signedInAccount = createMemo(() => {
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : null;
     });
     createEffect(signedInAccount, (account, previous) => {
-      if (account && previous !== undefined && account !== previous)
-        clearUiErrors(currentText().t("chat.errorStatus.readState"));
+      if (previous === undefined || account === previous) return;
+      prefetchedConversationPages.clear();
+      if (account) clearUiErrors(currentText().t("chat.errorStatus.readState"));
     });
 
     const [conversations, writeConversations] = createStore<Record<string, ConversationState>>({});
@@ -246,6 +248,11 @@ const Conversation = createSimpleContext({
         }
         const { agentId } = next;
         if (!agentId) return;
+        const prefetched = prefetchedConversationPages.get(agentId);
+        if (prefetched) {
+          prefetchedConversationPages.delete(agentId);
+          if (!conversations[agentId]?.loaded) applyConversationPage(prefetched, "replace", "latest");
+        }
         const serverId = untrack(activeServerId);
         const trackingKey = agentConversationKey(serverId, agentId);
         const pageRequest = (conversationPageRequests.get(agentId) ?? 0) + 1;
@@ -302,6 +309,60 @@ const Conversation = createSimpleContext({
       },
     );
 
+    // Warm chats after the open chat is readable, with one background read at a time. Cached pages stay
+    // in this workspace scope, and opening a chat still refreshes from the host.
+    createEffect(
+      () => {
+        const server = activeServer();
+        const agentId = activeAgentId();
+        return {
+          serverId: signedInAccount() && server?.kind === "remote" && server.state === "online" ? server.id : undefined,
+          agentId,
+          readable: agentId ? conversations[agentId]?.loaded === true : false,
+          agentIds: agentList().map((agent) => agent.id),
+        };
+      },
+      ({ serverId, agentId, readable, agentIds }) => {
+        if (!serverId || !readable || typeof window.requestIdleCallback !== "function") return;
+
+        const candidates = agentIds
+          .filter((id) => id !== agentId && !prefetchedConversationPages.has(id) && !conversations[id]?.loaded)
+          .slice(0, 20 - prefetchedConversationPages.size);
+        let stopped = false;
+        let idle: number | undefined;
+
+        function next(): void {
+          const id = candidates.shift();
+          if (stopped || !id) return;
+          idle = window.requestIdleCallback(() => {
+            const request = conversationPageRequests.get(id);
+            void conversationPort()
+              .agent.readConversationPage({ agentId: id, anchor: { type: "latest" }, limit: 50 }, serverId)
+              .then((page) => {
+                if (
+                  !stopped &&
+                  scopeIsCurrent() &&
+                  conversationPageRequests.get(id) === request &&
+                  !conversations[id]?.loaded
+                ) {
+                  prefetchedConversationPages.set(id, page);
+                }
+              })
+              .catch(() => {
+                // Opening this chat uses the regular fetch and error handling.
+              })
+              .finally(next);
+          });
+        }
+
+        next();
+        return () => {
+          stopped = true;
+          if (idle !== undefined) window.cancelIdleCallback(idle);
+        };
+      },
+    );
+
     function initializeConversation(agentId: string): void {
       updateConversation(agentId, (conversation) => {
         conversation.loaded = true;
@@ -315,6 +376,7 @@ const Conversation = createSimpleContext({
       deleteAgentMessageBodies(rawAgentMessageBodies, agentId);
       pendingConversationSnapshots.delete(agentId);
       conversationPageRequests.delete(agentId);
+      prefetchedConversationPages.delete(agentId);
       agentChatsRetriedOnOpen.delete(agentId);
     }
 
