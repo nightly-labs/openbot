@@ -12,8 +12,8 @@ description: "Turn an idea into the smallest clickable static prototype, click t
 
 ## Inputs
 
-1. **The idea.** From the user, a scope document, a sketch, a screenshot, or a Figma frame (an installed Figma
-   plugin, found with `tool_search` in the `openbot` tools, or a signed-in Figma tab in `openbot_browser`).
+1. **The idea.** From the user, a scope document, a sketch, a screenshot, or a Figma frame (the tools of an
+   installed Figma plugin, which `openbot.tool_search` does not list, else a signed-in Figma tab in `openbot_browser`).
 2. **The click path.** The 2 to 5 steps a person must be able to do. If it is not clear, ask one question with
    `ask_user`: "What is the one thing a person should be able to do in this prototype?"
 3. **Content.** Use the user's words when given. Else use plain sample content, labeled as sample.

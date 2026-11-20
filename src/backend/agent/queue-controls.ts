@@ -25,6 +25,7 @@ import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler
 import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import { quietTeammateTurnDelivery } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { providerForAgent } from "./thread-items";
 
@@ -283,6 +284,14 @@ export class QueueControls {
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
+    const turnDeliveries = this.#mailbox
+      .findDeliveriesByTurn(agent.id, turnId)
+      .filter(({ delivery }) => delivery.id !== input.deliveryId);
+    const steersQuietTurn =
+      turnDeliveries.length > 0 &&
+      turnDeliveries.every(({ delivery }) =>
+        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+      );
     yield* client
       .request(
         "turn/steer",
@@ -309,6 +318,7 @@ export class QueueControls {
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
+              steersQuietTurn,
             }),
           ],
         },

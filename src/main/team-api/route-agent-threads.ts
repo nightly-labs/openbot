@@ -40,6 +40,7 @@ import {
   stringField,
   WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
+import { agentTaskWire } from "./route-agent-tasks";
 
 export async function routeAgentThreads(
   context: TeamApiRequestContext,
@@ -115,7 +116,7 @@ export async function routeAgentThreadFiles(
     ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
   };
   if (url.pathname === AGENT_THREAD_FILES_ROUTES.start)
-    return json(200, await runCauseEffect(tasks.startTask(message, memberSender(member))));
+    return json(200, agentTaskWire(await runCauseEffect(tasks.startTask(message, memberSender(member))), capabilities));
   return json(
     202,
     await runCauseEffect(tasks.sendMessage({ ...message, taskId: stringField(body, "taskId") }, memberSender(member))),

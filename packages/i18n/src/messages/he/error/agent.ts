@@ -49,6 +49,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "הגדרת הסוכן נכשלה ולא ניתן היה להסיר את הסוכן החלקי.",
   "error.agent.modelUnavailable": "מודל הסוכן שנבחר אינו זמין.",
   "error.agent.modelProviderNotConnected": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מחובר.',
+  "error.agent.modelProviderSignInRequired":
+    'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש התחברות. התחבר ל-{provider} ונסה שוב.',
+  "error.agent.modelProviderNotInstalled": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מותקן.',
+  "error.agent.modelProviderOutdated": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש עדכון.',
   "error.agent.modelListEmpty":
     'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים. השגיאה האחרונה: {detail}',
   "error.agent.modelListEmptyNoError": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים.',
@@ -115,6 +119,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
   "error.agent.deleteFolderInUse":
     "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "תוכנה אחרת עדיין משתמשת בתיקייה של הסוכן הזה, למשל תוכנה שהסוכן הפעיל. יש לסגור את התוכנה הזו או להפעיל מחדש את המחשב שהסוכן הזה פועל בו, ואז למחוק את הסוכן שוב.",
   "error.agent.deleteWhenFolderFree":
     "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. OpenBot ימחק את הסוכן הזה כשהעבודה הזו תסתיים.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",

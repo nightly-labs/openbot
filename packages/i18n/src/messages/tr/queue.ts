@@ -8,6 +8,7 @@ export const messages = {
   "queue.hold.named": "Bekliyor - {name} {channel} kanalında çalışıyor",
   "queue.hold.unnamed": "Bekliyor - bu ajan {channel} kanalında çalışıyor",
   "queue.hold.providerRestart": "Bekliyor - {provider}, çalışan görevler bitince yeniden başlatılır",
+  "queue.hold.signIn": "Bekliyor - {provider} için oturum açılması gerekiyor",
   "queue.item.label": "Kuyruktaki mesaj {position}: {preview}",
   "queue.item.labelEditing": "Kuyruktaki mesaj {position}, düzenleniyor: {preview}",
   "queue.item.editing": "Düzenleniyor",

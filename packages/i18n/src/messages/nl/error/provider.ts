@@ -20,6 +20,8 @@ export const messages = {
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
   "error.provider.acpMcpNotLoaded":
     "{provider} heeft de tools van OpenBot niet geladen, dus deze agent kan ze niet gebruiken en zijn teamgenoten niet bereiken. Een teambeleid van {provider} kan lokale MCP-servers blokkeren. Vraag je teambeheerder om ze toe te staan en probeer het opnieuw.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} heeft dit bericht zonder de tools van OpenBot uitgevoerd, dus de agent kon zijn teamgenoten niet bereiken, de browser niet gebruiken en geen bestanden bijvoegen. Probeer het opnieuw.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} kon de MCP-server {name} niet starten, dus het antwoord is gestopt. Deze server staat in je eigen {provider}-instellingen, niet in OpenBot. Verwijder of herstel de server daar en start dan een nieuwe chat.",
   "error.provider.endpointsReadOnly":
@@ -333,6 +335,8 @@ export const messages = {
     "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
+  "error.provider.acpTurnStuck":
+    "{provider} heeft de vorige beurt niet afgerond en heeft dit bericht daarom niet aangenomen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw.",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -402,6 +406,10 @@ export const messages = {
     "Codex kon deze chat niet voortzetten, omdat een item in de opgeslagen geschiedenis ontbreekt. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexRequestRefused":
     "{provider} heeft het verzoek voor deze chat geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat met veel afbeeldingen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} De agent ziet dit bericht nu niet meer, dus het houdt je volgende berichten niet tegen. Stuur je verzoek opnieuw met andere woorden.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
   "error.provider.imageTooSmall":

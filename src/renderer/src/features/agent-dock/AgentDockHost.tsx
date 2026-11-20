@@ -22,7 +22,9 @@ import {
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  LOCAL_SERVER_ID,
   sameAgentModelChoice,
+  withOpenBotSource,
 } from "@openbot/contracts/ipc";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
@@ -716,6 +718,7 @@ function WindowAgentDock(props: { serverId: string }) {
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
@@ -744,7 +747,7 @@ function WindowAgentDock(props: { serverId: string }) {
       voice={voice}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
-      onOpenLink={(url) => void appPort().openUrl(url)}
+      onOpenLink={(url) => void appPort().openUrl(withOpenBotSource(url))}
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
       onHide={() => setAgentDockPreference({ shown: false })}
       results={dock.results()}
@@ -824,7 +827,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   onSettled(() => {
     const unsubscribe = agentDockPort().agentDock.onAction((action) => {
       if (action.type === "open-link") {
-        void appPort().openUrl(action.url);
+        void appPort().openUrl(withOpenBotSource(action.url));
         return;
       }
       if (action.type === "open-settings") {

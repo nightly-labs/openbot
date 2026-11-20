@@ -187,6 +187,15 @@ export interface EmailCodeDelivery {
   }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
+export interface OwnerTransferEmailDelivery {
+  send(message: {
+    email: string;
+    fromEmail: string;
+    serverName: string;
+    appUrl: string;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
+}
+
 export interface TeamInviteEmailDelivery {
   send(message: {
     email: string;

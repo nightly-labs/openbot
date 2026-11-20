@@ -1,4 +1,4 @@
-import type { RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, RoutineSchedule, StoredFileRow } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -16,7 +16,6 @@ import {
 } from "solid-js";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
-import { diagramEdgeMidpoint, diagramEdgePath } from "../diagrams/diagram-graph";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
 import type { Box } from "./workflow-ink";
 import type { WorkflowLoop } from "./workflow-loops";
@@ -25,6 +24,19 @@ import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 export type WfnPortType = "text" | "image" | "file";
 export type WfnPortSide = "in" | "out";
 export type WfnRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
+
+export interface WorkflowAgentProgress {
+  agentId: string;
+  detail: string;
+  previous: string | undefined;
+  activity: AgentStepActivity | null;
+  done: number;
+}
+
+export function customStepName(value: WfnFieldValue | undefined): string | undefined {
+  const name = typeof value === "string" ? value.trim() : "";
+  return name || undefined;
+}
 export type WfnEdgeTone = "idle" | "run" | "done";
 export type WfnFieldValue = string | number | boolean;
 export type WfnFields = Record<string, WfnFieldValue>;
@@ -32,6 +44,15 @@ export type WfnFields = Record<string, WfnFieldValue>;
 export interface WfnPoint {
   x: number;
   y: number;
+}
+
+function edgePath(from: WfnPoint, to: WfnPoint): string {
+  const bend = Math.max(48, Math.abs(to.x - from.x) / 2);
+  return `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
+}
+
+function edgeMidpoint(from: WfnPoint, to: WfnPoint): WfnPoint {
+  return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
 }
 
 export interface WfnSize {
@@ -167,6 +188,7 @@ export interface WfnBoard {
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
   catalogs: () => WorkflowCatalogs;
@@ -233,6 +255,7 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
   runFrom?: (id: string) => void;
@@ -808,6 +831,7 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
     runFrom: options.runFrom,
@@ -1141,7 +1165,7 @@ export function createBoard(options: BoardOptions) {
 
   const shapeOf = (edge: WfnEdge, from: WfnPoint, to: WfnPoint) => {
     const loop = options.loops?.().get(edge.id);
-    if (!loop) return { path: diagramEdgePath(from, to), middle: diagramEdgeMidpoint(from, to), turn: undefined };
+    if (!loop) return { path: edgePath(from, to), middle: edgeMidpoint(from, to), turn: undefined };
     const bottoms = loop.body.flatMap((id) => {
       const box = options.box?.(id);
       return box ? [box.y + box.height] : [];
@@ -1220,7 +1244,7 @@ export function createBoard(options: BoardOptions) {
       const anchor = options.anchor?.(from, undefined)?.at() ?? point(from.node, from.side, from.type, from.branch);
       const end = draftEnd();
       if (!anchor || !end) return null;
-      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+      return from.side === "out" ? edgePath(anchor, end) : edgePath(end, anchor);
     };
     const draftPath = () => (state.pending ? draftLine(state.pending) : null);
     const companionPaths = () => {

@@ -1,4 +1,4 @@
-import { agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
+import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
 import {
   type HeatLevel,
   heatLevel,
@@ -65,7 +65,7 @@ function placeholderStats(range: { startDate: string; endDate: string }): Profil
   };
 }
 
-const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
+const providerName = (value: string) => (isAgentProvider(value) ? agentProviderName(value) : value);
 
 function reportDate(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useAgentThreadUnread } from "@/features/chat/components/use-agent-thread-reads";
 import {
@@ -14,7 +14,7 @@ import type {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { agentThreadWaitReason } from "@/features/workspace/model/thread-waits";
-import type { TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import type { TurnStepLine, TurnStepLines } from "@/features/workspace/model/turn-step-lines";
 import { selectLiveState, useAgentUnread, useAgentUnreadCount } from "./use-live-workspace";
 
 export function useAgentActivity(agentId: string) {
@@ -123,5 +123,28 @@ const NO_TURN_LINES: TurnStepLines = {};
 export function useTurnStepLines(serverId: string): TurnStepLines {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+export function useTurnStepLinesOf(serverId: string, turnIds: readonly string[]): TurnStepLines {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const kept = useRef<TurnStepLines>(NO_TURN_LINES);
+  const select = useCallback(() => {
+    const lines = liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES;
+    const previous = kept.current;
+    const next: Record<string, readonly TurnStepLine[]> = {};
+    let count = 0;
+    let same = true;
+    for (const turnId of turnIds) {
+      const turn = lines[turnId];
+      if (!turn) continue;
+      next[turnId] = turn;
+      count += 1;
+      if (previous[turnId] !== turn) same = false;
+    }
+    if (same && count === Object.keys(previous).length) return previous;
+    kept.current = count === 0 ? NO_TURN_LINES : next;
+    return kept.current;
+  }, [liveState, serverId, turnIds]);
   return useSyncExternalStore(liveState.subscribe, select);
 }

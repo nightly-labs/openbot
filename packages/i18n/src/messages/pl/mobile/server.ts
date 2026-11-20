@@ -271,6 +271,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Czekanie. Host wykonuje tyle tur, na ile pozwala jego pamięć.",
   "mobile.server.threads.hold.agentBusy": "Czekanie na zakończenie innej pracy tego agenta.",
   "mobile.server.threads.hold.oneTurn": "Czekanie. Dostawca tego agenta wykonuje jedną turę naraz.",
+  "mobile.server.threads.hold.signIn": "Czekanie. Dostawca tego agenta wymaga zalogowania.",
   "mobile.server.threads.offline": "Połącz się z tym serwerem, aby zobaczyć jego wątki.",
   "mobile.server.threads.loading": "Wczytywanie wątków…",
   "mobile.server.threads.loadFailed": "Nie udało się wczytać wątków niektórych agentów.",
@@ -613,6 +614,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Dodaj agentów",
   "mobile.server.browserProfiles.agentsHint":
     "Dotknięcie daje agentowi ten profil lub przenosi go z powrotem do profilu wspólnego. Zmiana zamyka otwarte karty agenta.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logowania do witryn zostają w starym profilu. Przeniesiony agent musi ponownie zalogować się na tych witrynach.",
   "mobile.server.browserProfiles.clear": "Wyczyść dane",
   "mobile.server.browserProfiles.clearTitle": "Wyczyścić dane profilu {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1380,6 +1383,9 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Ten serwer MCP prosi o zalogowanie. Zaloguj się w OpenBot na komputerze, a potem przetestuj ponownie.",
+  "mobile.server.mcp.signIn": "Zaloguj się",
+  "mobile.server.mcp.signInHere":
+    "Ten serwer MCP prosi o zalogowanie. Stuknij Zaloguj się, a potem przetestuj ponownie.",
   "mobile.server.mcp.signedInDescription": "{server} jest zalogowany do tego serwera MCP.",
   "mobile.server.mcp.signOut": "Wyloguj",
   "mobile.server.mcp.saveFailed": "Nie udało się zapisać zmiany. Spróbuj ponownie.",
@@ -1440,6 +1446,7 @@ export const messages = {
     other: "{count} godz.",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Aktualizacje",
   "mobile.server.settings.updateAvailable": "Dostępna aktualizacja",
   "mobile.server.route.updates": "Aktualizacje",
@@ -1842,4 +1849,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Skopiowani agenci używają reguł zatwierdzania serwera {server}.",
   "mobile.server.transfer.copyNoServer":
     "Połącz się z innym serwerem jako właściciel lub administrator, aby skopiować na niego agentów.",
+  "mobile.server.route.ownerTransfer": "Przekaż własność",
+  "mobile.server.ownerTransfer.unavailable": "Połącz się z tym serwerem jako właściciel, aby przekazać własność.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hostuje ten serwer, więc jego właściciel nie może się zmienić.",
+  "mobile.server.ownerTransfer.lede":
+    "Nowy właściciel dostanie e-mail i musi zaakceptować, będąc zalogowanym na ten adres. Potem zostaniesz usunięty z tego serwera.",
+  "mobile.server.ownerTransfer.email": "E-mail nowego właściciela",
+  "mobile.server.ownerTransfer.send": "Wyślij",
+  "mobile.server.ownerTransfer.sending": "Wysyłanie…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenci, czaty, rutyny, logowania do dostawców, zapisane klucze, loginy z Vault, logowania w przeglądarce i połączone aplikacje zostają na serwerze. Nowy właściciel może z nich korzystać.",
+  "mobile.server.ownerTransfer.expiry": "Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirmTitle": "Uczynić {email} właścicielem?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Gdy {email} zaakceptuje, ta osoba zostanie właścicielem {server}, a ty stracisz dostęp. Dane zostają na serwerze. Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirm": "Przekaż",
+  "mobile.server.ownerTransfer.sendFailed": "Prośba nie została wysłana.",
+  "mobile.server.ownerTransfer.loadFailed": "Nie udało się odczytać oczekującego przekazania.",
+  "mobile.server.ownerTransfer.pending": "Czeka na nowego właściciela",
+  "mobile.server.ownerTransfer.expires": "Wygasa {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} musi zaakceptować, będąc zalogowanym na ten adres. Do tego czasu pozostajesz właścicielem.",
+  "mobile.server.ownerTransfer.cancel": "Anuluj",
+  "mobile.server.ownerTransfer.cancelTitle": "Anulować przekazanie?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} nie będzie już mógł go zaakceptować.",
+  "mobile.server.ownerTransfer.keep": "Zostaw",
+  "mobile.server.ownerTransfer.cancelFailed": "Przekazanie nie zostało anulowane.",
+  "mobile.server.ownerTransfer.incomingTitle": "Zostać właścicielem {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} chce uczynić cię właścicielem {server}. Dostaniesz pełną kontrolę nad serwerem, a jego agenci, czaty, rutyny i zapisane logowania na nim zostają. {name} traci dostęp. Każdy, kto nadal może zalogować się na komputerze, na którym działa serwer, może używać twojego konta OpenBot. Zmień na nim hasła i klucze SSH.",
+  "mobile.server.ownerTransfer.accept": "Akceptuj",
+  "mobile.server.ownerTransfer.decline": "Odrzuć",
+  "mobile.server.ownerTransfer.accepted": "Jesteś teraz właścicielem {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować",
+  "mobile.server.ownerTransfer.declineFailed": "Nie udało się odrzucić",
+  "mobile.server.ownerTransfer.tryAgain": "Spróbuj ponownie później.",
+  "mobile.server.providers.updateAll": "Aktualizuj wszystkie",
+  "mobile.server.providers.updateAllFailed": "Niektóre aktualizacje się nie rozpoczęły. Spróbuj ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

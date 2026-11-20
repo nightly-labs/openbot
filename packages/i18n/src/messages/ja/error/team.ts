@@ -123,6 +123,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
+  "error.team.ownerTransferUnsupported": "このサーバーは所有権の移転に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",

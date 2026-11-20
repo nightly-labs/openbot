@@ -213,8 +213,8 @@ export const messages = defineMessages("billing", {
   "billing.details.countryMissing": "Select your billing country.",
   "billing.details.saveFailed": "Could not save the billing details",
   "billing.referral.split":
-    "Your friend gets {percent} off each payment. You get {percent} of each payment of your friend, as credit.",
-  "billing.referral.split.friend": "{percent} off for your friend",
+    "Your friend gets {percent} off the first payment. You get {percent} of each payment of your friend, as credit.",
+  "billing.referral.split.friend": "{percent} off the first payment of your friend",
   "billing.referral.split.you": "{percent} credit for you",
   "billing.referral.link.title": "Your link",
   "billing.referral.link.label": "Your invite link",
@@ -224,9 +224,10 @@ export const messages = defineMessages("billing", {
   "billing.referral.credit.title": "Your credit",
   "billing.referral.credit.none": "None",
   "billing.referral.credit.next": "Goes to your next invoice.",
-  "billing.referral.credit.empty": "Starts when a friend pays a second time.",
+  "billing.referral.credit.empty": "Starts when a friend pays a second time, or 30 days after a yearly payment.",
   "billing.referral.credit.pendingTitle": "Waiting",
-  "billing.referral.credit.pending": "Ready after a friend pays a second time. Goes to your credit when full.",
+  "billing.referral.credit.pending":
+    "Ready after a friend pays a second time. A yearly payment gets ready in 12 parts, one each 30 days. Goes to your credit when full.",
   "billing.referral.credit.progress": "{ready} of {minimum} ready",
   "billing.referral.credit.earnedTitle": "Earned in total",
   "billing.referral.friends.title": "Friends",

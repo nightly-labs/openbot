@@ -5,8 +5,10 @@ browser data, and team data stay on the computer that runs OpenBot. The one exce
 encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
 The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
-configuration, memberships, invitations, logical sessions, and the account's product analytics
-answer.
+configuration, memberships, invitations, ownership transfers, logical sessions, and the account's
+product analytics answer. An ownership transfer keeps the server, the email that the owner entered
+and the two accounts, also after it ends, so that a server plan of the earlier owner still counts
+for the server.
 
 The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
 and attachment data travel through the existing encrypted host connection, not through the
@@ -92,8 +94,8 @@ profile of your account ID, as the apps do at sign-in. It does this also when pr
 off on your devices, so that the paid account is not anonymous in the sales data. The email is not
 copied into the events.
 
-For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
+For each email that the account service sends from its mailbox (a sign-in code, an invitation, an
+ownership transfer, a contact message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -218,7 +220,8 @@ without account credentials. The phone sends no request to a plugin vendor until
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
-counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+connection step times, the kind of connection path (direct or relayed, and UDP, TCP or TLS), whether
+the phone uses a VPN or a proxy app (never its name or an address), counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
 Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
@@ -260,7 +263,7 @@ for that Checkout page. It is not sent to analytics. When you open an invite lin
 address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
 When you sign in on the web, the web client sends the code to the account service and removes it from
 `localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
-on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. The invite page shows the first name from the profile of the account that made the link to anyone who opens the link. It shows no other name, picture or email. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -1199,6 +1202,11 @@ Network traffic can also occur when:
 - the local Claude Agent SDK connects to Anthropic through Claude CLI;
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
+- a user clicks a web link in a chat of the desktop app or the web client, and it opens in the
+  system browser or a new browser tab. OpenBot adds `utm_source=openbot` to the address, so the
+  site can see that the visit came from OpenBot. It adds nothing else. It does not change a link that already has a `utm_source`,
+  a link to a local or private address, or a link with sign-in or signature values such as `state`,
+  `code`, `token` or `X-Amz-Signature`;
 - a locally installed Codex plugin connects to its service;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
@@ -2248,6 +2256,23 @@ Notifications only inform: they have no buttons.
 
 Settings > Notifications turns this off, and sets the preview and the sound. Android also lists one
 notification channel for each sound in the system settings of the app.
+
+## Phone background refresh
+
+While you are signed in, the phone app reads your servers in the background, so it shows current
+agents, chats and channels when you open it. iOS starts this refresh through Background App Refresh,
+and Android through its job scheduler, at most once every 15 minutes. The system decides when it
+runs, and it can run it less often or not at all. The app refreshes only while it is still in the
+memory of the phone.
+
+A refresh uses the same encrypted host connection and the same requests as the app on screen, for at
+most 25 seconds. It sends no new data to the hosts, the OpenBot services, Apple or Google. The phone
+keeps what it reads in the same encrypted copy that it keeps for an offline start. During a refresh,
+the hosts know that the app is not on screen, so they continue to send notifications, and the app does
+not mark a chat as read.
+
+On iPhone, Settings > General > Background App Refresh turns this off. Signing out stops it on both
+phones.
 
 ## Optional macOS Host Manager
 

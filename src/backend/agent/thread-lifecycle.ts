@@ -986,7 +986,7 @@ export class ThreadLifecycle {
 
   #computerUseInOwnChat(agent: AgentSummary, publicThreadId: string): boolean {
     return (
-      this.#runsBesideOwnChat(agent, publicThreadId) &&
+      this.#conversation.isTaskThread(publicThreadId) &&
       !this.#routineThread(publicThreadId) &&
       agentComputerUseEnabled(agent)
     );
@@ -1023,7 +1023,8 @@ export class ThreadLifecycle {
   }
 
   #channelToolsParam(client: AgentClient, publicThreadId: string): { channelTools?: true } {
-    return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
+    return (client.provider === "claude" || client.provider === "grok") &&
+      this.#conversation.channelForThread(publicThreadId) !== null
       ? { channelTools: true }
       : {};
   }
@@ -1163,7 +1164,7 @@ export class ThreadLifecycle {
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
               client.provider === "antigravity"
               ? mcpServers
-                  .filter((config) => mcpFallbackRunsServer(config, agent) && config.id !== COMPUTER_USE_MCP_SERVER_ID)
+                  .filter((config) => mcpFallbackRunsServer(config, agent))
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,

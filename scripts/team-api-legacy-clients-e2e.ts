@@ -48,6 +48,7 @@ import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-pr
 import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_WEB_CLIENT_PROTOCOL,
   TEAM_WEBRTC_CLIENT_PROTOCOL,
@@ -180,6 +181,7 @@ function text(value: unknown, label: string): string {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -1000,7 +1002,7 @@ try {
   const withoutTertiary = (protocol: number) =>
     teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
 
-  async function currentUsageEvent(capabilities: readonly string[]): Promise<JsonObject> {
+  async function currentUsageEvent(capabilities: readonly string[], sent: AccountUsage = reading): Promise<JsonObject> {
     const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
       TEAM_PROTOCOL_V1_WEBSOCKET,
       `openbot-token.${member.token}`,
@@ -1022,7 +1024,7 @@ try {
     try {
       await scoped;
       const usage = nextMessage(opened, (value) => (isRecord(value) && value.type === "usage-changed" ? value : null));
-      hostAgents.emit("event", { type: "usage-changed", usage: reading });
+      hostAgents.emit("event", { type: "usage-changed", usage: sent });
       return await usage;
     } finally {
       opened.close();
@@ -1093,6 +1095,46 @@ try {
       const usage = record(wire.usage, "usage");
       assert.ok(Array.isArray(usage.limits));
       const bad = { ...record(usage.limits[0], "opencode"), tertiary: { usedPercent: "12" } };
+      const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+      assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+
+    const pools = [
+      { name: "Gemini Models", models: ["gemini-3-pro"], primary: reading.limits[0]?.primary ?? null, secondary: null },
+      { name: "Claude and GPT models", models: ["claude-sonnet-4-6"], primary: monthly, secondary: null },
+    ];
+    const grouped: AccountUsage = { limits: [{ id: "antigravity", primary: monthly, secondary: null, groups: pools }] };
+    const withoutGroups = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+      (capability) => capability !== TEAM_USAGE_GROUPS_CAPABILITY,
+    );
+
+    await step(
+      "usage-groups-v1: the host sends the model pools in usage-changed only to a client that asks",
+      async () => {
+        const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), grouped);
+        const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+        assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+        assert.deepEqual(decoded.event.usage.limits[0]?.groups, pools);
+        const without = await currentUsageEvent(withoutGroups, grouped);
+        assert.ok(!JSON.stringify(without).includes("groups"), "A client without usage-groups-v1 got the pools.");
+        const usage = record(without.usage, "usage");
+        assert.ok(Array.isArray(usage.limits) && usage.limits.length === 1, "The host dropped the limit itself.");
+        return { withCapability: "groups", without: "released" };
+      },
+    );
+
+    await step("usage-groups-v1: a WebRTC event follows the capability; a bad pool fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), grouped);
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageGroups: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[0]?.groups, pools);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("groups"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const bad = { ...record(usage.limits[0], "antigravity"), groups: [{ name: "Gemini Models", models: [1] }] };
       const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
       assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
       assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));

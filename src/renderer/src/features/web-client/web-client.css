@@ -122,7 +122,6 @@
   }
 
   .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="conversation"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="conversation"] .remote-compatibility-screen {
     grid-column: 1;
     min-width: 0;
@@ -133,7 +132,6 @@
   }
 
   .web-app-frame[data-web-mobile-pane="workspace"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="workspace"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="workspace"] .remote-compatibility-screen,
   .web-app-frame[data-web-mobile-pane="workspace"] > .server-connection-workspace {
     display: none;

@@ -72,6 +72,7 @@ export const Jellyfish = sceneStory("jellyfish");
 export const Sunset = sceneStory("sunset");
 export const Snowfall = sceneStory("snowfall");
 export const Fireflies = sceneStory("fireflies");
+export const Coast = sceneStory("coast");
 
 const AGENT_BUBBLES: ChatBackdropBubbles = { yours: "#7c3aed", agents: "#f59e0b" };
 const AGENT_PAGE = withChatBackdropBubbles(

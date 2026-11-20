@@ -84,7 +84,6 @@ export function useAgentPinSwipe(
   const config = useMemo<PanGestureConfig>(
     () => ({
       manualActivation: true,
-      enableTrackpadTwoFingerGesture: true,
       block: openingGesture,
       requireToFail: dragGesture,
       onTouchesDown: (event) => {

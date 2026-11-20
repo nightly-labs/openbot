@@ -57,6 +57,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Het gekozen model van de agent is niet beschikbaar.",
   "error.agent.modelProviderNotConnected":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet verbonden.",
+  "error.agent.modelProviderSignInRequired":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} vraagt om aanmelding. Meld je aan bij {provider} en probeer het opnieuw.",
+  "error.agent.modelProviderNotInstalled":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} is niet geïnstalleerd.",
+  "error.agent.modelProviderOutdated":
+    "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} heeft een update nodig.",
   "error.agent.modelListEmpty":
     "Het gekozen model “{model}” van de agent is niet beschikbaar: {provider} gaf geen modellen. Laatste fout: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -138,6 +144,8 @@ export const messages = {
     "De gegevens van de agent konden niet volledig worden verwijderd. Probeer de agent opnieuw te verwijderen.",
   "error.agent.deleteFolderInUse":
     "Werk van een andere agent gebruikt de map van deze agent nog. Verwijder deze agent opnieuw als dat werk klaar is, of nadat je OpenBot opnieuw start.",
+  "error.agent.deleteFolderLocked":
+    "Een ander programma gebruikt de map van deze agent nog, bijvoorbeeld een programma dat de agent heeft gestart. Sluit dat programma of start de computer waarop deze agent draait opnieuw op en verwijder de agent daarna opnieuw.",
   "error.agent.deleteWhenFolderFree":
     "Werk van een andere agent gebruikt de map van deze agent nog. OpenBot verwijdert deze agent als dat werk klaar is.",
   "error.agent.duplicationBusy": "Deze agent wordt al gedupliceerd.",

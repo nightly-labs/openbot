@@ -329,7 +329,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Donner",
   "routine.webhook.giveSecretFailed": "Impossible de donner le secret de signature à {name}.",
   "routine.webhook.secretGiven": "{name} a le nouveau secret de signature.",
-  "routine.webhook.statusFailed": "Impossible de vérifier si l’hôte est connecté au relais.",
   "routine.settings.instruction": "Instruction",
   "routine.settings.instructionPlaceholderAgent": "Décrivez ce que cet agent doit faire.",
   "routine.settings.instructionPlaceholderChannel": "Décrivez ce que ce canal doit faire.",

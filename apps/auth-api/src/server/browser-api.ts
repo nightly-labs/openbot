@@ -29,10 +29,11 @@ import type { HostedServerService } from "./hosted-server-service";
 import { HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
 import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
+import { startOwnerTransfer } from "./owner-transfer";
 import { type Referrals, referralPageQuery, referralState } from "./referrals";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
-import type { AuthUser, TeamInviteEmailDelivery } from "./types";
+import type { AuthUser, OwnerTransferEmailDelivery, TeamInviteEmailDelivery } from "./types";
 
 const COOKIE = "__Host-openbot-web";
 const PREFIX = "/api/browser/";
@@ -72,6 +73,12 @@ export interface BrowserApiServices {
     | "changeMembership"
     | "hostAsset"
     | "emailableInvite"
+    | "createOwnerTransfer"
+    | "pendingOwnerTransfer"
+    | "cancelOwnerTransfer"
+    | "incomingOwnerTransfers"
+    | "acceptOwnerTransfer"
+    | "declineOwnerTransfer"
   >;
   companySignIn: () => CompanySignInService;
   hostLogo: (hostId: string, version: string) => ReturnType<typeof readHostLogo>;
@@ -80,6 +87,8 @@ export interface BrowserApiServices {
     "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "restart" | "status" | "lifecycle"
   >;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
+  ownerTransferEmailDelivery: () => OwnerTransferEmailDelivery | null;
+  schedule: (work: Effect.Effect<void>) => void;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
   billing: () => Pick<
     BillingService,
@@ -323,6 +332,8 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (hosting) return hosting;
   const hostedSites = yield* handleHostedSites(request, path, user, services);
   if (hostedSites) return hostedSites;
+  const ownerTransfer = yield* handleOwnerTransfer(request, path, user, services);
+  if (ownerTransfer) return ownerTransfer;
   const administration = yield* handleAdministration(request, path, user, services);
   if (administration) return administration;
   if (request.method !== "POST")
@@ -556,6 +567,51 @@ const handleHostedSites = Effect.fn("BrowserApi.handleHostedSites")(function* (
   yield* services.hostedSites().delete({ kind: "account", userId: user.id }, decodeURIComponent(encodedSiteId), key);
   return json({ deleted: true });
 }, refuseWith(HostedSiteInputError));
+
+const handleOwnerTransfer = Effect.fn("BrowserApi.handleOwnerTransfer")(function* (
+  request: Request,
+  path: string,
+  user: AuthUser,
+  services: BrowserApiServices,
+) {
+  const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  if (path === "v2/remote/owner-transfers" && request.method === "GET")
+    return json({ transfers: yield* services.remote.incomingOwnerTransfers(user) });
+  const [, encodedTransferId, answer] = /^v2\/remote\/owner-transfers\/([^/]+)\/(accept|decline)$/u.exec(path) ?? [];
+  if (encodedTransferId !== undefined && request.method === "POST") {
+    const transferId = decodeURIComponent(encodedTransferId);
+    if (answer === "accept") return json(yield* services.remote.acceptOwnerTransfer(user, transferId));
+    yield* services.remote.declineOwnerTransfer(user, transferId);
+    return noContent();
+  }
+  const [, encodedHostId] = /^v2\/remote\/hosts\/([^/]+)\/owner-transfer$/u.exec(path) ?? [];
+  if (encodedHostId === undefined) return null;
+  const hostId = decodeURIComponent(encodedHostId);
+  if (request.method === "GET") return json({ transfer: yield* services.remote.pendingOwnerTransfer(user, hostId) });
+  if (request.method === "DELETE") {
+    yield* services.remote.cancelOwnerTransfer(user, hostId);
+    return noContent();
+  }
+  if (request.method !== "POST") return null;
+  return json(
+    yield* startOwnerTransfer(
+      {
+        auth: services.auth,
+        remote: services.remote,
+        delivery: services.ownerTransferEmailDelivery,
+        schedule: services.schedule,
+      },
+      user,
+      {
+        hostId,
+        body: yield* readJsonObject(request),
+        sourceIp: services.sourceIp(request),
+        appUrl: new URL("/app", request.url).toString(),
+      },
+    ),
+    201,
+  );
+});
 
 const handleAdministration = Effect.fn("BrowserApi.handleAdministration")(function* (
   request: Request,

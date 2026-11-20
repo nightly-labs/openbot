@@ -8,6 +8,7 @@ export const messages = {
   "queue.hold.named": "Wartet – {name} arbeitet in {channel}",
   "queue.hold.unnamed": "Wartet – dieser Agent arbeitet in {channel}",
   "queue.hold.providerRestart": "Wartet – {provider} startet neu, sobald die laufenden Aufgaben beendet sind",
+  "queue.hold.signIn": "Wartet – {provider} muss angemeldet werden",
   "queue.item.label": "Nachricht {position} in der Warteschlange: {preview}",
   "queue.item.labelEditing": "Nachricht {position} in der Warteschlange, in Bearbeitung: {preview}",
   "queue.item.editing": "In Bearbeitung",

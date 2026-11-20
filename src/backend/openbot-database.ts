@@ -71,6 +71,9 @@ export type {
   ProviderHistoryStageResult,
   ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
+
+import { perfTimed } from "./perf-probe-hooks";
+
 export type { ProviderSession } from "./database/provider-sessions";
 export type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 export type { StoredThreadSummary } from "./database/thread-summaries";
@@ -312,11 +315,13 @@ export class OpenBotDatabase {
     payload: unknown = {},
     commandId = `conversation:${eventType}:${randomUUID()}`,
   ): ConversationSnapshot {
-    return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
+    return perfTimed("db.persistConversation", () =>
+      this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId),
+    );
   }
 
   persistStreamingMessage(input: StreamingMessageWrite): number {
-    return this.#conversationWrites.persistStreamingMessage(input);
+    return perfTimed("db.persistStreamingMessage", () => this.#conversationWrites.persistStreamingMessage(input));
   }
 
   persistStreamingMessages(inputs: readonly StreamingMessageWrite[]): StreamingMessageResult[] {

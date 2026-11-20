@@ -15,7 +15,7 @@ description: "Explain what drove a change in campaign results and propose 1 to 3
 
 1. **Objective.** The business goal and the conversion that counts (sign-up, purchase, booked call). If it is
    missing, ask once with `ask_user`: "Which conversion should this campaign drive?"
-2. **Tool path.** Search the `openbot` namespace with `tool_search` for an installed plugin such as PostHog.
+2. **Tool path.** Use the tools of an installed plugin such as PostHog; `openbot.tool_search` does not list them.
    Else call `openbot_browser.list_tabs` and read a signed-in analytics or ads tab. If neither exists and a plugin
    would help, call `suggest_marketplace_app`.
 3. **Paste path.** A CSV or spreadsheet export that the user uploads.

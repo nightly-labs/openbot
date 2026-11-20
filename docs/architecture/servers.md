@@ -370,8 +370,9 @@ Later operations keep the current process's files. Local files selected by the u
 
 ### Routine flows
 
-`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to a
-joined desktop and to the web client. Its routes are `POST /v1/routine-flows/canvas`,
+`routine-flows-v1` serves the routine canvas (see [Routine flows](agents.md#routine-flows)) to older
+clients in the support window. Current clients do not show the canvas and do not call these routes.
+Its routes are `POST /v1/routine-flows/canvas`,
 `/positions/save`, `/positions/remove`, `/links/connect`, `/links/disconnect` and `/links/update`,
 with the input in the body. Any member who can see the agents can read and change a canvas, as with
 the agent routine routes; it is not an admin capability. A member sees a routine only when every
@@ -381,13 +382,11 @@ output and error cross with at most 4,000 characters each, and the host empties 
 routines with the oldest runs first when a canvas would pass three quarters of one WebRTC frame. The
 optional event `routine-flows-changed { agentId }` names the canvas that changed; the host sends it
 only to a connection with the capability and never for a hidden agent. Webhook config, secret
-rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
-in the Routines view; the web client shows the view switch only when the host serves it.
+rotation and webhook test runs stay on `events-v1`.
 
 `routine-flow-stop-v1` adds `POST /v1/routine-flows/runs/stop { routineId, runId }`, which stops a run
 that has not ended and answers `{}`. The member needs manage access to each agent of the routine and
-of the run's steps, and every one of them must be visible. A client without the capability shows no
-Stop.
+of the run's steps, and every one of them must be visible.
 
 ### Workflows
 
@@ -1000,6 +999,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -1103,6 +1103,25 @@ The host answers, then quits; it does not use `app.relaunch`, which would start 
 `xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
 account service, and a server on this computer through `localServers`. A host that does not answer
 cannot get the request; then the owner runs `sudo openbot restart`.
+
+`owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
+Members (desktop, web client and mobile). The owner enters an email; the account service stores a
+request in `remote_owner_transfers`, sends an email and an `account-servers-changed` event to that
+account, and the new owner accepts or declines in the app while signed in with that email. The
+request expires after 7 days, and a new request replaces it. A server with a `hosted_servers` row
+(OpenBot hosts it) is refused with `owner_transfer_hosted`, when the request is made and when it is
+accepted. Accept changes, in one D1 batch, `remote_hosts.owner_user_id`, the owner membership (the
+earlier owner is removed), the member and site limits, the hosted sites and the Slack, Discord,
+Telegram and webhook routes of the server, and it raises the auth epoch. A server plan stays with
+the earlier owner's Stripe subscription and still counts for the server
+(`subscriptionPaysForOwnerSql`) until someone cancels it. The host notices
+the change when its account registration gets `host_owner_mismatch` or when a renewed Signal ticket
+names another account. It then asks `POST /v2/remote/hosts/:hostId/owner-session` with its machine
+token for a session of the new owner, which revokes the session of the earlier owner on the host,
+rebinds the owner of its team file and signs in as the new owner. Only a host in server mode that
+OpenBot does not host does this, because a desktop app must keep the account of the person at the
+computer.
+Agents, chats, provider sign-ins, saved keys, Vault logins and browser sign-ins stay on the server.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
@@ -1340,6 +1359,17 @@ member IDs (`TeamMemberSummary.id`). A member gets the highest level of Everyone
 names them. An owner or an admin always gets `manage`. So a server with no roles works as before, and
 a new agent is open to every member until an admin closes it.
 
+An agent that works for a member keeps to the member's levels too. In a turn that a member's message
+started, `list_agents` lists, and `send_message` reaches, only the agents where the member has `chat`
+or more (`OpenBotToolRouter.#reachableAgents`). An agent that the member cannot use reads as an
+unknown id, so the refusal does not name it. The message that such an agent sends to another agent,
+its automatic result, the note about a failed request, its interrupt notice and a task that it starts
+keep the IDs of those members (`requesterIds` in the stored message), so each next agent in the chain
+keeps to the same levels. The field is optional JSON in `message_json`: there is no migration, and an
+older build ignores it. This is a routing rule for the OpenBot tools, not a wall between agents: an
+agent with Full access can still read the files of other agents on the host.
+`scripts/agent-message-access-e2e.ts` checks these rules.
+
 The host keeps the roles in `openbot-agent-access-v1.json`, by server ID (`src/main/agent-access-store.ts`).
 It is a preference file, not the database: there is no migration, and an older build ignores it, so a
 downgrade keeps the roles. A file that does not decode closes every agent to members until the next
@@ -1362,6 +1392,9 @@ Known limits:
 - `GET /v1/attachments/:id` does not check the agent of the attachment.
 - Channel messages of an agent that a member cannot see stay in the channel. A send to a channel does
   not check the levels of the agents in it; only a save that adds an agent checks `chat`.
+- The member levels of an agent's turn apply only to `list_agents`, `send_message` and the work that
+  they start. `send_to_channel` and channel work, `read_agent` and the other tools that take the id of
+  another agent, and the turn that a wait opens when it wakes do not use them.
 
 ### Audit log
 

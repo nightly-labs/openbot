@@ -143,6 +143,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
   "error.team.hostRestartUnsupported": "Cette connexion ne prend pas en charge le redémarrage du serveur.",
+  "error.team.ownerTransferUnsupported": "Ce serveur ne prend pas en charge le transfert de propriété.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
   "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",

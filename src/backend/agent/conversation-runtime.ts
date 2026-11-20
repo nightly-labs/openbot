@@ -16,6 +16,7 @@ import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-
 import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { perfCount, perfTimed } from "../perf-probe-hooks";
 import { conversationContentSignature } from "./delivery-content";
 
 interface TransactionScope {
@@ -549,7 +550,8 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const digests = messageDigests();
-    const signature = conversationContentSignature(snapshot, digests.json);
+    perfCount("conversation.emit");
+    const signature = perfTimed("conversation.signature", () => conversationContentSignature(snapshot, digests.json));
     const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
     const turnEnd = isTurnEndEvent(eventType);
     if (unchanged && !turnEnd) {

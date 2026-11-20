@@ -245,6 +245,7 @@ interface AgentSettingsDraft {
   allowNewChat: boolean;
   quickAcknowledgement: boolean;
   browserProfile: BrowserProfileChoice;
+  browserProfileMoved: boolean;
   busyMessage: BusyMessageChoice;
   backupModels: AgentBackupModels | null;
   confirmingPermission: AgentPermissionLevel | null;
@@ -281,6 +282,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     allowNewChat: false,
     quickAcknowledgement: false,
     browserProfile: "shared",
+    browserProfileMoved: false,
     busyMessage: "default",
     backupModels: null,
     confirmingPermission: null,
@@ -479,6 +481,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.allowNewChat = agentNewChatAllowed(agent, agentDefaults());
           state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
           state.browserProfile = browserProfile;
+          if (agentChanged) state.browserProfileMoved = false;
           state.busyMessage = agent.busyMessageMode ?? "default";
           state.backupModels = agent.backupModels ?? null;
           if (agentChanged) state.confirmingPermission = null;
@@ -942,6 +945,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     setSaveError(null);
     try {
       await options.onChange(agentId, choiceBrowserProfile(next));
+      if (!disposed && props.agent.id === agentId && next !== previous)
+        setDraft((state) => {
+          state.browserProfileMoved = true;
+        });
     } catch (error) {
       if (disposed || props.agent.id !== agentId) return;
       setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
@@ -1523,6 +1530,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </span>
                 </div>
               </SettingsLinkGroup>
+              <Show when={props.browserProfiles && draft.browserProfileMoved}>
+                <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="warning" role="status">
+                  {t("agentSettings.browserProfile.movedNote")}
+                </Text>
+              </Show>
               <Show when={props.busyMessageModeEditable && steerUnsupported()}>
                 <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
                   {t("agentSettings.busyMessage.steerUnsupported", {

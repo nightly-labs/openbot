@@ -121,6 +121,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "עדכוני מארח אינם נתמכים בחיבור הזה.",
   "error.team.hostTimezoneUnsupported": "אזור הזמן של השרת אינו נתמך בחיבור הזה.",
   "error.team.hostRestartUnsupported": "הפעלה מחדש של השרת אינה נתמכת בחיבור הזה.",
+  "error.team.ownerTransferUnsupported": "השרת הזה לא תומך בהעברת בעלות.",
   "error.team.hostKeyRotationUnsupported": "שינוי מפתח השרת אינו נתמך בחיבור הזה.",
   "error.team.localServersUnsupported": "שרתים במחשב הזה אינם נתמכים בחיבור הזה.",
   "error.team.routineResultsUnsupported": "יעדי שגרות אינם נתמכים בחיבור הזה.",

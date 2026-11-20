@@ -15,8 +15,8 @@
 - **Size**: L
 - **Planned at**: commit `5fd3a12b9a` (2026-11-19); updated at `39a0642862` for #12721 (new Terms:
   14 days of data, a cancelled and refunded server is deleted at once)
-- **State**: IN PROGRESS (items 1 and 2 done; items 3, 5 and 6 written, not applied; item 4 written,
-  not deployed; item 1b open)
+- **State**: IN PROGRESS (items 1 and 2 done; items 3, 5 and 6 written, not applied; item 4 live since
+  2026-11-19; item 1b open)
 
 ## Why this matters
 

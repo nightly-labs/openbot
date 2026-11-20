@@ -43,6 +43,7 @@ import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
+    message.startsWith("Exceeded skills context budget") ||
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
     message.startsWith("Under-development features enabled:") ||
     message.startsWith("Configured service tier ") ||
@@ -132,6 +133,14 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
+function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+}
+
+function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
+  return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
+}
+
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
@@ -183,7 +192,10 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
-  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
+    return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isStuckAcpTurn(provider, message))
+    return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");

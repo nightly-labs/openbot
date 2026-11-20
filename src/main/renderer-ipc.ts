@@ -1,4 +1,5 @@
 import type { EventEndpoint, Untyped } from "@openbot/contracts/ipc";
+import { perfIpcSend } from "../backend/perf-probe-hooks";
 
 type EventArgs<Payload> = [Payload] extends [Untyped]
   ? unknown[]
@@ -32,6 +33,7 @@ export function sendToRenderer<Payload>(
     const frame = contents.mainFrame;
     if (frame.isDestroyed() || frame.detached) return false;
     contents.send(endpoint.channel, ...args);
+    perfIpcSend(contents, endpoint.channel, args);
     return true;
   } catch (error) {
     if (isUnavailableRendererError(error)) return false;

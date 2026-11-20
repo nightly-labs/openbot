@@ -1383,6 +1383,10 @@ export class AgentStore {
     return this.#state.agents.some((agent) => agent.threadId === threadId);
   }
 
+  mainThreadAgentId(threadId: string): string | null {
+    return this.#state.agents.find((agent) => agent.threadId === threadId)?.id ?? null;
+  }
+
   activeProviderSession(id: string): ProviderSession | null {
     const agent = this.#requireAgent(id);
     if (!agent.threadId) return null;

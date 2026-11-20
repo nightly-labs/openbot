@@ -148,10 +148,8 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
-  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
-  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -230,7 +228,7 @@ import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
+import { agentFallbackMcpServers, type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
@@ -266,6 +264,7 @@ import { pickPoolAccount } from "./agent/provider-account-pool";
 import type { ProviderAccountStore } from "./agent/provider-account-store";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic, providerResetDelayMs } from "./agent/provider-diagnostics";
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
+import { ProviderSignInWaits } from "./agent/provider-sign-in-waits";
 import { QueueControls } from "./agent/queue-controls";
 import { quietRoutineRun } from "./agent/routine-quiet-runs";
 import { type RoutineMutationOptions, RoutineScheduler, toRoutineOperationFailed } from "./agent/routine-scheduler";
@@ -579,6 +578,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #stoppedTurns = new Map<string, string>();
 
   readonly #requestedNewChats = new Set<string>();
+  readonly signInWaits = new ProviderSignInWaits((agentId) => this.#store.get(agentId) !== undefined);
+  #signInProviders: ReadonlySet<AgentProvider> = new Set();
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
   readonly #poolReads = new Map<AgentProvider, number>();
   readonly #poolReading = new Set<AgentProvider>();
@@ -1168,7 +1169,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sendLateAnswer: (agentId, target, text, sender) =>
         Effect.runFork(
-          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+          this.#sendUserMessage(
+            { agentId, text, ...target },
+            sender,
+            undefined,
+            undefined,
+            false,
+            false,
+            undefined,
+            true,
+          ).pipe(
             Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
             Effect.forkIn(this.#scope, { startImmediately: true }),
           ),
@@ -1237,7 +1247,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         queueHold: (agentId) =>
           (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null) ??
-          this.#providerRestartHold(agentId),
+          this.#providerRestartHold(agentId) ??
+          this.#signInHold(agentId),
         threadRequestsChanged: (agentId) => this.#tasks.changed(agentId),
       },
     });
@@ -1341,6 +1352,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return run === null || quietRoutineRun(run);
         },
         quietRunDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        retriesAfterRestart: (deliveryId) => this.#routines.retriesAfterRestart(deliveryId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         executionThreads: () => [...this.channels.store.executionThreads(), ...this.messaging.store.executionThreads()],
         taskThreads: () => this.#tasks.executionThreads(),
@@ -1675,6 +1687,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
         staleTurnSettlement: (agentId, threadId, turnId) =>
           this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
+        orphanedDeliveryRecovery: (agentId) =>
+          this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
@@ -1683,6 +1697,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
         },
         followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
+        signInWait: (agentId, provider) => this.signInWaits.note(agentId, provider),
         followUsageLimit: (agentId) => {
           if (this.#startPendingRuntime(agentId)) return true;
           if (!this.#usageLimitMove(agentId)) return this.#returnCheckPending(agentId);
@@ -1954,12 +1969,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (agentId) => {
           const agent = this.#store.get(agentId) ?? { access: "workspace" };
           const saved = new Set(this.#mcp.list().map((config) => config.id));
-          return this.enabledMcpServers(agentId).filter(
-            (config) =>
-              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
-                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
-              mcpFallbackRunsServer(config, agent),
-          );
+          return agentFallbackMcpServers(this.enabledMcpServers(agentId), saved, agent);
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
       ),
@@ -2220,6 +2230,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.channels.hasActiveWork()) reasons.push("channel-work");
     if (this.#providers.activeProcessCount() > 0) reasons.push("provider-process");
     return reasons;
+  }
+
+  hasProviderOperation(): boolean {
+    return this.#providers.hasPendingOperation();
   }
 
   instructionsSaving(agentId: string, text: string): (written: boolean) => void {
@@ -3588,6 +3602,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  #mayRecoverOrphanedDeliveries(agentId: string): boolean {
+    if (this.#stopping || !this.#boot.hasOrphanedOwnChatDelivery(agentId)) return false;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    return agent !== undefined && this.#providers.clientFor(providerForAgent(agent)) !== null;
+  }
+
+  readonly #recoverOrphanedDeliveries = Effect.fn("AgentService.recoverOrphanedDeliveries")(function* (
+    this: AgentService,
+    agentId: string,
+  ) {
+    if (!this.#mayRecoverOrphanedDeliveries(agentId)) return;
+    logger.warn("A message that no provider runs held the agent's queue. OpenBot settles it again.", { agentId });
+    yield* this.#boot
+      .reconcileUnresolvedDeliveries(agentId)
+      .pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => this.#emitError("delivery_reconcile_failed", failure.cause, agentId)),
+        ),
+      );
+    if (!this.#boot.hasOrphanedOwnChatDelivery(agentId)) this.#drain.scheduleDrain(agentId);
+  });
+
   readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
     this: AgentService,
     agentId: string,
@@ -3657,13 +3693,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               : undefined))
           : undefined;
         if (input.model && !requestedModel) {
-          throw new AgentSettingsRefused(
-            modelUnavailableError(
-              input.model,
-              modelProvider,
-              this.#endpoints.available(),
-              this.#providers.status().providers ?? [],
-            ).message,
+          throw modelUnavailableError(
+            input.model,
+            modelProvider,
+            this.#endpoints.available(),
+            this.#providers.status().providers ?? [],
           );
         }
         const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
@@ -3672,7 +3706,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
         const providerMove =
-          (move === null || move === "next-turn") &&
+          (move === null || move === "next-turn" || move === "pool") &&
           previous !== undefined &&
           confinedProvider !== providerForAgent(previous);
         if (
@@ -3836,7 +3870,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 ...(previous.fastMode ? { fastMode: true } : {}),
                 ...(previous.fastMode && previous.ultrafast ? { ultrafast: true } : {}),
               }))
-        : undefined;
+        : move === "pool"
+          ? previous?.usageLimitReturn
+          : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
     const agent = yield* this.#store.updateAgent(
@@ -3924,7 +3960,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.get(agentId);
     if (!agent) return null;
     const pooled =
-      this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId) || !this.#hasWaitingWork(agentId)
+      this.#runsTurn(agentId) ||
+      this.#mailbox.hasStartedDelivery(agentId) ||
+      !this.#movesInPool(agent) ||
+      !this.#hasWaitingWork(agentId)
         ? null
         : this.#poolMove(agent);
     if (pooled)
@@ -3935,7 +3974,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           model: pooled.model,
           providerAccountId: pooled.providerAccountId ?? null,
         },
-        move: "next-turn",
+        move: "pool",
       };
     if (!agent.usageLimitReturn && !agent.backupModels) return null;
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
@@ -3993,7 +4032,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #poolMove(agent: AgentSummary): AgentModelChoice | null {
     const choice = agentModelChoice(agent);
-    if (!this.#pooled(choice) || this.#keepsPinnedAccount(agent)) return null;
+    if (!this.#movesInPool(agent)) return null;
     this.#readPoolWhenStale(choice.provider);
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
@@ -4023,12 +4062,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #poolBackup(agentId: string): boolean {
     const agent = this.#store.get(agentId);
-    if (!agent) return false;
+    if (!agent || !this.#movesInPool(agent)) return false;
     const choice = agentModelChoice(agent);
-    if (!this.#pooled(choice) || this.#keepsPinnedAccount(agent)) return false;
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
     return pick !== null && pick !== current;
+  }
+
+  #movesInPool(agent: AgentSummary): boolean {
+    return this.#pooled(agentModelChoice(agent)) && !this.#keepsPinnedAccount(agent);
   }
 
   #keepsPinnedAccount(agent: AgentSummary): boolean {
@@ -4248,7 +4290,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
-          if (move.move === "next-turn" && (yield* this.#poolMoveWaits(agentId))) {
+          if (move.move === "pool" && (yield* this.#poolMoveWaits(agentId))) {
             logger.info("A pool move waits: the agent's Claude session still runs background work.", { agentId });
             return false;
           }
@@ -5867,6 +5909,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
 
+  #signInHold(agentId: string): QueueHold | null {
+    const agent = this.#store.get(agentId);
+    if (!agent || this.#drain.ownChatHold(agentId) !== "sign-in") return null;
+    return { reason: "sign-in", provider: providerForAgent(agent) };
+  }
+
+  #providerStatusChanged(status: AgentStatus): void {
+    this.signInWaits.statusChanged(status);
+    const providers = status.providers ?? [];
+    const signIn = new Set(providers.flatMap((entry) => (entry.state === "sign-in-required" ? [entry.id] : [])));
+    const changed = [...signIn, ...this.#signInProviders].filter(
+      (provider) => signIn.has(provider) !== this.#signInProviders.has(provider),
+    );
+    this.#signInProviders = signIn;
+    if (changed.length > 0)
+      queueMicrotask(() => {
+        for (const provider of changed) this.#emitProviderQueues(provider);
+      });
+  }
+
   listWaits(agentId: string): AgentWaitsSnapshot {
     return this.#waits.list(agentId);
   }
@@ -6340,6 +6402,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     welcome = false,
     agentSetup = false,
     relayed?: LiveVoiceRelayed,
+    lateAnswer = false,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6438,7 +6501,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
       if (!targetThreadId) return;
-      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (!welcome && !agentSetup && !lateAnswer) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
       if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
@@ -6889,6 +6952,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#liveVoice?.observe(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
     this.emit("event", event, memberId);
+    if (event.type === "status") this.#providerStatusChanged(event.status);
   }
 
   readonly #forgetExecutionThread = Effect.fn("AgentService.forgetExecutionThread")(function* (
@@ -6925,7 +6989,7 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
 
 const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
-type ModelMove = "return" | "provider-error" | "next-turn";
+type ModelMove = "return" | "provider-error" | "next-turn" | "pool";
 
 const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "agentId",

@@ -119,6 +119,8 @@ export const messages = {
   "provider.picker.download": "Téléchargement de {name}",
   "provider.picker.search": "Rechercher des modèles",
   "provider.picker.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "provider.picker.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "provider.picker.workspaceOnlyUnavailable":
     "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
@@ -340,4 +342,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal garde sa propre connexion.",
+  "provider.settings.updateAll": "Tout mettre à jour",
 } as const satisfies PartialTranslation<typeof source>;

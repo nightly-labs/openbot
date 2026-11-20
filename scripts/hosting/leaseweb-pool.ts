@@ -845,6 +845,7 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
     }
     this.#write(`UPDATE operator_hosts SET assign_token_hash = NULL, seen_at = NULL WHERE host_id = ${host}`);
     try {
+      await this.#setReference(machine, POOL_REFERENCE);
       await this.#erase(machine);
     } catch (error) {
       throw new Error(
@@ -852,7 +853,6 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
         { cause: error },
       );
     }
-    await this.#setReference(machine, POOL_REFERENCE);
     logger.info(`VPS ${machine.id} is free. Run prepare to offer it for a new server.`);
   }
 

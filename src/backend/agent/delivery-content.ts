@@ -17,6 +17,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
+import { QUIET_ANSWER } from "../messaging/messaging-prompt";
 import type { LiveVoiceRelayed } from "./live-voice";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import { pendingSkillSuggestionNote } from "./skill-suggestion";
@@ -114,6 +115,8 @@ export interface DeliveryPromptSources {
   answeredRoutine?: AnsweredRoutine | null;
   liveVoice?: LiveVoiceRelayed | null;
   steerFramedAsUser?: boolean;
+  steersQuietTurn?: boolean;
+  externalChat?: boolean;
   taskReport?: TaskReportState | null;
 }
 
@@ -190,6 +193,7 @@ const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 const STILL_WORKING_FROM = "No answer yet from ";
+const EXTERNAL_CHAT_ANSWER = `This turn runs in an external chat, such as WhatsApp, Slack or Telegram. OpenBot posts your written answer there, and the people in it read it. Put the result only in openbot.send_message. When only a person in that chat can give what you need, ask them for it in your written answer, in plain words. Otherwise answer only ${QUIET_ANSWER}: nothing is posted.`;
 const STILL_WORKING_REASON = ": they still work on the request. Their answer comes in a later turn.";
 export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
@@ -198,8 +202,15 @@ export const CURRENT_MESSAGE_SEPARATOR = "\n\n--- current message ---\n";
 const RESTARTED_RESULT_NOTE =
   "OpenBot note, not from the teammate: OpenBot or its provider restarted while you worked with the result below, so your turn stopped before it ended. Continue with this result now. You can have done part of the work for it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
 
-export function restartedResultInput(input: readonly DeliveryInputItem[]): DeliveryInputItem[] {
-  const note = `${HANDOFF_START}\n\n${RESTARTED_RESULT_NOTE}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
+const RESTARTED_ROUTINE_NOTE =
+  "OpenBot note, not from the user: OpenBot or its provider restarted while you did the routine below, so that run stopped before it ended. Do the routine again now. You can have done part of it already: check the result of an action that you started before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action.";
+
+export function restartedResultInput(
+  input: readonly DeliveryInputItem[],
+  restarted: { routine: boolean; result: boolean },
+): DeliveryInputItem[] {
+  const notes = [restarted.routine ? RESTARTED_ROUTINE_NOTE : "", restarted.result ? RESTARTED_RESULT_NOTE : ""];
+  const note = `${HANDOFF_START}\n\n${notes.filter(Boolean).join("\n\n")}\n\n${HANDOFF_END}${CURRENT_MESSAGE_SEPARATOR}`;
   return input.map((item, index) =>
     index === 0 && item.type === "text" ? { ...item, text: `${note}${item.text}` } : item,
   );
@@ -268,6 +279,7 @@ function userFramedTeammateText(
   senderAgentId: string,
   agentNames: ReadonlyMap<string, string>,
   displayText: string,
+  steersQuietTurn: boolean,
 ): string {
   const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
   const teammate = `Your teammate ${senderName} (${senderAgentId})`;
@@ -280,8 +292,13 @@ function userFramedTeammateText(
   if (delivery.expectsReply === false)
     return [
       `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      steersQuietTurn
+        ? `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`
+        : null,
       displayText,
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   return [
     `${teammate} sent you this request through OpenBot:`,
     displayText,
@@ -390,7 +407,13 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     sources.steerFramedAsUser &&
     !(delivery.replyToMessageId && sources.answeredRoutine)
   ) {
-    text = userFramedTeammateText(delivery, delivery.sender.agentId, agentNames, displayText);
+    text = userFramedTeammateText(
+      delivery,
+      delivery.sender.agentId,
+      agentNames,
+      displayText,
+      sources.steersQuietTurn === true,
+    );
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
@@ -407,14 +430,18 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         ? [
             NO_ANSWER_LINE,
             "Use it if it changes your work, and continue. Send no reply, acknowledgement or result: OpenBot sends the sender nothing back.",
-            `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+            sources.externalChat
+              ? `OpenBot posts your written answer in the external chat of this turn. When nothing in it is for the people in that chat, answer only ${QUIET_ANSWER}: nothing is posted.`
+              : `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
           ]
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
             `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
-            "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
+            sources.externalChat
+              ? EXTERNAL_CHAT_ANSWER
+              : "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
           ];
     text = [
       `${TEAMMATE_HEADER} ${senderName} (${senderAgentId}).`,

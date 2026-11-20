@@ -332,6 +332,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Aucun modèle disponible pour ce fournisseur.",
   "mobile.agent.runtime.searchModels": "Rechercher des modèles",
   "mobile.agent.runtime.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ce fournisseur ne fonctionne pas avec « Espace de travail uniquement » sous Windows et Linux. Pour l’utiliser, modifiez d’abord les « Autorisations ».",
   "mobile.agent.runtime.usageLimit": "Limite d’utilisation atteinte",
@@ -410,6 +412,8 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gérer les profils",
   "mobile.agent.browserProfile.footer":
     "Chaque profil garde ses propres connexions et cookies. Un changement ferme les onglets ouverts de l’agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Les connexions aux sites restent dans l’ancien profil. L’agent doit se reconnecter à ces sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot n’a pas pu modifier le profil de navigateur de l’agent.",
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":
@@ -499,6 +503,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Cet hôte ne peut pas publier d’agents depuis un appareil distant.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Jetons hors lectures du cache",
   "mobile.agent.usage.estimatedCost": "Coût estimé",
+  "mobile.agent.usage.noCostEstimate": "Aucune estimation de coût",
   "mobile.agent.usage.daily": "Utilisation quotidienne",
   "mobile.agent.usage.tokens": "Jetons",
   "mobile.agent.usage.cost": "Coût",

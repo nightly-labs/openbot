@@ -1,8 +1,13 @@
-import type { PlanLimitRow, PlanLimits } from "@openbot/team-client/plan-limits";
+import type { PlanLimitListedWindow, PlanLimitRow, PlanLimits } from "@openbot/team-client/plan-limits";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
-import { lowestPlanLimitsFirst, planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
+import {
+  lowestPlanLimitsFirst,
+  planLimitListedWindowLabel,
+  planLimitName,
+  planLimitWindowLabel,
+} from "@/features/servers/model/plan-limits";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -13,6 +18,13 @@ const RING_SIZE = 30;
 const OVERLAP = 8;
 const CUTOUT_GAP = 2;
 const HEADER_RIPPLE = { borderless: true, radius: 24 } as const;
+
+function lowestListedWindow(row: PlanLimitRow): PlanLimitListedWindow | undefined {
+  return row.listedWindows.reduce<PlanLimitListedWindow | undefined>(
+    (lowest, window) => (lowest === undefined || window.remainingPercent < lowest.remainingPercent ? window : lowest),
+    undefined,
+  );
+}
 
 export function PlanLimitsHeaderButton({
   serverId,
@@ -33,10 +45,10 @@ export function PlanLimitsHeaderButton({
   const more = lowest.length - shown.length;
   const summary = lowest
     .map((row) => {
-      const window = row.windows.find((item) => item.remainingPercent === row.remainingPercent) ?? row.windows[0];
+      const window = lowestListedWindow(row);
       return `${planLimitName(row, accounts, t)} ${t("mobile.server.planLimits.windowLeft", {
-        window: planLimitWindowLabel(window?.durationMins ?? null, t),
-        percent: row.remainingPercent,
+        window: window ? planLimitListedWindowLabel(window, t) : planLimitWindowLabel(null, t),
+        percent: window?.remainingPercent ?? row.remainingPercent,
       })}`;
     })
     .join(", ");

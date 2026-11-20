@@ -236,6 +236,24 @@ export const messages = {
   "server.rail.delete": "Server wissen",
   "server.rail.hide": "Server verbergen",
   "server.rail.showLocal": "{name} tonen",
+  "server.plan.daysLeft": {
+    one: "{count} dag",
+    other: "{count} dagen",
+  },
+  "server.plan.ended": "Abonnement beëindigd",
+  "server.plan.status": "abonnement beëindigd, verwijderd op {date}",
+  "server.plan.deletedOn": "Verwijderd op {date}",
+  "server.plan.dialogTitle": "Laat je agents niet gaan",
+  "server.plan.dialogDescription":
+    "{name} is gestopt omdat het abonnement niet is betaald. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
+  "server.plan.dialogDaysLeft": {
+    one: "Nog {count} dag",
+    other: "Nog {count} dagen",
+  },
+  "server.plan.later": "Later",
+  "server.plan.keepAgents": "Agents houden",
+  "server.plan.ownerRenews":
+    "De agents van {name} zijn niet beschikbaar tot de eigenaar van de server het abonnement verlengt.",
   "server.select.failedTitle": "Kan de server niet kiezen",
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",
@@ -736,4 +754,38 @@ export const messages = {
   "server.settings.responseStyleNatural": "Natuurlijk",
   "server.settings.responseStyleClassic": "Klassiek",
   "server.settings.personalityLoadFailed": "Kan de persoonlijkheid van de server niet laden.",
+  "server.ownerTransfer.title": "Eigendom",
+  "server.ownerTransfer.ownerTitle": "Je bent eigenaar van deze server",
+  "server.ownerTransfer.ownerDescription":
+    "Maak iemand anders eigenaar. Je verliest de toegang als die persoon accepteert.",
+  "server.ownerTransfer.start": "Eigendom overdragen…",
+  "server.ownerTransfer.pending": "Overdracht aan {email} staat open",
+  "server.ownerTransfer.expires": "Verloopt {date}",
+  "server.ownerTransfer.cancel": "Verzoek intrekken",
+  "server.ownerTransfer.emailTitle": "Eigendom van {server} overdragen",
+  "server.ownerTransfer.emailDescription":
+    "Voer het e-mailadres van de nieuwe eigenaar in. Die moet accepteren terwijl die met dit e-mailadres is ingelogd.",
+  "server.ownerTransfer.email": "E-mailadres van de nieuwe eigenaar",
+  "server.ownerTransfer.confirmTitle": "{email} eigenaar maken?",
+  "server.ownerTransfer.confirmDescription": "Als {email} accepteert:",
+  "server.ownerTransfer.confirmLoseAccess": "Je verliest de toegang tot {server}.",
+  "server.ownerTransfer.confirmStays":
+    "Agents, routines, chats, aanmeldingen bij aanbieders, opgeslagen sleutels, Vault-logins, browseraanmeldingen en gekoppelde apps blijven op de server. De nieuwe eigenaar kan ze gebruiken.",
+  "server.ownerTransfer.confirmExpiry": "Het verzoek verloopt na 7 dagen.",
+  "server.ownerTransfer.send": "Verzoek sturen",
+  "server.ownerTransfer.sendFailed": "Kan de overdracht niet versturen.",
+  "server.ownerTransfer.incomingTitle": "Eigenaar van {server} worden?",
+  "server.ownerTransfer.incomingDescription": "{name} wil je eigenaar van {server} maken.",
+  "server.ownerTransfer.incomingYours": "De server, de agents, routines en gegevens worden van jou.",
+  "server.ownerTransfer.incomingPrevious": "{name} verliest de toegang tot de server.",
+  "server.ownerTransfer.incomingStays":
+    "Aanmeldingen bij aanbieders, opgeslagen sleutels, Vault-logins, browseraanmeldingen en gekoppelde apps op de server blijven daar, en je kunt ze gebruiken.",
+  "server.ownerTransfer.incomingMachine":
+    "Iedereen die nog kan inloggen op de computer waarop de server draait, kan je OpenBot-account gebruiken. Wijzig de wachtwoorden en SSH-sleutels ervan.",
+  "server.ownerTransfer.later": "Later",
+  "server.ownerTransfer.decline": "Weigeren",
+  "server.ownerTransfer.accept": "Accepteren",
+  "server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}",
+  "server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren.",
+  "server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren.",
 } as const satisfies PartialTranslation<typeof source>;

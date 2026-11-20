@@ -114,6 +114,7 @@ export const messages = {
     "Ожидание. Этот компьютер выполняет столько ходов, сколько позволяет его память.",
   "conversation.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "conversation.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "conversation.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "conversation.sidePanel.closePanel": "Закрыть панель",
   "conversation.threads.view.failedBody": "Провайдер не указал причину. Отправьте сообщение, чтобы повторить попытку.",
   "conversation.threads.deleteUndo.action": "Отменить",

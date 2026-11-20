@@ -49,8 +49,6 @@ import {
   isConversationSnapshot,
   isQueuedMessageReceipt,
   isRoutine,
-  isRoutineFlowCanvas,
-  isRoutineFlowLink,
   isRoutinePausedByRun,
   isRoutineRun,
   type LocalBrowserSecretResponse,
@@ -126,8 +124,6 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
-import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutinePauseReasons,
   ROUTINE_PAUSE_REASONS_ROUTES,
@@ -997,24 +993,6 @@ export function teamAgentRoutinesApi(
   };
 }
 
-export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
-
-const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
-const decodeRoutineFlowLink = guardedDecoder(isRoutineFlowLink, "routine flow link");
-
-export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsApi {
-  const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
-    request("POST", path, decode, decodeTeamProtocolV2Json(body));
-  return {
-    canvas: (agentId) => post(ROUTINE_FLOWS_ROUTES.canvas, decodeRoutineFlowCanvas, { agentId }),
-    savePosition: (input) => post(ROUTINE_FLOWS_ROUTES.savePosition, ignoreResponse, input),
-    removePosition: (input) => post(ROUTINE_FLOWS_ROUTES.removePosition, ignoreResponse, input),
-    connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
-    disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
-    updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
-    stopRun: (input) => post(ROUTINE_FLOW_STOP_ROUTES.stopRun, ignoreResponse, input),
-  };
-}
 export type AgentMemoriesRequest<E> = <T>(
   method: string,
   path: string,

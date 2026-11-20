@@ -19,6 +19,8 @@ export const messages = {
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
     "{provider}, OpenBot araçlarını yüklemedi; bu yüzden bu ajan onları kullanamıyor ve takım arkadaşlarına ulaşamıyor. Bir {provider} ekip politikası yerel MCP sunucularını engelleyebilir. Ekip yöneticinizden bunlara izin vermesini isteyin, ardından yeniden deneyin.",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} bu mesajı OpenBot araçları olmadan çalıştırdı; bu yüzden ajan takım arkadaşlarına ulaşamadı, tarayıcıyı kullanamadı ve dosya ekleyemedi. Yeniden deneyin.",
   "error.provider.acpOwnMcpServerFailed":
     "{provider}, {name} MCP sunucusunu başlatamadı, bu yüzden yanıt durdu. Bu sunucu OpenBot'ta değil, kendi {provider} ayarlarınızda. Sunucuyu orada kaldırın veya onarın, ardından yeni bir sohbet başlatın.",
   "error.provider.endpointsReadOnly":
@@ -333,6 +335,8 @@ export const messages = {
     "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini bu sohbetin kayıtlı geçmişini okuyamadı. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpTurnStuck":
+    "{provider} önceki turunu bitirmediği için bu mesajı kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -405,6 +409,10 @@ export const messages = {
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexRequestRefused":
     "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexSafetyBlocked":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} Ajan artık bu mesajı görmüyor, bu yüzden mesaj sonraki mesajlarınızı durdurmaz. İsteğinizi farklı kelimelerle yeniden gönderin.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.imageTooSmall":

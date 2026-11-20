@@ -10,12 +10,14 @@ import {
 import {
   REMOTE_PEER_LOST_AFTER_MS,
   type RemoteTeamConnectionUpdate,
+  type RemoteTeamDiagnostic,
   type RemoteTeamEvent,
 } from "@openbot/team-client/remote-peer";
 import { errorReference } from "@openbot/user-errors/reference";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { MobileConnectionAnalytics } from "@/features/analytics/connection";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
+import { phoneVpn } from "@/features/support/model/phone-network-capture";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { referencedError } from "@/features/workspace/model/referenced-error";
 import { subscribeNetworkMoves } from "@/shared/lib/network-path";
@@ -48,6 +50,7 @@ interface Props {
   hostId: string;
   publicKey: string;
   active: boolean;
+  background: boolean;
   directory: RemoteTeamDirectoryClient;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
@@ -66,6 +69,7 @@ export const ServerConnection = memo(function ServerConnection({
   hostId,
   publicKey,
   active,
+  background,
   directory,
   register,
   load,
@@ -80,8 +84,10 @@ export const ServerConnection = memo(function ServerConnection({
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const backgroundRef = useRef(background);
+  backgroundRef.current = background;
   const generation = useRef(0);
-  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics));
+  const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics, phoneVpn));
   const membershipRefreshPending = useRef(false);
   const inactiveSince = useRef<number | null>(null);
   const lastStatus = useRef<{ status: RemoteRecoveryStatus; failure: RemoteConnectionFailure | null } | null>(null);
@@ -127,6 +133,10 @@ export const ServerConnection = memo(function ServerConnection({
       else networkMoved.current = true;
     });
   }, [client, hostId]);
+  const handleDiagnostic = useCallback(
+    (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => analytics.diagnostic(step, detail),
+    [analytics],
+  );
   const lostAfterMs = useRef(REMOTE_PEER_LOST_AFTER_MS);
   const handleConnectionUpdate = useCallback(
     (update: RemoteTeamConnectionUpdate) => {
@@ -139,7 +149,7 @@ export const ServerConnection = memo(function ServerConnection({
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       if (update.state === "online" && update.lostAfterMs !== undefined) lostAfterMs.current = update.lostAfterMs;
       if (update.state === "offline") {
-        if (activeRef.current) analytics.lost();
+        if (activeRef.current && !backgroundRef.current) analytics.lost();
         if (update.code === "session_revoked") {
           if (activeRef.current) void onMembershipChangedRef.current?.().catch(() => undefined);
           else membershipRefreshPending.current = true;
@@ -167,18 +177,18 @@ export const ServerConnection = memo(function ServerConnection({
           isCurrent: () => !disposed && activeRef.current && attempt === generation.current,
           check,
         };
-        const finish = analytics.attempt();
+        const finish = backgroundRef.current ? null : analytics.attempt();
         const initiatingContext = context;
         const started = Date.now();
         supportLog.add("info", "connection", `${hostId} attempt ${attempt} started${check ? ", check" : ""}`);
         return load(hostId, publicKey, client, initiatingContext).then(
           () => {
-            if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
+            if (initiatingContext.isCurrent()) finish?.("succeeded", initiatingContext.stage);
             supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
             if (initiatingContext.isCurrent()) {
-              finish("failed", initiatingContext.stage);
+              finish?.("failed", initiatingContext.stage);
               onUnavailableRef.current?.(hostId);
             }
             const reference = errorReference(error);
@@ -271,6 +281,7 @@ export const ServerConnection = memo(function ServerConnection({
       onNetworkRestored={handleNetworkRestored}
       onTeamEvent={onTeamEvent}
       onConnectionUpdate={handleConnectionUpdate}
+      onDiagnostic={handleDiagnostic}
     />
   );
 });

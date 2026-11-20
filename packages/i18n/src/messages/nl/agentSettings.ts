@@ -235,6 +235,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Elk profiel bewaart eigen logins en cookies. Een wijziging sluit de open tabbladen van de agent.",
   "agentSettings.browserProfile.manage": "Beheren",
+  "agentSettings.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Het hele proces van {provider} draait in een sandbox, dus schrijven buiten mislukt. Alleen beschikbaar op macOS.",
 } as const satisfies PartialTranslation<typeof source>;

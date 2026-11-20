@@ -52,6 +52,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",
   "error.agent.modelUnavailable": "Выбранная модель агента недоступна.",
   "error.agent.modelProviderNotConnected": "Выбранная модель агента «{model}» недоступна: {provider} не подключён.",
+  "error.agent.modelProviderSignInRequired":
+    "Выбранная модель агента «{model}» недоступна: нужно войти в {provider}. Войдите в {provider} и повторите попытку.",
+  "error.agent.modelProviderNotInstalled": "Выбранная модель агента «{model}» недоступна: {provider} не установлен.",
+  "error.agent.modelProviderOutdated": "Выбранная модель агента «{model}» недоступна: {provider} нужно обновить.",
   "error.agent.modelListEmpty":
     "Выбранная модель агента «{model}» недоступна: {provider} не вернул ни одной модели. Последняя ошибка: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -127,6 +131,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Данные агента удалены не полностью. Повторите удаление.",
   "error.agent.deleteFolderInUse":
     "Работа другого агента ещё использует папку этого агента. Удалите агента снова, когда эта работа закончится, или после перезапуска OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Другая программа ещё использует папку этого агента, например программа, которую запустил агент. Закройте эту программу или перезагрузите компьютер, на котором работает этот агент, затем удалите агента снова.",
   "error.agent.deleteWhenFolderFree":
     "Работа другого агента ещё использует папку этого агента. OpenBot удалит этого агента, когда эта работа закончится.",
   "error.agent.duplicationBusy": "Этот агент уже дублируется.",

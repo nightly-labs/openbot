@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import type { VoiceSpeechFailure, VoiceSpeechRequest, VoiceSpeechResponse } from "./voice-speech-protocol";
 
 const DENOISING_STEPS = 8;
+const VIETNAMESE_MODEL_SPEED = 1.4;
 const MAXIMUM_THREADS = 64;
 const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
 
@@ -140,6 +141,10 @@ function toPcm(samples: Float32Array): Uint8Array {
   return new Uint8Array(pcm.buffer);
 }
 
+function modelSpeed(language: string) {
+  return language === "vi" ? VIETNAMESE_MODEL_SPEED : 1;
+}
+
 async function speak(request: VoiceSpeechRequest): Promise<{ pcm: Uint8Array; sampleRate: number }> {
   const { addon, tts } = await ttsFor(request);
   if (request.loadOnly) return { pcm: new Uint8Array(0), sampleRate: 0 };
@@ -148,7 +153,7 @@ async function speak(request: VoiceSpeechRequest): Promise<{ pcm: Uint8Array; sa
       text: request.text,
       generationConfig: {
         sid: request.speakerId,
-        speed: 1,
+        speed: modelSpeed(request.language),
         numSteps: DENOISING_STEPS,
         extra: { lang: request.language },
       },
