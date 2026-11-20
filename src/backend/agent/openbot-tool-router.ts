@@ -58,6 +58,7 @@ import {
   agentMemoryEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
+  agentPermissionLevels,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   channelAllowsBrowser,
@@ -1729,6 +1730,7 @@ export class OpenBotToolRouter {
       ...agentAccountSetup(agent),
       access,
       permissions,
+      permissionLevels: agentPermissionLevels(agent.provider, permissions),
       computerUse,
       ...(computerUse
         ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }

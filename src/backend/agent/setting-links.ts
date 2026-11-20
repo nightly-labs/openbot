@@ -266,7 +266,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.access": {
     title: "Access",
     place: `${AGENT} > Permissions`,
-    about: "What the agent can do without approval: ask first, workspace only, or full access.",
+    about:
+      "What the agent can do without approval: Workspace only, Ask first or Full access. The choices depend on the provider: read_agent gives them in permissionLevels.",
     words: "permissions approvals sandbox full access ask workspace security",
   },
   "agent.computer-use": {
