@@ -1388,12 +1388,12 @@ export class TurnLifecycle {
       case "openbot/background-work": {
         if (!threadId || !agentId) return;
         const runs = isRecord(params) && params.running === true;
-        if (runs === this.#waitingThreads.has(threadId)) return;
-        if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
-        else this.#waitingThreads.delete(threadId);
         if (runs)
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
+        if (runs === this.#waitingThreads.has(threadId)) return;
+        if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
+        else this.#waitingThreads.delete(threadId);
         this.#hooks.emitRuntimeSnapshot();
         return;
       }

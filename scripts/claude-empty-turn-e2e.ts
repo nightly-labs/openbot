@@ -64,6 +64,7 @@ const transcript = join(${JSON.stringify(projectsDir)}, sessionId + ".jsonl");
 const log = (entry) => fs.appendFileSync(${JSON.stringify(logPath)}, JSON.stringify({ pid: process.pid, ...entry }) + "\\n");
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 let parentUuid = null;
+const backgroundTasks = [];
 const save = (entry) => {
   fs.appendFileSync(transcript, JSON.stringify({ ...entry, parentUuid, sessionId, timestamp: new Date().toISOString(), isSidechain: false }) + "\\n");
   parentUuid = entry.uuid;
@@ -102,9 +103,9 @@ const turn = (message) => {
     return;
   }
   if (text.includes("BACKGROUND-THEN-EMPTY")) {
-    toolStep(message, "toolu_bash", "Bash", { command: "sleep 600", run_in_background: true });
-    write(frame({ type: "system", subtype: "background_tasks_changed", uuid: randomUUID(),
-      tasks: [{ id: "task_1", type: "local_bash", status: "running" }] }));
+    backgroundTasks.push({ id: "task_" + (backgroundTasks.length + 1), type: "local_bash", status: "running" });
+    toolStep(message, "toolu_bash_" + backgroundTasks.length, "Bash", { command: "sleep 600", run_in_background: true });
+    write(frame({ type: "system", subtype: "background_tasks_changed", uuid: randomUUID(), tasks: backgroundTasks }));
     result(message, "");
     return;
   }
@@ -353,6 +354,12 @@ try {
     await runCase("LATER-STEP-THEN-EMPTY"),
     "completed",
     [NO_ANSWER_AFTER_STEPS],
+  );
+  expect(
+    "more background work and no answer while earlier background work runs",
+    await runCase("SECOND-BACKGROUND-THEN-EMPTY"),
+    "completed",
+    [],
   );
   report.passed = report.failures.length === 0;
 } catch (error) {
