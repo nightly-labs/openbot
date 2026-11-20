@@ -402,7 +402,7 @@ interface ThreadRuntime {
 
 const CLAUDE_FAST_SERVICE_TIER = "fast";
 
-const AUTH_STATUS_TIMEOUT_MS = 5_000;
+const AUTH_STATUS_TIMEOUT_MS = 20_000;
 
 const CLAUDE_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
@@ -1104,8 +1104,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   readonly #readAccountEffect = Effect.fn("ClaudeAgentClient.readAccount")(function* (
     this: ClaudeAgentClient,
-    timeoutMs = AUTH_STATUS_TIMEOUT_MS,
+    requestTimeoutMs = 0,
   ): Effect.fn.Return<AccountReadResult, ProviderClientOperationError> {
+    const timeoutMs = Math.max(requestTimeoutMs, AUTH_STATUS_TIMEOUT_MS);
     let status = yield* this.#readAuthStatusEffect(false, timeoutMs);
     const onApiKey = status.loggedIn !== true && Boolean(this.#fallbackApiKey?.());
     if (onApiKey) status = yield* this.#readAuthStatusEffect(true, timeoutMs);
