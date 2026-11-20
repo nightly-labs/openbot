@@ -101,7 +101,7 @@ function McpServerForm({
   const enabled = saved?.enabled ?? newEnabled;
   const config = mcpServerConfig(draft, saved?.id ?? "", enabled);
   const errors = mcpServerDraftErrors(config);
-  const valid = !errors.name && !errors.command && !errors.url;
+  const valid = !errors.name && !errors.command && !errors.url && !errors.headers;
   const dirty = mcpServerDraftChanged(draft, saved);
   const signedIn =
     saved?.transport === "http" &&
@@ -298,7 +298,7 @@ function McpServerForm({
           />
           <PairField
             title={t("mobile.server.mcp.headers")}
-            footer={t("mobile.server.mcp.headersHint")}
+            footer={errors.headers ? sourceText(errors.headers) : t("mobile.server.mcp.headersHint")}
             items={draft.headers}
             maxItems={INPUT_LIMITS.mcpHeaders}
             maxKeyLength={INPUT_LIMITS.mcpEnvName}

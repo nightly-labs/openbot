@@ -316,7 +316,7 @@ export class McpGateway {
   readonly inspect = Effect.fnUntraced(function* (this: McpGateway, config: McpServerConfig, tested = false) {
     const normalized = normalizeMcpConfig(config);
     const errors = mcpConfigErrors(normalized);
-    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
+    const firstError = errors.name ?? errors.command ?? errors.url;
     if (firstError) return yield* new McpGatewayFailed({ cause: new Error(firstError) });
     const stored = this.#oauth;
     const silent: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined = stored
