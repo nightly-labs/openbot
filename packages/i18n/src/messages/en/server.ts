@@ -249,7 +249,7 @@ export const messages = defineMessages("server", {
   "server.plan.deletedOn": "Deleted on {date}",
   "server.plan.dialogTitle": "Don't let your agents go",
   "server.plan.dialogDescription":
-    "{name} stopped because its plan was not paid. On {date}, OpenBot deletes its agents, with all their chats and files.",
+    "{name} stopped because its plan ended. On {date}, OpenBot deletes its agents, with all their chats and files.",
   "server.plan.dialogDaysLeft": {
     one: "{count} day left",
     other: "{count} days left",

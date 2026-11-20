@@ -241,7 +241,7 @@ export const messages = {
   "server.plan.deletedOn": "{date}에 삭제",
   "server.plan.dialogTitle": "에이전트를 떠나보내지 마세요",
   "server.plan.dialogDescription":
-    "{name}의 플랜 요금이 결제되지 않아 서버가 멈췄어요. {date}에 OpenBot이 에이전트와 모든 채팅, 파일을 삭제해요.",
+    "{name}의 플랜이 끝나서 서버가 멈췄어요. {date}에 OpenBot이 에이전트와 모든 채팅, 파일을 삭제해요.",
   "server.plan.dialogDaysLeft": {
     other: "{count}일 남음",
   },
