@@ -14,10 +14,6 @@ export function setPerfProbeSink(next: PerfProbeSink | null): void {
   sink = next;
 }
 
-export function perfProbesActive(): boolean {
-  return sink !== null;
-}
-
 export function perfCount(key: string, amount = 1): void {
   sink?.count(key, amount);
 }

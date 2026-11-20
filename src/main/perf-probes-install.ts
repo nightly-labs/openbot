@@ -53,7 +53,7 @@ let cpuStart = process.cpuUsage();
 
 const originalPrepare = DatabaseSync.prototype.prepare;
 
-export function normalizeSql(sql: string): string {
+function normalizeSql(sql: string): string {
   return sql
     .replace(/'(?:[^']|'')*'/gu, "?")
     .replace(/\b\d+(?:\.\d+)?\b/gu, "?")
