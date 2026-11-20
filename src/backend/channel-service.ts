@@ -3749,7 +3749,6 @@ function routingTimedOut(error: unknown): boolean {
 
 function routingFailureText(error: unknown): string | null {
   if (!(error instanceof Error) || !isFixedSourceText(error.message)) return null;
-  if (routingTimedOut(error)) return sourceText("error.backend.channelLeadTimedOut");
   const keys = matchingSourceKeys(error.message);
   if (keys.some((key) => key.startsWith("error.agent.profile"))) return sourceText("error.backend.channelLeadFailed");
   return keys.some((key) => key.startsWith("error.backend.")) ? error.message : null;
