@@ -705,6 +705,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }
           this.#drain.scheduleDrain(agentId);
         }).bind(this),
+        turnAnswer: (agentId, threadId, turnId) => this.#turnAnswer(agentId, turnId, threadId),
+        closeTask: (agentId, taskId) => this.closeTask({ agentId, taskId }),
+        fork: (work) => {
+          Effect.runFork(work.pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+        },
       },
     });
     this.#messageDeletion = new MessageDeletion({
@@ -5824,10 +5829,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   }
 
-  #turnAnswer(agentId: string, turnId: string): string | null {
+  #turnAnswer(agentId: string, turnId: string, threadId?: string): string | null {
     const ofTurn = (messages: readonly ConversationMessage[]) =>
       messages.filter((message) => message.turnId === turnId);
-    const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+    const snapshot = threadId
+      ? this.#conversation.loadedExecutionSnapshot(threadId)
+      : this.#conversation.loadedSnapshot(agentId);
+    const loaded = ofTurn(snapshot?.messages ?? []);
     const messages = loaded.length > 0 ? loaded : this.#store.database.readTurnAssistantMessages(agentId, turnId);
     return messages.findLast(isAnswer)?.text ?? null;
   }
@@ -6117,9 +6125,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  readonly stopTask = Effect.fn("AgentService.stopTask")(function* (
+  stopTask(input: AgentTaskInput): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#stopTask(input, true);
+  }
+
+  readonly #stopTask = Effect.fn("AgentService.stopTask")(function* (
     this: AgentService,
     input: AgentTaskInput,
+    byUser: boolean,
   ): Effect.fn.Return<void, AgentLifecycleFailed> {
     const task = yield* lifecycleStep("find task", () => this.#tasks.require(input.agentId, input.taskId));
     yield* this.#drain.endPlanContinuation(task.agentId, task.taskId);
@@ -6127,7 +6140,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       yield* this.cancelQueuedMessage(task.agentId, message.deliveryId);
     const turnId = this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId;
     if (turnId) {
-      this.#tasks.markStopped(task.taskId, turnId);
+      this.#tasks.markStopped(task.taskId, turnId, byUser);
       yield* this.#interruptTurn(task.agentId, turnId, task.threadId);
     }
     this.#tasks.changed(task.agentId);
@@ -6144,7 +6157,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         : null;
     });
     yield* this.#returnTaskAnswers(input);
-    yield* this.stopTask(input);
+    yield* this.#stopTask(input, false);
     if (running) yield* running.pipe(Effect.timeoutOption(TASK_STOP_WAIT_MS));
     yield* this.#returnTaskAnswers(input);
     const task = yield* lifecycleStep("find task", () => {

@@ -467,6 +467,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",
   "error.backend.taskToolInvalid":
     "Dai all'attività un titolo di al massimo 120 caratteri e una descrizione che dica cosa fare.",
+  "error.backend.taskControlInvalid":
+    "Indica il taskId di un'attività che hai avviato. Un messaggio richiede anche un testo.",
   "error.backend.taskOwnChatOnly":
     "Avvia un'attività solo dalla tua chat. Un canale, una conversazione di messaggistica o un'altra attività non possono avviarne una.",
   "error.backend.taskUnfinishedLimit":
@@ -474,6 +476,7 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Questo agente ha {count} attività aperte. Chiudi un'attività, poi avviane o aprine un'altra.",
   "error.backend.taskRemoteUnsupported": "Le attività sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.taskMessageFailed": "OpenBot non è riuscito a inviare il messaggio all’attività. Riprova più tardi.",
   "error.backend.taskStartFailed":
     "OpenBot non è riuscito ad avviare l'attività. Esegui invece il lavoro in questo turno.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1099,6 +1099,23 @@ export class MailboxStore {
     );
   }
 
+  taskAwaitsAgent(agentId: string, taskId: string): boolean {
+    const messages = this.#messagesById();
+    return this.#deliveriesFor(agentId).some((delivery) => {
+      if (!isActiveDelivery(delivery)) return false;
+      const message = messages.get(delivery.messageId);
+      return message?.taskId === taskId && message.sender.kind === "agent";
+    });
+  }
+
+  taskRequesterIds(taskId: string): string[] {
+    const ids = new Set<string>();
+    for (const message of this.#state.messages)
+      if (message.taskId === taskId && message.sender.kind === "agent")
+        for (const id of message.requesterIds ?? []) ids.add(id);
+    return [...ids];
+  }
+
   deleteTaskMessages = Effect.fn("MailboxStore.deleteTaskMessages")(function* (
     this: MailboxStore,
     agentId: string,

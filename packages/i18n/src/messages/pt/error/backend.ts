@@ -474,6 +474,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",
   "error.backend.taskToolInvalid":
     "Dê à tarefa um título de no máximo 120 caracteres e uma instrução que diga o que fazer.",
+  "error.backend.taskControlInvalid":
+    "Informe o taskId de uma tarefa que você iniciou. Uma mensagem também precisa de texto.",
   "error.backend.taskOwnChatOnly":
     "Inicie uma tarefa só a partir do seu próprio chat. Um canal, uma conversa de mensagens ou outra tarefa não pode iniciar uma.",
   "error.backend.taskUnfinishedLimit":
@@ -481,5 +483,7 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Este agente tem {count} tarefas abertas. Feche uma tarefa e depois inicie ou abra outra.",
   "error.backend.taskRemoteUnsupported": "As tarefas só estão disponíveis para agentes neste computador.",
+  "error.backend.taskMessageFailed":
+    "O OpenBot não conseguiu enviar a mensagem para a tarefa. Tente novamente mais tarde.",
   "error.backend.taskStartFailed": "O OpenBot não conseguiu iniciar a tarefa. Faça o trabalho neste turno.",
 } as const satisfies PartialTranslation<typeof source>;
