@@ -441,21 +441,20 @@
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
+    "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
     "@modelcontextprotocol/sdk@1.32.1": "patches/@modelcontextprotocol%2Fsdk@1.32.1.patch",
     "expo-widgets@58.0.28": "patches/expo-widgets@58.0.28.patch",
-    "@norbert_bodziony/bloub@0.6.5": "patches/@norbert_bodziony%2Fbloub@0.6.5.patch",
+    "expo@58.0.25": "patches/expo@58.0.25.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
-    "expo@58.0.25": "patches/expo@58.0.25.patch",
     "expo-splash-screen@58.0.14": "patches/expo-splash-screen@58.0.14.patch",
     "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
+    "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
+    "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
     "react-native-keyboard-controller@1.22.7": "patches/react-native-keyboard-controller@1.22.7.patch",
     "react-native-worklets@0.13.0": "patches/react-native-worklets@0.13.0.patch",
-    "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
-    "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
-    "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
   },
   "catalog": {
     "@cacheable/node-cache": "1.7.6",
@@ -465,7 +464,7 @@
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.5",
+    "@norbert_bodziony/bloub": "0.6.7",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0",
@@ -1159,7 +1158,7 @@
 
     "@node-datachannel/win32-x64-msvc": ["@node-datachannel/win32-x64-msvc@0.33.6", "", { "os": "win32", "cpu": "x64" }, "sha512-N5GW6XH11Iuu+kyHLTiCMcCHdwWwpKqvtYril0LzQm6xBgmGQN3JXxFmgi4g4usw1nLy6WhBWADjbhSXJiiEMA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.5", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-mSKU/hDzUWFOr9Bg+ZQJ2zNKlmxT0mP3G7nhpUjMu6jkbdThyeiJZv1aUwJu9KNFWTAxa614UXP1ZS7zXaZDoQ=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.7", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-RPRieMg0EGglIgdwhybjDg2gn0w2WREnO+PMiaQK4hF1DLYvnR4i96GphJh8dHW01XGB60vz6Ex3Q3VC+gDUDg=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 
