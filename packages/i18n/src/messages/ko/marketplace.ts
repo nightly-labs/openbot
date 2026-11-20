@@ -213,6 +213,16 @@ export const messages = {
   "marketplace.plugin.hindsight.prompt.reflect":
     "내 Hindsight 기억을 되돌아봐 주세요. 지난 한 달 동안 내 작업에서 어떤 패턴이 보이나요?",
   "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud의 Connect 페이지에서 키를 만드세요.",
+  "marketplace.plugin.mnemoverse.tagline": "평가하고 공유할 수 있는 기억",
+  "marketplace.plugin.mnemoverse.description":
+    "Mnemoverse는 에이전트에게 호스팅되는 장기 기억을 제공합니다. 에이전트는 선호나 결정을 저장하고 나중에 평범한 질문으로 찾아냅니다. 같은 계정이 ChatGPT, Claude, Cursor, VS Code에서 작동합니다. 불러온 기억을 도움이 됨 또는 오해의 소지가 있음으로 평가하면 다음에 돌아오는 기억의 순서가 바뀝니다. 공유 룸에서는 여러 사람의 어시스턴트가 하나의 기억을 읽고 쓸 수 있습니다. Mnemoverse가 받는 것은 에이전트가 저장하는 내용과 검색에 쓰는 질문입니다.",
+  "marketplace.plugin.mnemoverse.app": "Mnemoverse 계정의 기억을 저장하고, 검색하고, 평가합니다.",
+  "marketplace.plugin.mnemoverse.prompt.recall":
+    "시작하기 전에 이 프로젝트에 대해 지난번에 무엇을 결정했는지 Mnemoverse에서 확인해 주세요.",
+  "marketplace.plugin.mnemoverse.prompt.save": "이 채팅의 결정을 하나씩 별도의 기억으로 Mnemoverse에 저장해 주세요.",
+  "marketplace.plugin.mnemoverse.prompt.rate":
+    "이 채팅에서 사용한 기억을 Mnemoverse에서 평가해 주세요. 어떤 것이 도움이 되었고 어떤 것이 틀렸는지 알려 주세요.",
+  "marketplace.plugin.mnemoverse.hint.apiKey": "console.mnemoverse.com에서 키를 만드세요.",
   "marketplace.plugin.figma.tagline": "디자인 및 프로토타입",
   "marketplace.plugin.figma.description":
     "Figma를 사용하면 에이전트가 디자인 파일을 읽고, 컴포넌트, 스타일, 변수를 살펴보고, 개발자에게 제작 명세를 전달할 수 있어요. 이 컴퓨터의 Figma 데스크톱 앱에 있는 MCP 서버에 연결해요. 서버는 디자인을 읽기만 할 수 있고, 쓰기 지원은 준비 중이에요.",

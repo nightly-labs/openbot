@@ -75,6 +75,12 @@
       "detailSha256": "8ecc544dca109f960949c8ae554a61fc49246c4fa61d419b139ecbdae1f95b37"
     },
     {
+      "slug": "mnemoverse",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "bf9e9d5d7a97f4fb96ce7e081a6887f163d69ee5df31111b2c82cae1543b2ad6"
+    },
+    {
       "slug": "figma",
       "version": "1.1.0",
       "featured": true,

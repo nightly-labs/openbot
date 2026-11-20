@@ -97,6 +97,18 @@ const PLUGIN_TEXT = {
       "prompt-reflect": "marketplace.plugin.hindsight.prompt.reflect",
     },
   },
+  mnemoverse: {
+    tagline: "marketplace.plugin.mnemoverse.tagline",
+    description: "marketplace.plugin.mnemoverse.description",
+    apps: {
+      "app-mnemoverse-mcp": "marketplace.plugin.mnemoverse.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.mnemoverse.prompt.recall",
+      "prompt-save": "marketplace.plugin.mnemoverse.prompt.save",
+      "prompt-rate": "marketplace.plugin.mnemoverse.prompt.rate",
+    },
+  },
   figma: {
     tagline: "marketplace.plugin.figma.tagline",
     description: "marketplace.plugin.figma.description",
@@ -554,6 +566,7 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
   "In Obsidian, open Settings > Local REST API and copy the API key.": "marketplace.plugin.obsidian.hint.apiKey",
   "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
   "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
+  "Create a key at console.mnemoverse.com.": "marketplace.plugin.mnemoverse.hint.apiKey",
   "In Omnisend, open Store settings > API keys and create a key.": "marketplace.plugin.omnisend.hint.apiKey",
 };
 

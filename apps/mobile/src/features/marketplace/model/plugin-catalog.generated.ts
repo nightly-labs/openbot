@@ -526,6 +526,63 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "mnemoverse",
+    name: "Mnemoverse",
+    tagline: "Memory you can rate and share",
+    description:
+      "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. Mnemoverse receives what an agent saves and the questions it searches with.",
+    category: "productivity",
+    creatorName: "Mnemoverse",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-recall",
+        text: "Before we start, check Mnemoverse for what I decided about this project last time.",
+      },
+      { id: "prompt-save", text: "Save each decision from this chat to Mnemoverse as a separate memory." },
+      {
+        id: "prompt-rate",
+        text: "In Mnemoverse, rate the memories you used in this chat: which helped and which were wrong.",
+      },
+    ],
+    websiteUrl: "https://mnemoverse.com",
+    privacyPolicyUrl: "https://mnemoverse.com/privacy",
+    termsUrl: "https://mnemoverse.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-mnemoverse-mcp",
+        name: "Mnemoverse",
+        description: "Save, search and rate memories in your Mnemoverse account.",
+        server: {
+          name: "mnemoverse",
+          transport: "http",
+          url: "https://mcp.mnemoverse.com/mcp",
+          auth: [
+            { id: "mnemoverse-oauth", kind: "link", label: "Sign in" },
+            {
+              id: "mnemoverse-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "mk_live_…",
+                  hint: "Create a key at console.mnemoverse.com.",
+                },
+              ],
+              docsUrl: "https://mnemoverse.com/docs/api/remote-mcp-server",
+              docsLabel: "Get a key",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     slug: "figma",
     name: "Figma",
     tagline: "Designs and prototypes",
