@@ -43,6 +43,7 @@ import {
   resetAgentSessionSetting,
   setAgentSessionSetting,
   setAgentSkillEnabled,
+  testMcpServer,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -347,6 +348,14 @@ export function createWebConversationRuntime(
           ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
           : [];
       },
+      ...(adminRequest
+        ? {
+            testMcpServer: async (input, serverId) => {
+              if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+              return runTeamEffect(testMcpServer(adminRequest(), input).pipe(Effect.mapError((error) => error.cause)));
+            },
+          }
+        : {}),
       listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);

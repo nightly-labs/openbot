@@ -465,6 +465,10 @@ export const messages = {
   "chat.suggestion.localOnly": "{name} は自分のコンピューターの OpenBot で接続してください。",
   "chat.suggestion.unavailable": "このサーバーでは {name} を接続できません。",
   "chat.suggestion.notAllowed": "{name} を接続できるのはサーバーの所有者または管理者だけです。",
+  "chat.mcpSignIn.notNeeded": "{name} はサインインなしで使えるようになりました。",
+  "chat.mcpSignIn.notNeededOutcome": "サインイン不要",
+  "chat.mcpSignIn.notNeededMessage":
+    "MCP サーバー {name} はサインインなしで使えるようになりました。もう一度テストしてください。",
   "chat.serverInstall.title": "新しいサーバー",
   "chat.serverInstall.expired": "コマンドの有効期限が切れました。エージェントに新しいコマンドを頼んでください。",
   "chat.compaction.running": "コンテキストを圧縮しています",
