@@ -24,7 +24,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
 import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
-import { ROUTINE_NO_UPDATE_TOOL } from "./routine-quiet-runs";
+import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL } from "./routine-quiet-runs";
 import type { PromptInstructionsFile } from "./workspace-instructions";
 import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sandbox";
 
@@ -374,7 +374,7 @@ export function developerInstructions(
         ? " In exec, ALL_TOOLS omits openbot, openbot_browser and image_gen tools; call them directly. For a local photo, call openbot.read_image: view_image in exec drops a file over 6 MB."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           agent.provider === "opencode"
-          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again.${
+          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again. Call ${ROUTINE_NO_UPDATE_TOOL} in execute as tools.openbot.${ROUTINE_NO_UPDATE_TOOL}({}), never as a separate tool; when OpenCode refuses it with "No tool named", answer only ${ROUTINE_NO_UPDATE_MARKER}.${
               process.platform === "win32"
                 ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash. In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as $([char]0x2013) inside double quotes, or read the text from a file."
                 : ""
