@@ -529,6 +529,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "لا يستطيع هذا المضيف نشر الوكلاء من جهاز بعيد.",
   "mobile.agent.usage.tokensWithoutCacheReads": "الرموز دون قراءات ذاكرة التخزين المؤقت",
   "mobile.agent.usage.estimatedCost": "التكلفة المقدّرة",
+  "mobile.agent.usage.noCostEstimate": "لا يوجد تقدير للتكلفة",
   "mobile.agent.usage.daily": "الاستخدام اليومي",
   "mobile.agent.usage.tokens": "الرموز",
   "mobile.agent.usage.cost": "التكلفة",

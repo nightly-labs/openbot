@@ -481,6 +481,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "이 호스트는 원격 기기에서 에이전트를 게시할 수 없어요.",
   "mobile.agent.usage.tokensWithoutCacheReads": "캐시 읽기를 제외한 토큰",
   "mobile.agent.usage.estimatedCost": "예상 비용",
+  "mobile.agent.usage.noCostEstimate": "비용 추정치 없음",
   "mobile.agent.usage.daily": "일별 사용량",
   "mobile.agent.usage.tokens": "토큰",
   "mobile.agent.usage.cost": "비용",

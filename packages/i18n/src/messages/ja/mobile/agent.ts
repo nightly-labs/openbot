@@ -491,6 +491,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "このホストでは、リモートデバイスからエージェントを公開できません。",
   "mobile.agent.usage.tokensWithoutCacheReads": "キャッシュ読み取りを除くトークン",
   "mobile.agent.usage.estimatedCost": "推定コスト",
+  "mobile.agent.usage.noCostEstimate": "コストの推定なし",
   "mobile.agent.usage.daily": "日別の使用量",
   "mobile.agent.usage.tokens": "トークン",
   "mobile.agent.usage.cost": "コスト",

@@ -482,6 +482,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "המארח הזה לא יכול לפרסם סוכנים מהתקן מרוחק.",
   "mobile.agent.usage.tokensWithoutCacheReads": "טוקנים ללא קריאות מטמון",
   "mobile.agent.usage.estimatedCost": "עלות משוערת",
+  "mobile.agent.usage.noCostEstimate": "אין הערכת עלות",
   "mobile.agent.usage.daily": "שימוש יומי",
   "mobile.agent.usage.tokens": "טוקנים",
   "mobile.agent.usage.cost": "עלות",
