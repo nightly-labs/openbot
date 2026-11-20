@@ -406,8 +406,20 @@ export function ComposerEditor(props: ComposerEditorProps) {
   // row that scrolls under a stationary pointer. Ignore hover until the pointer
   // really moves; scroll hit-test changes do not emit pointermove/mousemove.
   let ignoreHoverUntilPointerMove = false;
-  const resumeHoverSelection = () => {
+  const resumeHoverSelection = (event: PointerEvent | MouseEvent) => {
+    if (!ignoreHoverUntilPointerMove) return;
     ignoreHoverUntilPointerMove = false;
+    // Chromium dispatches the boundary mouseenter before the pointermove that
+    // caused it, so the enter ending this suppression was already ignored.
+    // Apply the hover for the row under the pointer once real movement arrives.
+    const target = event.target;
+    const row = target instanceof HTMLElement ? target.closest(".mention-picker-option") : null;
+    const key = row?.getAttribute("data-option-key");
+    if (!key) return;
+    const index = matchingOptions().findIndex((option) => pickerOptionKey(option) === key);
+    if (index < 0) return;
+    keyMove = false;
+    setActiveOption(index);
   };
   let releasePickerList: (() => void) | undefined;
   const bindPickerList = (list: HTMLElement) => {
