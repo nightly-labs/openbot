@@ -33,6 +33,9 @@
     .agent-activity-shine-text,
     .image-generation-glow,
     .media-generation-label[data-shine],
+    .computer-control-dot,
+    .trace-row[data-running] .trace-span-name,
+    .trace-bar[data-running],
     .task-list-item[data-state="active"] .task-list-item-text,
     .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label,
     [data-wait-state="resuming"] .open-waits-row-state
