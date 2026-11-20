@@ -608,6 +608,11 @@ export function createRemoteTeamPeer(
         renewSignal(state, actions);
       void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
     },
+    eventsFailed() {
+      const state = peer;
+      if (state && !state.closed)
+        failPeer(state, referenced(sourceText("error.remote.connectionDropped"), "events/failed"), actions);
+    },
     networkMoved() {
       const state = peer;
       if (active && state && !state.closed)
