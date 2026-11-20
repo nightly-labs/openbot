@@ -295,6 +295,7 @@ try {
     createRendererForwarders({
       getMainWindow: () => mainWindow,
       getChatWindows: () => [],
+      chatWindowTarget: () => null,
       getAgentService: () => agents ?? null,
       getHostService: () => null,
       getHostAnalytics: () => null,

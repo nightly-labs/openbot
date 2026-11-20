@@ -540,6 +540,7 @@ const {
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   getChatWindows: () => windows.getChatWindows(),
+  chatWindowTarget: (window) => windows.chatWindowTarget(window),
   getAgentService: () => services?.service ?? null,
   getHostService: () => services?.host ?? null,
   getHostAnalytics: () => services?.analytics ?? null,
