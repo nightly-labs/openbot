@@ -1,6 +1,7 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { AgentFilesView } from "@openbot/ui/features/files/AgentFilesView";
 import type { FilesPort } from "./files-port";
+import { smallPictureUrl } from "./library-picture-url";
 import type { StorageUsageResource } from "./storage-usage";
 
 export interface AgentFilesOptions {
@@ -41,6 +42,7 @@ export function AgentFilesSettings(
       onOpenWorkspace={props.onOpenWorkspace}
       canDelete={props.canManage}
       onOpenConversation={props.onOpenConversation}
+      pictureUrl={smallPictureUrl}
       onPreviewFile={(file) =>
         canPreviewAttachment(file) ? props.onPreviewFile(file) : void props.storage.fileAction(file, "open", showInChat)
       }

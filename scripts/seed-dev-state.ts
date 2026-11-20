@@ -258,7 +258,7 @@ export async function seedDevelopmentState(options: DevelopmentSeedOptions = {})
     ...SEED_SUMMARY,
     agents: SEED_SUMMARY.agents + scale.agents,
     conversations: SEED_SUMMARY.conversations + scale.agents,
-    attachments: SEED_SUMMARY.attachments + scale.attachments,
+    attachments: SEED_SUMMARY.attachments + scale.attachments + scale.pictures,
     channels: SEED_SUMMARY.channels + scale.channels,
     channelMessages: SEED_SUMMARY.channelMessages + scale.channels * scale.channelMessages,
   };
@@ -1696,7 +1696,7 @@ const USAGE = [
   "Replaces the app development profile with showcase data. It refuses while the dev app is open.",
   "  --dry-run      Print the target and the fixture counts. Change no files.",
   "  --if-missing   Keep an existing profile.",
-  "  --scale=<spec> Add generated data: agents:N,messages:M,channels:C,channelMessages:K,attachments:A",
+  "  --scale=<spec> Add generated data: agents:N,messages:M,channels:C,channelMessages:K,attachments:A,pictures:P",
 ].join("\n");
 
 async function main(): Promise<void> {

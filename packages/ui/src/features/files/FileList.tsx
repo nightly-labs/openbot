@@ -66,6 +66,7 @@ export interface FileListProps {
   folderLabel?: ((file: StoredFileRow) => string | undefined) | undefined;
   rowMenu?: ((file: StoredFileRow) => JSX.Element) | undefined;
   opensFiles?: boolean | undefined;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }
@@ -194,6 +195,7 @@ export function FileList(props: FileListProps) {
                         showConversation={props.showConversation !== false && !props.compact}
                         canDelete={props.canDelete === true && file.deletable}
                         selection={props.selection}
+                        pictureUrl={props.pictureUrl}
                         dateLabel={
                           group.label
                             ? format.date(new Date(file.createdAt), {
@@ -398,6 +400,7 @@ function FileRow(props: {
   showConversation: boolean;
   canDelete: boolean;
   selection: FileSelection | undefined;
+  pictureUrl: ((file: StoredFileRow) => string | null) | undefined;
   dateLabel: string;
   onPreview: () => void;
   onAction: (action: StoredFileAction) => void;
@@ -448,7 +451,7 @@ function FileRow(props: {
         <Show when={selecting()}>
           <FileSelectionMark selected={selected()} />
         </Show>
-        <FileVisual file={props.file} />
+        <FileVisual file={props.file} pictureUrl={props.pictureUrl} />
         <span class="file-row-copy">
           <span class="file-row-name" title={props.file.name}>
             {props.file.name}
@@ -482,7 +485,7 @@ function FileRow(props: {
   );
 }
 
-function FileVisual(props: { file: StoredFileRow }) {
+function FileVisual(props: { file: StoredFileRow; pictureUrl: ((file: StoredFileRow) => string | null) | undefined }) {
   return (
     <Show
       when={props.file.previewKind === "image" && props.file.previewUrl && props.file.status === "available"}
@@ -498,7 +501,7 @@ function FileVisual(props: { file: StoredFileRow }) {
       }
     >
       <span class="files-file-visual files-file-thumbnail" aria-hidden="true">
-        <img src={props.file.previewUrl ?? ""} alt="" />
+        <img src={props.pictureUrl?.(props.file) ?? props.file.previewUrl ?? ""} alt="" loading="lazy" />
       </span>
     </Show>
   );

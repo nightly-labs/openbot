@@ -1,6 +1,7 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
 import { ConversationFilesPanel } from "@openbot/ui/features/files/ConversationFilesPanel";
 import { type FilesPort, filesPort } from "./files-port";
+import { smallPictureUrl } from "./library-picture-url";
 import { createStorageUsage } from "./storage-usage";
 
 export type ChatFilesSource =
@@ -47,6 +48,7 @@ export default function ChatFilesPanel(props: {
       error={storage.error()}
       onRetry={() => void storage.refresh(true)}
       onClose={props.onClose}
+      pictureUrl={smallPictureUrl}
       onPreviewFile={(file) =>
         canPreviewAttachment(file) ? props.onPreviewFile(file) : void storage.fileAction(file, "open", showInChat)
       }

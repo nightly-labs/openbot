@@ -14,6 +14,7 @@ import { type AgentLevelsSource, createAgentLevels } from "../conversation/messa
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
 import { createLibraryFolders } from "./library-folders";
+import { smallPictureUrl } from "./library-picture-url";
 import {
   readLibraryCollapsedRows,
   readLibraryFavorites,
@@ -154,6 +155,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
             initialFavorites={readLibraryFavorites(props.serverId)}
             onFavoritesChange={saveFavorites}
             mediaSource={props.mediaSource}
+            pictureUrl={smallPictureUrl}
             opensFiles={props.opensFiles}
           />
         </Show>

@@ -22,6 +22,7 @@ export interface AgentFilesViewProps {
   conversations: readonly ConversationStorageRow[];
   files: readonly StoredFileRow[];
   now?: Date;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   onBack: () => void;
   onClose: () => void;
   onOpenWorkspace?: (() => void) | undefined;
@@ -147,6 +148,7 @@ export function AgentFilesView(props: AgentFilesViewProps) {
           canDelete={props.canDelete}
           emptyTitle={t("files.list.emptyTitle")}
           emptyDescription={t("files.agent.emptyDescription", { name: props.agentName })}
+          pictureUrl={props.pictureUrl}
           onPreview={props.onPreviewFile}
           onAction={props.onFileAction}
         />

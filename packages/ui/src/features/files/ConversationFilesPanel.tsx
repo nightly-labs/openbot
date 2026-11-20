@@ -17,6 +17,7 @@ export interface ConversationFilesPanelProps {
   onRetry?: () => void;
   width?: number;
   now?: Date;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   onClose: () => void;
   onPreviewFile: (file: StoredFileRow) => void;
   onFileAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
@@ -71,6 +72,7 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
             canDelete={props.canDelete}
             emptyTitle={t("files.conversation.emptyTitle")}
             emptyDescription={t("files.conversation.emptyDescription")}
+            pictureUrl={props.pictureUrl}
             onPreview={props.onPreviewFile}
             onAction={props.onFileAction}
           />

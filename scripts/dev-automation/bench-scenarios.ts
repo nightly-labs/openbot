@@ -226,6 +226,83 @@ async function scrollThroughHistory(context: ScenarioContext) {
   return steps;
 }
 
+const LIBRARY_SCROLL = ".library-page";
+const LIBRARY_PICTURE_WAIT_MS = 15 * SECOND;
+
+async function openRailPage(context: ScenarioContext, label: string): Promise<void> {
+  const rail = context.page.getByRole("navigation", { name: "Pages" });
+  const pinned = rail.getByRole("button", { name: label, exact: true });
+  if ((await pinned.count()) > 0) {
+    await pinned.first().click();
+    return;
+  }
+  await rail.getByRole("button", { name: "More", exact: true }).click();
+  await context.page.getByRole("menuitem", { name: label, exact: true }).first().click();
+}
+
+async function openLibrary(context: ScenarioContext): Promise<void> {
+  await openRailPage(context, "Library");
+  await context.page.locator(`${LIBRARY_SCROLL} .library-grid img`).first().waitFor();
+}
+
+interface LibraryPass {
+  steps: number;
+  pictures: number;
+  unloaded: number;
+  waits: number[];
+}
+
+async function scrollLibraryPictures(context: ScenarioContext): Promise<LibraryPass> {
+  return context.evaluate<LibraryPass>(`(async () => {
+    const scroller = document.querySelector(${json(LIBRARY_SCROLL)});
+    if (!scroller) throw new Error("The Library is not open.");
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const visiblePictures = () => {
+      const view = scroller.getBoundingClientRect();
+      return [...scroller.querySelectorAll(".library-grid img")].filter((image) => {
+        const box = image.getBoundingClientRect();
+        return box.bottom > view.top && box.top < view.bottom;
+      });
+    };
+    const shown = (image) => image.complete && image.naturalWidth > 0;
+    const timeout = () => new Promise((resolve) => setTimeout(resolve, ${LIBRARY_PICTURE_WAIT_MS}));
+    const waits = [];
+    let unloaded = 0;
+    let steps = 0;
+    scroller.scrollTop = 0;
+    while (steps < 400) {
+      const started = performance.now();
+      const visible = visiblePictures();
+      await Promise.race([Promise.all(visible.map((image) => image.decode().catch(() => undefined))), timeout()]);
+      await frame();
+      unloaded += visible.filter((image) => !shown(image)).length;
+      waits.push(Math.round(performance.now() - started));
+      steps += 1;
+      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) break;
+      scroller.scrollTop += Math.round(scroller.clientHeight * 0.9);
+      await frame();
+    }
+    return { steps, pictures: scroller.querySelectorAll(".library-grid img").length, unloaded, waits };
+  })()`);
+}
+
+function percentile(values: readonly number[], fraction: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))] ?? 0;
+}
+
+function libraryPassMetrics(name: string, pass: LibraryPass): MetricValues {
+  return {
+    [`library.${name}.steps`]: pass.steps,
+    [`library.${name}.pictures`]: pass.pictures,
+    [`library.${name}.unloaded`]: pass.unloaded,
+    [`library.${name}.totalMs`]: pass.waits.reduce((total, wait) => total + wait, 0),
+    [`library.${name}.waitP50Ms`]: percentile(pass.waits, 0.5),
+    [`library.${name}.waitP90Ms`]: percentile(pass.waits, 0.9),
+    [`library.${name}.waitMaxMs`]: Math.max(0, ...pass.waits),
+  };
+}
+
 function articlePage(index: number): string {
   const paragraphs = Array.from(
     { length: 300 },
@@ -760,6 +837,19 @@ export const SCENARIOS: Scenario[] = [
       await context.wait(3 * SECOND);
       context.record({ "scroll.steps": await scrollThroughHistory(context) });
       await context.wait(10 * SECOND);
+    },
+  },
+  {
+    id: "s15-library-pictures",
+    description:
+      "The Library with 96 pictures in 12 sizes (0.3 to 12 megapixels), scrolled through, closed and opened again",
+    seed: scaled("agents:1,messages:4,pictures:96"),
+    act: async (context) => {
+      await openLibrary(context);
+      context.record(libraryPassMetrics("first", await scrollLibraryPictures(context)));
+      await openRailPage(context, "Agents");
+      await openLibrary(context);
+      context.record(libraryPassMetrics("again", await scrollLibraryPictures(context)));
     },
   },
 ];
