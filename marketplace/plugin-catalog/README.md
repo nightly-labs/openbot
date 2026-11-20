@@ -255,6 +255,36 @@ Troubleshooting:
 - A self-hosted TryPost: add an MCP server with the address of the instance followed by
   `/mcp/trypost`, in the MCP servers settings, and select Sign in.
 
+## eksis
+
+The listing connects to eksis's own MCP server at `https://api.eksis.io/mcp`
+(<https://docs.eksis.io/en/mcp>). The protected-resource metadata names `https://api.eksis.io`,
+which has dynamic client registration with S256, the `refresh_token` grant and a revocation
+endpoint, so the user signs in through the browser and types no key. The server accepts the
+loopback redirect `http://127.0.0.1:28417/mcp-auth`. On the consent screen, the user chooses the
+workspace and the permissions (`read`, `write`) that the connection can use. One connection works
+on one workspace. MCP works on every eksis plan, the free plan included. Direct messages and
+analytics follow the plan of the workspace.
+
+The server answers `initialize` and `tools/list` with no credential, so a client can show the tools
+before the user signs in. A tool call with no credential gets 401 with a `Bearer` challenge that
+names the protected-resource metadata. For this reason, `bun run test:mcp-catalog` stops at its
+first check for this listing ("initialize with no sign-in answered 200, not 401"). The metadata
+checks after it pass.
+
+`create_post` with mode `now` and `publish_post` publish immediately. Replies to comments and
+direct messages are also sent immediately.
+
+Troubleshooting:
+
+- A tool answers 401 after the sign-in: the token was revoked on the **API & MCP** page of the
+  workspace. In the MCP servers settings, select Sign in on the eksis server again.
+- The agent does not see the channels that the user expects: the connection uses another
+  workspace. In the MCP servers settings, select Sign out on the eksis server, then Sign in, and
+  choose the correct workspace.
+- A tool answers that the plan does not include the feature: direct messages and analytics need a
+  paid eksis plan.
+
 ## Adobe Analytics
 
 The listing connects to Adobe's own MCP server at `https://aa-mcp.adobe.io/mcp`
