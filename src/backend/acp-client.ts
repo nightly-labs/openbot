@@ -3278,9 +3278,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
       if (reported === "completed" || reported === "failed") {
-        this.#openQuestionToolCalls
-          .get(questionToolCallKey(thread.id, update.toolCallId))
-          ?.abort(PROVIDER_STOPPED_WAITING);
+        if (!turn.stopped)
+          this.#openQuestionToolCalls
+            .get(questionToolCallKey(thread.id, update.toolCallId))
+            ?.abort(PROVIDER_STOPPED_WAITING);
         turn.messages.push(shown);
         turn.toolItems.delete(update.toolCallId);
         turn.mediaKinds.delete(update.toolCallId);
