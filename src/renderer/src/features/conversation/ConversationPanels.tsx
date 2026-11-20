@@ -749,6 +749,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
               quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
+              builtinMemoryEditable={props.server?.kind === "local" || props.remoteBuiltinMemoryLoaded === true}
               fastMode={fastMode()}
               ultrafast={ultrafast()}
               onFastModeChange={fastModeChange()}

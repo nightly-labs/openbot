@@ -55,6 +55,7 @@ import type {
 import {
   agentAccessRank,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentPermissionLevel,
   agentQuickAcknowledgementEnabled,
@@ -268,6 +269,14 @@ function requestAborted(signal: AbortSignal | undefined) {
     return Effect.sync(() => signal?.removeEventListener("abort", abort));
   });
 }
+
+const AGENT_MEMORY_TOOLS: ReadonlySet<string> = new Set([
+  "search_memories",
+  "list_memories",
+  "set_memory_inclusion",
+  "remember",
+  "forget_memory",
+]);
 
 const LISTED_DESCRIPTION_LENGTH = 300;
 
@@ -1659,6 +1668,11 @@ export class OpenBotToolRouter {
     };
   }
 
+  #memoryEnabled(agentId: string): boolean {
+    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
+    return agent === undefined || agentMemoryEnabled(agent);
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agents = this.#hooks.listAgents();
     const agent = agents.find((candidate) => candidate.id === agentId);
@@ -2267,6 +2281,10 @@ export class OpenBotToolRouter {
       );
     }
 
+    if (AGENT_MEMORY_TOOLS.has(params.tool) && !this.#memoryEnabled(senderAgentId))
+      return openBotToolFailure(
+        "OpenBot memory is off for you, so this tool does not work. Use a connected memory app instead, or tell the user that they can turn on OpenBot memory in your settings.",
+      );
     const memoryResult = this.#memories.handleTool(
       params,
       senderAgentId,

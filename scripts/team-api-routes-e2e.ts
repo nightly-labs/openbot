@@ -94,6 +94,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
@@ -2548,6 +2552,8 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
+              if (input.memory === true) delete target.memory;
+              else if (input.memory === false) target.memory = false;
               if (input.fastMode !== undefined) {
                 target.fastMode = input.fastMode;
                 if (input.fastMode && input.ultrafast) target.ultrafast = true;
@@ -5150,6 +5156,116 @@ try {
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,
       [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  {
+    const memoryCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_BUILTIN_MEMORY_CAPABILITY];
+    const v10 = { capabilities: memoryCapabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-builtin-memory-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_BUILTIN_MEMORY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_BUILTIN_MEMORY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const adminRead = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    check(
+      "an admin reads that OpenBot memory is on for an agent with no own value",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, { memory: true }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the OpenBot memory routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    const memberSet = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", memory: false },
+      ...v10,
+    });
+    check(
+      "a member cannot read or set OpenBot memory",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet)],
+    );
+    const notBoolean = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: null },
+      ...v10,
+    });
+    check(
+      "the host refuses an OpenBot memory value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const adminOff = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: false },
+      ...v10,
+    });
+    const readOff = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    check(
+      "an admin turns off OpenBot memory through the agent writer and reads it back",
+      adminOff.status === 200 &&
+        isDeepStrictEqual(adminOff.body, { memory: false }) &&
+        isDeepStrictEqual(readOff.body, { memory: false }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", memory: false }]),
+      [summary(adminOff), summary(readOff)],
+    );
+    const adminOn = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: true },
+      ...v10,
+    });
+    const missing = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      ...v10,
+    });
+    check(
+      "an admin turns OpenBot memory on again, and an unknown agent gets 404",
+      adminOn.status === 200 &&
+        isDeepStrictEqual(adminOn.body, { memory: true }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(adminOn), summary(missing)],
+    );
+    const colorWrites = callsOf("updateAgentColor").length;
+    const profilePatch = await call("PATCH", TEAM_API_ROUTES.agent.one("agent-ada"), {
+      token: adaToken,
+      json: { memory: false },
+      ...v10,
+    });
+    check(
+      "the agent profile update refuses OpenBot memory and writes nothing",
+      profilePatch.status === 400 &&
+        callsOf("updateAgent").length === writes + 2 &&
+        callsOf("updateAgentColor").length === colorWrites,
+      summary(profilePatch),
     );
   }
 

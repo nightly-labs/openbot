@@ -43,6 +43,10 @@ export function agentComputerUseEnabled(agent: { computerUse?: boolean | undefin
   return agent.computerUse !== false;
 }
 
+export function agentMemoryEnabled(agent: { memory?: boolean | undefined }): boolean {
+  return agent.memory !== false;
+}
+
 export const AGENT_DEFAULT_KEYS = ["allowAutomation", "allowNewChat", "quickAcknowledgement"] as const;
 export type AgentDefaultKey = (typeof AGENT_DEFAULT_KEYS)[number];
 export type AgentDefaults = Record<AgentDefaultKey, boolean> & {
@@ -226,6 +230,7 @@ export interface AgentSummary {
   additionalFolders?: string[];
   excludedFolders?: string[];
   computerUse?: boolean;
+  memory?: boolean;
   allowAutomation?: boolean;
   allowNewChat?: boolean;
   quickAcknowledgement?: boolean;
@@ -284,6 +289,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.additionalFolders === undefined || isAgentAdditionalFolders(value.additionalFolders)) &&
     (value.excludedFolders === undefined || isAgentAdditionalFolders(value.excludedFolders)) &&
     (value.computerUse === undefined || isBoolean(value.computerUse)) &&
+    (value.memory === undefined || isBoolean(value.memory)) &&
     (value.allowAutomation === undefined || isBoolean(value.allowAutomation)) &&
     (value.allowNewChat === undefined || isBoolean(value.allowNewChat)) &&
     (value.quickAcknowledgement === undefined || isBoolean(value.quickAcknowledgement)) &&
@@ -337,6 +343,7 @@ export interface UpdateAgentInput {
   reasoningEffort?: AgentReasoningEffort;
   access?: AgentAccess;
   computerUse?: boolean;
+  memory?: boolean;
   allowAutomation?: boolean | null;
   allowNewChat?: boolean | null;
   quickAcknowledgement?: boolean | null;

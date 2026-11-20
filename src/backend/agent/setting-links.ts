@@ -317,6 +317,13 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     about: "Before a long task, the agent shows its plan.",
     words: "plan card confirm before start",
   },
+  "agent.builtin-memory": {
+    title: "OpenBot memory",
+    place: `${AGENT} > Advanced`,
+    about:
+      "Turn off OpenBot memory to use only a memory app that you connect, such as Mem0. The agent then does not read or save OpenBot memories. Saved memories stay.",
+    words: "memory mem0 openviking provider external remember disable off",
+  },
 };
 
 export interface SettingLinkSummary {

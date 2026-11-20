@@ -17,6 +17,7 @@ import {
   type ClientAgentModelOption,
   canAdministerServer,
   decodeAgentBackupModelSettings,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentFastModeSettings,
   decodeAgentHostSettings,
@@ -35,6 +36,7 @@ import type { PricingOrder } from "@openbot/contracts/license";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
@@ -1075,6 +1077,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           agentId,
           quickAcknowledgement,
         }),
+      getAgentBuiltinMemory: (agentId, serverId) =>
+        hostRequest(serverId)("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, decodeAgentBuiltinMemorySettings, {
+          agentId,
+        }),
+      updateAgentBuiltinMemory: ({ agentId, memory }, serverId) =>
+        hostRequest(serverId)("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, decodeAgentBuiltinMemorySettings, {
+          agentId,
+          memory,
+        }),
       getAgentFastMode: async (agentId, serverId) =>
         workspace.state.capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? agentFastModeSettings(
@@ -1115,6 +1126,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const memory = remoteAgentAdmin.memory();
     const fastMode = remoteAgentAdmin.fastMode();
     const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
@@ -1128,6 +1140,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(backupModels ? { backupModels } : {}),
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
           ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
+          ...(memory === undefined ? {} : { memory }),
           ...(typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(computerUse === undefined ? {} : { computerUse }),
           ...(allowNewChat === undefined ? {} : { allowNewChat }),
@@ -3836,6 +3849,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   agentAutoApproves={remoteAgentAdmin.autoApproves()}
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+                  remoteBuiltinMemoryLoaded={remoteAgentAdmin.memory() !== undefined}
                   remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
                   remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
                   remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}

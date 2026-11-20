@@ -526,6 +526,42 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "mem0",
+    name: "Mem0",
+    tagline: "Memory layer for AI agents",
+    description:
+      "Mem0 gives agents a long-term memory in your Mem0 account. Agents add facts and preferences, search them by meaning, and update or delete them. Other AI tools that you connect to Mem0 share the same memories. To make Mem0 the only memory of an agent, turn off OpenBot memory in the agent's settings. What agents save goes to your Mem0 account.",
+    category: "productivity",
+    creatorName: "Mem0",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-recall", text: "Search Mem0 for what you know about my current projects before we start." },
+      { id: "prompt-save", text: "Add to Mem0 that I prefer short status updates with the open questions first." },
+      {
+        id: "prompt-clean",
+        text: "List my Mem0 memories about the old office and delete the ones that are out of date.",
+      },
+    ],
+    websiteUrl: "https://mem0.ai",
+    privacyPolicyUrl: "https://mem0.ai/privacy",
+    termsUrl: "https://mem0.ai/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-mem0-mcp",
+        name: "Mem0",
+        description:
+          "Add, search, update and delete memories in your Mem0 account over Mem0's MCP server with browser sign-in.",
+        server: {
+          name: "mem0",
+          transport: "http",
+          url: "https://mcp.mem0.ai/mcp/",
+          auth: [{ id: "mem0-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "figma",
     name: "Figma",
     tagline: "Designs and prototypes",

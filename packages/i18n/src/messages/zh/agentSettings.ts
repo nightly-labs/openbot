@@ -215,6 +215,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "对话变长时，让助手自行开始新对话。它会先保存笔记。",
   "agentSettings.quickAcknowledgement.title": "长任务开始前显示计划",
   "agentSettings.quickAcknowledgement.description": "长任务开始前，助手会先显示计划。",
+  "agentSettings.builtinMemory.title": "OpenBot 记忆",
+  "agentSettings.builtinMemory.description":
+    "助手会保存并读取自己的记忆。关闭后只使用记忆应用，例如 Mem0。已保存的记忆会保留。",
   "agentSettings.browserProfile.label": "浏览器配置文件",
   "agentSettings.browserProfile.shared": "共享",
   "agentSettings.browserProfile.agent": "仅该助手",

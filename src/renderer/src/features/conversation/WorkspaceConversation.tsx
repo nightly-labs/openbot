@@ -272,6 +272,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const memory = remoteAgentAdmin.memory();
     const fastMode = remoteAgentAdmin.fastMode();
     const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
@@ -285,6 +286,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
+          ...(activeServer()?.kind === "remote" && memory !== undefined ? { memory } : {}),
           ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
           ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
@@ -638,6 +640,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+        remoteBuiltinMemoryLoaded={remoteAgentAdmin.memory() !== undefined}
         remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
         remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
         remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
