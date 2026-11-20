@@ -579,6 +579,12 @@
       "detailSha256": "1babf747acf9d8791b437547ca1abe65a7dd49778b49170c5a7249e66d0988fc"
     },
     {
+      "slug": "datadog-eu",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "7c0875986a3df7e4e01b33067a9df194d1229e3d942cd7d61848cf3f78d43675"
+    },
+    {
       "slug": "dataforseo",
       "version": "1.0.0",
       "featured": false,

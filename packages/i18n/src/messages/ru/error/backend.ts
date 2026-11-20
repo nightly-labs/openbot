@@ -248,6 +248,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
+  "error.backend.mcpSignInGrantRefused":
+    "Сервер не принял вход. Войдите снова. Если проблема повторится, убедитесь, что ваш аккаунт находится на том же сайте или в том же регионе, что и это приложение.",
   "error.backend.mcpSignInAccountRefused":
     "Сервер отклонил аккаунт, с которым вы вошли. Проверьте, что у этого аккаунта есть доступ к сервису. Чтобы использовать другой аккаунт, выйдите и войдите снова.",
   "error.backend.mcpSignInClientRefused":

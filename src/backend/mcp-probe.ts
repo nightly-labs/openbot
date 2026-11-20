@@ -18,6 +18,7 @@ import {
   AccessDeniedError,
   InvalidClientError,
   InvalidClientMetadataError,
+  InvalidGrantError,
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -271,6 +272,8 @@ function describeProbeFailure(
   if (accountRefused) return sourceText("error.backend.mcpSignInAccountRefused");
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn?.exchangeFailed() && error instanceof InvalidGrantError)
+    return sourceText("error.backend.mcpSignInGrantRefused");
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
   if (challenge?.status === 401 && challenge.bearer && (challenge.keyOnly || authorizationWithoutScheme(config)))

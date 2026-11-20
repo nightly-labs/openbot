@@ -595,6 +595,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "1babf747acf9d8791b437547ca1abe65a7dd49778b49170c5a7249e66d0988fc",
     },
     {
+      slug: "datadog-eu",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "7c0875986a3df7e4e01b33067a9df194d1229e3d942cd7d61848cf3f78d43675",
+    },
+    {
       slug: "dataforseo",
       version: "1.0.0",
       featured: false,
@@ -5116,6 +5122,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
           transport: "http",
           url: "https://mcp.datadoghq.com/v1/mcp",
           auth: [{ id: "datadog-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.datadoghq.com",
+    privacyPolicyUrl: "https://www.datadoghq.com/legal/privacy/",
+    termsUrl: "https://www.datadoghq.com/legal/terms/",
+    skills: [],
+  },
+  "datadog-eu": {
+    slug: "datadog-eu",
+    name: "Datadog EU",
+    tagline: "Monitoring, logs and traces",
+    description:
+      "Datadog EU lets agents search logs, metrics, traces, monitors, dashboards and incidents in the organization of the signed-in account. Each user signs in to their own Datadog account on the EU site (datadoghq.eu) through the browser.",
+    category: "coding",
+    creatorName: "Datadog",
+    iconUrl: "https://www.datadoghq.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-errors", text: "Which services had the most errors in the last hour?" },
+      { id: "prompt-monitor", text: "Why is the checkout latency monitor alerting?" },
+      { id: "prompt-incident", text: "Summarize the open incidents and their status." },
+    ],
+    apps: [
+      {
+        id: "app-datadog-eu-mcp",
+        name: "Datadog EU",
+        description:
+          "Logs, metrics, traces, monitors, and incidents, over Datadog's EU MCP server with browser sign-in.",
+        iconUrl: "https://www.datadoghq.com/favicon.ico",
+        server: {
+          name: "datadog-eu",
+          transport: "http",
+          url: "https://mcp.datadoghq.eu/v1/mcp",
+          auth: [{ id: "datadog-eu-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],
