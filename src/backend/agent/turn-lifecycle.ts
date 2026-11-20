@@ -164,6 +164,8 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "model_not_found",
 ]);
 
+const CODEX_SAFETY_BLOCKS: ReadonlySet<unknown> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
+
 function isRefusedGeminiToken(provider: string | undefined, message: string): boolean {
   return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
 }
@@ -368,6 +370,7 @@ export class TurnLifecycle {
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   readonly #failoverRetries = new Map<string, Set<string>>();
   readonly #refusedRetries = new Set<string>();
+  readonly #safetyBlockedTurns = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
   readonly #noUpdateTurns = new Set<string>();
   readonly #taskStartTurns = new Set<string>();
@@ -538,6 +541,7 @@ export class TurnLifecycle {
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
+    this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
@@ -1442,6 +1446,10 @@ export class TurnLifecycle {
           this.#turnErrors.set(errorTurnId, message);
           this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
+          if (source.provider === "codex" && CODEX_SAFETY_BLOCKS.has(error?.codexErrorInfo)) {
+            this.#safetyBlockedTurns.add(errorTurnId);
+            return;
+          }
         }
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
@@ -1820,6 +1828,10 @@ export class TurnLifecycle {
           ? refusedSessionFailure(running.client.provider, reportedError)
           : null;
       const refused = running !== undefined && refusedFailure !== null;
+      const safetyBlock =
+        this.#safetyBlockedTurns.delete(turnId) && running !== undefined
+          ? yield* this.#dropSafetyBlockedTurn(running.client, threadId, turnId, reportedError ?? "")
+          : null;
       const limited = status === "failed" && this.#limitedTurns.has(turnId);
       const resetsAt = this.#limitedTurns.get(turnId) ?? null;
       this.#limitedTurns.delete(turnId);
@@ -2080,13 +2092,17 @@ export class TurnLifecycle {
       const ownLane = !taskTurn && this.#conversation.channelForThread(snapshot.threadId) === null;
       if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
       else if (ownLane) this.#failedTurns.delete(agentId);
-      const failure = refusedFailure ?? reportedError;
-      if (refused) {
-        yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      const failure = refusedFailure ?? safetyBlock ?? reportedError;
+      if (refused) yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      if (refused || safetyBlock !== null) {
+        const context =
+          safetyBlock === null
+            ? undefined
+            : { causeCode: "content_blocked" as const, provider: running?.client.provider, model, turnId };
         if (laneTaskId !== null && failure !== undefined) {
-          this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure) });
+          this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure), ...context });
           this.#hooks.taskFailed(laneTaskId, failure);
-        } else this.#hooks.emitError("agent_error", failure, agentId);
+        } else this.#hooks.emitError("agent_error", failure, agentId, context);
       }
       if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
@@ -2508,6 +2524,28 @@ export class TurnLifecycle {
       if (oldest !== undefined) this.#endedTurns.delete(oldest);
     }
   }
+
+  readonly #dropSafetyBlockedTurn = Effect.fn("TurnLifecycle.dropSafetyBlockedTurn")(function* (
+    this: TurnLifecycle,
+    client: AgentClient,
+    threadId: string,
+    turnId: string,
+    reason: string,
+  ) {
+    const dropped = yield* client
+      .request("thread/revert", { threadId, beforeTurnId: turnId }, decodeRecordResponse)
+      .pipe(
+        Effect.as(true),
+        Effect.catch(() => {
+          logger.warn("Codex kept a turn that its safety check blocked.", { provider: client.provider });
+          return Effect.succeed(false);
+        }),
+      );
+    const provider = agentProviderName(client.provider);
+    return dropped
+      ? sourceText("error.provider.codexSafetyBlocked", { provider, reason })
+      : sourceText("error.provider.codexSafetyBlockedKept", { provider, reason });
+  });
 
   readonly #retryRefusedTurn = Effect.fn("TurnLifecycle.retryRefusedTurn")(function* (
     this: TurnLifecycle,
