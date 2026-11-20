@@ -3652,13 +3652,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               : undefined))
           : undefined;
         if (input.model && !requestedModel) {
-          throw new AgentSettingsRefused(
-            modelUnavailableError(
-              input.model,
-              modelProvider,
-              this.#endpoints.available(),
-              this.#providers.status().providers ?? [],
-            ).message,
+          throw modelUnavailableError(
+            input.model,
+            modelProvider,
+            this.#endpoints.available(),
+            this.#providers.status().providers ?? [],
           );
         }
         const requestedProvider = input.provider ?? requestedModel?.provider ?? previous?.provider;
