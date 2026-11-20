@@ -260,7 +260,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   let scroller: HTMLElement | undefined;
   let messageList: HTMLDivElement | undefined;
   let atEnd = true;
-  let olderAnchor: { firstId: string | undefined; row: HTMLElement; top: number } | undefined;
+  let olderAnchor: { firstId: string | undefined; content: HTMLElement; top: number } | undefined;
   let autoLoadedFirstId: string | undefined | null = null;
   function firstVisibleRow(element: HTMLElement): HTMLElement | undefined {
     const viewTop = element.getBoundingClientRect().top;
@@ -268,9 +268,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     for (const row of rows) if (row.getBoundingClientRect().bottom > viewTop) return row;
     return rows[0];
   }
+  function contentTop(content: HTMLElement, element: HTMLElement): number {
+    return content.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  }
   function loadOlder(older: AgentThreadOlderMessages): void {
     const row = scroller && firstVisibleRow(scroller);
-    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.offsetTop };
+    const content = row?.lastElementChild instanceof HTMLElement ? row.lastElementChild : row;
+    if (scroller && content)
+      olderAnchor = { firstId: props.messages[0]?.id, content, top: contentTop(content, scroller) };
     older.onLoad();
   }
   function loadOlderNearTop(element: HTMLElement): void {
@@ -334,7 +339,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       const anchor = olderAnchor;
       if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
         olderAnchor = undefined;
-        if (anchor.row.isConnected) element.scrollTop += anchor.row.offsetTop - anchor.top;
+        if (anchor.content.isConnected) element.scrollTop += contentTop(anchor.content, element) - anchor.top;
       } else if (atEnd) element.scrollTop = element.scrollHeight;
       loadOlderNearTop(element);
     });
