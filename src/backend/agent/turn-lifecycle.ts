@@ -1279,7 +1279,7 @@ export class TurnLifecycle {
         }
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
-          const loads = skillLoads(item, getArray(params, "filePaths"));
+          const loads = skillLoads(item, getArray(params, "filePaths"), source.provider);
           if (loads.length > 0)
             yield* this.#recordSkillLoads(
               agentId,

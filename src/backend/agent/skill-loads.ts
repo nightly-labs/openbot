@@ -22,11 +22,15 @@ const SED_IN_PLACE = /(?:^|[\s;&|('"])sed\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)/u;
 export const COMMAND_SEPARATOR = /&&|\|\||[;|\n]/u;
 const BYTES_PER_TOKEN = 4;
 
-export function skillLoads(item: unknown, filePaths: readonly unknown[]): SkillLoad[] {
+export function skillLoads(item: unknown, filePaths: readonly unknown[], provider: string): SkillLoad[] {
   if (!isRecord(item)) return [];
   const status = getString(item, "status");
   if (status === "failed" || status === "declined") return [];
   const name = item.type === "toolCall" ? getString(item, "name") : null;
+  if (provider === "opencode" && name === "skill" && status === "completed") {
+    const skill = getString(getRecord(item, "arguments"), "id");
+    return skill && SKILL_NAME.test(skill) ? [{ skill, path: null }] : [];
+  }
   if (name === "Skill") {
     const skill = (getString(item, "skill") ?? "").replace(OPENBOT_SKILL_PLUGINS, "");
     return SKILL_NAME.test(skill) || PLUGIN_SKILL_NAME.test(skill) ? [{ skill, path: null }] : [];

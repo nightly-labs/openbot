@@ -51,6 +51,11 @@ function handle(message) {
     write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } } } });
     if (!match) return write({ id: message.id, result: { stopReason: "end_turn" } });
     const [input, cached, written, output, thought] = match.slice(1).map(Number);
+    if (input === 12000 || input === 500) {
+      const update = (update) => write({ method: "session/update", params: { sessionId: params.sessionId, update } });
+      update({ sessionUpdate: "tool_call", toolCallId: "skill-1", title: "skill", kind: "other", status: "pending", rawInput: { id: "release-notes" } });
+      update({ sessionUpdate: "tool_call_update", toolCallId: "skill-1", status: "completed" });
+    }
     const cost = /cost=([\\d.]+)/.exec(text);
     if (cost)
       write({ method: "session/update", params: { sessionId: params.sessionId, update: { sessionUpdate: "usage_update", used: input + cached + written + output + thought, size: 200000, cost: { amount: Number(cost[1]), currency: "USD" } } } });
@@ -100,6 +105,7 @@ const report: {
   model?: string;
   cases: CaseReport[];
   analytics?: { processedTokens: number; turns: number; missingUsageTurns: number };
+  skillRows?: string[];
   passed: boolean;
   error?: string;
 } = { cases: [], passed: false };
@@ -270,6 +276,17 @@ try {
   await check("first turn", threadId, 0, first, 0.05);
   await waitFor("the first turn to end", () => idle(agent.id));
 
+  const skillRows = () =>
+    sqlite()
+      .prepare("SELECT skill FROM agent_usage_skill_loads WHERE agent_id = ?")
+      .all(agent.id)
+      .map(({ skill }) => String(skill));
+  const firstLoad = await waitFor("the first skill load", () => {
+    const rows = skillRows();
+    return rows.length > 0 && rows;
+  });
+  assert.deepEqual(firstLoad, ["release-notes"]);
+
   const second: Turn = { input: 1_000, cached: 9_000, written: 0, output: 200, thought: 0 };
   await send(agent.id, second, "smaller second turn");
   await check("smaller second turn", threadId, 1, second, null);
@@ -320,6 +337,9 @@ try {
   assert.equal(analytics.totals.turns, 6, "Analytics count every turn.");
   assert.equal(analytics.totals.missingUsageTurns, 0, "Every turn has usage.");
   assert.equal(analytics.totals.processedTokens, sent, "Analytics count every turn's tokens once.");
+  const replayedLoads = skillRows();
+  assert.deepEqual(replayedLoads, firstLoad, "Replaying the same tool call in the resumed session keeps one row.");
+  report.skillRows = replayedLoads;
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
