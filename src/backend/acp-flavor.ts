@@ -367,7 +367,14 @@ function cursorTurnFailure(error: unknown, detail: string): string {
     : detail;
 }
 
+function cursorPromptUsage(response: PromptResponse): DynamicRecord | null {
+  if (isRecord(response._meta) && isRecord(response._meta.usage)) return response._meta.usage;
+  if (isRecord(response.usage)) return response.usage;
+  return null;
+}
+
 export const CURSOR_ACP_FLAVOR: AcpFlavor = {
+  promptUsage: cursorPromptUsage,
   sessionNotFound: (error, sessionId) =>
     error.code === -32602 ? isRecord(error.data) && error.data.message === `Session "${sessionId}" not found` : null,
   noiseChunk: /^\s*Error: (?:[\w$]+: )?WritableIterable is closed\s*$/u,

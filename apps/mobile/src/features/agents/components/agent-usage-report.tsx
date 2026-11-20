@@ -82,6 +82,12 @@ export function AgentUsageReport({
   const byTokens = <T extends { processedTokens: number; cachedInput: number | null }>(rows: readonly T[]) =>
     [...rows].sort((a, b) => analyticsTokens(b) - analyticsTokens(a));
   const partial = totals.missingUsageTurns || totals.incompleteRecords || totals.unpricedRecords;
+  const cursorUnmetered = (() => {
+    const rows = result.models.filter((model) => model.provider === "cursor");
+    const turns = rows.reduce((sum, model) => sum + model.turns, 0);
+    const processed = rows.reduce((sum, model) => sum + model.processedTokens, 0);
+    return turns > 0 && processed === 0;
+  })();
   return (
     <View className="gap-5">
       <Typography type="body-xs" className="text-center text-grouped-secondary">
@@ -284,6 +290,11 @@ export function AgentUsageReport({
               incomplete: totals.incompleteRecords,
               unpriced: totals.unpricedRecords,
             })}
+          </Typography>
+        ) : null}
+        {cursorUnmetered ? (
+          <Typography type="body-xs" className="text-grouped-secondary">
+            {t("mobile.agent.usage.cursorPerTurnUnavailable")}
           </Typography>
         ) : null}
         <Typography type="body-xs" className="text-grouped-secondary">

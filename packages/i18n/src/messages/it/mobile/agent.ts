@@ -521,6 +521,8 @@ export const messages = {
   "mobile.agent.usage.noModels": "Nessun utilizzo dei modelli registrato in questo intervallo.",
   "mobile.agent.usage.partial":
     "Dati parziali: {missingUsage} turni senza utilizzo, {incomplete} record incompleti, {unpriced} record senza stima del costo.",
+  "mobile.agent.usage.cursorPerTurnUnavailable":
+    "Cursor non riporta token né costo per turno tramite la CLI. La quota del piano è in Limiti piano.",
   "mobile.agent.usage.costNote":
     "Costo equivalente alle API in USD. Questa stima esclude i costi dell'abbonamento, dei tool e dei contenuti multimediali.",
   "mobile.agent.usage.tokensNote":

@@ -108,6 +108,12 @@ export function AgentUsageReport(props: {
   );
   const partial = () =>
     totals().missingUsageTurns > 0 || totals().unpricedRecords > 0 || totals().incompleteRecords > 0;
+  const cursorUnmetered = createMemo(() => {
+    const rows = models().filter((model) => model.provider === "cursor");
+    const turns = rows.reduce((sum, model) => sum + model.turns, 0);
+    const processed = rows.reduce((sum, model) => sum + model.processedTokens, 0);
+    return turns > 0 && processed === 0;
+  });
   const share = (amount: number | null) => {
     const total = cost() ? totals().estimatedCostUsd : analyticsTokens(totals());
     return amount === null || total === null
@@ -135,6 +141,11 @@ export function AgentUsageReport(props: {
             unpriced: totals().unpricedRecords,
             incomplete: totals().incompleteRecords,
           })}
+        </p>
+      </Show>
+      <Show when={cursorUnmetered()}>
+        <p class="agent-usage-notice" role="status">
+          {t("usage.cursorPerTurnUnavailable")}
         </p>
       </Show>
       <div class="agent-usage-overview">

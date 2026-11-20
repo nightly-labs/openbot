@@ -27,6 +27,8 @@ export const messages = defineMessages("usage", {
   "usage.empty": "No usage recorded in this range.",
   "usage.partial":
     "Partial data · {turns} turns have no reported usage; {unpriced} records have no cost estimate; {incomplete} records have incomplete token data.",
+  "usage.cursorPerTurnUnavailable":
+    "Cursor does not report per-turn tokens or cost through its CLI. Plan usage is on Plan limits.",
   "usage.summary": "Usage summary",
   "usage.sessions": { one: "{sessions} session", other: "{sessions} sessions" },
   "usage.costEstimate": "API estimate · USD",
