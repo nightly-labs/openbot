@@ -33,6 +33,22 @@ export const messages = {
   "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",
   "error.workflow.providerOffline":
     "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
+  "error.workflow.providerBilling":
+    "Le compte du fournisseur n’a plus de crédit, ou son forfait ne permet pas ce modèle. Vérifiez le forfait du compte, ou choisissez un autre modèle pour cette étape.",
+  "error.workflow.modelRefused":
+    "Le fournisseur ne permet pas ce modèle pour ce compte. Choisissez un autre modèle pour cette étape.",
+  "error.workflow.modelRefusedReason":
+    'Le fournisseur ne permet pas ce modèle pour ce compte : "{reason}". Choisissez un autre modèle pour cette étape.',
+  "error.workflow.contentBlocked":
+    "Le fournisseur a bloqué l’entrée de cette étape. Modifiez l’entrée ou le prompt, puis relancez l’étape.",
+  "error.workflow.inputTooLong":
+    "L’entrée de cette étape est trop longue pour le modèle. Raccourcissez l’entrée, ou choisissez un modèle qui lit plus de texte.",
+  "error.workflow.requestRefused":
+    "Le fournisseur n’a pas accepté cette étape. Choisissez un autre modèle pour cette étape.",
+  "error.workflow.requestRefusedReason":
+    'Le fournisseur n’a pas accepté cette étape : "{reason}". Choisissez un autre modèle pour cette étape.',
+  "error.workflow.providerRefused":
+    'Le fournisseur a refusé cette étape : "{reason}". Choisissez un autre modèle pour cette étape, ou relancez l’étape.',
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
   "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",

@@ -34,6 +34,22 @@ export const messages = {
   "error.workflow.providerBusy": "De provider is bezet. Wacht een paar minuten en voer de stap dan opnieuw uit.",
   "error.workflow.providerOffline":
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
+  "error.workflow.providerBilling":
+    "Het account bij de provider heeft geen tegoed, of het abonnement staat dit model niet toe. Controleer het abonnement van het account, of kies een ander model voor deze stap.",
+  "error.workflow.modelRefused":
+    "De provider staat dit model niet toe voor dit account. Kies een ander model voor deze stap.",
+  "error.workflow.modelRefusedReason":
+    'De provider staat dit model niet toe voor dit account: "{reason}". Kies een ander model voor deze stap.',
+  "error.workflow.contentBlocked":
+    "De provider heeft de invoer van deze stap geblokkeerd. Wijzig de invoer of de prompt en voer de stap dan opnieuw uit.",
+  "error.workflow.inputTooLong":
+    "De invoer van deze stap is te lang voor het model. Maak de invoer korter, of kies een model dat meer tekst leest.",
+  "error.workflow.requestRefused":
+    "De provider heeft deze stap niet geaccepteerd. Kies een ander model voor deze stap.",
+  "error.workflow.requestRefusedReason":
+    'De provider heeft deze stap niet geaccepteerd: "{reason}". Kies een ander model voor deze stap.',
+  "error.workflow.providerRefused":
+    'De provider heeft deze stap geweigerd: "{reason}". Kies een ander model voor deze stap, of voer de stap opnieuw uit.',
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",

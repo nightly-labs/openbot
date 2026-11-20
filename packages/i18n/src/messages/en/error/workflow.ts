@@ -29,6 +29,21 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.providerBusy": "The provider is busy. Wait a few minutes, then run the step again.",
   "error.workflow.providerOffline":
     "OpenBot could not reach the provider. Check the internet connection, then run the step again.",
+  "error.workflow.providerBilling":
+    "The provider account has no credit, or its plan does not permit this model. Check the account plan, or choose a different model for this step.",
+  "error.workflow.modelRefused":
+    "The provider does not permit this model for this account. Choose a different model for this step.",
+  "error.workflow.modelRefusedReason":
+    'The provider does not permit this model for this account: "{reason}". Choose a different model for this step.',
+  "error.workflow.contentBlocked":
+    "The provider blocked the input of this step. Change the input or the prompt, then run the step again.",
+  "error.workflow.inputTooLong":
+    "The input of this step is too long for the model. Make the input shorter, or choose a model that reads more text.",
+  "error.workflow.requestRefused": "The provider did not accept this step. Choose a different model for this step.",
+  "error.workflow.requestRefusedReason":
+    'The provider did not accept this step: "{reason}". Choose a different model for this step.',
+  "error.workflow.providerRefused":
+    'The provider refused this step: "{reason}". Choose a different model for this step, or run the step again.',
   "error.workflow.modelBusy": "Another model request is running. Run the step again soon.",
   "error.workflow.mediaFailed": "The model could not make the image or video. Run the step again.",
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",

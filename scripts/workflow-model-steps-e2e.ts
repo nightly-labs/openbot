@@ -48,6 +48,10 @@ function handle(message) {
   }
   if (message.method === "session/prompt") {
     const text = message.params.prompt.map((block) => block.text).join("");
+    if (text.includes("BILLING")) {
+      write({ id: message.id, error: { code: -32603, message: "Payment required: your credits balance is too low." } });
+      return;
+    }
     if (text.includes("FAIL")) {
       write({ id: message.id, error: { code: -32603, message: "The fake model failed." } });
       return;
@@ -193,15 +197,28 @@ try {
   const secondPid = second.at(-1) ?? 0;
   check("the step after a new main client runs on a new process", secondPid !== firstPid, second);
 
-  const failed = await runCauseEffect(
-    warm.generate("antigravity", model, "FAIL", workflowUsageObserver(database.usage, "antigravity", modelId)),
-  ).then(
-    () => false,
-    () => true,
+  const failedStepText = (prompt: string) =>
+    runCauseEffect(
+      warm.generate("antigravity", model, prompt, workflowUsageObserver(database.usage, "antigravity", modelId)),
+    ).then(
+      () => null,
+      (cause: unknown) => workflowGenerationError(cause, "antigravity"),
+    );
+  const failed = await failedStepText("FAIL");
+  check("a failed step fails", failed !== null);
+  check(
+    "a failed step shows the reason of the provider",
+    failed === sourceText("error.workflow.providerRefused", { reason: "The fake model failed." }),
+    failed,
   );
-  check("a failed step fails", failed);
   const failedStep = (await promptProcesses()).at(-1) ?? 0;
   check("a failed step stops its process", (await ended(secondPid)) && (await ended(failedStep)));
+  const billing = await failedStepText("BILLING");
+  check(
+    "a step that the provider refuses for billing says to check the plan, not to run it again",
+    billing === sourceText("error.workflow.providerBilling"),
+    billing,
+  );
   check("a step after a failed step answers", (await step("Say ok.")) === "ok");
   const third = await warmProcesses();
   const thirdPid = third.at(-1) ?? 0;
