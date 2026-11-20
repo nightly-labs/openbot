@@ -46,7 +46,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { windowMinimumSize } from "./linux-tiling-desktop";
+import { desktopLayoutZoomFactor, onTilingLinuxDesktop, windowMinimumSize } from "./linux-tiling-desktop";
 import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
@@ -141,6 +141,7 @@ export interface MainWindowContext {
 export interface MainWindowController {
   getMainWindow: () => BrowserWindow | null;
   getChatWindows: () => BrowserWindow[];
+  applyInterfaceSize: (zoomFactor: number) => void;
   chatWindowTarget: (window: BrowserWindow) => ChatWindowTarget | null;
   chatWindowTargets: () => ChatWindowTarget[];
   openChatWindow: (target: ChatWindowTarget) => void;
@@ -268,6 +269,13 @@ export function createMainWindowController({
       });
   }
 
+  function applyMainWindowZoom(window: BrowserWindow): void {
+    const interfaceSize = getServices()?.interfaceSize;
+    if (!interfaceSize || window.isDestroyed()) return;
+    const zoom = desktopLayoutZoomFactor(window.getContentBounds().width, interfaceSize.zoomFactor);
+    if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
+  }
+
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
     const minimumSize = windowMinimumSize({ minWidth: 960, minHeight: 640 });
@@ -341,14 +349,15 @@ export function createMainWindowController({
       for (const chat of chatWindows.values()) chat.window.close();
     });
     window.on("move", () => rememberMainWindowBounds(window.getNormalBounds()));
-    window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
+    window.on("resize", () => {
+      rememberMainWindowBounds(window.getNormalBounds());
+      applyMainWindowZoom(window);
+    });
 
+    if (onTilingLinuxDesktop) window.webContents.setZoomMode("isolated");
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("did-navigate", onRendererLoadStarted);
-    window.webContents.on("did-navigate", () => {
-      const interfaceSize = getServices()?.interfaceSize;
-      if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
-    });
+    window.webContents.on("did-navigate", () => applyMainWindowZoom(window));
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
@@ -500,6 +509,11 @@ export function createMainWindowController({
     getMainWindow: () => holder.current,
     getChatWindows: () =>
       [...chatWindows.values()].map((chat) => chat.window).filter((window) => !window.isDestroyed()),
+    applyInterfaceSize: (zoomFactor: number) => {
+      if (holder.current) applyMainWindowZoom(holder.current);
+      for (const chat of chatWindows.values())
+        if (!chat.window.isDestroyed()) chat.window.webContents.setZoomFactor(zoomFactor);
+    },
     chatWindowTarget: (window: BrowserWindow) =>
       [...chatWindows.values()].find((chat) => chat.window === window)?.target ?? null,
     chatWindowTargets,

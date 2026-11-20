@@ -137,7 +137,8 @@ are designed for a computer screen only.
   The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
   and 380 px for a separate chat window. Design the web client for 960 px and wider too.
   On a tiling Linux desktop (`src/main/linux-tiling-desktop.ts`) the compositor sets the size and
-  the windows have no minimum; the compact sidebar keeps the chat usable in a half-screen tile.
+  the windows have no minimum. Below 721 px the main window zooms out, so its layout stays at
+  least 721 CSS px wide and keeps the desktop layout.
 - On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
   links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
   (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;

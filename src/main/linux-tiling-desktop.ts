@@ -26,8 +26,16 @@ function isTilingLinuxDesktop(platform: NodeJS.Platform, environment: NodeJS.Pro
     .some((desktop) => TILING_DESKTOPS.has(desktop.trim().toLowerCase()));
 }
 
+export const onTilingLinuxDesktop = isTilingLinuxDesktop(process.platform, process.env);
+
 const NO_MINIMUM_SIZE = { minWidth: 0, minHeight: 0 } as const;
+const NARROWEST_DESKTOP_LAYOUT_WIDTH = 721;
 
 export function windowMinimumSize(preferred: { readonly minWidth: number; readonly minHeight: number }) {
-  return isTilingLinuxDesktop(process.platform, process.env) ? NO_MINIMUM_SIZE : preferred;
+  return onTilingLinuxDesktop ? NO_MINIMUM_SIZE : preferred;
+}
+
+export function desktopLayoutZoomFactor(contentWidth: number, interfaceZoomFactor: number): number {
+  if (!onTilingLinuxDesktop || contentWidth <= 0) return interfaceZoomFactor;
+  return Math.min(interfaceZoomFactor, contentWidth / NARROWEST_DESKTOP_LAYOUT_WIDTH);
 }
