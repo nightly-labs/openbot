@@ -106,6 +106,7 @@ import {
   getRecord,
   getString,
   isRecord,
+  PROVIDER_STOPPED_WAITING,
   type RequestId,
   type ResponseDecoder,
   type RpcError,
@@ -518,6 +519,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #privateAnswer: string[] | null = null;
   readonly #privatePromptLock = Semaphore.makeUnsafe(1);
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
+  readonly #openQuestionToolCalls = new Map<string, AbortController>();
   #initialized: Deferred.Deferred<void, ProviderClientOperationError> | null = null;
   #scope = Scope.makeUnsafe();
   #initialization: InitializeResponse | null = null;
@@ -3276,6 +3278,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
       if (reported === "completed" || reported === "failed") {
+        this.#openQuestionToolCalls
+          .get(questionToolCallKey(thread.id, update.toolCallId))
+          ?.abort(PROVIDER_STOPPED_WAITING);
         turn.messages.push(shown);
         turn.toolItems.delete(update.toolCallId);
         turn.mediaKinds.delete(update.toolCallId);
@@ -4147,16 +4152,36 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             question: getString(question, "question") ?? "",
           }))
       : null;
+    const toolCallId = isOwn ? getString(params, "toolCallId") : null;
+    const questionCall = sessionId && toolCallId ? questionToolCallKey(sessionId, toolCallId) : null;
+    const stoppedWaiting = new AbortController();
+    if (questionCall) this.#openQuestionToolCalls.set(questionCall, stoppedWaiting);
     const result = yield* this.#waitForUser(
       thread?.activeTurn,
-      this.#serverRequests.call("item/tool/requestUserInput", {
-        ...params,
-        ...(asked ? { questions: asked } : {}),
-        threadId: sessionId,
-        turnId: thread?.activeTurn?.id ?? randomUUID(),
-        sourceMethod: method,
-      }),
-    ).pipe(toProviderClientOperationError);
+      this.#serverRequests.call(
+        "item/tool/requestUserInput",
+        {
+          ...params,
+          ...(asked ? { questions: asked } : {}),
+          threadId: sessionId,
+          turnId: thread?.activeTurn?.id ?? randomUUID(),
+          sourceMethod: method,
+        },
+        stoppedWaiting.signal,
+      ),
+    ).pipe(
+      toProviderClientOperationError,
+      Effect.catchIf(
+        () => stoppedWaiting.signal.aborted,
+        () => Effect.succeed({}),
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (questionCall && this.#openQuestionToolCalls.get(questionCall) === stoppedWaiting)
+            this.#openQuestionToolCalls.delete(questionCall);
+        }),
+      ),
+    );
     return yield* providerSync(() => {
       if (!(own && asked)) return isRecord(result) ? result : {};
       const answers = getRecord(result, "answers") ?? {};
@@ -4318,6 +4343,10 @@ function printableInput(value: unknown): string | null {
 }
 
 type AcpToolCallUpdate = Extract<SessionUpdate, { sessionUpdate: "tool_call" | "tool_call_update" }>;
+
+function questionToolCallKey(sessionId: string, toolCallId: string): string {
+  return JSON.stringify([sessionId, toolCallId]);
+}
 
 function toolCallPaths(
   call: { readonly locations?: readonly { readonly path: string }[] | null; readonly rawInput?: unknown },

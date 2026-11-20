@@ -2114,12 +2114,14 @@ export class AttentionRegistry {
     }
   }
 
-  cancelRequest(client: AgentClient, requestId: RequestId): void {
+  cancelRequest(client: AgentClient, requestId: RequestId, providerStoppedWaiting = false): void {
     let changed = false;
     const prompt = this.#prompts.get(requestId);
     if (prompt?.client === client && !prompt.detached) {
-      this.#routines.markRunningForTurn(prompt.turnId);
-      this.#expirePrompt(requestId, prompt);
+      if (!providerStoppedWaiting || !this.#detachForLateAnswer(requestId, prompt)) {
+        this.#routines.markRunningForTurn(prompt.turnId);
+        this.#expirePrompt(requestId, prompt);
+      }
       changed = true;
     }
     const approval = this.#approvals.get(requestId);
@@ -2171,9 +2173,14 @@ export class AttentionRegistry {
         this.#detachPrompt(requestId, pending);
   }
 
-  #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
-    const target = pending.detach?.target;
-    if (this.#prompts.get(requestId) !== pending || !target) return;
+  #detachForLateAnswer(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.saving || pending.questions.some((question) => question.isSecret)) return false;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    return target !== null && this.#detachPrompt(requestId, pending, target);
+  }
+
+  #detachPrompt(requestId: RequestId, pending: PendingPrompt, target = pending.detach?.target): boolean {
+    if (this.#prompts.get(requestId) !== pending || !target) return false;
     clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
@@ -2186,6 +2193,7 @@ export class AttentionRegistry {
       }
     }
     this.#emitRuntimeSnapshot();
+    return true;
   }
 
   #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {

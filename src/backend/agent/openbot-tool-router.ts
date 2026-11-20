@@ -113,7 +113,13 @@ import {
   setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
-import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
+import {
+  type AppServerRequest,
+  type DynamicToolCallParams,
+  type DynamicToolResult,
+  isRecord,
+  PROVIDER_STOPPED_WAITING,
+} from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
 import type { VaultItems } from "../vault-items";
@@ -618,9 +624,11 @@ export class OpenBotToolRouter {
     request: AppServerRequest,
   ) {
     if (request.signal?.aborted) return;
-    request.signal?.addEventListener("abort", () => this.#attention.cancelRequest(client, request.id), {
-      once: true,
-    });
+    request.signal?.addEventListener(
+      "abort",
+      () => this.#attention.cancelRequest(client, request.id, request.signal?.reason === PROVIDER_STOPPED_WAITING),
+      { once: true },
+    );
     const reportFailure = (error: unknown) =>
       Effect.sync(() => {
         if (client.running) {

@@ -71,6 +71,8 @@ export interface AppServerRequest {
   answerBeforeMs?: number;
 }
 
+export const PROVIDER_STOPPED_WAITING = "provider-stopped-waiting";
+
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 export const CLAUDE_CLI_API_KEY_ACCOUNT_TYPE = "claude-cli-api-key";
