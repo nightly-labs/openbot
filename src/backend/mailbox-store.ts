@@ -91,6 +91,11 @@ interface StoredMessage {
   voiceRecording?: StoredAttachment;
   replyToMessageId: string | null;
   expectsReply?: false;
+  /**
+   * Stored as a notice only because it amends a request that was still running. If the steer it was
+   * meant for does not land, OpenBot restores the request behavior, so its result still comes back.
+   */
+  amendsRequest?: true;
   welcome?: true;
   agentSetup?: true;
   createdAt: string;
@@ -199,6 +204,8 @@ interface EnqueueInput {
   text: string;
   replyToMessageId?: string | null;
   expectsReply?: boolean | undefined;
+  /** True when that notice exists only to amend a running request (the router's amendment rule). */
+  amendsRequest?: boolean | undefined;
   welcome?: boolean;
   agentSetup?: boolean;
   draftIds?: string[];
@@ -658,6 +665,7 @@ export class MailboxStore {
         ...(voiceRecording ? { voiceRecording } : {}),
         replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
+        ...(input.expectsReply === false && input.amendsRequest ? { amendsRequest: true as const } : {}),
         ...(input.welcome ? { welcome: true as const } : {}),
         ...(input.agentSetup ? { agentSetup: true as const } : {}),
         createdAt,
@@ -1735,7 +1743,12 @@ export class MailboxStore {
     const delivery = this.#queuedFor(agentId).find(
       (candidate) => this.#laneOf(candidate, messages) === taskId && !this.#isHeldReply(candidate, messages),
     );
-    return delivery && this.#mayStart(delivery) ? this.#context(delivery, undefined, messages) : null;
+    if (!delivery || !this.#mayStart(delivery)) return null;
+    // The drain starts a turn straight from the queue, so this is the dispatch point a restart uses.
+    // An amendment was a notice only to join a turn that no longer runs: it takes the request meaning
+    // back here, so its own turn answers it. A delivery that is not an amendment is left untouched.
+    this.restoreAmendedRequest(delivery.id);
+    return this.#context(delivery, undefined, messages);
   }
 
   repliesToStartWith(deliveryId: string): DeliveryContext[] {
@@ -1897,6 +1910,24 @@ export class MailboxStore {
       .map((delivery) => delivery.recipientAgentId);
   }
 
+  /**
+   * The sender already has a request running with one of these recipients and no answer yet, so a
+   * message without an explicit expectsReply amends that request instead of starting a second one.
+   */
+  amendsRunningRequest(senderAgentId: string, recipientAgentIds: readonly string[]): boolean {
+    return amendsRunningRequest(this.#state, senderAgentId, recipientAgentIds);
+  }
+
+  /**
+   * Whether a queued message from another agent can join its recipient's running chat turn. A
+   * request, an answer, a requested result and a notice can all join, as a message from the person
+   * can. The request text tells the recipient to send its result with `send_message`; the turn end
+   * relays no result for a steered request, because the turn's answer is for other work. False for a
+   * question back (a reply that expects a reply): its text asks for no `send_message` reply, so it
+   * waits for a turn of its own, whose answer the turn end relays. False for channel, messaging and
+   * task work, which runs outside that turn, and for the answers to a request that went to several
+   * teammates: they start together in one turn (`#isHeldReply`), so none goes in alone.
+   */
   joinsChatTurn(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (delivery?.status !== "queued") return false;
@@ -2934,7 +2965,22 @@ export class MailboxStore {
     steerFallback: QueueSteerFallback,
   ): Effect.fn.Return<void, StoredStateFailure> {
     yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { steerFallback });
+    // The amendment was stored as a notice only to join the running turn. That did not happen, so it
+    // becomes a request again: its own turn runs and the sender still gets the corrected result.
+    this.restoreAmendedRequest(deliveryId);
   }, Effect.uninterruptible).bind(this);
+
+  /** Restores an amendment whose steer did not land, so it asks for its own answer again. Idempotent. */
+  restoreAmendedRequest(deliveryId: string): void {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (delivery?.status !== "queued") return;
+    const message = this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    if (!message?.amendsRequest) return;
+    delete message.expectsReply;
+    delete message.amendsRequest;
+    this.#changes.messageIds.add(message.id);
+    this.#persist("message.amend-restored");
+  }
 
   restoreQueued = Effect.fn("MailboxStore.restoreQueued")(function* (
     this: MailboxStore,
@@ -3845,6 +3891,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (value.voiceRecording === undefined || isStoredAttachment(value.voiceRecording)) &&
     (isString(value.replyToMessageId) || value.replyToMessageId === null) &&
     (value.expectsReply === undefined || value.expectsReply === false) &&
+    (value.amendsRequest === undefined || value.amendsRequest === true) &&
     (value.welcome === undefined || value.welcome === true) &&
     (value.agentSetup === undefined || value.agentSetup === true) &&
     isString(value.createdAt)
@@ -3965,4 +4012,60 @@ function sameAnswer(
     first.text.trim() === second.text.trim() &&
     files(first) === files(second)
   );
+}
+
+/** The two facts this query reads, so it can be tested without a store on disk. */
+interface AmendableState {
+  messages: ReadonlyArray<Pick<StoredMessage, "id" | "sender" | "expectsReply" | "replyToMessageId">>;
+  deliveries: ReadonlyArray<Pick<StoredDelivery, "messageId" | "recipientAgentId" | "status">>;
+}
+
+/**
+ * The stored expectsReply for a message the sender did not label: `false` when it amends a request
+ * already running at the recipient, otherwise unchanged. An explicit flag or a reply always wins.
+ */
+export function amendedExpectsReply(
+  explicit: boolean | undefined,
+  hasReply: boolean,
+  amends: boolean,
+): boolean | undefined {
+  if (explicit !== undefined) return explicit;
+  if (hasReply) return undefined;
+  return amends ? false : undefined;
+}
+
+/**
+ * Whether the agent's next message to one of these recipients corrects a request that is still
+ * running there. A request that already has an answer, or whose deliveries all finished, is not
+ * running any more. Only a payload that is actually in a turn counts: a request that waits for a
+ * free recipient is not one the sender can amend, so a real question keeps its own turn and answer.
+ */
+export function amendsRunningRequest(
+  state: AmendableState,
+  senderAgentId: string,
+  recipientAgentIds: readonly string[],
+): boolean {
+  const recipients = new Set(recipientAgentIds);
+  if (recipients.size === 0) return false;
+  const pending = new Set<string>();
+  let running = false;
+  for (const delivery of state.deliveries) {
+    if (delivery.status !== "running" || !recipients.has(delivery.recipientAgentId)) continue;
+    const message = state.messages.find((candidate) => candidate.id === delivery.messageId);
+    if (message?.sender.kind !== "agent" || message.sender.agentId !== senderAgentId) continue;
+    if (message.expectsReply === false) continue;
+    pending.add(message.id);
+    running = true;
+  }
+  if (!running) return false;
+  for (const messageId of pending) {
+    const answered = state.messages.some(
+      (candidate) =>
+        candidate.replyToMessageId === messageId &&
+        candidate.sender.kind === "agent" &&
+        candidate.expectsReply === false,
+    );
+    if (!answered) return true;
+  }
+  return false;
 }

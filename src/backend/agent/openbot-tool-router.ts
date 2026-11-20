@@ -90,7 +90,7 @@ import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
-import type { MailboxStore } from "../mailbox-store";
+import { amendedExpectsReply, type MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import { type MessagingThreads, PLATFORM_NAMES } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
@@ -403,6 +403,10 @@ export interface OpenBotToolRouterHooks {
   redactMcpForAgent(text: string): string;
   runsTurn(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
+  /** True when a message to this agent would really join its running turn now: Steer mode, a native
+   * provider, its own chat, and a turn that is still running. */
+  canSteerNow(agentId: string): boolean;
+  /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   turnUnfinished(turnId: string): boolean;
   startedTask(turnId: string): void;
@@ -3397,6 +3401,20 @@ export class OpenBotToolRouter {
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
+      // A message that only corrects a request still running at the recipient amends it: the first
+      // request's result still comes back, so asking for a second one would queue a turn for nothing.
+      // An explicit expectsReply, or a reply, keeps the caller's intent.
+      // Only amend when the message really joins the running turn. Otherwise a notice would wait for the
+      // next turn, whose result the sender never sees: keep the request behavior in that case.
+      // One recipient only: the amendment shares its message with the others, so a restore for one
+      // would change the semantics of a message another recipient already steered.
+      const amendsRunningRequest =
+        expectsReply === undefined &&
+        replyTo === null &&
+        recipientValues.length === 1 &&
+        this.#hooks.canSteerNow(recipientValues[0] ?? "") &&
+        this.#mailbox.amendsRunningRequest(senderAgentId, recipientValues);
+      const effectiveExpectsReply = amendedExpectsReply(expectsReply, replyTo !== null, amendsRunningRequest);
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
@@ -3404,7 +3422,8 @@ export class OpenBotToolRouter {
           text,
           sourcePaths: paths,
           replyToMessageId: replyTo,
-          ...(expectsReply === undefined ? {} : { expectsReply }),
+          ...(effectiveExpectsReply === undefined ? {} : { expectsReply: effectiveExpectsReply }),
+          ...(amendsRunningRequest ? { amendsRequest: true } : {}),
           ...(messaging ? { messaging } : {}),
           ...(messagingReturn ? { messagingReturn } : {}),
           ...(senderTaskId ? { senderTaskId } : {}),
@@ -3419,7 +3438,8 @@ export class OpenBotToolRouter {
             Effect.map((steer) => {
               this.#mailboxSync.emitQueue(delivery.recipientAgentId);
               this.#drain.scheduleDrain(delivery.recipientAgentId);
-              return sentDelivery(delivery, steer);
+              const sent = sentDelivery(delivery, steer);
+              return amendsRunningRequest ? { ...sent, note: amendmentNote(steer, sent.note) } : sent;
             }),
           ),
         { concurrency: "unbounded" },
@@ -3446,6 +3466,26 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
 
+/** Says that this message corrects the request already running, so no second result is expected. */
+function amendmentNote(steer: AgentMessageSteer, existing: string | undefined): string {
+  if (steer === "steered") {
+    return [
+      "This message amended the request already running at the recipient.",
+      "The result of your earlier request still comes back; this amendment gets no answer of its own.",
+      existing,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  // The steer did not land, so the store restored the request meaning: this message now asks for its
+  // own answer. Saying that it gets none would be false.
+  return [
+    "This message amends your request. It did not join the running turn, so it waits as a request and its own result comes back.",
+    existing,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;

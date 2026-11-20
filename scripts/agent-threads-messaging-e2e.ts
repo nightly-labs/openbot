@@ -730,6 +730,128 @@ try {
       await mode(settings.busyMessageMode);
     }
   });
+  // 13b. An unlabelled follow-up amends the request only when it will really join the running turn.
+  //      A first sends a request that keeps B busy. In Steer mode the follow-up joins that turn and its
+  //      correction reaches the work, so B's answer carries the amended token. In Queue mode the
+  //      follow-up stays a request, runs in its own turn and is answered with its own token (#9490).
+  await step("unlabelled follow-up amends only when it will steer", async (details) => {
+    const provider = toAgentInfo.provider;
+    if (!isAgentProvider(provider) || agentProviderDescriptor(provider).steer !== "native") {
+      details.skipped = `${provider} cannot steer a running turn.`;
+      return;
+    }
+    const settings = await page.evaluate((agentId) => window.openbot.agent.getAgentHostSettings(agentId), to);
+    const mode = (busyMessageMode: "steer" | "queue" | null) =>
+      page.evaluate((input) => window.openbot.agent.updateAgentHostSettings(input), {
+        agentId: to,
+        busyMessageMode,
+      });
+    const deliveryOf = async (text: string) => {
+      const queue = await page.evaluate((agentId) => window.openbot.agent.listQueue(agentId), to);
+      return queue.deliveries.find((entry) => entry.sender.kind === "agent" && entry.text.includes(text)) ?? null;
+    };
+    const answerInA = async (text: string) => {
+      const snapshot = await bridge.main(from);
+      return snapshot.messages.some((m) => m.senderAgentId === to && m.text.includes(text));
+    };
+    // A's own turn sends the message; the token names the delivery it creates, not A's prompt.
+    const askToSend = (token: string, withExpectsReply: boolean) =>
+      [
+        `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message:`,
+        `"${token}: ${busyFor(90)}, then reply with the single word ${token}-OK."`,
+        withExpectsReply
+          ? "Pass expectsReply true, exactly as written."
+          : "Do not pass expectsReply and do not pass replyToMessageId.",
+        "Then end your turn and reply with the single word SENT.",
+      ].join("\n");
+    const amendTo = (token: string) =>
+      [
+        `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message:`,
+        `"${token}: change of plan, reply with the single word ${token}-OK instead."`,
+        "Do not pass expectsReply and do not pass replyToMessageId.",
+        "Then end your turn and reply with the single word SENT.",
+      ].join("\n");
+    try {
+      await waitFor(page, "B's own chat is idle", () => bridge.main(to), idle, TURN_MS);
+      await page.evaluate((agentId) => window.openbot.agent.clearContext(agentId), to);
+
+      // Steer: the request keeps B busy, the follow-up joins that same turn and its token wins.
+      await mode("steer");
+      const requestToken = `M14${run}`;
+      const amendToken = `N14${run}`;
+      await bridge.send(from, askToSend(requestToken, true));
+      const runningRequest = await waitFor(
+        page,
+        "B runs A's request",
+        () => deliveryOf(requestToken),
+        (entry) => entry?.status === "running",
+        TURN_MS,
+      );
+      const turnId = runningRequest?.turnId ?? null;
+      assert.ok(turnId, "A's request did not start a turn in B.");
+      await bridge.send(from, amendTo(amendToken));
+      const amended = await waitFor(
+        page,
+        "the follow-up joins the running turn",
+        () => deliveryOf(amendToken),
+        (entry) => entry !== null && entry.status !== "queued",
+        TURN_MS,
+      );
+      details.amendedStatus = amended?.status ?? null;
+      details.amendedSameTurn = amended?.turnId === turnId;
+      assert.equal(details.amendedSameTurn, true, "The follow-up did not join the running turn in Steer mode.");
+      details.amendedAnswerCameBack = await waitFor(
+        page,
+        "B's answer carries the amendment",
+        () => answerInA(`${amendToken}-OK`),
+        (value) => value === true,
+        TURN_MS,
+      );
+      assert.equal(details.amendedAnswerCameBack, true, "The correction never reached the sender.");
+      await waitFor(page, "B's turn ends", () => bridge.main(to), idle, TURN_MS);
+
+      // Queue: the same follow-up keeps the request behavior and is answered with its own token.
+      await mode("queue");
+      const requestToken2 = `P14${run}`;
+      const amendToken2 = `Q14${run}`;
+      await bridge.send(from, askToSend(requestToken2, true));
+      const runningRequest2 = await waitFor(
+        page,
+        "B runs the second request",
+        () => deliveryOf(requestToken2),
+        (entry) => entry?.status === "running",
+        TURN_MS,
+      );
+      const turnId2 = runningRequest2?.turnId ?? null;
+      assert.ok(turnId2, "The second request did not start a turn in B.");
+      await bridge.send(from, askToSend(amendToken2, false));
+      const queuedAmend = await waitFor(
+        page,
+        "the follow-up waits as a request",
+        () => deliveryOf(amendToken2),
+        (entry) => entry !== null,
+        TURN_MS,
+      );
+      details.queueModeStatus = queuedAmend?.status ?? null;
+      details.queueModeExpectsReply = queuedAmend?.expectsReply ?? null;
+      assert.equal(queuedAmend?.status, "queued", "The follow-up did not wait in the queue.");
+      // A notice has expectsReply false; a request leaves the field absent, which is the old behavior.
+      assert.notEqual(queuedAmend?.expectsReply, false, "A notice was stored while the recipient cannot steer.");
+      details.queueAmendAnswerCameBack = await waitFor(
+        page,
+        "the amendment is answered in its own turn",
+        () => answerInA(`${amendToken2}-OK`),
+        (value) => value === true,
+        TURN_MS,
+      );
+      assert.equal(details.queueAmendAnswerCameBack, true, "The amendment's answer never reached the sender.");
+      await waitFor(page, "B's turn ends after the queue case", () => bridge.main(to), idle, TURN_MS);
+    } finally {
+      await mode(settings.busyMessageMode);
+    }
+  });
+  // 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
+  //    after it come to the side thread, not to A's own chat (#5093).
   await step("question back without replyToMessageId", async (details) => {
     const word = `M14${run}`;
     const question = (m: ConversationMessage) => m.senderAgentId === to && m.text.includes(`Q14${run}`);
