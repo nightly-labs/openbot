@@ -428,6 +428,7 @@ import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePendingApproval } from "./team-api/route-pending-approval";
+import { routePendingPrompts } from "./team-api/route-pending-prompts";
 import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
@@ -1306,6 +1307,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePendingPrompts(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePhoneFeedback(context, this.#options.agents)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;

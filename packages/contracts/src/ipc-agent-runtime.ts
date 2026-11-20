@@ -325,7 +325,9 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
   );
 }
 
-function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pendingPrompts"][number] {
+export type AgentRuntimePrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+
+export function isRuntimePrompt(value: unknown): value is AgentRuntimePrompt {
   return (
     isDynamicRecord(value) &&
     isRequestId(value.requestId) &&

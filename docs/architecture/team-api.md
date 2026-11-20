@@ -471,6 +471,16 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `pending-prompts-v1` capability (protocol 10 only) adds `POST /v1/agent-prompts/list`
+(empty body). It returns `{ prompts }`: every question that an agent waits on, oldest first, up to 200,
+in the form of a runtime snapshot entry. A runtime snapshot holds at most 4 questions, approvals and
+browser takeovers of all agents together, and sets `attentionComplete: false` when it leaves some out.
+A client that gets such a snapshot reads this list, and adds each question whose chat has no question
+yet. Without the read, a question that came while the client was away had no card after a restart, a
+reload or a reconnect, and the agent waited (#13486). `src/main/team-api/route-pending-prompts.ts`
+leaves out the questions of a hidden or missing agent and of an agent that the member cannot see.
+The phone draws a question card from the chat messages, so it does not read this list.
+
 The optional `phone-feedback-v1` capability (protocol 9 only) adds
 `POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
 has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and

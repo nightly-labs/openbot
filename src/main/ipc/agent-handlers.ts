@@ -157,6 +157,11 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -1579,6 +1584,18 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
               method: "POST",
               body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      listPendingPrompts: scopedQueryHandler({
+        local: () => service.pendingPrompts(),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_PROMPTS_CAPABILITY)) return [];
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_PROMPTS_ROUTES.list, decodePendingPromptsResponse, {
+              method: "POST",
+              body: {},
             }),
           );
         },

@@ -191,6 +191,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "אישיות השרת אינה נתמכת בחיבור הזה.",
   "error.team.agentWaitsUnsupported": "החיבור הזה לא תומך בהמתנות פתוחות.",
   "error.team.pendingApprovalUnsupported": "החיבור הזה לא תומך בקריאת בקשת אישור מלאה.",
+  "error.team.pendingPromptsUnsupported": "חיבור זה אינו תומך בקריאת השאלות הפתוחות.",
   "error.team.phoneFeedbackUnsupported": "החיבור הזה לא תומך בשליחת דיווח מאפליקציית הטלפון.",
   "error.team.messagePinsUnsupported": "החיבור הזה אינו תומך בהודעות מוצמדות.",
   "error.team.queuedMessageThreadUnsupported": "החיבור הזה לא תומך בהרצת הודעה מהתור כשרשור חדש.",

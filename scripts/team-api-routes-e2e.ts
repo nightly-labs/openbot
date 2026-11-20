@@ -319,6 +319,10 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
@@ -1612,6 +1616,25 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   agentIdForRequest: (requestId) => (requestId === 7 ? "agent-ada" : undefined),
+  pendingPrompts: () => {
+    record("pendingPrompts");
+    return [
+      ...Array.from({ length: 5 }, (_, index) => ({
+        requestId: `prompt-ada-${index}`,
+        agentId: "agent-ada",
+        threadId: `thread-ada-${index}`,
+        turnId: `turn-ada-${index}`,
+        questions: [{ id: "color", header: "Color", question: "Pick a color", isSecret: false, options: null }],
+      })),
+      {
+        requestId: "prompt-gone",
+        agentId: "agent-gone",
+        threadId: "thread-gone",
+        turnId: "turn-gone",
+        questions: [{ id: "day", header: "Day", question: "Pick a day", isSecret: false, options: null }],
+      },
+    ];
+  },
   pendingApproval: (requestId) => {
     record("pendingApproval", requestId);
     if (requestId === 7)
@@ -12494,6 +12517,44 @@ try {
         errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
         !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
       [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  {
+    const capabilities = [PENDING_PROMPTS_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises pending-prompts-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_PROMPTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_PROMPTS_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, json: {} });
+    check(
+      "a list of the open questions without the capability is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingPromptsUnsupported")) &&
+        callsOf("pendingPrompts").length === 0,
+      summary(unsupported),
+    );
+    const listed = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    const prompts = list(field(listed.body, "prompts"));
+    check(
+      "a member reads every open question past the 4 items of a runtime snapshot, and no question of a missing agent",
+      listed.status === 200 &&
+        prompts.length === 5 &&
+        prompts.every((prompt) => field(prompt, "agentId") === "agent-ada") &&
+        field(prompts[4], "requestId") === "prompt-ada-4",
+      { status: listed.status, prompts: prompts.length },
+    );
+    accessLevels = { revision: 95, everyone: { "agent-ada": "none" }, roles: [] };
+    const blocked = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    accessLevels = { revision: 96, everyone: {}, roles: [] };
+    check(
+      "a member with no access to an agent reads none of its questions",
+      blocked.status === 200 && list(field(blocked.body, "prompts")).length === 0,
+      summary(blocked),
     );
   }
 

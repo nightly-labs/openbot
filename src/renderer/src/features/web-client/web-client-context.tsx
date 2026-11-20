@@ -374,6 +374,39 @@ export function createWebWorkspace(
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
   const wholeApprovalReads = new Set<string>();
+  let promptListRead: "idle" | "reading" | "again" = "idle";
+  const resolvedDuringPromptListRead = new Set<string>();
+  function readListedPrompts(): void {
+    const list = runtime.listPendingPrompts;
+    if (!list) return;
+    if (promptListRead !== "idle") {
+      promptListRead = "again";
+      return;
+    }
+    promptListRead = "reading";
+    resolvedDuringPromptListRead.clear();
+    const current = generation;
+    const isCurrent = () => !disposed && current === generation;
+    void list()
+      .then((prompts) => {
+        if (!isCurrent()) return;
+        setState((draft) => {
+          const known = new Set(draft.prompts.map((item) => String(item.requestId)));
+          const open = prompts.filter((prompt) => {
+            const requestId = String(prompt.requestId);
+            return !known.has(requestId) && !resolvedDuringPromptListRead.has(requestId);
+          });
+          if (open.length > 0)
+            draft.prompts = [...draft.prompts, ...open.map((prompt) => ({ ...prompt, type: "prompt" as const }))];
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        const again = promptListRead === "again";
+        promptListRead = "idle";
+        if (again && isCurrent()) readListedPrompts();
+      });
+  }
   function readWholeApprovals(): void {
     const read = runtime.readPendingApproval;
     if (!read) return;
@@ -569,6 +602,7 @@ export function createWebWorkspace(
             );
           });
           readWholeApprovals();
+          if (!attentionComplete) readListedPrompts();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -581,6 +615,7 @@ export function createWebWorkspace(
             ];
           });
         } else if (event.type === "agent-input-resolved") {
+          if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(event.requestId));
           setState((draft) => {
             draft.approvals = draft.approvals.filter((item) => String(item.requestId) !== String(event.requestId));
             draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(event.requestId));
@@ -2280,6 +2315,7 @@ export function createWebWorkspace(
       const current = generation;
       await runtime.answer(input);
       if (disposed || current !== generation) return;
+      if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(input.requestId));
       setState((draft) => {
         draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(input.requestId));
       });
