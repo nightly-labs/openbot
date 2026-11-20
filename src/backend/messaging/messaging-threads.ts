@@ -45,7 +45,14 @@ export interface MessagingAnswerFile {
 type MessagingTurnStatus = "completed" | "failed" | "interrupted";
 
 export type MessagingActivity =
-  | { type: "started"; link: MessagingLink; turnId: string; origin: MessagingOrigin | null; followUp: boolean }
+  | {
+      type: "started";
+      link: MessagingLink;
+      turnId: string;
+      origin: MessagingOrigin | null;
+      followUp: boolean;
+      teammateRequest: boolean;
+    }
   | {
       type: "finished";
       link: MessagingLink;
@@ -767,9 +774,9 @@ export class MessagingThreads {
           followUp = origin !== null;
         }
         const deliveryIds = active.map((context) => context.delivery.id);
-        const teammateRequest = active.length > 0 && active.every(({ delivery }) => isTeammateRequest(delivery));
+        const teammateRequest = active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery));
         this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp, teammateRequest });
-        this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
+        this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp, teammateRequest });
         let stopped = false;
         for (const deliveryId of deliveryIds) if (this.#stopsBeforeStart.delete(deliveryId)) stopped = true;
         if (stopped)
@@ -894,7 +901,7 @@ export class MessagingThreads {
       status,
       origin,
       followUp: delivery?.sender.kind === "agent",
-      teammateRequest: delivery !== undefined && isTeammateRequest(delivery),
+      teammateRequest: delivery !== undefined && isTeammateMessage(delivery),
       answer,
       files: [],
       reason,
@@ -1019,7 +1026,7 @@ export class MessagingThreads {
   }
 }
 
-function isTeammateRequest(delivery: DeliveryContext["delivery"]): boolean {
+function isTeammateMessage(delivery: DeliveryContext["delivery"]): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
