@@ -6,11 +6,17 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
+import {
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
 import {
+  agentFallbackMcpServers,
   findAgentMcpTool,
   handleMcpServerTool,
   type MarketplaceAppServer,
@@ -645,6 +651,40 @@ process.stdin.on("data", (chunk) => {
   assert.deepEqual(mcpToolCallResponse(stdioRan.result), {
     success: true,
     contentItems: [{ type: "inputText", text: "get_messages key=true" }],
+  });
+
+  // Antigravity leaves out most Computer Use tools, so tool_call runs them for an agent that has it (#12340).
+  const computerUse: McpServerConfig = {
+    ...stdioRow,
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+  };
+  const unsaved: McpServerConfig = { ...stdioRow, id: "not-saved", name: "not_saved" };
+  const fallbackFor = (agent: { access: "full" | "workspace"; computerUse?: boolean }) =>
+    agentFallbackMcpServers([computerUse, stdioRow, unsaved], new Set([stdioRow.id]), agent);
+  const hidden = findAgentMcpTool(fallbackFor({ access: "full" }), "computer_use.list_windows");
+  assert.equal(hidden?.config.id, COMPUTER_USE_MCP_SERVER_ID, "Computer Use for a Full access agent");
+  assert.equal(hidden?.tool, "list_windows");
+  assert.equal(
+    findAgentMcpTool(fallbackFor({ access: "full", computerUse: false }), "computer_use.list_windows"),
+    null,
+    "no Computer Use when it is off for the agent",
+  );
+  assert.deepEqual(
+    fallbackFor({ access: "workspace" }).map((config) => config.id),
+    [],
+    "no stdio server, Computer Use included, for Workspace only",
+  );
+  assert.deepEqual(
+    fallbackFor({ access: "full" }).map((config) => config.id),
+    [COMPUTER_USE_MCP_SERVER_ID, stdioRow.id],
+    "an unsaved row stays out",
+  );
+  const computerUseRan = await runCauseEffect(agentTools.callTool(computerUse, "list_windows", {}));
+  assert.ok("result" in computerUseRan, "the Computer Use tool runs");
+  assert.deepEqual(mcpToolCallResponse(computerUseRan.result), {
+    success: true,
+    contentItems: [{ type: "inputText", text: "list_windows key=true" }],
   });
   store.remove(stdioRow.id);
 

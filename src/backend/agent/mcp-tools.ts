@@ -2,6 +2,10 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccess,
+  agentComputerUseEnabled,
+  COMPUTER_USE_MCP_SERVER_ID,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
+  isReservedMcpServerName,
   MCP_TRANSPORTS,
   type McpKeyValue,
   type McpServerConfig,
@@ -132,6 +136,24 @@ export interface AgentMcpServers {
 
 export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
   return config.transport === "http" || !workspaceAccessEnforced(agent);
+}
+
+/**
+ * The servers whose tools `tool_call` runs for an agent: its saved rows, the GitHub connection, and
+ * Computer Use when it is on for the agent, as the provider gets it (#12340).
+ */
+export function agentFallbackMcpServers(
+  enabled: readonly McpServerConfig[],
+  savedIds: ReadonlySet<string>,
+  agent: { access?: AgentAccess | undefined; computerUse?: boolean | undefined },
+): McpServerConfig[] {
+  return enabled.filter(
+    (config) =>
+      (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
+        (config.id === COMPUTER_USE_MCP_SERVER_ID && agentComputerUseEnabled(agent)) ||
+        (savedIds.has(config.id) && !isReservedMcpServerName(config.name))) &&
+      mcpFallbackRunsServer(config, agent),
+  );
 }
 
 export function findAgentMcpTool(
