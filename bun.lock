@@ -464,7 +464,7 @@
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.7",
+    "@norbert_bodziony/bloub": "0.6.8",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
     "@solidjs/signals": "2.0.0",
@@ -1158,7 +1158,7 @@
 
     "@node-datachannel/win32-x64-msvc": ["@node-datachannel/win32-x64-msvc@0.33.6", "", { "os": "win32", "cpu": "x64" }, "sha512-N5GW6XH11Iuu+kyHLTiCMcCHdwWwpKqvtYril0LzQm6xBgmGQN3JXxFmgi4g4usw1nLy6WhBWADjbhSXJiiEMA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.7", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-RPRieMg0EGglIgdwhybjDg2gn0w2WREnO+PMiaQK4hF1DLYvnR4i96GphJh8dHW01XGB60vz6Ex3Q3VC+gDUDg=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.8", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-s8aqBfEEmfqFUKX9qgeYhitJhODpyrJK7DlEK2sTWE9pY7AgPJK0WqoAKf41Bkuc3Ci1LgQiqZdAKIie37fgMw=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 
