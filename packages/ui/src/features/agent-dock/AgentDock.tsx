@@ -24,7 +24,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
@@ -357,7 +357,8 @@ export function AgentDock(props: AgentDockProps) {
   const tuck = motion.spring(untrack(() => props.tucked) ? TUCK_DISTANCE : 0, TUCK);
   const [dragging, setDragging] = createSignal(false);
   const [pointerOn, setPointerOn] = createSignal(false);
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && (pointerOn() || dragging() || state.open !== null);
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
