@@ -3791,7 +3791,7 @@ function holdsKeyToken(text: string, value: string): boolean {
   return false;
 }
 
-function channelResultId(assignment: ChannelAssignment): string {
+export function channelResultId(assignment: ChannelAssignment): string {
   return `channel-result-${assignment.id}-revision-${assignment.taskRevision}`;
 }
 

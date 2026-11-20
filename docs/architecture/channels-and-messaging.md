@@ -295,13 +295,17 @@ not to the external chat, so the person would get no answer (#6160).
 
 The result of each root task comes back to the sending agent as a teammate reply
 (`ChannelRequestReturns`). When a root task of an `agent:<agentId>` request becomes completed,
-failed or cancelled, the channel `changed` hook queues one mailbox message from the task owner (or
+failed, cancelled or paused, the channel `changed` hook queues one mailbox message from the task owner (or
 the lead) to that agent, with `replyToMessageId` set to the channel request id and
-`expectsReply: false`. The text names the channel and gives the newest `channel_result` of the task,
-or the newest completed answer, with its attachments. A failed or cancelled task gives a blocked
-note. The idempotency key holds the task id, revision and state, so a task that is resumed and
+`expectsReply: false`. The text names the channel and gives the `channel_result` of the newest
+assignment of the task, or else the newest completed answer after the request, with its attachments.
+A failed or cancelled task gives a blocked note with the task error. A paused task (a person
+stopped it, or OpenBot paused it) gives a paused note that tells the agent not to send the request
+again: when the task continues and finishes, a new result comes back. The idempotency key holds the task id, revision and state, so a task that is resumed and
 finishes again sends a new result. At start, the tasks that are already finished are marked as
-handled, so an upgrade or a restart sends no old results. No result is sent when the owner is the
+handled, so an upgrade or a restart sends no old results. A send that fails is reported
+(`channel_request_return_failed`) and is not tried again. The reply goes to the main chat of the
+agent, also when it sent the request from a side task. No result is sent when the owner is the
 sender, or when one of the two agents was deleted. The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of
 an agent chat opens the channel with the message text in its composer. Attachments stay behind.
 
