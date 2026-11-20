@@ -105,6 +105,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): string | null {
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
@@ -153,7 +154,9 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const withWork = backgroundWork ? withRuntimeSnapshotBackgroundWork(withContext, wireValue, true) : withContext;
   const withUsage = usageTertiary ? withUsageEventTertiary(withWork, wireValue, true) : withWork;
   const withPending = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
-  const output = queueHold ? withQueueEventHold(withPending, wireValue, true) : withPending;
+  const output = queueHold
+    ? withQueueEventHold(withPending, wireValue, true, options.queueHoldSignIn === true)
+    : withPending;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
   const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;
   return JSON.stringify(options.browserVaultSkip ? restoreBrowserVaultSkip(withReason, wireValue) : withReason);

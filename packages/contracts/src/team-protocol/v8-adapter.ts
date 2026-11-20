@@ -200,6 +200,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): string {
   const {
@@ -212,12 +213,13 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     agentPendingRuntime,
     memoryChanges,
     queueHold,
+    queueHoldSignIn,
     ...frozen
   } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
   if (queueHold && (isQueueSnapshotRoute(method, path) || isQueueEditRoute(method, path)))
-    return JSON.stringify(withQueueHold(JSON.parse(encoded), value, true));
+    return JSON.stringify(withQueueHold(JSON.parse(encoded), value, true, queueHoldSignIn === true));
   const withUsage = usageTertiary && isUsageRoute(method, path);
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);

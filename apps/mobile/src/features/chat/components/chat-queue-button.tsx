@@ -126,7 +126,9 @@ function ChatQueueCard({
   const editedElsewhere = locks?.editedElsewhere ?? false;
   const holdLabel = queue.restartingProvider
     ? t("mobile.chat.queue.providerRestart", { provider: providerDisplayName(queue.restartingProvider) })
-    : null;
+    : queue.signInProvider
+      ? t("mobile.chat.queue.signIn", { provider: providerDisplayName(queue.signInProvider) })
+      : null;
   const more = rest > 0 || waiting || holdLabel !== null;
   const moreLabel =
     holdLabel ??

@@ -159,6 +159,7 @@ import {
   providerEnvironmentProblem,
   type QueueDelivery,
   type QueuedMessageReceipt,
+  type QueueHold,
   type QueueSnapshot,
   type RemoteDesktopSession,
   type RemoteNetworkRouteState,
@@ -381,7 +382,7 @@ export interface MockOpenBotControls {
   emitConversationDelta: (
     event: Omit<Extract<AgentEvent, { type: "conversation-delta" }>, "type" | "revision">,
   ) => void;
-  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[]) => QueueSnapshot;
+  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null) => QueueSnapshot;
   setRuntimeSnapshot: (snapshot: AgentRuntimeSnapshot) => void;
   onMessageSent: (listener: (message: MockSentMessage) => boolean) => () => void;
   onPromptResponse: (listener: (input: RespondToPromptInput) => void) => () => void;
@@ -1154,8 +1155,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return readStateForMessages(state, getSnapshot(agentId).messages);
   }
 
-  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[]): QueueSnapshot {
-    const snapshot = { agentId, deliveries: clone(deliveries) };
+  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null): QueueSnapshot {
+    const snapshot: QueueSnapshot = { agentId, deliveries: clone(deliveries), ...(hold ? { hold: clone(hold) } : {}) };
     queues.set(agentId, snapshot);
     emitAgentEvent({ type: "queue-changed", snapshot });
     return clone(snapshot);

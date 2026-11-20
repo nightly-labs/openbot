@@ -224,7 +224,7 @@ const phone = new PushNotificationService({
   memberActive: () => true,
   lastUseElsewhere: () => null,
   atHostComputer: (memberId, event) =>
-    memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
+    memberId === OWNER_ID && event !== null && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
   memberLevels: (memberId) =>
     memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
   liveActivityShows: () => false,

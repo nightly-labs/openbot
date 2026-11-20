@@ -110,6 +110,7 @@ export interface DrainHooks {
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   startRequestedNewChat(agentId: string, queuedRuns?: readonly string[]): Effect.Effect<void>;
   dropRequestedNewChat(agentId: string): void;
+  signInWait(agentId: string, provider: AgentProvider): void;
 }
 
 export interface TaskLanes {
@@ -394,6 +395,8 @@ export class DrainScheduler {
     const working =
       reason === "active-turn" && lane.taskId === null ? this.#conversation.workingSnapshot(lane.agentId) : undefined;
     const channelId = laneChannelId(lane.taskId);
+    const provider = reason === "sign-in" ? this.#laneProvider(lane) : null;
+    if (provider) this.#hooks.signInWait(lane.agentId, provider);
     logger.info("A queued message waits.", {
       agentId: lane.agentId,
       ...(lane.taskId === null
@@ -404,8 +407,14 @@ export class DrainScheduler {
             ? { channelId }
             : { taskId: lane.taskId }),
       reason,
+      ...(provider ? { provider } : {}),
       ...(working ? { threadId: working.threadId, turnId: working.activeTurnId } : {}),
     });
+  }
+
+  #laneProvider(lane: Lane): AgentProvider | null {
+    const agent = this.#store.get(lane.agentId);
+    return agent ? providerForAgent(agent) : null;
   }
 
   messagingTurnActive(agentId: string): boolean {
