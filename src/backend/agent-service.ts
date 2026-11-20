@@ -3667,7 +3667,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }
         const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
         const providerMove =
-          (move === null || move === "next-turn") &&
+          (move === null || move === "next-turn" || move === "pool") &&
           previous !== undefined &&
           confinedProvider !== providerForAgent(previous);
         if (
@@ -3831,7 +3831,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 ...(previous.fastMode ? { fastMode: true } : {}),
                 ...(previous.fastMode && previous.ultrafast ? { ultrafast: true } : {}),
               }))
-        : undefined;
+        : move === "pool"
+          ? previous?.usageLimitReturn
+          : undefined;
     const usageLimitReturn =
       returning || (returnTo && nextChoice && sameAgentModelChoice(returnTo, nextChoice)) ? null : returnTo;
     const agent = yield* this.#store.updateAgent(
@@ -3930,7 +3932,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           model: pooled.model,
           providerAccountId: pooled.providerAccountId ?? null,
         },
-        move: "next-turn",
+        move: "pool",
       };
     if (!agent.usageLimitReturn && !agent.backupModels) return null;
     if (this.#runsTurn(agentId) || this.#mailbox.hasStartedDelivery(agentId)) return null;
@@ -4243,7 +4245,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         Effect.gen({ self: this }, function* () {
           const move = this.#removal.deleting().has(agentId) ? null : this.#usageLimitMove(agentId);
           if (!move) return false;
-          if (move.move === "next-turn" && (yield* this.#poolMoveWaits(agentId))) {
+          if (move.move === "pool" && (yield* this.#poolMoveWaits(agentId))) {
             logger.info("A pool move waits: the agent's Claude session still runs background work.", { agentId });
             return false;
           }
@@ -6912,7 +6914,7 @@ export class AgentLifecycleFailed extends Schema.TaggedError<AgentLifecycleFaile
 
 const POOL_READ_INTERVAL_MS = 4 * 60_000;
 
-type ModelMove = "return" | "provider-error" | "next-turn";
+type ModelMove = "return" | "provider-error" | "next-turn" | "pool";
 
 const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "agentId",
