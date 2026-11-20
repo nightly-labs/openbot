@@ -513,7 +513,10 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "list_routines",
     description:
       "List routines for this agent, or for another local agent when agentId is provided. Use this before updating or deleting a routine. routines has the schedule routines; webhookRoutines has the webhook routines with their event type, filters and URL.",
-    shape: { agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional() },
+    shape: {
+      agentId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+      routineId: z.string().min(1).max(INPUT_LIMITS.identifier).optional(),
+    },
   },
   {
     name: "create_routine",
@@ -579,9 +582,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       routineId: z.string().min(1).max(INPUT_LIMITS.identifier),
       name: z.string().min(1).max(INPUT_LIMITS.routineName).optional(),
       instruction: routineInstructionZodSchema.optional(),
-      schedule: routineScheduleZodSchema
-        .describe("Routine schedule. Must not run more often than every 3 minutes.")
-        .optional(),
+      schedule: routineScheduleZodSchema.describe("Routine schedule.").optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
       missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
