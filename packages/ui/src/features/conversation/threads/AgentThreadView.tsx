@@ -276,7 +276,10 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   function loadOlderNearTop(element: HTMLElement): void {
     const older = untrack(() => props.olderMessages);
     if (!older || older.loading) return;
-    if (element.scrollTop > element.clientHeight * OLDER_PRELOAD_VIEWS) return;
+    if (element.scrollTop > element.clientHeight * OLDER_PRELOAD_VIEWS) {
+      autoLoadedFirstId = null;
+      return;
+    }
     const firstId = untrack(() => props.messages[0]?.id);
     if (firstId === autoLoadedFirstId) return;
     autoLoadedFirstId = firstId;
@@ -308,6 +311,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (taskId === shownTaskId) return;
       shownTaskId = taskId;
       atEnd = true;
+      olderAnchor = undefined;
+      autoLoadedFirstId = null;
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
   );
