@@ -65,6 +65,7 @@ export interface ServerConnectionNoticeProps {
   onExited?: (() => void) | undefined;
   onMountViews?: (() => void) | undefined;
   screen?: boolean;
+  loadingScene?: "pile" | "quiet";
   hideDetails?: boolean;
   onRetry: () => void;
   onManage?: () => void;
@@ -287,6 +288,8 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
         <Show when={props.screen !== false}>
           <AppLoadingScreen
             label={title()}
+            title={title()}
+            scene={props.loadingScene ?? "pile"}
             ready={props.ready}
             onExited={props.onExited}
             onMountViews={props.onMountViews}

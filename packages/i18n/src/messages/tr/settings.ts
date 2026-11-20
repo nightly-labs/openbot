@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Hareketli ajan yüzleri",
   "settings.movingFaces.description":
     "Ajan yüzleri göz kırpar ve hareket eder. GPU’su olmayan bir bilgisayarda başta durağandır.",
+  "settings.startupAnimation.title": "Açılış animasyonu",
+  "settings.startupAnimation.description": "OpenBot açılırken ajan animasyonunu gösterir.",
   "settings.logoColor.title": "Logo rengi",
   "settings.logoColor.description": "Dock'ta, görev çubuğunda ve Dynamic Island'da gösterilir.",
   "settings.logoColor.buildNote": "Bu derleme kendi logo rengini korur. Seçim, yayımlanan uygulamaya uygulanır.",

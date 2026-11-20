@@ -93,6 +93,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.backgroundBlur.title", descriptionKey: "settings.backgroundBlur.description" },
       { titleKey: "settings.movingFaces.title", descriptionKey: "settings.movingFaces.description" },
+      { titleKey: "settings.startupAnimation.title", descriptionKey: "settings.startupAnimation.description" },
     ],
   },
   {

@@ -27,6 +27,8 @@ export const messages = defineMessages("settings", {
   "settings.backgroundBlur.description": "Blur behind menus and dialogs. It starts off on a computer with no GPU.",
   "settings.movingFaces.title": "Moving agent faces",
   "settings.movingFaces.description": "Agent faces blink and move. They start still on a computer with no GPU.",
+  "settings.startupAnimation.title": "Startup animation",
+  "settings.startupAnimation.description": "Show the agent animation while OpenBot opens.",
   "settings.logoColor.title": "Logo color",
   "settings.logoColor.description": "Shown in the Dock, the taskbar and the Dynamic Island.",
   "settings.logoColor.buildNote": "This build keeps its own logo color. The choice applies to the release app.",

@@ -217,6 +217,7 @@ import {
 } from "../../lazy-views";
 import { PlatformProvider } from "../../platform";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { startupLoadingScene } from "../../startup-animation-preference";
 import { WorkspaceFrame } from "../../WorkspaceFrame";
 import {
   ChannelCreateOverlay,
@@ -2679,6 +2680,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         onExited={cover ? () => setLoadingCover(false) : undefined}
         fullWindow={fullWindowLoading()}
         screen={!frameConnecting()}
+        loadingScene={startupLoadingScene()}
         issue={workspace.state.hostedIssue}
         start={workspace.state.hostedStart}
         updateVersion={workspace.state.hostRestart?.version ?? null}
