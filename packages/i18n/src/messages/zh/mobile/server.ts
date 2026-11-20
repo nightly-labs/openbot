@@ -1139,6 +1139,8 @@ export const messages = {
   "mobile.server.mcp.testFailed": "该 MCP 服务器没有响应。",
   "mobile.server.mcp.connected": { other: "已连接 · {count} 个工具" },
   "mobile.server.mcp.signInOnComputer": "该 MCP 服务器要求登录。请在电脑上的 OpenBot 中登录，然后重新测试。",
+  "mobile.server.mcp.signIn": "登录",
+  "mobile.server.mcp.signInHere": "此 MCP 服务器要求你登录。点按登录，然后再次测试。",
   "mobile.server.mcp.signedInDescription": "{server} 已登录该 MCP 服务器。",
   "mobile.server.mcp.signOut": "退出登录",
   "mobile.server.mcp.saveFailed": "无法保存更改，请重试。",

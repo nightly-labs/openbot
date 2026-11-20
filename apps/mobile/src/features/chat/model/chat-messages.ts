@@ -30,6 +30,7 @@ import {
   isAgentAnswer,
   isContextResetMarker,
   marketplaceSuggestionEvent,
+  mcpSignInEvent,
   parseConversationPlanText,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   replacedConversationPlans,
@@ -67,6 +68,7 @@ export type ChatMessage =
     }
   | { id: string; kind: "context-reset" }
   | { id: string; kind: "app-suggestion"; appId: string }
+  | { id: string; kind: "mcp-sign-in"; mcpServerId: string }
   | {
       id: string;
       kind: "routine";
@@ -255,6 +257,7 @@ function progressBubble(id: string, message: ConversationMessage): Extract<ChatM
 }
 
 const projectedSuggestions = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedSignIns = new WeakMap<ConversationMessage, ChatMessage>();
 
 function suggestedApp(message: ConversationMessage): string | null {
   const appId = marketplaceSuggestionEvent(message)?.appId;
@@ -456,6 +459,17 @@ export function projectChatMessages(
         result.push(
           projectedMarker(projectedSuggestions, message, () => ({ id: message.id, kind: "app-suggestion", appId })),
         );
+      continue;
+    }
+    const signIn = mcpSignInEvent(message);
+    if (signIn) {
+      result.push(
+        projectedMarker(projectedSignIns, message, () => ({
+          id: message.id,
+          kind: "mcp-sign-in",
+          mcpServerId: signIn.mcpServerId,
+        })),
+      );
       continue;
     }
     if (settingLinkMessage(message)) continue;

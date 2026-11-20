@@ -1680,6 +1680,8 @@ export const messages = {
   "mobile.server.mcp.testFailed": "שרת ה-MCP לא ענה.",
   "mobile.server.mcp.connected": { one: "מחובר · כלי אחד", two: "מחובר · שני כלים", other: "מחובר · {count} כלים" },
   "mobile.server.mcp.signInOnComputer": "שרת ה-MCP הזה דורש התחברות. יש להתחבר מ-OpenBot במחשב ואז לבדוק שוב.",
+  "mobile.server.mcp.signIn": "התחברות",
+  "mobile.server.mcp.signInHere": "שרת MCP זה מבקש ממך להתחבר. הקש על התחברות ואז בדוק שוב.",
   "mobile.server.mcp.signedInDescription": "{server} מחובר לשרת ה-MCP הזה.",
   "mobile.server.mcp.signOut": "התנתקות",
   "mobile.server.mcp.saveFailed": "לא ניתן לשמור את השינוי. אפשר לנסות שוב.",
