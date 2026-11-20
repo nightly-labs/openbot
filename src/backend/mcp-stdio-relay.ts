@@ -17,7 +17,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { cliSpawnTarget } from "./cli";
-import { MCP_TOOL_CALL_TIMEOUT_MS, type McpToolArguments, type McpToolCallResult } from "./mcp-probe";
+import { boundedError, MCP_TOOL_CALL_TIMEOUT_MS, type McpToolArguments, type McpToolCallResult } from "./mcp-probe";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
@@ -196,9 +196,9 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
 
 function relayedOutcome(answer: JSONRPCResultResponse | JSONRPCErrorResponse | null): RelayedMcpToolOutcome {
   if (answer === null) return { error: sourceText("error.backend.mcpServerStoppedDuringCall") };
-  if (!isJSONRPCResultResponse(answer)) return { error: answer.error.message };
+  if (!isJSONRPCResultResponse(answer)) return { error: boundedError(answer.error.message) };
   const decoded = CallToolResultSchema.safeParse(answer.result);
-  return decoded.success ? { result: decoded.data } : { error: decoded.error.message };
+  return decoded.success ? { result: decoded.data } : { error: boundedError(decoded.error.message) };
 }
 
 function startServer(

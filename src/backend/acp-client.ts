@@ -262,6 +262,11 @@ interface SharedStdioRelay {
   users: number;
 }
 
+interface RelayedMcpServers {
+  own: readonly string[];
+  byName: ReadonlyMap<string, StdioMcpRelay>;
+}
+
 interface AcpThread {
   id: string;
   cwd: string;
@@ -273,7 +278,7 @@ interface AcpThread {
   currentModelId: string | null;
   mcp: LocalMcpSession;
   relays: Effect.Effect<void>;
-  relayed: ReadonlyMap<string, StdioMcpRelay>;
+  relayed: RelayedMcpServers;
   activeTurn: AcpTurn | null;
   needsResume: boolean;
   transport: AcpConnection | null;
@@ -875,9 +880,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     args: McpToolArguments,
   ): Effect.Effect<RelayedMcpToolOutcome | null> {
     const thread = this.#threads.get(externalThreadId);
-    if (!thread || thread.relayed.size === 0) return Effect.succeed(null);
-    const name = acpMcpServerName(config, this.#ownMcpServerNames(thread.cwd), this.#flavor.mcpServerName);
-    return thread.relayed.get(name)?.callTool(tool, args) ?? Effect.succeed(null);
+    if (!thread || thread.relayed.byName.size === 0) return Effect.succeed(null);
+    const name = acpMcpServerName(config, thread.relayed.own, this.#flavor.mcpServerName);
+    return thread.relayed.byName.get(name)?.callTool(tool, args) ?? Effect.succeed(null);
   }
 
   readonly releaseThread = Effect.fn("AcpAgentClient.releaseThread")(function* (
@@ -1608,7 +1613,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     let threadRef: AcpThread | null = null;
     let transport: AcpConnection | null = null;
     let closeRelays: Effect.Effect<void> | null = null;
-    let relayedServers: ReadonlyMap<string, StdioMcpRelay> = new Map();
+    let relayedServers: RelayedMcpServers = { own: [], byName: new Map() };
     let retained = false;
     const relaysStdio =
       this.#flavor.relayStdioMcpServers === true ||
@@ -1652,6 +1657,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             let id: string;
             let configOptions: SessionConfigOption[];
             let currentModelId: string | null;
+            const ownMcpServerNames = this.#ownMcpServerNames(cwd);
             const handoff = acpMcpServers(
               providerResult(
                 yield* Effect.result(
@@ -1663,7 +1669,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                   ).pipe(toProviderClientOperationError),
                 ),
               ),
-              this.#ownMcpServerNames(cwd),
+              ownMcpServerNames,
               this.#flavor.mcpServerName,
               relaysStdio,
               Math.max(0, (this.#flavor.mcpServerLimit ?? Number.POSITIVE_INFINITY) - mcp.servers.length),
@@ -1674,7 +1680,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               const relayed = providerResult(yield* Effect.result(this.#relayStdioMcpServers(given, cwd)));
               given = relayed.servers;
               closeRelays = relayed.close;
-              relayedServers = relayed.byName;
+              relayedServers = { own: ownMcpServerNames, byName: relayed.byName };
             }
             let mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;

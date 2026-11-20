@@ -487,7 +487,7 @@ const countToolsEffect = Effect.fnUntraced(function* (client: ProbeClient) {
   }
 });
 
-function boundedError(text: string): string {
+export function boundedError(text: string): string {
   if (text.length <= INPUT_LIMITS.mcpErrorText) return text;
   return `${text.slice(0, INPUT_LIMITS.mcpErrorText - 1)}…`;
 }
