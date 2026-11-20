@@ -1,4 +1,4 @@
-import { decodeWorkflowFoldersSnapshot, parseWorkflowFolderAction } from "@openbot/contracts/ipc";
+import { parseWorkflowFolderAction } from "@openbot/contracts/ipc";
 import {
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOW_FOLDERS_ROUTES,
@@ -69,7 +69,7 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import type { WorkflowsHandle } from "../../backend/workflows/workflows";
 import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsService } from "../host-events-service";
-import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, decodeWorkflowFoldersSnapshotFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
@@ -146,7 +146,7 @@ export function workflowIpcHandlers({
   function remoteFolders(serverId: string, path: string, body: unknown) {
     if (!remoteServers.supportsCapability(serverId, WORKFLOW_FOLDERS_CAPABILITY))
       throw new Error(sourceText("error.team.workflowFoldersUnsupported"));
-    return remote(serverId, path, decodeWorkflowFoldersSnapshot, body);
+    return remote(serverId, path, decodeWorkflowFoldersSnapshotFromHost, body);
   }
   return {
     workflows: {

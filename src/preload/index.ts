@@ -84,7 +84,6 @@ import {
   decodeSaveSkillSuggestionResult,
   decodeServerAuditLog,
   decodeTestCompanySignInResult,
-  decodeWorkflowFoldersSnapshot,
   decodeWorkspaceDirectory,
   type EventEndpoint,
   type GroupApi,
@@ -377,6 +376,7 @@ import {
 import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
+  decodeWorkflowFoldersSnapshotFromMain,
   decodeWorkflowGitHubCatalog,
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
@@ -922,8 +922,8 @@ const openbotApi: OpenBotDesktopApi = {
     mediaCredits: decodeWorkflowMediaCredits,
     mediaCatalog: decodeWorkflowMediaCatalog,
     mediaPrice: decodeWorkflowMediaPrice,
-    folders: decodeWorkflowFoldersSnapshot,
-    folderAction: decodeWorkflowFoldersSnapshot,
+    folders: decodeWorkflowFoldersSnapshotFromMain,
+    folderAction: decodeWorkflowFoldersSnapshotFromMain,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,
