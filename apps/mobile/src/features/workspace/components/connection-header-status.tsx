@@ -14,6 +14,7 @@ import {
 } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { ErrorReference } from "@/shared/components/error-reference";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 function StatusText({ server: shown }: { server: MobileServer }) {
@@ -82,6 +83,7 @@ const STATUS_MIN_WIDTH = 96;
 const HEADER_CHROME_WIDTH = 270;
 
 function headerStatusWidth(windowWidth: number): number {
+  if (!isIOS) return STATUS_MAX_WIDTH;
   return Math.max(STATUS_MIN_WIDTH, Math.min(STATUS_MAX_WIDTH, windowWidth - HEADER_CHROME_WIDTH));
 }
 
