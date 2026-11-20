@@ -1261,6 +1261,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5시간",
   "mobile.server.planLimits.window.hours": { other: "{count}시간" },
   "mobile.server.planLimits.window.minutes": "{minutes}분",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "업데이트",
   "mobile.server.settings.updateAvailable": "업데이트 가능",
   "mobile.server.route.updates": "업데이트",

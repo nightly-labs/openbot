@@ -201,6 +201,7 @@ import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
+import { TEAM_USAGE_GROUPS_CAPABILITY } from "./usage-groups-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import {
   highestCommonTeamProtocol,
@@ -448,6 +449,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -770,6 +772,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
   [WORKFLOWS_STEP_SETTINGS_CAPABILITY, V10],
+  [TEAM_USAGE_GROUPS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

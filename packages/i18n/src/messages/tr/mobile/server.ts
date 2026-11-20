@@ -1312,6 +1312,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 saatlik",
   "mobile.server.planLimits.window.hours": { one: "{count} saatlik", other: "{count} saatlik" },
   "mobile.server.planLimits.window.minutes": "{minutes} dk",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Güncellemeler",
   "mobile.server.settings.updateAvailable": "Güncelleme var",
   "mobile.server.route.updates": "Güncellemeler",

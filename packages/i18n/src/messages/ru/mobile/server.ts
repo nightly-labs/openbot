@@ -1438,6 +1438,7 @@ export const messages = {
     other: "{count} ч",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} мин",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Обновления",
   "mobile.server.settings.updateAvailable": "Доступно обновление",
   "mobile.server.route.updates": "Обновления",

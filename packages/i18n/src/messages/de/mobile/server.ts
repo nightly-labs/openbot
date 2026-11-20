@@ -1349,6 +1349,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 Stunden",
   "mobile.server.planLimits.window.hours": { one: "{count} Stunde", other: "{count} Stunden" },
   "mobile.server.planLimits.window.minutes": "{minutes} Min.",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update verfügbar",
   "mobile.server.route.updates": "Updates",

@@ -1806,6 +1806,7 @@ export const messages = {
     other: "{count} ساعة",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} دقيقة",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "التحديثات",
   "mobile.server.settings.updateAvailable": "يتوفر تحديث",
   "mobile.server.route.updates": "التحديثات",

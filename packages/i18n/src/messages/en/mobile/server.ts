@@ -1710,6 +1710,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.planLimits.window.fiveHour": "5-hour",
   "mobile.server.planLimits.window.hours": { one: "{count}-hour", other: "{count}-hour" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update available",
   "mobile.server.route.updates": "Updates",

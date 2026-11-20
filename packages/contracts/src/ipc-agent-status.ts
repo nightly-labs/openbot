@@ -303,7 +303,7 @@ export function withReadCredits(read: AccountUsageLimit | undefined, limit: Acco
 
 export const MAX_USAGE_GROUPS = 16;
 
-function isAccountUsageGroup(value: unknown): value is AccountUsageGroup {
+export function isAccountUsageGroup(value: unknown): value is AccountUsageGroup {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.name, INPUT_LIMITS.identifier) &&

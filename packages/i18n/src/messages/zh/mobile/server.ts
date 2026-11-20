@@ -1188,6 +1188,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 小时",
   "mobile.server.planLimits.window.hours": { other: "{count} 小时" },
   "mobile.server.planLimits.window.minutes": "{minutes} 分钟",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "更新",
   "mobile.server.settings.updateAvailable": "有可用更新",
   "mobile.server.route.updates": "更新",
