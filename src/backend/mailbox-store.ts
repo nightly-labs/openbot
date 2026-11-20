@@ -1108,8 +1108,9 @@ export class MailboxStore {
     });
   }
 
-  awaitsTeammate(agentId: string, taskId: string | null): boolean {
+  awaitsTeammate(agentId: string, taskId: string | null, turnId: string): boolean {
     const messages = this.#messagesById();
+    const sourceTurnIds = this.#sourceTurnIds();
     return this.#state.deliveries.some((delivery) => {
       if (!isActiveDelivery(delivery) || delivery.recipientAgentId === agentId) return false;
       const request = messages.get(delivery.messageId);
@@ -1117,7 +1118,8 @@ export class MailboxStore {
         request?.sender.kind === "agent" &&
         request.sender.agentId === agentId &&
         request.expectsReply !== false &&
-        (request.senderTaskId ?? null) === taskId
+        (request.senderTaskId ?? null) === taskId &&
+        sourceTurnIds.get(request.id) === turnId
       );
     });
   }

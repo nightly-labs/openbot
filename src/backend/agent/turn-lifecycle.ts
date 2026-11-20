@@ -2198,15 +2198,16 @@ export class TurnLifecycle {
         !channelTurn &&
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
-        !this.#mailbox.awaitsTeammate(agentId, laneTaskId)
+        !this.#mailbox.awaitsTeammate(agentId, laneTaskId, turnId)
           ? this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text)
           : "no";
       const continueMode: FinishCheckMode =
         planMode !== "no" &&
         (taskStarted ||
-          (yield* (running?.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
-            Effect.orElseSucceed(() => false),
-          )))
+          (running?.startedBackgroundWork === true &&
+            (yield* (running.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+              Effect.orElseSucceed(() => false),
+            ))))
           ? "no"
           : planMode;
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;

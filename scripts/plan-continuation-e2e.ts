@@ -744,6 +744,73 @@ try {
     return { turns: leadTurns.length };
   });
 
+  await check("only a request from the same turn that a teammate still works on stops the continuation", async () => {
+    const lead = await createAgent("Delegator");
+    const worker = await createAgent("Worker");
+    const release = join(root, "worker-turn");
+    const mark = loggedTurns().length;
+    const delegated = await send(
+      lead.id,
+      `Delegate the audit. ${plan({
+        steps: [],
+        answer: "Next, I'll review the audit when Worker reports back.",
+        calls: [
+          {
+            tool: "send_message",
+            arguments: {
+              recipientAgentIds: [worker.id],
+              text: plan({ steps: [], answer: "The audit is done.", holdUntil: release }),
+            },
+          },
+        ],
+      })}`,
+    );
+    assert.equal(await settled(delegated), "completed");
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Delegate the audit."))?.threadId;
+    await waitFor("the worker's turn", () => turnsSince(mark).some((turn) => turn.threadId !== leadThread));
+    assert.equal(
+      turnsSince(mark).filter((turn) => turn.threadId === leadThread).length,
+      1,
+      "The turn that sent the request does not continue.",
+    );
+    const next = loggedTurns().length;
+    const fixed = await send(
+      lead.id,
+      `Fix the typo. ${plan(
+        {
+          steps: [
+            ["Fix the typo", "completed"],
+            ["Run the tests", "pending"],
+          ],
+          answer: "The typo is fixed.",
+        },
+        {
+          steps: [
+            ["Fix the typo", "completed"],
+            ["Run the tests", "completed"],
+          ],
+          answer: "The tests pass.",
+        },
+      )}`,
+    );
+    assert.equal(await settled(fixed), "completed");
+    assert.deepEqual(
+      turnsSince(next)
+        .filter((turn) => turn.threadId === leadThread)
+        .map((turn) => turn.note),
+      [false, true],
+      "A new request continues while the teammate works on an older request.",
+    );
+    await writeFile(release, "");
+    await waitFor("the worker's answer and the lead's answer turn", () =>
+      [lead.id, worker.id].every(
+        (agentId) =>
+          current.service.listQueue(agentId).deliveries.filter((delivery) => !ended(delivery.status)).length === 0,
+      ),
+    );
+    return { turns: turnsSince(mark).length };
+  });
+
   await check("a request with no plan continues at most 2 times for a next step", async () => {
     const agent = await createAgent("Repeater");
     const mark = loggedTurns().length;
