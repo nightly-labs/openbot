@@ -102,13 +102,15 @@ export class RemoteAttachmentCache {
     this.#pending.set(key, next);
     const transfer = queued
       ? Effect.raceFirst(
-          this.#downloadPermits(serverId).withPermit(
-            Effect.suspend(() => {
-              if (!next.waiting) return Deferred.await(request);
-              next.waiting = false;
-              return download();
-            }),
-          ),
+          this.#downloadPermits(serverId)
+            .withPermit(
+              Effect.suspend(() => {
+                if (!next.waiting) return Effect.succeed(null);
+                next.waiting = false;
+                return download();
+              }),
+            )
+            .pipe(Effect.flatMap((attachment) => (attachment === null ? Effect.never : Effect.succeed(attachment)))),
           Deferred.await(request),
         )
       : download();
