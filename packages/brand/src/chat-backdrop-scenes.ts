@@ -254,17 +254,16 @@ function sunset(cells: ChatBackdropCells, frame: ChatBackdropFrame): void {
   const radius = Math.max(6, Math.min(22, Math.min(w, h) * 0.18));
   const sx = w * 0.74;
   const sy = horizon - 2;
-  const top = dark ? [255, 214, 92] : [255, 196, 120];
-  const bottom = dark ? [255, 79, 139] : [255, 120, 170];
+  const top: Rgb = dark ? [255, 214, 92] : [255, 196, 120];
+  const bottom: Rgb = dark ? [255, 79, 139] : [255, 120, 170];
   for (let dy = -Math.ceil(radius); dy <= 0; dy += 1) {
     const share = (dy + radius) / radius;
     if (dy > -radius * 0.55) {
       const band = wrap(dy + t * 1.5, 5);
       if (band < 1 + share * 1.5) continue;
     }
-    const color = `rgb(${top.map((value, channel) => Math.round(value + ((bottom[channel] ?? value) - value) * share)).join(" ")})`;
     const half = Math.sqrt(Math.max(0, radius * radius - dy * dy));
-    line(cells, sx - half, sy + dy, sx + half, sy + dy, color);
+    line(cells, sx - half, sy + dy, sx + half, sy + dy, mix(top, bottom, share));
   }
 
   for (let x = 0; x < w; x += 1) {
@@ -424,7 +423,7 @@ const FLAMINGO = [
 ] as const;
 const PARTY_COLORS = ["#ff4fb8", "#4ff0e0", "#ffd27a", "#ff7a3c", "#b08cff"] as const;
 const FLAMES = ["#ff3b1f", "#ff8a1f", "#ffd24a"] as const;
-const CHASE_SPEED = 18;
+const CHASE_SECONDS = 13;
 const BURN_SECONDS = 9;
 const ROAD_HEIGHT = 14;
 
@@ -436,6 +435,7 @@ interface CoastLayout {
   lane: number;
   crashX: number;
   crashAt: number;
+  speed: number;
   after: number;
   fade: number;
 }
@@ -445,8 +445,8 @@ function coastLayout(frame: ChatBackdropFrame): CoastLayout {
   const shore = Math.floor(h * 0.58);
   const roadTop = shore + Math.max(1, Math.round(h * 0.03));
   const crashX = Math.round(w * 0.8);
-  const crashAt = (crashX + 28) / CHASE_SPEED;
-  const cycle = crashAt + BURN_SECONDS;
+  const crashAt = CHASE_SECONDS;
+  const cycle = CHASE_SECONDS + BURN_SECONDS;
   const local = wrap(t, cycle);
   return {
     horizon: Math.floor(h * 0.45),
@@ -456,6 +456,7 @@ function coastLayout(frame: ChatBackdropFrame): CoastLayout {
     lane: roadTop + ROAD_HEIGHT / 2,
     crashX,
     crashAt,
+    speed: (crashX + 28) / CHASE_SECONDS,
     after: local - crashAt,
     fade: clamp01((cycle - local) / 1.5),
   };
@@ -589,7 +590,7 @@ function coastSkyline(cells: ChatBackdropCells, frame: ChatBackdropFrame, layout
     const block = Math.floor((x - skylineStart) / 4);
     const tall = hash(block + 820);
     const height = Math.round(h * (0.04 + tall * tall * 0.16));
-    line(cells, x, horizon - height, x, horizon, building);
+    cells.fill(x, horizon - height, 1, height + 1, building, 1);
     if ((x - skylineStart) % 4 === 3) continue;
     for (let y = horizon - height + 2; y < horizon - 1; y += 2) {
       const lit = hash(x * 31 + y * 7 + Math.floor(t * 0.25 + hash(x + y)));
@@ -750,12 +751,12 @@ function coastBeach(cells: ChatBackdropCells, frame: ChatBackdropFrame, layout: 
 
 function coastChase(cells: ChatBackdropCells, frame: ChatBackdropFrame, layout: CoastLayout): void {
   const { time: t, dark } = frame;
-  const { lane, crashX, crashAt, after, fade } = layout;
+  const { lane, crashX, crashAt, speed, after, fade } = layout;
   const local = crashAt + after;
   const crashed = after > 0;
   const recoil = Math.min(Math.max(after, 0), 0.2) * 10;
-  const leadX = -20 + CHASE_SPEED * local;
-  const policeX = crashed ? crashX - 12 - recoil : -40 + CHASE_SPEED * local;
+  const leadX = -20 + speed * local;
+  const policeX = crashed ? crashX - 12 - recoil : -40 + speed * local;
   const policeY = Math.round(lane - 6 * clamp01((local - crashAt + 0.7) / 0.7));
   const oncomingX = crashed ? crashX + recoil : crashX + 12 * (crashAt - local);
   const glass = dark ? "#9fd8ff" : "#e9f6ff";
@@ -785,7 +786,7 @@ function coastChase(cells: ChatBackdropCells, frame: ChatBackdropFrame, layout: 
     if (!crashed) {
       disc(cells, policeX + 4.5, policeY, 4, flash ? "#ff2a4a" : "#3a6aff", 0.2);
       headlights(cells, oncomingX - 1, lane - 3, -1);
-      headlights(cells, policeX + POLICE_CAR[0].length, policeY + 4, 1);
+      headlights(cells, policeX + POLICE_CAR[0].length, policeY + 3, 1);
     }
   }
   sprite(
@@ -887,17 +888,17 @@ function crashShake(cells: ChatBackdropCells, frame: ChatBackdropFrame, layout: 
 
 function coast(base: ChatBackdropCells, frame: ChatBackdropFrame): void {
   const layout = coastLayout(frame);
-  const cells = crashShake(base, frame, layout);
-  coastSky(cells, frame, layout);
-  coastSun(cells, frame, layout);
-  coastSkyline(cells, frame, layout);
-  coastYacht(cells, frame, layout);
-  coastHelicopter(cells, frame, layout);
-  coastSpeedboat(cells, frame, layout);
-  coastBeach(cells, frame, layout);
-  coastChase(cells, frame, layout);
-  coastPalms(cells, frame, layout);
-  coastExplosion(cells, frame, layout);
+  coastSky(base, frame, layout);
+  coastSun(base, frame, layout);
+  coastSkyline(base, frame, layout);
+  coastYacht(base, frame, layout);
+  coastHelicopter(base, frame, layout);
+  coastSpeedboat(base, frame, layout);
+  coastBeach(base, frame, layout);
+  const shaken = crashShake(base, frame, layout);
+  coastChase(shaken, frame, layout);
+  coastPalms(shaken, frame, layout);
+  coastExplosion(shaken, frame, layout);
 }
 
 const PAINTERS: Record<ChatBackdropScene, (cells: ChatBackdropCells, frame: ChatBackdropFrame) => void> = {
