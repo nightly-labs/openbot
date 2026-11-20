@@ -981,6 +981,18 @@ try {
     return { notes };
   });
 
+  await check("without a backup, a spent balance shows its reason in the chat", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance alone");
+    const since = events.length;
+    const outcome = await send(agent.id, "usage-spent case:spent-alone");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on its own model.");
+    const shown = errorsFor(agent.id, since).map((event) => (event.type === "error" ? event.message : ""));
+    assert.deepEqual(shown, ["Your credit balance is too low to continue."], "The chat shows the reason once.");
+    return { shown };
+  });
+
   await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();
     const agent = await createCodex("No fallback", { automatic: true, order: [] });
