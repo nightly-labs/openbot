@@ -816,7 +816,7 @@
   scale: -1 1;
 }
 
-.agent-dock[data-ambient-motion="paused"] .agent-row-thinking-dots i {
+.agent-dock[data-ambient-motion="paused"] :is(.agent-row-thinking-dots i, .agent-dock-typing-dots i) {
   animation-play-state: paused;
 }
 
