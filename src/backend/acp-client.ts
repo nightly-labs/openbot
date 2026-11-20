@@ -75,7 +75,7 @@ import {
   ProviderSessionBusyError,
   ProviderTurnActiveError,
 } from "./agent-client";
-import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion } from "./cli";
+import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion, olderVersion } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
 import { encodedModelId, providerModelValue } from "./encoded-model-id";
 import { IdleThreadPool } from "./idle-thread-pool";
@@ -1497,6 +1497,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  get #sessionProcesses(): boolean {
+    if (this.#flavor.sessionProcesses) return true;
+    const before = this.#flavor.sessionProcessesBefore;
+    const version = this.#initialization?.agentInfo?.version;
+    return before !== undefined && typeof version === "string" && olderVersion(version, before);
+  }
+
   get #supportsSessionResume(): boolean {
     if (this.#flavor.loadInsteadOfResume) return false;
     return this.#initialization?.agentCapabilities?.sessionCapabilities?.resume != null;
@@ -1601,7 +1608,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       (mcp) =>
         Effect.gen({ self: this }, function* () {
           try {
-            if (this.#flavor.sessionProcesses)
+            if (this.#sessionProcesses)
               transport = providerResult(yield* Effect.result(this.#startSessionProcess(() => threadRef)));
             const sessionTransport = transport;
             const connection = () =>

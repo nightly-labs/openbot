@@ -94,6 +94,7 @@ export interface AcpFlavor {
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
   sessionProcesses?: true;
+  sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;
     answerIsFailure: RegExp;
@@ -335,6 +336,8 @@ function hermesSessionNotFound(error: RequestError): boolean | null {
 
 const HERMES_MCP_SERVER_LIMIT = 16;
 
+const HERMES_SESSION_MCP_SINCE = "0.22.1";
+
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
   sessionNotFound: hermesSessionNotFound,
@@ -343,6 +346,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+  sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
   setsConfigOnlyOnChange: true,
   resendsAnswer: true,
   subagentTools: ["delegate_task"],
@@ -456,6 +460,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+    sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
