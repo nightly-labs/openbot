@@ -63,6 +63,7 @@ export class ChannelRequestReturns {
       if (this.#handled.has(key)) return [];
       this.#handled.add(key);
       const request = this.#channels.store.message(channelId, task.requestMessageId);
+      if (request?.taskId && request.taskId !== task.id) return [];
       const requesterId = request ? channelHandoffSenderAgentId(request) : null;
       if (!request || !requesterId) return [];
       return [{ key, task, request, requesterId }];
