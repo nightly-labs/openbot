@@ -700,9 +700,7 @@
   --agent-dock-shelf-toward: 1;
 
   position: absolute;
-  display: grid;
-  justify-items: end;
-  gap: var(--openbot-space-2);
+  top: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -713,6 +711,9 @@
 }
 
 .agent-dock-shelf-item {
+  position: absolute;
+  right: 0;
+  width: max-content;
   animation: agent-dock-shelf-drip 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
   transition:
     opacity var(--openbot-duration-normal) ease-out,
@@ -811,10 +812,7 @@
   transform-origin: 50% 50%;
 }
 
-.agent-dock[data-side="left"] .agent-dock-shelf {
-  --agent-dock-shelf-toward: -1;
-
-  justify-items: start;
+.agent-dock[data-side="left"] .agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more) {
   scale: -1 1;
 }
 

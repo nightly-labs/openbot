@@ -140,6 +140,7 @@ export interface MainWindowContext {
 export interface MainWindowController {
   getMainWindow: () => BrowserWindow | null;
   getChatWindows: () => BrowserWindow[];
+  chatWindowTarget: (window: BrowserWindow) => ChatWindowTarget | null;
   chatWindowTargets: () => ChatWindowTarget[];
   openChatWindow: (target: ChatWindowTarget) => void;
   openMainWindow: () => BrowserWindow;
@@ -499,6 +500,8 @@ export function createMainWindowController({
     getMainWindow: () => holder.current,
     getChatWindows: () =>
       [...chatWindows.values()].map((chat) => chat.window).filter((window) => !window.isDestroyed()),
+    chatWindowTarget: (window: BrowserWindow) =>
+      [...chatWindows.values()].find((chat) => chat.window === window)?.target ?? null,
     chatWindowTargets,
     openChatWindow,
     openMainWindow,

@@ -152,6 +152,7 @@ import {
   isMarketplaceSkillSlug,
   type MarketplaceListingLink,
 } from "@openbot/contracts/marketplace-links";
+import { decodeOwnerTransfer, type OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { parseReferralState, type ReferralState } from "@openbot/contracts/referral";
 import {
@@ -392,6 +393,15 @@ export function decodeMobileConnectTicket(value: unknown): MobileConnectTicket {
 export function decodeMobileConnectLink(value: unknown): MobileConnectLink {
   const link = decodeRecord(value, "Mobile Connect link");
   return { url: requiredString(link, "url"), createdAt: requiredNumber(link, "createdAt") };
+}
+
+export function decodeOwnerTransferOrNull(value: unknown): OwnerTransfer | null {
+  return value === null ? null : decodeOwnerTransfer(value);
+}
+
+export function decodeOwnerTransferList(value: unknown): OwnerTransfer[] {
+  if (!Array.isArray(value)) throw new Error("Invalid ownership transfers.");
+  return value.map(decodeOwnerTransfer);
 }
 
 export function decodeMobileConnectedDevices(value: unknown): MobileConnectedDevice[] {

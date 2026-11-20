@@ -611,6 +611,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "撤销",
   "mobile.chat.appSuggestion.notAllowed": "只有服务器所有者或管理员可以连接 {name}。",
   "mobile.chat.appSuggestion.unavailable": "此服务器无法连接 {name}。",
+  "mobile.chat.mcpSignIn.signInNamed": "登录 {name}",
+  "mobile.chat.mcpSignIn.signedIn": "已登录",
   "mobile.chat.context.label": "上下文已用 {percent}",
   "mobile.chat.context.labelEstimated": "上下文约已用 {percent}",
   "mobile.chat.context.labelCompacting": "正在压缩上下文",

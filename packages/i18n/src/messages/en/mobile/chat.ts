@@ -630,6 +630,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.appSuggestion.undo": "Undo",
   "mobile.chat.appSuggestion.notAllowed": "Only the server owner or an admin can connect {name}.",
   "mobile.chat.appSuggestion.unavailable": "This server cannot connect {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "Sign in to {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Signed in",
   "mobile.chat.context.label": "Context {percent} full",
   "mobile.chat.context.labelEstimated": "Context about {percent} full",
   "mobile.chat.context.labelCompacting": "Compacting context",

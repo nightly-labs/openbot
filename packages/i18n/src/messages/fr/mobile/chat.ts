@@ -645,6 +645,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Annuler",
   "mobile.chat.appSuggestion.notAllowed": "Seul le propriétaire du serveur ou un administrateur peut connecter {name}.",
   "mobile.chat.appSuggestion.unavailable": "Ce serveur ne peut pas connecter {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "Se connecter à {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Connecté",
   "mobile.chat.context.label": "Contexte rempli à {percent}",
   "mobile.chat.context.labelEstimated": "Contexte rempli à environ {percent}",
   "mobile.chat.context.labelCompacting": "Compactage du contexte",

@@ -1023,7 +1023,8 @@ export class ThreadLifecycle {
   }
 
   #channelToolsParam(client: AgentClient, publicThreadId: string): { channelTools?: true } {
-    return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
+    return (client.provider === "claude" || client.provider === "grok") &&
+      this.#conversation.channelForThread(publicThreadId) !== null
       ? { channelTools: true }
       : {};
   }

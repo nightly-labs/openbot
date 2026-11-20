@@ -108,6 +108,7 @@ export * from "./ipc-workflow-telegram";
 export * from "./ipc-workflows";
 export * from "./marketplace-suggestion-events";
 export * from "./mcp-sign-in-events";
+export * from "./message-link-source";
 export * from "./mobile-connect";
 export * from "./setting-links";
 export * from "./skill-conversation-events";

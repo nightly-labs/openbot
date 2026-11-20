@@ -620,6 +620,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "실행 취소",
   "mobile.chat.appSuggestion.notAllowed": "서버 소유자나 관리자만 {name}을(를) 연결할 수 있습니다.",
   "mobile.chat.appSuggestion.unavailable": "이 서버는 {name}을(를) 연결할 수 없습니다.",
+  "mobile.chat.mcpSignIn.signInNamed": "{name}에 로그인",
+  "mobile.chat.mcpSignIn.signedIn": "로그인됨",
   "mobile.chat.context.label": "컨텍스트 {percent} 사용",
   "mobile.chat.context.labelEstimated": "컨텍스트 약 {percent} 사용",
   "mobile.chat.context.labelCompacting": "컨텍스트 압축 중",

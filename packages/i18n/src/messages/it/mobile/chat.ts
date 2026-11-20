@@ -636,6 +636,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Annulla",
   "mobile.chat.appSuggestion.notAllowed": "Solo il proprietario del server o un amministratore può connettere {name}.",
   "mobile.chat.appSuggestion.unavailable": "Questo server non può connettere {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "Accedi a {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Accesso eseguito",
   "mobile.chat.context.label": "Contesto pieno al {percent}",
   "mobile.chat.context.labelEstimated": "Contesto pieno al {percent} circa",
   "mobile.chat.context.labelCompacting": "Compattazione del contesto",

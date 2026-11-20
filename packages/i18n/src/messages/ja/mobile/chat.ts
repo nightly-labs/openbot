@@ -625,6 +625,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "元に戻す",
   "mobile.chat.appSuggestion.notAllowed": "{name} を接続できるのはサーバーの所有者または管理者だけです。",
   "mobile.chat.appSuggestion.unavailable": "このサーバーは {name} を接続できません。",
+  "mobile.chat.mcpSignIn.signInNamed": "{name} にサインイン",
+  "mobile.chat.mcpSignIn.signedIn": "サインイン済み",
   "mobile.chat.context.label": "コンテキスト使用率 {percent}",
   "mobile.chat.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "mobile.chat.context.labelCompacting": "コンテキストを圧縮しています",

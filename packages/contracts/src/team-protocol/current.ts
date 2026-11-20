@@ -134,6 +134,7 @@ import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
@@ -200,6 +201,7 @@ import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
+import { TEAM_USAGE_GROUPS_CAPABILITY } from "./usage-groups-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import {
   highestCommonTeamProtocol,
@@ -447,6 +449,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -764,10 +767,12 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
+  [OWNER_TRANSFER_CAPABILITY, V10],
   [VAULT_MEMBER_SAVE_CAPABILITY, V10],
   [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
   [WORKFLOWS_STEP_SETTINGS_CAPABILITY, V10],
+  [TEAM_USAGE_GROUPS_CAPABILITY, V10],
   [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

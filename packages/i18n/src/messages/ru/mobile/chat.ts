@@ -729,6 +729,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Отменить",
   "mobile.chat.appSuggestion.notAllowed": "Подключить {name} может только владелец сервера или администратор.",
   "mobile.chat.appSuggestion.unavailable": "Этот сервер не может подключить {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "Войти в {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Вход выполнен",
   "mobile.chat.context.label": "Контекст заполнен на {percent}",
   "mobile.chat.context.labelEstimated": "Контекст заполнен примерно на {percent}",
   "mobile.chat.context.labelCompacting": "Сжатие контекста",

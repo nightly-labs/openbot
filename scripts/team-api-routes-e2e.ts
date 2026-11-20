@@ -17,6 +17,7 @@ import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AccountUsageLimit,
   AGENT_PROVIDERS,
   type AgentEvent,
   type AgentModelId,
@@ -47,6 +48,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isAccountUsage,
   isQueueSnapshot,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
@@ -224,6 +226,7 @@ import {
   AGENT_HIDDEN_WORK_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -408,6 +411,10 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
+import {
+  decodeTeamProtocolV8BaseCurrentEvent,
+  encodeTeamProtocolV8BaseCurrentEvent,
+} from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
@@ -441,6 +448,7 @@ import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { planLimitRows } from "@openbot/team-client/plan-limits";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
@@ -812,6 +820,23 @@ function activeQueue(agentId: string): QueueSnapshot {
 }
 
 let queueSnapshotHold: { agentId: string; hold: QueueHold } | null = null;
+
+let groupedUsageLimit: AccountUsageLimit | null = null;
+
+const ANTIGRAVITY_GROUPS = [
+  {
+    name: "Gemini Models",
+    models: ["gemini-3-pro"],
+    primary: { usedPercent: 28, windowDurationMins: 10_080, resetsAt: 1_900_000_000 },
+    secondary: null,
+  },
+  {
+    name: "Claude and GPT models",
+    models: ["claude-sonnet-4-6", "gpt-oss-120b"],
+    primary: { usedPercent: 66, windowDurationMins: 300, resetsAt: 1_890_000_000 },
+    secondary: { usedPercent: 40, windowDurationMins: 10_080, resetsAt: 1_900_000_000 },
+  },
+];
 
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
@@ -1301,6 +1326,7 @@ const fakeAgents: TeamApiAgents = {
         { id: "codex", primary: null, secondary: SPENT_WEEK, creditsAvailable: true },
         { id: "claude", primary: null, secondary: SPENT_WEEK },
         { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
+        ...(groupedUsageLimit ? [groupedUsageLimit] : []),
       ],
     }),
   getAnalytics: unused("getAnalytics"),
@@ -6492,6 +6518,71 @@ try {
       [summary(restartOnly), summary(signInOlder)],
     );
     queueSnapshotHold = null;
+  }
+
+  {
+    const path = TEAM_API_ROUTES.agents.usage;
+    groupedUsageLimit = {
+      id: "antigravity",
+      primary: ANTIGRAVITY_GROUPS[0]?.primary ?? null,
+      secondary: null,
+      groups: ANTIGRAVITY_GROUPS,
+    };
+    const read = (headers?: Record<string, string>, protocol: number = TEAM_PROTOCOL_V10) =>
+      call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
+    const antigravityGroups = (body: unknown) =>
+      isDynamicRecord(body) && Array.isArray(body.limits)
+        ? (body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "antigravity") ?? { groups: "no limit" })
+            .groups
+        : "no limits";
+    const grouped = await read(teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES));
+    const plain = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_USAGE_GROUPS_CAPABILITY),
+      ),
+    );
+    const older = await read(undefined, TEAM_PROTOCOL_V9);
+    const decoded =
+      grouped.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, grouped.body) : null;
+    const listed = isAccountUsage(decoded)
+      ? planLimitRows(decoded)
+          .find((row) => row.provider === "antigravity")
+          ?.listedWindows.map((window) => [window.group?.name ?? null, window.durationMins, window.remainingPercent])
+      : null;
+    check(
+      "a client with usage-groups-v1 reads each Antigravity model pool, and the phone lists every pool window",
+      grouped.status === 200 &&
+        isDeepStrictEqual(antigravityGroups(grouped.body), ANTIGRAVITY_GROUPS) &&
+        isDeepStrictEqual(listed, [
+          ["Gemini Models", 10_080, 72],
+          ["Claude and GPT models", 300, 34],
+          ["Claude and GPT models", 10_080, 60],
+        ]),
+      [summary(grouped), listed],
+    );
+    check(
+      "a client without usage-groups-v1, and a protocol 9 client, read the usage without the pools, as before",
+      plain.status === 200 &&
+        antigravityGroups(plain.body) === undefined &&
+        older.status === 200 &&
+        antigravityGroups(older.body) === undefined,
+      [summary(plain), summary(older)],
+    );
+    const usage = { limits: [groupedUsageLimit] };
+    const eventWith = encodeTeamProtocolV8BaseCurrentEvent({ type: "usage-changed", usage }, { usageGroups: true });
+    const eventWithout = encodeTeamProtocolV8BaseCurrentEvent({ type: "usage-changed", usage });
+    const decodedEvent = eventWith ? decodeTeamProtocolV8BaseCurrentEvent(JSON.parse(eventWith)) : null;
+    check(
+      "a usage-changed event keeps the pools only for a client with usage-groups-v1, and its decoder keeps them",
+      decodedEvent?.kind === "known" &&
+        decodedEvent.event.type === "usage-changed" &&
+        isDeepStrictEqual(decodedEvent.event.usage.limits[0]?.groups, ANTIGRAVITY_GROUPS) &&
+        eventWithout !== null &&
+        antigravityGroups(JSON.parse(eventWithout).usage) === undefined,
+      [decodedEvent, eventWithout],
+    );
+    groupedUsageLimit = null;
   }
 
   {

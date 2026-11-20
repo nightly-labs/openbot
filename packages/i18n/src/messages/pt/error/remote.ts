@@ -221,6 +221,10 @@ export const messages = {
   "error.remote.formUnavailable": "Este formulário não está mais disponível.",
   "error.remote.hostedServerRemoval": "Use a seção Cobrança para excluir um servidor hospedado.",
   "error.remote.hostRemoved": "O proprietário removeu este servidor da conta.",
+  "error.remote.ownerTransferSelf": "Você já é o proprietário deste servidor. Digite o e-mail do novo proprietário.",
+  "error.remote.ownerTransferHosted": "Um servidor hospedado pela OpenBot não pode mudar de proprietário.",
+  "error.remote.ownerTransferInvalid":
+    "Esta transferência de propriedade não está mais disponível. Peça ao proprietário para enviá-la de novo.",
   "error.remote.channelsUnsupported": "Atualize este servidor no computador para usar canais.",
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",

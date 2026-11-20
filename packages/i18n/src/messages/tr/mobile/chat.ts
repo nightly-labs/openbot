@@ -633,6 +633,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Geri al",
   "mobile.chat.appSuggestion.notAllowed": "{name} uygulamasını yalnızca sunucu sahibi veya bir yönetici bağlayabilir.",
   "mobile.chat.appSuggestion.unavailable": "Bu sunucu {name} uygulamasını bağlayamaz.",
+  "mobile.chat.mcpSignIn.signInNamed": "{name} için oturum aç",
+  "mobile.chat.mcpSignIn.signedIn": "Oturum açıldı",
   "mobile.chat.context.label": "Bağlam {percent} dolu",
   "mobile.chat.context.labelEstimated": "Bağlam yaklaşık {percent} dolu",
   "mobile.chat.context.labelCompacting": "Bağlam sıkıştırılıyor",

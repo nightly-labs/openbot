@@ -615,6 +615,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Ongedaan maken",
   "mobile.chat.appSuggestion.notAllowed": "Alleen de servereigenaar of een beheerder kan {name} verbinden.",
   "mobile.chat.appSuggestion.unavailable": "Deze server kan {name} niet verbinden.",
+  "mobile.chat.mcpSignIn.signInNamed": "Inloggen bij {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Ingelogd",
   "mobile.chat.context.label": "Context {percent} vol",
   "mobile.chat.context.labelEstimated": "Context ongeveer {percent} vol",
   "mobile.chat.context.labelCompacting": "Context comprimeren",

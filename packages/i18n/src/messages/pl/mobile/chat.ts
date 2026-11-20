@@ -738,6 +738,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Cofnij",
   "mobile.chat.appSuggestion.notAllowed": "Tylko właściciel serwera lub administrator może połączyć {name}.",
   "mobile.chat.appSuggestion.unavailable": "Ten serwer nie może połączyć {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "Zaloguj się do {name}",
+  "mobile.chat.mcpSignIn.signedIn": "Zalogowano",
   "mobile.chat.context.label": "Kontekst zapełniony w {percent}",
   "mobile.chat.context.labelEstimated": "Kontekst zapełniony w około {percent}",
   "mobile.chat.context.labelCompacting": "Kompaktowanie kontekstu",

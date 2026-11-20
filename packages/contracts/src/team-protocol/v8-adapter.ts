@@ -55,6 +55,7 @@ import {
 } from "./remote-desktop-setup-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
+import { withUsageGroups } from "./usage-groups-v1";
 import { isUsageRoute, withUsageTertiary } from "./usage-tertiary-v1";
 import { decodeTeamProtocolV8HttpRequest, decodeTeamProtocolV8HttpResponse } from "./v8";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
@@ -197,6 +198,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
@@ -210,6 +212,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     promptMultiSelect,
     videoGeneration,
     usageTertiary,
+    usageGroups,
     agentPendingRuntime,
     memoryChanges,
     queueHold,
@@ -221,6 +224,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   if (queueHold && (isQueueSnapshotRoute(method, path) || isQueueEditRoute(method, path)))
     return JSON.stringify(withQueueHold(JSON.parse(encoded), value, true, queueHoldSignIn === true));
   const withUsage = usageTertiary && isUsageRoute(method, path);
+  const withGroups = usageGroups && isUsageRoute(method, path);
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
   const withSubagents = subagents && isConversationRoute(method, path);
@@ -230,6 +234,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const withMemory = memoryChanges && isConversationRoute(method, path);
   if (
     !withUsage &&
+    !withGroups &&
     !withExtent &&
     !withBlocks &&
     !withSubagents &&
@@ -241,6 +246,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     return encoded;
   let output: TeamProtocolV8BaseJsonValue = JSON.parse(encoded);
   if (withUsage) output = withUsageTertiary(output, value, true);
+  if (withGroups) output = withUsageGroups(output, value, true);
   if (withExtent) output = withPageHistoryExtent(output, value);
   if (withBlocks) output = withConversationUiBlocks(output, value);
   if (withSubagents) output = withConversationSubagents(output, value);
@@ -317,7 +323,7 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
   if (isAgentListRoute(method, path)) return withAgentPendingRuntimes(decoded, value);
-  const withUsage = isUsageRoute(method, path) ? withUsageTertiary(decoded, value) : decoded;
+  const withUsage = isUsageRoute(method, path) ? withUsageGroups(withUsageTertiary(decoded, value), value) : decoded;
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;
   if (!isConversationRoute(method, path)) return withExtent;
   return withConversationMemoryChanges(

@@ -148,6 +148,7 @@ export interface LicenseServiceOptions {
   now: () => number;
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, BillingError | BillingOperationError>;
   referralCoupon?: (userId: string) => Effect.Effect<string | null, BillingError | BillingOperationError>;
+  keptReferralCoupon?: (subscriptionId: string) => Effect.Effect<string | null, BillingError | BillingOperationError>;
   analytics?: AccountAnalytics;
   sales?: BillingSales | null;
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
@@ -165,6 +166,7 @@ export class LicenseService {
   readonly #secretKey: string;
   readonly #ensureCustomer: LicenseServiceOptions["ensureCustomer"];
   readonly #referralCoupon: NonNullable<LicenseServiceOptions["referralCoupon"]> | null;
+  readonly #keptReferralCoupon: NonNullable<LicenseServiceOptions["keptReferralCoupon"]> | null;
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #trialEnd: number | null;
@@ -181,6 +183,7 @@ export class LicenseService {
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
     this.#referralCoupon = options.referralCoupon ?? null;
+    this.#keptReferralCoupon = options.keptReferralCoupon ?? null;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#sales = options.sales ?? null;
     this.#onLicenseChanged = options.onLicenseChanged ?? null;
@@ -549,7 +552,10 @@ export class LicenseService {
       const made = listed.find(
         (candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id,
       );
-      const referralCouponId = made || !this.#referralCoupon ? null : yield* this.#referralCoupon(ownerId);
+      const keptCouponId =
+        made || (subscription.discounts ?? []).length === 0 || !this.#keptReferralCoupon
+          ? null
+          : yield* this.#keptReferralCoupon(subscription.id);
       const license =
         made ??
         (yield* this.#stripeCall(() =>
@@ -565,7 +571,7 @@ export class LicenseService {
                 automaticTax: subscription.automatic_tax?.enabled === true,
                 taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
-                ...(referralCouponId ? { couponId: referralCouponId } : {}),
+                ...(keptCouponId ? { couponId: keptCouponId } : {}),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),

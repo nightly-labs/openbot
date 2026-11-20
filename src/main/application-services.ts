@@ -15,6 +15,7 @@ import type {
   BrowserDisplayState,
   CapabilityState,
   CentralAuthState,
+  CentralAuthUser,
   ComputerUseState,
   ProviderRuntimeSnapshot,
   SpeechModelStatus,
@@ -397,7 +398,7 @@ import {
 } from "./remote-session-reuse-preference-store";
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
-import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
 import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
@@ -3152,6 +3153,7 @@ export async function createApplicationServices({
             },
           }
         : {}),
+      ...(serverModeEnvironment && !hostedServer ? { ownerTransfer: true as const } : {}),
       personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
@@ -3235,6 +3237,14 @@ export async function createApplicationServices({
     onKeyRotated: () => remoteServers.requestDirectoryRefresh(),
     issueRemoteHostTicket: (hostId, home) =>
       centralAuth.issueRemoteHostTicket(hostId, home).pipe(toRemoteWorkflowError),
+    ...(serverModeEnvironment && !hostedServer
+      ? {
+          requestTransferredOwnerSession: (hostId: string) =>
+            centralAuth.requestTransferredOwnerSession(hostId).pipe(toRemoteWorkflowError),
+          applyTransferredOwnerSession: (hostId: string, session: { sessionToken: string; user: CentralAuthUser }) =>
+            centralAuth.applyTransferredOwnerSession(hostId, session).pipe(toRemoteWorkflowError),
+        }
+      : {}),
     sendLiveActivityPush: (hostId, push) => centralAuth.sendLiveActivityPush(hostId, push).pipe(toRemoteWorkflowError),
     sendPushNotification: (hostId, push) => centralAuth.sendPushNotification(hostId, push).pipe(toRemoteWorkflowError),
     pushNotificationStore,
@@ -3964,6 +3974,9 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
     announce: (state, version) => host.announceRestart(state, version),
     clientInUse: hostedServer ? clientInUseSinceStart : undefined,
+    maximumIdleWait: hostedServer
+      ? { afterMs: HOSTED_UPDATE_MAXIMUM_IDLE_WAIT_MS, providerOperationPending: () => service.hasProviderOperation() }
+      : undefined,
   });
   const remoteUpdate = requestedUpdate;
   teardown.push(TEARDOWN_ORDER.requestedUpdate, "the requested update", () =>

@@ -217,6 +217,11 @@ export const messages = {
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
   "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
+  "error.remote.ownerTransferSelf":
+    "Dieser Server gehört bereits dir. Gib die E-Mail-Adresse des neuen Eigentümers ein.",
+  "error.remote.ownerTransferHosted": "Ein Server, den OpenBot hostet, kann den Eigentümer nicht wechseln.",
+  "error.remote.ownerTransferInvalid":
+    "Diese Eigentumsübertragung ist nicht mehr verfügbar. Bitte den Eigentümer, sie erneut zu senden.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":

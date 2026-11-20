@@ -40,6 +40,7 @@ import {
   licensePlanPrice,
   ORDER_METADATA,
 } from "@openbot/contracts/license";
+import { referralShare } from "@openbot/contracts/referral";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
@@ -87,6 +88,7 @@ const SCENARIOS = [
   "order-trial",
   "promotion-link",
   "vat",
+  "invite",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 const DAY = 86_400;
@@ -1004,6 +1006,62 @@ async function waitFor<T>(label: string, check: () => Promise<T | null | undefin
     await sleep(1_500);
   }
   throw new Error(`Timed out: ${label} (last: ${last})`);
+}
+
+const INVITE_COUPON = "openbot-invite-10-first";
+const inviteSessionSchema = z.object({
+  discounts: z.array(z.object({ coupon: z.union([z.string(), z.object({ id: z.string() })]).nullable() })).nullable(),
+});
+const discountsSchema = z.object({ discounts: z.array(z.unknown()) });
+const invoiceDiscountSchema = z.object({
+  amount_paid: z.number(),
+  subtotal: z.number(),
+  discounts: z.array(z.unknown()),
+  billing_reason: z.string().nullable(),
+});
+const balanceSchema = z.object({ balance: z.number() });
+const partSchema = z.object({
+  invoice_id: z.string(),
+  source_amount: z.number(),
+  amount: z.number(),
+  reversed_amount: z.number(),
+  ready_at: z.number().nullable(),
+  released_at: z.number().nullable(),
+  balance_transaction_id: z.string().nullable(),
+});
+const partReversalSchema = z.object({
+  reversal_id: z.string(),
+  invoice_id: z.string(),
+  amount: z.number(),
+  source_amount: z.number().nullable(),
+  balance_transaction_id: z.string().nullable(),
+});
+
+function sessionCoupons(session: z.infer<typeof inviteSessionSchema>) {
+  return (session.discounts ?? []).map((entry) =>
+    typeof entry.coupon === "string" ? entry.coupon : (entry.coupon?.id ?? null),
+  );
+}
+
+function inviteParts(friend: string) {
+  return d1(
+    `SELECT invoice_id, source_amount, amount, reversed_amount, ready_at, released_at, balance_transaction_id
+     FROM referral_credits WHERE referred_user_id = ${quote(friend)} ORDER BY ready_at, invoice_id`,
+    partSchema,
+  );
+}
+
+function inviteReversals(refundId: string) {
+  return d1(
+    `SELECT reversal_id, invoice_id, amount, source_amount, balance_transaction_id FROM referral_reversals
+     WHERE reversal_id LIKE ${quote(`${refundId}|%`)} ORDER BY reversal_id`,
+    partReversalSchema,
+  );
+}
+
+async function tickCron(api: string) {
+  const response = await fetch(`${api}/cdn-cgi/handler/scheduled?cron=*+*+*+*+*`);
+  if (!response.ok) throw new Error(`The scheduled handler returned ${response.status}.`);
 }
 
 function record(scenario: Scenario, step: string, pass: boolean, evidence: unknown) {
@@ -3129,6 +3187,223 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       );
     } else {
       print("SKIP [license-team-year] sales facts: the Worker has no OpenPanel client");
+    }
+  },
+
+  async invite(account) {
+    const referrers = quote(`${account.id}-referrer%`);
+    const referrer = `${account.id}-referrer-${randomBytes(4).toString("hex")}`;
+    const friend = quote(account.id);
+    const now = Date.now();
+    const leftCustomers = d1(
+      `SELECT stripe_customer_id FROM billing_customers WHERE user_id LIKE ${referrers}`,
+      z.object({ stripe_customer_id: z.string() }),
+    );
+    for (const row of leftCustomers)
+      await stripe("DELETE", `/v1/customers/${row.stripe_customer_id}`, idSchema).catch(() => null);
+    d1(
+      [
+        `DELETE FROM referral_reversals WHERE invoice_id IN (
+           SELECT invoice_id FROM referral_credits WHERE referred_user_id = ${friend})`,
+        `DELETE FROM referral_credits WHERE referred_user_id = ${friend}`,
+        `DELETE FROM referrals WHERE referred_user_id = ${friend}`,
+        `DELETE FROM referral_codes WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM billing_customers WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM users WHERE id LIKE ${referrers}`,
+        `INSERT OR IGNORE INTO users(id, identity_key, email, name, created_at, updated_at)
+         VALUES (${quote(referrer)}, ${quote(`e2e:${referrer}`)}, ${quote(`${referrer}@example.com`)},
+                 'Stripe e2e referrer', ${now}, ${now})`,
+        `INSERT INTO referral_codes(user_id, code, created_at)
+         VALUES (${quote(referrer)}, ${quote(randomBytes(6).toString("hex").slice(0, 8))}, ${now})`,
+        `INSERT INTO referrals(referred_user_id, referrer_user_id, created_at) VALUES (${friend}, ${quote(referrer)}, ${now})`,
+      ].join("; "),
+      z.unknown(),
+    );
+    const referrerCustomer = () =>
+      d1(
+        `SELECT stripe_customer_id FROM billing_customers WHERE user_id = ${quote(referrer)}`,
+        z.object({ stripe_customer_id: z.string() }),
+      )[0]?.stripe_customer_id ?? null;
+    const referrerBalance = async () => {
+      const id = referrerCustomer();
+      return id ? (await stripe("GET", `/v1/customers/${id}`, balanceSchema)).balance : 0;
+    };
+    try {
+      const opened = await account.request("POST", "v1/me/license/checkout", { users: 7, currency: "eur" });
+      const url = licenseCheckoutSchema.safeParse(opened.body).data?.url ?? "";
+      const first = url
+        ? await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, inviteSessionSchema)
+        : null;
+      record(
+        "invite",
+        "the first checkout of an invited friend has the first-payment invite coupon",
+        opened.status === 200 && first !== null && sessionCoupons(first).includes(INVITE_COUPON),
+        { status: opened.status, code: opened.code, coupons: first && sessionCoupons(first) },
+      );
+      if (url) await expireCheckout(url);
+
+      const sub = await stripe("POST", "/v1/subscriptions", idSchema, {
+        customer: account.customer,
+        "items[0][price]": await licensePriceId(TEAM_YEAR),
+        "items[0][quantity]": "7",
+        currency: "eur",
+        "discounts[0][coupon]": INVITE_COUPON,
+        "metadata[openbot_user_id]": account.id,
+        [`metadata[${LICENSE_METADATA.kind}]`]: LICENSE_METADATA_KIND,
+        [`metadata[${LICENSE_METADATA.tier}]`]: TEAM_YEAR.tier,
+        [`metadata[${LICENSE_METADATA.interval}]`]: TEAM_YEAR.interval,
+        [`metadata[${LICENSE_METADATA.bundle}]`]: String(TEAM_YEAR.bundle),
+        payment_behavior: "error_if_incomplete",
+      });
+      const invoiceId = (await subscription(sub.id)).latest_invoice ?? "";
+      await applied("invoice.paid", invoiceId);
+      const invoice = await stripe("GET", `/v1/invoices/${invoiceId}`, invoiceDiscountSchema);
+      record(
+        "invite",
+        "the first yearly invoice has 10% off",
+        invoice.discounts.length > 0 && invoice.amount_paid === Math.round(invoice.subtotal * 0.9),
+        invoice,
+      );
+      const ended = await waitFor(
+        "the subscription has no invite discount",
+        async () => {
+          const value = await stripe("GET", `/v1/subscriptions/${sub.id}`, discountsSchema);
+          return value.discounts.length === 0 ? value : null;
+        },
+        30_000,
+      ).catch(() => null);
+      record("invite", "after the first payment the subscription has no invite discount", ended !== null, ended);
+
+      const parts = inviteParts(account.id);
+      const share = referralShare(invoice.amount_paid);
+      const gaps = parts.slice(1).map((part, index) => (part.ready_at ?? 0) - (parts[index]?.ready_at ?? 0));
+      record(
+        "invite",
+        "the yearly credit is 12 parts, 30 days apart, that add up to 10% of the payment, and none is released",
+        parts.length === 12 &&
+          parts.reduce((sum, part) => sum + part.source_amount, 0) === share &&
+          gaps.every((gap) => gap === 30 * DAY * 1_000) &&
+          (parts[0]?.ready_at ?? 0) - now >= 29 * DAY * 1_000 &&
+          parts.every((part) => part.released_at === null),
+        { share, parts },
+      );
+
+      d1(
+        `UPDATE referral_credits SET ready_at = ${Date.now() - 1_000} WHERE invoice_id = ${quote(invoiceId)}`,
+        z.unknown(),
+      );
+      await tickCron(account.api);
+      const afterFirst = await waitFor("part 1 released", async () => {
+        const rows = inviteParts(account.id);
+        return rows[0]?.released_at !== null ? rows : null;
+      });
+      record(
+        "invite",
+        "the cron releases the due part 1 and keeps part 2; part 1 is under the minimum and stays unsent",
+        afterFirst[0]?.released_at !== null &&
+          afterFirst.slice(1).every((part) => part.released_at === null) &&
+          afterFirst[0]?.balance_transaction_id === null &&
+          (await referrerBalance()) === 0,
+        afterFirst.slice(0, 2),
+      );
+
+      const server = await account.orderServer("Invite second order", "standard");
+      const created = createdSchema.safeParse(server.body).data;
+      const secondSession = created?.checkoutUrl
+        ? await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(created.checkoutUrl)}`, inviteSessionSchema)
+        : null;
+      record(
+        "invite",
+        "a second purchase of the same friend has no invite coupon",
+        server.status === 201 && secondSession !== null && sessionCoupons(secondSession).length === 0,
+        { status: server.status, code: server.code, coupons: secondSession && sessionCoupons(secondSession) },
+      );
+      if (created?.checkoutUrl) await expireCheckout(created.checkoutUrl);
+
+      const paid = await paymentIntent(sub.id);
+      const firstRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+        payment_intent: paid.intent,
+        amount: String(Math.floor(invoice.amount_paid / 5)),
+      });
+      await applied("refund.created", firstRefund.id);
+      const unsentReversals = inviteReversals(firstRefund.id);
+      const unsentShare = referralShare(Math.floor(invoice.amount_paid / 5));
+      const newest = [...parts]
+        .reverse()
+        .slice(0, unsentReversals.length)
+        .map((part) => part.invoice_id);
+      record(
+        "invite",
+        "a refund before the parts are sent takes the newest unsent parts and does not touch the referrer balance",
+        unsentReversals.reduce((sum, row) => sum + (row.source_amount ?? 0), 0) === unsentShare &&
+          unsentReversals.every((row) => row.balance_transaction_id === "") &&
+          unsentReversals
+            .map((row) => row.invoice_id)
+            .sort()
+            .join() === [...newest].sort().join() &&
+          (await referrerBalance()) === 0,
+        { unsentShare, unsentReversals },
+      );
+
+      d1(
+        `UPDATE referral_credits SET ready_at = ${Date.now() - 1_000} WHERE source_invoice_id = ${quote(invoiceId)}`,
+        z.unknown(),
+      );
+      await tickCron(account.api);
+      const sent = await waitFor("all parts sent", async () => {
+        const rows = inviteParts(account.id);
+        return rows.every((part) => part.balance_transaction_id !== null) ? rows : null;
+      });
+      const owed = sent.reduce((sum, part) => sum + part.amount - part.reversed_amount, 0);
+      const balanceSent = await referrerBalance();
+      record(
+        "invite",
+        "when all parts are due the cron sends them, and the referrer gets the credit less the refund",
+        owed === share - unsentShare && balanceSent === -owed,
+        { owed, balance: balanceSent },
+      );
+
+      const secondRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+        payment_intent: paid.intent,
+        amount: String(Math.floor(invoice.amount_paid / 10)),
+      });
+      await applied("refund.created", secondRefund.id);
+      const sentReversals = inviteReversals(secondRefund.id);
+      const sentShare = referralShare(Math.floor(invoice.amount_paid / 10));
+      const balanceAfter = await referrerBalance();
+      record(
+        "invite",
+        "a refund after the parts are sent takes the credit back from the referrer balance",
+        sentReversals.reduce((sum, row) => sum + (row.source_amount ?? 0), 0) === sentShare &&
+          sentReversals.every((row) => (row.balance_transaction_id ?? "").startsWith("cbtxn_")) &&
+          balanceAfter === balanceSent + sentShare,
+        { sentShare, sentReversals, before: balanceSent, after: balanceAfter },
+      );
+
+      await account.advance(366);
+      const renewal = await waitFor(
+        "renewal invoice",
+        async () => {
+          const list = await invoices(sub.id);
+          return list.find((entry) => entry.reason === "subscription_cycle" && entry.status === "paid") ?? null;
+        },
+        180_000,
+      );
+      await applied("invoice.paid", renewal.id);
+      const renewed = await stripe("GET", `/v1/invoices/${renewal.id}`, invoiceDiscountSchema);
+      const renewalParts = d1(
+        `SELECT COUNT(*) AS parts FROM referral_credits WHERE source_invoice_id = ${quote(renewal.id)}`,
+        z.object({ parts: z.number() }),
+      )[0]?.parts;
+      record(
+        "invite",
+        "the second yearly invoice has no discount and gives 12 new credit parts",
+        renewed.discounts.length === 0 && renewed.amount_paid === renewed.subtotal && renewalParts === 12,
+        { renewed, renewalParts },
+      );
+    } finally {
+      const id = referrerCustomer();
+      if (id) await stripe("DELETE", `/v1/customers/${id}`, idSchema).catch(() => null);
     }
   },
 

@@ -31,6 +31,14 @@ import {
   type MobileConnectHostBinding,
 } from "@openbot/contracts/mobile-connect";
 import {
+  type AcceptedOwnerTransfer,
+  decodeAcceptedOwnerTransfer,
+  decodeIncomingOwnerTransfers,
+  decodeOwnerTransfer,
+  decodePendingOwnerTransfer,
+  type OwnerTransfer,
+} from "@openbot/contracts/owner-transfer";
+import {
   decodeRemoteSession,
   decodeRemoteSessionTicket,
   type RemoteSession,
@@ -1226,6 +1234,90 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  readonly pendingOwnerTransfer = Effect.fn("CentralAuth.pendingOwnerTransfer")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<OwnerTransfer | null, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`,
+        { method: "GET" },
+        decodePendingOwnerTransfer,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly startOwnerTransfer = Effect.fn("CentralAuth.startOwnerTransfer")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      email: string,
+    ): Effect.fn.Return<OwnerTransfer, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) },
+        decodeOwnerTransfer,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly cancelOwnerTransfer = Effect.fn("CentralAuth.cancelOwnerTransfer")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-transfer`,
+        { method: "DELETE" },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly incomingOwnerTransfers = Effect.fn("CentralAuth.incomingOwnerTransfers")(
+    function* (
+      this: CentralAuthManager,
+    ): Effect.fn.Return<OwnerTransfer[], CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        "/v2/remote/owner-transfers/",
+        { method: "GET" },
+        decodeIncomingOwnerTransfers,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly acceptOwnerTransfer = Effect.fn("CentralAuth.acceptOwnerTransfer")(
+    function* (
+      this: CentralAuthManager,
+      transferId: string,
+    ): Effect.fn.Return<AcceptedOwnerTransfer, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/accept`,
+        { method: "POST" },
+        decodeAcceptedOwnerTransfer,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly declineOwnerTransfer = Effect.fn("CentralAuth.declineOwnerTransfer")(
+    function* (
+      this: CentralAuthManager,
+      transferId: string,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/owner-transfers/${encodeURIComponent(transferId)}/decline`,
+        { method: "POST" },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly updateRemoteHostLogo = Effect.fn("CentralAuth.updateRemoteHostLogo")(
     function* (
       this: CentralAuthManager,
@@ -1923,6 +2015,64 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           Effect.succeed(centralAuthIssue(error, "server_claim_failed", sourceText("error.auth.serviceError"))),
         ),
       );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly requestTransferredOwnerSession = Effect.fn("CentralAuth.requestTransferredOwnerSession")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<
+      { sessionToken: string; user: CentralAuthUser } | null,
+      CentralAuthOperationError,
+      CentralAuthTransport
+    > {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      const previousSessionToken = this.#sessionToken;
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/owner-session`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ machineToken, ...(previousSessionToken ? { previousSessionToken } : {}) }),
+        },
+        decodeSessionResponse,
+      ).pipe(
+        Effect.catch((error) =>
+          error.cause instanceof AuthApiError && error.cause.status === 404 ? Effect.succeed(null) : Effect.fail(error),
+        ),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly applyTransferredOwnerSession = Effect.fn("CentralAuth.applyTransferredOwnerSession")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      session: { sessionToken: string; user: CentralAuthUser },
+    ): Effect.fn.Return<CentralAuthUser, CentralAuthOperationError, CentralAuthTransport> {
+      const hostKey = hostId.toLowerCase();
+      const machineToken = this.#teamHostTokens.get(hostKey);
+      const previousHostTokens = new Map(this.#teamHostTokens);
+      const previousToken = this.#sessionToken;
+      const previousMobileConnectLink = this.#mobileConnectLink;
+      this.#teamHostTokens.clear();
+      if (machineToken) this.#teamHostTokens.set(hostKey, machineToken);
+      this.#sessionToken = session.sessionToken;
+      this.#mobileConnectLink = null;
+      const stored = yield* this.#writeStoredSession({ required: true }).pipe(Effect.result);
+      if (Result.isFailure(stored)) {
+        this.#teamHostTokens.clear();
+        for (const [key, token] of previousHostTokens) this.#teamHostTokens.set(key, token);
+        this.#sessionToken = previousToken;
+        this.#mobileConnectLink = previousMobileConnectLink;
+        return yield* new CentralAuthOperationError({ cause: stored.failure.cause });
+      }
+      const user = this.#resolveUserAvatar(session.user);
+      this.#setState({ status: "signed_in", user });
+      return user;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

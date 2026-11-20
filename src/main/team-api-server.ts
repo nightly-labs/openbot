@@ -167,6 +167,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
@@ -229,6 +230,7 @@ import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/messag
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -1536,6 +1538,7 @@ export class TeamApiServer {
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
         backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+        usageGroups: capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2349,6 +2352,7 @@ export class TeamApiServer {
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+      usageGroups: route.capabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
       queueHold: route.capabilities.has(QUEUE_HOLD_CAPABILITY),
       queueHoldSignIn: route.capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
@@ -2720,6 +2724,7 @@ export class TeamApiServer {
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
+        if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
         if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
         if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
         if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
@@ -2920,6 +2925,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   AGENT_BACKGROUND_WORK_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
