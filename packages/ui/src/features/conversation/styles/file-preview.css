@@ -68,11 +68,21 @@
 }
 
 .file-preview-markdown {
-  max-width: 760px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 24px 26px 48px;
   color: var(--openbot-text-primary);
   overflow-wrap: anywhere;
+}
+
+/* Maximized markdown previews use a wider reading measure so multi-column tables and Mermaid
+ * diagrams are not squeezed into a narrow strip on wide displays. */
+.side-panel-maximized .file-preview-markdown {
+  max-width: min(100%, 1360px);
+}
+
+.file-preview-markdown .message-markdown-table :is(th, td) {
+  min-width: 88px;
 }
 
 .file-preview-markdown > .message-markdown {
