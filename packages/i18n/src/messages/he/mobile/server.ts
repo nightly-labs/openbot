@@ -1727,6 +1727,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 שעות",
   "mobile.server.planLimits.window.hours": { one: "שעה", two: "שעתיים", other: "{count} שעות" },
   "mobile.server.planLimits.window.minutes": "{minutes} דק׳",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "עדכונים",
   "mobile.server.settings.updateAvailable": "עדכון זמין",
   "mobile.server.route.updates": "עדכונים",

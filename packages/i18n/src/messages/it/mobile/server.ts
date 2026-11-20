@@ -1313,6 +1313,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 ore",
   "mobile.server.planLimits.window.hours": { one: "{count} ora", other: "{count} ore" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Aggiornamenti",
   "mobile.server.settings.updateAvailable": "Aggiornamento disponibile",
   "mobile.server.route.updates": "Aggiornamenti",

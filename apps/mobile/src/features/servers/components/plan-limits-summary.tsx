@@ -4,10 +4,10 @@ import { PLAN_LIMIT_TONE_TEXT, PlanLimitRing } from "@/features/servers/componen
 import {
   lowestPlanLimitsFirst,
   PLAN_LIMIT_RESET_FORMAT,
+  planLimitListedWindowLabel,
   planLimitName,
   planLimitResetDate,
   planLimitWindowKey,
-  planLimitWindowLabel,
   usePlanLimits,
 } from "@/features/servers/model/plan-limits";
 import { SettingsSection } from "@/features/settings/components/settings-content";
@@ -34,7 +34,7 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
           <View className="flex-row items-center" style={{ gap: RING_GAP }}>
             <PlanLimitRing row={row} size={RING_SIZE} />
             <View className="min-w-0 flex-1 gap-1">
-              {row.windows.map((window, index) => {
+              {row.listedWindows.map((window, index) => {
                 const resetsAt = planLimitResetDate(window);
                 return (
                   <View
@@ -47,7 +47,7 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
                       style={{ fontVariant: ["tabular-nums"] }}
                     >
                       {t("mobile.server.planLimits.windowLeft", {
-                        window: planLimitWindowLabel(window.durationMins, t),
+                        window: planLimitListedWindowLabel(window, t),
                         percent: window.remainingPercent,
                       })}
                     </Typography>

@@ -1286,6 +1286,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 uur",
   "mobile.server.planLimits.window.hours": { one: "{count} uur", other: "{count} uur" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update beschikbaar",
   "mobile.server.route.updates": "Updates",
