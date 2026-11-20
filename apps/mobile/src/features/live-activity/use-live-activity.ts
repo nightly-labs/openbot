@@ -461,6 +461,25 @@ export function useLiveActivity({
   }, [serverIds, publish]);
 
   useEffect(() => {
+    if (!live) return;
+    const apply = () => {
+      const { servers: levels } = useSyncedNotificationLevels.getState();
+      for (const [serverId, snapshot] of Object.entries(levels)) {
+        const mutedAgentIds = snapshot.agents
+          .filter((entry) => entry.level === "nothing")
+          .map((entry) => entry.agentId);
+        live.coordinator.setMemberMutedAgentIds(serverId, mutedAgentIds);
+      }
+      schedule();
+    };
+    apply();
+    const unsubscribe = useSyncedNotificationLevels.subscribe((state, previous) => {
+      if (state.servers !== previous.servers) apply();
+    });
+    return unsubscribe;
+  }, [live, schedule]);
+
+  useEffect(() => {
     staleDate.current = foreground ? undefined : new Date(Date.now() + STALE_AFTER_BACKGROUND_MS);
     if (foreground) sync.current?.forget();
     publish(!foreground);

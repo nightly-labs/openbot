@@ -1,9 +1,10 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
-import type { AgentRuntimeSnapshot, DynamicIslandPresentation } from "@openbot/contracts/ipc";
+import type { AgentRuntimeSnapshot, DynamicIslandPresentation, ServerNotificationLevel } from "@openbot/contracts/ipc";
 import { LIVE_ACTIVITY_SEALED_LIMIT, type LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import type { LiveActivityPushRegistration } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { mobileTranslateFor, resolveLocale } from "@openbot/i18n/mobile";
 import { redactText, toLogValue } from "@openbot/logging";
+import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { DynamicIslandCoordinator } from "@openbot/team-client/dynamic-island-coordinator";
 import {
   type AgentLiveActivityProps,
@@ -43,6 +44,15 @@ export interface LiveActivityPushOptions {
   randomBytes(size: number): Uint8Array;
   memberActive(memberId: string): boolean;
   sideThreadOfTurn?(agentId: string, turnId: string): string | null;
+  /**
+   * The levels that the member chose on this server for all of their devices
+   * (`agent-notification-levels-v1`). The server level replaces the level of the phone's registration,
+   * and the level of an agent replaces the server level for the events of that agent.
+   */
+  memberLevels?(memberId: string): {
+    server: ServerNotificationLevel | null;
+    agents: ReadonlyMap<string, ServerNotificationLevel>;
+  };
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
@@ -284,6 +294,15 @@ export class LiveActivityPushService {
     const hidden = viewer.hiddenAgentIds();
     const snapshot = visibleSnapshot(this.#options.agents.getRuntimeSnapshot(), hidden);
     coordinator.applyEvent({ serverId: value.serverId, event: { type: "runtime-snapshot", snapshot } }, value.serverId);
+    const levels = this.#options.memberLevels?.(viewer.memberId);
+    const muted = new Set(
+      snapshot.agents
+        .filter(
+          (agent) => agentNotificationLevel(levels?.server ?? "all", levels?.agents ?? null, agent.id) === "nothing",
+        )
+        .map((agent) => agent.id),
+    );
+    coordinator.setMemberMutedAgentIds(value.serverId, muted);
     const reads = this.#options.agents.listConversationReads(viewer.memberId, viewer.readOptions);
     const counts = new Map(
       Object.entries(reads).flatMap(([agentId, read]) =>
@@ -291,15 +310,17 @@ export class LiveActivityPushService {
       ),
     );
     coordinator.replaceUnreadReplies(value.serverId, Object.fromEntries(counts));
-    return { snapshot, counts, presentation: coordinator.presentation([value.serverId]) };
+    return { snapshot, counts, muted, presentation: coordinator.presentation([value.serverId]) };
   }
 
   #view(registration: Registration) {
     const { value } = registration;
-    const { snapshot, counts, presentation } = this.#read(registration);
+    const { snapshot, counts, muted, presentation } = this.#read(registration);
     const unreadAgents: LiveActivityUnreadAgent[] = snapshot.agents.flatMap((agent) => {
       const count = counts.get(agent.id);
-      return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
+      return count && agent.notifications && !muted.has(agent.id)
+        ? [{ ...agent, serverId: value.serverId, count }]
+        : [];
     });
     const props = liveActivityView(presentation, {
       t: phoneText(value.locale),
