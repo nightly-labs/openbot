@@ -189,6 +189,8 @@ const ROUTINE_TASK_START = "--- routine task ---";
 const ROUTINE_TASK_END = "--- end of routine task ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
+const USER_LANGUAGE_LINE =
+  "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.";
 const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
@@ -288,6 +290,7 @@ function userFramedTeammateText(
       `${teammate} answered your message through OpenBot:`,
       displayText,
       "Give the result to the user naturally, starting with the teammate's name. Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.",
+      USER_LANGUAGE_LINE,
     ].join("\n");
   if (delivery.expectsReply === false)
     return [
@@ -295,6 +298,7 @@ function userFramedTeammateText(
       steersQuietTurn
         ? `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`
         : null,
+      USER_LANGUAGE_LINE,
       displayText,
     ]
       .filter(Boolean)
@@ -425,6 +429,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             : "This replies to a message you sent. Give the result to the user naturally, starting with the teammate's name.",
           "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
           `Reply to the teammate only for another requested action or new information that unblocks its work, with replyToMessageId "${delivery.messageId}", never with the same request or an acknowledgement.`,
+          USER_LANGUAGE_LINE,
         ]
       : delivery.expectsReply === false
         ? [
@@ -433,6 +438,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             sources.externalChat
               ? `OpenBot posts your written answer in the external chat of this turn. When nothing in it is for the people in that chat, answer only ${QUIET_ANSWER}: nothing is posted.`
               : `When nothing in it is for the user, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
+            USER_LANGUAGE_LINE,
           ]
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
@@ -604,6 +610,7 @@ export function planContinuationPrompt(steps: readonly ConversationPlanStep[], c
     "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
     ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
     "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    USER_LANGUAGE_LINE,
     `Automatic continuation ${count} of ${limit}.`,
   ].join("\n");
 }
@@ -622,6 +629,7 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
   return [
     "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
     "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    USER_LANGUAGE_LINE,
     `Automatic continuation ${count} of ${limit}.`,
   ].join("\n");
 }
@@ -631,6 +639,7 @@ export function finishCheckContinuationPrompt(gap: string, count: number, limit:
     "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
     gap,
     "Do this work now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    USER_LANGUAGE_LINE,
     `Automatic continuation ${count} of ${limit}.`,
   ].join("\n");
 }
@@ -639,6 +648,7 @@ export function compactionContinuationPrompt(): string {
   return [
     "OpenBot note, not a message from the user. Your last turn stopped because the connection failed while your context was compacted.",
     "Continue the work now, from where you stopped. Do not repeat finished work or restate earlier answers. Check the result of an action that was interrupted before you do it again. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    USER_LANGUAGE_LINE,
   ].join("\n");
 }
 
@@ -646,6 +656,7 @@ export function providerExitContinuationPrompt(): string {
   return [
     "OpenBot note, not a message from the user. Your last turn stopped because your provider process exited while you wrote your answer, so the user got only its first part.",
     "Continue now: give the complete answer to the user's last message. Do not repeat finished work. An action that you started before the stop possibly finished or possibly still runs: check its result before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    USER_LANGUAGE_LINE,
   ].join("\n");
 }
 
