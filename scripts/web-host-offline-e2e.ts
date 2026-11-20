@@ -52,7 +52,8 @@ const host = await connectChannelE2e("web-host-offline-e2e");
 const browser = await chromium.launch(
   browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" },
 );
-const web = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+// The script finds controls by their English labels, so the page must not follow the system language.
+const web = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "en-US" });
 web.on("pageerror", (error) => report.pageErrors.push(error.stack ?? error.message));
 let stopped = false;
 
