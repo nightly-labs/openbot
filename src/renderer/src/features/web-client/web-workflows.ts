@@ -284,16 +284,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     foldersSupported,
     folders,
     folderAction,
-    onFoldersChanged(changed) {
-      const events = options.onHostEvent((event) => {
+    onFoldersChanged: (changed) =>
+      options.onHostEvent((event) => {
         if (event.type === "workflow-folders-changed") changed();
-      });
-      const reconnect = options.onReconnect(changed);
-      return () => {
-        events();
-        reconnect();
-      };
-    },
+      }),
     async places() {
       if (!placesSupported()) return [];
       const connections = await connectionOptions();

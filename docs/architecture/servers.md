@@ -603,11 +603,13 @@ them in `openbot-workflow-folders-v1.json` in its user data (`src/backend/workfl
 a versioned JSON file), and `src/main/workflow-folders-service.ts` applies each action (create,
 rename, delete, place) for the `workflows:folders` and `workflows:folder-action` IPC of this computer
 and for the route, so a joined server uses the same rules (`applyWorkflowFolderAction` in
-`@openbot/contracts/ipc-workflow-folders`). A member who may use workflows reads all folders, and
-the placement shows only the workflows that the member can see, with the same filter as the
-workflow list. Each member who may use workflows creates, renames and deletes folders. To place a
-workflow, or to create a folder with workflows, the member needs `manage` access to each of these
-workflows, and gets 403 without it and 404 for a workflow that they cannot see. A refused change is
+`@openbot/contracts/ipc-workflow-folders`). The placement shows only the workflows that the member
+can see, with the same filter as the workflow list. A member who may use workflows reads each empty
+folder and each folder with a workflow that the member can see; a folder with only hidden workflows
+does not show. Each member who may use workflows creates folders. To rename or delete a folder, to
+place a workflow, or to create a folder with workflows, the member needs `manage` access to each
+workflow that the action changes or that the folder holds, and gets 403 without it and 404 for a
+workflow that they cannot see. A refused change is
 404 for a folder or a workflow that the host does not have, and 400 for each other rule. Each route
 answers the full snapshot that the member can see. The service reads the workflow ids from the
 workflow list and removes the entries of deleted workflows on each read and before each change, so
@@ -618,7 +620,7 @@ After each saved change, the host sends the optional event `workflow-folders-cha
 only to the connections that advertise `workflow-folders-v1`; `application-services.ts` emits it
 through `AgentService`, so this computer's windows get it too. The desktop with a joined server and
 the web client hide the folders while the host does not have the capability, and read the folders
-again after the event and after a reconnect. The phone does not show workflow folders. The instance
+again after the event and after a reconnect, with the workflow list. The phone does not show workflow folders. The instance
 transfer does not carry the folders.
 
 ### CRM

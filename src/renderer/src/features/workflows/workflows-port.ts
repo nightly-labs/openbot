@@ -188,18 +188,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     foldersSupported,
     folders: () => api().folders(serverId),
     folderAction: (action) => api().folderAction(action, serverId),
-    onFoldersChanged(changed) {
-      const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
+    onFoldersChanged: (changed) =>
+      window.openbot.agent.onScopedEvent((scoped) => {
         if (scoped.serverId === serverId && scoped.event.type === "workflow-folders-changed") changed();
-      });
-      const reconnect = window.openbot.servers.onEvent((servers) => {
-        if (servers.some((server) => server.id === serverId && server.state === "online")) changed();
-      });
-      return () => {
-        unsubscribe();
-        reconnect();
-      };
-    },
+      }),
     async places() {
       if (!placesSupported()) return [];
       const connections = await options();

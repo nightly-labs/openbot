@@ -505,9 +505,9 @@ export function createWorkflowsController(
       folderFailed(error);
       return;
     }
-    folderRead += 1;
+    const request = ++folderRead;
     host.folderAction(action).then((next) => {
-      if (!disposed) setFolders(next);
+      if (!disposed && request === folderRead) setFolders(next);
     }, folderFailed);
   };
 

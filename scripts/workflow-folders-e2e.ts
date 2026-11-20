@@ -471,7 +471,7 @@ try {
     return oldEvents.types.filter((type) => type !== "runtime-snapshot");
   });
 
-  await step("read: the member sees all folders and only the placement of workflows that it can see", async () => {
+  await step("read: the member sees the folders and the placement of workflows that it can see", async () => {
     const snapshot = await read(memberToken);
     assert.equal(snapshot.revision, created.revision);
     assert.deepEqual(snapshot.folders, created.folders);
@@ -481,20 +481,28 @@ try {
     return { member: snapshot.placement, owner: owner.placement };
   });
 
-  await step("rename and create: a member who can use workflows changes folders", async () => {
-    const event = ownerEvents.next(["workflow-folders-changed"]);
-    const renamed = await act(memberToken, { type: "rename", folderId: "folder-a", name: "Launch 2" });
-    assert.equal(renamed.revision, 2);
-    assert.equal(renamed.folders[0]?.name, "Launch 2");
-    await event;
-    const added = await act(memberToken, { type: "create", id: "folder-b", name: "Ideas" });
-    assert.equal(added.revision, 3);
-    assert.deepEqual(
-      added.folders.map((folder) => folder.id),
-      ["folder-a", "folder-b"],
-    );
-    return added;
-  });
+  await step(
+    "rename and create: a member changes its own folder, not a folder with a workflow that it cannot see",
+    async () => {
+      const hidden = await refused(
+        memberToken,
+        { type: "rename", folderId: "folder-a", name: "Launch 2" },
+        404,
+        sourceText("error.workflow.missing"),
+      );
+      const event = ownerEvents.next(["workflow-folders-changed"]);
+      const added = await act(memberToken, { type: "create", id: "folder-b", name: "Idea" });
+      assert.equal(added.revision, 2);
+      await event;
+      const renamed = await act(memberToken, { type: "rename", folderId: "folder-b", name: "Ideas" });
+      assert.equal(renamed.revision, 3);
+      assert.deepEqual(renamed.folders, [
+        { id: "folder-a", name: "Launch" },
+        { id: "folder-b", name: "Ideas" },
+      ]);
+      return { hidden: hidden.status, folders: renamed.folders };
+    },
+  );
 
   await step("place: the member moves a workflow without agents into a folder", async () => {
     const snapshot = await act(memberToken, { type: "place", workflowIds: [ids.plain], folderId: "folder-b" });
@@ -591,6 +599,27 @@ try {
     assert.equal(snapshot.placement[ids.plain], undefined);
     assert.equal(snapshot.revision, 6);
     return snapshot;
+  });
+
+  await step("hidden folder: a member does not see or delete a folder of workflows that it cannot see", async () => {
+    const made = await act(ownerToken, { type: "create", id: "folder-h", name: "Private", workflowIds: [ids.closed] });
+    assert.equal(made.revision, 7);
+    const member = await read(memberToken);
+    assert.deepEqual(
+      member.folders.map((folder) => folder.id),
+      ["folder-b"],
+    );
+    assert.equal(member.placement[ids.closed], undefined);
+    const deleted = await refused(
+      memberToken,
+      { type: "delete", folderId: "folder-h" },
+      404,
+      sourceText("error.workflow.missing"),
+    );
+    const owner = await read(ownerToken);
+    assert.equal(owner.revision, 7);
+    assert.ok(owner.folders.some((folder) => folder.id === "folder-h"));
+    return { member: member.folders, deleted: deleted.status };
   });
 
   await step("old client: a client without the capability gets an update-required refusal", async () => {

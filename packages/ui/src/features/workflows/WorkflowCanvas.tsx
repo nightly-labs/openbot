@@ -1140,7 +1140,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const renameTab = (workflowId: string, title: string) => {
     if (workflowId === openId()) {
-      if (renaming()) return;
+      setRenaming(false);
       setName(title);
     }
     props.onRename(workflowId, title);

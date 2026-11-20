@@ -30,11 +30,23 @@ function parseAction(body: unknown): WorkflowFolderAction {
   }
 }
 
-function shownPlacement(snapshot: WorkflowFoldersSnapshot, shown: ReadonlySet<string>): WorkflowFoldersSnapshot {
+function shownFolders(snapshot: WorkflowFoldersSnapshot, shown: ReadonlySet<string>): WorkflowFoldersSnapshot {
+  const placed = Object.entries(snapshot.placement);
+  const filled = new Set(placed.map(([, folderId]) => folderId));
+  const placement = Object.fromEntries(placed.filter(([workflowId]) => shown.has(workflowId)));
+  const kept = new Set(Object.values(placement));
   return {
     ...snapshot,
-    placement: Object.fromEntries(Object.entries(snapshot.placement).filter(([workflowId]) => shown.has(workflowId))),
+    folders: snapshot.folders.filter((folder) => !filled.has(folder.id) || kept.has(folder.id)),
+    placement,
   };
+}
+
+function folderWorkflowIds(snapshot: WorkflowFoldersSnapshot, action: WorkflowFolderAction): readonly string[] {
+  if (action.type !== "rename" && action.type !== "delete") return [];
+  return Object.entries(snapshot.placement)
+    .filter(([, folderId]) => folderId === action.folderId)
+    .map(([workflowId]) => workflowId);
 }
 
 export async function routeWorkflowFolders(
@@ -52,26 +64,23 @@ export async function routeWorkflowFolders(
     throw new HttpError(400, sourceText("error.team.workflowFoldersUnsupported"));
   const body = await readJson(request);
   const { listed, visibleGraph, requireUsable } = workflowVisibility(context, workflows, agents, hiddenAgentIds);
-  const visibleGraphs = async () => {
-    const known = listed();
-    const graphs = new Map<string, WorkflowGraph>();
-    for (const { summary, graph } of await runWorkflowEffect(workflows.listWithGraphs()))
-      if (visibleGraph(graph, known)) graphs.set(summary.id, graph);
-    return graphs;
-  };
-  const visible = async (snapshot: WorkflowFoldersSnapshot) =>
-    json(200, shownPlacement(snapshot, new Set((await visibleGraphs()).keys())));
+  const known = listed();
+  const graphs = new Map<string, WorkflowGraph>();
+  const shown = new Set<string>();
+  for (const { summary, graph } of await runWorkflowEffect(workflows.listWithGraphs())) {
+    graphs.set(summary.id, graph);
+    if (visibleGraph(graph, known)) shown.add(summary.id);
+  }
+  const visible = (snapshot: WorkflowFoldersSnapshot) => json(200, shownFolders(snapshot, shown));
 
   if (url.pathname === WORKFLOW_FOLDERS_ROUTES.read) return visible(await runWorkflowEffect(workflowFolders.read()));
   const action = parseAction(body);
-  const workflowIds = workflowFolderActionWorkflowIds(action);
-  if (workflowIds.length > 0) {
-    const graphs = await visibleGraphs();
-    for (const workflowId of new Set(workflowIds)) {
-      const graph = graphs.get(workflowId);
-      if (!graph) workflowMissing();
-      requireUsable(graph, "manage");
-    }
+  const current = await runWorkflowEffect(workflowFolders.read());
+  const touched = new Set([...workflowFolderActionWorkflowIds(action), ...folderWorkflowIds(current, action)]);
+  for (const workflowId of touched) {
+    const graph = graphs.get(workflowId);
+    if (!graph || !shown.has(workflowId)) workflowMissing();
+    requireUsable(graph, "manage");
   }
   try {
     return visible(await runWorkflowEffect(workflowFolders.change(action)));
