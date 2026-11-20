@@ -90,6 +90,12 @@ fit the order or does not exist gives the code field. A copy of the Brazil partn
 gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
 coupons and turns off the codes at the end.
 
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
+
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 
@@ -245,6 +251,14 @@ SCIM). It encrypts each company's client secret in D1, so never change or lose i
 value, each company must enter its client secret again. Without it, company sign-in answers 503 and
 everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
 Environment; a local deployment reads it from the encrypted `.env.production`.
+
+`HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes in base64), `B2_WORKER_KEY_ID_EU` and
+`B2_WORKER_APPLICATION_KEY_EU` are set together or not at all. They are for the archives of ended
+pool servers ([plan 012](../../plans/012-pool-server-archive.md)). The first encrypts the `age` key
+of each archive in `hosted_server_archives`; with another value, no archive can be restored. The B2
+key reads the `openbot-pool-archive-eu` bucket and nothing else. The encrypted `.env.production` has
+all three, and GitHub Actions reads them from the `cloudflare-production` Environment. When you
+change one, change it in both places and deploy the Worker.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.

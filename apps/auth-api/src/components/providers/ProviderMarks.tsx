@@ -3,11 +3,6 @@ import { Show } from "solid-js";
 import type { ProviderPage } from "../../content/providers/provider-page";
 import { LandingIcon } from "../landing/LandingIcon";
 
-/**
- * The frosted plate of the compare pages, with OpenBot's mark, "runs", and the
- * provider's mark. The hero shows the names under the marks; an index card shows
- * the marks only.
- */
 export function ProviderMarks(props: { page: Pick<ProviderPage, "provider" | "name">; small?: boolean }) {
   return (
     <span class={props.small ? "compare-marks compare-marks-small" : "compare-marks"}>
@@ -20,7 +15,6 @@ export function ProviderMarks(props: { page: Pick<ProviderPage, "provider" | "na
       <span class="compare-vs">runs</span>
       <span class="compare-mark">
         <span class="compare-mark-logo provider-mark-frame">
-          {/* A model server of your own has no logo, so it gets the chip icon that its plan card shows. */}
           {props.page.provider === "custom" ? (
             <LandingIcon name="cpu" class="provider-mark-logo provider-mark-custom" />
           ) : (

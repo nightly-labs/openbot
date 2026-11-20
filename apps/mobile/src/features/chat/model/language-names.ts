@@ -1,9 +1,5 @@
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 
-// Hermes has no Intl.DisplayNames, so the dictation language picker names
-// locales from catalog keys. They cover the languages and regions that the iOS
-// and Google speech recognizers list. A code missing here shows as the code.
-
 const LANGUAGES: Record<string, MobileTextKey> = {
   af: "language.name.af",
   am: "language.name.am",
@@ -201,7 +197,6 @@ const REGIONS: Record<string, MobileTextKey> = {
   ZA: "language.region.za",
 };
 
-/** "pl-PL" becomes "Polish (Poland)". A script subtag, such as "Hans", is skipped. */
 export function localeName(locale: string, t: MobileTranslate): string | null {
   const [language, ...rest] = locale.replace(/_/g, "-").split("-");
   const languageKey = language ? LANGUAGES[language.toLowerCase()] : undefined;

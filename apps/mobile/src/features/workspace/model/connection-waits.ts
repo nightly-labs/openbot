@@ -3,12 +3,10 @@ interface ConnectionWait {
   reject: (error: Error) => void;
 }
 
-/** The servers in the quiet time of a return to the app, and the requests that wait for each one. */
 export class ConnectionWaits {
   readonly #resuming = new Set<string>();
   readonly #waits = new Map<string, Set<ConnectionWait>>();
 
-  /** A request to a server in its quiet return waits for the connection, instead of failing at once. */
   whenConnected = (serverId: string): Promise<void> =>
     this.#resuming.has(serverId)
       ? new Promise<void>((resolve, reject) => {
@@ -23,7 +21,6 @@ export class ConnectionWaits {
     else this.#resuming.delete(serverId);
   }
 
-  /** Sends the waiting requests of a server, or fails them with `error`. */
   settle = (serverId: string, error: Error | null): void => {
     const waits = this.#waits.get(serverId);
     if (!waits) return;
@@ -34,13 +31,11 @@ export class ConnectionWaits {
     }
   };
 
-  /** Fails the waiting requests of a server that the list no longer has. */
   drop(serverId: string, error: Error): void {
     this.#resuming.delete(serverId);
     this.settle(serverId, error);
   }
 
-  /** Fails every waiting request. The next return to the app starts a new quiet time. */
   dropAll(error: Error): void {
     for (const serverId of [...this.#waits.keys()]) this.settle(serverId, error);
     this.#resuming.clear();

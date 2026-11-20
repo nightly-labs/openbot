@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/computerUse";
 
 export const messages = {
-  // Computer Use settings, the permission help window, and the window highlight.
   "computerUse.permission.screenRecording.title": "画面収録",
   "computerUse.permission.screenRecording.description": "OpenBot がアプリのウィンドウを見られるようにします。",
   "computerUse.permission.screenRecording.pane": "画面収録とシステムオーディオ録音",

@@ -22,7 +22,6 @@ export interface ComposerStoreDeps {
   seenMessageIds: Set<string>;
 }
 
-/** The agent, or for a channel the channel, that owns the drafts, errors and panels of the view. */
 export function conversationOwnerId(props: ConversationProps): string | undefined {
   return props.channel?.id ?? props.agent?.id;
 }
@@ -57,7 +56,6 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     const referencedIds = attachmentReferenceIds(currentDraft().text);
     return currentDraft().attachments.filter((attachment) => !referencedIds.has(attachment.id));
   });
-  /** The thumbnail row: each image, also one that the text names, and each other file that the text does not name. */
   const rowDraftAttachments = createMemo(() => rowAttachments(currentDraft().text, currentDraft().attachments));
   const currentPastePreviews = createMemo(() => {
     const target = currentTarget();
@@ -110,7 +108,6 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
     const target = currentTarget();
     if (!target) return;
-    // A pending Save owns the outcome: keep the exact request for retry.
     if (
       deps.editingPendingSave() &&
       deps.editingAgentId() === target.agentId &&

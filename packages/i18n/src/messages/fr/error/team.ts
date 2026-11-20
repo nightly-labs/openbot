@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "Cet hôte n’est pas lié à un compte propriétaire OpenBot.",
   "error.team.ownerEmailRequired": "Connectez-vous avec l’adresse e-mail OpenBot qui a créé cet hôte.",
   "error.team.hostNotConfigured": "L’hôte de l’équipe n’est pas configuré.",
@@ -144,6 +143,7 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
   "error.team.hostRestartUnsupported": "Cette connexion ne prend pas en charge le redémarrage du serveur.",
+  "error.team.ownerTransferUnsupported": "Ce serveur ne prend pas en charge le transfert de propriété.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
   "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",

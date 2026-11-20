@@ -25,7 +25,6 @@ export const messages = defineMessages("error.agent", {
     "Call {names} directly. tool_describe does not describe the discovery tools.",
   "error.agent.routineScheduleArgumentsInvalid":
     "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Cannot grant approval while the agent is being deleted.",
   "error.agent.accessLocalOnly": "Agent access can only be changed on the computer that runs the agent.",
   "error.agent.duplicateCleanupFailed": "Agent duplication failed and the incomplete copy could not be removed.",
@@ -124,6 +123,10 @@ export const messages = defineMessages("error.agent", {
   "error.agent.deleteIncomplete": "The agent data could not be removed completely. Retry deleting the agent.",
   "error.agent.deleteFolderInUse":
     "Work of another agent still uses this agent's folder. Delete this agent again when that work ends, or after you restart OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Another program still uses this agent's folder, for example a program that the agent started. Close that program or restart the computer that this agent runs on, then delete the agent again.",
+  "error.agent.deleteWhenFolderFree":
+    "Work of another agent still uses this agent's folder. OpenBot deletes this agent when that work ends.",
   "error.agent.duplicationBusy": "This agent is already being duplicated.",
   "error.agent.waitBeforeDuplicate": "Wait for the agent to finish and clear its queue before duplicating it.",
   "error.agent.saveOtherAgent": "This save belongs to another agent.",
@@ -132,7 +135,6 @@ export const messages = defineMessages("error.agent", {
     'A stored agent profile has an unreadable "{field}" value; update the data before starting OpenBot.',
   "error.agent.storedProfileUnreadableId":
     'Stored agent profile {id} has an unreadable "{field}" value; update the data before starting OpenBot.',
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Queue edit rejected: {reason}",
   "error.agent.computerUseLocalOnly": "Computer Use can only be changed on the computer that runs the agent.",
   "error.agent.automationLocalOnly": "Local scripts can only be allowed on the computer that runs the agent.",
@@ -181,6 +183,10 @@ export const messages = defineMessages("error.agent", {
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
   "error.agent.mcpServerKeysMove":
     "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Marketplace, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "The MCP server {name} runs a local command, so it takes no headers. Ask the user to enter its keys in Marketplace, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Only the user of this OpenBot, in a chat with you, can give the keys of the MCP server {name}. Ask the user to enter them in Marketplace, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is part of OpenBot, so the MCP tools cannot test, turn on or off, or remove it. The user controls it on the computer that runs OpenBot: the GitHub connection in Marketplace, Apps, GitHub, and Computer Use in Settings, Computer Use.",
   "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",
@@ -192,6 +198,8 @@ export const messages = defineMessages("error.agent", {
     "The region is not inside one display. Use desktop points inside the bounds of one display from list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot does not have the Screen Recording permission. Ask the user to open System Settings > Privacy & Security > Screen & System Audio Recording, turn on OpenBot, then quit and open OpenBot again.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot does not have the Screen Recording permission yet, so it cannot list the windows. To capture a display, call capture_screen with target screen. The user approves the capture first, and then macOS can ask the user for the permission.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows gave an empty image. Ask the user to unlock the computer and close protected content. A policy of the organization can also stop screen capture.",
   "error.agent.screenCaptureFailed": "The screen capture failed. Try again.",

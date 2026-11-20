@@ -9,14 +9,9 @@ import { isIOS } from "@/shared/lib/platform";
 interface SheetScrollEdgeEffectProps {
   style: StyleProp<ViewStyle>;
   edge?: "top" | "bottom";
-  /** The color under the content: a sheet, or the canvas of a full screen. */
   surface?: "canvas" | "sheet";
 }
 
-/**
- * The edge where content scrolls under a bar. Sheets and full screens have the same effect: a
- * progressive blur on iOS, and on Android, which has no cheap blur, a fade into the surface color.
- */
 export function SheetScrollEdgeEffect({ style, edge = "top", surface = "canvas" }: SheetScrollEdgeEffectProps) {
   if (isIOS) return <ProgressiveSheetBlur style={style} edge={edge} surface={surface} />;
 

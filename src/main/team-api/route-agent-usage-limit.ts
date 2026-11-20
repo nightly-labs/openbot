@@ -18,13 +18,6 @@ import { isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireAgentLevel, requireListedAgent, stringField } from "./request-helpers";
 
-/**
- * The usage limits of the agents, and the move of one agent to another model when a usage limit holds
- * its message, from a joined server. The chat on the host's computer asks the same question. A member
- * reads the holds of the agents that the member can see. A move needs the `manage` level of the agent,
- * as a model change does. A move to a named provider account that is not the agent's account needs an
- * owner or admin, as `provider-accounts-v1` does. Frozen by `agent-usage-limit-v1`.
- */
 export async function routeAgentUsageLimit(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listAgents" | "getRuntimeSnapshot" | "updateAgent">,
@@ -38,11 +31,9 @@ export async function routeAgentUsageLimit(
     return "unmatched";
   if (!capabilities.has(AGENT_USAGE_LIMIT_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.usageLimitUnsupported"));
-  // `readJson` has already run the body through the agent-usage-limit wire codec.
   const body = await readJson(request);
   if (url.pathname === AGENT_USAGE_LIMIT_ROUTES.list) {
     const snapshot = agents.getRuntimeSnapshot();
-    // A model of a provider that the peer's protocol does not know stays on the host.
     const visible = (choice: { provider: string }) => !isPeerHiddenProvider(choice.provider, protocol);
     return json(200, {
       usageLimits: (snapshot.usageLimits ?? [])
@@ -63,8 +54,6 @@ export async function routeAgentUsageLimit(
   if (!isReasoningEffort(reasoningEffort)) throw new HttpError(400, "reasoningEffort is invalid.");
   const account = typeof providerAccountId === "string" ? providerAccountId : DEFAULT_PROVIDER_ACCOUNT_ID;
   const current = agents.listAgents().find((agent) => agent.id === agentId)?.providerAccountId;
-  // The provider's own sign-in is the account that a model change gives. Another named account is an
-  // admin choice.
   if (account !== DEFAULT_PROVIDER_ACCOUNT_ID && account !== current) requireAdmin(member);
   const input: UpdateAgentInput = {
     agentId,

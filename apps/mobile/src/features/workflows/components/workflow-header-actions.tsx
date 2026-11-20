@@ -13,7 +13,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/** A round header button on Android, in the glass circle of the full screens. */
 export function AndroidBarIcon({ children }: { children: ReactNode }) {
   const glass = useChromeGlass({ shadow: false });
   return (
@@ -25,7 +24,6 @@ export function AndroidBarIcon({ children }: { children: ReactNode }) {
   );
 }
 
-/** The Flow and List choices of a "…" menu, with a check on the current one. */
 export function viewMenuActions(view: EditorView, t: ReturnType<typeof useText>["t"]): MenuAction[] {
   return [
     {
@@ -58,11 +56,6 @@ export interface EditorSave {
   onSave: () => void;
 }
 
-/**
- * The header of the editor page: Back at the left; the "…" menu with Flow and List, and Save, at the
- * right. One toolbar holds both right actions: iOS reads the items of one `Stack.Toolbar` of a side,
- * and Android has one `headerRight`. Save shows when the draft has a change, as `SheetSaveAction` does.
- */
 export function WorkflowEditorHeader({
   view,
   onView,
@@ -72,7 +65,6 @@ export function WorkflowEditorHeader({
 }: {
   view: EditorView;
   onView: (view: EditorView) => void;
-  /** Absent when the workflow cannot be saved from the phone. */
   save: EditorSave | undefined;
   backDisabled: boolean;
   onBack: () => void;
@@ -95,9 +87,6 @@ export function WorkflowEditorHeader({
   };
   const moreLabel = t("mobile.workflow.detail.more");
   const saveLabel = save?.label ?? "";
-  // The Android header reads the newest callbacks through a ref, so its options change only when the
-  // header looks different: new options rebuild the toolbar, which a form did on every key press.
-  // Back does nothing during a save, as on iOS: the editor stays until the save ends or fails.
   const back = () => {
     if (!backDisabled) onBack();
   };

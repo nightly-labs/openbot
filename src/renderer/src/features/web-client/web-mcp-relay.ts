@@ -1,7 +1,3 @@
-// The relayed sign-ins of the browser client (`sign-in-relay-v1`), for the marketplace and the sign-in links of the host's agents. The host starts the sign-in and opens no page. This browser cannot listen for the
-// callback, so the user opens the page from the dialog and pastes the address that the browser shows
-// at the end. Only its query goes to the host.
-
 import {
   hostOnlySignInPage,
   type McpServerConfig,
@@ -24,10 +20,8 @@ import {
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
 
-/** How often a sign-in asks the host whether it ended. */
 const POLL_MS = 1_000;
 
-/** A relayed sign-in that waits for the address the user pastes. */
 interface RelayWait {
   cancel: () => void;
   page: URL;
@@ -37,27 +31,14 @@ interface RelayWait {
 }
 
 export interface WebMcpRelay {
-  /**
-   * Runs the sign-in of `config` on the host until it ends. `null` when the page is one that only the
-   * host can reach: the relay then ended on the host, and the host's own tab can show the page.
-   */
   signIn: (request: TeamApiRequest, config: McpServerConfig) => Promise<McpTestResult | null>;
-  /**
-   * Runs the sign-in of a link that the agent `agentId` printed until it ends. The host names the page,
-   * so any page other than `url` ends the sign-in.
-   */
   signInLink: (request: TeamApiRequest, agentId: string, url: string) => Promise<McpTestResult>;
-  /** The page of the sign-in of `url`, while it waits in this browser. */
   page: (url: string) => McpSignInRelayPage | null;
-  /** Opens the page from a click, so the browser does not block it. */
   open: (url: string) => void;
-  /** The address that the browser shows at the end of the sign-in. */
   paste: (url: string, address: string) => Promise<void>;
-  /** Ends the sign-in on the host while it waits for an address. */
   cancel: (url: string) => void;
 }
 
-/** `onPage` gets each page when it shows, and `null` when its sign-in ends. */
 export function webMcpRelay(
   onPage: (url: string, page: McpSignInRelayPage | null) => void = () => undefined,
 ): WebMcpRelay {
@@ -75,7 +56,6 @@ export function webMcpRelay(
   ): Promise<McpTestResult | H> {
     const { flowId } = await run(start);
     const status = () => run(signInRelayStatus(request, flowId));
-    // A new sign-in of the same link can start before this one ends, so this one removes only its own wait.
     let own: RelayWait | null = null;
     const forget = () => {
       if (own !== null && waits.get(url) === own) waits.delete(url);
@@ -87,8 +67,6 @@ export function webMcpRelay(
         current = await status();
       }
       if (current.result) return current.result;
-      // The cancel ends before the answer, so it cannot stop a sign-in that starts after it. A failed
-      // cancel does not stop the host tab: the flow already ended, or the next start replaces it.
       if (hostOnlySignInPage(current.authorizeUrl ?? "")) {
         await run(cancelSignInRelay(request, flowId)).catch(() => undefined);
         return hostOnly;
@@ -108,7 +86,6 @@ export function webMcpRelay(
       own = { cancel, page, view, state: page.searchParams.get("state"), receive };
       waits.set(url, own);
       onPage(url, view);
-      // The host can end the sign-in first: its deadline passed, or the user cancelled.
       while (true) {
         const query = await Promise.race([pasted, pause()]);
         if (query !== null) {
@@ -157,7 +134,6 @@ export function webMcpRelay(
   };
 }
 
-/** The page address, when it is a web page. The host chose it, so this browser opens nothing else. */
 function webPage(address: string): URL | null {
   const url = URL.parse(address);
   return url?.protocol === "https:" ? url : null;

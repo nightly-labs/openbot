@@ -1,16 +1,3 @@
-// Checks that an agent keeps its provider session when OpenBot's child processes stop under it.
-// Runs the real agent service on a temporary profile with a fake Codex app-server (or a fake OpenCode
-// with `PROBE_PROVIDER=opencode`), and the real Computer Use runtime with a fake driver daemon.
-// 1. After one turn the fake provider gets SIGTERM, as it does when the operating system or a process
-//    supervisor stops the app's process group. The runtime starts it again, and the next turn must
-//    resume the same provider thread rather than start a new one, which would lose its own context.
-// 2. The same signal reaches the driver daemon while OpenBot quits. Its exit must not deactivate the
-//    stored sessions, which the next run resumes.
-// 3. Control: a daemon that dies while OpenBot keeps running still deactivates them, because the live
-//    sessions then hold a tool set that is not the one they would be given now.
-// 4. The runtime then starts that daemon again by itself and gives the agents the tools again (#12347):
-//    on a server, no panel can check the driver again.
-// `bun run test:provider-exit-session`. Writes .openbot-build/provider-exit-session-e2e/report.json.
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -28,11 +15,9 @@ const logPath = join(root, "protocol.jsonl");
 const fakeCodex = join(root, "codex");
 const fakeOpenCode = join(root, "opencode");
 const fakeDriver = join(root, "cua-driver");
-// The socket path limit is 103 characters on macOS, and the temporary folder there is long.
 const driverRoot = await mkdtemp("/tmp/openbot-cua-");
 const PROVIDER = process.env.PROBE_PROVIDER === "opencode" ? "opencode" : "codex";
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -47,8 +32,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// A Codex app-server that keeps its threads in a file, as the real one keeps them on disk, so a
-// restarted process resumes a thread that the previous process started.
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -151,7 +134,6 @@ process.stdin.on("data", (chunk) => {
 setInterval(() => {}, 1000);
 `;
 
-// A driver daemon that only listens on its socket, as the real one does until it is asked something.
 const FAKE_DRIVER = `#!/usr/bin/env node
 const net = require("node:net");
 const socket = process.argv[process.argv.indexOf("--socket") + 1];
@@ -215,7 +197,6 @@ function protocol(): ProtocolLine[] {
   }
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -240,7 +221,6 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== PROVIDER),
 });
 
-/** A driver wired to the agents as `application-services.ts` wires it, with both grants given. */
 function driverRuntime(name: string) {
   const daemon: { child: ChildProcess | null } = { child: null };
   const quit = { started: false };
@@ -268,7 +248,6 @@ function driverRuntime(name: string) {
   return { runtime, announced, daemon, quit };
 }
 
-/** Stops the daemon from outside, as a signal to the process group does, and waits for the runtime to see it. */
 async function killDaemon({ runtime, daemon }: ReturnType<typeof driverRuntime>): Promise<void> {
   let stopped = false;
   runtime.onStateChanged((state) => {
@@ -284,7 +263,6 @@ const idle = (agentId: string) =>
 const atQuit = driverRuntime("driver-at-quit");
 const whileRunning = driverRuntime("driver-while-running");
 
-/** The state of the agent's first provider session. */
 function sessionState(agentId: string, externalSessionId: string): string | null {
   const threadId = store.list().find((one) => one.id === agentId)?.threadId ?? "";
   return (
@@ -295,7 +273,6 @@ function sessionState(agentId: string, externalSessionId: string): string | null
 
 try {
   await runCauseEffect(agents.initialize());
-  // At startup, as `application-services.ts` does: a user who granted Computer Use gets the daemon.
   await runCauseEffect(atQuit.runtime.warmUp());
   if (!atQuit.runtime.mcpServerForProviders())
     throw new Error(`The fake driver did not become ready: ${JSON.stringify(atQuit.runtime.lastState)}`);
@@ -315,7 +292,6 @@ try {
   });
   report.firstThread = firstThread;
 
-  // 1. The process stops between turns, as a SIGTERM to the app's process group stops it.
   const killedPid = protocol().find((line) => line.start)?.pid ?? 0;
   report.killedPid = killedPid;
   process.kill(killedPid, "SIGTERM");
@@ -326,7 +302,6 @@ try {
   const state = sessionState(agent.id, firstThread);
   report.sessionAfterExit = state ? { externalSessionId: firstThread, state } : null;
 
-  // 2. The next turn resumes the thread on the new process.
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Second message." }));
   const turn = await waitFor("the second turn to start", () =>
     protocol().find((line) => line.pid === restarted.pid && line.method === TURN_METHOD),
@@ -340,7 +315,6 @@ try {
     turnThread: turn.threadId ?? null,
   };
 
-  // 3. OpenBot quits, and the same signal stops the driver daemon before the teardown does.
   atQuit.quit.started = true;
   await killDaemon(atQuit);
   report.driverExitAtQuit = {
@@ -348,7 +322,6 @@ try {
     sessionState: sessionState(agent.id, firstThread),
   };
 
-  // 4. Control: a daemon that dies while OpenBot runs still deactivates the session.
   await runCauseEffect(whileRunning.runtime.warmUp());
   await killDaemon(whileRunning);
   const deactivated = await waitFor("the session to be deactivated", () => {
@@ -357,7 +330,6 @@ try {
   });
   report.driverExitWhileRunning = { announcements: whileRunning.announced.count, sessionState: deactivated };
 
-  // 5. With no panel open, the runtime checks the driver again and gives the agents the tools again.
   await waitFor("the driver to be ready again", () => whileRunning.runtime.mcpServerForProviders());
   report.driverBackAfterExit = {
     announcements: whileRunning.announced.count,
@@ -367,12 +339,10 @@ try {
   report.passed =
     report.sessionAfterExit?.state === "active" &&
     report.secondTurn.resumed === firstThread &&
-    // An ACP provider opens a discovery session for its model list, so only Codex can tell.
     (PROVIDER !== "codex" || !report.secondTurn.started) &&
     report.secondTurn.turnThread === firstThread &&
     report.driverExitAtQuit.announcements === 0 &&
     report.driverExitAtQuit.sessionState === "active" &&
-    // One for the stop and one for the return.
     report.driverBackAfterExit.announcements === 2 &&
     report.driverBackAfterExit.status === "ready";
 } catch (error) {

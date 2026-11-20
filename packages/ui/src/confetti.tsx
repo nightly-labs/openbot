@@ -2,11 +2,6 @@ import { For, untrack } from "solid-js";
 
 const CONFETTI_PIECES = 56;
 
-/**
- * A burst of paper from the center of `origin`, or from the upper middle of the window when there is no
- * element. The layer covers the window, so that a dialog or a card does not clip it. Mount it once for
- * each burst. CSS hides it when the user prefers reduced motion.
- */
 export function Confetti(props: { origin: Element | null | undefined }) {
   const origin = untrack(() => {
     const box = props.origin?.getBoundingClientRect();

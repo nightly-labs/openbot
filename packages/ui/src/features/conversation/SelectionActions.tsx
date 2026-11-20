@@ -13,12 +13,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show
 import { useText } from "../../text";
 
 const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
-/**
- * The text of a file in the side panel. `data-selection-file-quote` is its quote id without lines;
- * `data-selection-file-lines` marks text that is the file source, so a selection gives its lines.
- */
 const FILE_TEXT_SELECTOR = "[data-selection-file-quote]";
-/** A view with its own selection actions, such as a side thread. The actions around it leave its text alone. */
 const SCOPE_SELECTOR = "[data-selection-scope]";
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, [contenteditable="true"], [role="button"], .message-citation';
@@ -27,13 +22,11 @@ const VIEWPORT_MARGIN = 12;
 const TOOLBAR_GAP = 8;
 
 export interface MessageTextSelection {
-  /** The id of the selected message, or the quote id of the selected file passage. */
   messageId: string;
   text: string;
   range: Range;
 }
 
-/** The modifier of the quote chord with Shift and Period: Command on macOS, Control elsewhere. */
 export type QuoteShortcutModifier = "meta" | "ctrl";
 
 export interface SelectionRect {
@@ -90,19 +83,13 @@ export function selectionActionsPosition(
   return { top: clamp(idealTop, VIEWPORT_MARGIN, maximumTop), left, placement };
 }
 
-/**
- * Closes the selection action that shows. A press in a page frame reaches only that page, so the
- * window listeners of the other actions, in the app or in a different page, do not see it.
- */
 let closeShownAction: (() => void) | undefined;
 
-/** Makes `close` the one selection action that shows, and closes the action that showed before. */
 export function showSelectionAction(close: () => void): void {
   if (closeShownAction !== close) closeShownAction?.();
   closeShownAction = close;
 }
 
-/** Forgets `close` when its action goes away. */
 export function releaseSelectionAction(close: () => void): void {
   if (closeShownAction === close) closeShownAction = undefined;
 }
@@ -111,28 +98,21 @@ export function MessageSelectionActions(props: {
   contextKey: string | undefined;
   disabled: boolean;
   onSend: (messageId: string, body: string) => Promise<boolean>;
-  /** Puts the selected text in the composer as a quote. Without it, the toolbar has no Quote action. */
   onQuote?: ((messageId: string, text: string) => void) | undefined;
   quoteShortcut?: QuoteShortcutModifier;
-  /** The `data-selection-scope` element whose text these actions take. Without it, they take the text outside each scope. */
   scope?: HTMLElement | undefined;
 }) {
   const [selection, setSelection] = createSignal<MessageTextSelection | null>(null);
   const [fallbackHighlight, setFallbackHighlight] = createSignal(false);
-  // The document selection paints the passage while it holds it. The highlight takes over only when
-  // the selection moves away, such as into the instruction field, so the two never paint together.
   const [documentHolds, setDocumentHolds] = createSignal(true);
   let lastContextKey: string | undefined;
 
   const clearSelection = () => {
-    // The highlight has one name for all actions, so only the actions that hold a selection clear it.
     if (!selection()) return;
     setSelection(null);
     clearPersistentHighlight();
   };
 
-  // Only for deliberate dismissals: the composer is contenteditable, so its caret is the document
-  // selection and clearing it here would wipe the caret out from under the person typing.
   const dismiss = () => {
     clearSelection();
     window.getSelection()?.removeAllRanges();
@@ -141,7 +121,6 @@ export function MessageSelectionActions(props: {
   const quote = () => {
     const active = selection();
     if (!active || !props.onQuote) return;
-    // The composer takes the caret next, so the message selection must go first.
     dismiss();
     props.onQuote(active.messageId, active.text);
   };
@@ -179,9 +158,6 @@ export function MessageSelectionActions(props: {
   createEffect(
     () => (documentHolds() ? null : selection()),
     (active) => {
-      // The cleanup clears the highlight of the previous selection. Without a selection, or while the
-      // document selection paints it, the highlight can be of other actions, such as those of a side
-      // thread, so it stays.
       if (!active) {
         setFallbackHighlight(false);
         return;
@@ -193,8 +169,6 @@ export function MessageSelectionActions(props: {
 
   onSettled(() => {
     const onPointerDown = (event: PointerEvent) => {
-      // A secondary button opens the native context menu, which reads the live selection: dismissing
-      // here would clear the text before Copy ever sees it.
       if (event.button !== 0) return;
       if (event.target instanceof Element && event.target.closest(".selection-actions-layer")) return;
       if (selection()) dismiss();
@@ -205,7 +179,6 @@ export function MessageSelectionActions(props: {
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        // Escape in a text field closes its own list. The caret there is the document selection.
         if (event.target instanceof HTMLElement && event.target.isContentEditable) clearSelection();
         else dismiss();
         return;
@@ -275,9 +248,7 @@ export function SelectionActionsBar(props: {
   let content: HTMLDivElement | undefined;
   let animationFrame: number | undefined;
   let previousSelectionKey = "";
-  // Counts selection changes. A send that ends after one applies its result to no selection.
   let selectionGeneration = 0;
-  // A new mouse selection dismisses this bar on `pointerdown` and mounts a new one on `pointerup`.
   onCleanup(() => {
     selectionGeneration += 1;
   });
@@ -411,8 +382,6 @@ export function SelectionActionsBar(props: {
     } catch {
       sent = false;
     }
-    // The user selected other text while it sent: the bar now belongs to that selection, or a new bar
-    // shows it. The late reply must not dismiss that selection.
     if (generation !== selectionGeneration) return;
     if (sent) props.onDismiss();
     else setMode("error");
@@ -632,7 +601,6 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
   );
 }
 
-/** The Quote action of a selection toolbar. A press keeps the selection, so the click can quote it. */
 export function QuoteSelectionButton(props: { quoteShortcut: QuoteShortcutModifier | undefined; onQuote: () => void }) {
   const { t } = useText();
   return (
@@ -654,10 +622,8 @@ export function QuoteSelectionButton(props: { quoteShortcut: QuoteShortcutModifi
   );
 }
 
-/* The Quote button, so the presets do not clip it. */
 const QUOTE_ACTION_WIDTH = 84;
 
-/** ⌘⇧. on macOS, Ctrl+Shift+. elsewhere. A key that a visual reply page gives to the app counts too. */
 export function isQuoteShortcut(
   event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "shiftKey" | "altKey" | "code">,
   modifier: QuoteShortcutModifier,
@@ -676,7 +642,6 @@ function messageTextBlock(node: Node): HTMLElement | null {
   return element?.closest<HTMLElement>(`${MESSAGE_TEXT_SELECTOR}, ${FILE_TEXT_SELECTOR}`) ?? null;
 }
 
-/** The quote id of a file passage. Source text gives the lines; rendered Markdown names only the file. */
 function fileSelectionQuoteId(block: HTMLElement, range: Range): string | undefined {
   const id = block.dataset.selectionFileQuote;
   const target = id ? fileQuoteTarget(id) : null;
@@ -704,7 +669,6 @@ function rangeIntersectsInteractiveContent(range: Range, root: HTMLElement): boo
   });
 }
 
-/** True while the document selection still paints part of `range`. A focused text field collapses it. */
 function selectionCovers(selection: Selection | null, range: Range): boolean {
   if (selection?.rangeCount !== 1 || selection.isCollapsed) return false;
   const current = selection.getRangeAt(0);

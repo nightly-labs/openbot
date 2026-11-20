@@ -59,7 +59,6 @@ function StatusText({ server: shown }: { server: MobileServer }) {
             </Typography.Paragraph>
           </>
         ) : reference ? (
-          // The slot has room for one short line, and the message is cut there. The code is short.
           <ErrorReference reference={reference} numberOfLines={1} />
         ) : detail ? (
           <Typography.Paragraph
@@ -78,16 +77,8 @@ function StatusText({ server: shown }: { server: MobileServer }) {
   );
 }
 
-export function ConnectionHeaderStatus({
-  server,
-  fill = false,
-}: {
-  server: MobileServer | undefined;
-  /** Takes the room that its row leaves, as in the narrow bar of the chat list pane, in place of a fixed slot. */
-  fill?: boolean;
-}) {
+export function ConnectionHeaderStatus({ server, fill = false }: { server: MobileServer | undefined; fill?: boolean }) {
   return (
-    // Keep this native toolbar slot mounted: removing it would cut off the exit animation.
     <View className="justify-center" style={fill ? { flex: 1, minWidth: 0, height: 44 } : { width: 164, height: 44 }}>
       <ConnectionStatusReveal
         value={server && !server.initialConnectionPending && !showsOnline(server) ? server : null}

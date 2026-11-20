@@ -17,7 +17,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An agent with a drawn avatar. `level` null uses the level of its server. */
 function agent(
   id: string,
   name: string,
@@ -63,7 +62,6 @@ const ACME: NotificationMatrixServer = {
     ],
   },
 };
-/** A joined server on an older OpenBot, and one that is offline. */
 const LAB: NotificationMatrixServer = {
   id: "lab",
   name: "Old lab server",
@@ -86,10 +84,8 @@ const RESEARCH: NotificationMatrixServer = {
   deviceOnly: false,
   agents: { status: "loading" },
 };
-/** This computer, a joined server, a joined server on an older OpenBot, and one that is offline. */
 const SERVERS = [LOCAL, ACME, LAB, RESEARCH];
 
-/** The matrix with the state that a host keeps, so each choice shows as it does in the app. */
 function MatrixStory(props: {
   servers: NotificationMatrixServer[];
   device?: "computer" | "browser";
@@ -151,17 +147,14 @@ function MatrixStory(props: {
   );
 }
 
-/** Agents with their own level, agents to add, a muted server, an old and an offline server. */
 export const Default: Story = {
   render: () => <MatrixStory servers={SERVERS} />,
 };
 
-/** The web client: a server on an older OpenBot keeps its level in this browser only. */
 export const WebClient: Story = {
   render: () => <MatrixStory servers={SERVERS} device="browser" />,
 };
 
-/** The agents of each server load after the tab opens, or fail to load. */
 export const Loading: Story = {
   render: () => (
     <MatrixStory
@@ -173,12 +166,10 @@ export const Loading: Story = {
   ),
 };
 
-/** A server set to Nothing keeps every agent silent, so its card shows no agents. */
 export const ServerSetToNothing: Story = {
   render: () => <MatrixStory servers={[{ ...LOCAL, level: "nothing" }]} />,
 };
 
-/** Each save fails: the choice goes back to the saved level and a toast tells why. */
 export const SaveFails: Story = {
   render: () => <MatrixStory servers={[LOCAL, ACME]} failSaves />,
 };

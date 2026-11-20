@@ -14,9 +14,6 @@ const colors = [
   ["Danger", "--openbot-danger"],
 ] as const;
 
-// The two accent families, and what each step is for. The blue is the action
-// colour and reaches 155 call sites; the pink says "newly available" and has one,
-// the account dock's update pill.
 const accentBlue = [
   ["Accent", "--openbot-accent", "Filled buttons, switches, the send control"],
   ["Accent hover", "--openbot-accent-hover", "Hover on a filled control"],
@@ -95,8 +92,6 @@ export const Accents: Story = {
 function Swatch(props: { name: string; token: string; use?: string }): JSX.Element {
   const [card, setCard] = createSignal<HTMLElement>();
   const [resolved, setResolved] = createSignal("");
-  // Read the computed value rather than restating it, so the card cannot drift
-  // from packages/brand/src/tokens.css the way a hard-coded hex would.
   createEffect(card, (element) => {
     if (element) setResolved(getComputedStyle(element).getPropertyValue(props.token).trim());
   });

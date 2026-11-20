@@ -1,9 +1,3 @@
-// An agent of `antigravity-mcp-load-failure-e2e.ts`, for #12298. Antigravity 1.5.11 waits 5 s for each
-// MCP server of a session to list its tools. A server that is late is not in the prompt's tools, with
-// no error, and the CLI tries it again at the next prompt. This fake lists the tools of OpenBot's own
-// servers (`openbot*`) over the real bridge: when the session opens (`FAKE_OPEN_LIST`: `now`, `late`
-// after `FAKE_LATE_MS`, or `never`), and at a prompt that has the word "list". It then answers "OK".
-// `FAKE_VERSION` is the CLI version that it reports.
 import { type AcpHandler, type AcpParams, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = {
@@ -12,8 +6,8 @@ const MODELS = {
 };
 const servers = new Map<string, NonNullable<AcpParams["mcpServers"]>>();
 let sessions = 0;
+const CLI_LIST_LIMIT_MS = 5_000;
 
-/** The number of tools in a JSON-RPC answer, or 0. The answer can come as JSON or as one SSE event. */
 function toolCount(text: string): number {
   const answer: { result?: { tools?: readonly object[] } } = JSON.parse(
     text.startsWith("{") ? text : (/^data: (.*)$/mu.exec(text)?.[1] ?? "{}"),
@@ -21,7 +15,6 @@ function toolCount(text: string): number {
   return answer.result?.tools?.length ?? 0;
 }
 
-/** One JSON-RPC request to an http MCP server. Returns the number of tools that it answers. */
 async function mcpRequest(server: NonNullable<AcpParams["mcpServers"]>[number], method: string, id: number) {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -40,7 +33,6 @@ async function mcpRequest(server: NonNullable<AcpParams["mcpServers"]>[number], 
   return toolCount(await response.text());
 }
 
-/** Lists the tools of OpenBot's servers of the session, and returns how many there are. */
 async function listOpenBotTools(sessionId: string): Promise<number> {
   let count = 0;
   for (const server of servers.get(sessionId) ?? []) {
@@ -59,8 +51,12 @@ const open = (sessionId: string, request: AcpRequest, peer: Parameters<AcpHandle
     peer.reply(request, request.method === "session/new" ? { sessionId, models: MODELS } : { models: MODELS });
   };
   if (mode === "never") return answer(null);
-  const delay = mode === "late" ? Number(process.env.FAKE_LATE_MS ?? 0) : 0;
-  setTimeout(() => void listOpenBotTools(sessionId).then(answer), delay);
+  if (mode === "late") {
+    setTimeout(() => answer(null), CLI_LIST_LIMIT_MS);
+    setTimeout(() => void listOpenBotTools(sessionId), Number(process.env.FAKE_LATE_MS ?? 0));
+    return;
+  }
+  void listOpenBotTools(sessionId).then(answer);
 };
 
 serveFakeAcpAgent({

@@ -164,7 +164,7 @@ export const messages = {
   "billing.order.currency": "العملة",
   "billing.order.monthly": "شهري",
   "billing.order.yearly": "سنوي",
-  "billing.order.yearlySaving": "−{percent}% سنويًا",
+  "billing.order.yearlySaving": "خصم {percent}% سنويًا",
   "billing.order.server.title": "خادم مستضاف",
   "billing.order.server.summary": "نشغّل OpenBot لفريقك.",
   "billing.order.server.none": "بلا خادم",
@@ -182,7 +182,7 @@ export const messages = {
   "billing.order.license.noneDetail": "استخدام شخصي وغير تجاري",
   "billing.order.license.starter": "ترخيص Starter",
   "billing.order.license.team": "ترخيص Team",
-  "billing.order.license.bundleSaving": "−{percent}% مع خادمك",
+  "billing.order.license.bundleSaving": "خصم {percent}% مع خادمك",
   "billing.order.license.teamDetail": "{included} مشمولون، +{price} لكل إضافي",
   "billing.order.license.serverMembers": {
     zero: "لا أعضاء في خادمك",

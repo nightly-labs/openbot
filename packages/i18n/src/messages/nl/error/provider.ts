@@ -238,6 +238,8 @@ export const messages = {
     "Het endpoint “{provider}” heeft het verzoek geweigerd. Zijn API-sleutel of headers kunnen onjuist zijn, of zijn account mag dit model niet gebruiken. Controleer ze bij Serverinstellingen → Aanbieders of kies een ander model. Probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointEffortRefused":
+    "Het endpoint “{provider}” heeft het redeneerniveau van dit model geweigerd. Bewerk “{provider}” bij Serverinstellingen → Aanbieders. Houd bij Redeneerniveau alleen de niveaus die dit model accepteert, of kies Geen redenering. Probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeKeyRefused":
@@ -266,6 +268,10 @@ export const messages = {
     "Dit model is niet beschikbaar voor je. Kies een ander model voor deze agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Kies een lager denkniveau of een ander model en stuur je bericht opnieuw.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Open in Instellingen Eigen aanbieder, klik bij dit endpoint op Bewerken en stel een grotere Max. output in voor dit model. Of kies een lager denkniveau of een ander model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
   "error.provider.opencodeModelNotServed":
@@ -291,6 +297,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
+  "error.provider.channelNoAnswer":
+    "{provider} beëindigde de beurt zonder antwoord. Klik in het kanaal op Doorgaan om de taak opnieuw uit te voeren, of op Opnieuw toewijzen om hem aan een ander lid te geven.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -396,6 +404,10 @@ export const messages = {
     "Codex kon deze chat niet voortzetten, omdat een item in de opgeslagen geschiedenis ontbreekt. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexRequestRefused":
     "{provider} heeft het verzoek voor deze chat geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat met veel afbeeldingen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} De agent ziet dit bericht nu niet meer, dus het houdt je volgende berichten niet tegen. Stuur je verzoek opnieuw met andere woorden.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
   "error.provider.imageTooSmall":

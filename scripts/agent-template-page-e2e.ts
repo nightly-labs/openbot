@@ -1,12 +1,3 @@
-// End-to-end check of the public page of a shared agent (`/agents/<id>` on the site).
-//   bun scripts/agent-template-page-e2e.ts [--browser-executable=<path>]
-// 1. Applies the migrations to this worktree's local D1 and adds one user and one shared agent whose
-//    instructions are Markdown with raw HTML in them. The rows are removed at the end.
-// 2. Starts the site's development server on a free port.
-// 3. Opens the page in Chrome at 1440 and 390 px and checks: the closed instructions are plain text,
-//    "Read more" shows headings and lists from the left edge, the raw HTML is text and never runs,
-//    an unsafe link is not a link, and the page description has no Markdown marks.
-// Writes .openbot-build/agent-template-page-e2e/report.json and the screenshots beside it.
 import assert from "node:assert/strict";
 import { type ChildProcess, execFile, spawn } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -70,7 +61,6 @@ const freePort = () =>
     });
   });
 
-/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
 function waitForSite(child: ChildProcess, address: string): Promise<void> {
   return new Promise((done, fail) => {
     let output = "";
@@ -84,7 +74,6 @@ function waitForSite(child: ChildProcess, address: string): Promise<void> {
   });
 }
 
-// 1. Local D1 ----------------------------------------------------------------------
 await d1("migrations", "apply");
 const now = Date.now();
 await d1(
@@ -97,7 +86,6 @@ await d1(
   ].join(" "),
 );
 
-// 2. Site --------------------------------------------------------------------------
 const port = await freePort();
 const site = spawn(
   process.execPath,
@@ -127,10 +115,8 @@ const views: ViewReport[] = [];
 try {
   await waitForSite(site, origin);
 
-  // The description in the head is plain text: no Markdown marks reach a link preview.
   const html = await (await fetch(pageUrl)).text();
   writeFileSync(resolve(OUT, "page.html"), html);
-  // The root's description comes first; the page's own one replaces it.
   const metaDescription = [...html.matchAll(/<meta [^>]*name="description" content="([^"]*)"/gu)].at(-1)?.[1] ?? "";
   assert.ok(
     metaDescription.startsWith("Identity and Mission You keep the production systems healthy."),
@@ -138,7 +124,6 @@ try {
   );
   assert.ok(!metaDescription.includes("##"), metaDescription);
 
-  // 3. Browser ---------------------------------------------------------------------
   const browser = await chromium.launch(
     browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" },
   );
@@ -161,14 +146,12 @@ try {
       const card = page.getByRole("article", { name: "Sentinel" });
       await card.waitFor();
 
-      // Closed: one paragraph of plain text, centered as before.
       const closed = card.locator(".agent-share-description");
       const closedText = (await closed.textContent()) ?? "";
       assert.ok(closedText.startsWith("Identity and Mission You keep"), closedText);
       assert.ok(!/(^|\s)(##|-)\s/u.test(closedText), closedText);
       await page.screenshot({ path: resolve(OUT, `${view.name}-closed.png`), fullPage: true });
 
-      // Opened: the Markdown, from the left edge.
       await card.getByRole("button", { name: "Read more" }).click();
       const instructions = card.locator(".agent-share-instructions");
       await instructions.getByRole("heading", { name: "Identity and Mission" }).waitFor();
@@ -192,7 +175,6 @@ try {
       assert.ok(["start", "left"].includes(style.textAlign), style.textAlign);
       assert.equal(style.listStyle, "disc");
 
-      // The web link is a link. The `javascript:` one and the raw HTML are text, and nothing ran.
       const text = (await instructions.textContent()) ?? "";
       assert.equal(
         await instructions.getByRole("link", { name: "runbook" }).getAttribute("href"),
@@ -201,7 +183,6 @@ try {
       assert.equal(await instructions.getByRole("link", { name: "this link" }).count(), 0);
       assert.ok(text.includes("<script>window.agentShareInjected = true</script>"), text);
       assert.equal(await instructions.locator("script, img[onerror]").count(), 0);
-      // A link in another person's text never asks its site for a favicon.
       assert.equal(await instructions.locator(".message-link-icon img").count(), 0);
       assert.deepEqual(faviconRequests, []);
       assert.equal(await page.evaluate(() => "agentShareInjected" in window), false);

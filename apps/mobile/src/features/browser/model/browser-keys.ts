@@ -4,16 +4,9 @@ import {
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { graphemes } from "../../../shared/lib/graphemes";
 
-// The phone keyboard as keystrokes on the host's page. A hidden text field takes the typing, and
-// the screen sends what changed in it: each new character as a key press, each removed one as
-// Backspace. A field that only gets the change does not have to know the key that made it, so
-// autocorrect, dictation and swipe typing all arrive the same way.
-
 type NamedKey = "Backspace" | "Enter" | "Tab";
 
-/** The longest paste a phone sends to a page: the most that one paste carries to a host. */
 const PASTE_MAX_LENGTH = BROWSER_VIEW_MAX_CLIPBOARD_TEXT;
-/** The Meta key in the modifiers of a key input. */
 const META_MODIFIER = 4;
 
 function keyCode(character: string): string {
@@ -23,7 +16,6 @@ function keyCode(character: string): string {
   return "";
 }
 
-/** A named key, down and up. The host adds the character of Enter itself. */
 export function namedKeyInputs(key: NamedKey): BrowserViewInput[] {
   return [
     { type: "key", action: "down", key, code: key, text: "", modifiers: 0 },
@@ -31,7 +23,6 @@ export function namedKeyInputs(key: NamedKey): BrowserViewInput[] {
   ];
 }
 
-/** Text as keystrokes: each character down, as a character, and up. A line break is Enter. */
 export function typedTextInputs(text: string): BrowserViewInput[] {
   return Array.from(text).flatMap((character): BrowserViewInput[] => {
     if (character === "\n" || character === "\r") return namedKeyInputs("Enter");
@@ -45,11 +36,6 @@ export function typedTextInputs(text: string): BrowserViewInput[] {
   });
 }
 
-/**
- * What the page receives when the hidden field changes from `before` to `after`. The texts are
- * compared by the characters a reader sees: a Backspace on the page deletes a whole flag or joined
- * emoji, so one Backspace goes for each, not one for each code point in it.
- */
 export function textChangeInputs(before: string, after: string): BrowserViewInput[] {
   const old = graphemes(before);
   const next = graphemes(after);
@@ -62,7 +48,6 @@ export function textChangeInputs(before: string, after: string): BrowserViewInpu
   ];
 }
 
-/** A paste the host accepts. A text that is too long loses its end, and no character is split in two. */
 export function pasteInput(text: string): BrowserViewInput {
   let pasted = "";
   for (const character of Array.from(text.slice(0, PASTE_MAX_LENGTH + 1))) {
@@ -72,7 +57,6 @@ export function pasteInput(text: string): BrowserViewInput {
   return { type: "paste", text: pasted };
 }
 
-/** Cmd+A. A host reads it as Select All on any system, as it does for a member at a desktop. */
 export function selectAllInputs(): BrowserViewInput[] {
   const key = { key: "a", code: "KeyA", text: "", modifiers: META_MODIFIER };
   return [

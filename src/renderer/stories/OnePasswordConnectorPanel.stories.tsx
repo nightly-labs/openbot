@@ -35,21 +35,16 @@ const args = (status: Partial<OnePasswordConnectorStatus>, busy = false) => ({
   onDisconnect: fn(),
 });
 
-/** Step 1: no CLI on this computer. */
 export const CliMissing: Story = { args: args({}) };
 
 export const CliInstalling: Story = { args: args({ setup: { ...MISSING, cli: "installing" } }) };
 
-/** OpenBot has no CLI build for this computer, so the user installs it. */
 export const CliManualInstall: Story = { args: args({ setup: { ...MISSING, canInstall: false } }) };
 
-/** Step 2: the CLI is in place, and the 1Password app does not let it in yet. */
 export const AppIntegrationOff: Story = { args: args({ setup: INSTALLED }) };
 
-/** Step 3: everything is ready to create the shared vault. */
 export const ReadyToConnect: Story = { args: args({ setup: READY }) };
 
-/** The CLI waits for the user to approve it in the 1Password app. */
 export const Connecting: Story = { args: args({ state: "connecting", setup: READY }, true) };
 
 export const ChooseAccount: Story = {
@@ -67,7 +62,6 @@ export const Connected: Story = {
   args: args({ state: "connected", setup: READY, vaultNames: ["Shared with OpenBot"], loginCount: 3 }),
 };
 
-/** The login count has not arrived from 1Password. */
 export const ConnectedLoading: Story = {
   args: args({ state: "connected", setup: READY, vaultNames: ["Shared with OpenBot"], loginCount: null }),
 };
@@ -78,7 +72,6 @@ export const InstallFailed: Story = {
   }),
 };
 
-/** A joined server connects with a service account token only, so the page shows no setup steps. */
 export const HostTokenOnly: Story = { args: { ...args({}), hostName: "Studio" } };
 
 export const HostTokenRejected: Story = {

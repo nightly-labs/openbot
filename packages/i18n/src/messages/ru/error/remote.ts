@@ -23,6 +23,8 @@ export const messages = {
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
   "error.remote.windowsSessionDisconnected":
     "Сеанс Windows на хосте отключён, поэтому нет экрана для показа. Войдите в Windows на экране хоста и повторите попытку.",
+  "error.remote.macScreenLocked":
+    "Mac заблокирован, поэтому не может показать свой экран. Разблокируйте Mac на его экране и повторите попытку.",
   "error.remote.streamTooSlowLowerQuality":
     "Соединение с хостом слишком медленное для изображения. Повторите попытку: следующее подключение будет с более низким качеством.",
   "error.remote.streamTooSlow":
@@ -190,6 +192,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Не удалось установить прямое подключение к хосту. Его может блокировать брандмауэр, VPN или прокси.",
   "error.remote.iceDisconnected": "Прямое подключение к хосту потеряно.",
+  "error.remote.webrtcBlocked":
+    "Это устройство блокирует подключение, которое нужно OpenBot. Если включен режим блокировки, выключите его для OpenBot в Настройки > Конфиденциальность и безопасность > Режим блокировки.",
   "error.remote.directoryUnreachable": "OpenBot не смог связаться со службой OpenBot. Проверьте подключение.",
   "error.remote.directoryTimeout": "Служба OpenBot не ответила вовремя. Повторите попытку.",
   "error.remote.inviteAlreadyUsed": "Это приглашение уже использовано. Попросите новое приглашение.",
@@ -208,6 +212,10 @@ export const messages = {
   "error.remote.formUnavailable": "Эта форма больше недоступна.",
   "error.remote.hostedServerRemoval": "Чтобы удалить размещённый сервер, используйте раздел «Оплата».",
   "error.remote.hostRemoved": "Владелец удалил этот сервер из аккаунта.",
+  "error.remote.ownerTransferSelf": "Этот сервер уже принадлежит вам. Введите email нового владельца.",
+  "error.remote.ownerTransferHosted": "Сервер, который размещает OpenBot, не может сменить владельца.",
+  "error.remote.ownerTransferInvalid":
+    "Эта передача владения больше недоступна. Попросите владельца отправить её снова.",
   "error.remote.channelsUnsupported": "Обновите этот сервер на компьютере, чтобы использовать каналы.",
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",

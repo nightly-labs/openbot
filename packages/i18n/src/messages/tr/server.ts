@@ -80,7 +80,6 @@ export const messages = {
   "server.join.account": "Hesap",
   "server.join.emailBound": "Bu davet yalnızca e-posta alıcısı için geçerlidir.",
   "server.join.unknownDate": "Bilinmiyor",
-  // Sunucu çubuğundaki artı düğmesinin açtığı iletişim kutusu. {price} "€20" gibi biçimlendirilmiş bir tutardır.
   "server.add.title": "OpenBot'u harici bir sunucuda 7/24 çalıştırın",
   "server.add.description":
     "OpenBot Sunucuları, bilgisayarınız kapalıyken bile ajanlarınızı ve rutinlerinizi çalışır durumda tutar. Altyapı ve bakımla biz ilgileniriz; sunucunuz teknik bir kurulum gerektirmeden kullanıma hazır olur.",
@@ -102,12 +101,9 @@ export const messages = {
   "server.add.license.includedTrial": "Dahil: {license}, {date} tarihine kadar ücretsiz",
   "server.add.billedMonthly": "Aylık faturalandırılır",
   "server.add.billedYearly": "Yıllık {price} faturalandırılır",
-  // {amount} "€120" gibi biçimlendirilmiş bir tutardır. Yıllık fiyatın ardından gelir.
   "server.add.yearlySaving": "{amount} tasarruf",
-  // Görsel olarak gizli. Yıllık faturalandırmada üzeri çizili aylık fiyattan önce gelir.
   "server.add.regularPrice": "Normal fiyat {price}",
   "server.add.choosePlan": "{plan} planını seç",
-  // Planların altındaki alt bilgi; planların karşılamadığı gereksinimler içindir.
   "server.add.custom.title": "Daha fazla güce veya özel bir çözüme mi ihtiyacınız var?",
   "server.add.custom.description":
     "Özel altyapı, ek depolama alanı veya iş akışınıza göre uyarlanmış özellikler edinin.",
@@ -148,26 +144,22 @@ export const messages = {
   "server.install.setUpWithAgent": "Bir ajanla kur",
   "server.install.sshAgentPrompt":
     "Linux sunucuma SSH ile bağlan ve OpenBot'u sunucu olarak oraya kur.\n\nSSH adresi (user@host):",
-  // Hesap maksimum sayıda barındırılan sunucuya sahip olduğunda gösterilir. Planlar devre dışıdır.
   "server.add.limit.title": "Bu hesap maksimum sunucu sayısına ulaştı",
   "server.add.limit.description": {
     one: "Bir hesap en fazla {count} ücretli sunucuya sahip olabilir. Sunucu eklemek için önce birini silin.",
     other: "Bir hesap en fazla {count} ücretli sunucuya sahip olabilir. Sunucu eklemek için önce birini silin.",
   },
-  // Kullanıcının birini silebileceği, hesabın barındırılan sunucular listesini açar.
   "server.add.limit.manage": "Sunucuları yönet",
   "server.upgrade.title": "Ajanlarınızın alanı tükeniyor",
   "server.upgrade.description":
     "{server} üzerinde az boş alan kaldı. Ajanlarınızın kesintisiz çalışmaya devam etmesi için planınızı yükseltin.",
   "server.upgrade.used": "{total} alanın {used} kadarı kullanılıyor",
   "server.hosted.progressTitle": "{name} kuruluyor",
-  // Kurulum tarayıcıdaki Stripe sayfasında ilk ödemeyi bekler.
   "server.hosted.paymentTitle": "Ödemeyi tarayıcınızda tamamlayın",
   "server.hosted.paymentDescription": "Kurulum, Stripe ödemeyi onayladığında başlar.",
   "server.hosted.openPayment": "Ödeme sayfasını tekrar aç",
   "server.hosted.openingPayment": "Açılıyor…",
   "server.hosted.paymentFailed": "Ödeme sayfası açılamadı.",
-  // Yeni bir sunucunun adı. {number} bir sayıdır (örneğin 2).
   "server.hosted.defaultName": "Bulut sunucusu",
   "server.hosted.defaultNameNumbered": "Bulut sunucusu {number}",
   "server.hosted.step.create": "Makineyi oluştur",
@@ -177,6 +169,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot makineye kopyalanıyor",
   "server.hosted.detail.create.key": "Tek seferlik oturum açma anahtarı ekleniyor",
   "server.hosted.detail.start.boot": "Makine açılıyor",
+  "server.hosted.detail.start.restore": "Veriler geri yükleniyor",
   "server.hosted.detail.start.app": "OpenBot başlatılıyor",
   "server.hosted.detail.start.wait": "OpenBot'un yanıt vermesi bekleniyor",
   "server.hosted.detail.connect.signIn": "Sizin adınıza oturum açılıyor",
@@ -555,7 +548,6 @@ export const messages = {
   "server.settings.providersDescription": "Bu sunucuyu çalıştıran bilgisayarın yapay zeka sağlayıcılarını yönetin.",
   "server.settings.providersSwitchNote": "Yapay zeka sağlayıcılarını yönetmek için {name} sunucusuna geçin.",
   "server.settings.providersSwitch": "Bu sunucuya geç",
-  // Sunucu Ayarları > Güncellemeler: Katılınan bir sunucunun ana makinesinin OpenBot güncellemesi. {name} sunucudur.
   "server.settings.updatesTitle": "Güncellemeler",
   "server.settings.updatesDescription": "Bu sunucuyu çalıştıran bilgisayardaki OpenBot'u güncelleyin.",
   "server.update.hostTitle": "{name} üzerinde OpenBot",
@@ -563,7 +555,6 @@ export const messages = {
   "server.update.status.idle": "En son sürümü bulmak için güncellemeleri denetleyin.",
   "server.update.status.checking": "Güncellemeler denetleniyor…",
   "server.update.status.available": "{version} sürümü mevcut.",
-  // {progress} %42 gibi bir yüzdedir.
   "server.update.status.downloading": "{version} indiriliyor · {progress}",
   "server.update.status.downloadingUnknown": "{version} indiriliyor…",
   "server.update.status.ready": "{version} indirildi.",
@@ -616,7 +607,6 @@ export const messages = {
   "server.update.restarting": "Yeniden başlatılıyor…",
   "server.update.loadFailed": "{name} güncelleme durumu yüklenemedi.",
   "server.update.hostAction": "Ana makineyi güncelle",
-  // Güncelleme iletişim kutusu: indirme, yeniden başlatma ve sunucunun tekrar çevrim içi olması.
   "server.update.dialog.offerTitle": "{name} sunucusunu OpenBot {version} sürümüne güncelle",
   "server.update.dialog.offerDescription":
     "{name}, OpenBot {current} kullanıyor. Önce güncellemeyi indirir, ardından yeniden başlar.",
@@ -656,10 +646,8 @@ export const messages = {
   "server.update.dialog.cancelRestart": "Yeniden başlatmayı iptal et",
   "server.update.dialog.later": "Daha sonra",
   "server.update.dialog.hide": "Gizle",
-  // Kullanıcının gizlediği bir güncelleme iletişim kutusunun bildirimi.
   "server.update.dialog.hiddenTitle": "{name} için güncelleme",
   "server.update.dialog.show": "Göster",
-  // Yeniden başlatmanın beklediği işlemler, "{reasons} bekleniyor" içinde yer alır.
   "server.update.reason.agentTurn": "bir ajan turu",
   "server.update.reason.queuedDelivery": "kuyruktaki bir mesaj",
   "server.update.reason.drainTask": "arka plan ajan çalışması",
@@ -673,7 +661,6 @@ export const messages = {
   "server.update.reason.updateOperation": "başka bir güncelleme adımı",
   "server.update.reason.initialization": "OpenBot'un başlatılması",
   "server.update.reason.other": "diğer çalışmalar",
-  // Katılınan bir sunucu bir güncellemeye yeniden başladığında her üyeye bir bildirim. {name} sunucudur.
   "server.restartNotice.waitingTitle": "{name}, bir güncellemeyi yüklemek için yeniden başlatılacak",
   "server.restartNotice.waitingVersionTitle": "{name}, OpenBot {version} sürümünü yüklemek için yeniden başlatılacak",
   "server.restartNotice.waitingDescription":
@@ -689,4 +676,37 @@ export const messages = {
   "server.settings.responseStyleNatural": "Doğal",
   "server.settings.responseStyleClassic": "Klasik",
   "server.settings.personalityLoadFailed": "Sunucu kişiliği yüklenemedi.",
+  "server.ownerTransfer.title": "Sahiplik",
+  "server.ownerTransfer.ownerTitle": "Bu sunucunun sahibisiniz",
+  "server.ownerTransfer.ownerDescription": "Başka birini sahip yapın. Kabul ettiğinde erişiminizi kaybedersiniz.",
+  "server.ownerTransfer.start": "Sahipliği devret…",
+  "server.ownerTransfer.pending": "{email} adresine devir bekliyor",
+  "server.ownerTransfer.expires": "Son tarih: {date}",
+  "server.ownerTransfer.cancel": "İsteği iptal et",
+  "server.ownerTransfer.emailTitle": "{server} sahipliğini devret",
+  "server.ownerTransfer.emailDescription":
+    "Yeni sahibin e-postasını girin. Bu e-postayla oturum açmışken kabul etmesi gerekir.",
+  "server.ownerTransfer.email": "Yeni sahibin e-postası",
+  "server.ownerTransfer.confirmTitle": "{email} sahip yapılsın mı?",
+  "server.ownerTransfer.confirmDescription": "{email} kabul ettiğinde:",
+  "server.ownerTransfer.confirmLoseAccess": "{server} sunucusuna erişiminizi kaybedersiniz.",
+  "server.ownerTransfer.confirmStays":
+    "Ajanlar, rutinler, sohbetler, sağlayıcı oturumları, kayıtlı anahtarlar, Vault girişleri, tarayıcı oturumları ve bağlı uygulamalar sunucuda kalır. Yeni sahip bunları kullanabilir.",
+  "server.ownerTransfer.confirmExpiry": "İstek 7 gün sonra sona erer.",
+  "server.ownerTransfer.send": "İsteği gönder",
+  "server.ownerTransfer.sendFailed": "Devir gönderilemedi.",
+  "server.ownerTransfer.incomingTitle": "{server} sunucusunun sahibi olmak ister misiniz?",
+  "server.ownerTransfer.incomingDescription": "{name} sizi {server} sunucusunun sahibi yapmak istiyor.",
+  "server.ownerTransfer.incomingYours": "Sunucu, ajanları, rutinleri ve verileri sizin olur.",
+  "server.ownerTransfer.incomingPrevious": "{name} sunucuya erişimini kaybeder.",
+  "server.ownerTransfer.incomingStays":
+    "Sunucudaki sağlayıcı oturumları, kayıtlı anahtarlar, Vault girişleri, tarayıcı oturumları ve bağlı uygulamalar orada kalır ve bunları kullanabilirsiniz.",
+  "server.ownerTransfer.incomingMachine":
+    "Sunucuyu çalıştıran bilgisayarda hâlâ oturum açabilen herkes OpenBot hesabınızı kullanabilir. O bilgisayarın parolalarını ve SSH anahtarlarını değiştirin.",
+  "server.ownerTransfer.later": "Sonra",
+  "server.ownerTransfer.decline": "Reddet",
+  "server.ownerTransfer.accept": "Kabul et",
+  "server.ownerTransfer.accepted": "Artık {server} sunucusunun sahibisiniz",
+  "server.ownerTransfer.acceptFailed": "Devir kabul edilemedi.",
+  "server.ownerTransfer.declineFailed": "Devir reddedilemedi.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -241,6 +241,8 @@ export const messages = {
     'L\'endpoint "{provider}" ha rifiutato la richiesta. La sua chiave API o le sue intestazioni potrebbero essere errate, oppure il suo account non può usare questo modello. Controllale in Impostazioni server → Provider o scegli un altro modello. Poi riprova.',
   "error.provider.customEndpointKeyMissing":
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointEffortRefused":
+    'L\'endpoint "{provider}" ha rifiutato l\'impegno di ragionamento di questo modello. In Impostazioni server → Provider, modifica "{provider}". In Impegno, lascia solo i livelli che questo modello accetta, oppure seleziona Nessun ragionamento. Poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeKeyRefused":
@@ -269,6 +271,10 @@ export const messages = {
     "Questo modello non è disponibile per te. Scegli un altro modello per questo agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. Scegli un impegno più basso o un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. In Impostazioni, apri Provider personalizzato, fai clic su Modifica per questo endpoint e imposta un Output massimo più alto per questo modello. Oppure scegli un impegno più basso o un altro modello.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeModelNotServed":
@@ -294,6 +300,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",
+  "error.provider.channelNoAnswer":
+    "{provider} ha terminato il turno senza risposta. Nel canale, fai clic su Continua per eseguire di nuovo l'attività, o su Riassegna per darla a un altro membro.",
   "error.provider.chatgptPageFailed": "OpenBot non è riuscito ad aprire la pagina di connessione di ChatGPT.",
   "error.provider.noneReady": "Nessun provider di agenti è pronto.",
   "error.provider.claudeTurnActive": "Attendi il turno attivo di Claude prima di aggiornare il suo contesto.",
@@ -400,6 +408,10 @@ export const messages = {
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} L'agente non vede più questo messaggio, quindi non blocca i tuoi prossimi messaggi. Invia di nuovo la richiesta con parole diverse.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
   "error.provider.codexAudioRefused":
     "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":

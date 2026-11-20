@@ -22,34 +22,20 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/*
- * The run on the flow canvas, as the desktop canvas draws it (`workflow-nodes.css`): a bright arc goes
- * round a step that runs, a step that waits for the person has a warning ring, and the line into a
- * step that runs marches with a comet on it. A line that the run went through is solid. Reduce Motion
- * stops every loop: the arc becomes a full ring and the lines stay still.
- */
-
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 const AnimatedLine = Animated.createAnimatedComponent(Line);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-/** The desktop sweep: one turn in 1.6 s, at an even speed. */
 const SWEEP_MS = 1600;
-/** The share of the edge that the bright arc covers. */
 const ARC_SHARE = 0.28;
 const STROKE = 1.5;
-/** The desktop dashes: 5 on, 5 off, moving one period in 1.2 s. */
 const DASH = 5;
 const MARCH_MS = 1200;
-/** The desktop comet: 1.1 s along the line, easing out. */
 const COMET_MS = 1100;
-// `withTiming` needs a worklet easing: `Easing.bezier`, not the `cubicBezier` of CSS animations.
 const COMET_EASE = Easing.bezier(0.23, 1, 0.32, 1);
-/** A line of the run is longer than a line of the plain canvas, so its motion reads. */
 const RUN_CONNECTOR_WIDTH = 28;
 const CONNECTOR_HEIGHT = 6;
 
-/** The ring of a step that runs: a faint edge and a bright arc that goes round it. */
 export function RunningRing({ width, height, radius }: { width: number; height: number; radius: number }) {
   const reduced = useReducedMotion();
   const text = String(useCSSVariable("--openbot-text-primary"));
@@ -97,10 +83,8 @@ export function RunningRing({ width, height, radius }: { width: number; height: 
   );
 }
 
-/** How a line of the flow looks in a run: not reached, into the step that runs, or gone through. */
 export type RunTone = "idle" | "run" | "done";
 
-/** A line between two steps of a run, from left to right. */
 export function RunConnector({ tone }: { tone: RunTone }) {
   const reduced = useReducedMotion();
   const text = String(useCSSVariable("--openbot-text-primary"));
@@ -142,7 +126,6 @@ export function RunConnector({ tone }: { tone: RunTone }) {
 
 const SPIN = { from: { transform: [{ rotate: "0deg" }] }, to: { transform: [{ rotate: "360deg" }] } };
 
-/** The desktop spinner of a step that runs: one turn a second; still with Reduce Motion. */
 function Spinner({ color }: { color: string }) {
   const reduced = useReducedMotion();
   return (
@@ -163,7 +146,6 @@ function Spinner({ color }: { color: string }) {
   );
 }
 
-/** The time since a step started, counted each second, as the desktop counts it on the card. */
 function useElapsed(startedAt: string | null): string | null {
   const { t } = useText();
   const [now, setNow] = useState(() => Date.now());
@@ -175,7 +157,6 @@ function useElapsed(startedAt: string | null): string | null {
   return startedAt ? formatRunDuration(startedAt, new Date(now).toISOString(), t) : null;
 }
 
-/** The status of a step on its card: an icon and a word or the time, in the tone of the status. */
 export function RunStepStatus({ step }: { step: WorkflowStep | undefined }) {
   const { t } = useText();
   const [secondary, warning, success, danger] = useCSSVariable([

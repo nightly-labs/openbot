@@ -1,9 +1,3 @@
-/**
- * The Telegram settings of a trigger and of an output card. A Telegram trigger starts a run when a person
- * starts a conversation with OpenBot in a linked group chat. A Telegram output replies to that message,
- * adds a reaction to it, or posts in a chat.
- */
-
 import {
   WORKFLOW_TELEGRAM_ACTIONS,
   WORKFLOW_TELEGRAM_EMOJI,
@@ -51,7 +45,6 @@ const EMOJI_LABEL = {
   "👌": "workflow.telegram.emoji.okHand",
 } as const satisfies Record<WorkflowTelegramEmoji, AppTextKey>;
 
-/** The Telegram chats linked to the host, as choices. */
 function useChats() {
   const board = useBoard();
   return (): Choice<string>[] =>
@@ -62,9 +55,6 @@ function useChats() {
     }));
 }
 
-/* ------------------------------------------------------------- Trigger */
-
-/** The fields that a Telegram trigger stores when the user chooses it. The host reads the same names. */
 export const TELEGRAM_TRIGGER_DEFAULTS = { event: "mention", connectionId: "" } as const;
 
 export function TelegramTriggerRows(props: { id: string; locked: boolean }) {
@@ -115,9 +105,6 @@ export function TelegramTriggerRows(props: { id: string; locked: boolean }) {
   );
 }
 
-/* -------------------------------------------------------------- Output */
-
-/** The fields that a Telegram output stores when the user chooses it. The host reads the same names. */
 export const TELEGRAM_OUTPUT_DEFAULTS = { connectionId: WORKFLOW_TELEGRAM_TRIGGER_CHAT, action: "reply" } as const;
 
 export function TelegramOutputRows(props: { id: string; locked: boolean }) {
@@ -142,7 +129,6 @@ export function TelegramOutputRows(props: { id: string; locked: boolean }) {
     WORKFLOW_TELEGRAM_EMOJI[0],
     oneOf(WORKFLOW_TELEGRAM_EMOJI),
   );
-  /** One connection is one chat, so a post needs no channel. A reply and a reaction act on the trigger's message. */
   return (
     <>
       <SettingRow

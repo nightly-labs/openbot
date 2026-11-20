@@ -21,16 +21,6 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { CHANNEL_ICONS, knownChannelIcon } from "../model/channel-icons";
 
-/*
- * The members in the square one agent avatar occupies, as the desktop sidebar draws them, so a
- * channel row keeps the shape of the agent rows around it. The face centres sit `PITCH` apart and
- * each face box is `FACE` of the square. The plush body is about 0.73 of its face box (radius 100 of
- * the 316 view box, drawn at `PLUSH_BODY_SCALE`), so a body is about 0.46 of the square: wider than
- * the pitch, so the faces squeeze together, and a later face paints over an earlier one. The pair
- * still ends inside the square. One member fills the square, two sit side by side, three read as a
- * triangle. Past four, the last cell is the count; a count of two digits takes the whole bottom row,
- * under two faces.
- */
 const CELLS = 4;
 const PITCH = 0.34;
 const FACE = 0.63;
@@ -41,7 +31,6 @@ const LEFT = -PITCH / 2;
 const RIGHT = PITCH / 2;
 const TOP = -PITCH / 2;
 const BOTTOM = PITCH / 2;
-// Face centres as offsets from the middle of the square, in shares of its size, by face count.
 const LAYOUTS: Readonly<Record<number, readonly Cell[]>> = {
   2: [
     [LEFT, 0],
@@ -60,15 +49,10 @@ const LAYOUTS: Readonly<Record<number, readonly Cell[]>> = {
   ],
 };
 
-/** A channel picture is a rounded square, as on the desktop, so a channel does not look like an agent. */
 const PICTURE_RADIUS = 0.3;
 
 type ChannelPictureSource = Pick<ChannelSummary, "members"> & Partial<Pick<ChannelSummary, "id" | "icon" | "imageUrl">>;
 
-/**
- * The picture of a channel: its uploaded image, else its icon on a colour, else the member faces.
- * The image loads only with `serverId`; without it the channel shows its icon or its faces.
- */
 export const ChannelAvatar = memo(function ChannelAvatar({
   channel,
   agents,
@@ -102,7 +86,6 @@ export const ChannelAvatar = memo(function ChannelAvatar({
   );
 });
 
-/** An icon on the channel colour. The picture editor draws its choices with it too. */
 export function ChannelIconTile({
   name,
   hue,
@@ -128,7 +111,6 @@ export function ChannelIconTile({
         borderCurve: "continuous",
         alignItems: "center",
         justifyContent: "center",
-        // The hue at about a quarter over the surface, as the desktop mixes it.
         backgroundColor: `${swatch}42`,
         opacity: disconnected ? DISCONNECTED_APPEARANCE.opacity : 1,
       }}
@@ -162,13 +144,11 @@ function ChannelImage({
     queryKey: queryKeys.channelImage(queryScope, serverId, channelId, imageUrl),
     enabled: online,
     queryFn: () => channelStore.image(serverId, channelId, imageUrl),
-    // A saved image shows at once, also before the server connects.
     initialData: () => savedChannelImage(serverId, channelId, imageUrl) ?? undefined,
     staleTime: Infinity,
   });
   const [failed, setFailed] = useState<string | null>(null);
   const uri = image.data;
-  // An image that does not load shows the icon or the faces, as on the desktop.
   if (!uri || uri === failed) return children;
   return (
     <View
@@ -210,7 +190,6 @@ const MemberFaces = memo(function MemberFaces({
   const faceCount = total <= CELLS ? total : total - (CELLS - 1) >= 10 ? CELLS - 2 : CELLS - 1;
   const hidden = total - faceCount;
   const single = total === 1;
-  // Whole pixels keep the plush picture cache on the same entry for every row of one size.
   const face = single ? size : Math.round(size * FACE);
   const cells = LAYOUTS[hidden > 0 ? faceCount + 1 : faceCount] ?? [[0, 0]];
   return (
@@ -254,11 +233,8 @@ function HiddenCount({ count, size, cell }: { count: number; size: number; cell:
   const { t, format } = useText();
   const disc = Math.round(size * COUNT);
   const [x, y] = cell;
-  // The type follows the disc, so the count fits the small header avatar as well as a list row.
   const fontSize = Math.max(8, Math.round(disc * 0.55));
   return (
-    // A box of the cell's width centres the disc on its cell, also when a wide count grows it into a
-    // pill. A count of two digits is centred on the bottom row.
     <View
       style={{
         position: "absolute",

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "이 OpenBot 빌드에는 GitHub App이 없어요.",
   "error.connector.githubDenied": "GitHub 로그인이 거부됐어요.",
   "error.connector.githubCodeExpired": "GitHub 코드가 만료됐어요. GitHub를 다시 연결해 주세요.",
@@ -13,7 +12,6 @@ export const messages = {
   "error.connector.githubExpired": "GitHub 연결이 만료됐어요. GitHub를 다시 연결해 주세요.",
   "error.connector.githubFileUnreadable": "GitHub 연결 파일을 읽을 수 없어요.",
   "error.connector.githubFileTooLarge": "GitHub 연결 파일이 너무 커요.",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot이 1Password CLI를 찾을 수 없어요. CLI를 설치하고 1Password 앱에서 연동을 켜거나, 서비스 계정 토큰을 사용해 주세요.",
   "error.connector.onePasswordCliInstallFailed":

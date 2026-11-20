@@ -1,10 +1,3 @@
-// What Signal keeps from the OpenBot Discord bot's Gateway, and how it turns a Gateway event into a
-// delivery for a host. Everything here is pure and in memory: the Gateway adapter
-// (`./discord-gateway.ts`) gives it the events and does the actions it returns.
-//
-// Signal keeps only the names, the channel-to-guild map and the bot's own role of the guilds that
-// the bot is in, and the pending button presses. It keeps no message.
-
 import {
   DISCORD_ATTACHMENTS_LIMIT,
   DISCORD_CUSTOM_ID_PREFIX,
@@ -25,10 +18,8 @@ import {
   MessageReferenceType,
 } from "discord-api-types/v10";
 
-/** The text of the one reply to a direct message. */
 export const DISCORD_DIRECT_MESSAGE_REPLY = "OpenBot answers in Discord servers. Mention @OpenBot in a server channel.";
 
-/** Discord accepts follow-ups with an interaction token for 15 minutes. */
 const INTERACTION_TOKEN_TTL_MILLISECONDS = 15 * 60_000;
 const MAXIMUM_INTERACTIONS = 10_000;
 const DIRECT_REPLY_INTERVAL_MILLISECONDS = 60 * 60_000;
@@ -43,7 +34,6 @@ type DiscordAttachmentData = {
   url: string;
 };
 
-/** The parts of an embed that Signal reads. Discord leaves out each part that the embed does not have. */
 type DiscordEmbedData = {
   title?: string | undefined;
   description?: string | undefined;
@@ -56,7 +46,6 @@ type DiscordEmbedData = {
   video?: { url?: string | undefined } | undefined;
 };
 
-/** The text, files and embeds of a message, and of a forwarded message in `message_snapshots`. */
 type DiscordBodyData = {
   content?: string | undefined;
   attachments?: DiscordAttachmentData[] | undefined;
@@ -73,7 +62,6 @@ type DiscordBodyData = {
     | undefined;
 };
 
-/** The fields of a Gateway or REST message that Signal reads. */
 export interface DiscordMessageData {
   id: string;
   channel_id: string;
@@ -96,13 +84,10 @@ export interface DiscordMessageData {
   attachments: DiscordAttachmentData[];
 }
 
-/** What the Gateway adapter does for one event. */
 export type DiscordAction =
   | { type: "deliver"; guildId: string; delivery: DiscordDelivery }
-  // Acknowledge a button press at once, as a deferred update: Discord waits 3 seconds.
   | { type: "acknowledge"; interactionId: string; interactionToken: string }
   | { type: "direct-reply"; channelId: string }
-  // The Gateway listed every guild of the bot: the account service drops the links of the others.
   | { type: "reconcile" };
 
 interface StoredInteraction {
@@ -111,7 +96,6 @@ interface StoredInteraction {
   expiresAt: number;
 }
 
-/** The display name of a message author: the guild nickname, the global name, or the user name. */
 export function discordAuthorName(message: {
   author: { username: string; global_name?: string | null | undefined };
   member?: { nick?: string | null | undefined } | undefined;
@@ -119,10 +103,6 @@ export function discordAuthorName(message: {
   return message.member?.nick ?? message.author.global_name ?? message.author.username;
 }
 
-/**
- * Removes each mention of the bot user, and of the bot's own role: a host knows neither ID. Discord
- * makes that role when the bot joins, with the bot's name, so a person can choose it instead of the bot.
- */
 function stripBotMention(content: string, botUserId: string | null, botRoleId: string | null = null): string {
   const mentions = [
     ...(botUserId ? [`<@${botUserId}>`, `<@!${botUserId}>`] : []),
@@ -131,10 +111,6 @@ function stripBotMention(content: string, botUserId: string | null, botRoleId: s
   return mentions.reduce((text, mention) => text.split(mention).join(""), content).trim();
 }
 
-/**
- * The delivery for one guild message, or null when the host must not receive it: a bot or webhook
- * wrote it, or it mentions neither the bot nor the bot's own role.
- */
 function normalizeGuildMessage(
   message: DiscordMessageData,
   botUserId: string,
@@ -171,7 +147,6 @@ function normalizeGuildMessage(
   };
 }
 
-/** The attachments on Discord's CDN, up to Discord's limit. */
 function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[] {
   const attachments: DiscordInboundAttachment[] = [];
   for (const attachment of list) {
@@ -188,11 +163,6 @@ function attachmentsOf(list: DiscordAttachmentData[]): DiscordInboundAttachment[
   return attachments;
 }
 
-/**
- * The text of each embed, up to Discord's limits: one part on each line, and the links of its
- * images. An embed without text or links is left out. Colors, icons, timestamps and the provider
- * name are left out, and so are the components of a message, such as buttons.
- */
 function embedsOf(list: DiscordEmbedData[]): string[] {
   const embeds: string[] = [];
   let remaining = DISCORD_EMBED_TEXT_LIMIT;
@@ -221,7 +191,6 @@ function embedsOf(list: DiscordEmbedData[]): string[] {
   return embeds;
 }
 
-/** An embed part without the zero-width spaces that bots use for an empty field name. */
 function embedPart(value: string | undefined): string {
   return (value ?? "").replaceAll("\u200b", "").trim();
 }
@@ -231,10 +200,6 @@ function labelled(label: string, value: string | undefined): string {
   return part ? `${label}: ${part}` : "";
 }
 
-/**
- * The text, files and embeds of a message. A forward has none of its own: Discord gives the
- * forwarded message's in its snapshot.
- */
 export function messageBody(
   message: DiscordBodyData,
   botUserId: string | null,
@@ -250,12 +215,6 @@ export function messageBody(
   };
 }
 
-/**
- * The replied-to message of a person or of another bot, or null when Discord gave no text,
- * attachments or embeds: without the Message Content intent, Discord gives them only for a message
- * that mentions the bot.
- * A forward is kept without them, so that the host can say that its content is not available.
- */
 function quoteOf(
   referenced: NonNullable<DiscordMessageData["referenced_message"]>,
   botUserId: string,
@@ -287,47 +246,35 @@ export class DiscordState {
   readonly #configuredApplicationId: string;
   #applicationId: string | null = null;
   #botUserId: string | null = null;
-  // Guild ID to name, for each guild that the bot is in.
   readonly #guilds = new Map<string, string>();
-  // The guilds that the bot is in, for each Gateway shard, from that shard's READY on. Discord puts a
-  // guild on shard `(guild_id >> 22) % shard count`.
   readonly #shardGuilds = new Map<number, Set<string>>();
   #shardCount: number | null = null;
-  // The shards whose connection closed. Their guilds can be stale until the shard resumes, when the
-  // Gateway sends the missed events, or until its next READY.
   readonly #closedShards = new Set<number>();
-  // Channel or thread ID to its guild and name.
   readonly #channels = new Map<string, { guildId: string; name: string }>();
-  // Guild ID to the ID of the role that Discord made for the bot in that guild.
   readonly #botRoles = new Map<string, string>();
   readonly #interactions = new Map<string, StoredInteraction>();
-  // User ID to the time of the last reply to a direct message from that user.
   readonly #directReplies = new Map<string, number>();
 
   constructor(applicationId: string) {
     this.#configuredApplicationId = applicationId;
   }
 
-  /** Whether the bot is in the guild, or null before the READY of every shard. */
   isMember(guildId: string): boolean | null {
     return this.memberGuildIds() === null
       ? null
       : (this.#shardGuilds.get(this.#shardOf(guildId))?.has(guildId) ?? false);
   }
 
-  /** Every guild that the bot is in, or null before the READY of every shard and while one is closed. */
   memberGuildIds(): string[] | null {
     const count = this.#shardCount;
     if (count === null || this.#shardGuilds.size < count || this.#closedShards.size > 0) return null;
     return [...this.#shardGuilds.values()].flatMap((guilds) => [...guilds]);
   }
 
-  /** A shard's connection closed: its guilds are not known until it resumes or is ready again. */
   shardClosed(shard: number): void {
     this.#closedShards.add(shard);
   }
 
-  /** A shard resumed: the Gateway sent the events it missed, so its guilds are current again. */
   shardResumed(shard: number): DiscordAction[] {
     this.#closedShards.delete(shard);
     return this.memberGuildIds() === null ? [] : [{ type: "reconcile" }];
@@ -341,17 +288,14 @@ export class DiscordState {
     return this.#botUserId;
   }
 
-  /** The application ID from the Gateway, or the configured one before READY. */
   get applicationId(): string {
     return this.#applicationId ?? this.#configuredApplicationId;
   }
 
-  /** The role that Discord made for the bot in the guild, or null when the Gateway did not give it. */
   botRoleId(guildId: string): string | null {
     return this.#botRoles.get(guildId) ?? null;
   }
 
-  /** Keeps or drops the guild's bot role. Its `bot_id` tag names the bot user, the same ID as the app. */
   #rememberRole(guildId: string, role: { id: string; tags?: { bot_id?: string } | undefined }): void {
     if (role.tags?.bot_id === (this.#botUserId ?? this.applicationId)) this.#botRoles.set(guildId, role.id);
     else if (this.#botRoles.get(guildId) === role.id) this.#botRoles.delete(guildId);
@@ -361,12 +305,10 @@ export class DiscordState {
     return this.#channels.get(channelId) ?? null;
   }
 
-  /** Keeps a channel that a REST call found, for a guild that the bot is in. */
   rememberChannel(channelId: string, guildId: string, name: string): void {
     if (this.#guilds.has(guildId)) this.#channels.set(channelId, { guildId, name });
   }
 
-  /** The token of a button press in the guild that Discord still accepts, or null. */
   interactionToken(interactionId: string, guildId: string, now = Date.now()): string | null {
     const stored = this.#interactions.get(interactionId);
     if (!stored || stored.guildId !== guildId || stored.expiresAt <= now) return null;
@@ -380,8 +322,6 @@ export class DiscordState {
         this.#applicationId = payload.d.application.id;
         {
           const [shard, count] = payload.d.shard ?? [0, 1];
-          // A new session of a shard lists its guilds again; a guild that it does not list was left.
-          // A new shard count, such as after a new connection, starts the list of every shard again.
           if (this.#shardCount !== count) {
             this.#shardGuilds.clear();
             this.#closedShards.clear();
@@ -405,7 +345,6 @@ export class DiscordState {
         return [];
       }
       case GatewayDispatchEvents.GuildDelete: {
-        // An outage makes a guild unavailable. Only a removal ends the guild's connection.
         if (payload.d.unavailable === true) return [];
         this.#forgetGuild(payload.d.id);
         return [{ type: "deliver", guildId: payload.d.id, delivery: { kind: "removed" } }];

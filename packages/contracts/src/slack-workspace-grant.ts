@@ -1,10 +1,3 @@
-// The hand-off of the OpenBot Slack app's bot token from the account Worker to one desktop host.
-//
-// The OpenBot Slack app's client secret lives only on the Worker (`apps/auth-api`), so the Worker
-// exchanges the OAuth code. It must not keep the token, and the browser that carries the
-// result back to `openbot://` must not be able to read it, so the Worker seals it to the host
-// (`./host-grant.ts`).
-
 import { createHostGrantKeyPair, type HostGrantKind, openHostGrant, sealHostGrant } from "./host-grant";
 import { isDynamicRecord, isString } from "./runtime-values";
 
@@ -14,7 +7,6 @@ export const SLACK_WORKSPACE_GRANT_VERSION = 2;
 
 const KIND: HostGrantKind = { version: SLACK_WORKSPACE_GRANT_VERSION, info: "openbot-slack-workspace-grant-v2" };
 
-/** What the OpenBot app's OAuth install gives the host: the bot token for one workspace. */
 export interface SlackWorkspaceGrant {
   botToken: string;
   botUserId: string;
@@ -33,7 +25,6 @@ export function sealSlackWorkspaceGrant(
   return sealHostGrant(KIND, hostPublicKey, nonce, grant);
 }
 
-/** Throws for a payload that another key sealed, that another sign-in asked for, or that was changed. */
 export function openSlackWorkspaceGrant(
   privateKey: CryptoKey,
   nonce: string,

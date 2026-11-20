@@ -88,6 +88,7 @@
 @import "@openbot/ui/features/settings/chat-color-picker.css";
 @import "@openbot/ui/features/settings/logo-color-picker.css";
 @import "@openbot/ui/features/settings/sound-choice-select.css";
+@import "@openbot/ui/features/settings/talk-key-recorder.css";
 @import "@openbot/ui/features/settings/notification-matrix.css";
 @import "@openbot/ui/features/settings/plan-start.css";
 @import "@openbot/ui/features/settings/mcp-connect-dialog.css";
@@ -106,9 +107,7 @@
 @import "@openbot/ui/features/crm/crm.css";
 @import "@openbot/ui/styles/reference-chip.css";
 @import "@openbot/ui/skill-preview.css";
-/* After the page styles: the transparent window replaces their backgrounds. */
 @import "./styles/window-glass.css";
-/* After the transparent window: the chat background replaces its canvas in conversations. */
 @import "./styles/chat-background.css";
 
 @source "../../../packages/ui/src";

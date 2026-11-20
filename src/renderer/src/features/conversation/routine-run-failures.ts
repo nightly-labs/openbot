@@ -3,7 +3,6 @@ import type { ListRoutineRunsInput, RoutineRun } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createEffect, createMemo, createSignal } from "solid-js";
 
-/** The run history of the agent of a chat, for a person who can read it. */
 export interface RoutineRunFailureSource {
   agentId: string;
   serverId: string | undefined;
@@ -15,12 +14,6 @@ interface FailedRun {
   runId: string;
 }
 
-/**
- * The reason of each failed routine run in a chat, by run id (#11143). The chat message of a run
- * names only its state, and the reason stays on the run, which the history in Agent settings >
- * Routines shows. Each failed run is looked for once, in the newest page of its routine's runs; a
- * run that is not there, or a history that this person cannot read, keeps the marker without a reason.
- */
 export function createRoutineRunFailures(
   source: () => RoutineRunFailureSource | undefined,
   messages: () => readonly AgentMessage[],
@@ -33,7 +26,6 @@ export function createRoutineRunFailures(
           ? [{ routineId: marker.routineId, runId: marker.runId }]
           : [];
       }),
-    // A streamed answer changes the messages; only a new failed run needs a read.
     { equals: (left, right) => runKeys(left) === runKeys(right) },
   );
   const [reasons, setReasons] = createSignal<ReadonlyMap<string, string>>(new Map());
@@ -43,7 +35,6 @@ export function createRoutineRunFailures(
   createEffect(
     () => ({ current: source(), runs: failedRuns() }),
     ({ current, runs }) => {
-      // Another agent or server starts again; a late answer from the last one is dropped.
       if (current !== readFrom) {
         readFrom = current;
         request += 1;
@@ -68,8 +59,6 @@ export function createRoutineRunFailures(
             );
             if (failed.length > 0) setReasons((known) => new Map([...known, ...failed]));
           })
-          // The marker stays without a reason when the host cannot list the runs. The next new failed
-          // run reads again, so a host that was offline for a moment does not lose the reasons.
           .catch(() => {
             if (loading === request) for (const id of ids) lookedFor.delete(id);
           });

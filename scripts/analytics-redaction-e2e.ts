@@ -1,22 +1,3 @@
-// Seeds one random marker into everything a user can type that analytics could read: a custom
-// agent's id, name, arguments and secret environment value, an agent's name and messages, a
-// routine's name and instruction, an MCP server's address, headers and command, and the address of
-// a browser page, and a workflow's title and texts. It then runs agent turns, a failed turn, a
-// routine run, a workflow run and site visits in a running dev app, receives the analytics of main
-// and the window on a local capture server, and checks that
-// no request carries the marker, that the expected events arrived, and that turning analytics off
-// stops them. The turns run on a fake custom agent on this computer, so no model is used. The fake
-// agent reports token usage for each answered turn, and the script checks that the turn event carries
-// those counts, the same counts as the Usage report, that the model's own token event carries them,
-// that the turn says how it is paid for,
-// that a turn with no usage reports unknown, that the failed turn's failure report arrives, and that
-// the failed turn's own event names the failure and cause codes of that report.
-//
-// Start the dev app with the capture server's address first, then run the script:
-//   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47321 bun run dev
-//   bun scripts/analytics-redaction-e2e.ts --allow-mutations [--capture-port=47321]
-// The script removes what it added and restores the analytics setting. It writes
-// .openbot-build/analytics-redaction-e2e/report.json and needs internet access for one page.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -31,7 +12,6 @@ import { z } from "zod";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -42,13 +22,9 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/analytics-redaction-
 const portFlag = process.argv.find((argument) => argument.startsWith("--capture-port="));
 const CAPTURE_PORT = Number(portFlag?.slice("--capture-port=".length) ?? 47321);
 const CAPTURE_URL = `http://localhost:${CAPTURE_PORT}`;
-/** Lower-case letters and digits only, so every encoding of it still contains it. */
 const MARKER = `obe2e${randomBytes(6).toString("hex")}`;
 const EVENT_TIMEOUT_MS = 60_000;
 
-// A custom agent that speaks the Agent Client Protocol on stdio. When a message asks it to fail, it
-// prints its secret token to stderr and in the error of the prompt, the way a CLI that refuses a
-// credential does. An answered prompt reports ACP usage, which is cumulative for the session.
 const FAKE_AGENT = `#!/usr/bin/env node
 const NL = String.fromCharCode(10);
 const prompts = new Map();
@@ -96,10 +72,6 @@ function handle(message) {
 setInterval(() => {}, 1000);
 `;
 
-/**
- * The body that the OpenPanel SDK and the failure report transport post. It comes from `JSON.parse`,
- * so every value is JSON. `z.json()` in a record makes TypeScript 7.1 report TS5115.
- */
 const openPanelBody = z.object({
   type: z.string(),
   payload: z.object({ name: z.string().optional(), properties: z.record(z.string(), z.unknown()).optional() }),
@@ -108,10 +80,8 @@ const openPanelBody = z.object({
 interface Captured {
   method: string;
   url: string;
-  /** The request headers, as JSON text, for the leak scan. */
   headers: string;
   body: string;
-  /** The event name of a `track` body, or the body type. */
   name: string | null;
   properties: z.infer<typeof openPanelBody>["payload"]["properties"] & {};
 }
@@ -136,7 +106,6 @@ async function readBody(request: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-/** `localhost` can resolve to either loopback address, so a server listens on both and on no other. */
 async function listenOnLoopback(port: number, server: () => Server): Promise<{ port: number; servers: Server[] }> {
   const servers: Server[] = [];
   let bound = port;
@@ -166,7 +135,6 @@ const capture = await listenOnLoopback(CAPTURE_PORT, () =>
     });
   }),
 );
-// A page on a local host. Analytics must not name a private or local host.
 const localPage = await listenOnLoopback(0, () =>
   createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html" }).end("<title>Local page</title><p>Local page</p>");
@@ -213,8 +181,6 @@ assert.equal(
   `Start the dev app with OPENBOT_ANALYTICS_CAPTURE_URL=${CAPTURE_URL}.`,
 );
 
-// The renderer reports `desktop_app_opened` once per load. Load the window again, so that the
-// renderer send path is checked too, and not only the host's.
 await page.reload();
 await page.waitForFunction(() => document.readyState === "complete");
 
@@ -235,7 +201,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
 try {
   if (!trackingBefore.enabled) await page.evaluate(() => window.openbot.setAnalyticsPreference({ enabled: true }));
 
-  // An MCP server whose address, header, command and environment all carry the marker.
   const mcpServers = await page.evaluate(
     ({ marker, server }) =>
       window.openbot.agent.saveMcpServer(
@@ -289,8 +254,6 @@ try {
     }),
   );
 
-  // A saved custom agent restarts the provider. Until the restarted process has listed its models,
-  // the host refuses the model with "listed no models"; that refusal is the state to wait out.
   const createAgent = async (label: string, message: string) => {
     const deadline = Date.now() + EVENT_TIMEOUT_MS;
     for (;;) {
@@ -325,11 +288,9 @@ try {
   check("a custom agent's model is reported as its kind only", completed.properties.model === "custom", {
     model: completed.properties.model,
   });
-  // A custom ACP agent's payment is not known to the host, so it reports `unknown`, never a guess.
   check("a turn reports how it is paid for", completed.properties.provider_auth === "unknown", {
     provider_auth: completed.properties.provider_auth,
   });
-  // The fake agent reports 1,500 input tokens, of which 1,000 are cache reads and 200 cache writes.
   const expectedTokens = {
     token_usage: "reported",
     uncached_input_tokens: 300,
@@ -381,12 +342,10 @@ try {
     (event) => event.properties.provider === "acp" && event.properties.status === "failed",
   );
   check("a failed turn is reported", true, failure.properties);
-  // Before the shared generation list, `safeReport` refused the host's generation, so no report arrived.
   const report = await waitForEvent("system_operation_failed", (event) => event.properties.source === "host").catch(
     () => null,
   );
   check("the failed turn's failure report arrives", report !== null, report?.properties);
-  // The fake agent refuses the prompt with ACP's internal error and "Authentication failed" text.
   check(
     "the failed turn names the error that ended it",
     failure.properties.failure_code === "agent_event_failed" &&
@@ -420,7 +379,6 @@ try {
   const routineRun = await waitForEvent("system_routine_run");
   check("a routine run is reported", true, routineRun.properties);
 
-  // A prompt into a step of the answering agent: the run sends the agent the marker.
   const workflow = await page.evaluate(
     ({ agentId, marker, server }) =>
       window.openbot.workflows.create(
@@ -473,7 +431,6 @@ try {
     !captured.some((event) => event.name === "system_site_visited" && event.properties.domain !== "example.com"),
   );
 
-  // With analytics off nothing is sent. The visit after analytics is back on proves the queue moved.
   await page.evaluate(() => window.openbot.setAnalyticsPreference({ enabled: false }));
   const offTab = await openTab("https://example.org/");
   cleanup.push(() => page.evaluate((id) => window.openbot.browser.close(id), offTab.id));

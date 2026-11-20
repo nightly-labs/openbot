@@ -11,12 +11,10 @@ import { useText } from "@/shared/lib/text";
 
 const HERO_SIZE = 150;
 const STAGE_SIZE = 260;
-// The hero lands from the header in about 400 ms; the sparks and the badge follow it.
 const BURST_DELAY_MS = 420;
 const BURST_MS = 760;
 const STAMP_DELAY_MS = 640;
 const STAMP_MS = 380;
-// The badge touches the page at its "60%" keyframe.
 const STAMP_LANDS_AT = 0.6;
 const STAMP = {
   from: { opacity: 0, transform: [{ scale: 1.6 }, { rotate: "-24deg" }] },
@@ -25,7 +23,6 @@ const STAMP = {
 };
 const FADE_IN = { from: { opacity: 0 }, to: { opacity: 1 } };
 
-// Twelve sparks, evenly round the hero, at two distances so the burst is not a perfect ring.
 const SPARKS = Array.from({ length: 12 }, (_, index) => {
   const angle = (index / 12) * Math.PI * 2 + 0.2;
   const distance = index % 2 === 0 ? 118 : 92;
@@ -49,10 +46,6 @@ const SPARKS = Array.from({ length: 12 }, (_, index) => {
   };
 });
 
-/**
- * The agent exists. It lands in the middle, sparks burst round it, and a "First agent" badge is
- * stamped next to it. The chat is one tap away with the main action.
- */
 export function ReadyStep({
   motion,
   color,
@@ -61,9 +54,7 @@ export function ReadyStep({
   withTask,
 }: {
   motion: OnboardingMotion;
-  /** The colour of the agent. */
   color: string;
-  /** The starting role, or null for an agent made from scratch. */
   roleTitle: string | null;
   name: string;
   withTask: boolean;
@@ -72,7 +63,6 @@ export function ReadyStep({
   const insets = useSafeAreaInsets();
   const full = motion === "full";
   useEffect(() => {
-    // The success haptic plays when the badge touches the page.
     const landing = full ? STAMP_DELAY_MS + STAMP_MS * STAMP_LANDS_AT : 0;
     const timer = setTimeout(() => void haptics.notification("success"), landing);
     return () => clearTimeout(timer);

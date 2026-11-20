@@ -491,6 +491,13 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-agent-files-v1` says that the host gives an Agent step the files of the steps that connect
+to it. The host attaches each image and file input to the message for the agent, and the message
+tells the agent to use them together, as given, and not to invent a substitute. The capability adds
+no route. A client shows the connected pictures on the Agent card only on a host that advertises it,
+because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
+them without the note and does not advertise the capability, so its Agent card shows no pictures.
+
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
 `models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
@@ -522,6 +529,35 @@ address. The catalog, the price and the answers of `workflows-sunra-v1` and `wor
 stay on the first account. The capability goes to protocol 10 peers. When a service has more than one
 account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
 shows one credits button for each account, with its name.
+
+`workflows-media-catalog-v2` (protocol 10) adds the other settings of a model and the aspect ratios
+`21:9` and `3:4`. `POST /v1/workflows/media/v2/catalog {}` answers `{ models }` as v1 does, and each
+model can have `options`: a `switch` (values `off` and `on`) or a `choice`, each with its `default`. The
+host reads them from the `parameters` of the service and leaves out a setting that the canvas sets
+another way (prompt, pictures, aspect ratio, length, resolution, background). `POST
+/v1/workflows/media/v2/price` takes the v1 request and `options`, a list of `{ name, value }`. The node
+field `options` is a JSON text of an object, a name to a value; the host sends only the names and values
+that the model has. The v1 routes keep their shape: the v1 catalog leaves out `options`, `21:9` and
+`3:4`, and a model left with no aspect ratio. A client reads the v2 routes when the host advertises the
+capability, and offers the settings and the new aspect ratios only for a model of the v2 catalog.
+
+A v2 video model can also have `inputs`, the files that it takes (`frames`, `references`, `videos`,
+`audios`), and `modes`, a list of `{ value, inputs }` for the values of its `mode` setting. The client
+shows only the input ports of the chosen mode; with no mode, the host chooses it from the inputs. A
+video step has one `file` input port for its video and audio references: the host gives each file its
+role from its type (`video/*` or `audio/*`) and refuses another type. The v1 catalog leaves out `inputs`
+and `modes`.
+
+`workflows-step-settings-v1` reads the settings and the inputs that one step attempt ran with.
+`POST /v1/workflows/step-settings { stepId }` answers `{ settings, sources }`. `settings` are the
+runtime fields of the node (`runtimeFields` in `src/backend/workflows/workflow-graph.ts`), so the
+label and the canvas layout are not in them. Each source names the node of an incoming edge, the
+edge type, the step that the attempt read (`stepId`) and the file of an asset or image input
+(`attachmentId`). A step from a release before migration 66 answers `null` for both: "not
+recorded". Each member who can read the run can read its steps. A workflow that the member cannot
+see answers `missing`, and a step of an agent that the member cannot see answers `stepMissing`. The fields are the node settings that the member can already read
+in the graph, and no secret is in them. The answer has its own route so that the frozen
+`workflows-v1` step stays as it is. The capability goes to protocol 10 peers.
 
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
@@ -964,6 +1000,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
@@ -997,6 +1034,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
+| `vault-member-save-v1` | No route or field of its own. The host takes a password save on `browser-secret-vault-v1` and a `request_vault_item` or API key card answer from any member, not only from an owner or admin. The item goes to all agents of the host | `agent` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the
@@ -1066,6 +1104,25 @@ The host answers, then quits; it does not use `app.relaunch`, which would start 
 `xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
 account service, and a server on this computer through `localServers`. A host that does not answer
 cannot get the request; then the owner runs `sudo openbot restart`.
+
+`owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
+Members (desktop, web client and mobile). The owner enters an email; the account service stores a
+request in `remote_owner_transfers`, sends an email and an `account-servers-changed` event to that
+account, and the new owner accepts or declines in the app while signed in with that email. The
+request expires after 7 days, and a new request replaces it. A server with a `hosted_servers` row
+(OpenBot hosts it) is refused with `owner_transfer_hosted`, when the request is made and when it is
+accepted. Accept changes, in one D1 batch, `remote_hosts.owner_user_id`, the owner membership (the
+earlier owner is removed), the member and site limits, the hosted sites and the Slack, Discord,
+Telegram and webhook routes of the server, and it raises the auth epoch. A server plan stays with
+the earlier owner's Stripe subscription and still counts for the server
+(`subscriptionPaysForOwnerSql`) until someone cancels it. The host notices
+the change when its account registration gets `host_owner_mismatch` or when a renewed Signal ticket
+names another account. It then asks `POST /v2/remote/hosts/:hostId/owner-session` with its machine
+token for a session of the new owner, which revokes the session of the earlier owner on the host,
+rebinds the owner of its team file and signs in as the new owner. Only a host in server mode that
+OpenBot does not host does this, because a desktop app must keep the account of the person at the
+computer.
+Agents, chats, provider sign-ins, saved keys, Vault logins and browser sign-ins stay on the server.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).

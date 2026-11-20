@@ -6,15 +6,9 @@ export interface ToolGuidanceOptions {
   passwordVault?: boolean;
 }
 
-/** The same rule for the section tools and the teammate message tools. */
 const RECIPIENT_RULE =
   "Choose recipients for new work from your own sidebar section first: a section_teammates block in your instructions, or the latest openbot_section_teammates block in a user message, lists them. Go outside it only when no section teammate fits, more expertise is needed, or the user names another agent. With no section list, choose by name, title, and description, and give ungrouped agents no priority. Recipients that the user names and replies to existing messages come first. Use openbot.list_agents to compare descriptions and status, and openbot.list_sections only to see other sections. Send only to the selected stable ids.";
 
-/**
- * Owns detailed tool workflows. It does not import the prompt builder or tool catalog. A search or describe
- * result names each section once, and the model reads these results many times in a task, so a section must
- * not repeat what another one says.
- */
 export function toolGuidance(
   namespace: string,
   tool: string,
@@ -35,22 +29,14 @@ const BROWSER_VAULT_TOOLS = new Set([
   "request_link_payment",
 ]);
 
-/**
- * Each browser tool gets the core. A detailed section comes only with the tools that it is about, and the
- * core says which tools to describe before a sign-in or a checkout.
- */
 function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
   const core = [
     "Describe only a tool whose inputSchema you lack.",
     "openbot_browser is OpenBot's private persistent browser. Prefer revision-bound refs and unique role/name targets, then text, CSS, and coordinates. Input actions return a short status, not a snapshot. Tabs stay open across turns and restarts, at most 25: close a tab with close_tab when the task no longer needs it, unless the user wants to keep or see it. After navigation, a layout change, or a covered-target error, take a fresh snapshot and resolve the target again; do not reuse old coordinates or repeat coordinate clicks.",
-    // The images of snapshot and screenshot reach only the model; a saved file can go to the chat (#6271).
     "The user does not see your page images. To show the user a page, call screenshot with save: true, then attach the saved path with openbot.attach_files_to_response.",
     "After a submit, booking, or other change on a site, read a fresh snapshot or wait_for the expected result before you report the outcome. Current confirmation of the requested item, such as a success message or a cancel control, wins over a list that did not update; a waitlist place is not a booking. When it stays unclear, say what you saw; do not submit again.",
-    // `bun run bench:browser-tools` (2026-11-10, Haiku, 10 tasks x 3): the turn cost and the bans on
-    // lone or confirming snapshots cut mean input tokens by 18% and tool calls from 3.6 to 2.8.
     "Each tool call is a full model turn, so put all steps that you know, such as paging, into one run_script call. Do not spend a call on a lone snapshot or evaluate: read and return only what you need in the acting script. run_script returns a final snapshot; do not take another to confirm it. Do not add sleeps: actions and waitFor wait. Use single action tools to explore a new page. After a step navigates, refs stop working; use role, text, or CSS targets.",
     "Before a sign-in, code, or takeover, describe submit_secret, list_logins, and request_takeover; before a checkout or address form, describe list_vault_items and fill_card. Never ask for a password, code, or card number in chat.",
-    // A weekly order that stopped at the bank's code made users relay checkouts to other agents.
     "At a checkout that the user approved, when the bank sends a 3-D Secure code to mail or SMS that you can read, such as an open mail tab, reload that page, wait up to a minute, and type the newest code yourself once, only when it names the same merchant and amount. Else, or when refused, use request_takeover.",
     "When a service in the browser has an OpenBot plugin that is not in your tools, also after a failed sign-in or a teammate's sign-in request, call openbot.suggest_marketplace_app.",
     "In a routine run, nobody answers: report a sign-in that needs the user, not a takeover. Otherwise wait for request_takeover to return, because the end of your turn cancels it. After an error or a cancel, no request stays open, so do not tell the user to sign in through it.",
@@ -107,8 +93,8 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "uninstall_skill":
       return [
         "Use openbot.create_agent when the user asks for a new persistent teammate: take its name, title, description, and optional generated avatar from the request, and give its first task. Keep create_agent simple and configure the agent after it exists. When the new agent needs scheduled work, create that routine yourself with openbot.create_routine and the new agent's id; do not ask the new agent to schedule it. For a specific provider, model, or reasoning effort, call openbot.list_models and pass only values that it lists; otherwise omit them, and the new agent uses yours. OpenBot can use any OpenAI-compatible API (a gateway or a local model server) as a custom provider: the user adds it in Server settings > Providers > Custom provider, and list_models shows it in customProviders. Never say that OpenBot cannot use such an API.",
-        "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, browser profile, skills, routines, and MCP servers. openbot.update_profile changes a local agent's name, title, description, avatar, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
-        "For an avatar color, pass avatarHue; never make an image for a color. Pass avatarPath only for an image that the user gives or asks for: make a square PNG, JPEG, or WebP copy if needed, best 512 by 512 pixels, up to 512 KB; keep the original. Only avatarSeed removes an image.",
+        "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, browser profile, skills, routines, and MCP servers. openbot.update_profile changes a local agent's profile, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
+        "For a color, pass avatarHue, never an image. For an image the user gives or asks for, pass avatarPath: a square PNG, JPEG, or WebP copy up to 512 KB; keep the original. Make a GIF an animated WebP, or tell the user Upload image in agent settings keeps it animated. Only avatarSeed removes an image.",
         "To delete agents, call openbot.delete_agent once with all their ids; the owner approves one card. First move what the user wants to keep to an agent that stays. The user deletes you from your sidebar menu.",
         "To keep the sign-ins of clients or teams apart when the user asks, put each team on one browser profile with openbot.set_browser_profile. Reuse a name from read_agent's browserProfileNames. Do not suggest another browser.",
         "To give an agent a local skill, call openbot.list_local_skills, then openbot.install_local_skill with its agentId. Use openbot.set_skill_enabled and openbot.uninstall_skill with the skillId from read_agent. update_profile can limit access to the workspace, turn Computer Use off, or change notifications. Only the user can give Full access, turn Computer Use on, or change auto-approve, so say when a task needs that. Change MCP servers with the MCP server tools, only when the user asks.",
@@ -145,7 +131,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "read_workflow_runs":
       return [
         "Read a workflow before a change. Make all changes in one openbot.edit_workflow call: give each new node a ref. add with from also connects. To insert a step, disconnect, add it with from, connect it to the next. The host lays out nodes: send no at; move if asked; tidy cleans up. The result maps refs to ids; do not read again.",
-        "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack), schedule as {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute}, {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, edges need branch yes|no; both take provider, model, effort only if asked; approval question; output target notify, chat-channel channelId, channel connectionId, placeId (openbot.messaging_list_places), github, discord, telegram, slack; prompt text. text, note and shape take no edges.",
+        "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack), schedule as {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute}, {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, edges need branch yes|no; both take provider, model, effort only if asked; approval question; output target notify, chat-channel channelId, channel connectionId, placeId (openbot.messaging_list_places), github, discord, telegram, slack; prompt text; image prompt, media image|video, model only if asked. text, note and shape take no edges.",
         "Only a person-started turn can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only if asked or to test a build; give a case as input. No tool waits for a run: read it once, then report what ran and what runs.",
       ].join("\n");
     case "crm_find":
@@ -172,7 +158,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "remove_mcp_server":
       return [
         "Add, change, turn on or off, or remove an MCP server only when the user asks. When a Marketplace app covers the service, use openbot.suggest_marketplace_app instead. A new server goes to every agent; the user selects its agents in Marketplace, Apps: say so in your answer. Call openbot.list_mcp_servers first for the names in use. Do not ask the user to confirm a requested change: OpenBot asks for approval when needed, and a declined change is final for the request.",
-        "openbot.save_mcp_server tests a server that is on before the save. On ready, give the user the tool names. On needs_sign_in, follow its next field: only the user sees the Sign in card. On needs_key, tell the user to enter the key in Marketplace, Apps, then test again; never put a key in a URL or an argument. On error, report it and what to change. The new tools reach the agents from the next turn.",
+        "openbot.save_mcp_server tests a server that is on before the save. On ready, give the user the tool names. On needs_sign_in, follow its next field: only the user sees the Sign in card. On needs_key, save again with the key in headers when the user gave it; else tell the user to enter it in Marketplace, Apps, then test again. Never put a key in a URL or repeat it. On error, report it and what to change. The new tools reach the agents from the next turn.",
       ].join("\n");
     case "send_feedback":
       return "Use it for a problem in OpenBot itself, not the user's project, or for a wanted change. When the user complains about OpenBot, first help or give a workaround, then call it unasked. Call it once per problem; after Not now, if asked. Write the text yourself, plainly. Do not ask for versions, logs or settings: OpenBot adds them. Set surface Phone app for a phone app bug, also if told on a computer. Ask one question only when you do not know what went wrong, what they want or which app. Leave out secrets, private paths and other chat text. Never send a security problem: give https://github.com/nightly-labs/openbot/security/advisories/new. For a question or discussion, give https://github.com/nightly-labs/openbot/discussions. Say the issue is public, without their name. Then follow the result's next field. Never open an OpenBot issue with other tools";

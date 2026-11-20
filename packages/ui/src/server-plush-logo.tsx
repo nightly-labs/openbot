@@ -34,10 +34,6 @@ const PICTURES: Readonly<Record<ServerPlushColor, string>> = {
   rose,
 };
 
-/**
- * The grey Bloub bodies, cropped to the fur as the pictures above are. `tintRamp` gives them a
- * colour in the browser.
- */
 const GREY_BODIES: Readonly<Record<ServerAppearanceShape, string>> = {
   squircle,
   cercle,
@@ -53,7 +49,6 @@ const GREY_BODIES: Readonly<Record<ServerAppearanceShape, string>> = {
 
 const tintedBodies = new Map<string, Promise<string>>();
 
-/** The `data:` URL of a grey body in a colour. Each pair is drawn once per page. */
 function tintedBody(shape: ServerAppearanceShape, hex: string): Promise<string> {
   const key = `${shape}|${hex}`;
   const cached = tintedBodies.get(key);
@@ -87,20 +82,16 @@ async function drawTintedBody(url: string, hex: string): Promise<string> {
   return canvas.toDataURL("image/webp", 0.9);
 }
 
-/** True when the server looks as it does with no choice: the squircle in its automatic colour. */
 function isAutomatic(appearance: ServerAppearance | null | undefined): appearance is null | undefined {
   return !appearance || (appearance.shape === "squircle" && appearance.color === null);
 }
 
 export interface ServerPlushLogoProps {
-  /** The server ID. It chooses the colour when the server has no colour of its own. */
   seed: string;
-  /** The shape and colour that an owner or admin chose. Null or absent gives the automatic look. */
   appearance?: ServerAppearance | null | undefined;
   class?: JSX.HTMLAttributes<HTMLImageElement>["class"];
 }
 
-/** The felt plush that a server shows when it has no logo of its own. */
 export function ServerPlushLogo(props: ServerPlushLogoProps): JSX.Element {
   const [tinted, setTinted] = createSignal<{ key: string; url: string | null } | null>(null);
   const chosen = () => {
@@ -116,7 +107,6 @@ export function ServerPlushLogo(props: ServerPlushLogoProps): JSX.Element {
       (url) => {
         if (live) setTinted({ key: current.key, url });
       },
-      // A body that does not draw keeps the automatic picture.
       () => {
         if (live) setTinted({ key: current.key, url: null });
       },
@@ -129,7 +119,6 @@ export function ServerPlushLogo(props: ServerPlushLogoProps): JSX.Element {
     const current = chosen();
     if (!current) return PICTURES[serverPlushColor(props.seed)];
     const drawn = tinted();
-    // Until the body is drawn, the image stays empty and keeps its size.
     if (drawn?.key !== current.key) return undefined;
     return drawn.url ?? PICTURES[serverPlushColor(props.seed)];
   };

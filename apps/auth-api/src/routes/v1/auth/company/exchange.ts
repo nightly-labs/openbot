@@ -5,8 +5,6 @@ import { runApiResponse } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import { apiError, companySignInErrorResponse, json, requestCompanySignIn } from "../../../../server/request-auth";
 
-// The app gives the one-time code from its loopback listener and the verifier of its challenge.
-// The answer is a session, as an email code gives.
 export const Route = createFileRoute("/v1/auth/company/exchange")({
   server: {
     handlers: {

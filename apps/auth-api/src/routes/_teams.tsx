@@ -2,17 +2,31 @@ import { createFileRoute, Outlet, useMatch } from "@tanstack/solid-router";
 import { Show } from "solid-js";
 import { TeamsPage } from "../components/teams/TeamsPage";
 
-// The Teams page at `/teams`, `/pl/teams` and `/pt/teams`. Each child route loads the text of its language,
-// and this layout shows the page, so a change of language changes only the text.
+const PAGE_ROUTES = [
+  "/_teams/teams",
+  "/_teams/ar/teams",
+  "/_teams/de/teams",
+  "/_teams/es/teams",
+  "/_teams/fr/teams",
+  "/_teams/he/teams",
+  "/_teams/it/teams",
+  "/_teams/ja/teams",
+  "/_teams/ko/teams",
+  "/_teams/nl/teams",
+  "/_teams/pl/teams",
+  "/_teams/pt/teams",
+  "/_teams/ru/teams",
+  "/_teams/tr/teams",
+  "/_teams/zh/teams",
+] as const;
+
 export const Route = createFileRoute("/_teams")({
   component: TeamsLayout,
 });
 
 function TeamsLayout() {
-  const english = useMatch({ from: "/_teams/teams", shouldThrow: false, select: (match) => match.loaderData });
-  const polish = useMatch({ from: "/_teams/pl/teams", shouldThrow: false, select: (match) => match.loaderData });
-  const portuguese = useMatch({ from: "/_teams/pt/teams", shouldThrow: false, select: (match) => match.loaderData });
-  const page = () => english() ?? polish() ?? portuguese();
+  const pages = PAGE_ROUTES.map((from) => useMatch({ from, shouldThrow: false, select: (match) => match.loaderData }));
+  const page = () => pages.map((match) => match()).find((data) => data !== undefined);
   return (
     <>
       <Show when={page()}>{(data) => <TeamsPage lang={data().lang} text={data().text} />}</Show>

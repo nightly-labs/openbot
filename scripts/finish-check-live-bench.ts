@@ -1,13 +1,3 @@
-// Measures the finish check end to end: a real Claude agent does multi-part tasks with the check off
-// and on, and a validator reads the agent's workspace to see if the task is done with no "continue"
-// from the user. Runs the real agent service on a temporary profile with the user's own Claude
-// sign-in, on the agent model `--model` (default the provider's default model).
-// For each task and each mode the report holds: done or not, the turns, the automatic continuations
-// by kind (plan, next step, finish check), the finish-check verdicts, the time from the message to
-// the end of the request, and the tokens of the agent's turns.
-// `bun scripts/finish-check-live-bench.ts`; `--runs=<n>` repeats each task (default 1);
-// `--task=<name>` runs one task. Uses the Claude subscription: about 10 agent turns for one run.
-// Writes .openbot-build/finish-check-live-bench/report.json.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -37,11 +27,8 @@ const model = argument("model") ?? defaultProviderModel("claude");
 interface Task {
   name: string;
   request: string;
-  /** The agent's description, which its prompt holds and the finish check does not read. */
   agentDescription?: string;
-  /** Writes the task's files into the agent's workspace. */
   setup: (workspace: string) => void;
-  /** Null when the task is done, or what is missing. */
   validate: (workspace: string) => string | null;
 }
 
@@ -69,7 +56,6 @@ const NUMBER_WORDS = [
 
 const MODULES = ["orders", "invoices", "customers", "stock", "shipping", "refunds", "reports", "taxes", "coupons"];
 
-/** A check script that stops at its first failure, so each bug shows only after the one before it is fixed. */
 const CHECK_PY = `import sys
 from shop import pricing, dates, text, stock, report
 
@@ -198,9 +184,6 @@ print(len(missing), " ".join(missing))`;
     },
   },
   {
-    // The failure that users report: the agent stops after a part of the work. The agent's own
-    // description makes that stop happen, so the bench measures what follows it. The user's request
-    // does not ask for the stop.
     name: "stops-after-3-of-12",
     agentDescription:
       "Works in short rounds: after 3 tool calls it always ends its turn with a short progress line, and it waits for the user to say continue.",
@@ -253,7 +236,6 @@ interface Run {
   task: string;
   mode: Mode;
   model: string;
-  /** The validator found the task done when the request ended. */
   done: boolean;
   missing: string | null;
   status: string;

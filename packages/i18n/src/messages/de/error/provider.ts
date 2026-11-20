@@ -247,6 +247,8 @@ export const messages = {
     "Der Endpunkt „{provider}“ hat die Anfrage abgelehnt. Sein API-Schlüssel oder seine Header können falsch sein, oder sein Konto darf dieses Modell nicht nutzen. Prüfe sie in Servereinstellungen → Anbieter oder wähle ein anderes Modell. Versuche es dann erneut.",
   "error.provider.customEndpointKeyMissing":
     "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
+  "error.provider.customEndpointEffortRefused":
+    "Der Endpunkt „{provider}“ hat den Denkaufwand dieses Modells abgelehnt. Bearbeite „{provider}“ in Servereinstellungen → Anbieter. Behalte unter Denkaufwand nur die Stufen, die dieses Modell annimmt, oder wähle Kein Nachdenken. Versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeKeyRefused":
@@ -275,6 +277,10 @@ export const messages = {
     "Dieses Modell ist für dich nicht verfügbar. Wähle ein anderes Modell für diesen Agenten.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht erneut.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Öffne in den Einstellungen Eigener Anbieter, klicke bei diesem Endpunkt auf Bearbeiten und lege für dieses Modell eine größere Max. Ausgabe fest. Oder wähle einen geringeren Aufwand oder ein anderes Modell.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeModelNotServed":
@@ -300,6 +306,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
   "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
+  "error.provider.channelNoAnswer":
+    "{provider} hat den Durchlauf ohne Antwort beendet. Klicke im Kanal auf „Weiter“, um die Aufgabe erneut auszuführen, oder auf „Neu zuweisen“, um sie einem anderen Mitglied zu geben.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":
@@ -411,6 +419,10 @@ export const messages = {
     "Codex konnte diesen Chat nicht fortsetzen, da ein Element in seinem gespeicherten Verlauf fehlt. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.codexRequestRefused":
     "{provider} hat die Anfrage für diesen Chat abgelehnt und keinen Grund genannt. Das kann in einem langen Chat mit vielen Bildern passieren. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.codexSafetyBlocked":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Der Agent sieht diese Nachricht jetzt nicht mehr, daher hält sie deine nächsten Nachrichten nicht auf. Sende deine Anfrage erneut mit anderen Worten.",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Wenn {provider} auch deine nächsten Nachrichten blockiert, starte einen neuen Chat.",
   "error.provider.codexAudioRefused":
     "Dieses Modell kann kein Audio anhören, darum hat es den Ton in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Um fortzufahren, sende deine Anfrage erneut und bitte den Agenten, ohne den Ton zu arbeiten. Um Ton zu prüfen, wähle im Modellmenü des Agenten ein Modell, das Audio anhören kann.",
   "error.provider.imageTooSmall":

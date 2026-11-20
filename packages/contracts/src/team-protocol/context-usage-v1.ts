@@ -2,26 +2,6 @@ import { isIdentifier } from "../ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "../runtime-values";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
 
-/**
- * Frozen optional context-usage-v1 contract: how full the context window of each agent is. It adds
- * `contextStates` and `threadContextStates` beside the frozen keys of the `snapshot` of a
- * `runtime-snapshot` event. Each item is an `AgentContextState` with only these keys, spelled as the rest
- * of that snapshot is (`botId`, see `current-agent-keys.ts`):
- *
- * - `botId`, `threadId`;
- * - `usage`: null, or `usedTokens`, `windowTokens`, `autoCompactAt`, `nativeManaged`, and optionally
- *   `estimated` and `categories` (`{ category, tokens }` rows of `CONTEXT_USAGE_V1_CATEGORIES`);
- * - `compaction`: null, or `id`, `startedAt`, `status`, and optionally `beforeTokens`, `afterTokens`
- *   and `expectedMs`.
- *
- * The host adds them only for a client that advertises the capability, on protocol 8, so the wire of
- * every released client stays as it was. Such a client shows no context meter for the host's agents. The
- * host sends only the agents that the member can see. It drops a category row that this list does not
- * name, and a state that the v1 shape cannot describe, such as a later compaction status, so a client of
- * this capability never refuses a snapshot for a value that came after it. A host without the capability never sends the fields, so a client accepts them whenever they are
- * present. A present value that the runtime snapshot decoder refuses fails closed. Widening any of it
- * needs a second capability string.
- */
 export const TEAM_CONTEXT_USAGE_CAPABILITY = "context-usage-v1";
 
 const CONTEXT_USAGE_V1_CATEGORIES = [
@@ -53,7 +33,6 @@ function pickKeys(value: TeamProtocolV8BaseJsonObject, keys: readonly string[]):
   return result;
 }
 
-/** The keys of `value` that `keys` names. A value that is not an object goes as it is, for the decoder to refuse. */
 function pick(value: TeamProtocolV8BaseJsonValue, keys: readonly string[]): TeamProtocolV8BaseJsonValue {
   return isJsonObject(value) ? pickKeys(value, keys) : value;
 }
@@ -81,7 +60,6 @@ function isOptionalCount(value: TeamProtocolV8BaseJsonValue | undefined): boolea
   return value === undefined || isCount(value);
 }
 
-/** Whether a projected state has the v1 shape, as the runtime snapshot decoder of this capability reads it. */
 function isV1ContextState(state: TeamProtocolV8BaseJsonValue): boolean {
   if (!isJsonObject(state) || !isIdentifier(state.botId) || !isIdentifier(state.threadId)) return false;
   const { usage, compaction } = state;
@@ -126,11 +104,6 @@ function v1ContextStates(states: unknown, sending: boolean): TeamProtocolV8BaseJ
   return sending ? projected.filter(isV1ContextState) : projected;
 }
 
-/**
- * `projected` with the context states of the `runtime-snapshot` event `source`, both on the wire
- * vocabulary. Other events are unchanged. The host passes `sending`, so a state outside the v1 shape
- * stays on the host; a client keeps every state, and the decoder refuses a bad one.
- */
 export function withRuntimeSnapshotContextUsage(
   projected: TeamProtocolV8BaseJsonValue,
   source: unknown,

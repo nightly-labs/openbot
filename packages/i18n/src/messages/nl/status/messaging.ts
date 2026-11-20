@@ -35,7 +35,7 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot heeft de Slack-installatie ontvangen. Je kunt dit tabblad sluiten.",
   "status.messaging.signInUnknown": "OpenBot heeft deze Slack-installatie niet gestart. Start hem opnieuw in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Er kan hier nog geen agent antwoorden. Voeg de Telegram-orchestrator toe in OpenBot.",
+    "Er kan hier nog geen agent antwoorden. Open in OpenBot Marktplaats > Apps > Telegram en klik op Agent toevoegen.",
   "status.messaging.telegramLinked":
     "OpenBot is verbonden met deze chat. Noem {bot} of reageer op een bericht van OpenBot om de agents iets te vragen.",
   "status.messaging.telegramOrchestratorName": "Telegram-orchestrator",

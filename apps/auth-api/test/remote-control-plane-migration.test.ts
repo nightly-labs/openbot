@@ -77,7 +77,6 @@ describe("remote control plane migration", () => {
         )
         .run();
       database.exec(readFileSync(new URL("../migrations/0020_permanent_invites.sql", import.meta.url), "utf8"));
-      // An INSERT from a Worker that does not know the new columns keeps working.
       database
         .prepare(
           `INSERT INTO remote_invites(

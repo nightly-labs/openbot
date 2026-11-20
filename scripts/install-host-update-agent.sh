@@ -1,7 +1,4 @@
 #!/bin/sh
-# Administrator setup. Build the standalone helper as an unprivileged developer first:
-# bun build scripts/host-manager.ts --compile --outfile /tmp/openbot-host-manager
-# sudo scripts/install-host-update-agent.sh --managed /tmp/openbot-host-manager client-acme client-bravo
 set -eu
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 export LC_ALL=C
@@ -44,7 +41,6 @@ for tenant in "$@"; do
     echo "Could not verify that $tenant is a Standard user." >&2
     exit 1
   fi
-  # Metadata only. Never open, scan, copy or modify any tenant content.
   tenant_home="/Users/$tenant"
   [ "$(dscl . -read "/Users/$tenant" NFSHomeDirectory)" = "NFSHomeDirectory: $tenant_home" ] || exit 1
   [ ! -L "$tenant_home" ] && [ -d "$tenant_home" ] && [ "$(stat -f %u "$tenant_home")" = "$tenant_uid" ] || exit 1
@@ -56,14 +52,12 @@ for tenant in "$@"; do
   fi
   UIDS="$UIDS $tenant_uid"
 done
-# The operator supplies trusted compiled code. Never compile repository hooks as root.
 [ -f "$HELPER" ] && [ ! -L "$HELPER" ] || exit 1
 for destination in "$ROOT/host-manager" "$ROOT/openbot-relaunch.sh" /Library/LaunchAgents/app.openbot.desktop.relaunch.plist /Library/LaunchDaemons/app.openbot.host-manager.plist; do
   [ ! -e "$destination" ] && [ ! -L "$destination" ] || { echo "Existing installation asset: $destination" >&2; exit 1; }
 done
 install -o root -g wheel -m 755 "$HELPER" "$ROOT/host-manager"
 install -o root -g wheel -m 755 "$ASSETS/openbot-relaunch.sh" "$ROOT/openbot-relaunch.sh"
-# UIDS contains only numbers returned by id above.
 # shellcheck disable=SC2086
 "$ROOT/host-manager" --setup $UIDS
 install -o root -g wheel -m 644 "$ASSETS/app.openbot.desktop.relaunch.plist" /Library/LaunchAgents/app.openbot.desktop.relaunch.plist

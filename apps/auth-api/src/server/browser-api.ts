@@ -29,18 +29,15 @@ import type { HostedServerService } from "./hosted-server-service";
 import { HostedSiteInputError, requireIdempotencyKey } from "./hosted-site-contract";
 import type { HostedSiteService } from "./hosted-site-service";
 import { readJsonObject } from "./json-body";
+import { startOwnerTransfer } from "./owner-transfer";
 import { type Referrals, referralPageQuery, referralState } from "./referrals";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
-import type { AuthUser, TeamInviteEmailDelivery } from "./types";
+import type { AuthUser, OwnerTransferEmailDelivery, TeamInviteEmailDelivery } from "./types";
 
 const COOKIE = "__Host-openbot-web";
 const PREFIX = "/api/browser/";
 const COOKIE_ATTRIBUTES = "Path=/; Secure; HttpOnly; SameSite=Lax";
-/**
- * The company sign-in that this browser started: its state and verifier. Only this browser can finish
- * it, so a provider page that someone else opened cannot sign this browser in.
- */
 const COMPANY_COOKIE = "__Host-openbot-company";
 const COMPANY_FLOW_SECONDS = 600;
 
@@ -76,18 +73,23 @@ export interface BrowserApiServices {
     | "changeMembership"
     | "hostAsset"
     | "emailableInvite"
+    | "createOwnerTransfer"
+    | "pendingOwnerTransfer"
+    | "cancelOwnerTransfer"
+    | "incomingOwnerTransfers"
+    | "acceptOwnerTransfer"
+    | "declineOwnerTransfer"
   >;
-  /** The methods bind their service, so this is the whole service. */
   companySignIn: () => CompanySignInService;
-  /** The stored logo of one host version, or null. The handler checks membership and the version first. */
   hostLogo: (hostId: string, version: string) => ReturnType<typeof readHostLogo>;
   hosting: () => Pick<
     HostedServerService,
     "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "restart" | "status" | "lifecycle"
   >;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
+  ownerTransferEmailDelivery: () => OwnerTransferEmailDelivery | null;
+  schedule: (work: Effect.Effect<void>) => void;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
-  /** The billing service, or null when this deployment has no Stripe key. */
   billing: () => Pick<
     BillingService,
     | "getState"
@@ -112,7 +114,6 @@ function requiredString(value: DynamicRecord, field: string): Effect.Effect<stri
     : Effect.fail(new AuthServiceError(400, "invalid_browser_request", "The request is invalid."));
 }
 
-/** The same checks and messages as the bearer member and invite routes. */
 function invalidRemoteRequest(message: string): RemoteControlPlaneError {
   return new RemoteControlPlaneError(400, "invalid_remote_request", message);
 }
@@ -124,12 +125,10 @@ function json<T>(value: T, status = 200): Response {
   });
 }
 
-/** The same `{ error: { code, message } }` shape as every other account API refusal. */
 function failure(status: number, code: string, message: string): Response {
   return json({ error: { code, message } }, status);
 }
 
-/** Answers one refusal class with its own status, whether the operation failed with it or threw it. */
 function refuseWith(refusal: abstract new (...args: never) => { status: number; code: string; message: string }) {
   return <A, E, R>(operation: Effect.Effect<A, E, R>) =>
     operation.pipe(
@@ -160,11 +159,6 @@ function browserSessionToken(request: Request): string | null {
 const METHODS: ReadonlySet<string> = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const AVATAR_PATH = "v1/me/avatar";
 
-/**
- * Every write sends JSON, except an avatar upload, which sends the image bytes as the bearer route
- * does. The `X-OpenBot-Browser` header and the same-origin check still apply to it: a cross-site
- * page cannot send that header without a CORS preflight, which this API never answers.
- */
 function browserWriteContentTypeAllowed(request: Request, path: string): boolean {
   const contentType = request.headers.get("Content-Type")?.toLowerCase() ?? "";
   if (path === AVATAR_PATH && request.method === "PUT")
@@ -172,12 +166,6 @@ function browserWriteContentTypeAllowed(request: Request, path: string): boolean
   return contentType.startsWith("application/json");
 }
 
-/**
- * A closed list of account operations. Chat traffic never passes through this handler.
- *
- * The member and invite operations are the bearer `/v2/remote/...` routes for a signed-in browser:
- * they call the same control-plane methods, so the host role checks there are the only gate.
- */
 export function handleBrowserApi(request: Request, services: BrowserApiServices): Promise<Response> {
   const path = new URL(request.url).pathname.slice(PREFIX.length).replace(/\/$/u, "");
   if (!METHODS.has(request.method))
@@ -189,8 +177,6 @@ export function handleBrowserApi(request: Request, services: BrowserApiServices)
       !browserWriteContentTypeAllowed(request, path))
   )
     return Promise.resolve(failure(403, "browser_request_refused", "The browser request was refused."));
-  // The company provider sends the browser here, so this navigation is cross-site. The flow cookie
-  // of the browser that started the sign-in is its check.
   if (path === "company/return" && request.method === "GET")
     return runApiResponse(finishCompanySignIn(request, services), services.errorResponse);
   if (request.headers.get("Sec-Fetch-Site") === "cross-site")
@@ -198,10 +184,6 @@ export function handleBrowserApi(request: Request, services: BrowserApiServices)
   return runApiResponse(handleBrowserOperation(request, path, services), services.errorResponse);
 }
 
-/**
- * The provider's return through the account service. A sign-in that finished gets the session cookie,
- * as an email code does. Every answer goes back to the web app and removes the flow cookie.
- */
 const finishCompanySignIn = Effect.fn("BrowserApi.finishCompanySignIn")(function* (
   request: Request,
   services: BrowserApiServices,
@@ -276,7 +258,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     return response;
   }
   if (path === "company/start" && request.method === "POST") {
-    // The email start answered `company_sign_in_required`. The page goes to the answer in this tab.
     const body = yield* readJsonObject(request);
     const email = yield* requiredString(body, "email");
     const site = new URL(request.url);
@@ -308,7 +289,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
       );
   }
   if (path === "checkout-attribution" && request.method === "POST") {
-    // The page after a desktop checkout. The session ID that Stripe put in its URL is the only proof.
     const body = yield* readJsonObject(request);
     const firstTouch = requestFirstTouch(body.firstTouch);
     if (isString(body.sessionId) && firstTouch) {
@@ -339,7 +319,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   const [, encodedLogoHostId] = /^v2\/remote\/hosts\/([^/]+)\/logo$/u.exec(path) ?? [];
   if (encodedLogoHostId !== undefined && request.method === "GET") {
     const hostId = decodeURIComponent(encodedLogoHostId);
-    // Any member may read the logo. The version keeps a cached image from outliving a logo change.
     const { logoKey } = yield* services.remote.hostAsset(user.id, hostId);
     const logo =
       logoKey && new URL(request.url).searchParams.get("v") === logoKey
@@ -353,6 +332,8 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   if (hosting) return hosting;
   const hostedSites = yield* handleHostedSites(request, path, user, services);
   if (hostedSites) return hostedSites;
+  const ownerTransfer = yield* handleOwnerTransfer(request, path, user, services);
+  if (ownerTransfer) return ownerTransfer;
   const administration = yield* handleAdministration(request, path, user, services);
   if (administration) return administration;
   if (request.method !== "POST")
@@ -395,10 +376,6 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   return failure(404, "browser_operation_not_found", "This browser operation is not available.");
 });
 
-/**
- * The signed-in account's profile, avatar and sessions: the bearer `/v1/me/...` and
- * `/v1/mobile-auth/devices?includeDesktop=true` routes for a browser. Returns null for any other path.
- */
 const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
   request: Request,
   path: string,
@@ -434,7 +411,6 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
   if (path === "v1/me/sessions" && request.method === "GET")
     return json({ sessions: yield* services.auth.listAccountSessions(token) });
-  // The install command of a self-hosted server. Never log the claim.
   if (path === "v2/server-claims" && request.method === "POST")
     return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
@@ -452,7 +428,6 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
       ).pipe(refuseWith(BillingError)),
     );
   }
-  // A session ID is a UUID, so the segment needs no decoding; the service refuses any other value.
   const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
   if (sessionId !== undefined && request.method === "DELETE") {
     yield* services.auth.revokeAccountSession(token, sessionId);
@@ -461,10 +436,6 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
   return null;
 });
 
-/**
- * The bearer `/v1/me/billing...` and `/v1/me/license...` routes for a browser. Stripe sends the user back to `/app`, not to the
- * desktop return page. Returns null for any other path.
- */
 const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   request: Request,
   path: string,
@@ -523,14 +494,12 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   return null;
 }, refuseWith(BillingError));
 
-/** The hosted servers of the account. Returns null when the path is not one of them. */
 const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   request: Request,
   path: string,
   user: AuthUser,
   services: BrowserApiServices,
 ) {
-  // Stripe sends the user back to `/app` on this origin, not to the desktop return page.
   const returnTo = { target: "web", origin: new URL(request.url).origin } as const;
   if (path === "v2/hosting/plans" && request.method === "GET") return json(yield* services.hosting().plans(user));
   if (path === "v2/hosting/servers") {
@@ -584,10 +553,6 @@ const handleHosting = Effect.fn("BrowserApi.handleHosting")(function* (
   return null;
 });
 
-/**
- * The account's published sites: the bearer `/v1/sites/` list and delete routes for a browser.
- * Publishing reads a local folder, so it stays on the desktop. Returns null for any other path.
- */
 const handleHostedSites = Effect.fn("BrowserApi.handleHostedSites")(function* (
   request: Request,
   path: string,
@@ -603,7 +568,51 @@ const handleHostedSites = Effect.fn("BrowserApi.handleHostedSites")(function* (
   return json({ deleted: true });
 }, refuseWith(HostedSiteInputError));
 
-/** Members and invites of one host. Returns null when the path and method are not one of them. */
+const handleOwnerTransfer = Effect.fn("BrowserApi.handleOwnerTransfer")(function* (
+  request: Request,
+  path: string,
+  user: AuthUser,
+  services: BrowserApiServices,
+) {
+  const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  if (path === "v2/remote/owner-transfers" && request.method === "GET")
+    return json({ transfers: yield* services.remote.incomingOwnerTransfers(user) });
+  const [, encodedTransferId, answer] = /^v2\/remote\/owner-transfers\/([^/]+)\/(accept|decline)$/u.exec(path) ?? [];
+  if (encodedTransferId !== undefined && request.method === "POST") {
+    const transferId = decodeURIComponent(encodedTransferId);
+    if (answer === "accept") return json(yield* services.remote.acceptOwnerTransfer(user, transferId));
+    yield* services.remote.declineOwnerTransfer(user, transferId);
+    return noContent();
+  }
+  const [, encodedHostId] = /^v2\/remote\/hosts\/([^/]+)\/owner-transfer$/u.exec(path) ?? [];
+  if (encodedHostId === undefined) return null;
+  const hostId = decodeURIComponent(encodedHostId);
+  if (request.method === "GET") return json({ transfer: yield* services.remote.pendingOwnerTransfer(user, hostId) });
+  if (request.method === "DELETE") {
+    yield* services.remote.cancelOwnerTransfer(user, hostId);
+    return noContent();
+  }
+  if (request.method !== "POST") return null;
+  return json(
+    yield* startOwnerTransfer(
+      {
+        auth: services.auth,
+        remote: services.remote,
+        delivery: services.ownerTransferEmailDelivery,
+        schedule: services.schedule,
+      },
+      user,
+      {
+        hostId,
+        body: yield* readJsonObject(request),
+        sourceIp: services.sourceIp(request),
+        appUrl: new URL("/app", request.url).toString(),
+      },
+    ),
+    201,
+  );
+});
+
 const handleAdministration = Effect.fn("BrowserApi.handleAdministration")(function* (
   request: Request,
   path: string,

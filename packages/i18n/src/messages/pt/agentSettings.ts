@@ -171,11 +171,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Esta escolha vale só para você, em todos os seus dispositivos. Se o servidor estiver silenciado ou em “Nada”, este agente também fica em silêncio.",
   "agentSettings.newChat.title": "Novo chat",
-  "agentSettings.newChat.description": "O agente esquece este chat. Sua configuração é mantida.",
+  "agentSettings.newChat.description":
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. Sua configuração é mantida.",
   "agentSettings.newChat.button": "Iniciar",
   "agentSettings.newChat.confirmTitle": "Iniciar um novo chat com {name}?",
   "agentSettings.newChat.confirmDescription":
-    "O agente esquece este chat. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
   "agentSettings.newChat.confirm": "Iniciar novo chat",
   "agentSettings.newChat.failed": "Não foi possível iniciar um novo chat.",
   "agentSettings.deleteHistory.title": "Excluir histórico",

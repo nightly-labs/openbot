@@ -1,5 +1,4 @@
 import { Dynamic } from "@solidjs/web";
-/** The marks of the social networks that the social toast offers. The paths are from Simple Icons (CC0). */
 
 import { XMark } from "../settings/brand-marks";
 import type { SocialNetworkId } from "./social-networks";

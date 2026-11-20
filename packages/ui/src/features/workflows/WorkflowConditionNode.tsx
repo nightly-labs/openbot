@@ -1,5 +1,3 @@
-/** A condition: a rule that sends the run down one of two branches. */
-
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { createMemo, For, Show, untrack } from "solid-js";
@@ -22,14 +20,10 @@ import {
   useTextField,
   type WfProvider,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 const BRANCHES = ["yes", "no"] as const;
 
-/**
- * A rule that sends the run down one of two branches, and the model that judges it. Each branch has
- * its own output port on its row. After a run, the branch that the run took has a check and the
- * other branch dims.
- */
 export function ConditionNode(props: { id: string; rule?: string }) {
   const board = useBoard();
   const { t } = useText();
@@ -39,8 +33,6 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     untrack(() => props.rule ?? ""),
   );
   const models = () => board.catalogs().models;
-  // A condition saved before it had a model has none, and the host chooses the model and effort of
-  // each run. The model pill then says Auto, and the effort pill shows when the user chooses a model.
   const [model] = useField<AgentModelId>(() => props.id, "model", "", asString);
   const [provider] = useField<WfProvider | "">(() => props.id, "provider", "", asProvider);
   const [effort, setEffort] = useField<AgentReasoningEffort | "">(
@@ -50,7 +42,6 @@ export function ConditionNode(props: { id: string; rule?: string }) {
     oneOf(AGENT_REASONING_EFFORTS),
   );
   const chosen = () => modelOption(models(), model());
-  /** The provider tab that the model menu opens on: the one of the step, else the one of a new step. */
   const tab = createMemo(
     (): WfProvider => provider() || chosen()?.provider || defaultWorkflowModel(board.catalogs())?.provider || "codex",
   );
@@ -78,7 +69,11 @@ export function ConditionNode(props: { id: string; rule?: string }) {
       kind="condition"
       inputs={["text"]}
       requires
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked}>
+          <StepSettingsAction id={props.id} kind="condition" />
+        </NodeToolbar>
+      }
     >
       <Field class="wfn-block-field">
         <Textarea
