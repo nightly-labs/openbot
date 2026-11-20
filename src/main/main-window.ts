@@ -46,6 +46,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { windowMinimumSize } from "./linux-tiling-desktop";
 import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
@@ -269,17 +270,17 @@ export function createMainWindowController({
 
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
+    const minimumSize = windowMinimumSize({ minWidth: 960, minHeight: 640 });
     const bounds = resolveMainWindowBounds(
       currentMainWindowBounds(),
       screen.getAllDisplays().map((display) => display.workArea),
       screen.getDisplayNearestPoint(cursor).workArea,
       { width: 1200, height: 820 },
-      { width: 960, height: 640 },
+      { width: minimumSize.minWidth, height: minimumSize.minHeight },
     );
     const window = new BrowserWindow({
       ...bounds,
-      minWidth: 960,
-      minHeight: 640,
+      ...minimumSize,
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title:
@@ -411,8 +412,7 @@ export function createMainWindowController({
     const window = new BrowserWindow({
       width: 560,
       height: 760,
-      minWidth: 380,
-      minHeight: 480,
+      ...windowMinimumSize({ minWidth: 380, minHeight: 480 }),
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title: getTranslate()("window.localHostTitle"),

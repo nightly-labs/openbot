@@ -136,6 +136,8 @@ are designed for a computer screen only.
   do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
   The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
   and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+  On a tiling Linux desktop (`src/main/linux-tiling-desktop.ts`) the compositor sets the size and
+  the windows have no minimum; the compact sidebar keeps the chat usable in a half-screen tile.
 - On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
   links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
   (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;
