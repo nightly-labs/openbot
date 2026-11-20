@@ -419,6 +419,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       );
       if (Result.isSuccess(blocked)) this.#blocked = blocked.success;
       yield* this.#startAutomaticUpdates(target);
+      yield* Effect.forEach(
+        this.#stopping ? [] : PROVIDERS.filter((provider) => !this.#tasks.has(provider)),
+        (provider) => this.#removeBlockedCopiesEffect(provider, target),
+        { discard: true },
+      );
       const repairs = PROVIDERS.filter(
         (provider) =>
           this.#rejected.has(provider) &&
@@ -463,11 +468,30 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       this.#declined.get(provider) !== offered &&
       (phase === "ready" || phase === "not-downloaded") &&
       version !== null &&
-      olderVersion(version, offered) &&
+      (olderVersion(version, offered) || (version !== offered && this.#isBlocked(provider, version))) &&
       !this.#systemVersions.has(provider) &&
       !configuredCliPath(provider) &&
       this.#isProviderOn(provider)
     );
+  }
+
+  #isBlocked(runtime: ManagedRuntimeId, version: string): boolean {
+    return !isManagedToolRuntime(runtime) && (this.#blocked.get(runtime)?.has(version) ?? false);
+  }
+
+  #removeBlockedCopiesEffect(runtime: ManagedRuntimeId, target: RuntimeTarget): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const targetRoot = dirname(this.#installRoot(runtimeSpec(runtime, target, this.#lock)));
+      const versions = yield* runtimeIO(async () => await readdir(targetRoot).catch(() => []));
+      const blocked = versions.filter(
+        (version) => version !== this.#statuses[runtime].version && this.#isBlocked(runtime, version),
+      );
+      const unused = yield* Effect.forEach(blocked, (version) => {
+        const path = join(targetRoot, version);
+        return this.#stampedBySiblingEffect(path).pipe(Effect.map((inUse) => (inUse ? [] : [path])));
+      });
+      yield* this.#removeOldVersionPathsEffect(unused.flat(), Number.POSITIVE_INFINITY);
+    }).pipe(Effect.catch(() => Effect.void));
   }
 
   #targetSpec(runtime: ManagedRuntimeId, target: RuntimeTarget): RuntimeSpec {
@@ -604,7 +628,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (this.#tasks.has(runtime)) return this.getStatus();
       const spec = this.#targetSpec(runtime, target);
       const current = this.#statuses[runtime];
-      if (current.version && !olderVersion(current.version, spec.version)) {
+      if (
+        current.version &&
+        !olderVersion(current.version, spec.version) &&
+        !(current.version !== spec.version && this.#isBlocked(runtime, current.version))
+      ) {
         if (current.phase !== "ready") this.#setStatus(runtime, yield* this.#inspectEffect(runtime));
         return this.getStatus();
       }
@@ -817,16 +845,17 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
   #updateProviderRuntime(spec: RuntimeSpec, signal: AbortSignal): Effect.Effect<void, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<void, ProviderRuntimeFailure> {
+      const previous = this.#statuses[spec.runtime].version;
       const installed = yield* this.#readStoreEffect(spec);
-      if (installed.phase === "ready") {
-        yield* this.#activateEffect(spec, signal, false);
-        return;
+      if (installed.phase !== "ready") {
+        if (this.#stopping)
+          return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
+        yield* runtimeSync(() => signal.throwIfAborted());
+        this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
       }
-      if (this.#stopping)
-        return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.closing")) });
-      yield* runtimeSync(() => signal.throwIfAborted());
-      this.#setStatus(spec.runtime, { phase: "downloading", progress: 0, message: null, version: installed.version });
-      yield* this.#activateEffect(spec, signal, true);
+      yield* this.#activateEffect(spec, signal, installed.phase !== "ready");
+      if (previous && previous !== spec.version && this.#isBlocked(spec.runtime, previous))
+        yield* this.#removeBlockedCopiesEffect(spec.runtime, spec.target);
     });
   }
 
