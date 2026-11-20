@@ -631,7 +631,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Aucune discussion ouverte",
   "mobile.agent.home.noChatOpenBody": "Choisissez une discussion dans la liste.",
   "mobile.agent.home.chatListWidth": "Largeur de la liste des discussions",
-  "mobile.agent.home.serverTitle": "{name}, ouvrir les serveurs",
   "mobile.agent.home.waiting": "En attente de connexion",
   "mobile.agent.home.waitingBody": "La liste des agents se chargera une fois ce serveur connecté.",
   "mobile.agent.home.noAgents": "Aucun agent sur ce serveur",

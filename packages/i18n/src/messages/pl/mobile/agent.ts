@@ -668,7 +668,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Brak otwartego czatu",
   "mobile.agent.home.noChatOpenBody": "Wybierz czat z listy.",
   "mobile.agent.home.chatListWidth": "Szerokość listy czatów",
-  "mobile.agent.home.serverTitle": "{name}, otwórz serwery",
   "mobile.agent.home.waiting": "Oczekiwanie na połączenie",
   "mobile.agent.home.waitingBody": "Lista agentów wczyta się po połączeniu z tym serwerem.",
   "mobile.agent.home.noAgents": "Brak agentów na tym serwerze",

@@ -628,7 +628,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Açık sohbet yok",
   "mobile.agent.home.noChatOpenBody": "Listeden bir sohbet seçin.",
   "mobile.agent.home.chatListWidth": "Sohbet listesi genişliği",
-  "mobile.agent.home.serverTitle": "{name}, sunucuları aç",
   "mobile.agent.home.waiting": "Bağlantı bekleniyor",
   "mobile.agent.home.waitingBody": "Ajan listesi bu sunucu bağlandığında yüklenecektir.",
   "mobile.agent.home.noAgents": "Bu sunucuda ajan yok",

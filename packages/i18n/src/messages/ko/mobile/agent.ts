@@ -602,7 +602,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "열린 채팅 없음",
   "mobile.agent.home.noChatOpenBody": "목록에서 채팅을 선택해 주세요.",
   "mobile.agent.home.chatListWidth": "채팅 목록 너비",
-  "mobile.agent.home.serverTitle": "{name}, 서버 열기",
   "mobile.agent.home.waiting": "연결 대기 중",
   "mobile.agent.home.waitingBody": "이 서버에 연결되면 에이전트 목록을 불러와요.",
   "mobile.agent.home.noAgents": "이 서버에 에이전트가 없어요",
