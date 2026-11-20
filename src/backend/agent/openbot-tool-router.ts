@@ -2312,8 +2312,6 @@ export class OpenBotToolRouter {
       if (connection) {
         const name = PLATFORM_NAMES[connection.platform];
         const agentIds = new Set(this.#hooks.listAgents().map((agent) => agent.id));
-        // Without its orchestrator, nobody answers the people there. The card opens the app's page,
-        // where the user adds it (#12216).
         if (connected.some((record) => !record.orchestratorAgentId || !agentIds.has(record.orchestratorAgentId))) {
           suggestCard();
           return openBotToolResult({
@@ -2352,7 +2350,6 @@ export class OpenBotToolRouter {
         const matches = searchSettingLinks(setting);
         const serverPlaces = searchServerPlaces(setting);
         const found = matches.length > 0 || serverPlaces.length > 0;
-        // A connected app's fix, such as a missing Telegram Orchestrator, is on its Marketplace page (#12216).
         const apps =
           "An app in Marketplace, such as Telegram, Slack or Notion, is not a setting: for one, call suggest_marketplace_app with its id.";
         return openBotToolResult({
