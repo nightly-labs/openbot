@@ -2,6 +2,7 @@ import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { coordinatorText } from "../channels/coordinator-text";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarPinnedAvatar } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu } from "./SidebarChannelContextMenu";
@@ -59,8 +60,7 @@ export function SidebarPinnedGroup() {
               const pinnedPreview = () => {
                 if (item.chat.kind === "agent") return item.chat.agent.preview;
                 const lastMessage = item.chat.channel.lastMessage;
-                if (lastMessage)
-                  return lastMessage.author?.kind === "coordinator" ? sourceText(lastMessage.text) : lastMessage.text;
+                if (lastMessage) return coordinatorText(lastMessage.author, lastMessage.text, sourceText);
                 return props.channelPreviewsPending === true ? undefined : t("sidebar.channel.noMessages");
               };
               const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);

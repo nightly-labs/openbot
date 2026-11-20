@@ -4,6 +4,7 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { coordinatorText } from "../channels/coordinator-text";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
 import { SidebarNameTooltip } from "./SidebarNameTooltip";
@@ -40,7 +41,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const lastMessageText = () => {
     const message = rowProps.channel.lastMessage;
     if (!message) return undefined;
-    return message.author?.kind === "coordinator" ? sourceText(message.text) : message.text;
+    return coordinatorText(message.author, message.text, sourceText);
   };
   const preview = () => {
     const text = wait()?.detail || (lastMessageText() ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));

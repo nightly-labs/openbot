@@ -14,6 +14,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 import { ChannelAvatar } from "../components/channel-avatar";
 import { useChannels } from "../components/use-channels";
+import { coordinatorText } from "../model/coordinator-text";
 
 export function DeletedChatsScreen() {
   const { t, errorMessage, sourceText } = useText();
@@ -104,9 +105,7 @@ export function DeletedChatsScreen() {
                       </Typography.Paragraph>
                       <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
                         {channel.lastMessage
-                          ? channel.lastMessage.author?.kind === "coordinator"
-                            ? sourceText(channel.lastMessage.text)
-                            : channel.lastMessage.text
+                          ? coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText)
                           : t("mobile.channel.list.noMessages")}
                       </Typography.Paragraph>
                     </View>

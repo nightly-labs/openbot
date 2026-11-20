@@ -1,5 +1,6 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import type { GlobalSearchChannel } from "@openbot/ui/components/GlobalSearch";
+import { coordinatorText } from "@openbot/ui/features/channels/coordinator-text";
 
 export function globalSearchChannels(
   channels: ChannelSummary[],
@@ -11,11 +12,7 @@ export function globalSearchChannels(
       id: channel.id,
       name: channel.name,
       detail: channel.lastMessage
-        ? `${channel.lastMessage.authorName}: ${channelPreviewText(channel.lastMessage, localize)}`
+        ? `${channel.lastMessage.authorName}: ${coordinatorText(channel.lastMessage.author, channel.lastMessage.text, localize)}`
         : undefined,
     }));
-}
-
-function channelPreviewText(message: NonNullable<ChannelSummary["lastMessage"]>, localize: (text: string) => string) {
-  return message.author?.kind === "coordinator" ? localize(message.text) : message.text;
 }

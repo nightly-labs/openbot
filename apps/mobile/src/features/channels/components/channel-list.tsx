@@ -30,6 +30,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
+import { coordinatorText } from "../model/coordinator-text";
 import { ChannelAvatar } from "./channel-avatar";
 
 function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
@@ -289,11 +290,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const previewLine = useMemo(
     () =>
       channel.lastMessage
-        ? markdownPreviewText(
-            channel.lastMessage.author?.kind === "coordinator"
-              ? sourceText(channel.lastMessage.text)
-              : channel.lastMessage.text,
-          )
+        ? markdownPreviewText(coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText))
         : t("mobile.channel.list.noMessages"),
     [channel.lastMessage, t, sourceText],
   );

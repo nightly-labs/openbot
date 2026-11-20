@@ -40,6 +40,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { coordinatorText } from "@/features/channels/model/coordinator-text";
 import { MOBILE_PLUGINS } from "@/features/marketplace/model/plugin-catalog.generated";
 import { isMobileConnectorId } from "@/features/servers/model/connectors";
 import { thinkingRowId } from "./turn-thinking";
@@ -902,7 +903,7 @@ function projectChannelMessage(
     ...(self ? { mine: true } : {}),
     speaker: entry.author,
     superseded: entry.superseded,
-    body: entry.author.kind === "coordinator" ? localize(entry.message.text) : entry.message.text,
+    body: coordinatorText(entry.author, entry.message.text, localize),
     streaming: entry.message.status === "streaming",
     status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,

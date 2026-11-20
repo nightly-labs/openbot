@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
+import { coordinatorText } from "@openbot/ui/features/channels/coordinator-text";
 import { toAgentMessage, toAgentMessages } from "../../app-message-projection";
 
 export function channelMessageHasContent(entry: ChannelMessage): boolean {
@@ -53,8 +54,8 @@ function channelRoutineRow(row: AgentMessage, entry: ChannelMessage, tasks: read
 }
 
 function localizedCoordinatorEntry(entry: ChannelMessage, localize: (text: string) => string): ChannelMessage {
-  if (entry.author.kind !== "coordinator") return entry;
-  return { ...entry, message: { ...entry.message, text: localize(entry.message.text) } };
+  const text = coordinatorText(entry.author, entry.message.text, localize);
+  return text === entry.message.text ? entry : { ...entry, message: { ...entry.message, text } };
 }
 
 export function channelConversationRows(
