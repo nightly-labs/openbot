@@ -442,8 +442,9 @@ when another program holds that port, the sign-in cannot finish. A sign-in app t
 replaces the built-in client and uses the loopback address. The Meta app must list the relay address
 in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
 App Review puts the app in Live mode. Until then, Marketplace does not list Meta Ads: every other
-account saw Meta's "App inactive" page and could not continue (#13492). `bun run test:mcp-sign-in-https-relay` checks the Meta page,
-the relay, and that another server that names Meta's issuer does not get the app.
+account saw Meta's "App inactive" page and could not continue (#13492).
+`bun run test:mcp-sign-in-https-relay` checks the Meta page, the relay, and that another server that
+names Meta's issuer does not get the app.
 
 A server that does not register OpenBot by itself needs a **sign-in app**: an OAuth app that the
 admin registers with the provider. The user enters its client ID in the "Sign-in app" section of the
