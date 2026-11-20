@@ -106,6 +106,7 @@ export interface DrainHooks {
   followPendingRuntime(agentId: string): boolean;
   turnEnded(turnId: string): boolean;
   staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
+  orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
   turnRestarting(turnId: string): void;
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
   startRequestedNewChat(agentId: string, queuedRuns?: readonly string[]): Effect.Effect<void>;
@@ -197,6 +198,7 @@ export class DrainScheduler {
   readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
   readonly #settlingTurns = new Set<string>();
+  readonly #recoveringAgents = new Set<string>();
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
   readonly #startRetry = new RoutineStartRetry({
     retry: (deliveryId, agentId, provider) => Effect.runFork(this.#retryRoutineStart(deliveryId, agentId, provider)),
@@ -312,6 +314,21 @@ export class DrainScheduler {
     if (!settlement) return;
     this.#settlingTurns.add(turnId);
     Effect.runFork(settlement.pipe(Effect.ensuring(Effect.sync(() => this.#settlingTurns.delete(turnId)))));
+  }
+
+  #recoverIdleLane(lane: Lane): void {
+    const { agentId, taskId } = lane;
+    if (
+      taskId !== null ||
+      this.#recoveringAgents.has(agentId) ||
+      this.#laneTurnActive(lane) ||
+      !this.#mailbox.laneActive(agentId, taskId)
+    )
+      return;
+    const recovery = this.#hooks.orphanedDeliveryRecovery(agentId);
+    if (!recovery) return;
+    this.#recoveringAgents.add(agentId);
+    Effect.runFork(recovery.pipe(Effect.ensuring(Effect.sync(() => this.#recoveringAgents.delete(agentId)))));
   }
 
   #compactionHolds(lane: Lane): boolean {
@@ -513,6 +530,7 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
     if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+    if (hold === "machine") this.#recoverIdleLane(lane);
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
       return true;
@@ -624,6 +642,7 @@ export class DrainScheduler {
     if (hold) {
       this.#reportHold(lane, hold);
       if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+      if (hold === "machine") this.#recoverIdleLane(lane);
       return;
     }
     this.#reportedHolds.delete(key);
@@ -632,6 +651,7 @@ export class DrainScheduler {
       if (this.#laneTurnActive(lane)) return;
       const context = this.#mailbox.nextQueued(agentId, taskId);
       if (!context) {
+        this.#recoverIdleLane(lane);
         if (taskId === null) yield* this.#hooks.startRequestedNewChat(agentId);
         return;
       }

@@ -1,6 +1,6 @@
 import { REMOTE_RETRY_LIMIT } from "@openbot/team-client";
 import { Typography } from "heroui-native";
-import { View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 
 import { ConnectionCountdown } from "@/features/workspace/components/connection-countdown";
 import { AnimatedCounter } from "@/features/workspace/components/connection-counter";
@@ -14,6 +14,7 @@ import {
 } from "@/features/workspace/model/server-status";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { ErrorReference } from "@/shared/components/error-reference";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 function StatusText({ server: shown }: { server: MobileServer }) {
@@ -77,9 +78,22 @@ function StatusText({ server: shown }: { server: MobileServer }) {
   );
 }
 
+const STATUS_MAX_WIDTH = 164;
+const STATUS_MIN_WIDTH = 96;
+const HEADER_CHROME_WIDTH = 270;
+
+function headerStatusWidth(windowWidth: number): number {
+  if (!isIOS) return STATUS_MAX_WIDTH;
+  return Math.max(STATUS_MIN_WIDTH, Math.min(STATUS_MAX_WIDTH, windowWidth - HEADER_CHROME_WIDTH));
+}
+
 export function ConnectionHeaderStatus({ server, fill = false }: { server: MobileServer | undefined; fill?: boolean }) {
+  const { width: windowWidth } = useWindowDimensions();
   return (
-    <View className="justify-center" style={fill ? { flex: 1, minWidth: 0, height: 44 } : { width: 164, height: 44 }}>
+    <View
+      className="justify-center"
+      style={fill ? { flex: 1, minWidth: 0, height: 44 } : { width: headerStatusWidth(windowWidth), height: 44 }}
+    >
       <ConnectionStatusReveal
         value={server && !server.initialConnectionPending && !showsOnline(server) ? server : null}
       >

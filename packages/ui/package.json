@@ -255,6 +255,8 @@
     "./features/servers/ServerStatusDialog": "./src/features/servers/ServerStatusDialog.tsx",
     "./features/servers/ServerActionItems": "./src/features/servers/ServerActionItems.tsx",
     "./features/servers/ServerMenu": "./src/features/servers/ServerMenu.tsx",
+    "./features/servers/ServerPlanEnd": "./src/features/servers/ServerPlanEnd.tsx",
+    "./features/servers/server-plan-end.css": "./src/features/servers/server-plan-end.css",
     "./features/servers/ServerUpdateDialog": "./src/features/servers/ServerUpdateDialog.tsx",
     "./features/servers/server-update-dialog.css": "./src/features/servers/server-update-dialog.css",
     "./features/servers/ServerConnectionNotice": "./src/features/servers/ServerConnectionNotice.tsx",
