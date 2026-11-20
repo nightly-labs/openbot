@@ -3592,7 +3592,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #mayRecoverOrphanedDeliveries(agentId: string): boolean {
     if (this.#stopping || !this.#boot.hasOrphanedOwnChatDelivery(agentId)) return false;
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
-    return agent !== undefined && this.#providers.clientForAgent(agent) !== null;
+    return agent !== undefined && this.#providers.clientFor(providerForAgent(agent)) !== null;
   }
 
   readonly #recoverOrphanedDeliveries = Effect.fn("AgentService.recoverOrphanedDeliveries")(function* (

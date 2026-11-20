@@ -122,9 +122,16 @@ export class BootRecovery {
   }
 
   hasOrphanedOwnChatDelivery(agentId: string): boolean {
-    return this.#mailbox
-      .unresolvedDeliveries()
-      .some(({ delivery }) => this.#inOwnChatOf(delivery, agentId) && this.#orphanedDeliveryIds.has(delivery.id));
+    for (const id of this.#orphanedDeliveryIds) {
+      const delivery = this.#mailbox.getDelivery(id)?.delivery;
+      if (
+        delivery &&
+        (delivery.status === "starting" || delivery.status === "running") &&
+        this.#inOwnChatOf(delivery, agentId)
+      )
+        return true;
+    }
+    return false;
   }
 
   #inOwnChatOf(delivery: UnresolvedDelivery, agentId: string): boolean {
