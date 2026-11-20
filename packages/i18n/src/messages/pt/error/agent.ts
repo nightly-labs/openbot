@@ -130,7 +130,7 @@ export const messages = {
   "error.agent.deleteFolderInUse":
     "O trabalho de outro agente ainda usa a pasta deste agente. Exclua este agente de novo quando esse trabalho terminar ou depois de reiniciar o OpenBot.",
   "error.agent.deleteFolderLocked":
-    "Outro programa ainda usa a pasta deste agente, por exemplo um programa que o agente iniciou. Feche esse programa ou reinicie o computador e exclua o agente novamente.",
+    "Outro programa ainda usa a pasta deste agente, por exemplo um programa que o agente iniciou. Feche esse programa ou reinicie o computador em que este agente roda e exclua o agente novamente.",
   "error.agent.deleteWhenFolderFree":
     "O trabalho de outro agente ainda usa a pasta deste agente. O OpenBot exclui este agente quando esse trabalho terminar.",
   "error.agent.duplicationBusy": "Este agente já está sendo duplicado.",

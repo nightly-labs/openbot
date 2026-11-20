@@ -109,7 +109,7 @@ export const messages = {
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
   "error.agent.deleteFolderLocked":
-    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启电脑，然后再次删除此助手。",
+    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启运行此助手的电脑，然后再次删除此助手。",
   "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",

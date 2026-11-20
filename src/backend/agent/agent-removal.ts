@@ -265,12 +265,14 @@ export class AgentRemoval {
       Effect.mapError((failure) => {
         const code = removalErrorCode(failure);
         this.#logger.warn("Agent deletion failed.", { stage, ...code });
-        if (stage === "agent-files-and-record" && code.code === "EBUSY")
-          return new AgentRemovalFailed({
-            cause: processKeptForWork
-              ? new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse"))
-              : new AgentFolderLocked(sourceText("error.agent.deleteFolderLocked")),
-          });
+        if (stage === "agent-files-and-record" && code.code === "EBUSY") {
+          if (processKeptForWork)
+            return new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse")) });
+          if (process.platform === "win32")
+            return new AgentRemovalFailed({
+              cause: new AgentFolderLocked(sourceText("error.agent.deleteFolderLocked")),
+            });
+        }
         return new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) });
       }),
     );

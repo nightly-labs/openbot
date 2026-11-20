@@ -127,7 +127,7 @@ export const messages = {
   "error.agent.deleteFolderInUse":
     "Praca innego agenta nadal używa folderu tego agenta. Usuń agenta ponownie, gdy ta praca się zakończy, lub po ponownym uruchomieniu OpenBot.",
   "error.agent.deleteFolderLocked":
-    "Inny program nadal używa folderu tego agenta, na przykład program uruchomiony przez agenta. Zamknij ten program lub uruchom ponownie komputer, a potem usuń agenta ponownie.",
+    "Inny program nadal używa folderu tego agenta, na przykład program uruchomiony przez agenta. Zamknij ten program lub uruchom ponownie komputer, na którym działa ten agent, a potem usuń agenta ponownie.",
   "error.agent.deleteWhenFolderFree":
     "Praca innego agenta nadal używa folderu tego agenta. OpenBot usunie tego agenta, gdy ta praca się zakończy.",
   "error.agent.duplicationBusy": "Ten agent jest już duplikowany.",
