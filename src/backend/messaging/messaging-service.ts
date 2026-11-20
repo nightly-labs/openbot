@@ -2359,6 +2359,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
     "place_not_allowed",
     "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
   ],
+  [
+    "no_account",
+    `OpenBot sent nothing. ${sourceText("error.messaging.whatsappNumberNotFound")} Tell the user to open Marketplace, then Apps, then WhatsApp, to remove this contact, and to add it again with its country code.`,
+  ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
   [
