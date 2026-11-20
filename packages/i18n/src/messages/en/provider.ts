@@ -124,7 +124,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels":
-    "No {name} models show here. An admin can turn them on in Server settings > Providers > {name} > Models.",
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
   "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
   "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":

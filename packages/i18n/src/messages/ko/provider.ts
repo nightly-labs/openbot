@@ -125,7 +125,7 @@ export const messages = {
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
   "provider.picker.noModels":
-    "여기에 표시되는 {name} 모델이 없어요. 관리자가 서버 설정 > 제공자 > {name} > 모델에서 켤 수 있어요.",
+    "여기에 표시되는 {name} 모델이 없어요. 꺼져 있다면 관리자가 서버 설정 > 제공자 > {name} > 모델에서 켤 수 있어요.",
   "provider.picker.endpointModelsInCustom":
     "{name}에서 사용자 지정 엔드포인트를 실행해요. 해당 모델은 사용자 지정 탭에 있어요.",
   "provider.picker.showCustomModels": "모델 보기",

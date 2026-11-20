@@ -141,7 +141,7 @@ export const messages = {
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels":
-    "Здесь нет моделей {name}. Администратор может включить их в разделе «Настройки сервера» > «Провайдеры» > «{name}» > «Модели».",
+    "Здесь нет моделей {name}. Если они выключены, администратор может включить их в разделе «Настройки сервера» > «Провайдеры» > «{name}» > «Модели».",
   "provider.picker.endpointModelsInCustom": "{name} запускает ваши эндпоинты. Их модели — на вкладке «Свой».",
   "provider.picker.showCustomModels": "Показать модели",
   "provider.picker.museNoModels":

@@ -141,7 +141,7 @@ export const messages = {
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
   "provider.picker.noModels":
-    "Nie widać tu modeli od: {name}. Administrator może je włączyć w Ustawienia serwera > Dostawcy > {name} > Modele.",
+    "Nie widać tu modeli od: {name}. Jeśli są wyłączone, administrator może je włączyć w Ustawienia serwera > Dostawcy > {name} > Modele.",
   "provider.picker.endpointModelsInCustom": "{name} obsługuje Twoje własne endpointy. Ich modele są na karcie Własny.",
   "provider.picker.showCustomModels": "Pokaż modele",
   "provider.picker.museNoModels":

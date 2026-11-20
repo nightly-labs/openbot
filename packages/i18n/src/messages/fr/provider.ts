@@ -126,7 +126,7 @@ export const messages = {
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels":
-    "Aucun modèle {name} ne s’affiche ici. Un admin peut les activer dans Réglages du serveur > Fournisseurs > {name} > Modèles.",
+    "Aucun modèle {name} ne s’affiche ici. S’ils sont désactivés, un admin peut les activer dans Réglages du serveur > Fournisseurs > {name} > Modèles.",
   "provider.picker.endpointModelsInCustom":
     "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
   "provider.picker.showCustomModels": "Voir les modèles",

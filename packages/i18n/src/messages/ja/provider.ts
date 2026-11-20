@@ -126,7 +126,7 @@ export const messages = {
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels":
-    "ここには {name} のモデルが表示されていません。管理者が「サーバーの設定」>「プロバイダー」>「{name}」>「モデル」でオンにできます。",
+    "ここには {name} のモデルが表示されていません。オフになっている場合は、管理者が「サーバーの設定」>「プロバイダー」>「{name}」>「モデル」でオンにできます。",
   "provider.picker.endpointModelsInCustom":
     "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
   "provider.picker.showCustomModels": "モデルを表示",

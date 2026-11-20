@@ -124,7 +124,7 @@ export const messages = {
   "provider.picker.olderModels": "Modelli precedenti",
   "provider.picker.olderModelsList": "Modelli {name} precedenti",
   "provider.picker.noModels":
-    "Qui non compare nessun modello di {name}. Un amministratore può attivarli in Impostazioni server > Provider > {name} > Modelli.",
+    "Qui non compare nessun modello di {name}. Se sono disattivati, un amministratore può attivarli in Impostazioni server > Provider > {name} > Modelli.",
   "provider.picker.endpointModelsInCustom":
     "{name} esegue i tuoi endpoint personalizzati. I loro modelli sono nella scheda Personalizzato.",
   "provider.picker.showCustomModels": "Mostra modelli",

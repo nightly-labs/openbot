@@ -124,7 +124,7 @@ export const messages = {
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels":
-    "Burada {name} modeli görünmüyor. Bir yönetici bunları Sunucu ayarları > Sağlayıcılar > {name} > Modeller bölümünden açabilir.",
+    "Burada {name} modeli görünmüyor. Kapalıysalar, bir yönetici bunları Sunucu ayarları > Sağlayıcılar > {name} > Modeller bölümünden açabilir.",
   "provider.picker.endpointModelsInCustom": "{name} özel uç noktalarınızı çalıştırıyor. Modelleri Özel sekmesinde.",
   "provider.picker.showCustomModels": "Modelleri göster",
   "provider.picker.museNoModels":
