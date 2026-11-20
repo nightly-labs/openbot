@@ -230,7 +230,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.mnemoverse.tagline": "評価して共有できる記憶",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse は、エージェントにホスト型の長期記憶を提供します。エージェントは好みや決定事項を保存し、あとから普通の質問で見つけられます。同じアカウントが ChatGPT、Claude、Cursor、VS Code で使えます。呼び出した記憶を役に立った、または誤解を招いたと評価すると、次に返ってくる記憶の順序が変わります。共有ルームでは、複数の人のアシスタントが 1 つの記憶を読み書きできます。Mnemoverse が受け取るのは、エージェントが保存する内容と、検索に使う質問です。",
+    "Mnemoverse は、エージェントにホスト型の長期記憶を提供します。エージェントは好みや決定事項を保存し、あとから普通の質問で見つけられます。同じアカウントが ChatGPT、Claude、Cursor、VS Code で使えます。呼び出した記憶を役に立った、または誤解を招いたと評価すると、次に返ってくる記憶の順序が変わります。共有ルームでは、複数の人のアシスタントが 1 つの記憶を読み書きできます。エージェントの設定で「OpenBot のメモリー」をオフにすると、Mnemoverse がそのエージェントの唯一の記憶になります。Mnemoverse が受け取るのは、エージェントが保存する内容と、検索に使う質問です。",
   "marketplace.plugin.mnemoverse.app": "Mnemoverse アカウントの記憶を保存、検索、評価します。",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "始める前に、このプロジェクトについて前回何が決まったかを Mnemoverse で確認してください。",

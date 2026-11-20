@@ -32,7 +32,7 @@ export const MNEMOVERSE_PLUGIN_GUIDE: PluginGuide = {
     {
       question: "How is Mnemoverse different from the memory of an OpenBot agent?",
       answer:
-        "Each OpenBot agent keeps its own memory on the computer that runs OpenBot. Mnemoverse keeps memory in your account, so ChatGPT, Claude, Cursor, VS Code and other tools you connect can read and write it too. Mnemoverse receives only the agent's calls to its tools: text to save, questions and ratings.",
+        "Each OpenBot agent keeps its own memory on the computer that runs OpenBot. Mnemoverse keeps memory in your account, so ChatGPT, Claude, Cursor, VS Code and other tools you connect can read and write it too. To use only Mnemoverse, turn off OpenBot memory in the agent's settings under Advanced; the saved OpenBot memories stay. Mnemoverse receives only the agent's calls to its tools: text to save, questions and ratings.",
     },
     {
       question: "Which memory does the agent use?",

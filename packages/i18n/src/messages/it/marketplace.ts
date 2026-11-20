@@ -234,7 +234,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "Crea una chiave nella pagina Connect di Hindsight Cloud.",
   "marketplace.plugin.mnemoverse.tagline": "Memoria da valutare e condividere",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse dà agli agenti una memoria a lungo termine ospitata. Un agente salva una preferenza o una decisione e la ritrova più tardi con una semplice domanda. Lo stesso account funziona in ChatGPT, Claude, Cursor e VS Code. Valutare un ricordo recuperato come utile o fuorviante cambia l'ordine di ciò che torna la volta successiva. Le stanze condivise permettono agli assistenti di più persone di leggere e scrivere un'unica memoria. Mnemoverse riceve ciò che un agente salva e le domande con cui cerca.",
+    "Mnemoverse dà agli agenti una memoria a lungo termine ospitata. Un agente salva una preferenza o una decisione e la ritrova più tardi con una semplice domanda. Lo stesso account funziona in ChatGPT, Claude, Cursor e VS Code. Valutare un ricordo recuperato come utile o fuorviante cambia l'ordine di ciò che torna la volta successiva. Le stanze condivise permettono agli assistenti di più persone di leggere e scrivere un'unica memoria. Se disattivi «Memoria di OpenBot» nelle impostazioni di un agente, Mnemoverse diventa la sua unica memoria. Mnemoverse riceve ciò che un agente salva e le domande con cui cerca.",
   "marketplace.plugin.mnemoverse.app": "Salva, cerca e valuta i ricordi nel tuo account Mnemoverse.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "Prima di iniziare, cerca in Mnemoverse cosa è stato deciso su questo progetto l'ultima volta.",

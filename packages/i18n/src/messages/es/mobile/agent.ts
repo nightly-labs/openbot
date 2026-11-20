@@ -408,6 +408,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Mostrar el plan antes de tareas largas",
   "mobile.agent.planCard.footer":
     "Antes de una tarea larga, el agente muestra su plan. Empieza tras 10 s o cuando pulsas Iniciar.",
+  "mobile.agent.builtinMemory.label": "Memoria de OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "El agente guarda y lee sus propios recuerdos. Desactívala para usar solo una app de memoria, como Mem0. Los recuerdos guardados se mantienen.",
   "mobile.agent.workspace.title": "Carpeta del espacio de trabajo",
   "mobile.agent.workspace.footer": "La carpeta de este agente en el equipo host.",
   "mobile.agent.advanced.behavior": "Comportamiento",

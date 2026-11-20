@@ -878,7 +878,7 @@ export function agentIpcHandlers({
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }
-          if (input.fastMode !== undefined || input.ultrafast !== undefined) {
+          if (input.fastMode !== undefined || input.ultrafast !== undefined || input.memory !== undefined) {
             throw new Error(sourceText("error.agent.settingsLocalOnly"));
           }
           if (input.busyMessageMode !== undefined) {

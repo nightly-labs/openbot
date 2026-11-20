@@ -249,7 +249,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "أنشئ مفتاحًا في صفحة Connect في Hindsight Cloud.",
   "marketplace.plugin.mnemoverse.tagline": "ذاكرة يمكنك تقييمها ومشاركتها",
   "marketplace.plugin.mnemoverse.description":
-    "يمنح Mnemoverse الوكلاء ذاكرة طويلة المدى مستضافة. يحفظ الوكيل تفضيلًا أو قرارًا ويجده لاحقًا بسؤال بسيط. الحساب نفسه يعمل في ChatGPT وClaude وCursor وVS Code. تقييم ذكرى مسترجعة بأنها مفيدة أو مضللة يغيّر ترتيب ما يظهر في المرة التالية. تتيح الغرف المشتركة لمساعدي عدة أشخاص قراءة ذاكرة واحدة والكتابة فيها. يتلقى Mnemoverse ما يحفظه الوكيل والأسئلة التي يبحث بها.",
+    "يمنح Mnemoverse الوكلاء ذاكرة طويلة المدى مستضافة. يحفظ الوكيل تفضيلًا أو قرارًا ويجده لاحقًا بسؤال بسيط. الحساب نفسه يعمل في ChatGPT وClaude وCursor وVS Code. تقييم ذكرى مسترجعة بأنها مفيدة أو مضللة يغيّر ترتيب ما يظهر في المرة التالية. تتيح الغرف المشتركة لمساعدي عدة أشخاص قراءة ذاكرة واحدة والكتابة فيها. عند إيقاف «ذاكرة OpenBot» في إعدادات الوكيل، يصبح Mnemoverse ذاكرته الوحيدة. يتلقى Mnemoverse ما يحفظه الوكيل والأسئلة التي يبحث بها.",
   "marketplace.plugin.mnemoverse.app": "احفظ الذكريات وابحث فيها وقيّمها في حسابك في Mnemoverse.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "قبل أن نبدأ، ابحث في Mnemoverse عمّا تقرر بشأن هذا المشروع في المرة السابقة.",

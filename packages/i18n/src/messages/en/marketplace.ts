@@ -237,7 +237,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.hindsight.hint.apiKey": "Create a key on the Connect page of Hindsight Cloud.",
   "marketplace.plugin.mnemoverse.tagline": "Memory you can rate and share",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. Mnemoverse receives what an agent saves and the questions it searches with.",
+    "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. With OpenBot memory turned off in an agent's settings, Mnemoverse becomes that agent's only memory. Mnemoverse receives what an agent saves and the questions it searches with.",
   "marketplace.plugin.mnemoverse.app": "Save, search and rate memories in your Mnemoverse account.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "Before we start, check Mnemoverse for what I decided about this project last time.",

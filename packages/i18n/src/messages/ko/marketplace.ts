@@ -215,7 +215,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud의 Connect 페이지에서 키를 만드세요.",
   "marketplace.plugin.mnemoverse.tagline": "평가하고 공유할 수 있는 기억",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse는 에이전트에게 호스팅되는 장기 기억을 제공합니다. 에이전트는 선호나 결정을 저장하고 나중에 평범한 질문으로 찾아냅니다. 같은 계정이 ChatGPT, Claude, Cursor, VS Code에서 작동합니다. 불러온 기억을 도움이 됨 또는 오해의 소지가 있음으로 평가하면 다음에 돌아오는 기억의 순서가 바뀝니다. 공유 룸에서는 여러 사람의 어시스턴트가 하나의 기억을 읽고 쓸 수 있습니다. Mnemoverse가 받는 것은 에이전트가 저장하는 내용과 검색에 쓰는 질문입니다.",
+    "Mnemoverse는 에이전트에게 호스팅되는 장기 기억을 제공합니다. 에이전트는 선호나 결정을 저장하고 나중에 평범한 질문으로 찾아냅니다. 같은 계정이 ChatGPT, Claude, Cursor, VS Code에서 작동합니다. 불러온 기억을 도움이 됨 또는 오해의 소지가 있음으로 평가하면 다음에 돌아오는 기억의 순서가 바뀝니다. 공유 룸에서는 여러 사람의 어시스턴트가 하나의 기억을 읽고 쓸 수 있습니다. 에이전트 설정에서 ‘OpenBot 메모리’를 끄면 Mnemoverse가 그 에이전트의 유일한 기억이 됩니다. Mnemoverse가 받는 것은 에이전트가 저장하는 내용과 검색에 쓰는 질문입니다.",
   "marketplace.plugin.mnemoverse.app": "Mnemoverse 계정의 기억을 저장하고, 검색하고, 평가합니다.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "시작하기 전에 이 프로젝트에 대해 지난번에 무엇을 결정했는지 Mnemoverse에서 확인해 주세요.",

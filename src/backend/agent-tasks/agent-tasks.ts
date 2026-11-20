@@ -16,6 +16,7 @@ import {
   type BranchAgentTaskInput,
   type ConversationMessage,
   type ConversationSnapshot,
+  fitAgentTaskTitle,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -820,7 +821,7 @@ export class AgentTasks implements TaskLanes {
       agentId: task.agentId,
       threadId: task.threadId,
       origin: task.origin,
-      title: task.title,
+      title: fitAgentTaskTitle(task.title),
       state,
       outcome: task.outcome,
       hold,
@@ -848,7 +849,7 @@ export class AgentTasks implements TaskLanes {
     const source = this.#store.taskForThread(sourceThreadId);
     return {
       sourceTaskId: source?.taskId ?? sourceThreadId,
-      sourceTitle: source?.title ?? null,
+      sourceTitle: source ? fitAgentTaskTitle(source.title) : null,
       sourceMessageId,
       throughMessageId,
     };
@@ -915,7 +916,7 @@ function taskTitle(text: string): string {
       .split("\n")
       .map((part) => part.trim())
       .find((part) => part.length > 0) ?? "";
-  return line.length > INPUT_LIMITS.agentTaskTitle ? `${line.slice(0, INPUT_LIMITS.agentTaskTitle - 1)}…` : line;
+  return fitAgentTaskTitle(line);
 }
 
 function publicHold(reason: string | null): AgentTaskHold | null {

@@ -242,7 +242,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud'un Connect sayfasında bir anahtar oluşturun.",
   "marketplace.plugin.mnemoverse.tagline": "Puanlayıp paylaşabileceğiniz hafıza",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse, ajanlara barındırılan uzun süreli bir hafıza sağlar. Bir ajan bir tercihi ya da kararı kaydeder ve daha sonra basit bir soruyla bulur. Aynı hesap ChatGPT, Claude, Cursor ve VS Code'da çalışır. Geri çağrılan bir anıyı yararlı ya da yanıltıcı olarak puanlamak, bir sonraki sefer gelenlerin sırasını değiştirir. Paylaşılan odalar, birden çok kişinin asistanlarının tek bir hafızayı okuyup yazmasını sağlar. Mnemoverse, bir ajanın kaydettiklerini ve arama yaptığı soruları alır.",
+    "Mnemoverse, ajanlara barındırılan uzun süreli bir hafıza sağlar. Bir ajan bir tercihi ya da kararı kaydeder ve daha sonra basit bir soruyla bulur. Aynı hesap ChatGPT, Claude, Cursor ve VS Code'da çalışır. Geri çağrılan bir anıyı yararlı ya da yanıltıcı olarak puanlamak, bir sonraki sefer gelenlerin sırasını değiştirir. Paylaşılan odalar, birden çok kişinin asistanlarının tek bir hafızayı okuyup yazmasını sağlar. Bir ajanın ayarlarında “OpenBot belleği” kapatılırsa Mnemoverse o ajanın tek hafızası olur. Mnemoverse, bir ajanın kaydettiklerini ve arama yaptığı soruları alır.",
   "marketplace.plugin.mnemoverse.app": "Mnemoverse hesabınızda anıları kaydedin, arayın ve puanlayın.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "Başlamadan önce, bu proje hakkında geçen sefer ne karar verildiğine Mnemoverse'te bak.",

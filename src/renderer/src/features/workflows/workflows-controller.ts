@@ -140,6 +140,8 @@ export function createWorkflowsController(
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
   const [build, setBuild] = createSignal<WorkflowBuild>();
+  const [opening, setOpening] = createSignal<string>();
+  const [failed, setFailed] = createSignal(false);
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
@@ -328,12 +330,22 @@ export function createWorkflowsController(
       readGitHubHistory(workflowId),
     ]);
 
+  const readOpening = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+    const shownId = stored()?.detail.summary.id;
+    setOpening(shownId !== undefined && shownId !== workflowId ? workflowId : undefined);
+    try {
+      return await read(workflowId, undefined, listed);
+    } finally {
+      if (opening() === workflowId) setOpening(undefined);
+    }
+  };
+
   const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
     current = workflowId;
     limit = RUN_PAGE;
     const known = cached(workflowId);
     if (known && !disposed) show(known);
-    await read(workflowId, undefined, listed);
+    await readOpening(workflowId, listed);
   };
 
   const save = async (
@@ -474,7 +486,7 @@ export function createWorkflowsController(
     readLevels();
     readGitHubCatalog();
   });
-  write(async () => {
+  void queued(async () => {
     const asked = untrack(() => requested?.workflowId());
     const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
     const known = asked ?? (current === "" ? remembered : current);
@@ -484,7 +496,7 @@ export function createWorkflowsController(
       limit = RUN_PAGE;
       const shown = cached(known);
       if (shown && stored()?.detail.summary.id !== known) show(shown);
-      if (await read(known)) return;
+      if (await readOpening(known)) return;
       if (disposed) return;
     }
     const list = library ?? (await host.workflows.list());
@@ -497,7 +509,7 @@ export function createWorkflowsController(
     }
     const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
     if (!disposed) await load(created.summary.id);
-  });
+  }).catch(() => setFailed(true));
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -599,6 +611,9 @@ export function createWorkflowsController(
     get library() {
       return summaries();
     },
+    get opening() {
+      return opening() !== undefined;
+    },
     onGraphChange: (graph) => {
       edits += 1;
       pending = { workflowId: current, graph };
@@ -698,6 +713,7 @@ export function createWorkflowsController(
 
   return {
     detail: () => stored()?.detail,
+    failed,
     places,
     channels,
     discord,

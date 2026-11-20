@@ -151,6 +151,7 @@ const workRowSchema = z.object({
 });
 type WorkRow = z.infer<typeof workRowSchema>;
 const archiveRowSchema = workRowSchema.extend({
+  plan: z.string(),
   plan_ended_at: z.number().int(),
   subscription: z.string().regex(SUBSCRIPTION_PATTERN).nullable(),
 });
@@ -327,6 +328,10 @@ function referenceLabel(reference: string) {
 }
 
 const gigabytes = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+const elapsedText = (milliseconds: number) => {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return seconds < 120 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+};
 
 function packBytes(pack: { value: number; unit: string } | null | undefined) {
   const scale = { GB: 1e9, TB: 1e12 }[pack?.unit ?? ""];
@@ -476,7 +481,7 @@ class Pool {
       ),
       reinstall: query("desired_state = 'deleted' AND observed_state = 'deleted'"),
       archive: this.#rows(
-        `SELECT h.server_id, h.operator_host, h.plan_ended_at,
+        `SELECT h.server_id, h.operator_host, h.plan, h.plan_ended_at,
            (SELECT s.stripe_subscription_id FROM billing_subscriptions s WHERE s.server_id = h.server_id
             ORDER BY COALESCE(s.current_period_end, 0) DESC, s.updated_at DESC LIMIT 1) AS subscription
          FROM hosted_servers h
@@ -791,6 +796,7 @@ class Pool {
 command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q age >/dev/null
 `,
     });
+    const started = Date.now();
     const serverBytes = Number(this.#remote(machine, SERVER_BYTES, { capture: true }).trim());
     if (!Number.isSafeInteger(serverBytes) || serverBytes <= 0)
       throw new Error(`VPS ${machine.id} has no server data.`);
@@ -798,6 +804,7 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
     const archiveKey = newArchiveKey();
     const uploadId = await startUpload(b2, objectKey);
     let versionId = "";
+    let archivedBytes = 0;
     let kept = false;
     try {
       const output = this.#remote(
@@ -830,6 +837,7 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
         return;
       }
       kept = true;
+      archivedBytes = upload.bytes;
     } finally {
       if (versionId === "") await abortUpload(b2, objectKey, uploadId);
       else if (!kept) await deleteArchive(b2, objectKey, versionId).catch(() => undefined);
@@ -854,6 +862,33 @@ command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -
       );
     }
     logger.info(`VPS ${machine.id} is free. Run prepare to offer it for a new server.`);
+    await this.#alert(
+      [
+        `📦 **Archived** · ${row.plan} server · ${row.server_id.slice(0, 8)} · ${gigabytes(archivedBytes)} in B2`,
+        `VPS ${machine.id} free`,
+        end === "payment_failed" ? "payment failed" : "cancelled",
+        elapsedText(Date.now() - started),
+      ].join(" · "),
+    );
+  }
+
+  async #alert(text: string) {
+    if (!this.#apply || this.#testDatabase) return;
+    const url = URL.parse(this.#environment.HOSTED_POOL_ALERT_WEBHOOK_URL?.trim() ?? "");
+    if (url?.protocol !== "https:") {
+      logger.warn("HOSTED_POOL_ALERT_WEBHOOK_URL is not an HTTPS URL. The Discord alert is not sent.");
+      return;
+    }
+    const sent = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: text, allowed_mentions: { parse: [] } }),
+      signal: AbortSignal.timeout(10_000),
+    }).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (!sent) logger.warn("The Discord alert was not sent.");
   }
 
   async #deleteStoredArchive(row: z.infer<typeof storedArchiveSchema>) {

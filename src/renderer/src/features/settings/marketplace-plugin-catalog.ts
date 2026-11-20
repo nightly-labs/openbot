@@ -581,13 +581,57 @@ const HINDSIGHT: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/hindsight",
 };
 
+const MEM0: MarketplacePluginDetail = {
+  id: "plugin-mem0",
+  slug: "mem0",
+  name: "Mem0",
+  tagline: "Memory layer for AI agents",
+  description:
+    "Mem0 gives agents a long-term memory in your Mem0 account. Agents add facts and preferences, search them by meaning, and update or delete them. Other AI tools that you connect to Mem0 share the same memories. To make Mem0 the only memory of an agent, turn off OpenBot memory in the agent's settings. What agents save goes to your Mem0 account.",
+  category: "productivity",
+  creatorName: "Mem0",
+  iconUrl: "https://app.mem0.ai/apple-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-recall", text: "Search Mem0 for what you know about my current projects before we start." },
+    { id: "prompt-save", text: "Add to Mem0 that I prefer short status updates with the open questions first." },
+    {
+      id: "prompt-clean",
+      text: "List my Mem0 memories about the old office and delete the ones that are out of date.",
+    },
+  ],
+  apps: [
+    {
+      id: "app-mem0-mcp",
+      name: "Mem0",
+      description:
+        "Add, search, update and delete memories in your Mem0 account over Mem0's MCP server with browser sign-in.",
+      iconUrl: "https://app.mem0.ai/apple-icon.png",
+      server: {
+        name: "mem0",
+        transport: "http",
+        url: "https://mcp.mem0.ai/mcp/",
+        auth: [{ id: "mem0-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://mem0.ai",
+  privacyPolicyUrl: "https://mem0.ai/privacy",
+  termsUrl: "https://mem0.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/mem0",
+};
+
 const MNEMOVERSE: MarketplacePluginDetail = {
   id: "plugin-mnemoverse",
   slug: "mnemoverse",
   name: "Mnemoverse",
   tagline: "Memory you can rate and share",
   description:
-    "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. Mnemoverse receives what an agent saves and the questions it searches with.",
+    "Mnemoverse is hosted long-term memory for AI agents. An agent saves a preference or a decision and finds it later with a plain question. The same account works in ChatGPT, Claude, Cursor and VS Code. Rating a recalled memory as helpful or misleading re-ranks what comes back next. Shared rooms let several people's assistants read and write one memory. With OpenBot memory turned off in an agent's settings, Mnemoverse becomes that agent's only memory. Mnemoverse receives what an agent saves and the questions it searches with.",
   category: "productivity",
   creatorName: "Mnemoverse",
   iconUrl: "https://mnemoverse.com/apple-touch-icon.png",
@@ -10715,6 +10759,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   COBRAIN,
   HONCHO,
   HINDSIGHT,
+  MEM0,
   MNEMOVERSE,
   FIGMA,
   PAPER,

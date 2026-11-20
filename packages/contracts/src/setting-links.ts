@@ -54,6 +54,7 @@ export const SETTING_LINK_SCOPES = {
   "agent.new-chat": "agent",
   "agent.starts-new-chats": "agent",
   "agent.plan-card": "agent",
+  "agent.builtin-memory": "agent",
 } as const satisfies Record<string, "app" | "agent">;
 
 export type SettingLinkId = keyof typeof SETTING_LINK_SCOPES;

@@ -241,7 +241,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "צור מפתח בדף Connect של Hindsight Cloud.",
   "marketplace.plugin.mnemoverse.tagline": "זיכרון שאפשר לדרג ולשתף",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse נותן לסוכנים זיכרון לטווח ארוך מתארח. סוכן שומר העדפה או החלטה ומוצא אותה מאוחר יותר בשאלה פשוטה. אותו חשבון עובד ב-ChatGPT, ב-Claude, ב-Cursor וב-VS Code. דירוג של זיכרון שנשלף כמועיל או כמטעה משנה את סדר מה שיחזור בפעם הבאה. חדרים משותפים מאפשרים לעוזרים של כמה אנשים לקרוא ולכתוב באותו זיכרון. Mnemoverse מקבל את מה שהסוכן שומר ואת השאלות שבהן הוא מחפש.",
+    "Mnemoverse נותן לסוכנים זיכרון לטווח ארוך מתארח. סוכן שומר העדפה או החלטה ומוצא אותה מאוחר יותר בשאלה פשוטה. אותו חשבון עובד ב-ChatGPT, ב-Claude, ב-Cursor וב-VS Code. דירוג של זיכרון שנשלף כמועיל או כמטעה משנה את סדר מה שיחזור בפעם הבאה. חדרים משותפים מאפשרים לעוזרים של כמה אנשים לקרוא ולכתוב באותו זיכרון. כשמכבים את הזיכרון של OpenBot בהגדרות של סוכן, Mnemoverse הופך לזיכרון היחיד שלו. Mnemoverse מקבל את מה שהסוכן שומר ואת השאלות שבהן הוא מחפש.",
   "marketplace.plugin.mnemoverse.app": "שמירה, חיפוש ודירוג של זיכרונות בחשבון Mnemoverse שלך.",
   "marketplace.plugin.mnemoverse.prompt.recall": "לפני שנתחיל, בדוק ב-Mnemoverse מה הוחלט על הפרויקט הזה בפעם הקודמת.",
   "marketplace.plugin.mnemoverse.prompt.save": "שמור ב-Mnemoverse כל החלטה מהצ'אט הזה כזיכרון נפרד.",

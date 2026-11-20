@@ -234,6 +234,9 @@ export const messages = {
     "L’agent peut démarrer une nouvelle discussion quand la sienne devient longue. Il enregistre d’abord des notes.",
   "agentSettings.quickAcknowledgement.title": "Montrer le plan avant les longues tâches",
   "agentSettings.quickAcknowledgement.description": "Avant une longue tâche, l’agent montre son plan.",
+  "agentSettings.builtinMemory.title": "Mémoire OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L’agent enregistre et lit ses propres souvenirs. Désactivez-la pour utiliser seulement une app de mémoire, comme Mem0. Les souvenirs enregistrés restent.",
   "agentSettings.browserProfile.label": "Profil de navigateur",
   "agentSettings.browserProfile.shared": "Partagé",
   "agentSettings.browserProfile.agent": "Cet agent uniquement",

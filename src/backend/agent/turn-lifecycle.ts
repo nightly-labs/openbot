@@ -2197,7 +2197,8 @@ export class TurnLifecycle {
         running !== undefined &&
         !channelTurn &&
         !routineSession &&
-        (!taskTurn || laneTaskId !== null)
+        (!taskTurn || laneTaskId !== null) &&
+        !this.#mailbox.awaitsTeammate(agentId, laneTaskId)
           ? this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text)
           : "no";
       const continueMode: FinishCheckMode =

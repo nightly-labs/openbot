@@ -226,6 +226,9 @@ export const messages = {
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
   "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-geheugen",
+  "agentSettings.builtinMemory.description":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",

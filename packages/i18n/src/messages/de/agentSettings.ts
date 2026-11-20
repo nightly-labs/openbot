@@ -238,6 +238,9 @@ export const messages = {
     "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "agentSettings.quickAcknowledgement.title": "Plan vor langen Aufgaben zeigen",
   "agentSettings.quickAcknowledgement.description": "Vor einer langen Aufgabe zeigt der Agent seinen Plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-Erinnerungen",
+  "agentSettings.builtinMemory.description":
+    "Der Agent speichert und liest eigene Erinnerungen. Schalte dies aus, um nur eine Gedächtnis-App wie Mem0 zu nutzen. Gespeicherte Erinnerungen bleiben.",
   "agentSettings.browserProfile.label": "Browser-Profil",
   "agentSettings.browserProfile.shared": "Gemeinsam",
   "agentSettings.browserProfile.agent": "Nur dieser Agent",

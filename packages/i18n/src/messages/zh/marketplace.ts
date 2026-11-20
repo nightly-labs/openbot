@@ -208,7 +208,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "在 Hindsight Cloud 的 Connect 页面创建密钥。",
   "marketplace.plugin.mnemoverse.tagline": "可以评分和共享的记忆",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse 为智能体提供托管的长期记忆。智能体保存一个偏好或决定，之后用一个普通问题就能找到。同一个账号可以在 ChatGPT、Claude、Cursor 和 VS Code 中使用。把找回的记忆评为有帮助或有误导，会改变下一次返回结果的顺序。共享房间让多个人的助手读写同一份记忆。Mnemoverse 接收的是智能体保存的内容和它用来搜索的问题。",
+    "Mnemoverse 为智能体提供托管的长期记忆。智能体保存一个偏好或决定，之后用一个普通问题就能找到。同一个账号可以在 ChatGPT、Claude、Cursor 和 VS Code 中使用。把找回的记忆评为有帮助或有误导，会改变下一次返回结果的顺序。共享房间让多个人的助手读写同一份记忆。在智能体设置中关闭“OpenBot 记忆”后，Mnemoverse 就成为该智能体唯一的记忆。Mnemoverse 接收的是智能体保存的内容和它用来搜索的问题。",
   "marketplace.plugin.mnemoverse.app": "在你的 Mnemoverse 账号中保存、搜索和评价记忆。",
   "marketplace.plugin.mnemoverse.prompt.recall": "开始之前，在 Mnemoverse 里查一下上次关于这个项目做了什么决定。",
   "marketplace.plugin.mnemoverse.prompt.save": "把这次对话中的每个决定分别作为一条记忆保存到 Mnemoverse。",

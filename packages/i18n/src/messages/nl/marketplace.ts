@@ -222,7 +222,7 @@ export const messages = {
   "marketplace.plugin.hindsight.hint.apiKey": "Maak een sleutel op de pagina Connect van Hindsight Cloud.",
   "marketplace.plugin.mnemoverse.tagline": "Geheugen om te beoordelen en te delen",
   "marketplace.plugin.mnemoverse.description":
-    "Mnemoverse geeft agents een gehost langetermijngeheugen. Een agent slaat een voorkeur of een beslissing op en vindt die later terug met een gewone vraag. Hetzelfde account werkt in ChatGPT, Claude, Cursor en VS Code. Als je een opgehaalde herinnering als nuttig of misleidend beoordeelt, verandert wat de volgende keer bovenaan komt. In gedeelde ruimtes lezen en schrijven de assistenten van meerdere mensen in één geheugen. Mnemoverse ontvangt wat een agent opslaat en de vragen waarmee hij zoekt.",
+    "Mnemoverse geeft agents een gehost langetermijngeheugen. Een agent slaat een voorkeur of een beslissing op en vindt die later terug met een gewone vraag. Hetzelfde account werkt in ChatGPT, Claude, Cursor en VS Code. Als je een opgehaalde herinnering als nuttig of misleidend beoordeelt, verandert wat de volgende keer bovenaan komt. In gedeelde ruimtes lezen en schrijven de assistenten van meerdere mensen in één geheugen. Zet je “OpenBot-geheugen” uit in de instellingen van een agent, dan wordt Mnemoverse het enige geheugen van die agent. Mnemoverse ontvangt wat een agent opslaat en de vragen waarmee hij zoekt.",
   "marketplace.plugin.mnemoverse.app": "Herinneringen in je Mnemoverse-account opslaan, doorzoeken en beoordelen.",
   "marketplace.plugin.mnemoverse.prompt.recall":
     "Kijk voordat we beginnen in Mnemoverse wat er de vorige keer over dit project is besloten.",

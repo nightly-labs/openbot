@@ -12,6 +12,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
@@ -2566,6 +2567,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
         canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
         canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+        canManageAgentBuiltinMemory: (serverId) => administers(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY),
         canManageAgentDefaults: (serverId) => administers(serverId, AGENT_DEFAULTS_CAPABILITY),
         canManageBackgroundProcesses: (serverId) => administers(serverId, BACKGROUND_PROCESSES_CAPABILITY),
         canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
