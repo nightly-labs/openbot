@@ -18,7 +18,6 @@ function transferAgent(
   return { id, name, title, avatarSeed: id, avatarHue: null, avatarUrl: null, ...counts };
 }
 
-/** This computer, as `instanceTransfer.summary` answers it. */
 export const INSTANCE_TRANSFER_SUMMARY: InstanceTransferSummary = {
   agents: [
     transferAgent("research", "Research", "Market research analyst", {
@@ -59,7 +58,6 @@ export const INSTANCE_TRANSFER_SUMMARY: InstanceTransferSummary = {
   ],
 };
 
-/** A transfer file, as `instanceTransfer.choose` answers it. */
 export const INSTANCE_TRANSFER_PREVIEW: InstanceTransferPreview = {
   token: "transfer-preview",
   appVersion: "0.9.4",
@@ -71,7 +69,7 @@ export const INSTANCE_TRANSFER_PREVIEW: InstanceTransferPreview = {
 
 export const INSTANCE_TRANSFER_WARNINGS = [
   'Research: the model "llama-4-70b" is not available here yet, so the agent uses the default model. Choose the model again when its provider is ready.',
-  "GitHub: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in MCP settings.",
+  "GitHub: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in Marketplace, Apps.",
 ];
 
 export const INSTANCE_TRANSFER_RESULT: Omit<InstanceTransferResult, "agents"> = {

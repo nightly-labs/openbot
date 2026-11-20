@@ -23,6 +23,7 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationForAgentEvent,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
   decodeLiveActivityBytes,
@@ -43,33 +44,13 @@ import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
 
-/** The answer of a turn is among the last messages of the conversation. */
 const ANSWER_PAGE_SIZE = 20;
-/**
- * A member who did something in a desktop or web app this recently, or who used the computer of a
- * desktop app (`computer-activity-v1`), is at that app, which shows the event itself, so the phone
- * stays quiet. This includes the events that wait for the member: the desktop app asks for them. The
- * computer of this host counts the same idle time. It is short: a task can end at any time after the
- * member leaves the computer. An unpackaged app can set another time (`OPENBOT_DEV_AWAY_SECONDS`).
- */
 export const DESKTOP_USE_MS = 30 * 1000;
-/**
- * iOS can suspend the app before it says that it goes away, and the host sees the lost connection
- * about 30 s later, or about 150 s when only Signal reports it. An event in that time is kept this
- * long, and goes out when the phone turns out to be away and the member has not seen it.
- */
 const HELD_EVENT_MS = 5 * 60 * 1000;
-/** The most events kept for one phone. */
 const HELD_EVENT_LIMIT = 20;
-/**
- * A phone that iOS suspended while it sent `away` sends it when it runs again, just before it says
- * that it is back. The kept events wait this long, so the phone does not show them on screen.
- */
 const HELD_FLUSH_DELAY_MS = 3_000;
-/** A notification that the account service, Apple or Google did not take is sent again after these times. */
 const RESEND_DELAYS_MS = [10_000, 60_000] as const;
 
-/** One notification for the relay route of its platform. */
 export type NotificationRelayRequest =
   | { platform: "ios"; push: NotificationRelayPush }
   | { platform: "android"; push: AndroidNotificationRelayPush };
@@ -83,64 +64,37 @@ type PushNotificationAgents = Pick<
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
   store: Pick<PushNotificationStore, "list" | "replace">;
-  /** Sends one notification through the account service. `gone` means the phone gets no more. */
   send(request: NotificationRelayRequest): Effect.Effect<"sent" | "gone", PushNotificationSendFailure>;
-  /** The agents that the member's phone with this protocol and these capabilities cannot see. */
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, memberId: string): ReadonlySet<string>;
-  /** Whether the member is still a member and not disabled. A removed member gets no more notifications. */
   memberActive(memberId: string): boolean;
-  /** The last send, answer or typing of the member in a session other than this phone, or `null`. */
   lastUseElsewhere(memberId: string, sessionId: string): number | null;
-  /** How long after the last use of the member elsewhere the phone notifies. `DESKTOP_USE_MS` when not set. */
   awayAfterMs?: number;
-  /**
-   * The levels that the member chose on this server for all of their devices
-   * (`agent-notification-levels-v1`). The server level replaces the level of the phone's registration,
-   * and the level of an agent replaces the server level for the events of that agent.
-   */
   memberLevels?(memberId: string): {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  /**
-   * Whether the member is at the computer of this host, where the desktop app shows the event. For a
-   * side thread turn that is not a routine's, `event` is the `thread-turn-completed` event, as the
-   * desktop gets it.
-   */
   atHostComputer(memberId: string, event: AgentEvent): boolean;
-  /**
-   * Whether the session's phone shows a Live Activity of this host that shows this event, in place of
-   * a notification. With `alert`, the activity lights up the screen and plays the sound.
-   * `startedAt` is the start of the activity that the phone gives, in milliseconds, or `null`.
-   */
   liveActivityShows(
     sessionId: string,
     subject: PushNotificationSubject,
     alert: LiveActivityRelayPush["alert"],
     startedAt: number | null,
   ): boolean;
-  /** The channel whose execution thread `threadId` is, or `null` for an agent's own thread. */
   channelForThread?(threadId: string): AgentNotificationChannel | null;
   randomBytes(size: number): Uint8Array;
   now?: () => number;
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
-/** What the phone of a member can see. */
 interface PushNotificationViewer {
   memberId: string;
   protocol: number;
   capabilities: ReadonlySet<string>;
 }
 
-/** The agent and the kind of an event that can notify. */
 export interface PushNotificationSubject {
   agentId: string;
   kind: PushNotificationKind;
-  /**
-   * `true` for the end of a turn in a side thread. The Live Activity shows the replies and the failed
-   * turn of the agent's own chat only, so it does not show this event.
-   */
   sideThread?: boolean;
 }
 
@@ -153,36 +107,15 @@ interface Registration {
   stored: StoredPushRegistration;
   capabilities: ReadonlySet<string>;
   keys: PushNotificationKeys;
-  /** `false` after the connection of the session closed, as when iOS suspends the app. */
   connected: boolean;
-  /** Events that came while the phone looked on screen, oldest first. */
   held: HeldEvent[];
   flushTimer: ReturnType<typeof setTimeout> | null;
 }
 
-/**
- * Sends a notification to a member's iPhone or Android phone when an agent that the member can see
- * finishes, fails, cannot start a message, or waits for input, an approval or a browser step, while
- * the app is not on screen.
- * It decides as the desktop does (`notificationForAgentEvent`): the member's level, the agent's own
- * switch, and no notification for a quiet routine run. It sends nothing while the member uses a
- * desktop app or the computer that it runs on, and no answer to a message while an iPhone shows the Live Activity, which shows the
- * answer. The agent name and the text are sealed for the phone, so the account service, Apple and
- * Google see the token, the time, and sealed bytes only.
- *
- * The end of a turn in a side thread notifies too, and the notification names that thread, so a tap
- * opens it. A routine thread notifies each phone, as a routine run in the agent's chat did. Another
- * side thread notifies only a phone that can open it (`push-notification-threads-v1`) and that did not
- * turn these notifications off.
- *
- * The phones are kept in a file, so they get notifications after this computer restarts, also when
- * they do not connect again. The account service sends nothing for a session that has ended.
- */
 export class PushNotificationService {
   readonly #options: PushNotificationOptions;
   readonly #now: () => number;
   readonly #registrations = new Map<string, Registration>();
-  /** The last input on the computer of each desktop session (`computer-activity-v1`). Older entries go. */
   readonly #computerInput = new Map<string, { memberId: string; at: number }>();
   readonly #awayAfterMs: number;
   readonly #listener = (event: AgentEvent) => {
@@ -191,9 +124,7 @@ export class PushNotificationService {
   };
   #scope = Scope.makeUnsafe();
   #listening = false;
-  /** Between `start` and `dispose`. A request that comes later must not save a list without the other phones. */
   #running = false;
-  /** Saves finish before `dispose` returns, so the file has the last list. */
   readonly #saves = new Set<Fiber.Fiber<void>>();
 
   constructor(options: PushNotificationOptions) {
@@ -202,10 +133,6 @@ export class PushNotificationService {
     this.#awayAfterMs = options.awayAfterMs ?? DESKTOP_USE_MS;
   }
 
-  /**
-   * The desktop app of a session says that its computer had input `idleSeconds` ago. Answers whether
-   * a phone of the member gets notifications from this host, so the app knows whether to tell more.
-   */
   computerInput(sessionId: string, memberId: string, idleSeconds: number): boolean {
     const now = this.#now();
     for (const [other, input] of this.#computerInput) {
@@ -217,7 +144,6 @@ export class PushNotificationService {
     return [...this.#registrations.values()].some((registration) => registration.stored.memberId === memberId);
   }
 
-  /** The last use of the member in a session other than `sessionId`: a send, an answer, typing or computer input. */
   #lastUseElsewhere(memberId: string, sessionId: string): number | null {
     let last = this.#options.lastUseElsewhere(memberId, sessionId);
     for (const [other, input] of this.#computerInput) {
@@ -226,7 +152,6 @@ export class PushNotificationService {
     return last;
   }
 
-  /** Reads the saved phones when the host starts. They count as away until they connect again. */
   start(): void {
     this.#running = true;
     for (const stored of this.#options.store.list()) {
@@ -236,21 +161,16 @@ export class PushNotificationService {
   }
 
   register(sessionId: string, viewer: PushNotificationViewer, target: PushTarget): void {
-    // The phone registers again when it connects to the next runtime.
     if (!this.#running) return;
     const { memberId, protocol, capabilities } = viewer;
     const previous = this.#registrations.get(sessionId);
-    // The request came over the connection of this session, so it is open.
-    // The frozen registration does not carry the thread choice, so a phone that registers again keeps it.
     const threadReplies = previous?.stored.threadReplies;
     const threadChoice = threadReplies === undefined ? {} : { threadReplies };
     const stored = { sessionId, memberId, protocol, capabilities: [...capabilities], ...threadChoice, ...target };
     if (!this.#add(stored, true, previous)) throw new Error("The notification secret is not valid.");
     const registration = this.#registrations.get(sessionId);
-    // The app on screen showed the kept events. A phone that goes away gets those it did not see.
     if (registration && target.value.away) this.#scheduleFlush(registration);
     else if (registration) this.#dropHeld(registration);
-    // A phone that signs in again gets a new session. The old one would notify it a second time.
     const token = target.value.token;
     for (const [other, registration] of this.#registrations) {
       if (other !== sessionId && token !== null && registration.stored.value.token === token) {
@@ -261,11 +181,6 @@ export class PushNotificationService {
     this.#save();
   }
 
-  /**
-   * The phone of the session says whether it takes a notification for the end of a turn in a side
-   * thread (`push-notification-threads-v1`). The choice stays with the registration of the session. A
-   * session without a registration has nothing to keep.
-   */
   setThreadReplies(sessionId: string, replies: boolean): void {
     const registration = this.#registrations.get(sessionId);
     if (!this.#running || !registration) return;
@@ -274,7 +189,6 @@ export class PushNotificationService {
     this.#save();
   }
 
-  /** The connection of the session closed. The phone can still come back on the same session. */
   disconnected(sessionId: string): void {
     const registration = this.#registrations.get(sessionId);
     if (!registration) return;
@@ -282,7 +196,6 @@ export class PushNotificationService {
     this.#scheduleFlush(registration);
   }
 
-  /** The path of the session came back, as when the phone app runs again. The app shows events itself. */
   reconnected(sessionId: string): void {
     const registration = this.#registrations.get(sessionId);
     if (!registration) return;
@@ -290,7 +203,6 @@ export class PushNotificationService {
     if (!registration.stored.value.away) this.#dropHeld(registration);
   }
 
-  /** The phone turned notifications off, signed out, or the session ended. */
   remove(sessionId: string): void {
     this.#computerInput.delete(sessionId);
     const registration = this.#registrations.get(sessionId);
@@ -300,7 +212,6 @@ export class PushNotificationService {
     this.#save();
   }
 
-  /** The saved phones stay in the file for the next start. */
   readonly dispose = Effect.fn("PushNotifications.dispose")(function* (this: PushNotificationService) {
     this.#running = false;
     if (this.#listening) this.#options.agents.off("event", this.#listener);
@@ -328,30 +239,20 @@ export class PushNotificationService {
     return true;
   }
 
-  /**
-   * Sends `event` to each phone that is away, or only to `only`. A phone that looks on screen keeps
-   * the event, because iOS can suspend the app before it says that it goes away.
-   */
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
     received: AgentEvent,
     only?: Registration,
   ) {
-    // A side thread's turn notifies as a turn of the chat does. Its answer is in that thread.
+    if (teammateTurnCompleted(received)) return;
     const thread = received.type === "thread-turn-completed" ? received : null;
     const event = thread ? thread.turn : received;
     const subject = eventSubject(event, thread !== null);
     if (!subject) return;
     const now = this.#now();
-    // The desktop notifies about a routine thread turn as about a turn of the chat. It does not notify
-    // about the turn of another side thread.
     const desktopNotifies = !thread || thread.routine;
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
       const { value, memberId, protocol, sessionId } = registration.stored;
-      // A routine run notified from the agent's chat before each routine had a thread, so each phone
-      // still gets it. A phone gets the turns of the other side threads only when a tap can open the
-      // thread, and while the member did not turn them off on that phone. Such a turn is not kept
-      // either: it would take the place of an event that the phone can get.
       if (
         thread &&
         !thread.routine &&
@@ -359,7 +260,6 @@ export class PushNotificationService {
           registration.stored.threadReplies === false)
       )
         return false;
-      // While the app is on screen, it shows the event itself.
       if (!value.away && registration.connected) {
         if (!only) this.#hold(registration, received, now);
         return false;
@@ -371,10 +271,6 @@ export class PushNotificationService {
       }
       if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
         return false;
-      // A member at a desktop app sees the event there, and the phone would only repeat it. No desktop
-      // notifies about a side thread turn that is not a routine's. So for it, input on the computer in
-      // another app does not count: only the use of OpenBot does, and the host computer gets the
-      // event as its desktop gets it, which shows it only in a window with focus.
       const used = desktopNotifies
         ? this.#lastUseElsewhere(memberId, sessionId)
         : this.#options.lastUseElsewhere(memberId, sessionId);
@@ -385,7 +281,7 @@ export class PushNotificationService {
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
-    // A prompt, an approval or a takeover on a channel thread names the channel, as on desktop.
+    const userHidden = agents.some((agent) => agent.id === subject.agentId && agent.hiddenAt !== undefined);
     const requestThread = agentEventRequestThread(event);
     const channel = requestThread ? (this.#options.channelForThread?.(requestThread) ?? null) : null;
     let answer: string | null | undefined;
@@ -394,15 +290,15 @@ export class PushNotificationService {
       const { value, memberId, sessionId } = stored;
       const translate = translateFor(resolveLocale("system", value.locale));
       const chosen = this.#options.memberLevels?.(memberId);
-      const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);
-      // A phone from before channel-attention-v1 has no channel view, so its title names the agent only.
+      const level = agentNotificationLevel(
+        chosen?.server ?? value.level,
+        chosen?.agents ?? null,
+        subject.agentId,
+        userHidden,
+      );
       const eventChannel = registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY) ? channel : null;
-      // The fixed text, as the desktop shows it without a preview.
       const fixed = notificationForAgentEvent(event, agents, translate, level, null, eventChannel);
       if (!fixed) continue;
-      // The Live Activity of an iPhone shows the event, and a notification would repeat it. With a
-      // sound, the activity also lights up the screen and plays it; without one, it updates silently.
-      // A message that did not start has no turn, so the activity does not show it.
       if (stored.platform !== "android") {
         const sound = soundOf(stored.value);
         const startedAt =
@@ -412,14 +308,11 @@ export class PushNotificationService {
           this.#options.liveActivityShows(sessionId, subject, sound ? { sound } : null, startedAt)
         )
           continue;
-        // An iPhone with notifications off registers for the sound of the Live Activity only.
         if (stored.value.token === null) continue;
       }
       if (value.preview && subject.kind === "reply" && event.type === "turn-completed" && answer === undefined) {
         answer = yield* this.#answer(event, memberId, agents, thread?.taskId ?? null);
       }
-      // The desktop builds the same preview: the answer, the question, or the action to approve,
-      // with its secrets redacted.
       const notice = value.preview
         ? (notificationForAgentEvent(
             event,
@@ -438,13 +331,10 @@ export class PushNotificationService {
         title: notice.title,
         body: notice.body,
       };
-      // A failed send waits before it goes again, so each send has its own fiber: the other phones
-      // do not wait for it.
       yield* this.#send(registration, content, fixed.body).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
     }
   });
 
-  /** The answer of a turn in the agent's own chat or in a side thread, or `null` when it has none. */
   #answer = Effect.fn("PushNotifications.answer")(function* (
     this: PushNotificationService,
     event: AgentTurnCompletedEvent,
@@ -455,7 +345,6 @@ export class PushNotificationService {
     let messages: ConversationMessage[] | null = null;
     if (taskId) {
       messages = yield* Effect.try(() => this.#options.agents.readTask(event.agentId, taskId).messages).pipe(
-        // The thread was deleted after the turn, as when its routine was deleted.
         Effect.catch(() => Effect.succeed(null)),
       );
     } else if (agents.find((agent) => agent.id === event.agentId)?.threadId === event.threadId) {
@@ -465,7 +354,6 @@ export class PushNotificationService {
       messages = page?.messages ?? null;
     }
     const text = messages ? latestTurnAnswer(messages, event.turnId)?.text : undefined;
-    // A routine Test run shows the no-update marker in the chat, but it is not news.
     return text && !isNoUpdateAnswer(text) ? text : null;
   });
 
@@ -477,18 +365,15 @@ export class PushNotificationService {
   ) {
     const { stored, keys } = registration;
     let sealed = sealPushNotification(content, keys, this.#options.randomBytes(LIVE_ACTIVITY_NONCE_BYTES));
-    // A long agent name and a preview of wide characters can pass the 4 KB limit of Apple and Google.
     if (sealed.length > NOTIFICATION_SEALED_LIMIT) {
       const short = { ...content, title: content.title.slice(0, 64), body: shortBody };
       sealed = sealPushNotification(short, keys, this.#options.randomBytes(LIVE_ACTIVITY_NONCE_BYTES));
     }
     const request = relayRequest(stored, sealed, Math.floor(this.#now() / 1_000));
     if (!request) return;
-    // A Mac that wakes before its network, or a short fault at Apple or Google, refuses one send.
     for (let attempt = 0; ; attempt += 1) {
       const result = yield* Effect.result(this.#options.send(request));
       if (Result.isSuccess(result)) {
-        // The session ended, the app was removed, or Apple or Google refused the token.
         if (result.success === "gone" && this.#registrations.get(stored.sessionId) === registration) {
           this.remove(stored.sessionId);
         }
@@ -500,12 +385,10 @@ export class PushNotificationService {
         return;
       }
       yield* Effect.sleep(delay);
-      // The phone removed the registration or registered again, and that registration gets the next events.
       if (this.#registrations.get(stored.sessionId) !== registration) return;
     }
   });
 
-  /** Keeps an event for a phone that looks on screen, in case iOS suspended it before it said so. */
   #hold(registration: Registration, event: AgentEvent, now: number): void {
     const held = registration.held.filter((item) => now - item.at < HELD_EVENT_MS);
     held.push({ event, at: now });
@@ -522,7 +405,6 @@ export class PushNotificationService {
     registration.flushTimer = null;
   }
 
-  /** An answer from any device ends the wait for a request, so a kept notification of it is old. */
   #releaseAnswered(event: AgentEvent): void {
     const answered =
       event.type === "agent-input-resolved" || event.type === "browser-takeover-resolved"
@@ -537,7 +419,6 @@ export class PushNotificationService {
     }
   }
 
-  /** Sends the kept events of a phone that is away, after a short wait for the phone to say that it is back. */
   #scheduleFlush(registration: Registration): void {
     if (!registration.held.length || registration.flushTimer) return;
     registration.flushTimer = setTimeout(() => {
@@ -560,9 +441,6 @@ export class PushNotificationService {
       markerExclusionsForCapabilities(registration.capabilities),
     );
     const agents = this.#options.agents.listAgents();
-    // A phone that said that it goes away over an open connection was on screen until then, so it
-    // gets only the events that it surely did not see. After a lost connection, iOS can have
-    // suspended the app before it showed them, so the events that the host cannot judge go out too.
     const sawScreen = registration.connected;
     for (const { event } of held) {
       const unseen = heldEventUnseen(event, snapshot, reads, agents);
@@ -599,7 +477,6 @@ function soundOf(value: StoredPushRegistration["value"]): NotificationSound | nu
   return value.sound === "none" ? null : value.sound;
 }
 
-/** The relay request of the platform of the phone, or `null` for an iPhone without a token. */
 function relayRequest(
   stored: StoredPushRegistration,
   sealed: string,
@@ -614,30 +491,21 @@ function relayRequest(
   return token === null ? null : { platform: "ios", push: { token, environment, sessionId, sealed, sound, timestamp } };
 }
 
-/**
- * Whether the member still has to see a kept event: the reply in the agent's own chat is unread, the
- * turn still shows as failed, or the request still waits (an answered one left the list when its
- * answer came). `null` when the host cannot know: a reply in another thread, or a message that did
- * not start.
- */
 function heldEventUnseen(
   event: AgentEvent,
   snapshot: ReturnType<PushNotificationAgents["getRuntimeSnapshot"]>,
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
 ): boolean | null {
-  // As for a reply in another thread of the chat below.
   if (event.type === "error" || event.type === "thread-turn-completed") return null;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
   }
-  // The read state counts the agent's own chat only. A reply in another thread is not known as read.
   if (agents.find((agent) => agent.id === event.agentId)?.threadId !== event.threadId) return null;
   return (reads[event.agentId]?.unreadCount ?? 0) > 0;
 }
 
-/** The request that a kept event waits for, or `null` for an event that waits for nothing. */
 function heldRequest(event: AgentEvent): { agentId: string; requestId: string | number } | null {
   switch (event.type) {
     case "prompt":
@@ -651,10 +519,6 @@ function heldRequest(event: AgentEvent): { agentId: string; requestId: string | 
   }
 }
 
-/**
- * The agent and the kind of an event that can notify. `notificationForAgentEvent` decides the rest.
- * `sideThread` is true for the turn of a `thread-turn-completed` event.
- */
 function eventSubject(event: AgentEvent, sideThread: boolean): PushNotificationSubject | null {
   if (!agentEventCanNotify(event)) return null;
   switch (event.type) {
@@ -666,7 +530,6 @@ function eventSubject(event: AgentEvent, sideThread: boolean): PushNotificationS
       return { agentId: event.approval.agentId, kind: "approval" };
     case "browser-takeover-requested":
       return { agentId: event.request.agentId, kind: "browser" };
-    // A message or a routine run that did not start failed as a turn does.
     case "error":
       return event.agentId ? { agentId: event.agentId, kind: "failed" } : null;
     default:

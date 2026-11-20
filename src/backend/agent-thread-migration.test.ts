@@ -1,13 +1,9 @@
 // @vitest-environment node
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a task does not become a thread, or
-// loses a column; a task row with no thread stops the upgrade; a failed upgrade leaves the new table, or
-// drops the task table; a newer or incomplete history is accepted; a queued message that names its task
-// no longer finds the thread; a thread can point to no conversation, or two threads to one task; a
-// deleted conversation leaves its thread behind. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -28,7 +24,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** The agent's own chat and two task conversations, in the columns every release has. */
 function seedThreads(db: DatabaseSync): void {
   const insert = db.prepare("INSERT INTO projection_threads VALUES (?, 'chief', ?, NULL, ?, ?, 1)");
   insert.run("openbot-thread-chief", 'Chief 界"\\', "2026-10-01T07:00:00.000Z", "2026-10-01T07:00:00.000Z");
@@ -36,7 +31,6 @@ function seedThreads(db: DatabaseSync): void {
   insert.run("openbot-thread-closed", "Release notes", "2026-10-01T09:00:00.000Z", "2026-10-01T09:00:00.000Z");
 }
 
-/** An open task of the person, and a closed, failed task that the agent started. From schema 38 on. */
 function seedTasks(db: DatabaseSync): void {
   db.exec(`INSERT INTO projection_agent_tasks
     (task_id, agent_id, thread_id, origin, title, outcome, error, created_at, updated_at, closed_at,
@@ -47,14 +41,12 @@ function seedTasks(db: DatabaseSync): void {
         '2026-10-01T09:00:00.000Z', '2026-10-02T09:00:00.000Z', '2026-10-03T09:00:00.000Z', 7)`);
 }
 
-// Migration 49 adds the GitHub workflow tables, empty.
 const EMPTY_GITHUB_TABLES = {
   workflow_github_actions: [],
   workflow_github_deliveries: [],
   workflow_github_runs: [],
 };
 
-// Migration 48 adds the branch link, null for every moved task.
 const THREADS = [
   {
     thread_id: "openbot-thread-closed",
@@ -94,7 +86,6 @@ const THREADS = [
   },
 ];
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Record<string, unknown[]> {
   const tables = db
     .prepare(
@@ -118,10 +109,6 @@ function agentTables(db: DatabaseSync): unknown[] {
     .all();
 }
 
-/**
- * The rows that migration 47 must keep: every table except the task table, which becomes the thread table.
- * Migration 51 adds an empty sender table after it.
- */
 function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]> {
   const {
     projection_agent_tasks: _tasks,
@@ -132,13 +119,15 @@ function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]
     browser_profile_proxies: _profileProxies,
     agent_usage_skill_loads: _skillLoads,
     projection_messaging_pings: _pings,
+    projection_pinned_thread_messages: _pins,
+    projection_messaging_history: _history,
     ...kept
   } = rows;
-  return kept;
+  return Object.fromEntries(Object.entries(kept).filter(([table]) => !table.startsWith("crm_")));
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 66 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -165,13 +154,16 @@ describe("agent thread migration", () => {
     (version) => {
       const db = databaseAt(version);
       seedThreads(db);
-      // The earlier migrations run first; the rows after them are what v47 must keep.
       if (version < 38) migrateUpTo(db, 38);
       seedTasks(db);
       if (version < 46) migrateUpTo(db, 46);
       const before = contents(db);
       migrateOpenBotDatabase(db);
-      expect(withoutTasks(contents(db))).toEqual({ ...withoutTasks(before), ...EMPTY_GITHUB_TABLES });
+      expect(withoutTasks(contents(db))).toEqual({
+        ...withoutTasks(before),
+        ...EMPTY_GITHUB_TABLES,
+        ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+      });
       expect(threads(db)).toEqual(THREADS);
       expect(agentTables(db)).toEqual([
         { type: "index", name: "agent_threads_agent" },
@@ -245,9 +237,9 @@ describe("agent thread migration", () => {
     seedThreads(db);
     seedTasks(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(61,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(67,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=61; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=67; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
   });

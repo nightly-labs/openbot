@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("update", {
-  // The app update button in Settings, one label for each updater phase.
   "update.action.check": "Check for updates",
   "update.action.checking": "Checking for updates…",
   "update.action.download": "Download update",
@@ -12,12 +11,15 @@ export const messages = defineMessages("update", {
   "update.managedByHost": "Managed by host",
   "update.upToDate": "Up to date",
 
-  // The provider CLI update notification.
   "update.provider.update": "Update",
   "update.provider.upToDate": "{name} is up to date",
   "update.provider.checking": "Checking for {name} updates",
   "update.provider.available": "{name} update available",
   "update.provider.updating": "Updating {name}",
+  "update.provider.downloading": "Downloading {name}",
+  "update.provider.downloaded": "{name} is downloaded",
+  "update.provider.downloadFailed": "{name} download failed",
+  "update.provider.downloadFailedRetry": "The download failed. Try again.",
   "update.provider.waiting": "Waiting to update {name}",
   "update.provider.failed": "{name} update failed",
   "update.provider.settingUp": "Setting up",
@@ -30,16 +32,13 @@ export const messages = defineMessages("update", {
   "update.provider.showDetails": "Show details",
   "update.provider.hideDetails": "Hide details",
 
-  // An update that an admin of this server asked for. {name} is the admin.
   "update.scheduled.title": "{name} scheduled an OpenBot update",
-  // The same notice when "Install updates automatically" scheduled the restart.
   "update.scheduled.automaticTitle": "OpenBot installs an update",
   "update.scheduled.whenIdle": "OpenBot restarts when the agents are idle.",
   "update.scheduled.now": "OpenBot restarts when the update is downloaded.",
   "update.scheduled.cancel": "Cancel update",
   "update.scheduled.cancelFailed": "The update could not be cancelled.",
 
-  // A restart that the user of this computer asked for. It waits until no work runs.
   "update.idleRestart.relaunchTitle": "OpenBot restarts when the agents are idle",
   "update.idleRestart.updateTitle": "OpenBot installs the update when the agents are idle",
   "update.idleRestart.description": "New routine runs wait until the restart.",
@@ -49,7 +48,6 @@ export const messages = defineMessages("update", {
   "update.idleRestart.requestFailed": "The restart could not be scheduled.",
   "update.idleRestart.failedTitle": "OpenBot did not restart",
 
-  // The "What's new" dialog after an app update.
   "update.whatsNew.title": "What’s new in OpenBot",
   "update.whatsNew.description": "The new features and changes in this version of OpenBot.",
   "update.whatsNew.version": "Version {version}",
@@ -69,4 +67,10 @@ export const messages = defineMessages("update", {
   "update.whatsNew.changelog": "Full changelog",
   "update.whatsNew.changelogFailed": "OpenBot could not open the changelog.",
   "update.whatsNew.done": "Got it",
+
+  "update.required.title": "Update required",
+  "update.required.description": "OpenBot {version} is no longer supported. Update to {minimum} or newer to continue.",
+  "update.required.download": "Download OpenBot",
+  "update.required.continue": "Continue without updating",
+  "update.required.failed": "The update did not finish.",
 });

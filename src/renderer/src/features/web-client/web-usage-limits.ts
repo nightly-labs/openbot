@@ -14,11 +14,6 @@ const decodeUsageLimits = guardedDecoder(isAgentUsageLimits, "agent usage limit 
 
 const NONE: AgentUsageLimits = { usageLimits: [], usageLimitedModels: [], failedModels: [] };
 
-/**
- * The usage limits of one host's agents, through `agent-usage-limit-v1`. The released runtime snapshot
- * does not carry them, so each snapshot reads them again. A host without the capability has none. The
- * owner ends, it stops listening.
- */
 export function createWebUsageLimits(options: {
   workspace: Pick<WebWorkspace, "state" | "onHostEvent">;
   hostId: string;
@@ -26,7 +21,6 @@ export function createWebUsageLimits(options: {
 }) {
   const { workspace, hostId } = options;
   const [limits, setLimits] = createSignal<AgentUsageLimits>(NONE);
-  /** The reset time of the limit for which the user chose Wait, by agent id. */
   const [waited, setWaited] = createSignal<Record<string, number | null>>({});
   let reading = false;
   let stale = false;
@@ -45,7 +39,6 @@ export function createWebUsageLimits(options: {
           : NONE;
         if (disposed) break;
         setLimits(next);
-        // A hold that ended takes its "Wait" with it, so the next hold asks again.
         const held = new Set(next.usageLimits.map((limit) => limit.agentId));
         setWaited((current) => Object.fromEntries(Object.entries(current).filter(([agentId]) => held.has(agentId))));
       } while (stale && !disposed);
@@ -53,7 +46,6 @@ export function createWebUsageLimits(options: {
       reading = false;
     }
   };
-  // A failed read keeps the last limits; the next runtime snapshot reads them again.
   const refresh = () => void read().catch(() => undefined);
   onCleanup(() => {
     disposed = true;
@@ -61,7 +53,6 @@ export function createWebUsageLimits(options: {
   onCleanup(
     workspace.onHostEvent((event) => {
       if (workspace.state.host?.hostId !== hostId) return;
-      // A limit can start or end while the host is away, and a reconnect sends a runtime snapshot.
       if (event.type === "runtime-snapshot") refresh();
     }),
   );

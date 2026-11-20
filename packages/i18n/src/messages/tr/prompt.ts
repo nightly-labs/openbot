@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Girdi gerekiyor",
   "prompt.question.label": "Ajan soruları",
   "prompt.question.cancelled": "Sorular iptal edildi",
   "prompt.question.expired": "Soruların süresi doldu",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "İleri",
   "prompt.question.cancel": "Soruları iptal et",
   "prompt.question.privatePlaceholder": "Gizli bir yanıt girin",
-  "prompt.customPlaceholder": "Kendi yanıtınızı yazın",
   "prompt.question.customAnswerFor": "Şunun için özel yanıt: {question}",
   "prompt.question.skip": "Atla",
   "prompt.question.chooseAll": "Uygun olanların hepsini seçin.",
   "prompt.question.somethingElse": "Başka bir şey",
   "prompt.question.emptyTitle": "Bekleyen soru yok.",
   "prompt.question.emptyBody": "Ajan başka bir karara ihtiyaç duyduğunda devam edecektir.",
-  "prompt.choice.hint": "Uygun olanı seçin veya kendinizinkini yazın.",
-  "prompt.choice.customLabel": "Özel yanıt",
   "prompt.approval.answerFailed": "Bu onay yanıtlanamadı. Tekrar deneyin.",
   "prompt.approval.grantFailed": "Kalıcı onay kaydedilemedi. Tekrar deneyin.",
   "prompt.approval.label": "Ajan onayı",
@@ -29,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "İzin ver",
   "prompt.approval.alwaysAllow": "Her zaman izin ver",
   "prompt.approval.deny": "Reddet",
+  "prompt.approval.cut":
+    "Bu kart isteğin yalnızca başını gösterdiği için yalnızca Reddet sunuyor. İzin ver yakında görünmezse sunucudaki OpenBot'u güncelleyin.",
   "prompt.approval.report.bugHeadline": "Bir hata mı buldun? Hadi düzeltelim.",
   "prompt.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
   "prompt.approval.report.dontSend": "Şimdi değil",
   "prompt.approval.report.send": "OpenBot ekibine gönder",
+  "prompt.approval.report.phoneOnly":
+    "Bu sohbeti OpenBot telefon uygulamasında açın ve raporu oradan gönderin. Telefon kendi sürümünü, sistemini ve destek günlüğünü ekler. Telefon bağlanamıyorsa telefon uygulamasında Ayarlar > Destek bölümünü açın ve sorunu GitHub'da bildirin.",
   "prompt.approval.title.command": "Bir komut çalıştır",
   "prompt.approval.title.fileChange": "Dosyaları değiştir",
   "prompt.approval.title.permissions": "İzinleri ver",
@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "{host} üzerinde adımı tamamlayın",
   "prompt.browser.cancelled": "İptal edildi",
   "prompt.browser.reload":
-    "Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
+    "OpenBot parolayı veya kodu girmeyi tamamlayamadı. Sayfayı kontrol edin ve eksik olanı girin. Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
   "prompt.browser.continuing": "{name} devam ediyor.",
   "prompt.browser.cancelledBody": "Tarayıcı adımı iptal edildi.",
   "prompt.browser.pendingBody":
     "Oturum açma, doğrulama veya onayı tamamlamak için sayfayı açın. Ardından {name} ajanının devam etmesine izin verin.",
   "prompt.browser.openPage": "{title} sayfasını aç",
+  "prompt.browser.openFailed": "Sayfa ana pencerede açılamadı. Yeniden deneyin.",
   "prompt.browser.done": "Tamamladım",
   "prompt.browser.pageFallback": "Tarayıcı sayfası",
   "prompt.browser.hostFallback": "tarayıcı",
@@ -58,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} oturum açma işlemi iptal edildi",
   "prompt.browser.signInBlocked.body":
     "Bu bilgisayarda oturum açın. OpenBot {server} sunucusuna yalnızca {host} oturumunu gönderir ve {name} devam eder.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın. Ardından {name} devam eder.",
   "prompt.browser.signInBlocked.cancelledBody": "Oturum açma iptal edildi.",
   "prompt.browser.signInBlocked.waiting": "Oturum açma bekleniyor",
   "prompt.browser.signInBlocked.waitingButton": "Oturum açma bekleniyor…",

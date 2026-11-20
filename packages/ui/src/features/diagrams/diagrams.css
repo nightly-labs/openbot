@@ -1,5 +1,3 @@
-/* The diagram view: header, canvas, cards, edges, the assistant over the canvas and the run panel. */
-
 .diagram-view {
   display: flex;
   height: 100%;
@@ -10,7 +8,6 @@
   background: var(--openbot-bg-canvas);
 }
 
-/* What the Routines view says instead of a canvas: it is loading, it failed, or the server is remote. */
 .diagram-flows-notice {
   align-items: center;
   justify-content: center;
@@ -18,14 +15,10 @@
   font-size: var(--openbot-text-md);
 }
 
-/* The Bloub overflows its box. An auto grid track grows to the Bloub and starts at the box's top,
-   and its percentage height then resolves against that track, so the Bloub grows taller than wide
-   and sits low. One track the size of the box keeps every avatar here centred on its line. */
 .diagram-view .agent-avatar {
   grid-template: 100% / 100%;
 }
 
-/* The same height, avatar and name as the agent chat header, so switching views keeps the bar. */
 .diagram-view-header {
   display: flex;
   height: 38px;
@@ -36,14 +29,12 @@
   padding: 0 var(--openbot-space-3);
 }
 
-/* The chevron that closes routine details has no open fill: it is a close action, not a lit toggle. */
 .diagram-view .diagram-view-header .header-panel-toggle[aria-expanded="true"]:not(:hover) {
   border-color: transparent;
   background: transparent;
   color: var(--openbot-text-muted);
 }
 
-/* The run panel is at the inline end, so its toggle and Back chevrons follow the reading direction. */
 .diagram-view-actions .header-panel-toggle > svg:dir(rtl),
 .diagram-inspector .header-panel-toggle > svg:dir(rtl) {
   transform: scaleX(-1);
@@ -70,7 +61,6 @@
   height: var(--openbot-icon-xs);
 }
 
-/* The name keeps its room; the routine picker beside it is the part that narrows. */
 .diagram-view-title {
   max-width: 32ch;
   flex: none;
@@ -90,8 +80,6 @@
   margin-inline-start: auto;
 }
 
-/* As with the chat's browser sidebar: the routine details panel appears at once at the right edge, and
-   the canvas eases its padding to make room. */
 .diagram-view-body {
   --diagram-inspector-width: 340px;
 
@@ -107,7 +95,6 @@
   padding-inline-end: var(--diagram-inspector-width);
 }
 
-/* The board, or the empty canvas, and the chat panel over it. The panel keeps to this box. */
 .diagram-view-canvas {
   position: relative;
   display: flex;
@@ -121,11 +108,8 @@
   inset-inline-start: var(--openbot-space-4);
   z-index: 2;
   width: min(360px, calc(100% - var(--openbot-space-8)));
-  /* The folded panel keeps its box, so the canvas under it still takes the pointer. */
   pointer-events: none;
 }
-
-/* Canvas */
 
 .diagram-board {
   position: relative;
@@ -159,7 +143,6 @@
   position: absolute;
   top: 0;
   left: 0;
-  /* The world is a coordinate space, so it stays left to right in right-to-left text. */
   direction: ltr;
   transform-origin: 0 0;
 }
@@ -168,7 +151,6 @@
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The right-click menu's trigger wraps the viewport without a box of its own. */
 .diagram-board-menu-area {
   display: contents;
 }
@@ -179,7 +161,6 @@
   grid-template: 100% / 100%;
 }
 
-/* An agent row has a name and a title, so it gets more room than a one-line menu row. */
 .ui-action-menu.diagram-canvas-agents:not([data-menu-layout="grid"]) [role="menuitem"] {
   height: auto;
   gap: var(--openbot-space-3);
@@ -201,7 +182,6 @@
   white-space: nowrap;
 }
 
-/* A new agent, asked for at the spot the user right-clicked and kept inside the canvas. */
 .diagram-new-agent {
   position: absolute;
   top: clamp(
@@ -238,7 +218,6 @@
   grid-template: 100% / 100%;
 }
 
-/* The model field, drawn as the inputs above it are: their height, edge and fill. */
 .diagram-new-agent .provider-model-trigger-field {
   height: var(--openbot-control-sm);
   min-height: var(--openbot-control-sm);
@@ -267,7 +246,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* Zoom in, zoom out and fit, as a column of separate square buttons. */
 .diagram-board-zoom {
   position: absolute;
   inset-inline-end: var(--openbot-space-4);
@@ -294,7 +272,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* Below the routine picker, which holds the top centre of the canvas. */
 .diagram-board-status {
   position: absolute;
   top: calc(var(--openbot-space-4) + var(--openbot-control-sm) + var(--openbot-space-2));
@@ -321,8 +298,6 @@
   box-shadow: 0 0 0 1px var(--openbot-danger-border);
   color: var(--openbot-danger-text);
 }
-
-/* Edges. The SVG has no size of its own: it draws outside its box, in canvas coordinates. */
 
 .diagram-edges {
   position: absolute;
@@ -362,7 +337,6 @@
   animation: diagram-edge-flow 0.6s linear infinite;
 }
 
-/* A connection that belongs to one routine wears its colour, so its path reads as that routine's. */
 .diagram-edge[data-routine-color][data-state="idle"] .diagram-edge-line {
   stroke: var(--diagram-routine-color);
   opacity: 0.6;
@@ -374,7 +348,6 @@
   stroke-width: 3px;
 }
 
-/* One arrow where a connection enters a card. Before a run it stays readable on the quiet line. */
 .diagram-edge .diagram-edge-arrow {
   fill: var(--openbot-text-muted);
 }
@@ -431,8 +404,6 @@
     stroke-dashoffset: -12;
   }
 }
-
-/* Cards */
 
 .diagram-node {
   position: absolute;
@@ -565,7 +536,6 @@
   font-size: var(--openbot-text-md);
 }
 
-/* The output of the last run, inside the card, the way a generation shows its result. */
 .diagram-node-preview {
   display: flex;
   min-height: 64px;
@@ -648,7 +618,6 @@
 }
 
 .diagram-node-remove.ui-button,
-/* Stays at the right edge also when the routine has no runs to show. */
 .diagram-node-run.ui-button {
   flex: none;
   margin-inline-start: auto;
@@ -660,7 +629,6 @@
   height: var(--openbot-icon-xs);
 }
 
-/* Ports sit on the card's edge, level with the header. */
 .diagram-port.ui-button {
   position: absolute;
   top: 19px;
@@ -679,7 +647,6 @@
     background-color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* A larger target than the dot it shows. */
 .diagram-port.ui-button::before {
   position: absolute;
   inset: -8px;
@@ -716,8 +683,6 @@
   cursor: default;
 }
 
-/* Routine colours. A routine, the chips that name it on agent cards, and its path while it is in
-   focus share one colour, so a run can be followed across the canvas. */
 [data-routine-color="0"] {
   --diagram-routine-color: var(--openbot-file-blue);
   --diagram-routine-soft: var(--openbot-file-blue-soft);
@@ -748,7 +713,6 @@
   --diagram-routine-soft: var(--openbot-file-yellow-soft);
 }
 
-/* Outside the focused routine's path the canvas recedes, but stays readable and editable. */
 .diagram-node[data-dimmed] {
   opacity: 0.4;
 }
@@ -796,7 +760,6 @@
   white-space: nowrap;
 }
 
-/* The webhook of a routine in the details panel: the routine settings' card, and Save under it. */
 .diagram-routine-webhook {
   display: grid;
   gap: var(--openbot-space-2);
@@ -807,7 +770,6 @@
   justify-content: flex-end;
 }
 
-/* The routine picker, at the top centre of the canvas. */
 .diagram-view-lens-bar {
   position: absolute;
   top: var(--openbot-space-4);
@@ -845,7 +807,6 @@
   flex: none;
 }
 
-/* "All routines" has no colour of its own: its dot is an outline. */
 .diagram-view-lens-dot[data-all] {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--openbot-text-muted);
@@ -864,9 +825,6 @@
   background: var(--diagram-routine-soft);
 }
 
-/* Routine: what it asks, when it fires, how it went */
-
-/* The routine glows while the run it started is in progress. */
 .diagram-node[data-kind="routine"][data-firing] {
   box-shadow:
     0 0 0 1px var(--diagram-routine-color),
@@ -912,7 +870,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* One day, midnight at the top: a tick sits at the time the routine fires. */
 .diagram-routine-day-track {
   position: relative;
   width: 100%;
@@ -929,7 +886,6 @@
   box-shadow: inset 0 0 0 1px var(--openbot-accent);
 }
 
-/* Noon, so a morning run reads as morning. */
 .diagram-routine-day-track::after {
   position: absolute;
   top: 50%;
@@ -996,8 +952,6 @@
     scale: 1.15;
   }
 }
-
-/* Run panel */
 
 .diagram-inspector {
   position: absolute;
@@ -1072,7 +1026,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The task reads as text until the user points at it or types in it. */
 .diagram-inspector-task.ui-textarea {
   min-height: 0;
   margin: calc(-1 * var(--openbot-space-1-5));
@@ -1213,8 +1166,6 @@
   height: var(--openbot-icon-xs);
 }
 
-/* Assistant */
-
 .diagram-chat,
 .diagram-chat-launcher.ui-button {
   background: var(--openbot-bg-glass);
@@ -1224,9 +1175,6 @@
   backdrop-filter: blur(16px);
 }
 
-/* The launcher and the panel share one grid cell. Opening grows the panel out of the launcher's pill
-   with a clip that relaxes into the panel's own corners, with a little overshoot; closing folds it
-   back faster and without one. The panel's shadow sits outside its box, so the open clip leaves room. */
 .diagram-chat-morph {
   --diagram-chat-open-duration: var(--openbot-duration-island-content);
   --diagram-chat-close-duration: var(--openbot-duration-island-content-exit);
@@ -1289,7 +1237,6 @@
     opacity var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* The content settles a beat after the shape, so the panel reads as opening, not appearing. */
 .diagram-chat > * {
   filter: blur(var(--diagram-chat-blur));
   opacity: 0;
@@ -1363,7 +1310,6 @@
   white-space: pre-wrap;
 }
 
-/* The chat's Markdown, a size down to fit the panel. */
 .diagram-chat-markdown {
   min-width: 0;
   font-size: var(--openbot-text-md);
@@ -1401,9 +1347,9 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The chat composer's compact row, without its attach button: the editor and the send button. */
 .diagram-chat-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
+  flex-shrink: 0;
   margin: var(--openbot-space-2);
 }
 
@@ -1431,11 +1377,6 @@
   }
 }
 
-/*
- * The canvas before its first routine: a faint sample diagram builds itself behind the pitch, one
- * run passes through it, and it fades and starts again. The dots move into the backdrop, so they
- * clear behind the pitch with the cards.
- */
 .diagram-empty {
   container-type: inline-size;
 }
@@ -1482,7 +1423,6 @@
   filter: blur(4px);
 }
 
-/* A card lands: it rises out of a blur. */
 .diagram-empty-node {
   opacity: 0;
   filter: blur(6px);
@@ -1503,7 +1443,6 @@
   cursor: default;
 }
 
-/* A connection draws from its output to its input, after the card it enters has landed. */
 .diagram-empty .diagram-empty-edge[data-state="idle"] .diagram-edge-line {
   stroke-dasharray: 1600;
   stroke-dashoffset: 1600;
@@ -1523,7 +1462,6 @@
   opacity: 1;
 }
 
-/* The run pulse rides one connection, once, in the colour of the routine that fired. */
 .diagram-empty-pulse {
   position: absolute;
   top: 0;
@@ -1585,8 +1523,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The one handwritten word of the title. It writes itself once. The app has no hand font, so it
-   uses the system ones; their small x-height is brought up to the title's. */
 .diagram-empty-title .diagram-empty-hand {
   display: inline;
   color: var(--openbot-accent-text);
@@ -1619,7 +1555,6 @@
   margin-top: var(--openbot-space-2);
 }
 
-/* A narrow pane: a smaller title, and a stronger fade so the cards stay behind the words. */
 @container (max-width: 720px) {
   .diagram-empty-title {
     font-size: var(--openbot-text-3xl);
@@ -1634,7 +1569,6 @@
   }
 }
 
-/* Less motion: a still frame with the finished run. */
 .diagram-empty[data-still] :is(.diagram-empty-world, .diagram-empty-node, .diagram-empty-hand),
 .diagram-empty[data-still] .diagram-empty-edge[data-state] path {
   animation: none;

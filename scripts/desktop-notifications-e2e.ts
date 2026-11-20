@@ -1,13 +1,3 @@
-// Checks which agent events raise a desktop notification, that an answer withdraws it, and that the
-// owner's phone tells the owner when mute or the level keeps the desktop quiet. Events go through the
-// real notification forwarder, with an Electron `Notification` that records what it shows and closes,
-// and through the real phone notification service, with a send that records what it sends. The
-// level and the mute are set on a real `RemoteServerManager` on a temporary profile. Only the local
-// server is used, so no remote host or account is needed. A run in a routine thread notifies on both,
-// and a click on its desktop notification opens the routine thread.
-// Run: `bun scripts/desktop-notifications-e2e.ts`.
-// Writes .openbot-build/desktop-notifications-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -47,12 +37,9 @@ interface RecordedNotification {
   click: () => void;
 }
 
-/** The notifications that the forwarder showed, in order. */
 const shown: RecordedNotification[] = [];
-/** The payloads of the "notification opened" events that a click sent to the window. */
 const opened: unknown[] = [];
 
-// The main process imports Electron. No check here opens a window or a real notification.
 plugin({
   name: "desktop-notifications-electron-boundary",
   setup(build) {
@@ -88,7 +75,6 @@ plugin({
       loader: "object",
       exports: {
         app: { getPath: () => tmpdir(), getVersion: () => APP_VERSION, isPackaged: false, on: () => undefined },
-        // The window is open and not focused: the case in which a notification is due.
         BrowserWindow: class UnfocusedWindow {
           static getAllWindows() {
             return [];
@@ -154,7 +140,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -176,6 +161,7 @@ const userData = join(root, "user-data");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -193,7 +179,6 @@ const agentBrowser: AgentBrowserHost = {
   unshareThread: () => undefined,
   agentTab: () => null,
 };
-/** Stored tokens are not read here: the local server has none. */
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8"),
   decrypt: (value: Buffer) => value.toString("utf8"),
@@ -208,12 +193,9 @@ const manager = new RemoteServerManager(join(userData, "remote-servers.json"), c
   appVersion: APP_VERSION,
 });
 let agents: AgentService | undefined;
-/** The agent events that the phone service reads, as the host's agent service sends them. */
 const hostEvents = new EventEmitter<{ event: [AgentEvent] }>();
 const sent: NotificationRelayRequest[] = [];
-/** The levels that the owner chose for each agent, which the desktop and the owner's phone read. */
 const ownLevels = new Map<string, ServerNotificationLevel>();
-/** The owner's level of the whole server, for all of their devices, or `null` for the level of each device. */
 let ownServerLevel: ServerNotificationLevel | null = null;
 const sentWaiters: (() => void)[] = [];
 const phone = new PushNotificationService({
@@ -225,7 +207,6 @@ const phone = new PushNotificationService({
     readTask: () => {
       throw new Error("Previews are off in this check.");
     },
-    // The phone is away from the start, so it keeps no event to read the state for.
     getRuntimeSnapshot: () => {
       throw new Error("Not used by this check.");
     },
@@ -243,10 +224,8 @@ const phone = new PushNotificationService({
   hiddenAgentIds: () => new Set(),
   memberActive: () => true,
   lastUseElsewhere: () => null,
-  // As `hostComputerInUse` decides for the owner with recent input and the window not focused.
   atHostComputer: (memberId, event) =>
     memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
-  // The host reads the owner's levels from the same store as the desktop app of its computer.
   memberLevels: (memberId) =>
     memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
   liveActivityShows: () => false,
@@ -266,7 +245,6 @@ async function setLevel(level: ServerNotificationLevel, muted = false): Promise<
   assert.equal(localServer().notificationsMuted, muted);
 }
 
-/** The bodies of the notifications shown since `from`. */
 function shownSince(from: number): string[] {
   return shown.slice(from).map((notification) => notification.body);
 }
@@ -274,7 +252,6 @@ function shownSince(from: number): string[] {
 try {
   const agentId = await step("Start the manager, an agent, the forwarder and the phone service", async () => {
     await runCauseEffect(sidebar.initialize());
-    // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
     await runCauseEffect(agentStore.initialize());
     await runCauseEffect(mailbox.initialize());
     const agent = await runCauseEffect(
@@ -288,10 +265,8 @@ try {
     agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
     await runCauseEffect(manager.initialize());
     phone.start();
-    // The phone of the owner, away from the app.
     phone.register(
       "phone-session",
-      // The phone can open a side thread, so the host sends it the turns of side threads.
       { memberId: OWNER_ID, protocol: 9, capabilities: new Set([PUSH_NOTIFICATION_THREADS_CAPABILITY]) },
       {
         platform: "android",
@@ -313,6 +288,7 @@ try {
   const forwarders = createRendererForwarders({
     getMainWindow: () => mainWindow,
     getChatWindows: () => [],
+    chatWindowTarget: () => null,
     getAgentService: () => agents ?? null,
     getHostService: () => null,
     getHostAnalytics: () => null,
@@ -324,7 +300,6 @@ try {
     notificationPreviewEnabled: () => false,
     ownAgentNotificationLevels: () => ownLevels,
   });
-  // For the local server the decision and the notification finish before `forwardAgentEvent` returns.
   const desktop = (event: AgentEvent) => forwarders.forwardAgentEvent(LOCAL_SERVER_ID, event);
   const ids = { threadId: "thread-1", turnId: "turn-1" };
   const browserStep = (requestId: number): AgentEvent => ({
@@ -386,7 +361,6 @@ try {
     await setLevel("all");
     const from = shown.length;
     desktop(sideThreadFinished);
-    // The routine thread after it shows, so the forwarder ran for both events.
     desktop(routineFinished);
     assert.deepEqual(shownSince(from), [english("notification.finished")]);
     return { shown: shownSince(from) };
@@ -443,13 +417,11 @@ try {
     return { shown: shownSince(from).length };
   });
 
-  /** Sends one event to the phone service and waits for the send that it causes. */
   const phoneSends = async (event: AgentEvent): Promise<void> => {
     const delivered = new Promise<void>((resolve) => sentWaiters.push(resolve));
     hostEvents.emit("event", event);
     await delivered;
   };
-  /** Sends the events to the phone service, then one that always reaches the phone, as a barrier. */
   const phoneCount = async (events: AgentEvent[]): Promise<number> => {
     const from = sent.length;
     for (const event of events) hostEvents.emit("event", event);
@@ -467,8 +439,6 @@ try {
   });
 
   await step("The phone tells the owner about a side thread turn, which the desktop does not show", async () => {
-    // The desktop notifies at this level, so the phone stays quiet for a turn of the chat. No desktop
-    // notification names a side thread that is not a routine thread, so that turn goes to the phone.
     await setLevel("all");
     assert.equal(await phoneCount([finished, routineFinished, sideThreadFinished]), 1);
     return { sent: 1 };
@@ -495,7 +465,6 @@ try {
     desktop(finished);
     ownLevels.set(agentId, "nothing");
     desktop(prompt(11));
-    // The server level Nothing keeps every agent quiet, also one with its own level.
     await setLevel("nothing");
     ownLevels.set(agentId, "all");
     desktop(prompt(12));
@@ -504,14 +473,34 @@ try {
     return { shown: shownSince(from) };
   });
 
+  await step("A hidden agent notifies on the desktop only when it needs the user", async () => {
+    const service = agents;
+    assert.ok(service);
+    const from = shown.length;
+    await setLevel("all");
+    await runCauseEffect(service.setAgentHidden({ agentId, hidden: true }));
+    desktop(finished);
+    desktop(startFailure);
+    desktop(prompt(18));
+    ownLevels.set(agentId, "all");
+    desktop(finished);
+    ownLevels.clear();
+    await runCauseEffect(service.setAgentHidden({ agentId, hidden: false }));
+    desktop(startFailure);
+    assert.deepEqual(shownSince(from), [
+      english("notification.needsInput"),
+      english("notification.finished"),
+      english("notification.failed"),
+    ]);
+    return { shown: shownSince(from) };
+  });
+
   await step("The owner's phone follows the level of the agent", async () => {
-    // The desktop is muted, so only the level of the agent can keep the phone quiet.
     await setLevel("all", true);
     const count = async (level: ServerNotificationLevel, events: AgentEvent[]): Promise<number> => {
       const from = sent.length;
       ownLevels.set(agentId, level);
       for (const event of events) hostEvents.emit("event", event);
-      // The barrier always reaches the phone, so each event before it was decided.
       ownLevels.clear();
       await phoneSends(browserStep(98));
       return sent.length - from - 1;
@@ -522,7 +511,6 @@ try {
   });
 
   await step("The owner's phone follows the server level that the owner chose for all devices", async () => {
-    // The phone registered "All activity". The level for all devices replaces it.
     await setLevel("all", true);
     const count = async (level: ServerNotificationLevel, events: AgentEvent[]): Promise<number> => {
       const from = sent.length;
@@ -534,7 +522,6 @@ try {
     };
     assert.equal(await count("needs-me", [finished, prompt(15)]), 1, "The server level of all devices was not used.");
     assert.equal(await count("nothing", [prompt(16), browserStep(17)]), 0, "The server level Nothing sent a request.");
-    // The level of an agent still replaces the server level, but not a server level of Nothing.
     ownLevels.set(agentId, "all");
     assert.equal(await count("needs-me", [finished]), 1, "The agent level did not replace the server level.");
     assert.equal(await count("nothing", [finished]), 0, "The agent level opened a server set to Nothing.");

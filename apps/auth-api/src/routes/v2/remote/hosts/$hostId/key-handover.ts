@@ -12,8 +12,6 @@ import {
   requestUser,
 } from "../../../../../server/request-auth";
 
-// The signed-in owner's host moves its identity to a new key. The host proves its machine token, and
-// its previous key and new key both sign the step.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/key-handover")({
   server: {
     handlers: {

@@ -3,8 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses or changes an event or a receipt; a partial migration survives a failure;
-// a retry fails on the index that the failed run left; a newer or incomplete history is changed.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -21,7 +19,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-// A thread snapshot, two flushes of one streamed message, and a hosted-site event, each with its receipt.
 function seedEvents(db: DatabaseSync): void {
   db.exec(`INSERT INTO orchestration_events
       (event_id, command_id, aggregate_type, aggregate_id, event_type, occurred_at, payload_json)
@@ -55,14 +52,13 @@ function typeIndexColumns(db: DatabaseSync) {
 const TYPE_INDEX_COLUMNS = ["aggregate_id", "event_type", "sequence"];
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 66 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
 describe("event type index migration", () => {
-  // The event table is the same from the v8 baseline on, so the oldest and the newest released schema bound it.
   it.each([8, 42])("upgrades v%i and keeps every event and receipt", (version) => {
     const db = databaseAt(version);
     seedEvents(db);
@@ -94,7 +90,6 @@ describe("event type index migration", () => {
     const db = databaseAt(42);
     seedEvents(db);
     const before = contents(db);
-    // SQLite refuses an index whose name a table holds, even with IF NOT EXISTS.
     db.exec("CREATE TABLE orchestration_events_thread_type (conflict TEXT)");
     expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 43 failed");
     expect(db.prepare("SELECT version FROM schema_migrations WHERE version = 43").all()).toEqual([]);
@@ -110,9 +105,9 @@ describe("event type index migration", () => {
     const db = databaseAt(42);
     seedEvents(db);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(61, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(67, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 61; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 67; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(typeIndexColumns(db)).toEqual([]);

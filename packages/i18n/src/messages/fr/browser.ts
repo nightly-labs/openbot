@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Fermer {name}",
   "browser.tab.closeUnnamed": "Fermer l’onglet du navigateur",
   "browser.newTab": "Nouvel onglet du navigateur",
-  "browser.hide": "Masquer le navigateur",
+  "browser.backToChat": "Retour au chat",
   "browser.goBack": "Revenir en arrière",
   "browser.goForward": "Avancer",
   "browser.reload": "Actualiser la page",
@@ -67,6 +67,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Ce texte est trop long pour être collé. Collez moins de 100 000 caractères.",
   "browser.liveView.copyTooLarge": "La sélection est trop longue pour être copiée. Sélectionnez moins de texte.",
   "browser.liveView.copyFailed": "Impossible de copier le texte. Cliquez sur la page et réessayez.",
+  "browser.liveView.pageCopied":
+    "La page a copié du texte. Choisissez Copier pour le mettre dans votre presse-papiers.",
   "browser.previews.label": "Aperçus du navigateur",
   "browser.previews.resize": "Redimensionner le panneau de droite",
   "browser.previews.empty": "Aucun onglet de navigateur",
@@ -91,10 +93,39 @@ export const messages = {
   "browser.secret.submitting": "Envoi…",
   "browser.secret.takeOver": "Prendre la main",
   "browser.secret.failed": "Impossible de terminer la demande. Vérifiez la connexion et réessayez.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a choisi le mauvais champ sur la page.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car l’agent n’a choisi aucun des identifiants enregistrés pour ce site. Indiquez à l’agent le compte à utiliser.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de mot de passe pour ce site.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de clé d’authentificateur.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car il n’a pas pu lire votre gestionnaire de mots de passe.",
   "browser.error.openAddress": "Impossible d’ouvrir l’adresse dans cet onglet.",
+  "browser.error.channelNoBrowserMember": "Aucun membre ne peut ouvrir un nouvel onglet dans ce canal.",
   "browser.error.closeTab": "Impossible de fermer l’onglet du navigateur.",
   "browser.error.reloadTab": "Impossible d’actualiser l’onglet du navigateur.",
   "browser.error.stopLoading": "Impossible d’arrêter le chargement de la page.",
+  "browser.error.teachStart": "Impossible de démarrer l’enregistrement de la tâche.",
+  "browser.error.teachStop": "Impossible d’arrêter l’enregistrement de la tâche.",
+  "browser.error.teachEmpty": "L’enregistrement ne contient aucune étape.",
+  "browser.teach.intro":
+    "Montrez une tâche à {name} sur cette page. {name} apprend les étapes et peut refaire la tâche.",
+  "browser.teach.start": "Démarrer l’enregistrement",
+  "browser.teach.recording": "{name} enregistre vos étapes",
+  "browser.teach.stop": "Arrêter et sauvegarder l’enregistrement",
+  "browser.teach.discard": "Supprimer l’enregistrement",
+  "browser.teach.message":
+    "Je vous ai montré une tâche dans le navigateur. Apprenez-la à partir de l’enregistrement et enregistrez-la comme compétence. Dites-moi ensuite en quelques mots simples ce que vous avez appris.",
+  "browser.teach.steps": "L’enregistrement ne contient aucun texte saisi : demandez-moi chaque valeur que j’ai saisie.",
+  "browser.teach.step.page": "{number}. Ouvrir {page}",
+  "browser.teach.step.pageTitled": "{number}. Ouvrir {page} (« {title} »)",
+  "browser.teach.step.click": "{number}. Appuyer sur « {name} » ({role})",
+  "browser.teach.step.clickUnnamed": "{number}. Appuyer sur un élément ({role}) sur {page}",
   "browser.error.takeControl": "Impossible de prendre le contrôle de l’onglet du navigateur.",
   "browser.error.releaseControl": "Impossible de rendre l’onglet du navigateur à l’agent.",
   "browser.error.navigateBack": "Impossible de revenir en arrière.",

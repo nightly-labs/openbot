@@ -1,36 +1,32 @@
 import { type Duration, Effect, Schema } from "effect";
-import { type RemoteSignalPlan, remoteSignalPlan } from "./remote-control-plane";
+import { type RemoteSignalPlan, remoteSignalPlan, signalAnswers } from "./remote-control-plane";
 import type { WorkerBindings } from "./types";
 
-/**
- * The cron that runs only the entry check. The other scheduled jobs keep their own cron. Cloudflare
- * reads `*\/1` as each minute, and `controller.cron` keeps the text, so the two crons stay apart.
- */
 export const SIGNAL_ENTRY_CRON = "*/1 * * * *";
 const CLOUDFLARE_API = "https://api.cloudflare.com/client/v4";
-// A machine leaves the entry only when two checks this far apart fail, so one slow answer does not move
-// the bots.
 const CONFIRM_DELAY: Duration.Input = "20 seconds";
 const HEALTH_TIMEOUT_MS = 5_000;
 const API_TIMEOUT_MS = 10_000;
 
 export type SignalEntryBindings = Pick<
   WorkerBindings,
-  "REMOTE_SIGNAL_URL" | "REMOTE_SIGNAL_HOMES" | "SIGNAL_ENTRY_ZONE_ID" | "SIGNAL_ENTRY_DNS_TOKEN"
+  | "REMOTE_SIGNAL_URL"
+  | "REMOTE_SIGNAL_HOMES"
+  | "REMOTE_SIGNAL_HOME_LOCATIONS"
+  | "REMOTE_SIGNAL_HOME_COUNTRIES"
+  | "SIGNAL_ENTRY_ZONE_ID"
+  | "SIGNAL_ENTRY_DNS_TOKEN"
 >;
 
 export type SignalEntryFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 type SignalEntryCheck =
   | { status: "off" }
-  /** The DNS records do not show one entry machine. The check changes nothing. */
   | { status: "unknown"; reason: "entry_record" | "entry_address" }
   | { status: "healthy"; entry: string }
-  /** The entry machine failed, and no other machine answered. */
   | { status: "kept"; entry: string }
   | { status: "moved"; from: string; to: string };
 
-/** The Cloudflare API refused a request or did not answer. The token and the answer text are not kept. */
 class SignalEntryDnsError extends Schema.TaggedError<SignalEntryDnsError>()("SignalEntryDnsError", {
   operation: Schema.Literals(["list", "update"]),
   status: Schema.Number,
@@ -49,19 +45,9 @@ const DnsRecordUpdate = Schema.Struct({ success: Schema.Literal(true) });
 interface SignalMachine {
   id: string;
   host: string;
-  healthUrl: string;
+  url: string;
 }
 
-/**
- * Keeps `signal.openbot.run` on a Signal machine that answers. The entry machine runs the bots and
- * takes the tickets without a `signal` claim (`remote/api/src/entry.ts`), so the name must move when
- * that machine stops.
- *
- * Each run reads the A records of the entry name and of each home in `REMOTE_SIGNAL_HOMES`. When the
- * machine that the entry name gives fails `/health/ready` two times, 20 seconds apart, the record gets
- * the address of the first other home that answers. The name does not go back by itself: both machines
- * are equal, and a machine that starts and stops must not move the bots each minute.
- */
 export const checkSignalEntry = Effect.fn("SignalEntry.check")(function* (
   bindings: SignalEntryBindings,
   options: { fetch: SignalEntryFetch; confirmDelay?: Duration.Input },
@@ -101,26 +87,11 @@ export const checkSignalEntry = Effect.fn("SignalEntry.check")(function* (
 });
 
 function signalMachines(plan: RemoteSignalPlan): SignalMachine[] {
-  return [...plan.homes].map(([id, url]) => {
-    const parsed = new URL(url);
-    const protocol = parsed.protocol === "ws:" ? "http:" : "https:";
-    return { id, host: parsed.hostname, healthUrl: `${protocol}//${parsed.host}/health/ready` };
-  });
+  return [...plan.homes].map(([id, url]) => ({ id, host: new URL(url).hostname, url }));
 }
 
-/** Whether the Signal of the machine answers. A failed request is an unhealthy machine, not an error. */
 function isHealthy(fetcher: SignalEntryFetch, machine: SignalMachine): Effect.Effect<boolean> {
-  return Effect.tryPromise({
-    try: (signal) =>
-      fetcher(machine.healthUrl, {
-        method: "GET",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(HEALTH_TIMEOUT_MS)]),
-      }),
-    catch: () => null,
-  }).pipe(
-    Effect.map((response) => response.ok),
-    Effect.orElseSucceed(() => false),
-  );
+  return signalAnswers(fetcher, machine.url, HEALTH_TIMEOUT_MS);
 }
 
 interface CloudflareDnsApi {

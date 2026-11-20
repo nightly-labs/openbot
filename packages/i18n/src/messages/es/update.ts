@@ -16,6 +16,10 @@ export const messages = {
   "update.provider.checking": "Buscando actualizaciones de {name}",
   "update.provider.available": "Actualización de {name} disponible",
   "update.provider.updating": "Actualizando {name}",
+  "update.provider.downloading": "Descargando {name}",
+  "update.provider.downloaded": "{name} se ha descargado",
+  "update.provider.downloadFailed": "La descarga de {name} falló",
+  "update.provider.downloadFailedRetry": "La descarga falló. Vuelve a intentarlo.",
   "update.provider.waiting": "Actualización de {name} en espera",
   "update.provider.failed": "La actualización de {name} falló",
   "update.provider.settingUp": "Configurando",
@@ -65,4 +69,10 @@ export const messages = {
   "update.whatsNew.changelog": "Todos los cambios",
   "update.whatsNew.changelogFailed": "OpenBot no pudo abrir el registro de cambios.",
   "update.whatsNew.done": "Entendido",
+  "update.required.title": "Actualización necesaria",
+  "update.required.description":
+    "OpenBot {version} ya no tiene soporte. Actualiza a {minimum} o posterior para continuar.",
+  "update.required.download": "Descargar OpenBot",
+  "update.required.continue": "Continuar sin actualizar",
+  "update.required.failed": "La actualización no terminó.",
 } as const satisfies PartialTranslation<typeof source>;

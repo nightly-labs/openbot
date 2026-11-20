@@ -1,9 +1,21 @@
+import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevels,
   MESSAGING_LIMITS,
   type OpenBotDesktopApi,
   type ServerSummary,
+  STORAGE_CAPABILITY,
+  type StorageUsage,
+  type StoredFileRow,
+  WORKFLOW_PICTURE_TYPES,
+  type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
+import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import type {
   WorkflowChannel,
   WorkflowDiscordServer,
@@ -11,6 +23,7 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
+import { currentText } from "@openbot/ui/text";
 import {
   type GitHubConnectorPort,
   githubConnectorPort,
@@ -19,84 +32,104 @@ import {
 import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
-/** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog";
-/** Each method with its input only; `list` and `githubCatalog` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog";
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
   ) => ReturnType<WorkflowsApi[Name]>;
 } & { [Name in NoInputMethod]: () => ReturnType<WorkflowsApi[Name]> };
 
-/**
- * What the Workflows page reaches on one server: the workflows, the changes that make one stale, and
- * the messaging places an output can post to. The desktop app reaches this computer or a joined
- * server through main.
- */
 export interface WorkflowHost {
-  /** Called without a server: the host already names one. */
   workflows: BoundWorkflowsApi;
-  /**
-   * Calls `changed` with the workflow that changed, or null when all can be stale: the server came
-   * back, or the agent levels changed. `agentId`: the agent whose tool call made or saved the
-   * workflow. Only this computer names it; a joined server does not.
-   */
   onChanged(changed: (workflowId: string | null, agentId?: string) => void): () => void;
-  /**
-   * The messaging places that an output can post to: this computer's, or a joined server's for an owner
-   * or admin when the host serves `routine-results-v1`. A member gets none, as the host lets only an
-   * owner or admin choose a place.
-   */
   places(): Promise<WorkflowPlace[]>;
-  /**
-   * The open channels that an output can post to: this computer's, or a joined server's for an owner
-   * or admin when the host serves `workflows-channels-v1`.
-   */
   channels(): Promise<WorkflowChannel[]>;
-  /**
-   * Only this computer runs Discord triggers and outputs; a joined server gives none. A Discord node
-   * filters by role, and no Team API route sends the host's Discord roles (`workflows-chats-v1`).
-   */
   discordServers(): Promise<WorkflowDiscordServer[]>;
-  /**
-   * The Telegram chats of triggers and outputs: this computer's, or a joined server's for an owner or
-   * admin when the host serves `workflows-chats-v1` and `routine-results-v1`.
-   */
   telegramChats(): Promise<WorkflowTelegramChat[]>;
-  /** The Slack workspaces of triggers and outputs, with the same gate as `telegramChats`. */
   slackWorkspaces(): Promise<WorkflowSlackWorkspace[]>;
-  /** The level of this account on each agent that it sees, or null when it manages all of them. */
   agentLevels(): Promise<AgentAccessLevels | null>;
-  /**
-   * Whether the host runs GitHub triggers and outputs: this computer always, and a joined server only
-   * when it advertises `workflows-github-v1`.
-   */
   githubSupported(): boolean;
-  /** The GitHub connection that the host's GitHub triggers and outputs use. */
+  mediaSupported(): boolean;
+  mediaAccountSupported(): boolean;
+  mediaTransparentSupported(): boolean;
+  mediaSizeSupported(): boolean;
+  agentFilesSupported(): boolean;
+  stepSettingsSupported(): boolean;
+  pictures(): Promise<readonly StoredFileRow[]>;
+  uploadPicture(file: File): Promise<StoredFileRow>;
+  mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
+  mediaPreviewUrl(attachmentId: string): string | null | undefined;
   githubConnector: GitHubConnectorPort;
-  /** The joined server, as its server row names it, or undefined for this computer. */
   hostName(): string | undefined;
-  /** Opens an http or https page in the browser. */
   openUrl(url: string): Promise<void>;
 }
 
-/**
- * The desktop adapter for one server. `window.openbot` and `server` are read on each call: tests and
- * stories replace them per case, and a role can change.
- */
+export function libraryPictures(usage: StorageUsage | null): readonly StoredFileRow[] {
+  return (usage?.files ?? [])
+    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function checkPicture(file: File, maxBytes: number): void {
+  const { t } = currentText();
+  if (!WORKFLOW_PICTURE_TYPES.has(file.type)) throw new Error(t("error.workflow.pictureType"));
+  if (file.size > maxBytes) throw new Error(t("error.attachment.fileTooLarge"));
+}
+
+export function keptPicture(fileId: string, file: File, previewUrl: string | null): StoredFileRow {
+  return {
+    id: fileId,
+    name: file.name,
+    size: file.size,
+    kind: "image",
+    mimeType: file.type,
+    previewKind: "image",
+    previewUrl,
+    source: "generated",
+    agentId: null,
+    conversation: null,
+    messageId: null,
+    createdAt: new Date().toISOString(),
+    status: "available",
+    deletable: true,
+  };
+}
+
+export function desktopMediaCredits(serverId: string) {
+  return window.openbot.workflows.mediaCredits(serverId);
+}
+
 export function desktopWorkflowHost(serverId: string, server: () => ServerSummary | undefined): WorkflowHost {
   const api = () => window.openbot.workflows;
-  /** A server that has not loaded yet is this computer, as the page reads it. */
   const local = () => server()?.kind !== "remote";
-  /** A joined server lets only an owner or admin read its connections (`routine-results-v1`). */
   const placesSupported = () => local() || serverCanAdminister(server(), "routine-results-v1");
-  /** The host runs Telegram and Slack nodes, and their chats and workspaces come from its connections. */
   const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
   const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
-  const options = () => window.openbot.routineResults.options(serverId);
+  let optionsCall: ReturnType<OpenBotDesktopApi["routineResults"]["options"]> | undefined;
+  const options = () => {
+    optionsCall ??= window.openbot.routineResults.options(serverId).finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
-  // A joined server without GitHub workflows gets no call: its port rejects before main.
+  const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
+  const mediaAccountSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+  const mediaTransparentSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+  const mediaSizeSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+  const agentFilesSupported = () => local() || serverSupportsCapability(server(), WORKFLOWS_AGENT_FILES_CAPABILITY);
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
+  const mediaUrl = (attachmentId: string) =>
+    local()
+      ? `openbot-attachment://file/${encodeURIComponent(attachmentId)}`
+      : `openbot-remote-attachment://${encodeURIComponent(serverId)}/${encodeURIComponent(attachmentId)}`;
+  const mediaPreviewUrl = (attachmentId: string) =>
+    !local() && serverSupportsCapability(server(), ATTACHMENT_PREVIEW_CAPABILITY)
+      ? `${mediaUrl(attachmentId)}?preview=1`
+      : mediaUrl(attachmentId);
   return {
     workflows: {
       list: () => api().list(serverId),
@@ -116,11 +149,17 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       decide: (input) => api().decide(input, serverId),
       runs: (input) => api().runs(input, serverId),
       run: (runId) => api().run(runId, serverId),
+      stepSettings: (stepId) => api().stepSettings(stepId, serverId),
       rotateWebhookSecret: (input) => api().rotateWebhookSecret(input, serverId),
       githubCatalog: () => api().githubCatalog(serverId),
       githubOptions: (input) => api().githubOptions(input, serverId),
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
+      keepPicture: (draftId) => api().keepPicture(draftId, serverId),
+      mediaProviders: () => api().mediaProviders(serverId),
+      mediaCredits: () => api().mediaCredits(serverId),
+      mediaCatalog: () => api().mediaCatalog(serverId),
+      mediaPrice: (input) => api().mediaPrice(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -156,13 +195,11 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       return channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name }));
     },
     async discordServers() {
-      // Local only: the role filter needs the host's Discord roles, which no Team API route sends.
       if (!local()) return [];
       const [connections, overview] = await Promise.all([options(), window.openbot.messaging.getDiscordOverview()]);
       const discord = connections.filter((option) => option.platform === "discord");
       return Promise.all(
         discord.map(async (option) => {
-          // The options name a server only by its name; two servers with one name get no roles.
           const guilds = overview.connections.filter(
             (connection) => connection.workspaceName.slice(0, MESSAGING_LIMITS.name) === option.connectionName,
           );
@@ -176,7 +213,6 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
           return {
             connectionId: option.connectionId,
             name: option.connectionName,
-            // The driver names a channel "#general"; the Discord rows show their own "#" icon.
             channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
             roles,
           };
@@ -196,7 +232,6 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
         .map((option) => ({
           connectionId: option.connectionId,
           name: option.connectionName,
-          // The rows show their own "#" icon.
           channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
         }));
     },
@@ -204,7 +239,35 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       if (local() || serverRoleCanAdminister(server())) return null;
       return (await window.openbot.hostAdmin.getAgentAccess(serverId)).mine;
     },
+    async pictures() {
+      if (!mediaSupported() || !(local() || serverSupportsCapability(server(), STORAGE_CAPABILITY))) return [];
+      return libraryPictures(await window.openbot.storage.getUsage({ scope: "host" }, serverId));
+    },
+    async uploadPicture(file) {
+      checkPicture(file, ATTACHMENT_LIMITS.fileBytes);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const [draft] = await window.openbot.agent.importAttachmentData(
+        [{ name: file.name, mimeType: file.type, bytes }],
+        serverId,
+      );
+      if (!draft) throw new Error(currentText().t("error.workflow.pictureMissing"));
+      const fileId = await api()
+        .keepPicture(draft.id, serverId)
+        .catch(async (error: unknown) => {
+          await window.openbot.agent.discardDraftAttachment(draft.id, serverId).catch(() => undefined);
+          throw error;
+        });
+      return keptPicture(fileId, file, mediaUrl(fileId));
+    },
     githubSupported,
+    mediaSupported,
+    mediaAccountSupported,
+    mediaTransparentSupported,
+    mediaSizeSupported,
+    agentFilesSupported,
+    stepSettingsSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_STEP_SETTINGS_CAPABILITY),
+    mediaUrl,
+    mediaPreviewUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
     },

@@ -17,6 +17,10 @@ export const messages = {
   "update.provider.checking": "{name} のアップデートを確認しています",
   "update.provider.available": "{name} のアップデートがあります",
   "update.provider.updating": "{name} をアップデートしています",
+  "update.provider.downloading": "{name} をダウンロードしています",
+  "update.provider.downloaded": "{name} をダウンロードしました",
+  "update.provider.downloadFailed": "{name} のダウンロードに失敗しました",
+  "update.provider.downloadFailedRetry": "ダウンロードに失敗しました。もう一度お試しください。",
   "update.provider.waiting": "{name} のアップデートを待機中",
   "update.provider.failed": "{name} のアップデートに失敗しました",
   "update.provider.settingUp": "準備中",
@@ -62,4 +66,10 @@ export const messages = {
   "update.whatsNew.changelog": "完全な変更履歴",
   "update.whatsNew.changelogFailed": "OpenBot は変更履歴を開けませんでした。",
   "update.whatsNew.done": "OK",
+  "update.required.title": "アップデートが必要です",
+  "update.required.description":
+    "OpenBot {version} はサポートが終了しました。続けるには {minimum} 以降にアップデートしてください。",
+  "update.required.download": "OpenBot をダウンロード",
+  "update.required.continue": "アップデートせずに続ける",
+  "update.required.failed": "アップデートが完了しませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

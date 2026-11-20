@@ -46,61 +46,43 @@ import {
 } from "./files-view";
 
 export interface FileListProps {
-  /** Accessible name of the list, such as "Files in Chief". */
   label: string;
   files: readonly StoredFileRow[];
-  /** Names the agent on each row. Leave it out where the list already belongs to one agent. */
   agents?: readonly AgentProfile[] | undefined;
-  /** Show the chat each file belongs to. Off in the chat's own panel. */
   showConversation?: boolean;
-  /** Narrow layout for the chat side panel: filters scroll, rows drop the chat column. */
   compact?: boolean;
-  /** Day headings between rows. Applies to the "Newest" order only. */
   groupByDay?: boolean;
-  /** Level of the day headings: one below the nearest heading of the caller. Default 4. */
   groupHeadingLevel?: 3 | 4;
   loading?: boolean | undefined;
   error?: string | null | undefined;
   onRetry?: (() => void) | undefined;
   initialQuery?: Partial<FileQuery>;
-  /**
-   * The search, type and order that the caller owns, such as the Library page. The list then shows no
-   * search, filters or count of its own.
-   */
   query?: FileQuery | undefined;
-  /** The clock for day labels, so a story does not depend on the day it runs. */
   now?: Date | undefined;
   emptyTitle?: string;
   emptyDescription?: string;
-  /** The viewer can delete files. A row also needs `deletable`. Off for a member of a remote server. */
   canDelete?: boolean | undefined;
-  /** Lets the caller select rows, such as the Library for a delete of many files. */
   selection?: FileSelection | undefined;
+  folderLabel?: ((file: StoredFileRow) => string | undefined) | undefined;
+  rowMenu?: ((file: StoredFileRow) => JSX.Element) | undefined;
+  opensFiles?: boolean | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }
 
-/** The selected files of a list that the caller owns. */
 export interface FileSelection {
-  /** A click selects the file instead of opening it, and each row shows its mark. */
   active: boolean;
   isSelected: (file: StoredFileRow) => boolean;
   canSelect: (file: StoredFileRow) => boolean;
-  /** A click on a row in selection mode, or a Command, Control or Shift click in any mode. */
   onToggle: (file: StoredFileRow, event: MouseEvent) => void;
 }
 
-/** Command, Control or Shift starts a selection, as in Finder and Explorer. */
 export function isSelectClick(event: MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey;
 }
 
 const LOADING_ROWS = [0, 1, 2, 3, 4];
 
-/**
- * The file browser every Files surface shares: Storage in Settings, an agent's Files, and a chat's
- * Files panel. It owns the search, type filter and order; the caller owns the data and every action.
- */
 export function FileList(props: FileListProps) {
   const { t, format } = useText();
   const [ownQuery, setQuery] = createStore<FileQuery>({
@@ -206,6 +188,9 @@ export function FileList(props: FileListProps) {
                       <FileRow
                         file={file}
                         agentName={agentName(file.agentId)}
+                        folderLabel={props.folderLabel}
+                        rowMenu={props.rowMenu}
+                        opensFiles={props.opensFiles !== false}
                         showConversation={props.showConversation !== false && !props.compact}
                         canDelete={props.canDelete === true && file.deletable}
                         selection={props.selection}
@@ -241,7 +226,6 @@ export function FileList(props: FileListProps) {
   );
 }
 
-/** The search box of a file list. */
 export function FileSearch(props: { label: string; value: string; onChange: (value: string) => void; class?: string }) {
   return (
     <div class={props.class ? `file-list-search ${props.class}` : "file-list-search"}>
@@ -259,7 +243,6 @@ export function FileSearch(props: { label: string; value: string; onChange: (val
   );
 }
 
-/** One chip for each file type that has files, with its count. "All" always shows. */
 export function FileTypeFilters(props: {
   counts: Record<FileTypeFilter, number>;
   value: FileTypeFilter;
@@ -288,7 +271,6 @@ export function FileTypeFilters(props: {
   );
 }
 
-/** The message when no file matches the search and type. "Clear filters" shows only when a filter is set. */
 export function FileNoMatches(props: { filtered: boolean; onClear: () => void }) {
   const { t } = useText();
   return (
@@ -303,7 +285,6 @@ export function FileNoMatches(props: { filtered: boolean; onClear: () => void })
   );
 }
 
-/** The loading, error and empty states of a file list. The children show when there are files. */
 export function FileListStatus(props: {
   loading?: boolean | undefined;
   error?: string | null | undefined;
@@ -355,10 +336,6 @@ export function FileListStatus(props: {
   );
 }
 
-/**
- * Asks before a file is deleted, or before a file that is gone is removed from the list. The dialog
- * stays open with the error when the delete fails.
- */
 export function FileDeleteDialog(props: {
   file: StoredFileRow | null;
   onClose: () => void;
@@ -400,7 +377,6 @@ export function FileDeleteDialog(props: {
   );
 }
 
-/** The check mark of a selectable file. The control that selects the file has the state; the mark only shows it. */
 export function FileSelectionMark(props: { selected: boolean; class?: string }) {
   return (
     <span
@@ -416,6 +392,9 @@ export function FileSelectionMark(props: { selected: boolean; class?: string }) 
 function FileRow(props: {
   file: StoredFileRow;
   agentName: string | null;
+  folderLabel: ((file: StoredFileRow) => string | undefined) | undefined;
+  rowMenu: ((file: StoredFileRow) => JSX.Element) | undefined;
+  opensFiles: boolean;
   showConversation: boolean;
   canDelete: boolean;
   selection: FileSelection | undefined;
@@ -440,6 +419,7 @@ function FileRow(props: {
       format.fileSize(props.file.size),
       props.showConversation ? props.file.conversation?.title : null,
       props.agentName,
+      props.folderLabel?.(props.file),
       props.dateLabel,
     ].filter(Boolean);
   const rowLabel = () => {
@@ -489,7 +469,14 @@ function FileRow(props: {
       </Button>
       <FileStatusBadge status={props.file.status} />
       <Show when={!selecting()}>
-        <FileRowMenu file={props.file} canDelete={props.canDelete} onAction={props.onAction} />
+        <FileRowMenu
+          file={props.file}
+          canDelete={props.canDelete}
+          opensFiles={props.opensFiles}
+          onAction={props.onAction}
+        >
+          {props.rowMenu?.(props.file)}
+        </FileRowMenu>
       </Show>
     </li>
   );
@@ -537,12 +524,13 @@ function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
   );
 }
 
-/** The actions of one file. The items depend on where the file is. */
 export function FileRowMenu(props: {
   file: StoredFileRow;
   canDelete: boolean;
+  opensFiles?: boolean | undefined;
   onAction: (action: StoredFileAction) => void;
   class?: string | undefined;
+  children?: JSX.Element;
 }) {
   const { t } = useText();
   const status = () => props.file.status;
@@ -556,7 +544,7 @@ export function FileRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content>
-          <Show when={status() === "available"}>
+          <Show when={status() === "available" && props.opensFiles !== false}>
             <DropdownMenu.Item onSelect={() => props.onAction("open")}>
               <ExternalLink aria-hidden="true" />
               {t("common.open")}
@@ -578,12 +566,13 @@ export function FileRowMenu(props: {
               {t("common.tryAgain")}
             </DropdownMenu.Item>
           </Show>
-          <Show when={props.file.conversation && props.file.messageId}>
+          <Show when={props.file.messageId}>
             <DropdownMenu.Item onSelect={() => props.onAction("show-in-chat")}>
               <MessageCircle aria-hidden="true" />
               {t("files.action.showInChat")}
             </DropdownMenu.Item>
           </Show>
+          {props.children}
           <Show when={props.canDelete}>
             <DropdownMenu.Separator />
             <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>

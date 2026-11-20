@@ -111,9 +111,14 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
   "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
+  "provider.picker.showCustomModels": "Modellen tonen",
   "provider.picker.museNoModels":
     "Muse heeft geen modellen voor dit account gestuurd. Muse is mogelijk niet beschikbaar in het land waar deze agent draait. Kies een model van een andere provider.",
   "provider.picker.customEmpty":
@@ -141,6 +146,8 @@ export const messages = {
   "provider.picker.selectEffort": "Kies niveau",
   "provider.picker.custom": "Eigen",
   "provider.picker.cliReady": "{cli} gereed",
+  "provider.picker.modelSourceProvider": "Gebruikt {name} uit je {cli}-instellingen",
+  "provider.picker.modelSourceCatalog": "Gebruikt een modellijst uit je {cli}-instellingen",
   "provider.status.signInRequired": "Inloggen vereist",
   "provider.model.free": "Gratis",
   "provider.model.new": "Nieuw",
@@ -159,22 +166,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini-API-sleutel",
   "provider.geminiKey.description":
     "Sla een Gemini-API-sleutel op deze computer op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Sla een Gemini-API-sleutel op de host op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
   "provider.geminiKey.label": "Gemini-API-sleutel",
   "provider.claudeKey.title": "Anthropic-API-sleutel",
   "provider.claudeKey.description":
     "Sla een Anthropic-API-sleutel op de host op. Anthropic brengt elk verzoek in rekening op het API-tegoed van de sleutel, niet op je Claude-abonnement. Om hem voor een agent te gebruiken, kies je het API-sleutelaccount in het modelmenu van de agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.claudeKey.label": "Anthropic-API-sleutel",
+  "provider.cursorKey.title": "Cursor-API-sleutel",
+  "provider.cursorKey.description":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op deze computer opgeslagen.",
+  "provider.cursorKey.descriptionHost":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op de host opgeslagen.",
+  "provider.cursorKey.label": "Cursor-API-sleutel",
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":
     "Sla een Inception-API-sleutel op deze computer op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.inceptionKey.descriptionHost":
+    "Sla een Inception-API-sleutel op de host op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.inceptionKey.label": "Inception-API-sleutel",
   "provider.deepseekKey.title": "DeepSeek-API-sleutel",
   "provider.deepseekKey.description":
     "Sla een DeepSeek-API-sleutel op deze computer op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.deepseekKey.descriptionHost":
+    "Sla een DeepSeek-API-sleutel op de host op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.deepseekKey.label": "DeepSeek-API-sleutel",
   "provider.openrouterKey.title": "OpenRouter-API-sleutel",
   "provider.openrouterKey.description":
     "Sla een OpenRouter-API-sleutel op deze computer op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.openrouterKey.descriptionHost":
+    "Sla een OpenRouter-API-sleutel op de host op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.openrouterKey.label": "OpenRouter-API-sleutel",
   "provider.openCodeKey.title": "Inloggen bij OpenCode Go",
   "provider.openCodeKey.description":
@@ -191,6 +212,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Kan niet opnieuw verbinden.",
   "provider.account.add": "Account toevoegen",
   "provider.account.addLabel": "Nog een {name}-account toevoegen",
+  "provider.account.addWithCode": "Account toevoegen met code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API-sleutel",
@@ -218,6 +240,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} heeft geen resettegoed meer.",
   "provider.account.resetUsageAlreadyRedeemed": "Dit resettegoed van {name} is al gebruikt.",
   "provider.account.resetUsageFailed": "Kan het gebruik van {name} niet resetten.",
+  "provider.account.pool": "Accounts bundelen",
+  "provider.account.poolDescription":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "provider.account.inUse": "In gebruik",
+  "provider.account.notInPool": "Niet in pool",
+  "provider.account.leaveOutOfPool": "Uit pool halen",
+  "provider.account.putBackInPool": "Terug in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool van {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in gebruik",
   "provider.settings.connected": "Verbonden",
   "provider.settings.other": "Andere aanbieders",
   "provider.settings.search": "Aanbieders zoeken",
@@ -239,6 +271,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "Standaard voor nieuwe agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} van {max}. Elke agent gebruikt één account.",
+  "provider.settings.accountsPooledDescription": "{count} van {max}. Agents delen deze accounts.",
   "provider.settings.accountBlocked": "{agents} kan niet draaien tot je opnieuw inlogt.",
   "provider.settings.removeTitle": "{name} verwijderen?",
   "provider.settings.removeMoves": "{agents} gaat {name} gebruiken.",
@@ -259,6 +292,8 @@ export const messages = {
   "provider.settings.keyAlternative": "Of plak een {name}-API-sleutel.",
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",
@@ -268,6 +303,12 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} is beschikbaar",
   "provider.settings.versionInstalledByUser": "{version} · door jou geïnstalleerd",
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
+  "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Sommige modellen hebben een onderdeel nodig dat deze versie niet heeft. Download de versie van OpenBot om ze te gebruiken.",
+  "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
+  "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
   "provider.settings.downloadLabel": "Download van {name}",
   "provider.settings.diagnostics": "Diagnose",
@@ -292,6 +333,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Standaard van Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokens",
   "provider.settings.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
+  "provider.settings.environment": "Omgeving",
+  "provider.settings.environmentVariables": "Variabelen",
+  "provider.settings.environmentDescription":
+    "API-sleutels, basis-URL’s en andere instellingen die elk {name}-proces krijgt. Een wijziging geldt als de lopende beurten klaar zijn.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL stuurt met OPENAI_API_KEY als sleutel de modelverzoeken van ChatGPT naar dat adres.",
+  "provider.settings.environmentShellNote": "De opdrachten die agents uitvoeren, kunnen deze waarden lezen.",
+  "provider.settings.environmentAdd": "Variabele toevoegen",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Waarde",
+  "provider.settings.environmentSaved": "Opgeslagen",
+  "provider.settings.environmentSensitive": "Gevoelig",
+  "provider.settings.environmentNameLabel": "Variabelenaam {index}",
+  "provider.settings.environmentValueLabel": "Waarde van {name}",
+  "provider.settings.environmentSensitiveLabel": "{name} geheimhouden",
+  "provider.settings.environmentRemoveLabel": "{name} verwijderen",
+  "provider.settings.environmentUnnamed": "variabele {index}",
+  "provider.settings.environmentPending":
+    "Opslaan start {name} opnieuw als de lopende beurten klaar zijn. Gevoelige waarden blijven op de server.",
+  "provider.settings.environmentDone": "Opgeslagen. {name} start opnieuw als de lopende beurten klaar zijn.",
+  "provider.settings.environmentDiscard": "Verwerpen",
+  "provider.settings.environmentSave": "Opslaan",
+  "provider.settings.environmentLoadFailed": "Kan de variabelen van {name} niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {
     one: "{shown} van {count} model staat in de modelkiezer.",
@@ -319,4 +383,6 @@ export const messages = {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
 } as const satisfies PartialTranslation<typeof source>;

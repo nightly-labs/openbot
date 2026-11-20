@@ -1,6 +1,6 @@
 import type { AgentApproval, AgentTask, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AgentProfile } from "@openbot/ui/data";
-import { createSignal, onCleanup } from "solid-js";
+import { onCleanup } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { TasksView } from "../src/features/tasks/TasksView";
@@ -9,13 +9,7 @@ import { PlatformProvider } from "../src/platform";
 import { requireFixture, STORY_AGENTS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-/*
- * The Tasks page of a server: a composer that starts a task for one agent, and the tasks of all agents
- * by what they need. A row opens the task beside the list. The preview mock runs each turn.
- */
-
 const MINUTE = 60_000;
-/* The real clock, so the times read as recent. */
 const NOW = Date.now();
 const ago = (minutes: number) => new Date(NOW - minutes * MINUTE).toISOString();
 
@@ -26,7 +20,6 @@ const TASK_AGENTS: AgentProfile[] = ["chief", "research", "sales"].map((id) =>
   ),
 );
 
-/** More agents than the window has rows, so the agent menu scrolls. */
 const MANY_AGENTS: AgentProfile[] = Array.from({ length: 30 }, (_, index) => {
   const agent = requireFixture(STORY_AGENTS[index % STORY_AGENTS.length], "Story agent");
   return { ...agent, id: `${agent.id}-${index}`, name: `${agent.name} ${index + 1}` };
@@ -51,7 +44,6 @@ function seedTask(seed: TaskSeed): AgentTask {
   };
 }
 
-/** Every state, long titles, and closed tasks over three days. */
 const TASKS: AgentTask[] = [
   seedTask({
     id: "task-board-update",
@@ -189,17 +181,21 @@ function TasksPageStory(props: {
   tasks: readonly AgentTask[];
   approvals?: AgentApproval[];
   agents?: AgentProfile[];
-  agentsToggle?: boolean;
   waitsForAnswer?: (task: AgentTask) => boolean;
+  startFails?: boolean;
 }) {
   const previousApi = window.openbot;
-  const [agentsOpen, setAgentsOpen] = createSignal(false);
   const tasks: Record<string, AgentTask[]> = {};
   for (const task of props.tasks) tasks[task.agentId] = [...(tasks[task.agentId] ?? []), task];
   const mock = createMockOpenBot({
     tasks,
     taskConversations: Object.fromEntries(props.tasks.map((task) => [task.id, conversationOf(task)])),
   });
+  if (props.startFails) {
+    mock.api.agent.startTask = async () => {
+      throw new Error("Chief has no provider. Connect one in Settings.");
+    };
+  }
   window.openbot = mock.api;
   onCleanup(() => {
     mock.dispose();
@@ -218,8 +214,6 @@ function TasksPageStory(props: {
           onAttachmentAction={fn()}
           approvals={props.approvals ?? []}
           onRespondApproval={fn(async () => true)}
-          agentsOpen={agentsOpen()}
-          onToggleAgents={props.agentsToggle ? () => setAgentsOpen((open) => !open) : undefined}
           waitsForAnswer={props.waitsForAnswer}
           onOpenInChat={fn()}
         />
@@ -236,16 +230,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The tasks of three agents. A send waits six seconds for Undo; a row opens the task beside the list. */
 export const Default: Story = { render: () => <TasksPageStory tasks={TASKS} /> };
-/** No tasks: only the composer. */
 export const Empty: Story = { render: () => <TasksPageStory tasks={[]} /> };
-/** Thirty agents: the agent menu fits the window and scrolls to the last agent. */
 export const ManyAgents: Story = { render: () => <TasksPageStory tasks={[]} agents={MANY_AGENTS} /> };
-/** In the app frame: the header button shows or hides the agent list. Its label follows the state. */
-export const AgentListButton: Story = { render: () => <TasksPageStory tasks={TASKS} agentsToggle /> };
+export const StartError: Story = { render: () => <TasksPageStory tasks={TASKS} startFails /> };
 
-/** A running task asks to write outside its workspace. Its row and panel say that it waits for you. */
 const WAITING_APPROVAL: AgentApproval = {
   requestId: "task-board-update-approval",
   agentId: "chief",
@@ -262,7 +251,6 @@ export const WaitingForApproval: Story = {
   render: () => <TasksPageStory tasks={TASKS} approvals={[WAITING_APPROVAL]} />,
 };
 
-/** A running task asks a question. Open it: its panel sends you to the chat, which answers it. */
 export const WaitingForAnswer: Story = {
   render: () => <TasksPageStory tasks={TASKS} waitsForAnswer={(task) => task.id === "task-papers"} />,
 };

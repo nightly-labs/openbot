@@ -5,6 +5,7 @@ import type {
   BrowserLocalSignInInput,
   BrowserNavigateInput,
   BrowserOpenInput,
+  BrowserTeachStopInput,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber } from "@openbot/contracts/runtime-values";
@@ -44,6 +45,11 @@ export function parseBrowserNavigate(value: unknown): BrowserNavigateInput {
     tabId: requireString(value.tabId, "tabId"),
     direction: value.direction,
   };
+}
+
+export function parseBrowserTeachStop(value: unknown): BrowserTeachStopInput {
+  if (!isObject(value) || !isBoolean(value.save)) throw new Error("Invalid browser teach request.");
+  return { tabId: requireString(value.tabId, "tabId"), save: value.save };
 }
 
 export function parseVisibility(value: unknown): BrowserVisibilityInput {

@@ -1,11 +1,3 @@
-// Frozen optional agent-hidden-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: any signed-in member reads
-// the agents that the host owner or an admin hid. Only an owner or an admin hides or restores one; the
-// host refuses a member with 403. A hidden agent stays in
-// `/v1/agents` with all of its data. The host does not run its routines and refuses new messages to
-// it until it is restored. Each change sends `hidden-agents-changed` with the whole list. Bounds and
-// meaning do not follow IPC changes; widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,

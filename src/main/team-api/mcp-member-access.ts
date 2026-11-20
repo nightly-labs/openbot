@@ -1,12 +1,9 @@
-// Who may use the MCP routes of this host (`mcp-member-access-v1`).
-//
-// An owner or admin may do everything. A member may use the routes only when the client and this host
-// both have `mcp-member-access-v1`, so a released client keeps the admin-only routes it knows. A member
-// reads the list, tests, and adds a server. A member changes, signs in, signs out, or removes only a
-// server that the member added. A sign-in belongs to an address, not to a row, so each row on the
-// same address must be the member's.
-
-import { canAdministerServer, type McpServerConfig, type TeamMemberSummary } from "@openbot/contracts/ipc";
+import {
+  canAdministerServer,
+  type McpAccessLevel,
+  type McpServerConfig,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
 import { MCP_MEMBER_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import { mcpOAuthAccountKey } from "../../backend/mcp-oauth-provider";
@@ -14,10 +11,8 @@ import type { TeamApiMcpServerOwners } from "./dependencies";
 import { HttpError } from "./http-error";
 import { requireAdmin } from "./request-helpers";
 
-/** What a member may do on the MCP routes, or `null` for an owner or admin, who may do everything. */
 export type McpMemberAccess = { memberId: string; owners: TeamApiMcpServerOwners } | null;
 
-/** Lets an owner or admin in, and a member when the client and this host have `mcp-member-access-v1`. */
 export function requireMcpAccess(
   member: TeamMemberSummary,
   capabilities: ReadonlySet<string>,
@@ -28,12 +23,50 @@ export function requireMcpAccess(
   return owners ? { memberId: member.id, owners } : null;
 }
 
-/** Refuses a member a row that another person added. */
-export function requireOwnMcpServer(access: McpMemberAccess, mcpServerId: string): void {
-  if (access && !access.owners.addedBy(mcpServerId, access.memberId)) throw notYours();
+function memberLevel(access: NonNullable<McpMemberAccess>, mcpServerId: string): McpAccessLevel {
+  if (access.owners.level) return access.owners.level(mcpServerId, access.memberId);
+  return access.owners.addedBy(mcpServerId, access.memberId) ? "manage" : "use";
 }
 
-/** Refuses a member the sign-in of an address that a row of another person also uses. */
+export function requireOwnMcpServer(access: McpMemberAccess, mcpServerId: string): void {
+  if (access && memberLevel(access, mcpServerId) !== "manage") throw notYours();
+}
+
+export function visibleMcpServers(access: McpMemberAccess, servers: McpServerConfig[]): McpServerConfig[] {
+  return access ? servers.filter((server) => seesMcpServer(access, server.id)) : servers;
+}
+
+export function seesMcpServer(access: McpMemberAccess, mcpServerId: string): boolean {
+  return !access || memberLevel(access, mcpServerId) !== "none";
+}
+
+export function seesMcpAddress(access: McpMemberAccess, servers: readonly McpServerConfig[], url: string): boolean {
+  if (!access) return true;
+  const key = signInKey(url);
+  return !servers.some(
+    (server) =>
+      server.transport === "http" && signInKey(server.url) === key && memberLevel(access, server.id) === "none",
+  );
+}
+
+export function requireVisibleMcpAddress(
+  access: McpMemberAccess,
+  servers: readonly McpServerConfig[],
+  url: string,
+): void {
+  if (!seesMcpAddress(access, servers, url)) throw notYours();
+}
+
+export function requireVisibleMcpTest(
+  access: McpMemberAccess,
+  servers: readonly McpServerConfig[],
+  config: McpServerConfig,
+): void {
+  if (!access) return;
+  if (servers.some((server) => server.id === config.id) && memberLevel(access, config.id) === "none") throw notYours();
+  if (config.transport === "http") requireVisibleMcpAddress(access, servers, config.url);
+}
+
 export function requireOwnMcpAddress(access: McpMemberAccess, servers: readonly McpServerConfig[], url: string): void {
   if (!access) return;
   const key = signInKey(url);
@@ -41,7 +74,6 @@ export function requireOwnMcpAddress(access: McpMemberAccess, servers: readonly 
     if (server.transport === "http" && signInKey(server.url) === key) requireOwnMcpServer(access, server.id);
 }
 
-/** The sign-in of the row `mcpServerId`, for a member: each row on its address must be theirs. */
 export function requireOwnMcpSignIn(
   access: McpMemberAccess,
   servers: readonly McpServerConfig[],
@@ -53,7 +85,6 @@ export function requireOwnMcpSignIn(
   if (row?.transport === "http") requireOwnMcpAddress(access, servers, row.url);
 }
 
-/** The key of the host's sign-in store: one sign-in for each address and account. */
 function signInKey(url: string): string {
   return mcpOAuthAccountKey(url) ?? url;
 }

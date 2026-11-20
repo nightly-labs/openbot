@@ -1,5 +1,276 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, las copias pequeñas de las imágenes del lienzo de flujos de trabajo, las duraciones de vídeo personalizadas y los agentes que terminan una solicitud sin “Continuar” solo funcionan cuando el servidor tiene esta versión.",
+      "En Linux, si OpenBot sigue lento después de la actualización, elimina el archivo `~/.config/OpenBot/gpu-crash.json` y vuelve a iniciar OpenBot.",
+      "Si configuraste Pensamiento en Ajustes del proveedor para un agente de Mistral, vuelve a seleccionar el nivel en el menú Esfuerzo y restablece la fila antigua de Pensamiento."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Comparte tu enlace de invitación en Ajustes > Invite friends. La pestaña muestra tu crédito y los amigos que se han unido. Un amigo obtiene un 10 % de descuento en cada pago, y tú obtienes un 10 % de cada factura pagada de tu amigo como crédito.",
+          "Pon los nodos de un lienzo de flujos de trabajo en un grupo. Selecciónalos y pulsa Agrupar (⌘G). Contrae un grupo en una sola tarjeta de pila y pulsa Desagrupar (⇧⌘G) para terminarlo.",
+          "Da a un paso de vídeo del lienzo de flujos de trabajo cualquier duración que admita su modelo de Sunra o Higgsfield. Selecciona Personalizada en el menú Duración y usa el control deslizante.",
+          "Abre el Marketplace desde la fila Apps en los ajustes de un agente. Conecta una app, o añade tu propio servidor MCP con Añadir personalizada.",
+          "Cuando inicies sesión en un equipo nuevo y tu cuenta ya tenga servidores, el primer paso los muestra. Abre uno para continuar con sus agentes y chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los agentes terminan tu solicitud sin que tengas que escribir “Continuar”. Si una parte de la solicitud no está terminada, el agente continúa con esa parte, como máximo 3 veces. Una pregunta que necesita tu elección o aprobación sigue deteniendo al agente.",
+          "Las pestañas del panel lateral mantienen su título y un ancho único. Cuando las pestañas no caben, la fila se desplaza, y un menú al final de la fila muestra las demás pestañas. Un clic con el botón central cierra una pestaña.",
+          "En un servidor al que te has unido, las imágenes del lienzo de flujos de trabajo se muestran mucho más rápido. El lienzo recibe una copia pequeña de cada imagen, y la imagen completa se abre en el visor.",
+          "Un hilo ahora se parece al chat del agente. Los mensajes de un mismo remitente se leen como un bloque, y los pasos de una respuesta aparecen junto a ellos."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un agente de Claude o ChatGPT ya no se queda en “Trabajando” durante horas cuando el proveedor deja de responder. Tras 15 minutos sin salida (60 minutos mientras se ejecuta una herramienta), OpenBot termina el turno y continúan los mensajes en cola.",
+          "Con “Usar mi configuración de Claude Code” desactivado, los agentes de Claude ya no cargan tus instrucciones y reglas globales de Claude Code. Cada turno es más rápido y cuesta menos. Para conservarlas, activa “Usar mi configuración de Claude Code”.",
+          "Tus agentes siguen trabajando mientras OpenBot descarga una actualización de un proveedor. Una descarga que no recibe datos durante un minuto se detiene, y continúa desde donde se quedó cuando vuelves a intentarlo.",
+          "Los agentes vuelven a enviar mensajes directamente a sus agentes compañeros de equipo. Antes, una tarjeta pedía aprobar cada traspaso, y el trabajo se detenía hasta que aprobabas.",
+          "Un agente con modelos de respaldo automáticos pasa a su siguiente modelo de respaldo en más casos, por ejemplo tras un límite de frecuencia o cuando Gemini pierde la conexión con Google."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Después de instalar esta versión, no podrás volver a una versión anterior de OpenBot en este equipo o servidor. Esta versión hace la base de datos más pequeña, y una versión anterior no puede abrirla.",
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, los tamaños de imagen personalizados, los modelos y precios de Sunra y Higgsfield, y la carga más rápida de muchos agentes solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Mira los hilos laterales de cada agente en la barra lateral. Selecciona la flecha al final de una fila de agente, o deja el puntero sobre la fila para ver todos sus hilos.",
+          "Filtra la barra lateral con el botón de filtro al final del campo de búsqueda. Muestra solo agentes o canales, solo chats no leídos o agentes que están trabajando, o solo los chats de las carpetas que selecciones.",
+          "Da a un paso de imagen del lienzo de flujos de trabajo un tamaño personalizado en píxeles, o usa la relación de aspecto 4:5 o 5:4.",
+          "El lienzo de flujos de trabajo muestra todos los modelos de imagen y vídeo de Sunra y Higgsfield, y el botón Ejecutar muestra el precio en créditos.",
+          "Desactiva el Desenfoque de fondo y las Caras de agentes en movimiento en Ajustes > Apariencia > Movimiento para que OpenBot vaya más rápido en un equipo lento."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Varias personas pueden editar un mismo flujo de trabajo al mismo tiempo. El lienzo añade los cambios de las otras personas a medida que se guardan.",
+          "OpenBot usa mucha menos CPU mientras trabajan muchos agentes, y puedes escribir sin retrasos.",
+          "Los agentes terminan una compra cuando el banco pide un código 3-D Secure. Cuando el código está en un correo o un SMS que el agente puede leer, el agente lo escribe.",
+          "Ajustes del servidor > Transferir > Copiar a otro servidor ahora también copia los flujos de trabajo y los flujos de rutina de los agentes."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La base de datos de OpenBot ocupa mucho menos espacio. Después de la actualización, OpenBot elimina copias antiguas de los mensajes del chat en pasos pequeños.",
+          "En Windows, una actualización vuelve a mostrar su progreso.",
+          "Un servidor al que te has unido con muchos agentes, y un canal grande, se abren más rápido.",
+          "Los chats de Gemini con muchas imágenes o un historial largo dejan de fallar, y Gemini ya no pide iniciar sesión otra vez cuando empieza un chat nuevo.",
+          "La aplicación de escritorio vuelve a conectarse a un servidor con OpenBot v0.34.1 o anterior."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, el CRM, Añadir cuenta con código, un fondo que establece un agente, las carpetas de la biblioteca que organizan los agentes y los mensajes que entran en un turno de Devin en curso solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Muestra un fondo animado detrás de toda la ventana. Elige una escena, como Estanque koi o Luciérnagas, en Ajustes > Fondo de la ventana, o pide a un agente que cree una para ti.",
+          "Gestiona clientes potenciales, clientes y pagos en la nueva página del CRM. Es experimental: un propietario o administrador lo activa en Ajustes del servidor > Experimental. Puede importar desde Stripe, y los agentes proponen cambios que un propietario o administrador aprueba.",
+          "Responde a un agente en el chat del Dock de agentes. Permite o deniega un comando, responde a una pregunta o termina un paso del navegador sin la ventana principal.",
+          "Organiza la Biblioteca con mosaicos de carpetas, Favoritos, Recientes y Deshacer. Arrastra archivos a Nueva carpeta para crear una carpeta, o pide a un agente que organice sus carpetas.",
+          "Añade una cuenta de ChatGPT (Codex), Grok o Claude con un código. Abre el menú junto a Añadir cuenta y selecciona Añadir cuenta con código.",
+          "Un mensaje que envías mientras trabaja un agente de Devin u OpenCode entra en el turno en curso. Esto requiere Devin CLI 3000.12.57 u OpenCode 2.3.0, o una versión posterior."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los ajustes tienen un nuevo diseño. Las secciones están en grupos con nombre, y los Ajustes del servidor tienen las nuevas secciones Memoria y Predeterminados de agentes. En macOS, OpenBot usa la fuente del sistema.",
+          "Añade y edita servidores MCP personalizados en Marketplace > Apps. Los Ajustes del servidor ya no tienen una sección de MCP.",
+          "En un chat con un agente, tus burbujas ahora toman el color del avatar del agente. Cámbialo en Ajustes > Apariencia > Tus burbujas.",
+          "Una conversación por voz ya no abre el panel lateral. Una barra pequeña en la parte superior del chat muestra los controles de voz."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un chat que pierde su sesión guardada, o que se vuelve demasiado grande, ya no se queda roto. El agente inicia una sesión nueva con el historial del chat y responde a tu mensaje.",
+          "Más agentes pasan a su modelo de respaldo cuando un límite de uso o un error del proveedor detiene un turno, incluidos los agentes de Grok, Hermes y Claude.",
+          "Los agentes pueden usar un inicio de sesión guardado en más lugares, como un formulario de inicio de sesión en un marco.",
+          "Una rutina sigue activa después de una ejecución fallida, y una ejecución que vence mientras el proveedor no puede iniciarse se ejecuta más tarde.",
+          "OpenBot usa menos CPU y batería: los videos del chat y de las pestañas ocultas del navegador se pausan cuando no los ves."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, Detener para las ejecuciones de rutinas, los archivos que los agentes envían sin texto y las claves de API en su ruta antigua solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Separa dos dedos en un touchpad o en una pantalla táctil para acercar el área bajo el puntero. Los diagramas, el lienzo y el visor de imágenes mantienen su propio zoom.",
+          "Detén una ejecución de rutina desde el lienzo de Rutinas: selecciona Detener en la barra superior o en los detalles de la rutina. La ejecución termina con el estado Cancelada.",
+          "Los agentes pueden enviar un archivo o una imagen sin texto a un chat de WhatsApp, Telegram, Slack o Discord.",
+          "Vuelve a comprar un servidor alojado Starter. Tiene 25 GB de almacenamiento.",
+          "Usa una suscripción de ClinePass con agentes de Cline. El menú de modelos muestra los modelos de ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "En el lienzo, arrastra una nota, un texto libre, una forma o un paso por su texto. Un clic en el texto coloca el cursor donde hiciste clic.",
+          "Un mensaje que envías mientras trabaja un agente de Antigravity entra en la ejecución en curso. Esto requiere Antigravity CLI 1.5.0 o una versión posterior.",
+          "Una rutina cuya tarea indica que debe detenerse al terminar el trabajo ahora se pausa sola. Vuelve a activarla desde tu lista de rutinas.",
+          "Vault ahora indica que cada agente puede leer los archivos de claves de API de los demás agentes, porque todos los agentes se ejecutan con el mismo usuario del sistema."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Los scripts, los servidores MCP y los ajustes de proveedores que leen claves de API de Vault desde sus archivos vuelven a funcionar tras la actualización a 0.70.0.",
+          "Un agente de Claude conserva el modelo de su perfil cuando Claude Code cambia su modelo predeterminado.",
+          "Cuando Claude detiene una ejecución en el límite de gasto mensual, un agente con modelos de respaldo continúa con su siguiente modelo.",
+          "Los agentes obtienen la transcripción completa de un video con subtítulos, como un video de YouTube.",
+          "OpenBot usa menos CPU: las pestañas del navegador que no ves se ralentizan, y la luz en movimiento de la línea de actividad de un agente es más ligera."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Actualiza cada servidor unido a esta versión. Reiniciar servidor, los valores predeterminados de los agentes, los límites de hilos y los nuevos pasos de Flujos de trabajo solo funcionan en un servidor que tenga esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Reinicia desde la app un servidor que alojas tú mismo: como propietario o administrador, selecciona Reiniciar servidor en el menú del servidor.",
+          "Elige qué agentes pueden usar cada inicio de sesión, tarjeta, contacto y clave de API en Ajustes del servidor > Vault. Un agente ve y completa solo los elementos que puede usar.",
+          "Los flujos de trabajo tienen pasos de Imagen y Video. Crea imágenes y videos cortos con los modelos GPT Image, Grok Imagine o Sunra, y conecta imágenes como referencias.",
+          "Conecta Sunra y TryPost desde Marketplace, en Apps. Los agentes pueden entonces crear medios con tus créditos de Sunra, y redactar y publicar publicaciones en redes sociales.",
+          "Los propietarios y administradores pueden definir cuántos hilos se ejecutan al mismo tiempo, en el servidor y para cada agente, en Ajustes del servidor > General.",
+          "Muestra los agentes con mensajes nuevos en el dock: actívalo en Ajustes > Dock de agentes. Haz clic derecho en ese agente y selecciona Añadir al dock para mantenerlo ahí.",
+          "Añade más de una cuenta de Cursor. Cada agente puede usar una cuenta distinta."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una clave de API que guardas para un solo agente ahora se guarda en el Vault cifrado. Las claves que leen los agentes tienen una nueva ruta, así que un script con la ruta antigua debe usar la nueva.",
+          "Los ajustes de los agentes, como Orientar a los agentes mientras trabajan, están ahora en Ajustes del servidor > Agentes, para cada servidor, también en este equipo.",
+          "En la vista completa del navegador, el cuadro de mensaje vuelve a estar en el centro inferior de la página.",
+          "El encabezado del chat muestra el título del agente después de su nombre, por ejemplo «Brock · Gerente de tienda»."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot abre más rápido cuando tus chats son largos.",
+          "En Windows y Linux, OpenBot pregunta antes de salir mientras los agentes trabajan. Selecciona Seguir para ocultar la ventana y dejar que los agentes terminen.",
+          "Los dispositivos vuelven a conectarse a un servidor cuando se corta la conexión de un dispositivo durante la configuración. La vista en vivo del navegador de un agente en un servidor unido también se mantiene abierta con una conexión lenta.",
+          "Cuando pides a un agente una captura de pantalla de una página web, ahora adjunta la imagen a su respuesta.",
+          "Los modelos gratuitos de OpenCode vuelven a responder cuando se guarda una clave de OpenCode Go."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Los agentes ocultos siguen trabajando. OpenBot desactivó las rutinas de los agentes que ocultaste antes de esta versión, así que activa las rutinas que quieras."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Fija un mensaje en el chat de un agente: haz clic derecho en él y selecciona Fijar. El botón de mensajes fijados del encabezado del chat muestra los mensajes fijados de todos los chats del agente.",
+          "La Biblioteca tiene carpetas y tres vistas. Un agente también puede guardar los archivos que adjunta en una carpeta que tú nombres.",
+          "Enseñar una tarea: selecciona Enseñar una tarea en el menú +, y luego realiza la tarea en el navegador del agente. El agente guarda los pasos como una habilidad.",
+          "Agrupa las cuentas de un proveedor en Ajustes. Los agentes usan una cuenta hasta que se acerca a un límite de uso, y luego la siguiente.",
+          "Añade habilidades desde GitHub: pega el enlace de un repositorio público en la búsqueda de habilidades del Marketplace.",
+          "Ajustes del servidor → Transferir puede exportar una copia completa de un servidor y copiar agentes a otro servidor en un solo paso.",
+          "Silencia un agente desde su menú en la barra lateral. Un agente silenciado no envía notificaciones ni reproduce sonidos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un mensaje que envías a un agente mientras trabaja ahora orienta el turno en curso. Para ponerlo en cola como antes, desactiva Orientar a los agentes mientras trabajan en Ajustes → Agentes.",
+          "Un agente oculto sigue trabajando. Ejecuta sus rutinas y aparece en Te necesita cuando espera tu respuesta.",
+          "El servidor abierto aparece como logotipo en la parte inferior de la barra de páginas. El botón Nuevo está al final del campo de búsqueda de la barra lateral.",
+          "OpenBot usa Electron 45.3.0 con Chromium 156, y más sitios con una comprobación de bots se cargan en el navegador del agente."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot arranca más rápido, sobre todo en Windows, y un equipo lento sigue respondiendo después del inicio.",
+          "OpenBot sigue respondiendo después de un reinicio cuando tienes muchas tareas o hilos.",
+          "En Linux y Windows, OpenBot completa su cierre cuando cierras la ventana principal.",
+          "Las rutinas se ejecutan a su hora después de corregir el reloj del equipo.",
+          "El texto que copias de un chat ya no tiene líneas vacías al principio ni al final."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Los ajustes del canal tienen un ajuste de Navegador. Elige si todos los miembros, un miembro o nadie pueden usar el navegador en el canal.",
+          "El panel lateral del canal tiene un panel Navegador y un panel Archivos. Muestran las pestañas de los miembros del canal y los archivos enviados en el canal.",
+          "Haz clic derecho en la Dynamic Island o en el dock de agentes para ocultarlo. También puedes arrastrar un agente a un nuevo lugar del dock y cambiar el tamaño del dock en Ajustes.",
+          "Puedes desactivar el grupo No leídos en la barra lateral. Haz clic derecho en el título No leídos o cambia Ordenar chats a Manual.",
+          "Cuando una nueva versión no puede iniciarse 3 veces seguidas, se abre una ventana de recuperación. Puedes reintentar, descargar la versión anterior o exportar el diagnóstico."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una nueva versión llega ahora primero a aproximadamente 1 de cada 10 equipos, y a todos los equipos alrededor de un día después. Para recibirla de inmediato, selecciona Buscar actualizaciones.",
+          "Los agentes hacen preguntas con opciones en el cuadro de preguntas. Las tarjetas con botones son solo para aprobaciones."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un chat que has leído ya no se queda en el grupo No leídos. Los hilos secundarios sin leer, como el hilo de una rutina, ya no mantienen a un agente en ese grupo.",
+          "En Windows, el dock de agentes y la Dynamic Island ya no hacen lento el puntero en todas las apps mientras trabajan muchos agentes.",
+          "Un equipo ya no se detiene cuando el líder del equipo termina su turno sin respuesta, después de que sus compañeros informan.",
+          "Un chat de Claude que se hizo demasiado largo ahora empieza una sesión nueva con el historial del chat. Antes, cada mensaje fallaba con «Prompt is too long».",
+          "Cuando una cuenta de Claude llega a su límite de 5 horas, el agente pasa a su modelo de respaldo o espera al reinicio del límite.",
+          "Un agente puede guardar una captura de pantalla del navegador como archivo y adjuntarla a su respuesta."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

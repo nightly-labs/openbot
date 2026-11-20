@@ -1,11 +1,4 @@
-/**
- * The last run of the focused routine, beside the canvas. With no node selected it lists the steps in
- * the order they ran; a selected agent shows the routines that start it and exactly what it received
- * and returned in the focused one's run, and a
- * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
- */
-
-import { Badge, Button, ChevronLeft, CopyButton, Textarea } from "@openbot/ui";
+import { Badge, Button, ChevronLeft, CopyButton, Square, Textarea } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, flush, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -35,16 +28,28 @@ export interface DiagramInspectorProps {
   diagram: Diagram;
   agents: AgentProfile[];
   selectedNodeId: string | null;
-  /** The routine whose last run the panel shows. */
   focusRoutineId: string | null;
-  /** The day the routine week strip starts on. */
   now: Date;
   onSelectNode: (nodeId: string | null) => void;
   onFocusRoutine: (routineId: string) => void;
-  /** Saves what an agent does in one routine. Without it, the task is read-only. */
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
-  /** Sets the webhook of a routine that a webhook starts. Without it, the webhook is not shown. */
   webhooks?: DiagramWebhookActions | undefined;
+  runStop?: DiagramRunStop | undefined;
+}
+
+export interface DiagramRunStop {
+  stopping: boolean;
+  onStop: () => void;
+}
+
+export function DiagramStopButton(props: { stop: DiagramRunStop }) {
+  const { t } = useText();
+  return (
+    <Button type="button" variant="secondary" size="xs" disabled={props.stop.stopping} onClick={props.stop.onStop}>
+      <Square aria-hidden="true" />
+      {props.stop.stopping ? t("diagram.run.stopping") : t("diagram.run.stop")}
+    </Button>
+  );
 }
 
 export function DiagramInspector(props: DiagramInspectorProps) {
@@ -71,7 +76,6 @@ export function DiagramInspector(props: DiagramInspectorProps) {
     if (node.kind === "routine") return node.name;
     return agentById().get(node.agentId)?.name ?? node.agentId;
   };
-  /** The agents of the focused routine's run, in the order they run. */
   const orderedAgents = createMemo(() =>
     props.diagram.nodes
       .filter((node) => node.kind === "agent" && (!props.focusRoutineId || steps().has(node.id)))
@@ -112,6 +116,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
             </>
           )}
         </Show>
+        <Show when={props.runStop}>{(stop) => <DiagramStopButton stop={stop()} />}</Show>
       </header>
 
       <div class="diagram-inspector-body">
@@ -221,11 +226,6 @@ function StepStatus(props: { step: DiagramStepRun }) {
   );
 }
 
-/**
- * The task as text the user can change in place. It saves when it loses focus or on Command or
- * Control with Enter, and Escape puts back the saved task. A new task from the host replaces the
- * draft only while the user is not typing.
- */
 function TaskEditor(props: { value: string; labelledBy: string; onSave: (task: string) => void }) {
   const { t } = useText();
   const [draft, setDraft] = createSignal(props.value);
@@ -254,7 +254,6 @@ function TaskEditor(props: { value: string; labelledBy: string; onSave: (task: s
       onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          // Applied before the blur below reads the draft, or the blur would save what was typed.
           flush(() => setDraft(props.value));
           editing = false;
           event.currentTarget.blur();
@@ -278,7 +277,6 @@ function AgentStepDetail(props: {
   const { t } = useText();
   const routines = () => diagramRoutinesReaching(props.diagram.nodes, props.diagram.edges, props.node.id);
   const task = () => diagramAgentTask(props.node, props.focusRoutineId);
-  /** The routine in focus, when this agent has a task in it that the user can change. */
   const editableIn = () => {
     const routineId = props.focusRoutineId;
     return props.onEditTask &&
@@ -305,8 +303,6 @@ function AgentStepDetail(props: {
           )}
         </Show>
       </section>
-      {/* Each routine that starts this agent, with how the agent's step went in its last run. The
-          one picked is the run the input and output below come from. */}
       <Show when={routines().length > 0}>
         <section class="diagram-inspector-section">
           <h3 class="diagram-inspector-section-title">{t("diagram.node.startedBy")}</h3>
@@ -403,7 +399,6 @@ function RoutineDetail(props: {
       return node?.kind === "agent" ? [node] : [];
     });
   const agentFor = (agentId: string) => props.agents.find((agent) => agent.id === agentId);
-  /** The runs the week strip shows, so the list under it matches the picture. */
   const thisWeek = () => {
     const start = new Date(props.now);
     start.setHours(0, 0, 0, 0);

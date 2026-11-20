@@ -1,12 +1,3 @@
-// Every provider can use the skills in `~/.agents/skills` (nightly-labs/openbot#3204).
-// A temporary HOME holds two skills; `npx skills` also linked one of them into `~/.claude/skills`.
-// - The real Claude Agent SDK starts a stand-in Claude executable that records its arguments. With the
-//   user's Claude Code setup off (the default), the session gets only the sign-in keys of
-//   `~/.claude/settings.json`. With it on, it gets an `agents` plugin with the skill that Claude does not read already.
-// - The installed Claude CLI, when there is one, loads that plugin and lists `agents:<name>`.
-// - Antigravity gets the skills in its developer instructions; Codex, which reads the folder, does not.
-// - The `$` list adds the home skill, and its tag names the skill's SKILL.md for the provider only.
-// `bun run test:home-skills`; exit 0 = all pass. Writes .openbot-build/home-agent-skills-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
@@ -24,7 +15,6 @@ const SIGN_IN_TOKEN = "e2e-sign-in-token";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/home-agent-skills-e2e");
 const ROOT_VARIABLE = "OPENBOT_HOME_SKILLS_E2E_ROOT";
 
-// `os.homedir()` reads HOME when the process starts, so the checks run in a child with the temporary HOME.
 if (!process.env[ROOT_VARIABLE]) {
   const root = await mkdtemp(join(tmpdir(), "openbot-home-skills-e2e-"));
   const child = spawnSync(process.execPath, [import.meta.filename], {
@@ -73,7 +63,6 @@ try {
     "The scan lists the valid skills and leaves out the one whose name is not its folder.",
   );
 
-  // The user's Claude settings: the sign-in keys, and a plugin that an agent must not load by default.
   await writeFile(
     join(home, ".claude", "settings.json"),
     JSON.stringify({
@@ -89,7 +78,6 @@ try {
   const workspace = join(root, "workspace");
   await mkdir(workspace);
   const state = join(root, "state");
-  /** Starts one Claude session through the real SDK and gives the arguments of the stand-in executable. */
   async function claudeArguments(userSetup: boolean): Promise<string[]> {
     for (const previous of clients.splice(0)) await runCauseEffect(previous.stop()).catch(() => undefined);
     const recorded = join(root, `claude-arguments-${userSetup ? "on" : "off"}.txt`);
@@ -136,20 +124,17 @@ try {
     });
     return text.split("\n");
   }
-  // The SDK writes some flags as `--flag value` and others as `--flag=value`.
   const flagValues = (argv: string[], flag: string) =>
     argv.flatMap((value, index) => {
       if (value === flag) return [argv[index + 1] ?? ""];
       return value.startsWith(`${flag}=`) ? [value.slice(flag.length + 1)] : [];
     });
 
-  // With the user's setup off (the default), the session keeps only the sign-in settings.
   const offArgv = await claudeArguments(false);
   assert.deepEqual(flagValues(offArgv, "--plugin-dir"), [], "No home skills plugin with the user's setup off.");
   const offSources = flagValues(offArgv, "--setting-sources");
   assert.equal(offSources.length, 1, "The session names its setting sources.");
   assert.ok(!offSources.some((value) => value.split(",").includes("user")), "The user settings file is not a source.");
-  // The settings can hold keys: they go in a file that only this user can read, never on the command line.
   assert.ok(!offArgv.some((value) => value.includes(SIGN_IN_TOKEN)), "No sign-in key is on the command line.");
   const offSettings = flagValues(offArgv, "--settings");
   assert.equal(offSettings.length, 1, "The sign-in settings go to the session as a flag settings file.");
@@ -166,7 +151,6 @@ try {
   );
   report.checks.signInSettings = { apiKeyHelper: signInSettings.apiKeyHelper, env: Object.keys(signInSettings.env) };
 
-  // The Claude session with the user's setup gets a plugin with the skill that `~/.claude/skills` does not hold.
   const argv = await claudeArguments(true);
   await assert.rejects(stat(settingsFile), "The settings file is deleted when its query closes.");
   assert.deepEqual(flagValues(argv, "--settings"), [], "The user's setup loads the settings file itself.");
@@ -180,7 +164,6 @@ try {
   assert.equal(await readlink(join(plugin, "skills", "zeta-skill")), join(homeSkills, "zeta-skill"));
   report.checks.claudePlugin = { plugin, linked };
 
-  // The installed Claude CLI loads the linked skill from that plugin.
   const cli = spawnSync("claude", ["--version"], { encoding: "utf8", env: { ...process.env, HOME: realHome } });
   if (cli.status === 0) {
     const run = spawnSync(
@@ -204,7 +187,6 @@ try {
     report.checks.claudeCli = "skipped: no claude on PATH";
   }
 
-  // Antigravity does not read the folder, so its instructions name each skill and its SKILL.md.
   const agent: AgentSummary = {
     id: "agent-1",
     name: "Tester",
@@ -237,14 +219,12 @@ try {
   assert.ok(!withoutSkills.includes("~/.agents/skills"), "No list without home skills.");
   report.checks.instructions = "antigravity block present";
 
-  // The `$` list adds a home skill that the agent's list does not have yet.
   const chat = await runCauseEffect(listHomeFolderSkills(new Set(["linked-skill"])));
   assert.deepEqual(
     chat.map((skill) => [skill.skillId, skill.origin, skill.location]),
     [["home:zeta-skill", "workspace", "~/.agents/skills/zeta-skill"]],
   );
 
-  // The provider reads the SKILL.md path of a home tag; a person and an unsafe id get the name alone.
   const tagged = "Use @[zeta-skill](skill:home:zeta-skill) and @[x](skill:home:../x).";
   const provider = displayMessageReferences(tagged, [], new Map());
   assert.equal(provider, `Use zeta-skill at ${join(homeSkills, "zeta-skill", "SKILL.md")} (skill) and x (skill).`);

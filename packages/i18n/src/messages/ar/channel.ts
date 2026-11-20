@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "تبادل الأعضاء هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
   "channel.conversation.noMembers": "أضف وكلاء في إعدادات القناة لبدء العمل.",
+  "channel.conversation.waitFull": "في الانتظار - يبدأ {name} عند انتهاء مهمة قيد التشغيل",
   "channel.conversation.archivedNotice": "قناة محذوفة. معاينة فقط.",
   "channel.composer.label": "رسالة إلى القناة",
   "channel.composer.placeholder": "راسل {name}",
@@ -23,6 +24,9 @@ export const messages = {
   "channel.settings.memories": "الذكريات",
   "channel.settings.isolated": "الاحتفاظ بالذكريات في هذه القناة",
   "channel.settings.isolatedDescription": "يحفظ الوكلاء ما يتعلمونه هنا كذكريات للقناة. لا تراها دردشاتهم الأخرى.",
+  "channel.settings.browser": "المتصفح",
+  "channel.settings.browserEveryone": "كل الأعضاء",
+  "channel.settings.browserNone": "لا أحد",
   "channel.settings.memoryCount": {
     zero: "لا شيء محفوظ",
     one: "عنصر واحد محفوظ",

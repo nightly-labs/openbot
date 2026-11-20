@@ -1,5 +1,7 @@
 import {
+  AGENT_EXCHANGE_ITEM_TYPE,
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
   type ConversationTurnTrace,
   isConversationTurnTrace,
@@ -11,6 +13,7 @@ import {
   databaseRows,
   decodeConversationMessageJson,
   optionalStringColumn,
+  requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
 
@@ -18,10 +21,17 @@ export interface AgentHistorySelection {
   before?: string;
   messageId?: string;
   author?: string;
+  outgoing?: boolean;
+  acrossResets?: boolean;
   limit: number;
 }
 
-/** Model history reads use a thread and reset boundary; UI history remains unchanged. */
+export class HistoryReferenceUnavailable extends Error {
+  constructor() {
+    super("History reference is unavailable. Read recent history again.");
+  }
+}
+
 export class AgentHistoryQueries {
   readonly #core: DatabaseCore;
   constructor(core: DatabaseCore) {
@@ -41,28 +51,41 @@ export class AgentHistoryQueries {
       AND json_extract(message_json, '$.source') = 'system' AND json_extract(message_json, '$.status') = 'completed'
       ORDER BY ${ORDER_KEY_DESC} LIMIT 1
     ), allowed AS (
-      SELECT * FROM visible WHERE NOT EXISTS (SELECT 1 FROM boundary)
+      SELECT * FROM visible WHERE ? OR NOT EXISTS (SELECT 1 FROM boundary)
       OR (${ORDER_KEY_COLUMNS}) > (SELECT ${ORDER_KEY_COLUMNS} FROM boundary)
     )`;
-    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE];
+    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE, selection.acrossResets ? 1 : 0];
     const reset = databaseRow(this.#core.connection.prepare(`${cte} SELECT message_id FROM boundary`).get(...bindings));
     const resetMessageId = reset ? requiredStringColumn(reset, "message_id") : null;
     const anchorId = selection.messageId ?? selection.before;
-    if (
-      anchorId &&
-      !this.#core.connection
-        .prepare(`${cte} SELECT message_id FROM allowed WHERE message_id = ?`)
-        .get(...bindings, anchorId)
-    ) {
-      throw new Error("History reference is unavailable. Read recent history again.");
-    }
+    const anchor = anchorId
+      ? (databaseRow(
+          this.#core.connection
+            .prepare(`${cte} SELECT message_id FROM allowed WHERE message_id = ?`)
+            .get(...bindings, anchorId),
+        ) ??
+        databaseRow(
+          this.#core.connection
+            .prepare(
+              `${cte} SELECT message_id FROM allowed WHERE json_extract(message_json, '$.exchange.messageId') = ?
+              ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
+            )
+            .get(...bindings, anchorId),
+        ))
+      : null;
+    if (anchorId && !anchor) throw new HistoryReferenceUnavailable();
+    const anchorMessageId = anchor ? requiredStringColumn(anchor, "message_id") : null;
+    const messageId = selection.messageId === undefined ? null : anchorMessageId;
+    const before = selection.before === undefined ? null : anchorMessageId;
     const rows = databaseRows(
       this.#core.connection
         .prepare(`${cte}
       SELECT message_json,
+        COALESCE((${ORDER_KEY_COLUMNS}) < (SELECT ${ORDER_KEY_COLUMNS} FROM boundary), 0) AS before_reset,
         (SELECT provider_session_id FROM projection_turns WHERE thread_id = ? AND turn_id = json_extract(allowed.message_json, '$.turnId')) AS provider_session_id
-      FROM allowed WHERE author IN ('user', 'assistant', 'agent')
-        AND COALESCE(item_type, '') NOT IN ('commentary', '${AGENT_WELCOME_ITEM_TYPE}')
+      FROM allowed WHERE (author IN ('user', 'assistant', 'agent') OR (? AND author = 'system'
+          AND item_type = '${AGENT_EXCHANGE_ITEM_TYPE}' AND json_extract(message_json, '$.exchange.direction') = 'outgoing'))
+        AND COALESCE(item_type, '') NOT IN ('commentary', '${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')
         AND COALESCE(json_extract(message_json, '$.delivery.status'), 'completed') IN ('completed', 'failed', 'interrupted')
         AND (? IS NULL OR author = ?)
         AND (? IS NULL OR message_id = ?)
@@ -71,12 +94,13 @@ export class AgentHistoryQueries {
         .all(
           ...bindings,
           threadId,
+          selection.outgoing ? 1 : 0,
           selection.author ?? null,
           selection.author ?? null,
-          selection.messageId ?? null,
-          selection.messageId ?? null,
-          selection.before ?? null,
-          selection.before ?? null,
+          messageId,
+          messageId,
+          before,
+          before,
           selection.limit,
         ),
     );
@@ -85,14 +109,11 @@ export class AgentHistoryQueries {
       messages: rows.map((row) => ({
         message: decodeConversationMessageJson(requiredStringColumn(row, "message_json")),
         providerSessionId: optionalStringColumn(row, "provider_session_id"),
+        beforeReset: requiredNumberColumn(row, "before_reset") === 1,
       })),
     };
   }
 
-  /**
-   * The trace of a turn. Only one message of the turn holds it, and that message can be a thinking
-   * message that `read` leaves out, or on another page.
-   */
   turnTrace(threadId: string, turnId: string): ConversationTurnTrace | null {
     const row = databaseRow(
       this.#core.connection

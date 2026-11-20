@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -13,26 +13,17 @@ import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
-// Paged history (`excludeTurns`, `thread/turns/list`, and `thread/items/list`) is required by the
-// Codex adapter. Older app-server versions only return the full thread snapshot on resume.
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
 const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
-// The first Cline CLI that OpenBot was checked with: its sessions run in-process and it answers a lost
-// session with the ACP resource-not-found error.
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
-// The first checked Python Kimi CLI. Login capabilities are probed before code sign-in.
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
 
-/** What every resolved provider CLI carries. */
 interface ResolvedCli {
   executable: string;
   version: string;
-  /**
-   * The `PATH` from `cliLaunchPath` that each process of the CLI starts with. `--version` runs with it
-   * too, when the resolver runs the CLI. Absent on Windows, which has no login shell.
-   */
   launchPath?: string;
+  incomplete?: true;
 }
 
 export interface CodexCliInfo extends ResolvedCli {
@@ -67,12 +58,6 @@ export interface KimiCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
-/**
- * The user's own `hermes` runs, with the user's own `~/.hermes`, and `resolveHermesCli` gives only
- * `system`. The Download of `HermesInstaller` runs the official installer, which puts Hermes where a
- * terminal install does, so OpenBot finds it as the user's CLI. The type keeps `managed`, as each
- * other CLI does, so a `managed` test value does not narrow `AgentCliInfo`.
- */
 export interface HermesCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
@@ -98,11 +83,6 @@ export class CodexCliError extends Error {
   }
 }
 
-/**
- * The managed CLI OpenBot downloaded for each provider, keyed by provider id. `null` means OpenBot
- * has no managed copy and only the user's own installation is used. A missing key means the same as
- * an unset option: the resolver looks for the copy shipped inside the application itself.
- */
 export type BundledProviderExecutables = Partial<Record<AgentProviderId, string | null | undefined>>;
 
 export const resolveCodexCli: (input?: {
@@ -116,8 +96,9 @@ export const resolveCodexCli: (input?: {
       input.bundledExecutable === undefined ? bundledCodexExecutable() : input.bundledExecutable;
     const candidates = yield* cliCandidates("codex", input.systemCandidates, bundledExecutable);
     const failures: CodexCliError[] = [];
-    // The copy that OpenBot tried first. The message for it tells the user which copy to repair.
     let firstFailedSource: "system" | "managed" | undefined;
+    const configured = input.systemCandidates === undefined ? configuredCliPath("codex") : null;
+    let incomplete: CodexCliInfo | undefined;
 
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
@@ -133,10 +114,20 @@ export const resolveCodexCli: (input?: {
           return { executable: candidate.executable, version, source: candidate.source, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
-      if (Result.isSuccess(attempt)) return attempt.success;
+      if (Result.isSuccess(attempt)) {
+        const cli = attempt.success;
+        if (cli.source === "managed" || cli.executable === configured || (yield* hasCodeModeHost(cli.executable))) {
+          return cli;
+        }
+        incomplete ??= { ...cli, incomplete: true };
+        continue;
+      }
       const error = attempt.failure.cause;
 
-      if (isCliTimeout(error)) throw error;
+      if (isCliTimeout(error)) {
+        if (incomplete) return incomplete;
+        throw error;
+      }
       firstFailedSource ??= candidate.source;
       failures.push(
         error instanceof CodexCliError
@@ -145,6 +136,7 @@ export const resolveCodexCli: (input?: {
       );
     }
 
+    if (incomplete) return incomplete;
     const outdated = failures.find((failure) => failure.code === "outdated");
     if (outdated) throw outdated;
     if (failures.length > 0) {
@@ -171,6 +163,36 @@ function bundledCodexExecutable(
   return bundledProviderExecutable("codex", platform, architecture, resourcesPath);
 }
 
+const CODEX_LAUNCHER = /^(?:volta-shim|mise|aqua-proxy)(?:\.exe)?$/iu;
+
+const hasCodeModeHost = Effect.fn("Cli.hasCodeModeHost")((executable: string) =>
+  providerCall(async () => {
+    const program = await realpath(executable);
+    if (CODEX_LAUNCHER.test(basename(program))) return true;
+    const isFile = (path: string) =>
+      stat(path).then(
+        (info) => info.isFile(),
+        () => false,
+      );
+    if (process.platform === "win32") {
+      if (extname(program).toLowerCase() !== ".exe") return true;
+      const stem = program.slice(0, -".exe".length);
+      if ((await isFile(`${stem}.bunx`)) || (await isFile(`${stem}.shim`))) return true;
+    } else {
+      const file = await open(program, "r");
+      try {
+        const { buffer, bytesRead } = await file.read(Buffer.alloc(2), 0, 2, 0);
+        if (bytesRead === 2 && buffer.toString("latin1") === "#!") return true;
+      } finally {
+        await file.close();
+      }
+    }
+    const host = process.platform === "win32" ? "codex-code-mode-host.exe" : "codex-code-mode-host";
+    const folder = dirname(program);
+    return (await isFile(join(folder, host))) || (await isFile(join(folder, "..", "codex-resources", host)));
+  }).pipe(Effect.orElseSucceed(() => true)),
+);
+
 export const resolveClaudeCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -182,7 +204,6 @@ export const resolveClaudeCli: (input?: {
       input.bundledExecutable === undefined ? bundledClaudeExecutable() : input.bundledExecutable;
     const candidates = yield* cliCandidates("claude", input.systemCandidates, bundledExecutable);
     const failures: CodexCliError[] = [];
-    // The copy that OpenBot tried first. The message for it tells the user which copy to repair.
     let firstFailedSource: "system" | "managed" | undefined;
 
     for (const candidate of candidates) {
@@ -282,10 +303,6 @@ export const resolveGrokCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * There is deliberately no minimum version here. OpenBot downloads and pins OpenCode now, but a
- * user who already has the CLI keeps it, and a floor would newly lock out an install that works.
- */
 export const resolveOpencodeCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -304,9 +321,6 @@ export const resolveOpencodeCli: (input?: {
         Effect.gen(function* () {
           const { stdout, launch } = yield* readCliVersion(candidate, "opencode");
           const version = parseOpencodeVersion(stdout);
-          // `source` has to be the candidate's own: hardcoding "system" made `updateProviderCli` refuse
-          // to activate the managed copy, and made `trackSystemCliVersions` report the managed version
-          // as the user's, which suppressed every later update offer.
           return { executable: candidate.executable, version, source: candidate.source, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
@@ -314,7 +328,6 @@ export const resolveOpencodeCli: (input?: {
       const error = attempt.failure.cause;
 
       if (isCliTimeout(error)) throw error;
-      /* Try the remaining installed candidates. */
     }
     throw new CodexCliError(
       found ? sourceText("error.provider.opencodeNotStarted") : sourceText("error.provider.opencodeMissing"),
@@ -324,16 +337,6 @@ export const resolveOpencodeCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * The Antigravity CLI is never looked for on `PATH`: the Antigravity IDE installs an `antigravity`
- * command that is an editor, not this CLI. Only the copy OpenBot downloaded, or the path in
- * `OPENBOT_ANTIGRAVITY_PATH`, is used. The CLI prints its version, such as `1.5.4`, with
- * `--version`. It still gets `cliLaunchPath`: the MCP servers that it starts are commands such as
- * bare `node` (#3418).
- *
- * A path the user set is the only candidate: when it cannot start, the error says so, and the
- * managed copy does not run in its place without a message.
- */
 export const resolveAntigravityCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -364,11 +367,8 @@ export const resolveAntigravityCli: (input?: {
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
       if (Result.isSuccess(attempt)) return attempt.success;
-
-      /* Try the remaining candidates. */
+      if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
     }
-    // Only the managed copy is downloadable, so a path the user set that cannot run must not say
-    // "not downloaded": Download is refused while the override is set (#4978).
     if (!found && override.length > 0)
       throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
     throw new CodexCliError(
@@ -379,21 +379,14 @@ export const resolveAntigravityCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/** Antigravity CLI 1.5.4 prints `1.5.4`. */
 function parseAntigravityVersion(output: string): string {
   const version = /^\s*(\d+\.\d+\.\d+)\s*$/u.exec(output)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
   return version;
 }
 
-/** The file beside `bin/` that names the version of a Cursor install. */
 export const CURSOR_MANIFEST = "cursor-package.json";
 
-/**
- * The Cursor CLI is `cursor-agent` on `PATH`. The `cursor` command is the Cursor editor, not this
- * CLI, so it is never used. There is no minimum version, as for OpenCode: a user who already has
- * the CLI keeps it.
- */
 export const resolveCursorCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -417,7 +410,6 @@ export const resolveCursorCli: (input?: {
       const error = attempt.failure.cause;
 
       if (isCliTimeout(error)) throw error;
-      /* Try the remaining installed candidates. */
     }
     throw new CodexCliError(
       found ? sourceText("error.provider.cursorNotStarted") : sourceText("error.provider.cursorMissing"),
@@ -427,10 +419,6 @@ export const resolveCursorCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * Finds the user's own Hermes Agent. OpenBot has no copy of its own: a newer Hermes moves the
- * user's `~/.hermes` database and settings forward, and the user's older Hermes then cannot read them.
- */
 export const resolveHermesCli: (input?: {
   systemCandidates?: string[];
 }) => Effect.Effect<HermesCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveHermesCli")(
@@ -442,22 +430,25 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
       if (isCliTimeout(error)) throw error;
-      /* Try the remaining installed candidates. */
     }
     throw new CodexCliError(
       found ? sourceText("error.provider.hermesNotStarted") : sourceText("error.provider.hermesMissing"),
@@ -467,20 +458,12 @@ export const resolveHermesCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * Hermes prints its release and its build on the first line, such as
- * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
- */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
 
-/**
- * Cursor prints its build as a date and a commit, such as `2026.09.28-64d2043`. The newer form that
- * its launcher accepts adds the time: `2026.09.28-10-15-00-64d2043`.
- */
 function parseCursorVersion(output: string): string {
   const version = output.trim();
   if (!/^\d{4}\.\d{2}\.\d{2}(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40}$/u.test(version)) {
@@ -489,26 +472,18 @@ function parseCursorVersion(output: string): string {
   return version;
 }
 
-/** The version in the manifest that a managed Cursor install writes beside `bin/`. */
 export function parseCursorManifestVersion(manifest: string): string {
   let version: unknown = null;
   try {
     const value = JSON.parse(manifest);
     if (isDynamicRecord(value)) version = value.version;
-  } catch {
-    /* Reported below. */
-  }
+  } catch {}
   if (typeof version !== "string") {
     throw new CodexCliError(sourceText("error.provider.cursorVersionUnreadable"), "invalid");
   }
   return parseCursorVersion(version);
 }
 
-/**
- * The Cline CLI is `cline` on `PATH`, which the npm package `cline` installs. A CLI older than
- * `MINIMUM_CLINE_VERSION` is skipped, so a managed one after it is still used. With no newer CLI,
- * the outdated one is the error the user sees.
- */
 export const resolveClineCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -549,11 +524,6 @@ export const resolveClineCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * The Kimi Code CLI is `kimi` on `PATH`, which `uv tool install kimi-cli` and Kimi's install script
- * install. A CLI older than `MINIMUM_KIMI_VERSION` is skipped, so a managed one after it is still
- * used. With no newer CLI, the outdated one is the error the user sees.
- */
 export const resolveKimiCli: (input?: {
   systemCandidates?: string[];
   bundledExecutable?: string | null | undefined;
@@ -594,11 +564,6 @@ export const resolveKimiCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/**
- * The arguments of `kimi login`. The Python CLI supports JSON, and takes its region from the
- * variables of `kimiPythonLoginEnv`. Kimi Code 2.x prints a device code as text, and takes the
- * region as an option: without it, a first sign-in goes to kimi.com.
- */
 export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
   cli: { executable: string; launchPath?: string },
   env: Readonly<Record<string, string>>,
@@ -627,7 +592,6 @@ export const kimiLoginArgs = Effect.fn("Cli.kimiLoginArgs")(function* (
       );
     },
   });
-  // A browser sign-in needs no option, so a probe that fails keeps the plain `kimi login`.
   const output = options.code ? yield* probe : yield* Effect.orElseSucceed(probe, () => ({ stdout: "", stderr: "" }));
   const help = stripVTControlCharacters(`${output.stdout}\n${output.stderr}`);
   if (/\bkimi\b/i.test(help)) {
@@ -699,50 +663,34 @@ export function parseGrokVersion(output: string): string {
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
-/** OpenCode prints a bare `1.18.30`, and `verifyInstalledRuntime` compares that exactly. */
 export function parseOpencodeVersion(output: string): string {
   const match = output.trim().match(/^(?:opencode\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
   if (!match) throw new CodexCliError(sourceText("error.provider.opencodeVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
-/** Cline prints a bare `3.0.68`, the npm version of its package. */
 export function parseClineVersion(output: string): string {
   const match = output.trim().match(/^(?:cline\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/i);
   if (!match) throw new CodexCliError(sourceText("error.provider.clineVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
-/** Kimi prints `kimi, version 1.52.0`. */
 export function parseKimiVersion(output: string): string {
   const match = output.trim().match(/^(?:kimi,?\s+version\s+)?v?(\d+)\.(\d+)\.(\d+)(?:[-+.][\w.-]+)?$/i);
   if (!match) throw new CodexCliError(sourceText("error.provider.kimiVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
-/**
- * Bun prints a bare `1.4.2` and nothing else. It is not a provider CLI, so no discovery step reads
- * this; only `verifyInstalledRuntime` does, to confirm the binary in the store is the pinned one.
- */
 export function parseBunVersion(output: string): string {
   const match = output.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?$/);
   if (!match) throw new CodexCliError(sourceText("error.provider.bunVersionUnreadable"), "invalid");
   return `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}`;
 }
 
-/**
- * Whether this Claude Code takes `--system-prompt-snapshot`. Checked in 2.1.263, the version the
- * lock falls back to; an older CLI above the minimum would reject the unknown flag and not start.
- */
 export function claudeTakesPromptSnapshotFlag(version: string): boolean {
   return isMinimumVersion(version, [2, 1, 263]);
 }
 
-/**
- * Whether this Antigravity CLI takes `--gemini-dir` and `--app-data-dir`, so that an account after
- * the first can have a folder of its own, and keeps its token in a file there when it sees
- * `WSL_DISTRO_NAME`. Checked in 1.5.3 and 1.5.4.
- */
 export function antigravityTakesStateFolders(version: string): boolean {
   return isMinimumVersion(version, [1, 5, 3]);
 }
@@ -750,7 +698,6 @@ export function antigravityTakesStateFolders(version: string): boolean {
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
   const parts = version.split(".").map(Number);
   for (const [index, required] of minimum.entries()) {
-    // A missing part compares like NaN: neither above nor below the minimum.
     const part = parts[index] ?? Number.NaN;
     if (part > required) return true;
     if (part < required) return false;
@@ -758,7 +705,6 @@ function isMinimumVersion(version: string, minimum: readonly number[]): boolean 
   return true;
 }
 
-/** Resolves the native providers through the same explicit/managed/system precedence. */
 const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   provider: NativeCliProvider,
   input: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined } = {},
@@ -828,7 +774,6 @@ function parseMuseVersion(output: string): string {
   return match[0];
 }
 
-/** Devin CLI 3000.11.234 prints `devin 3000.11.234 (92c83011d113)`. */
 function parseDevinVersion(output: string): string {
   const match = output.match(/\bdevin[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
@@ -836,7 +781,6 @@ function parseDevinVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
-/** GitHub Copilot CLI 1.0.105 prints `GitHub Copilot CLI 1.0.105.` and a line about updates. */
 function parseCopilotVersion(output: string): string {
   const match = output.match(/\bCopilot CLI[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
@@ -847,7 +791,6 @@ function parseCopilotVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
-/** Mistral Vibe 3.1.0 prints `vibe-acp 3.1.0`. */
 function parseMistralVersion(output: string): string {
   const match = output.match(/\bvibe-acp[ \t]+v?(\d+\.\d+\.\d+)\b/iu) ?? output.match(/\b\d+\.\d+\.\d+\b/u);
   if (!match)
@@ -858,10 +801,10 @@ function parseMistralVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
-/** The providers whose CLI is one native program that OpenBot can download. */
+export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
+
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
-/** The version parser of each native provider CLI. */
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
   pi: parsePiVersion,
   muse: parseMuseVersion,
@@ -875,10 +818,6 @@ export function isVersion(value: string): boolean {
   return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
 }
 
-/**
- * A commit orders nothing, so two Cursor builds of the same date and time, or of the same date with
- * no time, are neither older nor newer.
- */
 export function olderVersion(installed: string, target: string): boolean {
   return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
 }
@@ -888,44 +827,64 @@ export function compareReleases(a: string, b: string): number {
   return release(a).localeCompare(release(b), "en", { numeric: true });
 }
 
-/**
- * Resolve a provider's CLI with OpenBot's copy as `bundledExecutable`. The CLI the user installed
- * wins over the copy when it is as new: the copy then runs nothing, and the Storage page can remove
- * it. A version that cannot be compared keeps the copy, as before. An update passes
- * `preferInstalled: false`, because it must start the copy it just downloaded.
- */
 export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
+}
+
+export interface InstalledFirstChoice<Cli> {
+  readonly cli: Cli;
+  readonly passedOver: {
+    readonly source: "system" | "managed";
+    readonly version: string;
+    readonly incomplete?: boolean;
+  } | null;
+}
+
+export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+  installedChosen = false,
+): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  if (!preferInstalled) return copy;
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-  const choose = (resolved: Cli, installed: Cli | null): Cli =>
-    resolved.source === "managed" &&
-    installed?.source === "system" &&
-    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
-      ? installed
-      : resolved;
+  const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
+    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
+    if (preferInstalled && (installedChosen || (asNew && !installed.incomplete))) {
+      const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
+    }
+    return {
+      cli: resolved,
+      passedOver: {
+        source: "system",
+        version: installed.version,
+        ...(installed.incomplete ? { incomplete: true } : {}),
+      },
+    };
+  };
   return Effect.gen(function* () {
-    // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
     if (bundledExecutable) {
       const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
       return choose(resolved, installed);
     }
     const resolved = yield* copy;
-    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };
   });
 }
 
-/** The command name of a provider's CLI on `PATH`. */
 function cliCommandName(provider: AgentProviderId): string {
-  // Mistral Vibe's `vibe` command is its terminal app; `vibe-acp` is its ACP server.
   return provider === "cursor" ? "cursor-agent" : provider === "mistral" ? "vibe-acp" : provider;
 }
 
-/** An explicit path remains under the user's control, including during managed updates. */
 export function configuredCliPath(provider: AgentProviderId): string | null {
   return process.env[`OPENBOT_${provider.toUpperCase()}_PATH`]?.trim() || null;
 }
@@ -948,12 +907,6 @@ const cliCandidates = Effect.fn("Cli.candidates")(function* (
   );
 });
 
-/**
- * The places a provider's CLI may be, in order. On Windows `where.exe` takes the fixed command name
- * as one argument. Elsewhere each folder of the login shell's `PATH` is searched here, in Node, as
- * `resolveAgentCommand` in `acp-agent-command.ts` does for a custom agent: no command name reaches
- * the shell, and one cached login shell serves every provider.
- */
 const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
   provider: AgentProviderId,
   configuredPath: string | undefined,
@@ -966,8 +919,6 @@ const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
     const output = yield* providerCall(() =>
       execFileAsync("where.exe", [command], { timeout: 5_000, maxBuffer: 64 * 1024 }),
     ).pipe(Effect.catch(() => Effect.succeed({ stdout: "" })));
-    // `where.exe` also lists the extensionless script that npm writes for Git Bash, which Windows
-    // cannot start.
     candidates.push(
       ...output.stdout
         .split(/\r?\n/u)
@@ -984,13 +935,10 @@ const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
   return [...new Set(candidates)];
 });
 
-/** The extensions Windows runs when `PATHEXT` is unset, in the order the system itself uses. */
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
-/** Whether Windows can start a file by its extension, as `PATHEXT` lists them. */
 export function isWindowsRunnable(path: string, pathext: string | undefined): boolean {
   const dot = path.lastIndexOf(".");
-  // A dot inside a directory name is not an extension.
   if (dot <= Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"))) return false;
   const extension = path.slice(dot).toLowerCase();
   return (pathext?.trim() || DEFAULT_PATHEXT).split(";").some((entry) => entry.trim().toLowerCase() === extension);
@@ -1012,7 +960,6 @@ function windowsFallbackPaths(
   if (command === "claude" && localAppData) {
     paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "claude.exe"));
   }
-  // Cursor's installer puts the launcher in a folder of its own and adds that folder to `PATH`.
   if (command === "cursor-agent" && localAppData) {
     paths.push(win32.join(localAppData, "cursor-agent", "cursor-agent.cmd"));
   }
@@ -1024,6 +971,7 @@ function windowsFallbackPaths(
     paths.push(win32.join(userHome, ".opencode", "bin", "opencode.exe"));
     if (localAppData) paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "opencode.exe"));
   }
+  if (command === "kimi") paths.push(win32.join(userHome, ".kimi-code", "bin", "kimi.exe"));
   if (appData) paths.push(win32.join(appData, "npm", `${command}.cmd`));
   paths.push(
     win32.join(userHome, ".local", "bin", `${command}.exe`),
@@ -1037,24 +985,8 @@ function windowsFallbackPaths(
   return paths;
 }
 
-/**
- * The shells that macOS runs as the login shell when `$SHELL` names one. Each accepts `-lic` (`sh`
- * gets `-lc`) and runs `printf %s "$PATH"` as POSIX shells do; fish joins a quoted `$PATH` with `:`
- * too. tcsh refuses `-lic`, so a tcsh user gets `/bin/zsh`.
- */
 const MAC_LOGIN_SHELLS = new Set(["bash", "fish", "ksh", "sh", "zsh"]);
 
-/**
- * The shell that reports the login `PATH`. It has to be a login shell, because that is what reads
- * the profile a version manager appends its `PATH` to, and a packaged app inherits none of it.
- *
- * Both platforms prefer the user's own `$SHELL`, because that is the profile their terminal reads:
- * a user who sets up nvm in `~/.bash_profile` has no Codex in zsh. macOS falls back to `/bin/zsh`,
- * the default login shell, which is always present, and uses `$SHELL` only for a known shell at an
- * absolute path. Linux cannot assume zsh is installed at all, so it falls back to `/bin/sh`. The
- * `-i` flag does not go with `sh`, because `sh` is not required to accept an interactive non-tty
- * invocation and dash exits rather than running the command.
- */
 function loginShellCommand(
   platform: NodeJS.Platform = process.platform,
   environment: NodeJS.ProcessEnv = process.env,
@@ -1073,18 +1005,6 @@ function loginShellCommand(
 const LOGIN_SHELL_TIMEOUT_MS = 5_000;
 const LOGIN_SHELL_MAX_OUTPUT_BYTES = 64 * 1024;
 
-/**
- * Runs one script in the user's login shell and returns what it printed.
- *
- * The shell starts in a session of its own, with no controlling terminal. An interactive bash that
- * finds the terminal held by another process group sends SIGTTIN to its own group, and without a
- * session of its own that group is OpenBot's. An OpenBot started from a terminal then stopped as soon
- * as two lookups overlapped, and only SIGKILL could end it (#766). With no terminal, the shell turns
- * job control off instead. `execFile` cannot do this: it does not pass `detached` on to `spawn`.
- *
- * A failed start, a non-zero exit, a signal, the timeout and too much output all reject, as
- * `execFile` did, so each caller keeps its fallback.
- */
 export function runInLoginShell(
   script: string,
   shell = loginShellCommand(),
@@ -1100,9 +1020,6 @@ export function runInLoginShell(
     const chunks: Buffer[] = [];
     let size = 0;
     let failure: Error | null = null;
-    // The whole group, so that nothing the user's profile started outlives the lookup. The pipes are
-    // closed too, as `execFile` did: a process outside the group can still hold them, and `close`
-    // waits for every holder.
     const stop = (error: Error) => {
       if (failure) return;
       failure = error;
@@ -1110,9 +1027,7 @@ export function runInLoginShell(
       child.stderr.destroy();
       try {
         if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
-      } catch {
-        // The group has already exited.
-      }
+      } catch {}
     };
     const timer = setTimeout(
       () => stop(new Error(`The login shell did not finish in ${LOGIN_SHELL_TIMEOUT_MS / 1000} seconds.`)),
@@ -1123,7 +1038,6 @@ export function runInLoginShell(
       if (size > LOGIN_SHELL_MAX_OUTPUT_BYTES) stop(new Error("The login shell printed too much output."));
       else chunks.push(chunk);
     });
-    // Drained and dropped: an interactive shell with no terminal reports that job control is off.
     child.stderr.resume();
     child.once("error", (error) => {
       finished = true;
@@ -1144,17 +1058,10 @@ export function runInLoginShell(
   });
 }
 
-/** How long the login shell's `PATH` is kept. A tool the user installs is found after this. */
 const LOGIN_PATH_TTL_MS = 60_000;
 
 let loginPath: { value: Deferred.Deferred<readonly string[]>; readAt: number } | null = null;
 
-/**
- * The login shell's `PATH`, then this process's. The script is fixed: no user text reaches the
- * shell. A packaged app starts with a short `PATH`, and a version manager adds its folders in the
- * profile that only a login shell reads. Provider CLIs and custom agents are looked up here, and
- * every caller in the next `LOGIN_PATH_TTL_MS` shares one shell.
- */
 export const loginSearchPath = Effect.fn("Cli.loginSearchPath")(function* () {
   if (loginPath && Date.now() - loginPath.readAt < LOGIN_PATH_TTL_MS) return yield* Deferred.await(loginPath.value);
   const value = Deferred.makeUnsafe<readonly string[]>();
@@ -1162,7 +1069,6 @@ export const loginSearchPath = Effect.fn("Cli.loginSearchPath")(function* () {
   const exit = yield* Effect.exit(
     runInLoginShell('printf %s "$PATH"').pipe(
       Effect.catch(() => Effect.succeed("")),
-      // An interactive profile can print before the script runs, such as a greeting or `fastfetch`.
       Effect.map((stdout) => stdout.split(/\r?\n/u).pop()?.trim() ?? ""),
       Effect.map((shellPath) => [
         ...new Set([...shellPath.split(delimiter), ...(process.env.PATH ?? "").split(delimiter)].filter(Boolean)),
@@ -1173,29 +1079,14 @@ export const loginSearchPath = Effect.fn("Cli.loginSearchPath")(function* () {
   return yield* exit;
 }, Effect.uninterruptible);
 
-/**
- * The `PATH` that a custom agent's process and a Claude session start with, or null where none is
- * needed. It is the folders `resolveAgentCommand` looks in, so a command found there can find its
- * own interpreter: an app that Finder, the Dock or a login item starts has a short `PATH`, and
- * `#!/usr/bin/env node` fails with exit code 127 without the login shell's folders. Windows has no
- * login shell.
- */
 export const agentLaunchPath = Effect.fn("Cli.agentLaunchPath")(function* (
   platform: NodeJS.Platform = process.platform,
 ) {
   if (platform === "win32") return null;
-  // A relative folder such as `.` would be read in the agent's working folder, which is a workspace.
   const folders = (yield* loginSearchPath()).filter((folder) => isAbsolute(folder));
   return folders.length > 0 ? folders.join(delimiter) : null;
 });
 
-/**
- * The `PATH` that a provider CLI runs with: `agentLaunchPath`, then the CLI's own folder for a copy
- * of the user's. A CLI that npm, Volta or Homebrew installed is a `#!/usr/bin/env node` script, and
- * when it was found in a fallback folder rather than on the login `PATH`, its Node is often beside
- * it. A managed copy is a native program, and its folder stays off the `PATH` that agents' commands
- * get.
- */
 export const cliLaunchPath = Effect.fn("Cli.launchPath")(function* (
   executable: string,
   source: "system" | "managed" | undefined,
@@ -1208,17 +1099,10 @@ export const cliLaunchPath = Effect.fn("Cli.launchPath")(function* (
   return folders.length > 0 ? folders.join(delimiter) : null;
 });
 
-/** The `PATH` entry that each process of a resolved CLI starts with, to spread over its environment. */
 export function cliPathEnvironment(cli: { readonly launchPath?: string }): Record<string, string> {
   return cli.launchPath ? { PATH: cli.launchPath } : {};
 }
 
-/**
- * Where a CLI may be when the login shell's `PATH` does not name it: the shell failed or took too
- * long, or the profile that sets the `PATH` is one the login shell does not read. These are the
- * default global folders of the installers and package managers, never a version-manager folder
- * that only its own shell setup selects, such as nvm's.
- */
 function posixFallbackPaths(
   provider: AgentProviderId,
   userHome = homedir(),
@@ -1229,6 +1113,7 @@ function posixFallbackPaths(
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
   if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));
   if (command === "grok") paths.push(posix.join(userHome, ".grok", "bin", "grok"));
+  if (command === "kimi") paths.push(posix.join(userHome, ".kimi-code", "bin", "kimi"));
   paths.push(
     posix.join(userHome, ".npm-global", "bin", command),
     posix.join(userHome, ".volta", "bin", command),
@@ -1243,13 +1128,6 @@ function posixFallbackPaths(
   return paths;
 }
 
-/**
- * One argument on a `cmd.exe /c` line that runs a batch wrapper. `cmd.exe` reads the line first: it
- * toggles quoting at every `"` and expands `%NAME%` inside quotes too. The wrapper then hands `%*` to
- * a program that splits it with the C runtime rules. So an argument with any character outside a
- * plain set is quoted, an inner `"` is written as `""` with the backslashes before it doubled, which
- * both parsers read as one literal quote, and `%` is written as `%%cd:~,%`, which expands to one `%`.
- */
 function batchArgument(argument: string): string {
   if (/^[\w\-.,/:=@+\\]+$/.test(argument)) return argument;
   let quoted = '"';
@@ -1266,13 +1144,6 @@ function batchArgument(argument: string): string {
   return `${quoted}${"\\".repeat(backslashes)}"`;
 }
 
-/**
- * How to start a resolved CLI. A `.cmd` or `.bat` wrapper is a script that only the Windows command
- * processor runs, so it is called through `cmd.exe` with the same verbatim quoting as
- * `readCliVersion`. Every other executable starts with no shell. That keeps a path that holds a
- * space runnable: a managed CLI lives under `userData`, which holds a space for a user such as
- * `C:\Users\Jane Doe` and for the `OpenBot Dev` profile, and `cmd.exe` would split it there.
- */
 export function cliSpawnTarget(
   executable: string,
   argv: readonly string[],
@@ -1290,70 +1161,75 @@ export function cliSpawnTarget(
   };
 }
 
-/**
- * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
- * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
- */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+const ANTIGRAVITY_VERSION_TIMEOUT_MS = 90_000;
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+const slowVersionReads = new Set<string>();
 
-/**
- * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
- * wait for the next candidate. It also wins over a candidate that answered as outdated.
- */
 function isCliTimeout(error: unknown): error is CodexCliError {
   return error instanceof CodexCliError && error.code === "timeout";
 }
 
-/**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
- */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
-  const output = yield* providerCall(() =>
-    target
-      ? execFileAsync(
-          process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
-          {
+  const slow = slowVersionReads.has(candidate);
+  const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
+  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      target
+        ? execFileAsync(
+            process.env.ComSpec?.trim() || "cmd.exe",
+            ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
+            {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              env: { ...process.env, ...providerEnv },
+              windowsHide: true,
+              windowsVerbatimArguments: true,
+            },
+          )
+        : execFileAsync(candidate, [...args], {
+            signal,
             timeout,
             maxBuffer: 64 * 1024,
-            windowsHide: true,
-            windowsVerbatimArguments: true,
-          },
-        )
-      : execFileAsync(candidate, ["--version"], {
-          timeout,
-          maxBuffer: 64 * 1024,
-          windowsHide: process.platform === "win32",
-          env: { ...process.env, ...cliPathEnvironment(launch) },
-        }),
-  ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+            windowsHide: process.platform === "win32",
+            env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
+          }),
+    catch: providerFailure,
+  }).pipe(
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      if (slow) slowVersionReads.delete(candidate);
+      else slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });
 
-/** `X_OK` also passes for a folder, and a login-shell `PATH` folder can hold one with the CLI's name. */
 export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return (await stat(path)).isFile();
+    return await stat(path).then(
+      (info) => info.isFile(),
+      async (error: unknown) => {
+        if (process.platform !== "win32" || !isDynamicRecord(error) || error.code !== "EACCES") throw error;
+        return (await lstat(path)).isSymbolicLink();
+      },
+    );
   }).pipe(Effect.match({ onSuccess: (file) => file, onFailure: () => false })),
 );

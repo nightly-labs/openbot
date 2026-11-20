@@ -47,8 +47,6 @@ const server = createServer((_request, response) => {
   response.end('<!doctype html><meta charset="utf-8"><title>Fixture</title><p>Fixture</p>');
 });
 
-// Agents A and B have a session of their own. Agent C keeps the shared one. Agents D and E share the named
-// profile CLIENT_ONE, agent F uses CLIENT_TWO, and agent G names a profile that does not exist.
 const CLIENT_ONE = "11111111111111111111111111111111";
 const CLIENT_TWO = "22222222222222222222222222222222";
 const MISSING_PROFILE = "33333333333333333333333333333333";
@@ -97,7 +95,6 @@ async function main(): Promise<void> {
     const b = await runCauseEffect(first.open(page("b"), "thread-b", "agent-b"));
     const c = await runCauseEffect(first.open(page("c"), "thread-c", "agent-c"));
     const shared = await runCauseEffect(first.open(page("shared")));
-    // The last write wins in a session that two tabs share.
     await writeValues(contentsFor(a.url), "a");
     await writeValues(contentsFor(b.url), "b");
     await writeValues(contentsFor(c.url), "c");
@@ -112,7 +109,6 @@ async function main(): Promise<void> {
     const e = await runCauseEffect(first.open(page("e"), "thread-e", "agent-e"));
     const f = await runCauseEffect(first.open(page("f"), "thread-f", "agent-f"));
     await writeValues(contentsFor(d.url), "d");
-    // Agent E did not write: it reads what agent D wrote, because they share a profile.
     assert.deepEqual(await readValues(contentsFor(e.url)), values("d"));
     recordCases("named-profile-shared-by-its-agents");
     await writeValues(contentsFor(f.url), "f");
@@ -149,13 +145,9 @@ async function main(): Promise<void> {
     const savedProfile = (id: string) => saved.tabs.find((tab) => tab.id === id)?.profile;
     assert.equal(savedProfile(d.id), CLIENT_ONE);
     assert.equal(savedProfile(a.id), undefined);
-    // An older build reads only `agentSession`, so a profile tab opens there in a session of its own.
     assert.equal(savedSession(d.id), agentBrowserSessionKey(`browser-profile:${CLIENT_ONE}`));
     recordCases("saved-profile-tabs-record-profile-and-older-build-key");
-    // The profile of agent F is deleted while the app is closed.
     profiles.delete(CLIENT_TWO);
-    // A tab a released build wrote has no session key, even when its agent now has a session of its own.
-    // A key that is not a key drops the tab.
     saved.tabs.push(
       { id: "legacy-tab", url: page("legacy"), ownerThreadId: "thread-a", ownerAgentId: "agent-a" },
       {
@@ -195,7 +187,6 @@ async function main(): Promise<void> {
     phase("clear");
     const partitionCookies = (agentId: string) =>
       session.fromPartition(`persist:openbot-browser-agent-${agentBrowserSessionKey(agentId)}`).cookies.get({});
-    // A tab that is still open keeps its session, and the call says so.
     await assert.rejects(runCauseEffect(second.clearAgentSession("agent-b")));
     assert.equal((await partitionCookies("agent-b")).length, 1);
     await runCauseEffect(second.close(b.id));
@@ -272,7 +263,6 @@ function contentsFor(url: string): WebContents {
   return contents;
 }
 
-/** Resolves with the contents of `url` once its page has loaded, whichever tab it is in. */
 function loadedContents(host: BrowserHost, url: string): Promise<WebContents> {
   return new Promise((resolve) => {
     const check = () => {
@@ -326,7 +316,6 @@ async function readValues(contents: WebContents): Promise<StoredValues> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

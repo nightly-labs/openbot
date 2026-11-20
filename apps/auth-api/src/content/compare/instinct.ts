@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Instinct here is taken from instinct.com, its terms of service and
-// its privacy policy, or from the TechCrunch report on its private access; each page used
-// is in `sources`. Instinct names no model, no price and no list of countries, so the text
-// says so. Check them again, and move `checkedAt`, whenever this file changes. Instinct is
-// a service of Spear Street Technology, in San Francisco.
-
 export const INSTINCT_COMPARISON: Comparison = {
   rival: { name: "Instinct", mark: "instinct" },
   answer:

@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Stai modificando un messaggio in coda. Salva o annulla la modifica per farlo partire.",
   "composer.queueEdit.cancel": "Annulla modifica",
+  "composer.feedbackFix.body":
+    "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",
+  "composer.feedbackFix.cancel": "Annulla",
   "composer.providerWait.offlineTitle": "Nessuna connessione a Internet",
   "composer.providerWait.offline": "{provider} non può rispondere finché questo computer non torna online.",
   "composer.providerWait.silent": "{provider} non invia nulla da {duration}.",
@@ -19,6 +22,16 @@ export const messages = {
   "composer.update.manual": "Aggiorna {provider} sul computer su cui è in esecuzione per continuare.",
   "composer.update.pending": "Aggiornamento…",
   "composer.update.action": "Aggiorna",
+  "composer.imageInput.body":
+    "{model} riceve solo testo, quindi non vede le immagini che alleghi. Se questo modello può leggere immagini, attiva le immagini.",
+  "composer.imageInput.label": "Attiva le immagini per {model}",
+  "composer.imageInput.pending": "Attivazione…",
+  "composer.imageInput.action": "Attiva immagini",
+  "composer.usageLimit.credits":
+    "Hai usato tutto il limite del piano {provider}. I tuoi agenti ora usano i tuoi crediti.",
+  "composer.usageLimit.creditsResets":
+    "Hai usato tutto il limite del piano {provider}. I tuoi agenti usano i tuoi crediti finché non si azzera {reset}.",
+  "composer.usageLimit.creditsTitle": "Uso dei crediti",
   "composer.usageLimit.resets": "Hai usato tutto il limite di {provider}. Si azzera {reset}.",
   "composer.usageLimit.selectModel": "Hai usato tutto il limite di {provider}. Scegli un altro modello per continuare.",
   "composer.usageLimit.title": "Limite di utilizzo raggiunto",
@@ -40,6 +53,7 @@ export const messages = {
   "composer.picker.noSkills": "Questo agente non ha skill.",
   "composer.picker.noSkillMatch": "Nessuna skill corrisponde a «{query}».",
   "composer.picker.skillsLoadFailed": "Impossibile caricare le skill.",
+  "composer.picker.skillProblem": "{name} non è disponibile. {problem} Chiedi all’agente di correggerla.",
   "composer.token.attachment": "Apri il file allegato {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Skill {name}",
@@ -58,6 +72,8 @@ export const messages = {
     "L'accesso al microfono è bloccato. Consenti a OpenBot di usare il microfono nelle impostazioni di sistema.",
   "composer.voice.noMicrophone": "Nessun microfono disponibile.",
   "composer.voice.startFailed": "OpenBot non è riuscito ad avviare la registrazione vocale.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot non è riuscito ad aprire il microfono. Chiudi le altre app che lo usano, verifica che sia collegato e consentito nelle impostazioni di sistema, poi riprova.",
   "composer.voice.transcribeFailed": "OpenBot non è riuscito a trascrivere questa registrazione.",
   "composer.reply.toYou": "Risposta al tuo messaggio",
   "composer.reply.toAgent": "Risposta all'agente",
@@ -76,6 +92,7 @@ export const messages = {
   "composer.placeholder.answer": "Scrivi la tua risposta",
   "composer.add.label": "Aggiungi al prompt",
   "composer.add.files": "Allega file",
+  "composer.add.teach": "Insegna un’attività",
   "composer.add.skill": "Usa una skill",
   "composer.upload.cancel": "Annulla caricamento",
   "composer.upload.uploading": "Caricamento di {name}",
@@ -107,10 +124,19 @@ export const messages = {
   "composer.error.holdQueued": "Impossibile bloccare il messaggio in coda per modificarlo.",
   "composer.error.cancelEdit": "Impossibile annullare la modifica della coda. Riprova.",
   "composer.error.updateQueued": "Impossibile aggiornare il messaggio in coda. Riprova.",
+  "composer.queueEdit.received": "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata.",
+  "composer.queueEdit.receivedKept":
+    "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.deletedKept":
+    "Questo messaggio è stato eliminato, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.endedKept":
+    "Questa modifica è terminata prima del salvataggio. Le tue modifiche sono ancora nella casella del messaggio.",
   "composer.voice.prepareFailed": "Impossibile preparare il modello vocale. Riprova.",
   "composer.voice.noSpeechRecorded": "Nessuna voce registrata.",
   "composer.voice.noSpeechDetected": "Nessuna voce rilevata.",
   "composer.voice.readFailed": "Impossibile leggere la risposta ad alta voce.",
+  "composer.voice.languageUnsupported":
+    "Impossibile leggere la risposta ad alta voce. Questa lingua non è ancora disponibile.",
   "composer.error.saveEditTryAgain": "Impossibile salvare questa modifica su questo computer. Riprova.",
   "composer.error.saveUnconfirmed": "Il salvataggio non è confermato. Riprova a salvare per controllare il risultato.",
   "composer.error.changeModel": "Impossibile cambiare modello. Riprova.",
@@ -151,6 +177,7 @@ export const messages = {
   "composer.picker.section.files": "File",
   "composer.picker.section.tabs": "Schede del browser",
   "composer.picker.section.threads": "Thread",
+  "composer.picker.section.messages": "Nei messaggi",
   "composer.token.tab": "Scheda del browser {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Scheda del browser {name} chiusa",

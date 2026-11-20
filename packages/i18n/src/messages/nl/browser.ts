@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} sluiten",
   "browser.tab.closeUnnamed": "Browsertabblad sluiten",
   "browser.newTab": "Nieuw browsertabblad",
-  "browser.hide": "Browser verbergen",
+  "browser.backToChat": "Terug naar chat",
   "browser.goBack": "Terug",
   "browser.goForward": "Vooruit",
   "browser.reload": "Pagina opnieuw laden",
@@ -67,6 +67,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Deze tekst is te lang om te plakken. Plak minder dan 100.000 tekens.",
   "browser.liveView.copyTooLarge": "De selectie is te lang om te kopiëren. Selecteer minder tekst.",
   "browser.liveView.copyFailed": "Kan de tekst niet kopiëren. Klik op de pagina en probeer het opnieuw.",
+  "browser.liveView.pageCopied": "De pagina heeft tekst gekopieerd. Kies Kopiëren om die op je klembord te zetten.",
   "browser.previews.label": "Browservoorbeelden",
   "browser.previews.resize": "Grootte van rechterpaneel wijzigen",
   "browser.previews.empty": "Geen browsertabbladen",
@@ -98,10 +99,39 @@ export const messages = {
   "browser.secret.submitting": "Versturen…",
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat de agent geen van de opgeslagen logins voor deze site heeft gekozen. Vertel de agent welk account hij moet gebruiken.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen wachtwoord voor deze site heeft.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen authenticatorsleutel heeft.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat je wachtwoordmanager niet gelezen kon worden.",
   "browser.error.openAddress": "Kan het adres niet openen in dit tabblad.",
+  "browser.error.channelNoBrowserMember": "Geen lid kan een nieuw tabblad openen in dit kanaal.",
   "browser.error.closeTab": "Kan het browsertabblad niet sluiten.",
   "browser.error.reloadTab": "Kan het browsertabblad niet opnieuw laden.",
   "browser.error.stopLoading": "Kan het laden van de pagina niet stoppen.",
+  "browser.error.teachStart": "Kan de opname van de taak niet starten.",
+  "browser.error.teachStop": "Kan de opname van de taak niet stoppen.",
+  "browser.error.teachEmpty": "De opname heeft geen stappen.",
+  "browser.teach.intro":
+    "Laat {name} een taak zien op deze pagina. {name} leert de stappen en kan de taak opnieuw doen.",
+  "browser.teach.start": "Opname starten",
+  "browser.teach.recording": "{name} neemt je stappen op",
+  "browser.teach.stop": "Opname stoppen en opslaan",
+  "browser.teach.discard": "Opname verwijderen",
+  "browser.teach.message":
+    "Ik heb je een taak in de browser laten zien. Leer de taak uit de opname en sla die op als vaardigheid. Vertel me daarna in een paar eenvoudige woorden wat je hebt geleerd.",
+  "browser.teach.steps": "De opname bevat geen getypte tekst: vraag mij om elke waarde die ik heb getypt.",
+  "browser.teach.step.page": "{number}. Open {page}",
+  "browser.teach.step.pageTitled": "{number}. Open {page} (“{title}”)",
+  "browser.teach.step.click": "{number}. Klik op “{name}” ({role})",
+  "browser.teach.step.clickUnnamed": "{number}. Klik op een element ({role}) op {page}",
   "browser.error.takeControl": "Kan het browsertabblad niet overnemen.",
   "browser.error.releaseControl": "Kan het browsertabblad niet teruggeven aan de agent.",
   "browser.error.navigateBack": "Kan niet teruggaan.",

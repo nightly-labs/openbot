@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Figma here is taken from developers.figma.com and figma.com. Each page
-// used is in `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const FIGMA_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

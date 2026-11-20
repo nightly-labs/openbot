@@ -1,16 +1,3 @@
-// Checks the OpenBot tools that a member agent uses in a channel turn, in this worktree's running
-// dev app with real provider turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-tools-e2e.ts --allow-mutations`. It needs two visible agents whose provider is
-// signed in and follows tool instructions.
-//
-// It checks that `html_render` gives a visual reply in the channel with its page attached, that
-// `ask_ui` and the plan card of `acknowledge_request` show in the channel and that the answer reaches
-// the turn, that a screen capture asks each time and names the channel also with Full access, that
-// `channel_history` reads the channel, that `start_task` starts no task from a channel, and that text
-// after `channel_result` folds into the steps rather than showing as a second reply. The model
-// does the tool calls, so a model that does not follow the instructions fails a step. It makes its own
-// channel and deletes it, and gives the agent its settings back.
-// Writes .openbot-build/channel-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
@@ -63,7 +50,6 @@ const repliesAfter = (channel: ChannelPage, agentId: string, sequence: number): 
 
 const seen = () => page.evaluate(() => window.channelToolsE2e ?? { prompts: [], approvals: [] });
 
-/** Sends one request to the agent and waits until its task ends. */
 async function ask(channelId: string, agentId: string, text: string, label: string) {
   const sequence = (await client.read(channelId)).throughSequence;
   await client.send(channelId, text, agentId);
@@ -71,7 +57,6 @@ async function ask(channelId: string, agentId: string, text: string, label: stri
   return { channel, sequence, replies: repliesAfter(channel, agentId, sequence) };
 }
 
-/** The first new prompt of the agent after `count` prompts were seen. */
 async function nextPrompt(agentId: string, count: number, label: string): Promise<SeenPrompt> {
   const all = await waitFor(page, label, seen, (events) =>
     events.prompts.slice(count).some((prompt) => prompt.agentId === agentId),
@@ -81,7 +66,6 @@ async function nextPrompt(agentId: string, count: number, label: string): Promis
   return prompt;
 }
 
-/** Answers each question with the option that `pick` names, or with its first option. */
 function answersFor(prompt: SeenPrompt, pick: RegExp | null): Record<string, string[]> {
   return Object.fromEntries(
     prompt.questions.map((question) => {
@@ -125,7 +109,6 @@ try {
 
   const channel = await client.create("E2E channel tools", [a.id, b.id], a.id);
 
-  // 1. html_render gives a visual reply in the channel, with the page attached.
   const visual = await ask(
     channel.id,
     a.id,
@@ -140,12 +123,11 @@ try {
   assert.ok(visualMessage, "The channel has no visual reply.");
   assert.ok(report.visualReply.attachments > 0, "The visual reply has no attached page.");
 
-  // 2. ask_ui shows its block in the channel, and the answer reaches the turn.
   let prompts = (await seen()).prompts.length;
   let sequence = (await client.read(channel.id)).throughSequence;
   await client.send(
     channel.id,
-    "Call the ask_ui tool once with a choice block titled 'Pick a color' with the options Red and Blue. When the answer comes, reply with the chosen color only.",
+    "Call the ask_ui tool once with a confirm block titled 'Pick a color' with the buttons Red and Blue. When the answer comes, reply with the chosen color only.",
     a.id,
   );
   const colorPrompt = await nextPrompt(a.id, prompts, "the ask_ui prompt arrives");
@@ -170,7 +152,6 @@ try {
   assert.equal(newestTask(colorAnswered)?.state, "completed");
   assert.match(colorReply, /blue/i, "The answer did not reach the turn.");
 
-  // 3. The plan card shows in the channel, and the start reaches the turn.
   prompts = (await seen()).prompts.length;
   sequence = (await client.read(channel.id)).throughSequence;
   await client.send(
@@ -186,7 +167,6 @@ try {
     })
     .then(
       () => true,
-      // The host presses the start button itself after ten seconds.
       () => false,
     );
   const planEnded = await waitFor(page, "the plan turn ends", () => client.read(channel.id), ended);
@@ -200,7 +180,6 @@ try {
   assert.ok(report.planCard.uiBlockInChannel, "The plan card does not show in the channel.");
   assert.equal(report.planCard.state, "completed");
 
-  // 4. A screen capture asks each time, names the channel, and the decline reaches the turn.
   const approvals = (await seen()).approvals.length;
   await client.send(
     channel.id,
@@ -224,7 +203,6 @@ try {
   };
   assert.ok(report.screenCapture.namesChannel, "The capture approval does not name the channel.");
 
-  // 5. channel_history reads the channel; start_task starts nothing from a channel.
   await ask(
     channel.id,
     b.id,
@@ -244,7 +222,6 @@ try {
   assert.match(historyReply, /heron/i, "channel_history did not find the code word.");
   assert.equal(report.history.tasksStarted, 0, "start_task started a task from a channel.");
 
-  // 6. Text after channel_result folds into the steps; the result is the only reply (#3202).
   const result = await ask(
     channel.id,
     a.id,

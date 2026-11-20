@@ -1,5 +1,276 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze małe kopie obrazów na kanwie przepływu pracy, własne długości wideo oraz agenci, którzy kończą żądanie bez twojego „kontynuuj”, działają tylko wtedy, gdy serwer ma tę wersję.",
+      "W systemie Linux, jeśli OpenBot nadal działa wolno po aktualizacji, usuń plik `~/.config/OpenBot/gpu-crash.json` i uruchom OpenBot ponownie.",
+      "Jeśli w ustawieniach dostawcy ustawiłeś Myślenie dla agenta Mistral, wybierz poziom ponownie w menu Wysiłek i zresetuj stary wiersz Myślenie."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Udostępnij swój link z zaproszeniem w Ustawienia > Invite friends. Karta pokazuje twój kredyt i znajomych, którzy dołączyli. Znajomy dostaje 10% zniżki od każdej płatności, a ty dostajesz 10% każdej opłaconej faktury znajomego jako kredyt.",
+          "Umieść węzły kanwy przepływu pracy w grupie. Zaznacz je i naciśnij Grupuj (⌘G). Zwiń grupę do jednej karty stosu, a Rozgrupuj (⇧⌘G) zakończy grupowanie.",
+          "Nadaj krokowi wideo na kanwie przepływu pracy dowolną długość, jaką obsługuje jego model Sunra lub Higgsfield. Wybierz Własna w menu Długość i użyj suwaka.",
+          "Otwórz Marketplace z wiersza Aplikacje w ustawieniach agenta. Połącz aplikację albo dodaj własny serwer MCP przyciskiem Dodaj własną.",
+          "Gdy logujesz się na nowym komputerze, a twoje konto ma już serwery, pierwszy krok je pokazuje. Otwórz jeden, aby kontynuować z jego agentami i czatami."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agenci kończą twoje żądanie bez „kontynuuj” z twojej strony. Gdy część żądania nie jest gotowa, agent kontynuuje tę część, najwyżej 3 razy. Pytanie, które wymaga twojego wyboru lub zgody, nadal zatrzymuje agenta.",
+          "Karty panelu bocznego zachowują tytuł i jedną szerokość. Gdy karty się nie mieszczą, wiersz się przewija, a menu na końcu wiersza pokazuje pozostałe karty. Środkowy przycisk myszy zamyka kartę.",
+          "Na serwerze, do którego dołączyłeś, obrazy na kanwie przepływu pracy wyświetlają się dużo szybciej. Kanwa dostaje małą kopię każdego obrazu, a pełny obraz otwiera się w przeglądarce.",
+          "Wątek wygląda teraz jak czat agenta. Wiadomości jednego nadawcy są czytane jako jeden blok, a kroki odpowiedzi są pokazane obok."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agent Claude lub ChatGPT nie zostaje już godzinami w stanie „pracuje”, gdy dostawca przestaje odpowiadać. Po 15 minutach bez wyniku (60 minut, gdy działa narzędzie) OpenBot kończy turę, a wiadomości w kolejce są kontynuowane.",
+          "Gdy opcja „Używaj mojej konfiguracji Claude Code” jest wyłączona, agenci Claude nie wczytują już twoich globalnych instrukcji i reguł Claude Code. Każda tura jest szybsza i kosztuje mniej. Aby je zachować, włącz „Używaj mojej konfiguracji Claude Code”.",
+          "Agenci dalej pracują, gdy OpenBot pobiera aktualizację dostawcy. Pobieranie, które przez minutę nie dostaje danych, zatrzymuje się i wznawia od miejsca, w którym przerwało, gdy spróbujesz ponownie.",
+          "Agenci znów wysyłają wiadomości bezpośrednio do swoich agentów z zespołu. Wcześniej karta prosiła cię o zatwierdzenie każdego przekazania i praca stała, dopóki nie zatwierdziłeś.",
+          "Agent z automatycznymi zapasowymi modelami przechodzi do następnego zapasowego modelu w większej liczbie przypadków, na przykład po limicie zapytań albo gdy Gemini traci połączenie z Google."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Po zainstalowaniu tej wersji nie będziesz mógł wrócić do starszej wersji OpenBot na tym komputerze lub serwerze. Ta wersja zmniejsza bazę danych, a starsza wersja nie może jej otworzyć.",
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze niestandardowe rozmiary obrazów, modele i ceny Sunra oraz Higgsfield, a także szybsze ładowanie wielu agentów działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zobacz wątki boczne każdego agenta na pasku bocznym. Wybierz strzałkę na końcu wiersza agenta albo trzymaj wskaźnik nad wierszem, aby zobaczyć wszystkie jego wątki.",
+          "Filtruj pasek boczny przyciskiem filtra na końcu pola wyszukiwania. Pokaż tylko agentów lub kanały, tylko nieprzeczytane czaty albo agentów w pracy, albo tylko czaty w wybranych folderach.",
+          "Nadaj krokowi obrazu na kanwie przepływu pracy własny rozmiar w pikselach albo użyj proporcji 4:5 lub 5:4.",
+          "Kanwa przepływu pracy pokazuje wszystkie modele obrazów i wideo Sunra oraz Higgsfield, a przycisk Uruchom pokazuje cenę w kredytach.",
+          "Wyłącz Rozmycie tła i Ruchome twarze agentów w Ustawienia → Wygląd → Ruch, aby OpenBot działał szybciej na wolnym komputerze."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Kilka osób może jednocześnie edytować jeden przepływ pracy. Kanwa dodaje zmiany innych osób, gdy je zapisują.",
+          "OpenBot zużywa dużo mniej CPU, gdy pracuje wielu agentów, a ty możesz pisać bez opóźnień.",
+          "Agenci kończą płatność, gdy bank prosi o kod 3-D Secure. Gdy kod jest w e-mailu lub SMS-ie, który agent może odczytać, agent go wpisuje.",
+          "Ustawienia serwera → Przeniesienie → Kopiuj na inny serwer kopiuje teraz także przepływy pracy i przepływy rutyn agentów."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Baza danych OpenBot zajmuje dużo mniej miejsca. Po aktualizacji OpenBot w małych krokach usuwa stare kopie wiadomości czatu.",
+          "W systemie Windows aktualizacja znów pokazuje postęp.",
+          "Serwer, do którego dołączyłeś, z wieloma agentami oraz duży kanał otwierają się szybciej.",
+          "Czaty Gemini z dużą liczbą obrazów lub długą historią nie przestają działać, a Gemini nie prosi już o ponowne logowanie, gdy zaczyna się nowy czat.",
+          "Aplikacja na komputer znów łączy się z serwerem z OpenBot v0.34.1 lub starszym."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Zaktualizuj do tej wersji także każdy serwer, do którego dołączyłeś. Na serwerze CRM, Dodaj konto kodem, tło ustawione przez agenta, foldery Biblioteki, które agenci porządkują, i wiadomości do bieżącej tury Devin działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Odtwarzaj animowane tło za całym oknem. Wybierz scenę, na przykład Staw z karpiami koi lub Świetliki, w Ustawienia → Tło okna, albo poproś agenta, żeby ją dla ciebie utworzył.",
+          "Przechowuj leady, klientów i płatności na nowej stronie CRM. Jest eksperymentalna: właściciel lub administrator włącza ją w Ustawienia serwera → Eksperymentalne. Może importować dane ze Stripe, a agenci proponują zmiany, które właściciel lub administrator zatwierdza.",
+          "Odpowiadaj agentowi w czacie panelu Dok agentów. Zezwól na polecenie lub je odrzuć, odpowiedz na pytanie albo zakończ krok w przeglądarce bez głównego okna.",
+          "Porządkuj Bibliotekę kafelkami folderów, Ulubionymi, Ostatnimi i Cofnij. Przeciągnij pliki na Nowy folder, aby utworzyć folder, albo poproś agenta o uporządkowanie jego folderów.",
+          "Dodaj konto ChatGPT (Codex), Grok lub Claude kodem. Otwórz menu obok Dodaj konto i wybierz Dodaj konto kodem.",
+          "Wiadomość wysłana podczas pracy agenta Devin lub OpenCode trafia do bieżącej tury. Wymaga Devin CLI 3000.12.57 lub OpenCode 2.3.0 albo nowszego."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ustawienia mają nowy układ. Sekcje są w opisanych grupach, a Ustawienia serwera mają nowe sekcje Pamięć i Ustawienia domyślne agentów. Na macOS OpenBot używa czcionki systemowej.",
+          "Dodawaj i edytuj własne serwery MCP w Marketplace → Aplikacje. Ustawienia serwera nie mają już sekcji MCP.",
+          "W czacie z agentem twoje dymki przyjmują teraz kolor awatara agenta. Zmień to w Ustawienia → Wygląd → Twoje dymki.",
+          "Rozmowa głosowa nie otwiera już panelu bocznego. Mały pasek u góry czatu pokazuje sterowanie głosem."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Czat, który utracił zapisaną sesję albo stał się za duży, nie zostaje zepsuty. Agent rozpoczyna nową sesję z historią czatu i odpowiada na twoją wiadomość.",
+          "Więcej agentów przechodzi na model zapasowy, gdy limit użycia albo błąd dostawcy zatrzyma turę, w tym agenci Grok, Hermes i Claude.",
+          "Agenci mogą używać zapisanego logowania w większej liczbie miejsc, na przykład w formularzu logowania w ramce.",
+          "Rutyna pozostaje włączona po nieudanym uruchomieniu, a uruchomienie zaplanowane wtedy, gdy dostawca nie może wystartować, zostaje wykonane później.",
+          "OpenBot zużywa mniej CPU i baterii: filmy w czacie i w ukrytych kartach przeglądarki wstrzymują się, gdy ich nie widzisz."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Zaktualizuj do tej wersji także każdy serwer, do którego dołączyłeś. Na serwerze Zatrzymaj dla uruchomień rutyn, pliki, które agenci wysyłają bez tekstu, i klucze API w starej ścieżce działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Przybliż gestem szczypania na gładziku lub ekranie dotykowym obszar pod wskaźnikiem. Diagramy, kanwy i przeglądarka obrazów mają własne przybliżenie.",
+          "Zatrzymaj uruchomienie rutyny na kanwie Rutyny: wybierz Zatrzymaj na górnym pasku lub w szczegółach rutyny. Uruchomienie kończy się jako Anulowano.",
+          "Agenci mogą wysłać plik albo obraz bez tekstu do czatu w WhatsApp, Telegram, Slack lub Discord.",
+          "Kup ponownie hostowany serwer Starter. Ma 25 GB pamięci.",
+          "Użyj subskrypcji ClinePass z agentami Cline. Menu modeli pokazuje modele ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Na kanwie przeciągnij notatkę, wolny tekst, kształt lub krok za tekst. Kliknięcie w tekst ustawia kursor tam, gdzie kliknąłeś.",
+          "Wiadomość wysłana podczas pracy agenta Antigravity trafia do bieżącej tury. Wymaga Antigravity CLI 1.5.0 lub nowszego.",
+          "Rutyna, której zadanie mówi, by zatrzymać się po wykonaniu pracy, teraz wstrzymuje się sama. Włącz ją ponownie z listy rutyn.",
+          "Sejf informuje teraz, że każdy agent może czytać pliki kluczy API innych agentów, bo wszyscy agenci działają jako ten sam użytkownik systemu."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Skrypty, serwery MCP i ustawienia dostawców, które czytają z plików klucze API z Sejfu, działają znów po aktualizacji do 0.70.0.",
+          "Agent Claude zachowuje model w swoim profilu, gdy Claude Code zmienia swój model domyślny.",
+          "Gdy Claude zatrzyma turę na miesięcznym limicie wydatków, agent z modelami zapasowymi kontynuuje na następnym modelu.",
+          "Agenci dostają pełną transkrypcję filmu z napisami, na przykład filmu z YouTube.",
+          "OpenBot zużywa mniej CPU: karty przeglądarki, których nie widzisz, działają wolniej, a ruchome światło na linii aktywności agenta jest lżejsze."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Zaktualizuj też każdy serwer, do którego jesteś dołączony, do tej wersji. Ponowne uruchomienie serwera, domyślne ustawienia agentów, limity wątków i nowe kroki Przepływów pracy działają na serwerze tylko wtedy, gdy ma on tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Uruchom ponownie serwer, który hostujesz sam, z aplikacji: jako właściciel lub administrator wybierz Uruchom ponownie serwer w menu serwera.",
+          "Wybierz, którzy agenci mogą używać każdego loginu, karty, danych kontaktowych i klucza API w Ustawieniach serwera → Sejf. Agent widzi i wypełnia tylko te pozycje, których może używać.",
+          "Przepływy pracy mają kroki Obraz i Wideo. Twórz obrazy i krótkie filmy modelami GPT Image, Grok Imagine lub Sunra i podłączaj obrazy jako referencje.",
+          "Połącz Sunra i TryPost z zakładki Aplikacje w Marketplace. Agenci mogą wtedy tworzyć media z twoimi kredytami Sunra oraz przygotowywać i publikować posty w mediach społecznościowych.",
+          "Właściciele i administratorzy mogą ustawić, ile wątków działa jednocześnie, na serwerze i dla każdego agenta, w Ustawienia serwera → Ogólne.",
+          "Pokazuj agentów z nowymi wiadomościami w doku: włącz to w Ustawienia → Dok agentów. Kliknij prawym przyciskiem myszy takiego agenta i wybierz Dodaj do doku, aby zostawał tam na stałe.",
+          "Dodaj więcej niż jedno konto Cursor. Każdy agent może używać innego konta."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Klucz API, który zapisujesz tylko dla jednego agenta, jest teraz przechowywany w zaszyfrowanym Sejfie. Klucze, które czytają agenci, mają nową ścieżkę, więc skrypt ze starą ścieżką musi użyć nowej.",
+          "Ustawienia agentów, na przykład Kieruj agentami podczas pracy, są teraz w Ustawienia serwera → Agenci dla każdego serwera, także dla tego komputera.",
+          "W pełnym widoku przeglądarki pole wiadomości znów jest na dole, na środku strony.",
+          "Nagłówek czatu pokazuje tytuł agenta po jego nazwie, na przykład „Brock · Kierownik sklepu”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot otwiera się szybciej, gdy twoje czaty są długie.",
+          "W systemach Windows i Linux OpenBot pyta przed zamknięciem, gdy agenci pracują. Wybierz Nie zamykaj, aby ukryć okno i pozwolić agentom skończyć.",
+          "Urządzenia ponownie łączą się z serwerem, gdy połączenie jednego urządzenia zostanie przerwane podczas konfiguracji. Podgląd na żywo przeglądarki agenta na dołączonym serwerze również pozostaje otwarty przy wolnym połączeniu.",
+          "Gdy poprosisz agenta o zrzut ekranu strony internetowej, dołącza teraz obraz do swojej odpowiedzi.",
+          "Darmowe modele OpenCode znów odpowiadają, gdy zapisany jest klucz OpenCode Go."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Ukryci agenci nadal pracują. OpenBot wyłączył rutyny agentów ukrytych przed tą wersją, więc włącz rutyny, które chcesz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Przypnij wiadomość w czacie agenta: kliknij ją prawym przyciskiem myszy i wybierz Przypnij. Przycisk przypiętych wiadomości w nagłówku czatu pokazuje przypięte wiadomości wszystkich czatów agenta.",
+          "Biblioteka ma foldery i trzy widoki. Agent może też zapisywać załączane pliki w folderze, który wskażesz.",
+          "Naucz zadania: w menu + wybierz Naucz zadania, a potem wykonaj zadanie w przeglądarce agenta. Agent zapisze kroki jako umiejętność.",
+          "Połącz konta dostawcy w pulę w Ustawieniach. Agenci używają jednego konta, dopóki nie zbliży się ono do limitu użycia, a potem następnego.",
+          "Dodaj umiejętności z GitHub: wklej link do publicznego repozytorium w polu wyszukiwania Umiejętności w Marketplace.",
+          "Ustawienia serwera → Przeniesienie może wyeksportować pełną kopię serwera i w jednym kroku skopiować agentów na inny serwer.",
+          "Wycisz agenta z jego menu w pasku bocznym. Wyciszony agent nie wysyła powiadomień i nie odtwarza dźwięku."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Wiadomość, którą wyślesz do agenta, gdy pracuje, kieruje teraz bieżącą turą. Aby ustawić ją w kolejce jak dawniej, wyłącz Kieruj agentami podczas pracy w Ustawienia → Agenci.",
+          "Ukryty agent działa dalej. Uruchamia swoje rutyny i pojawia się w Potrzebują cię, gdy czeka na twoją odpowiedź.",
+          "Otwarty serwer pokazuje się jako logo na dole paska stron. Przycisk Nowy jest na końcu pola wyszukiwania paska bocznego.",
+          "OpenBot używa Electron 45.3.0 z Chromium 156, a więcej stron z weryfikacją antybotową ładuje się w przeglądarce agenta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot uruchamia się szybciej, przede wszystkim na Windows, a wolny komputer pozostaje używalny po starcie.",
+          "OpenBot pozostaje responsywny po ponownym uruchomieniu, gdy masz wiele zadań lub wątków.",
+          "Na Linuxie i Windows OpenBot kończy zamykanie, gdy zamkniesz główne okno.",
+          "Rutyny uruchamiają się o czasie po poprawieniu zegara komputera.",
+          "Tekst skopiowany z czatu nie ma już pustych linii na początku ani na końcu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ustawienia kanału mają ustawienie Przeglądarka. Wybierz, czy każdy członek, jeden członek czy nikt może używać przeglądarki w kanale.",
+          "Panel boczny kanału ma panel Przeglądarka i panel Pliki. Pokazują karty członków kanału oraz pliki wysłane w kanale.",
+          "Kliknij prawym przyciskiem Dynamic Island lub dok agentów, aby je ukryć. Możesz też przeciągnąć agenta na nowe miejsce w doku i zmienić rozmiar doku w Ustawieniach.",
+          "Możesz wyłączyć grupę Nieprzeczytane na pasku bocznym. Kliknij prawym przyciskiem nagłówek Nieprzeczytane albo ustaw Sortuj czaty na Ręcznie.",
+          "Gdy nowa wersja nie może się uruchomić 3 razy z rzędu, otwiera się okno odzyskiwania. Możesz spróbować ponownie, pobrać poprzednią wersję albo wyeksportować diagnostykę."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Nowa wersja trafia najpierw na około 1 na 10 komputerów, a na wszystkie komputery około dzień później. Aby ją dostać od razu, wybierz Sprawdź aktualizacje.",
+          "Agenci zadają pytania z opcjami w oknie pytań. Karty z przyciskami służą tylko do zatwierdzeń."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Przeczytany czat nie zostaje już w grupie Nieprzeczytane. Nieprzeczytane wątki poboczne, na przykład wątek rutyny, nie trzymają już tam agenta.",
+          "W systemie Windows dok agentów i Dynamic Island nie spowalniają już kursora we wszystkich aplikacjach, gdy pracuje wielu agentów.",
+          "Zespół nie zatrzymuje się już, gdy lider kończy turę bez odpowiedzi, po tym jak członkowie zespołu zgłoszą wyniki.",
+          "Czat z Claude, który stał się zbyt długi, rozpoczyna teraz nową sesję z historią czatu. Wcześniej każda wiadomość kończyła się błędem „Prompt is too long”.",
+          "Gdy konto Claude osiągnie limit 5-godzinny, agent przechodzi na model zapasowy albo czeka na reset limitu.",
+          "Agent może zapisać zrzut ekranu przeglądarki jako plik i dołączyć go do odpowiedzi."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.67.1",
     "date": "2026-11-10",
     "notices": [],

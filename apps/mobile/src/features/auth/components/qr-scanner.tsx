@@ -10,7 +10,6 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AppState, Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import Animated, {
-  Easing,
   FadeIn,
   FadeOut,
   ReduceMotion,
@@ -19,22 +18,22 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCSSVariable } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { ScanAgainButton } from "./scan-again-button";
+import { SIGN_IN_EASE_OUT } from "./sign-in-motion";
 
 type ScanState =
   | { status: "idle" }
   | { status: "connecting" }
   | { status: "error"; source: "camera" | "connection"; message: string };
 
-/** What the scanner shows: nothing yet, the permission request, or a live camera (or its error). */
 export type ScannerMode = "pending" | "permission" | "camera";
 export type ScanStatus = ScanState["status"];
-// The dark backdrop under an immersive camera, before its first frame.
 const CAMERA_BACKDROP = "radial-gradient(90% 60% at 50% 46%, #2c2a30 0%, #121114 70%)";
 const QR_SCANNER_SETTINGS: CameraViewProps["barcodeScannerSettings"] = { barcodeTypes: ["qr"] };
 
@@ -72,15 +71,13 @@ function ScannerStatus({
   return (
     <Card variant="default" className="rounded-3xl p-4">
       <Card.Body className="flex-row items-center gap-3">
-        {scanState.status === "connecting" ? (
-          <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+        <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+          {scanState.status === "connecting" ? (
             <Spinner size="sm" color={accent} />
-          </Surface>
-        ) : (
-          <Surface variant="tertiary" className="size-11 items-center justify-center rounded-2xl p-0">
+          ) : (
             <ScanLine size={22} color={foreground} strokeWidth={1.75} />
-          </Surface>
-        )}
+          )}
+        </Surface>
         <View className="min-w-0 flex-1 gap-0.5">
           <Card.Title className="font-sans text-body font-semibold">
             {scanState.status === "connecting"
@@ -104,7 +101,6 @@ function ScannerStatus({
   );
 }
 
-/** The status as a small pill over the camera, for the immersive scanner. */
 function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanState: ScanState; onRetry: () => void }) {
   const { t } = useText();
   const text =
@@ -119,7 +115,7 @@ function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanSt
     <View className="items-center gap-3">
       <Animated.View
         key={`${scanState.status}-${text}`}
-        entering={FadeIn.duration(220).easing(Easing.bezier(0.23, 1, 0.32, 1))}
+        entering={FadeIn.duration(220).easing(SIGN_IN_EASE_OUT)}
         exiting={FadeOut.duration(120)}
         accessibilityLiveRegion="polite"
         className="max-w-full flex-row items-center gap-2.5 rounded-full px-4 py-3"
@@ -139,7 +135,6 @@ function ScannerPill({ pairing, scanState, onRetry }: { pairing: boolean; scanSt
   );
 }
 
-// Mount with the session so readiness resets on close, focus loss and background.
 function ScannerCamera({
   onBarcodeScanned,
   onCameraReady,
@@ -179,12 +174,7 @@ export function QrScanner({
   onScan: (data: string) => Promise<void>;
   pairing?: boolean;
   embedded?: boolean;
-  /**
-   * Full screen under the sign-in stage: a dark backdrop, a status pill, and no frame of its own,
-   * because the stage's eyes become the frame. Implies `embedded`.
-   */
   immersive?: boolean;
-  /** Space above the permission request, for a header drawn over the scanner. */
   contentInsetTop?: number;
   scanEnabled?: boolean;
   onModeChange?: (mode: ScannerMode) => void;
@@ -193,8 +183,6 @@ export function QrScanner({
 }) {
   const embedded = inSheet || immersive;
   const { t, errorMessage } = useText();
-  // A full screen keeps its content clear of the side insets (the iPhone Duo rail). In a sheet, the
-  // padding stays as it was.
   const insets = useSafeAreaInsets();
   const sideLeft = inSheet ? 0 : insets.left;
   const sideRight = inSheet ? 0 : insets.right;
@@ -215,7 +203,8 @@ export function QrScanner({
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [scanState, setScanState] = useState<ScanState>({ status: "idle" });
-  const [foregroundColor, accentForeground] = useThemeColor(["foreground", "accent-foreground"]);
+  const foregroundColor = useThemeColor("foreground");
+  const actionForeground = String(useCSSVariable("--openbot-action-foreground"));
   const { width: windowWidth } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const connecting = useSharedValue(0);
@@ -224,7 +213,7 @@ export function QrScanner({
     connecting.set(
       withTiming(isConnecting ? 1 : 0, {
         duration: 220,
-        easing: Easing.bezier(0.23, 1, 0.32, 1),
+        easing: SIGN_IN_EASE_OUT,
         reduceMotion: ReduceMotion.Never,
       }),
     );
@@ -242,10 +231,8 @@ export function QrScanner({
   }));
   const scannerFrameSize = Math.min(windowWidth - 80, 280);
   const cameraLive = focused && foreground;
-  // The camera reports readiness once per mount. A new mount waits for its own report.
   const cameraKey = `${cameraAttempt}-${cameraLive}`;
   const [readyFor, setReadyFor] = useState<string | null>(null);
-  // A camera that leaves forgets its report, so the next mount with the same key waits for its own.
   if (!cameraLive && readyFor !== null) setReadyFor(null);
   const previewReady = readyFor === cameraKey;
   const mode: ScannerMode = !permission
@@ -358,29 +345,22 @@ export function QrScanner({
                     canRequestPermission
                       ? async () => {
                           const scope = mobileAnalytics.scope();
-                          try {
-                            const response = await requestPermission();
-                            if (pairing)
-                              scope.track("mobile_pairing_action", {
-                                action: "camera_permission",
-                                entry_point: "qr",
-                                result: response.granted ? "succeeded" : "failed",
-                                ...(response.granted ? {} : { failure_code: "permission_denied" }),
-                              });
-                          } catch {
-                            if (pairing)
-                              scope.track("mobile_pairing_action", {
-                                action: "camera_permission",
-                                entry_point: "qr",
-                                result: "failed",
-                                failure_code: "permission_denied",
-                              });
-                          }
+                          const granted = await requestPermission().then(
+                            (response) => response.granted,
+                            () => false,
+                          );
+                          if (pairing)
+                            scope.track("mobile_pairing_action", {
+                              action: "camera_permission",
+                              entry_point: "qr",
+                              result: granted ? "succeeded" : "failed",
+                              ...(granted ? {} : { failure_code: "permission_denied" }),
+                            });
                         }
                       : () => void Linking.openSettings()
                   }
                 >
-                  <Camera size={19} color={accentForeground} strokeWidth={2} />
+                  <Camera size={19} color={actionForeground} strokeWidth={2} />
                   <Button.Label className="font-sans font-semibold">
                     {canRequestPermission ? t("mobile.auth.camera.allow") : t("mobile.auth.camera.openSettings")}
                   </Button.Label>
@@ -420,8 +400,6 @@ export function QrScanner({
               setScanState({ status: "error", source: "camera", message: t("mobile.auth.scanner.cameraFailed") });
               setReadyFor(cameraKey);
             }}
-            // Expo enables native scanning from the presence of this callback.
-            // Keep it enabled from startup; connect guards opening and pending scans.
             onBarcodeScanned={({ data }) => void connect(data)}
           />
         ) : null}
@@ -442,7 +420,6 @@ export function QrScanner({
         {immersive ? (
           <View className="absolute items-center" style={{ bottom: "19%", left: sideLeft + 24, right: sideRight + 24 }}>
             {previewReady ? (
-              // The pill comes in once the block over the camera has faded.
               <Animated.View entering={FadeIn.duration(200).delay(reducedMotion ? 0 : 650)}>
                 <ScannerPill pairing={pairing} scanState={scanState} onRetry={retry} />
               </Animated.View>

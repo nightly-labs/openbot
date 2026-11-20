@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -15,13 +16,19 @@ import type { ContactMessageServices } from "./contact-message";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
-import { createContactMessageDelivery, createEmailCodeDelivery, createTeamInviteEmailDelivery } from "./email-delivery";
+import {
+  createContactMessageDelivery,
+  createEmailCodeDelivery,
+  createOwnerTransferEmailDelivery,
+  createTeamInviteEmailDelivery,
+} from "./email-delivery";
 import {
   COUNT_FEEDBACK,
   DELETE_EARLIER_FEEDBACK_DAYS,
   FEEDBACK_DAILY_LIMIT,
   UNCOUNT_FEEDBACK,
 } from "./feedback-daily-counts";
+import { feedbackOwner } from "./feedback-owner";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
@@ -37,6 +44,7 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
+import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
   notifyAccountProfileChanged,
@@ -46,7 +54,12 @@ import {
 } from "./remote-control-plane";
 import { SkillMarketplace, SkillMarketplaceError } from "./skill-marketplace";
 import { SlackAppError, SlackAppService } from "./slack-app";
-import { requireWorkerBindings, type TeamInviteEmailDelivery, type WorkerBindings } from "./types";
+import {
+  type OwnerTransferEmailDelivery,
+  requireWorkerBindings,
+  type TeamInviteEmailDelivery,
+  type WorkerBindings,
+} from "./types";
 
 function accountAnalytics(bindings: WorkerBindings): AccountAnalytics {
   return createAccountAnalytics({
@@ -71,11 +84,11 @@ export function requestAuthService(): AuthService {
     repository: new D1AuthRepository(bindings.DB),
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
-    // The revocation is already written and the cron redelivers it, so the answer does not wait.
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
     attribution: new AccountAttribution({ database: bindings.DB, analytics }),
+    referrals: new Referrals({ database: bindings.DB }),
     usesCompanySignIn: (email) =>
       new CompanySignInService(bindings)
         .usesCompanySignIn(email)
@@ -87,7 +100,6 @@ export function requestCompanySignIn(): CompanySignInService {
   const bindings = requireWorkerBindings(env);
   const remote = new RemoteControlPlane(bindings, { schedule });
   return new CompanySignInService(bindings, {
-    // The revocation is already written and the cron redelivers it, so the answer does not wait.
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     revokeMembership: (actorUserId, hostId, membershipId) =>
       remote.changeMembership(actorUserId, { hostId, membershipId, revoke: true }).pipe(Effect.asVoid),
@@ -118,12 +130,10 @@ export function requestAgentTemplates(): AgentTemplates {
   return new AgentTemplates(requireWorkerBindings(env));
 }
 
-/** The sites that a signed-in `/v1/sites` request can see and change. See `resolveHostedSiteScope`. */
 export function requestHostedSiteScope(request: Request, userId: string) {
   return resolveHostedSiteScope(requireWorkerBindings(env).DB, userId, request);
 }
 
-/** Moves the account's sites from before a self-hosted server registered into it. See `adoptUnlinkedHostedSites`. */
 export function requestAdoptUnlinkedHostedSites(userId: string, serverId: string) {
   return adoptUnlinkedHostedSites(requireWorkerBindings(env).DB, userId, serverId, Date.now());
 }
@@ -139,7 +149,10 @@ export function requestHostedSiteService(): HostedSiteService {
   );
 }
 
-/** The billing service, or null when this deployment has no Stripe key. */
+export function requestReferrals(): Referrals {
+  return new Referrals({ database: requireWorkerBindings(env).DB });
+}
+
 export function requestBillingService(): BillingService | null {
   return requestHostedBilling().billing;
 }
@@ -168,10 +181,6 @@ export function hostedSiteErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-/**
- * One service for each key, so the imported key and the app ID are read once for each isolate. Only
- * resolved values are kept: workerd refuses a promise that another request made.
- */
 let githubInstallationTokens: { key: string; service: GitHubInstallationTokens } | null = null;
 
 export function requestGitHubInstallationTokens(): GitHubInstallationTokens {
@@ -206,10 +215,6 @@ export const enforceGitHubTokenRateLimit = Effect.fn("GitHub.enforceTokenRateLim
   }
 });
 
-/**
- * A few similar-issue searches for each account and minute. All accounts share the search quota of
- * the one app installation, so one account must not use it all.
- */
 export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackSearchRateLimit")(function* (
   userId: string,
 ) {
@@ -226,11 +231,38 @@ export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackS
   }
 });
 
-/**
- * A few feedback issues for each account and minute, and 10 each day: each one is a public issue
- * that a person reads. The daily count is the only feedback data that D1 keeps. It returns the UTC day
- * that it counted, for `uncountFeedback`.
- */
+export function requestFeedbackOwner(userId: string) {
+  const privateKey = requireWorkerBindings(env).GITHUB_APP_PRIVATE_KEY?.trim();
+  if (!privateKey)
+    return Effect.fail(
+      new GitHubInstallationTokensError(503, "github_app_unavailable", "The OpenBot GitHub App is not configured."),
+    );
+  return feedbackOwner(privateKey, userId);
+}
+
+export function requestFeedbackWithdrawnRepository(): string | null {
+  const repository = requireWorkerBindings(env).FEEDBACK_WITHDRAWN_REPOSITORY?.trim();
+  if (!repository || !/^[\w.-]+\/[\w.-]+$/u.test(repository)) return null;
+  const owner = (name: string) => name.split("/")[0]?.toLowerCase();
+  return owner(repository) === owner(FEEDBACK_REPOSITORY) ? repository : null;
+}
+
+export const enforceFeedbackWithdrawRateLimit = Effect.fn("GitHub.enforceFeedbackWithdrawRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `withdraw:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many requests. Try again later.");
+  }
+});
+
 export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLimit")(function* (userId: string) {
   const bindings = requireWorkerBindings(env);
   const limiter = bindings.FEEDBACK_RATE_LIMITER;
@@ -260,16 +292,11 @@ export const enforceFeedbackRateLimit = Effect.fn("GitHub.enforceFeedbackRateLim
   return day;
 });
 
-/**
- * Takes back the daily count of an issue that GitHub did not open, so a failed send does not use up the
- * limit. A failure here keeps the count: the error of the send goes to the user.
- */
 export const uncountFeedback = Effect.fn("GitHub.uncountFeedback")(function* (userId: string, day: string) {
   const bindings = requireWorkerBindings(env);
   yield* Effect.tryPromise(() => bindings.DB.prepare(UNCOUNT_FEEDBACK).bind(userId, day).run()).pipe(Effect.ignore);
 });
 
-/** The seconds to the next UTC day, when the daily feedback limit starts again. */
 function secondsToNextUtcDay(now = Date.now()): number {
   const day = 86_400_000;
   return Math.ceil((day - (now % day)) / 1000);
@@ -285,15 +312,9 @@ export function githubInstallationTokensErrorResponse(error: unknown): Response 
   return authErrorResponse(error);
 }
 
-/**
- * The Apple relay for Live Activity updates and notifications: the Apple sender and the limits for
- * each host. `null` when this Worker has no Apple key or no limiter, so the relay is off.
- */
 export function requestApnsRelay(): {
   sender: ApnsRelaySender;
-  /** A host sends a few updates a minute for each phone. More is a fault or misuse. */
   allow(hostId: string): Effect.Effect<boolean, AuthOperationError>;
-  /** A host sends one notification for each event that waits for a member, under a separate limit. */
   allowNotification(hostId: string): Effect.Effect<boolean, AuthOperationError>;
 } | null {
   const bindings = requireWorkerBindings(env);
@@ -303,7 +324,6 @@ export function requestApnsRelay(): {
   const limit = relayLimit(LIVE_ACTIVITY_RATE_LIMITER);
   return {
     sender: sharedApnsSender({
-      // A deploy passes the key as one line, with `\n` for each line break.
       privateKey: APNS_PRIVATE_KEY.replaceAll("\\n", "\n"),
       keyId: APNS_KEY_ID,
       teamId: APNS_TEAM_ID,
@@ -315,11 +335,6 @@ export function requestApnsRelay(): {
   };
 }
 
-/**
- * The Firebase relay for Android notifications: the Firebase sender and the notification limit of
- * each host, which it shares with iPhone notifications. `null` when this Worker has no valid service
- * account key or no limiter, so the relay is off.
- */
 export function requestFcmRelay(): {
   sender: FcmRelaySender;
   allowNotification(hostId: string): Effect.Effect<boolean, AuthOperationError>;
@@ -340,7 +355,6 @@ function relayLimit(limiter: RateLimit) {
     }).pipe(Effect.map((result) => result.success));
 }
 
-/** Only a development server on this computer can stand in for Apple. */
 function developmentApnsOrigin(value: string | undefined): string | undefined {
   return value && /^http:\/\/127\.0\.0\.1:\d+\/__dev\/apns$/u.test(value) ? value : undefined;
 }
@@ -387,7 +401,6 @@ export const requireServerClaimsAdmin = Effect.fn("Auth.requireServerClaimsAdmin
   return yield* adminTokenMatches(requireWorkerBindings(env).SERVER_CLAIMS_ADMIN_TOKEN, bearerToken(request));
 });
 
-/** The limits and delivery of the site's contact form. */
 export function requestContactMessageServices(): ContactMessageServices {
   const bindings = requireWorkerBindings(env);
   return {
@@ -402,11 +415,15 @@ export function requestTeamInviteEmailDelivery(): TeamInviteEmailDelivery | null
   return createTeamInviteEmailDelivery(bindings, accountAnalytics(bindings));
 }
 
+export function requestOwnerTransferEmailDelivery(): OwnerTransferEmailDelivery | null {
+  const bindings = requireWorkerBindings(env);
+  return createOwnerTransferEmailDelivery(bindings, accountAnalytics(bindings));
+}
+
 export function requestRemoteControlPlane(): RemoteControlPlane {
   return new RemoteControlPlane(requireWorkerBindings(env), { schedule });
 }
 
-/** Pass the request when the call checks who can create servers, so its developer key counts. */
 export function requestHostedServerService(request?: Request): HostedServerService {
   return requestHostedBilling(request?.headers.get(HOSTING_DEVELOPER_KEY_HEADER) ?? null).hosting;
 }
@@ -446,7 +463,6 @@ export function remoteControlPlaneErrorResponse(error: unknown): Response {
   return authErrorResponse(error);
 }
 
-/** A GitHub route ticket checks the host credential and then the GitHub sign-in. */
 export function githubRouteErrorResponse(error: unknown): Response {
   if (error instanceof RemoteControlPlaneError) return remoteControlPlaneErrorResponse(error);
   return githubInstallationTokensErrorResponse(error);
@@ -454,7 +470,6 @@ export function githubRouteErrorResponse(error: unknown): Response {
 
 export function requestSlackApp(): SlackAppService {
   const bindings = requireWorkerBindings(env);
-  // The events are already in D1 and the cron redelivers them, so the answer does not wait.
   return new SlackAppService(bindings, {
     flushAuthEvents: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
   });
@@ -467,7 +482,6 @@ export function slackAppErrorResponse(error: unknown): Response {
 
 export function requestDiscordApp(): DiscordAppService {
   const bindings = requireWorkerBindings(env);
-  // The events are already in D1 and the cron redelivers them, so the answer does not wait.
   return new DiscordAppService(bindings, {
     flushAuthEvents: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
   });
@@ -519,8 +533,6 @@ export function authErrorResponse(error: unknown): Response {
     }
     return response;
   }
-  // The reference is random, so it holds no user data. The log line shows the same value, so a code
-  // that a user copies identifies this log line. The log shows only the error type, not its message.
   const reference = `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
   console.error("Account service request failed:", reference, errorType(error));
   return json(
@@ -534,7 +546,6 @@ function errorType(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
-/** Starts background work in the active Worker invocation. */
 export function schedule<E>(work: Effect.Effect<void, E>): void {
   waitUntil(runApiEffect(work));
 }

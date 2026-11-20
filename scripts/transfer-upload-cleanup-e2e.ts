@@ -1,6 +1,3 @@
-// Run: bun scripts/transfer-upload-cleanup-e2e.ts
-// Report: .openbot-build/transfer-upload-cleanup-e2e.json
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -30,7 +27,6 @@ const manifest = {
 };
 const bytes = zipSync({ [INSTANCE_TRANSFER_MANIFEST]: strToU8(JSON.stringify(manifest)) });
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-// Empty exports omit settings and cannot be imported. Check their wire manifest too.
 const decodeArchiveManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
@@ -75,7 +71,6 @@ async function seed(directory: string): Promise<string[]> {
   await run(previous.stageUpload(async () => bytes, "previous-owner"));
   await run(previous.exportForMember(exportInput, "export-member"));
   await writeFile(join(directory, "interrupted.zip.part"), bytes);
-  // An upload in parts that the previous process did not finish, and one that it finished.
   const upload = await run(previous.chunks.beginUpload({ size: bytes.length, sha256 }, "parts-owner"));
   await run(
     previous.chunks.writePart({ uploadId: upload.uploadId, index: 0, sha256 }, async () => bytes, "parts-owner"),
@@ -175,7 +170,6 @@ async function checkLocal(root: string): Promise<void> {
   assert.deepEqual(await readFile(path), Buffer.from(bytes));
 }
 
-/** Parts of an upload and an export are files of the same folder: a restart removes them too. */
 async function checkChunks(root: string): Promise<void> {
   const directory = join(root, "chunks", "instance-transfer-uploads");
   const orphans = await restart(directory);
@@ -198,6 +192,46 @@ async function checkChunks(root: string): Promise<void> {
   await run(current.chunks.finishExport(exported.exportId, "bob"));
   await verifyArchives(directory, 1);
   await run(current.chunks.finishExport(exported.exportId, "alice"));
+  assert.deepEqual(await names(directory), []);
+}
+
+async function checkOverlappingUploads(root: string): Promise<void> {
+  const directory = join(root, "overlapping", "instance-transfer-uploads");
+  const current = service(directory);
+  const part = (uploadId: string) => ({ uploadId, index: 0, sha256 });
+  const first = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  const second = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.equal(second.uploadId, first.uploadId);
+  await run(current.chunks.writePart(part(first.uploadId), async () => bytes, "alice"));
+  const [preview, joined] = await Promise.all([
+    run(current.chunks.finishUpload(first.uploadId, "alice")),
+    run(current.chunks.finishUpload(second.uploadId, "alice")),
+  ]);
+  assert.equal(joined.token, preview.token);
+  const late = await run(current.chunks.writePart(part(second.uploadId), async () => bytes, "alice"));
+  assert.equal(late.receivedBytes, bytes.length);
+  assert.equal((await run(current.chunks.finishUpload(second.uploadId, "alice"))).token, preview.token);
+  const third = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.deepEqual([third.uploadId, third.received], [first.uploadId, [0]]);
+  await assert.rejects(run(current.chunks.writePart(part(first.uploadId), async () => bytes, "bob")));
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "bob")));
+  await verifyArchives(directory, 1);
+  await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+  const afterApply = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.notEqual(afterApply.uploadId, first.uploadId);
+  assert.deepEqual(afterApply.received, []);
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "alice")));
+  await run(current.chunks.abortUpload(afterApply.uploadId, "alice"));
+  const wrong = createHash("sha256").update("another file").digest("hex");
+  const failed = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  await run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol"));
+  await assert.rejects(run(current.chunks.finishUpload(failed.uploadId, "carol")));
+  await assert.rejects(run(current.chunks.writePart(part(failed.uploadId), async () => bytes, "carol")));
+  const retried = await run(current.chunks.beginUpload({ size: bytes.length, sha256: wrong }, "carol"));
+  assert.notEqual(retried.uploadId, failed.uploadId);
+  assert.deepEqual(retried.received, []);
+  await run(current.chunks.abortUpload(retried.uploadId, "carol"));
   assert.deepEqual(await names(directory), []);
 }
 
@@ -224,6 +258,7 @@ if (process.argv[2] === "--seed") {
       ["preparation-retry", () => checkRetry(root)],
       ["local-file-and-invalid-upload", () => checkLocal(root)],
       ["parts-restart-and-owner", () => checkChunks(root)],
+      ["overlapping-uploads", () => checkOverlappingUploads(root)],
     ];
     for (const [name, check] of checks) {
       activeCheck = name;

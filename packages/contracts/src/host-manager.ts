@@ -1,4 +1,3 @@
-/** Local host-management protocol. Contains no tenant content or tenant-supplied paths. */
 export interface HostManagerConfig {
   managed: boolean;
   tenants: number[];
@@ -18,7 +17,6 @@ export interface HostTenantStatus {
   currentVersion: string;
   heartbeatAt: number;
   safeToRestart: boolean;
-  /** Changes each time this process observes busy work, including between host polls. */
   idleSince: number | null;
   cycle: string;
   healthy: boolean;

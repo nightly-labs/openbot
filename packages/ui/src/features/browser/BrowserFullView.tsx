@@ -1,4 +1,4 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Minimize2, Tabs } from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, AlertTitle, ArrowLeft, Button, Tabs } from "@openbot/ui";
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
@@ -7,13 +7,13 @@ import { BrowserAddressRow } from "./BrowserAddressRow";
 import BrowserLiveView from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
+import { BrowserTeachBar } from "./BrowserTeachBar";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { BrowserPageCover } from "./browser-page-cover";
 import { type BrowserViewCommand, browserAriaShortcut, browserViewCommand } from "./browser-view-shortcuts";
 
 export type { BrowserFullViewProps } from "./browser-full-view-types";
 
-/** Below this width the chips do not fit: one button with the tab count opens the list of tabs. */
 const NARROW_QUERY = "(max-width: 720px)";
 
 function createNarrow() {
@@ -27,26 +27,18 @@ function createNarrow() {
   return narrow;
 }
 
-/**
- * The browser as a full view: every tab in the top row, the address row and the page in the card, and
- * the dock of the tab's agent over the page. With `shortcuts`, the keys of other browsers work here.
- */
 export default function BrowserFullView(props: BrowserFullViewProps) {
   const { t, sourceText } = useText();
-  // The app frame stays below the portaled view, also while it is hidden (`browser-full-view.css`).
   onCleanup(holdFlag(document.body, "browser-full-view"));
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
-  /**
-   * The shape of the host's page. A live view takes that shape rather than the window's, so the page
-   * fills its surface instead of sitting between bars.
-   */
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number } | undefined>(undefined, {
     equals: (previous, next) => previous?.width === next?.width && previous?.height === next?.height,
   });
   const live = () => props.liveViewTabId !== null;
   const canClose = () => props.canCloseTabs !== false;
+  const recording = () => typeof props.teach?.startedAt === "number";
   let hideButton: HTMLButtonElement | undefined;
   let view: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -73,7 +65,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       let disposed = false;
       onSettled(() => {
         hideButton?.focus();
-        // Chromium is a native child view. Attach it only after the CSS view settles.
         const animations = view?.getAnimations() ?? [];
         const settle = () => {
           if (!disposed) setSettled(true);
@@ -87,7 +78,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     },
   );
 
-  // The page is drawn above this window, so it is hidden while a menu of the view is open.
   createEffect(
     () => props.open && settled() && covers().size === 0,
     (shown) => props.onSurface(shown ? surfaceElement : undefined),
@@ -148,15 +138,12 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     }
   };
 
-  // The keys of other browsers. The capture phase runs before the server rail (⌘1–9) and the app
-  // menu (⌘R), so a key here acts on the tabs and not on the window.
   createEffect(
     () => (props.open ? props.shortcuts : undefined),
     (platform) => {
       if (!platform) return;
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.isComposing || event.keyCode === 229 || event.defaultPrevented) return;
-        // A menu or a dialog over the view has the focus: its keys are its own.
         if (event.target instanceof Element && event.target.closest("[role=dialog], [role=alertdialog], [role=menu]"))
           return;
         const command = browserViewCommand(event, platform);
@@ -172,16 +159,15 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
 
   const hideBrowserButton = () => (
     <Button
-      variant="ghost"
-      size="icon-sm"
+      variant="secondary"
+      size="sm"
       ref={(element) => (hideButton = element)}
       class="no-drag browser-hide"
-      aria-label={t("browser.hide")}
-      title={t("browser.hide")}
       data-cuelume-tap="close"
       onClick={props.onBack}
     >
-      <Minimize2 aria-hidden="true" />
+      <ArrowLeft aria-hidden="true" />
+      {t("browser.backToChat")}
     </Button>
   );
 
@@ -236,7 +222,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
         {hideBrowserButton()}
       </div>
       <div class="browser-full-card">
-        {/* The narrow row has no tab list, so the panel names itself. */}
         <Tabs.Content
           forceMount
           value={props.activeTab?.id ?? "__empty"}
@@ -273,9 +258,22 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
               </Button>
             </Alert>
           </Show>
+          <Show when={props.teach}>
+            {(teach) => (
+              <BrowserTeachBar
+                agentName={teach().agentName}
+                startedAt={teach().startedAt}
+                pending={teach().pending}
+                onStart={() => teach().onStart()}
+                onSave={() => teach().onSave()}
+                onClose={() => teach().onClose()}
+              />
+            )}
+          </Show>
           <div
             class="browser-surface browser-full-surface"
             data-live={live() ? "" : undefined}
+            data-teach-recording={recording() ? "" : undefined}
             ref={(element) => (surfaceElement = element)}
           >
             <Show when={props.liveViewTabId}>
@@ -289,7 +287,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                 />
               )}
             </Show>
-            <Show when={props.open && props.tabs.length > 0}>{props.dock}</Show>
+            <Show when={props.open && props.tabs.length > 0 && !props.teach}>{props.dock}</Show>
             <Show when={props.tabs.length === 0}>
               <div class="browser-empty-state">
                 <strong>{t("browser.empty.title")}</strong>

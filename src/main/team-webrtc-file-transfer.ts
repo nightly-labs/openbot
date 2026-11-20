@@ -24,7 +24,6 @@ import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 const FILE_CHUNK_BYTES = 60 * 1024;
 const ACK_INTERVAL_BYTES = 1024 * 1024;
 const TRANSFER_RESUME_MILLISECONDS = 10 * 60_000;
-// A stopped request keeps its watch this long, so a file that the host opens after the stop is refused.
 const STOPPED_WATCH_MILLISECONDS = 60_000;
 
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
@@ -50,32 +49,24 @@ interface OutgoingTransfer {
   name: string;
   mimeType: string;
   size: number;
-  /** Returns `length` bytes at `offset`. The source is memory or a file in the transfer directory. */
   read: (offset: number, length: number) => Promise<Uint8Array>;
   sha256: string;
   acknowledged: number;
   acknowledgementGeneration: number;
   lastProgressAt: number;
   cancelled: Error | null;
-  /** Gets the bytes that the peer confirmed, after each acknowledgement. */
   onProgress?: ((acknowledged: number, size: number) => void) | undefined;
 }
 
-/** A request that waits for one file from a peer, and the file that it took, when one opened. */
 interface IncomingWatch {
   peerId: string;
   size: number;
   onProgress: (received: number, size: number) => void;
   transferId: string | null;
-  /** Each file that the watch took. A file of a stopped request of the same size can come first. */
   taken: string[];
   stopped: boolean;
 }
 
-/**
- * Ends a watch. `end` gets the file that the answer names, or `null`, and removes the other files that
- * the watch took. `stop` also refuses its file, so the host stops sending it.
- */
 export interface IncomingFileWatch {
   end: (answered: string | null) => void;
   stop: Effect.Effect<void>;
@@ -90,7 +81,6 @@ export interface ReceivedWebRtcFile {
   path: string;
 }
 
-/** A file that the protocol cannot send. The peer gets the reason, not a generic host failure. */
 export class TeamFileTooLargeError extends Error {}
 
 export class TeamWebRtcFileTransfer {
@@ -102,7 +92,6 @@ export class TeamWebRtcFileTransfer {
   readonly #acceptPeer: (peerId: string) => boolean;
   readonly #incoming = new Map<string, IncomingTransfer>();
   readonly #outgoing = new Map<string, OutgoingTransfer>();
-  /** The streams that `sendStream` still writes to disk, with the bytes written so far. */
   readonly #writing = new Set<{ peerId: string; size: number }>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
   readonly #watches = new Set<IncomingWatch>();
@@ -116,7 +105,6 @@ export class TeamWebRtcFileTransfer {
     }
   >();
   #frames = Semaphore.makeUnsafe(1);
-  /** The last frame that `#onData` started. The next frame waits until it ends. */
   #lastFrame: Deferred.Deferred<void> | null = null;
   readonly #connectedPeers = new Set<string>();
   readonly #stateWaiters = new Set<() => void>();
@@ -142,7 +130,6 @@ export class TeamWebRtcFileTransfer {
     this.#notifyStateChange();
   }
 
-  /** Whether a transfer is moving right now, either direction. Completed files waiting for pickup do not count. */
   hasActiveTransfers(): boolean {
     return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0;
   }
@@ -173,13 +160,6 @@ export class TeamWebRtcFileTransfer {
     );
   }).bind(this);
 
-  /**
-   * Sends a stream, such as a Team API response body, without holding it in memory. `file-open`
-   * needs the size and the SHA-256 before the first chunk, so the stream goes to a file in the
-   * transfer directory first. The chunks, also the ones sent again after a resume, come from that
-   * file. The file is removed when the transfer ends.
-   */
-
   readonly sendStream = Effect.fn("TeamFileTransfer.sendStream")(function* (
     this: TeamWebRtcFileTransfer,
     peerId: string,
@@ -194,8 +174,6 @@ export class TeamWebRtcFileTransfer {
         yield* remoteCall(() => mkdir(this.#directory, { recursive: true, mode: 0o700 }));
         const path = join(this.#directory, `${randomUUID()}.outgoing`);
         let file: FileHandle | null = null;
-        // The bytes on disk count against the file set limit while they are written, so parallel
-        // streams cannot write more than the limit before the check.
         const pending = { peerId, size: 0 };
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {
@@ -224,8 +202,6 @@ export class TeamWebRtcFileTransfer {
               const size = pending.size;
               const source = yield* remoteCall(() => open(path, "r"));
               file = source;
-              // No `await` between this check and `#sendOutgoing`, which adds the transfer: two parallel
-              // streams cannot both pass the file set limit.
               this.#writing.delete(pending);
               yield* remoteDecode(() => this.#checkOutgoing(peerId, size));
               const transferId = yield* this.#sendOutgoingEffect(peerId, {
@@ -253,7 +229,6 @@ export class TeamWebRtcFileTransfer {
     );
   }).bind(this);
 
-  /** `own` is the stream that asks, so its bytes on disk are not counted twice. */
   #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
@@ -262,7 +237,6 @@ export class TeamWebRtcFileTransfer {
       .filter((transfer) => transfer.peerId === peerId)
       .reduce((sum, transfer) => sum + transfer.size, 0);
     if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
-      // Other transfers end and free the set, so this stays a retryable host failure.
       throw new Error(sourceText("error.remote.fileSetTooLarge"));
     }
   }
@@ -301,15 +275,8 @@ export class TeamWebRtcFileTransfer {
     );
   });
 
-  /**
-   * Reports the bytes of the next file of `size` that `peerId` opens. The host names a file only in
-   * its answer, after the last byte, so the size ties a file to the request. Two files of one size can
-   * swap their progress; their bytes still go to the request that the answer names.
-   */
   watchIncoming(peerId: string, size: number, onProgress: (received: number, size: number) => void): IncomingFileWatch {
     const watch: IncomingWatch = { peerId, size, onProgress, transferId: null, taken: [], stopped: false };
-    // The host does not keep the order of its files. A stopped request that has no file yet must not
-    // refuse the file of this request. This watch can take that file first; `end` then removes it.
     for (const item of this.#watches)
       if (item.stopped && item.peerId === peerId && item.size === size && item.transferId === null)
         this.#watches.delete(item);
@@ -317,10 +284,8 @@ export class TeamWebRtcFileTransfer {
     return {
       end: (answered) => {
         if (watch.stopped || !this.#watches.delete(watch)) return;
-        // While another request waits for a file of this size, a file that this watch took can be its file.
         const shared = [...this.#watches].some((item) => !item.stopped && item.peerId === peerId && item.size === size);
         const others = shared ? [] : watch.taken.filter((transferId) => transferId !== answered);
-        // The file of a stopped request counts against the file set limit of the peer until it expires.
         for (const transferId of others)
           void Effect.runPromise(
             this.#owned(
@@ -335,7 +300,6 @@ export class TeamWebRtcFileTransfer {
         watch.stopped = true;
         const { transferId } = watch;
         if (transferId === null) {
-          // The host can still be writing the file to its disk. Its `file-open` comes later.
           const timer = setTimeout(() => this.#watches.delete(watch), STOPPED_WATCH_MILLISECONDS);
           timer.unref?.();
           return Effect.void;
@@ -404,8 +368,6 @@ export class TeamWebRtcFileTransfer {
       }),
     );
   }).bind(this);
-
-  /** Lends a received file to `use`, which can stream it from disk, and removes it after `use` ends. */
 
   readonly useReceived = Effect.fn("TeamFileTransfer.useReceived")(function* <T, E, R>(
     this: TeamWebRtcFileTransfer,
@@ -482,9 +444,6 @@ export class TeamWebRtcFileTransfer {
   ): void => {
     if (channel !== "files" || !this.#connectedPeers.has(peerId) || !this.#acceptPeer(peerId)) return;
     const transferId = fileTransferId(data);
-    // The semaphore does not keep the order of its waiters: a frame that arrives when the permit is
-    // free goes before the frames that wait. Each frame waits for the one before it, so the chunks of
-    // parallel files stay in order.
     const previous = this.#lastFrame;
     const done = Deferred.makeUnsafe<void>();
     this.#lastFrame = done;
@@ -614,8 +573,6 @@ export class TeamWebRtcFileTransfer {
         };
         this.#completed.set(key, completed);
         this.#scheduleExpiration(key);
-        // A watch can take the file of a stopped request of the same size. When its own answer does not
-        // come with this file, the watch takes the next file.
         for (const watch of this.#watches)
           if (watch.peerId === peerId && watch.transferId === frame.transferId) watch.transferId = null;
         const waiter = this.#waiters.get(key);
@@ -637,11 +594,19 @@ export class TeamWebRtcFileTransfer {
     const chunk = yield* remoteDecode(() => decodeTeamProtocolV2FileChunk(data));
     const key = transferKey(peerId, chunk.transferId);
     const transfer = this.#incoming.get(key);
-    if (!transfer || chunk.offset !== transfer.received || transfer.received + chunk.bytes.byteLength > transfer.size) {
+    const end = chunk.offset + chunk.bytes.byteLength;
+    if (!transfer || chunk.offset > transfer.received || end > transfer.size) {
       return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC file offset is invalid.") });
     }
-    yield* remoteCall(() => transfer.file.write(chunk.bytes, 0, chunk.bytes.byteLength, chunk.offset));
-    transfer.received += chunk.bytes.byteLength;
+    if (end <= transfer.received) {
+      this.#scheduleExpiration(key);
+      return;
+    }
+    const skipped = transfer.received - chunk.offset;
+    yield* remoteCall(() =>
+      transfer.file.write(chunk.bytes, skipped, chunk.bytes.byteLength - skipped, transfer.received),
+    );
+    transfer.received = end;
     this.#scheduleExpiration(key);
     for (const watch of this.#watches)
       if (watch.peerId === peerId && watch.transferId === chunk.transferId)
@@ -686,7 +651,6 @@ export class TeamWebRtcFileTransfer {
     }
   });
 
-  /** Tells the host to stop sending a file, and removes what arrived of it. */
   readonly #refuse = Effect.fn("TeamFileTransfer.refuse")(function* (
     this: TeamWebRtcFileTransfer,
     peerId: string,

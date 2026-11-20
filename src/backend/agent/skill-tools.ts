@@ -9,6 +9,7 @@ import type {
   SkillConversationEvent,
   UninstallSkillInput,
 } from "@openbot/contracts/ipc";
+import { GITHUB_SKILL_ID_MAX_LENGTH } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -27,18 +28,27 @@ const targetAgentId = z
   .max(INPUT_LIMITS.identifier)
   .describe("Stable id of the agent to change, from list_agents. Omit it to change your own agent.")
   .optional();
-// An installed skill can come from the marketplace too, so its id is not always a local skill id.
-const installedSkillId = z.string().trim().min(1).max(INPUT_LIMITS.identifier);
+const installedSkillId = z.string().trim().min(1).max(GITHUB_SKILL_ID_MAX_LENGTH);
 export const installLocalSkillSchema = z.object({ agentId: targetAgentId, skillId, revision }).strict();
 const setSkillEnabledSchema = z
   .object({ agentId: targetAgentId, skillId: installedSkillId, enabled: z.boolean() })
   .strict();
 const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
 
+export interface UnreadableLocalSkill {
+  skillId: string;
+  error: string;
+}
+
+export interface LocalSkillListing {
+  skills: MarketplaceSkillDetail[];
+  unreadable: UnreadableLocalSkill[];
+}
+
 export interface LocalSkillTools {
   create(input: CreateLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
   revise(input: ReviseLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
-  list(): Effect.Effect<MarketplaceSkillDetail[], ToolOperationFailed>;
+  list(): Effect.Effect<LocalSkillListing, ToolOperationFailed>;
   get(
     input: LocalSkillRevisionInput,
   ): Effect.Effect<MarketplaceSkillDetail & { archivePath: string }, ToolOperationFailed>;
@@ -60,7 +70,7 @@ export const LOCAL_SKILL_TOOL_DEFINITIONS = [
   {
     name: "revise_skill",
     description:
-      "Publish a new local skill revision from a workspace folder when the user asks to revise it. Read first and supply expectedRevision. Installs it for you; other agents keep their copy.",
+      "Publish a local skill revision from a workspace folder when the user asks. Read first; supply expectedRevision. Installs for you only. Never edit installed copies: it blocks updates.",
     shape: reviseSkillSchema.shape,
   },
   {
@@ -113,10 +123,6 @@ function skillToolDetail(skill: MarketplaceSkillDetail) {
   };
 }
 
-/**
- * `agentId` is the calling agent: it owns the skills it creates and revises. `targetAgent` resolves
- * the agent that an install, enable, or uninstall changes, which is the caller when `agentId` is omitted.
- */
 export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
   api: LocalSkillTools,
   agentId: string,
@@ -158,8 +164,11 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
       });
       return skill;
     }
-    case "list_local_skills":
-      return (yield* api.list()).map(skillToolSummary);
+    case "list_local_skills": {
+      const { skills, unreadable } = yield* api.list();
+      const listed = skills.map(skillToolSummary);
+      return unreadable.length ? { skills: listed, unreadable } : listed;
+    }
     case "set_skill_enabled": {
       const input = yield* toolStep(() => setSkillEnabledSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
@@ -168,12 +177,10 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     case "uninstall_skill": {
       const input = yield* toolStep(() => uninstallSkillSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
-      // The service ignores an id that is not in the lock file, and workspace folder skills are never in it.
       const installed = yield* api.listInstalled(target);
       if (!installed.some((skill) => skill.skillId === input.skillId && skill.origin !== "workspace")) {
         return yield* new ToolOperationFailed({ cause: new Error(sourceText("error.skill.notFound")) });
       }
-      // Never `removeModified`: files the user changed are theirs to remove.
       yield* api.uninstall({ agentId: target, skillId: input.skillId });
       return { agentId: target, skillId: input.skillId, removed: true };
     }

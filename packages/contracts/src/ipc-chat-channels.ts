@@ -7,23 +7,10 @@ import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtim
 
 export const CHANNEL_CHATS_CAPABILITY = "channel-chats-v1";
 export const CHANNEL_DELETE_CAPABILITY = "channel-delete-v1";
-/**
- * The host takes the channel command `cancel`, which ends a stopped or failed task and the open tasks
- * below it. A host without it rejects the command, so a client shows Cancel only with it.
- */
 export const CHANNEL_TASK_CANCEL_CAPABILITY = "channel-task-cancel-v1";
-/**
- * The id a channel row carries for the reader, and for its own author, while no account is signed
- * in. The person behind it does not change when they sign in, so their read cursors follow them and
- * their own messages stay their own in the transcript.
- */
 export const SIGNED_OUT_CHANNEL_MEMBER_ID = "local";
 export const CHANNEL_PARALLEL_LIMIT = 2;
 export const CHANNEL_ASSIGNMENT_LIMIT = 8;
-/**
- * The reason a run stops at `CHANNEL_ASSIGNMENT_LIMIT`. Saved tasks and every host version carry this
- * exact English, so a screen compares it to show its own text. Do not change it.
- */
 export const CHANNEL_ASSIGNMENT_LIMIT_ERROR =
   "The automatic assignment limit was reached. Continue or reassign this task.";
 
@@ -31,20 +18,11 @@ export interface ChannelMember {
   agentId: string;
 }
 
-/**
- * The icon a reader chose for a channel, in place of its member faces. `name` is a key of the icon
- * set in the app. A name this version does not know shows the faces, so a later version can add
- * icons without making a channel unreadable after a downgrade.
- */
 export interface ChannelIcon {
   name: string;
   hue: number;
 }
 
-/**
- * The icons that this version draws, in the order of the editor grid. The names are saved in the
- * channel, so a name never changes its meaning; add new names at the end.
- */
 export const CHANNEL_ICON_NAMES = [
   "megaphone",
   "chart",
@@ -76,17 +54,37 @@ export interface ChannelDraft {
   instructions: string;
   members: ChannelMember[];
   leadAgentId: string | null;
-  /**
-   * An isolated channel keeps what its members learn in it: `openbot.remember` saves a channel
-   * memory there, not a memory of the agent (#4332). Absent is off. A save without it keeps the
-   * stored value, so a client from before it does not turn it off.
-   */
   isolated?: boolean;
-  /**
-   * Absent keeps the stored icon, and null removes it. The Team API channel codecs carry it only
-   * between peers with `channel-picture-v1`; other peers show the member faces.
-   */
+  browser?: ChannelBrowser;
   icon?: ChannelIcon | null;
+}
+
+export type ChannelBrowser = { kind: "members" } | { kind: "none" } | { kind: "member"; agentId: string };
+
+export const CHANNEL_BROWSER_MEMBERS: ChannelBrowser = { kind: "members" };
+
+export function isChannelBrowser(value: unknown): value is ChannelBrowser {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "members" || value.kind === "none") return Object.keys(value).length === 1;
+  return value.kind === "member" && isIdentifier(value.agentId) && Object.keys(value).length === 2;
+}
+
+export function channelBrowserAgent(channel: Pick<ChannelDraft, "browser">): string | boolean {
+  const browser = channel.browser ?? CHANNEL_BROWSER_MEMBERS;
+  if (browser.kind === "member") return browser.agentId;
+  return browser.kind === "members";
+}
+
+export function channelAllowsBrowser(channel: Pick<ChannelDraft, "browser">, agentId: string): boolean {
+  const agent = channelBrowserAgent(channel);
+  return typeof agent === "string" ? agent === agentId : agent;
+}
+
+export function withBrowserMember<T extends ChannelDraft>(channel: T): T {
+  const browser = channel.browser;
+  if (browser?.kind !== "member" || channel.members.some((member) => member.agentId === browser.agentId))
+    return channel;
+  return { ...channel, browser: { kind: "none" } };
 }
 
 export interface Channel extends ChannelDraft {
@@ -94,11 +92,6 @@ export interface Channel extends ChannelDraft {
   archived: boolean;
   revision: number;
   createdAt: string;
-  /**
-   * An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. A
-   * joined server sends the host's URL with `channel-picture-v1`; the desktop changes it to an
-   * `openbot-remote-avatar://<server>/channel/` URL, and the web client to a data URL.
-   */
   imageUrl?: string | null;
 }
 
@@ -126,6 +119,7 @@ export interface ChannelTask {
   revision: number;
   assignmentCount: number;
   error: string | null;
+  seenDependencies?: string[];
 }
 
 export interface ChannelMessage {
@@ -138,24 +132,19 @@ export interface ChannelMessage {
   message: ConversationMessage;
 }
 
-/** Deletes one message of a channel from its history and view. Agents can still remember it. */
 export interface DeleteChannelMessageInput {
   channelId: string;
   messageId: string;
 }
 
-/** One ellipsised sidebar line: enough to preview a channel, never a whole message body. */
 export interface ChannelPreview {
   authorName: string;
-  /** Who wrote it. Absent from a host without channel-attention-v1. */
   author?: { kind: ChannelMessage["author"]["kind"]; id: string };
-  /** Whether it is still streaming. Absent from a host without channel-attention-v1. */
   status?: ConversationMessage["status"];
   text: string;
   at: string;
 }
 
-/** The execution thread of one member agent in a channel. A prompt on it belongs to the channel. */
 export interface ChannelThread {
   agentId: string;
   threadId: string;
@@ -166,12 +155,14 @@ export const CHANNEL_PREVIEW_LIMIT = 160;
 export interface ChannelSummary extends Channel {
   unreadCount: number;
   activeTasks: number;
-  /** Its queued, waiting and running tasks; `activeTasks` counts only running ones. Absent from a host without channel-attention-v1. */
   openTasks?: number;
   lastMessage: ChannelPreview | null;
-  /** One for each member agent that has worked here. Absent from a host without channel-attention-v1. */
   threads?: ChannelThread[];
 }
+
+export type ChannelTaskWait =
+  | { taskId: string; agentId: string; reason: "agent-busy"; channelId: string; channelName: string }
+  | { taskId: string; agentId: string; reason: "channel-full" };
 
 export interface ChannelPage {
   channel: Channel;
@@ -179,9 +170,9 @@ export interface ChannelPage {
   tasks: ChannelTask[];
   olderCursor: number | null;
   throughSequence: number;
-  /** As in `ConversationPageInfo`: the unloaded length, for the scroll rail. Absent from a remote host. */
   olderCount?: number;
   oldestAt?: string;
+  waits?: ChannelTaskWait[];
 }
 
 export type ChannelCommand =
@@ -190,12 +181,6 @@ export type ChannelCommand =
       operationId: string;
       channelId: string;
       draft: ChannelDraft;
-      /**
-       * The save edits a channel that the sender has open. A save without it creates the channel
-       * when its id is unknown, which is how a channel is made, and how every released client
-       * still saves. Settings save on every field and a save can arrive after a deletion, so the
-       * settings panel sets this and the service refuses to bring the channel back.
-       */
       update?: boolean;
     }
   | { type: "restore"; operationId: string; channelId: string }
@@ -210,12 +195,6 @@ export type ChannelCommand =
       attachmentDraftIds: string[];
     }
   | {
-      /**
-       * A routine firing into the channel. It is a `send` without the continuation heuristic: a
-       * schedule must start its own task rather than fold itself into whatever a member is doing.
-       * The `requestMessageId` is minted by the caller and persisted on its run row before the
-       * command is issued, so a replay after a crash lands on the same message.
-       */
       type: "request";
       operationId: string;
       channelId: string;
@@ -238,13 +217,6 @@ export interface ChannelReadInput {
   beforeSequence?: number | undefined;
 }
 
-/**
- * A channel used to hold one `purpose`. It now holds a `title` and `instructions`, the way an agent
- * does, and the guards below are strict about both - so every row written before the rename has to
- * pass through here on the way in. This is the only place that knows the old key: the store reads
- * `channel_json` through `decodeChannel` (`channel-store.ts`), and a strict guard at the call sites
- * would make every one of those rows unreadable instead.
- */
 export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined {
   if (!isDynamicRecord(value)) return undefined;
   if (!("purpose" in value)) return value;
@@ -252,23 +224,27 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
   return { title: "", instructions: isString(purpose) ? purpose : "", ...rest };
 }
 
-/**
- * A saved channel, read back. An icon this version cannot read is left out, so a channel that a later
- * version saved shows its member faces after a downgrade and does not become unreadable. A command
- * with such an icon is still refused.
- */
 function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
-  const channel = normalizeChannelDraft(value);
+  const channel = readableLead(readableBrowser(normalizeChannelDraft(value)));
   if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
   const { icon: _unreadable, ...rest } = channel;
   return rest;
 }
 
-/**
- * `instructionsLimit` is `storedChannelInstructions` where the instructions can be the stored ones
- * unchanged: a read, and a save, which sends the whole draft. The backend refuses a save that
- * changes them to more than `agentDescription`.
- */
+function readableLead(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || !isIdentifier(channel.leadAgentId) || !Array.isArray(channel.members)) return channel;
+  const members = channel.members.filter(isChannelMember);
+  if (members.some((member) => member.agentId === channel.leadAgentId)) return channel;
+  return { ...channel, leadAgentId: members[0]?.agentId ?? null };
+}
+
+function readableBrowser(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || channel.browser === undefined) return channel;
+  const members = Array.isArray(channel.members) ? channel.members.filter(isChannelMember) : [];
+  if (isChannelBrowser(channel.browser) && browserIsMember(channel.browser, members)) return channel;
+  return { ...channel, browser: { kind: "none" } };
+}
+
 export function isChannelDraft(
   value: unknown,
   instructionsLimit: number = INPUT_LIMITS.agentDescription,
@@ -280,13 +256,23 @@ export function isChannelDraft(
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
     isBoundedString(value.instructions, instructionsLimit) &&
     (value.isolated === undefined || typeof value.isolated === "boolean") &&
+    (value.browser === undefined || isChannelBrowser(value.browser)) &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
     value.members.every(isChannelMember) &&
     new Set(value.members.map((member) => member.agentId)).size === value.members.length &&
     (value.leadAgentId === null ||
       (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId))) &&
-    (value.icon === undefined || value.icon === null || isChannelIcon(value.icon))
+    (value.icon === undefined || value.icon === null || isChannelIcon(value.icon)) &&
+    browserIsMember(value.browser, value.members)
+  );
+}
+
+function browserIsMember(browser: unknown, members: readonly ChannelMember[]): boolean {
+  return (
+    !isChannelBrowser(browser) ||
+    browser.kind !== "member" ||
+    members.some((member) => member.agentId === browser.agentId)
   );
 }
 
@@ -304,9 +290,8 @@ export function isChannelIcon(value: unknown): value is ChannelIcon {
   );
 }
 
-/** Only the fields of a draft, so a save cannot carry a host-owned field such as `imageUrl`. */
 function draftFields(draft: ChannelDraft): ChannelDraft {
-  const { name, title, instructions, members, leadAgentId, isolated, icon } = draft;
+  const { name, title, instructions, members, leadAgentId, isolated, browser, icon } = draft;
   return {
     name,
     title,
@@ -314,6 +299,7 @@ function draftFields(draft: ChannelDraft): ChannelDraft {
     members,
     leadAgentId,
     ...(isolated === undefined ? {} : { isolated }),
+    ...(browser === undefined ? {} : { browser }),
     ...(icon === undefined ? {} : { icon }),
   };
 }
@@ -367,7 +353,8 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
-    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
+    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
+    (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
 }
 
@@ -380,8 +367,6 @@ export function isChannelMessage(value: unknown): value is ChannelMessage {
     isDynamicRecord(value.author) &&
     isOneOf(["member", "agent", "coordinator"] as const, value.author.kind) &&
     isIdentifier(value.author.id) &&
-    // The author of a channel message can be a person, and an account name is bounded there, not
-    // by the agent name. A name this validator refuses is a stored message no read can decode.
     isBoundedString(value.author.name, INPUT_LIMITS.accountName) &&
     (value.taskId === null || isIdentifier(value.taskId)) &&
     typeof value.superseded === "boolean" &&
@@ -405,7 +390,11 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     !Array.isArray(value.tasks) ||
     !value.tasks.every(isChannelTask) ||
     !(value.olderCursor === null || sequence(value.olderCursor)) ||
-    !sequence(value.throughSequence)
+    !sequence(value.throughSequence) ||
+    !(
+      value.waits === undefined ||
+      (Array.isArray(value.waits) && value.waits.length <= value.tasks.length && value.waits.every(isChannelTaskWait))
+    )
   ) {
     throw new Error("Invalid channel conversation response.");
   }
@@ -416,7 +405,18 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     olderCursor: value.olderCursor,
     throughSequence: value.throughSequence,
     ...optionalHistoryExtent(value),
+    ...(value.waits === undefined ? {} : { waits: value.waits }),
   };
+}
+
+function isChannelTaskWait(value: unknown): value is ChannelTaskWait {
+  if (!isDynamicRecord(value) || !isIdentifier(value.taskId) || !isIdentifier(value.agentId)) return false;
+  if (value.reason === "channel-full") return true;
+  return (
+    value.reason === "agent-busy" &&
+    isIdentifier(value.channelId) &&
+    isBoundedString(value.channelName, INPUT_LIMITS.agentName)
+  );
 }
 
 export function decodeChannelSummaries(value: unknown): ChannelSummary[] {

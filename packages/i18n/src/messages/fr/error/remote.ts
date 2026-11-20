@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate":
     "Mettez à jour le client pour utiliser la configuration du bureau à distance.",
   "error.remote.desktopSetupUnavailable": "La configuration du bureau à distance n’est pas disponible.",
@@ -25,6 +24,14 @@ export const messages = {
   "error.remote.testActive": "Un test du bureau à distance est en cours. Réessayez quand il sera terminé.",
   "error.remote.screenRecordingDenied":
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",
+  "error.remote.windowsSessionDisconnected":
+    "La session Windows de l’hôte est déconnectée : elle n’a aucun écran à partager. Connectez-vous à Windows sur l’écran de l’hôte, puis réessayez.",
+  "error.remote.macScreenLocked":
+    "Le Mac est verrouillé : il ne peut pas partager son écran. Déverrouillez le Mac sur son écran, puis réessayez.",
+  "error.remote.streamTooSlowLowerQuality":
+    "La connexion à l’hôte est trop lente pour l’image. Réessayez : la prochaine connexion utilisera une qualité inférieure.",
+  "error.remote.streamTooSlow":
+    "La connexion à l’hôte est trop lente pour l’image. Utilisez un réseau plus rapide, puis réessayez.",
   "error.remote.teamSessionExpired": "La session de l’équipe a expiré.",
   "error.remote.finishTestBeforeSwitch": "Terminez le test du bureau à distance avant de changer d’écran.",
   "error.remote.displayNotFound": "Écran distant introuvable.",
@@ -84,10 +91,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Seul le propriétaire peut supprimer ce serveur.",
   "error.remote.requestTimeout": "La requête distante a expiré.",
   "error.remote.requestFailed": "La requête distante a échoué.",
-  "error.remote.pinnedKeyMissing": "L’hôte distant n’a pas de clé d’appareil épinglée.",
+  "error.remote.hostKeyMissing":
+    "OpenBot ne peut pas vérifier ce serveur, car sa clé de sécurité est absente ou a changé. Demandez au propriétaire du serveur de le vérifier.",
+  "error.remote.connectionNotStarted":
+    "OpenBot n’a pas pu démarrer la connexion à ce serveur. Si le problème persiste, quittez OpenBot et rouvrez-le.",
   "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
-  "error.remote.hostDisconnected": "L’hôte WebRTC s’est déconnecté.",
+  "error.remote.hostDisconnected":
+    "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",
   "error.remote.eventGap": "La séquence d’événements de l’hôte présente un trou.",
   "error.remote.malformedKnownEvent": "L’hôte a renvoyé un événement connu mal formé.",
   "error.remote.fileTransportIsStopped": "Le transport de fichiers WebRTC est arrêté.",
@@ -153,6 +164,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L’hôte a refusé la pièce jointe.",
   "error.remote.attachmentTooLarge": "Les pièces jointes doivent faire 10 Mo au maximum.",
   "error.remote.attachmentBusy": "Attendez la fin de l’envoi de la pièce jointe en cours.",
+  "error.remote.attachmentChanged": "Le fichier a changé ou n’est pas disponible. Sélectionnez-le à nouveau.",
   "error.remote.uploadTimeout": "L’envoi de la pièce jointe a expiré.",
   "error.remote.hostSessionActive": "L’hôte a déjà une session distante active.",
   "error.remote.tooManyConnections": "Trop de connexions distantes actives.",
@@ -182,6 +194,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Impossible d’établir une connexion directe avec l’hôte. Un pare-feu, un VPN ou un proxy peut la bloquer.",
   "error.remote.iceDisconnected": "La connexion directe avec l’hôte a été perdue.",
+  "error.remote.webrtcBlocked":
+    "Cet appareil bloque la connexion dont OpenBot a besoin. Si le mode Isolement est activé, désactivez-le pour OpenBot dans Réglages > Confidentialité et sécurité > Mode Isolement.",
   "error.remote.directoryUnreachable": "OpenBot n’a pas pu joindre le service OpenBot. Vérifiez votre connexion.",
   "error.remote.directoryTimeout": "Le service OpenBot n’a pas répondu à temps. Réessayez.",
   "error.remote.inviteAlreadyUsed": "Cette invitation a déjà été utilisée. Demandez une nouvelle invitation.",
@@ -201,12 +215,20 @@ export const messages = {
   "error.remote.formUnavailable": "Ce formulaire n’est plus disponible.",
   "error.remote.hostedServerRemoval": "Utilisez « Facturation » pour supprimer un serveur hébergé.",
   "error.remote.hostRemoved": "Le propriétaire a retiré ce serveur du compte.",
+  "error.remote.ownerTransferSelf":
+    "Vous êtes déjà propriétaire de ce serveur. Saisissez l'e-mail du nouveau propriétaire.",
+  "error.remote.ownerTransferHosted": "Un serveur hébergé par OpenBot ne peut pas changer de propriétaire.",
+  "error.remote.ownerTransferInvalid":
+    "Ce transfert de propriété n'est plus disponible. Demandez au propriétaire de l'envoyer à nouveau.",
   "error.remote.channelsUnsupported": "Mettez à jour ce serveur de bureau pour utiliser les canaux.",
   "error.remote.channelDeleteUnsupported": "Mettez à jour ce serveur de bureau pour supprimer des canaux.",
   "error.remote.historyRefreshFailed":
     "Le message a été envoyé, mais l’historique de la discussion n’a pas pu être actualisé.",
   "error.remote.taskHistoryRefreshFailed":
     "La tâche a été modifiée, mais l’historique de la discussion n’a pas pu être actualisé.",
+  "error.remote.serverNotLoaded": "OpenBot n'a pas pu charger le serveur. Réessayez.",
+  "error.remote.localServerNotStarted":
+    "Le serveur sur cet ordinateur n'a pas démarré. Réessayez. S'il ne démarre toujours pas, redémarrez OpenBot sur cet ordinateur.",
   "error.remote.localServerAccountRemovalFailed":
     "Le serveur est supprimé sur son ordinateur, mais le compte l’affiche encore. Supprimez-le à nouveau pour le retirer du compte.",
 } as const satisfies PartialTranslation<typeof source>;

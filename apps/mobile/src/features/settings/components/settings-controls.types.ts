@@ -8,7 +8,6 @@ export interface SettingsPickerProps<T extends string | number> {
   options: SettingsPickerOption<T>[];
   enabled: boolean;
   dark: boolean;
-  /** The row label. Android names the menu button with it. */
   label: string;
   onChange: (value: T) => void;
 }

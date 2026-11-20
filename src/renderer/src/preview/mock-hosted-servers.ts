@@ -15,12 +15,9 @@ import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
 const CREATED_AT = "2026-09-20T09:30:00.000Z";
-/** How long each mock step takes (payment, then start), so the list shows the transition states. */
 const MOCK_STEP_MS = 4_000;
-/** The account server's `MAX_SERVERS_PER_ACCOUNT`. */
 const MOCK_MAX_SERVERS = 50;
 
-/** The list prices of a plan, as `scripts/stripe-bootstrap.ts` sets them in Stripe. */
 function prices(plan: BillingPlanId) {
   const month = billingListPrices(plan, "month");
   const year = billingListPrices(plan, "year");
@@ -28,10 +25,10 @@ function prices(plan: BillingPlanId) {
     eur: { month: month.eur, year: year.eur },
     usd: { month: month.usd, year: year.usd },
     pln: { month: month.pln, year: year.pln },
+    brl: { month: month.brl, year: year.brl },
   };
 }
 
-/** The Stripe sandbox catalog, for the preview and Storybook. */
 export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
   plans: BILLING_PLANS.map((plan) => ({
     id: plan.id,
@@ -39,11 +36,9 @@ export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
     memberLimit: plan.memberLimit,
     relativeSpeed: plan.relativeSpeed,
     prices: prices(plan.id),
-    soldOut: plan.id === "starter",
   })),
 };
 
-/** The state that follows each transition state when its mock step ends. */
 const NEXT_STATE: Partial<Record<HostedServerState, HostedServerState>> = {
   awaiting_payment: "starting",
   starting: "running",
@@ -51,7 +46,6 @@ const NEXT_STATE: Partial<Record<HostedServerState, HostedServerState>> = {
   stopping: "waking",
 };
 
-/** One stopped server and one whose plan ended, so the preview shows the start and renew actions. */
 export function createMockHostedServers(billingPlans?: BillingServerPlan[]): HostedServersDesktopApi {
   let servers: HostedServerSummary[] = [
     {
@@ -77,6 +71,7 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
       error: "plan_ended",
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
+      dataKeptUntil: Date.now() + 12 * 24 * 60 * 60_000,
     },
   ];
   if (billingPlans) {
@@ -103,7 +98,6 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
     if (billingPlans)
       billingPlans.splice(0, billingPlans.length, ...billingPlans.filter((plan) => plan.serverId !== serverId));
   };
-  /** The account server's idempotency key: a repeated create request returns the same server. */
   const requests = new Map<string, string>();
   const update = (serverId: string, change: Partial<HostedServerSummary>): HostedServerSummary => {
     const server = servers.find((entry) => entry.serverId === serverId);
@@ -149,7 +143,6 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
     create: async (input) => {
       const earlier = servers.find((entry) => entry.serverId === requests.get(input.requestId));
       if (earlier) return structuredClone(earlier);
-      // The account server gives the new plan to the server that waits for its first payment.
       const unpaid = servers.find((entry) => entry.state === "awaiting_payment");
       if (unpaid) {
         requests.set(input.requestId, unpaid.serverId);
@@ -174,7 +167,6 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
       requests.set(input.requestId, server.serverId);
       return structuredClone(server);
     },
-    // The preview has no payment page: a renewal is paid at once, and a new server waits for its step.
     openCheckout: async (serverId) =>
       update(
         serverId,
@@ -191,7 +183,6 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
     },
     wake: async (serverId) => update(serverId, { state: "waking" }),
     restart: async (serverId) => update(serverId, { state: "stopping" }),
-    // A fake claim in the account service's form: 32 bytes, base64url.
     createServerClaim: async () => ({
       claim: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
         .replace(/\+/g, "-")

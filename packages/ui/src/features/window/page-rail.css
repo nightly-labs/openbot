@@ -1,6 +1,3 @@
-/* The page rail at the left of the window, on desktop and on the web. The window styles place it in
- * the window grid. The window buttons of macOS sit at the top of the rail, in the top row. Other
- * windows can show the OpenBot logo there. */
 .window-rail {
   position: relative;
   display: flex;
@@ -13,8 +10,6 @@
   -webkit-app-region: drag;
 }
 
-/* The logo has the size of a rail icon, in the column of the icons. Its top padding is the same as
- * the top padding of `.sidebar-topbar`, so it is on the center line of the server logo. */
 .window-rail-logo {
   position: absolute;
   top: 0;
@@ -49,14 +44,45 @@
   flex-direction: column;
   align-items: center;
   gap: var(--openbot-space-1-5);
-  /* The window swallows mouse events over a drag area. With the gaps between the buttons in the
-   * drag area, the pointer left the group between two buttons, and the tooltip closed instead of
-   * moving to the next button. */
+
   -webkit-app-region: no-drag;
 }
 
-/* A rail icon is 20px, so it takes the line of the large icons. The line does not change on hover or on
- * the open page; only the color does. */
+.window-rail-end,
+.window-rail-server-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.window-rail-server-slot {
+  -webkit-app-region: no-drag;
+}
+
+.window-rail-server-slot:empty {
+  display: none;
+}
+
+.window-rail-server-slot::before {
+  width: var(--openbot-space-6);
+  height: 1px;
+  margin-block: var(--openbot-space-0-5);
+  background: var(--openbot-border);
+  content: "";
+}
+
+.window-rail-button.window-rail-server > .server-menu-mark {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}
+
+.window-rail-button.window-rail-server > .window-rail-server-sleep {
+  position: absolute;
+  inset-block-end: var(--openbot-space-1);
+  inset-inline-end: var(--openbot-space-1);
+}
+
 .window-rail-button {
   --openbot-icon-stroke: var(--openbot-icon-stroke-lg);
 
@@ -98,7 +124,6 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
 }
-/* The dot of a rail button that has a notice, such as an update. */
 .window-rail-notice {
   position: absolute;
   top: var(--openbot-space-1-5);
@@ -109,20 +134,49 @@
   background: var(--openbot-badge-new);
 }
 
-/* The hover card of a usage ring shows the limits only. The usage page has the refresh. */
 .window-rail-usage-card .account-usage-refresh {
   display: none;
 }
 
-/* The card opens, closes and moves with the tooltip motion, not with the transition of the usage
- * popover. A transition would cover the motion. */
 .account-usage-popover.window-rail-usage-card {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
   transition: none;
   transform-origin: var(--kb-tooltip-content-transform-origin);
 }
 
-/* Usage rings: the provider logo inside one ring per limit window. The hover fill is a circle around
- * the rings. */
+.window-rail-usage-card .account-usage-popover-header {
+  flex: none;
+}
+
+.window-rail-usage-card .account-usage-providers {
+  --window-rail-usage-fade-top: 0px;
+  --window-rail-usage-fade-bottom: 0px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-transparent),
+    var(--openbot-text-primary) var(--window-rail-usage-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--window-rail-usage-fade-bottom)),
+    var(--openbot-transparent)
+  );
+}
+
+.window-rail-usage-card .account-usage-providers::-webkit-scrollbar {
+  display: none;
+}
+
+.window-rail-usage-card .account-usage-providers.scroll-fade-top {
+  --window-rail-usage-fade-top: calc(var(--openbot-space-1) * 6);
+}
+
+.window-rail-usage-card .account-usage-providers.scroll-fade-bottom {
+  --window-rail-usage-fade-bottom: calc(var(--openbot-space-1) * 6);
+}
+
 .window-rail-button.window-rail-usage {
   border-radius: var(--openbot-radius-pill);
 }
@@ -159,8 +213,63 @@
   stroke: var(--openbot-danger);
 }
 
-/* The usage of a custom agent: its logo with no ring, at the size of a rail icon. The hover card
- * shows the answer of the agent as it wrote it. */
+.window-rail-usage-more .window-rail-usage-count {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.window-rail-button.window-rail-credits {
+  height: auto;
+  flex-direction: column;
+  gap: var(--openbot-space-1);
+  padding-block: var(--openbot-space-1-5);
+}
+
+.window-rail-button .window-rail-credits-logo {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  overflow: visible;
+  fill: var(--openbot-provider-current);
+}
+
+.window-rail-credits-count {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.window-rail-credits-count[data-usage-tone="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.window-rail-credits-count[data-usage-tone="critical"] {
+  color: var(--openbot-danger-text);
+}
+
+.window-rail-credits-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: grid;
+  place-items: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-glyph-sm);
+  font-weight: var(--openbot-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .window-rail-button .window-rail-agent-usage-logo {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -181,7 +290,6 @@
   overflow-wrap: anywhere;
 }
 
-/* A row of the More menu: the page, then its pin. */
 .window-rail-more-menu .window-rail-more-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--openbot-control-md);
@@ -190,7 +298,6 @@
   transition: background-color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* The whole line highlights, for the page and for its pin. The items have no background of their own. */
 .ui-action-menu.window-rail-more-menu .window-rail-more-row:is(:hover, :has([data-highlighted])) {
   background: var(--ui-menu-item-hover);
 }
@@ -201,8 +308,6 @@
   background: transparent;
 }
 
-/* The pin shows on a pinned page, and on the row under the pointer or the keyboard. The shared
- * .ui-action-menu item rule outranks a single class, so this rule names the role to center the pin. */
 .ui-action-menu.window-rail-more-menu .window-rail-more-pin[role="menuitemcheckbox"] {
   justify-content: center;
   padding: 0;
@@ -215,19 +320,16 @@
   opacity: 1;
 }
 
-/* A touch screen has no hover, so each pin shows. */
 @media (hover: none) {
   .ui-action-menu.window-rail-more-menu .window-rail-more-pin[role="menuitemcheckbox"] {
     opacity: 1;
   }
 }
 
-/* A pinned page has a pin in the primary text color, as a highlighted icon. Icons stay outlines. */
 .window-rail-more-menu .window-rail-more-row[data-pinned] .window-rail-more-pin > .agent-context-icon {
   color: var(--openbot-text-primary);
 }
 
-/* The page icon takes the primary text color with its row, also when the pin is highlighted. */
 .ui-action-menu.window-rail-more-menu
   .window-rail-more-row:is(:hover, :has([data-highlighted]))
   > [role="menuitem"]

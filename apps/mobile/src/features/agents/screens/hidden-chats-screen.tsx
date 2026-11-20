@@ -21,6 +21,7 @@ export function HiddenChatsScreen() {
     hiddenAgents,
     unhideAgent,
     hidesAgentsOnServer,
+    hiddenAgentsWorkOnServer,
     canUnhideAgent,
     hiddenChannelIds,
     unhideChannel,
@@ -51,7 +52,6 @@ export function HiddenChatsScreen() {
           animateIdle={false}
         />
       ),
-      // A member cannot show an agent that the host hid; the host refuses the request.
       show: canUnhideAgent(agent.id)
         ? () => {
             unhideAgent(agent.id);
@@ -60,7 +60,6 @@ export function HiddenChatsScreen() {
           }
         : null,
     }));
-  // The phone hides a channel only for itself.
   const items = [
     ...agentItems,
     ...hiddenChannels.map((channel) => ({
@@ -84,6 +83,10 @@ export function HiddenChatsScreen() {
     })),
   ];
   const synced = hidesAgentsOnServer(activeServer.id) || agentItems.some((item) => item.show === null);
+  const syncedKey = hiddenAgentsWorkOnServer(activeServer.id)
+    ? "mobile.agent.hidden.bodySyncedWorking"
+    : "mobile.agent.hidden.bodySynced";
+  const bodyKey = synced ? syncedKey : "mobile.agent.hidden.body";
 
   return (
     <SheetScrollView contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-7">
@@ -92,7 +95,7 @@ export function HiddenChatsScreen() {
           {t("mobile.agent.hidden.title")}
         </Typography.Heading>
         <Typography.Paragraph type="body-xs" align="center" className="text-text-secondary">
-          {t(synced ? "mobile.agent.hidden.bodySynced" : "mobile.agent.hidden.body")}
+          {t(bodyKey)}
         </Typography.Paragraph>
       </View>
 

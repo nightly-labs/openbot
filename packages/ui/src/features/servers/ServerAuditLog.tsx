@@ -73,7 +73,6 @@ function category(change: ServerAuditChange): Exclude<AuditFilter, "all"> {
   }
 }
 
-/** One keyword of a change line. */
 type Keyword =
   | { kind: "member"; name: string }
   | { kind: "role"; name: string }
@@ -81,7 +80,6 @@ type Keyword =
   | { kind: "level"; value: AgentAccessLevel }
   | { kind: "memberRole"; value: ServerAuditMemberRole };
 
-/** A change from one keyword to the next, shown with an arrow. */
 type Step = { kind: "step"; from: Keyword; to: Keyword };
 
 type Value = Keyword | Step;
@@ -89,10 +87,6 @@ type Value = Keyword | Step;
 const member = (name: ServerAuditName): Extract<Keyword, { kind: "member" }> => ({ kind: "member", name: name.name });
 const role = (name: string): Extract<Keyword, { kind: "role" }> => ({ kind: "role", name });
 
-/**
- * The line of a change in the interface language. `show` gives the text of each placeholder value:
- * plain text for the search, or a marker that the row replaces with a styled keyword.
- */
 function changeLine(entry: ServerAuditEntry, t: AppTranslate, show: (value: Value) => string): string {
   const change = entry.change;
   switch (change.kind) {
@@ -102,7 +96,6 @@ function changeLine(entry: ServerAuditEntry, t: AppTranslate, show: (value: Valu
         role: show({ kind: "memberRole", value: change.role }),
       });
     case "member-removed":
-      // A member who removed themself left.
       return entry.actor?.id === change.member.id
         ? t("server.audit.memberLeft", { member: show(member(change.member)) })
         : t("server.audit.memberRemoved", { member: show(member(change.member)) });
@@ -142,7 +135,6 @@ function changeLine(entry: ServerAuditEntry, t: AppTranslate, show: (value: Valu
 
 type Tone = "success" | "danger" | "accent";
 
-/** The icon and its color for one change: green adds, red takes away, blue changes. */
 function changeMark(change: ServerAuditChange): { icon: () => JSX.Element; tone: Tone } {
   switch (change.kind) {
     case "member-joined":
@@ -165,7 +157,6 @@ function changeMark(change: ServerAuditChange): { icon: () => JSX.Element; tone:
   }
 }
 
-/** The face of an agent. A deleted agent keeps a face made from its ID. */
 function AgentFace(props: { agent: ServerAuditName; profile: RoleAgent | undefined }) {
   return (
     <span class="integrations-agent-face" aria-hidden="true">
@@ -174,19 +165,14 @@ function AgentFace(props: { agent: ServerAuditName; profile: RoleAgent | undefin
   );
 }
 
-// Marks a placeholder in a translated line, so the line can be split around its keywords.
 const MARK = "\u0000";
 
 export interface ServerAuditLogPanelProps {
-  /** The changes, newest first. */
   entries: ServerAuditEntry[];
-  /** The agents of now, for their faces. */
   agents: RoleAgent[];
-  /** Where the filter menu opens: inside the dialog, so the dialog keeps focus. */
   menuMount?: HTMLElement | undefined;
 }
 
-/** The changes to the access of a server, with a filter by kind and a search. */
 export function ServerAuditLogPanel(props: ServerAuditLogPanelProps) {
   const { t, format } = useText();
   const [filter, setFilter] = createSignal<AuditFilter>("all");
@@ -251,7 +237,6 @@ export function ServerAuditLogPanel(props: ServerAuditLogPanelProps) {
       KeywordView(value)
     );
 
-  /** The translated line, split around its placeholders, with each keyword styled. */
   const LineView = (entry: ServerAuditEntry) => {
     const values: Value[] = [];
     const marked = changeLine(entry, t, (value) => `${MARK}${values.push(value) - 1}${MARK}`);

@@ -1,13 +1,13 @@
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Option, Schema, Semaphore } from "effect";
-import { BrowserWindow, session as electronSession, type Session } from "electron";
+import { BrowserWindow, session as electronSession, net, type Session } from "electron";
 import {
   type VideoReaderHost,
   VideoReadFailed,
@@ -20,25 +20,11 @@ import { fileResponse } from "./file-response";
 import { downloadArchive } from "./onepassword-cli-installer";
 import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
-/**
- * Reads an online video for the `read_video` agent tool.
- *
- * yt-dlp downloads the video to a new temporary folder. A window that is never shown decodes it:
- * Chromium takes the frames and the sound, and the user's voice model transcribes the sound. The
- * window has its own session in memory and can load only the files of this one call. The folder is
- * deleted when the call ends, also when it fails or the agent stops it.
- */
-
 const logger = createOpenBotLogger("video-reader");
 const execFileAsync = promisify(execFile);
 
-/**
- * The yt-dlp release that OpenBot installs. Each file's SHA-256 is pinned from the release's own
- * `SHA2-256SUMS`; a new release is a code change.
- */
 const YT_DLP_VERSION = "2026.10.26";
 const YT_DLP_RELEASES: Record<RuntimeTarget, { name: string; sha256: string }> = {
-  // One universal binary for both Mac architectures.
   "darwin-arm64": { name: "yt-dlp_macos", sha256: "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa" },
   "darwin-x64": { name: "yt-dlp_macos", sha256: "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa" },
   "linux-x64": { name: "yt-dlp_linux", sha256: "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795" },
@@ -51,27 +37,21 @@ const YT_DLP_RELEASES: Record<RuntimeTarget, { name: string; sha256: string }> =
 
 const VIDEO_PARTITION = "openbot-video-reader";
 const VIDEO_SCHEME = "openbot-video";
-/** The whole call, which includes the first yt-dlp download and the first load of the speech model. */
 const READ_TIMEOUT = "15 minutes";
 const INFO_TIMEOUT_MS = 2 * 60_000;
 const DOWNLOAD_TIMEOUT_MS = 8 * 60_000;
 const DECODE_TIMEOUT = "2 minutes";
 const MAX_FILE_SIZE = "500M";
-/** A frame larger than this costs the model more than it shows. */
 const FRAME_LONG_SIDE = 768;
-/** The highest picture that is worth the download: frames are smaller still. */
 const MAX_HEIGHT = 720;
-/** One transcription call per minute of sound gives a time for each part of the transcript. */
 const TRANSCRIPT_PART_SECONDS = 60;
 const MAX_TRANSCRIPT_SECONDS = 30 * 60;
+const MAX_DECODE_SECONDS = 90 * 60;
+const MAX_CAPTION_LENGTH = 200_000;
 const MAX_DESCRIPTION_LENGTH = 4_000;
 const MAX_REASON_LENGTH = 300;
 const SAMPLE_RATE = VOICE_AUDIO_LIMITS.sampleRate;
 
-/**
- * The functions that the decode window runs. The page is OpenBot's own empty page, so the main world
- * holds nothing else. The sound is kept in the page and read back one part at a time.
- */
 const DECODER_SCRIPT = `window.openbotVideo = {
   async frames(url, count, knownDuration, longSide) {
     const response = await fetch(url);
@@ -144,7 +124,6 @@ const DECODER_SCRIPT = `window.openbotVideo = {
 };
 true`;
 
-/** A WAV file of 16 kHz mono 16-bit sound: the input of the voice models. */
 function wav(pcm: Uint8Array): Uint8Array {
   const file = new Uint8Array(44 + pcm.byteLength);
   const view = new DataView(file.buffer);
@@ -172,7 +151,8 @@ function failure(reason: string) {
   return new VideoReadFailed({ reason: reason.slice(0, MAX_REASON_LENGTH) });
 }
 
-/** The last `ERROR:` line of yt-dlp, without the site and video id in front of it. */
+const YOUTUBE_BOT_CHECK = /^ERROR:\s*\[youtube[^\]]*\].*Sign in to confirm you/iu;
+
 function ytDlpReason(error: unknown): string {
   const stderr =
     typeof error === "object" && error !== null && "stderr" in error && typeof error.stderr === "string"
@@ -183,11 +163,13 @@ function ytDlpReason(error: unknown): string {
     .reverse()
     .find((entry) => entry.startsWith("ERROR:"));
   if (!line) return "OpenBot could not get the video from this link.";
+  if (YOUTUBE_BOT_CHECK.test(line)) {
+    return "YouTube does not let this computer download its videos: it asks for a sign-in to show that this is not a bot. This often happens on a server. Open the video page with openbot_browser to read it.";
+  }
   const message = line.replace(/^ERROR:\s*(\[[^\]]*\]\s*)?([^:\s]+:\s+)?/u, "").trim();
   return `OpenBot could not get the video: ${message}`;
 }
 
-/** yt-dlp's JSON. Each field is checked where it is read: a site can leave out or change any of them. */
 const Info = Schema.Record(Schema.String, Schema.Unknown);
 type Info = typeof Info.Type;
 const decodeInfo = Schema.decodeUnknownOption(Schema.fromJsonString(Info));
@@ -199,7 +181,6 @@ interface Format {
   hasAudio: boolean;
   height: number;
   streamed: boolean;
-  /** HEVC, which Chromium decodes only with hardware or system support. */
   hevc: boolean;
   m4a: boolean;
   bitrate: number;
@@ -225,7 +206,6 @@ function formats(info: Info): Format[] {
     const id = text(format.format_id);
     const protocol = text(format.protocol) ?? "https";
     if (!id || !PROTOCOLS.has(protocol) || format.ext === "mhtml") return [];
-    // yt-dlp writes "none" for a track that the format does not have; a missing codec is unknown.
     const hasVideo = format.vcodec !== "none";
     const hasAudio = format.acodec !== "none";
     if (!hasVideo && !hasAudio) return [];
@@ -244,10 +224,6 @@ function formats(info: Info): Format[] {
   });
 }
 
-/**
- * The highest picture up to 720 lines, or the smallest when every picture is larger. A direct file
- * wins, and then a codec that every Chromium build decodes.
- */
 function bestPicture(candidates: Format[]): Format | undefined {
   const score = (format: Format) => (format.height <= MAX_HEIGHT ? format.height : -format.height);
   return candidates.toSorted(
@@ -259,11 +235,6 @@ function bestPicture(candidates: Format[]): Format | undefined {
   )[0];
 }
 
-/**
- * The formats to download, as yt-dlp ids. A format with both picture and sound comes first: two
- * separate files would need ffmpeg to join them, so OpenBot downloads them side by side instead.
- * An empty list lets yt-dlp choose, for a link that gives only one file.
- */
 function chooseFormats(info: Info): { video: string | null; audio: string | null } {
   const available = formats(info);
   if (available.length === 0) return { video: null, audio: null };
@@ -276,6 +247,76 @@ function chooseFormats(info: Info): { video: string | null; audio: string | null
       (a, b) => Number(a.streamed) - Number(b.streamed) || Number(b.m4a) - Number(a.m4a) || b.bitrate - a.bitrate,
     )[0];
   return { video: picture?.id ?? null, audio: sound?.id ?? null };
+}
+
+function vttTracks(value: unknown): string[] {
+  const decoded = decodeFields(value);
+  if (Option.isNone(decoded)) return [];
+  return Object.entries(decoded.value).flatMap(([key, entries]) =>
+    key !== "live_chat" &&
+    Array.isArray(entries) &&
+    entries.some(
+      (entry: unknown) => typeof entry === "object" && entry !== null && "ext" in entry && entry.ext === "vtt",
+    )
+      ? [key]
+      : [],
+  );
+}
+
+function captionTrack(info: Info): { key: string; automatic: boolean } | null {
+  const language = text(info.language)?.toLowerCase().split("-")[0] ?? null;
+  const inLanguage = (key: string, code: string) =>
+    key.toLowerCase() === code || key.toLowerCase().startsWith(`${code}-`);
+  const written = vttTracks(info.subtitles);
+  const automatic = vttTracks(info.automatic_captions);
+  const writtenKey = language === null ? undefined : written.find((key) => inLanguage(key, language));
+  if (writtenKey) return { key: writtenKey, automatic: false };
+  const automaticKey =
+    automatic.find((key) => key.endsWith("-orig")) ?? automatic.find((key) => key.toLowerCase() === language);
+  if (automaticKey) return { key: automaticKey, automatic: true };
+  if (language !== null) return null;
+  const otherKey = written.length === 1 ? written[0] : written.find((key) => inLanguage(key, "en"));
+  return otherKey ? { key: otherKey, automatic: false } : null;
+}
+
+const CUE_TIME = /^(?:(\d+):)?(\d{2}):(\d{2})[.,]\d{3}\s+-->/u;
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+function entity(match: string, name: string): string {
+  if (!name.startsWith("#")) return ENTITIES[name.toLowerCase()] ?? match;
+  const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
+  return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+}
+
+function captionTranscript(vtt: string, automatic: boolean): Pick<VideoReading, "transcript" | "transcriptNote"> {
+  const transcript: VideoReading["transcript"] = [];
+  let start: number | null = null;
+  let last = "";
+  let length = 0;
+  for (const line of vtt.split(/\r?\n/u)) {
+    const time = CUE_TIME.exec(line);
+    if (time) {
+      start = Number(time[1] ?? 0) * 3600 + Number(time[2]) * 60 + Number(time[3]);
+      continue;
+    }
+    if (line.length === 0) start = null;
+    if (start === null) continue;
+    const words = line
+      .replace(/<[^>]*>/gu, "")
+      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/giu, entity)
+      .replace(/\s+/gu, " ")
+      .trim();
+    if (!words || (automatic && words === last)) continue;
+    last = words;
+    const seconds = Math.floor(start / TRANSCRIPT_PART_SECONDS) * TRANSCRIPT_PART_SECONDS;
+    const part = transcript.at(-1);
+    if (part?.seconds === seconds) part.text += ` ${words}`;
+    else if (length >= MAX_CAPTION_LENGTH)
+      return { transcript, transcriptNote: `Only the captions of the first ${seconds / 60} minutes are given.` };
+    else transcript.push({ seconds, text: words });
+    length += words.length + 1;
+  }
+  return { transcript, transcriptNote: null };
 }
 
 function uploadDate(value: unknown): string | null {
@@ -300,23 +341,27 @@ interface Media {
   audio: string | null;
 }
 
-/** What the decode window gives back. The window runs only OpenBot's script, on the downloaded file. */
+type Decoded = Pick<VideoReading, "frames" | "framesNote" | "transcript" | "transcriptNote"> & {
+  duration: number | null;
+};
+
+const NO_MEDIA: Decoded = { duration: null, frames: [], framesNote: null, transcript: [], transcriptNote: null };
+
+type YtDlp = (args: string[], timeout: number) => Effect.Effect<unknown, VideoReadFailed>;
+
 const FramesResult = Schema.Struct({
   duration: Schema.NullOr(Schema.Number),
   frames: Schema.Array(Schema.Struct({ seconds: Schema.Number, imageUrl: Schema.String })),
 });
 
 interface VideoReaderOptions {
-  /** `<userData>/runtimes/yt-dlp`: the managed yt-dlp, one folder for each release. */
   runtimeDirectory: string;
   target: RuntimeTarget | null;
-  /** The user's selected voice model. It fails with a reason that the user can read. */
   transcribe: (wav: Uint8Array) => Effect.Effect<{ text: string }, { readonly cause: unknown }>;
 }
 
 export class VideoReader implements VideoReaderHost {
   readonly #options: VideoReaderOptions;
-  /** One video at a time: each one is a download, a renderer process and the voice model. */
   readonly #lock = Semaphore.makeUnsafe(1);
   readonly #media = new Map<string, Media>();
   #session: Session | null = null;
@@ -376,8 +421,46 @@ export class VideoReader implements VideoReaderHost {
       try: () => writeFile(infoPath, stdout, { mode: 0o600 }),
       catch: () => failure("OpenBot could not save the details of the video."),
     });
+    const captions = yield* this.#captions(run, info, infoPath, directory);
+    const decoded: Decoded = !captions
+      ? yield* this.#downloadAndDecode(run, info, infoPath, directory, request.frames, true)
+      : request.frames === 0
+        ? NO_MEDIA
+        : yield* this.#downloadAndDecode(run, info, infoPath, directory, request.frames, false).pipe(
+            Effect.catchTag("VideoReadFailed", (error) => Effect.succeed({ ...NO_MEDIA, framesNote: error.reason })),
+          );
+    const { transcript, transcriptNote } = captions ?? decoded;
+    const description = text(info.description);
+    return {
+      title: text(info.title) ?? text(info.fulltitle),
+      uploader: text(info.uploader) ?? text(info.channel) ?? text(info.uploader_id),
+      pageUrl: text(info.webpage_url),
+      durationSeconds: count(info.duration) ?? (decoded.duration === null ? null : Math.round(decoded.duration)),
+      uploadDate: uploadDate(info.upload_date),
+      viewCount: count(info.view_count),
+      likeCount: count(info.like_count),
+      commentCount: count(info.comment_count),
+      description: description ? description.slice(0, MAX_DESCRIPTION_LENGTH) : null,
+      transcript,
+      transcriptNote,
+      frames: decoded.frames,
+      framesNote: decoded.framesNote,
+    };
+  });
+
+  readonly #downloadAndDecode = Effect.fn("VideoReader.downloadAndDecode")(function* (
+    this: VideoReader,
+    run: YtDlp,
+    info: Info,
+    infoPath: string,
+    directory: string,
+    frames: number,
+    withSound: boolean,
+  ): Effect.fn.Return<Decoded, VideoReadFailed> {
     const chosen = chooseFormats(info);
-    const ids = [...new Set([chosen.video, chosen.audio].filter((id) => id !== null))];
+    if (!withSound && chosen.video === null && chosen.audio !== null)
+      return { ...NO_MEDIA, framesNote: "The video has no picture." };
+    const ids = [...new Set([chosen.video, withSound ? chosen.audio : null].filter((id) => id !== null))];
     yield* run(
       [
         "--load-info-json",
@@ -397,39 +480,55 @@ export class VideoReader implements VideoReaderHost {
       try: () => readdir(directory),
       catch: () => failure("OpenBot could not find the downloaded video."),
     });
-    /** The file of a format id, or, when yt-dlp chose the format, its only file. */
     const fileOf = (prefix: string) => {
       const name = files.find((file) => file.startsWith(prefix));
       return name ? join(directory, name) : null;
     };
     const chosenFile = (id: string | null) => (id === null ? null : fileOf(`media.${id}.`));
-    // A format with no sound has no sound file: the picture file is not decoded for sound.
     const media: Media =
       ids.length > 0
         ? { video: chosenFile(chosen.video), audio: chosenFile(chosen.audio) }
         : { video: fileOf("media."), audio: fileOf("media.") };
     if (!media.video && !media.audio)
       return yield* failure("The video is larger than 500 MB, or the site gave no file to download.");
-    const decoded = yield* this.#decode(media, request.frames, count(info.duration));
-    const description = text(info.description);
-    return {
-      title: text(info.title) ?? text(info.fulltitle),
-      uploader: text(info.uploader) ?? text(info.channel) ?? text(info.uploader_id),
-      pageUrl: text(info.webpage_url),
-      durationSeconds: count(info.duration) ?? (decoded.duration === null ? null : Math.round(decoded.duration)),
-      uploadDate: uploadDate(info.upload_date),
-      viewCount: count(info.view_count),
-      likeCount: count(info.like_count),
-      commentCount: count(info.comment_count),
-      description: description ? description.slice(0, MAX_DESCRIPTION_LENGTH) : null,
-      transcript: decoded.transcript,
-      transcriptNote: decoded.transcriptNote,
-      frames: decoded.frames,
-      framesNote: decoded.framesNote,
-    };
+    return yield* this.#decode(withSound ? media : { ...media, audio: null }, frames, count(info.duration));
   });
 
-  /** The managed yt-dlp. The first call downloads it and checks its hash. */
+  readonly #captions = Effect.fn("VideoReader.captions")(function* (
+    run: YtDlp,
+    info: Info,
+    infoPath: string,
+    directory: string,
+  ) {
+    const track = captionTrack(info);
+    if (!track) return null;
+    const args = [
+      "--load-info-json",
+      infoPath,
+      "--skip-download",
+      track.automatic ? "--write-auto-subs" : "--write-subs",
+      "--sub-langs",
+      track.key.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"),
+      "--sub-format",
+      "vtt",
+      "--output",
+      join(directory, "captions.%(ext)s"),
+    ];
+    return yield* run(args, INFO_TIMEOUT_MS).pipe(
+      Effect.flatMap(() =>
+        Effect.tryPromise(async () => {
+          const name = (await readdir(directory)).find((file) => file.startsWith("captions.") && file.endsWith(".vtt"));
+          return name ? captionTranscript(await readFile(join(directory, name), "utf8"), track.automatic) : null;
+        }),
+      ),
+      Effect.map((captions) => (captions && captions.transcript.length > 0 ? captions : null)),
+      Effect.catch(() => {
+        logger.warn("Video captions did not download; the sound is transcribed instead.");
+        return Effect.succeed(null);
+      }),
+    );
+  });
+
   readonly #ytDlp = Effect.fn("VideoReader.ytDlp")(function* (this: VideoReader) {
     const { target, runtimeDirectory } = this.#options;
     if (!target) return yield* failure("OpenBot cannot read videos on this computer.");
@@ -443,7 +542,8 @@ export class VideoReader implements VideoReaderHost {
     if (installed) return executable;
     logger.info(`Installing yt-dlp ${YT_DLP_VERSION} for video reading.`);
     const staging = join(folder, `.download-${randomBytes(8).toString("hex")}`);
-    const unavailable = "OpenBot could not get its video tool. Check the internet connection and try again.";
+    const unavailable =
+      "OpenBot could not download its video tool from github.com. Make sure that this computer can open github.com, then try again.";
     return yield* Effect.tryPromise({
       try: async (signal) => {
         await mkdir(folder, { recursive: true });
@@ -453,7 +553,7 @@ export class VideoReader implements VideoReaderHost {
             archive: staging,
             failed: unavailable,
             signal,
-            fetch: (url, init) => fetch(url, init),
+            fetch: (url, init) => net.fetch(url, init),
           });
           if (sha256 !== release.sha256) throw new Error("The yt-dlp download does not match its pinned hash.");
           await chmod(staging, 0o755);
@@ -470,7 +570,6 @@ export class VideoReader implements VideoReaderHost {
     });
   });
 
-  /** The login shell's `PATH`, so yt-dlp finds ffmpeg or a JavaScript runtime that the user installed. */
   readonly #environment = Effect.fn("VideoReader.environment")(function* () {
     const path = yield* agentLaunchPath();
     return { ...process.env, ...(path ? { PATH: path } : {}) };
@@ -580,7 +679,6 @@ export class VideoReader implements VideoReaderHost {
     let duration = knownDuration;
     let frames: VideoReading["frames"] = [];
     let framesNote: string | null = null;
-    // A picture that does not decode leaves the details and the transcript for the agent.
     if (media.video && frameCount > 0) {
       const result = yield* script(
         `openbotVideo.frames(${JSON.stringify(`${origin}/video`)}, ${frameCount}, ${knownDuration ?? 0}, ${FRAME_LONG_SIDE})`,
@@ -606,6 +704,9 @@ export class VideoReader implements VideoReaderHost {
       ).pipe(Effect.catchTag("VideoReadFailed", (error) => Effect.succeed(error)));
       if (decoded instanceof VideoReadFailed) transcriptNote = decoded.reason;
       const samples = decoded instanceof VideoReadFailed ? 0 : decoded;
+      if (samples === 0 && (knownDuration ?? 0) > MAX_DECODE_SECONDS)
+        transcriptNote =
+          "The video is too long for OpenBot to decode its sound, and OpenBot found no captions for it. The video page can show a transcript.";
       if (samples === 0 && !transcriptNote) transcriptNote = "The video has no sound that OpenBot can decode.";
       duration ??= samples / SAMPLE_RATE;
       const heard = Math.min(samples, MAX_TRANSCRIPT_SECONDS * SAMPLE_RATE);

@@ -148,8 +148,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.accessLabel": "Agent access",
   "agentSettings.runtime.busyMessage": "While working",
   "agentSettings.runtime.busyMessageLabel": "Messages while the agent works",
-  "agentSettings.runtime.taskLimit": "Parallel threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads that run at the same time",
   "agentSettings.runtime.workingDirectory": "Working directory",
   "agentSettings.runtime.notAvailable": "Not available yet",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +167,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.busyMessage.steer": "Steer",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
-  "agentSettings.taskLimit.default": "Default ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
   "agentSettings.notificationLevel.title": "Notify me",
   "agentSettings.notificationLevel.server": "Server default ({level})",
@@ -179,11 +174,12 @@ export const messages = defineMessages("agentSettings", {
     "This choice is only for you and applies on all your devices. When the server is muted or set to Nothing, this agent stays silent too.",
 
   "agentSettings.newChat.title": "New chat",
-  "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",
+  "agentSettings.newChat.description":
+    "The agent starts fresh and can still look up this chat when it needs to. Its setup stays.",
   "agentSettings.newChat.button": "Start",
   "agentSettings.newChat.confirmTitle": "Start a new chat with {name}?",
   "agentSettings.newChat.confirmDescription":
-    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+    "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.newChat.confirm": "Start new chat",
   "agentSettings.newChat.failed": "Could not start a new chat.",
   "agentSettings.deleteHistory.title": "Delete history",
@@ -206,6 +202,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.fullAccess.askConfirm": "Use Ask first",
 
   "agentSettings.links.usage": "Usage",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "All agents",
   "agentSettings.links.memories": "Memories",
   "agentSettings.links.memoriesCount": { one: "{count} saved", other: "{count} saved" },
   "agentSettings.links.skills": "Skills",
@@ -241,6 +239,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.browserProfile.manageDescription":
     "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
   "agentSettings.browserProfile.manage": "Manage",
+  "agentSettings.browserProfile.movedNote":
+    "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });

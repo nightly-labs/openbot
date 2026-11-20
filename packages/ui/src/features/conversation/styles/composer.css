@@ -26,26 +26,19 @@
   animation-delay: var(--openbot-duration-overlay);
 }
 
-/* A main window that the user does not look at keeps the loops of a working agent still, on their
-   current frame. See `AmbientMotion`. The task list pauses through `--task-list-play-state`. */
 :root[data-openbot-ambient-motion-paused]
-:is(
-  .ui-spinner,
-  .agent-row-thinking-dots i,
-  .agent-activity-label,
-  .subagents-status-icon,
-  .chat-action-target-status-in-progress .ui-marker-icon svg,
-  .context-meter-ring .ui-radial-progress-chart,
-  .image-generation-glow,
-  .image-generation-label
-) {
+  :is(
+    .ui-spinner,
+    .agent-row-thinking-dots i,
+    .agent-activity-shine,
+    .agent-activity-shine-text,
+    .subagents-status-icon,
+    .chat-action-target-status-in-progress .ui-marker-icon svg,
+    .context-meter-ring .ui-radial-progress-chart,
+    .image-generation-glow,
+    .media-generation-label[data-shine]
+  ) {
   animation-play-state: paused;
-}
-
-/* A new plain label still rises into place, so its text stays readable. The values follow the order of
-   the plain label's animations in messages.css: the rise, then the light. */
-:root[data-openbot-ambient-motion-paused] .agent-activity-entry[data-plain="true"] .agent-activity-label {
-  animation-play-state: running, paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -55,35 +48,39 @@
   .image-generation-glow,
   .image-generation-canvas,
   .image-generation-preview,
-  .image-generation-label,
-  /* Matches the scoped shimmer above, which outranks the bare class on its own. */
-  .image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label,
+  .media-generation-label[data-shine],
   .agent-activity-label {
     animation: none;
     transition: none;
   }
 
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar,
+  .media-stage-details,
+  .ui-button.media-generation-play,
+  .media-generation-seek-fill {
     transition: none;
+  }
+
+  .media-generation-wait {
+    animation-duration: 0s;
   }
 }
 
 @media (hover: none), (pointer: coarse) {
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar {
     opacity: 1;
-    pointer-events: auto;
-    transform: none;
   }
 }
 
 @media (max-width: 620px) {
-  .message-entry-agent .ui-bubble:has(.image-generation) {
+  .message-entry-agent .ui-bubble:has(:is(.image-generation, .media-generation)) {
     width: 100%;
     max-width: 100%;
   }
 
-  .image-generation-stage,
-  .image-generation-meta {
+  .image-generation-stage {
     width: 100%;
   }
 }
@@ -138,7 +135,6 @@
 }
 
 .composer {
-  /* Grok Bot's composer height curve (300ms): fast at the start, then a long, soft stop. */
   --composer-resize-duration: 300ms;
   --composer-resize-ease: linear(
     0,
@@ -174,6 +170,9 @@
     0.99829 90%,
     1
   );
+
+  --composer-pill-radius: 24px;
+
   position: relative;
   z-index: 11;
   display: grid;
@@ -181,14 +180,14 @@
   min-height: 96px;
   gap: 4px;
   margin: 0 auto;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
   padding: 10px;
   box-shadow: none;
   transition:
     border-color var(--openbot-duration-hover) var(--openbot-ease-out),
-    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out),
+    border-radius var(--composer-resize-duration) var(--composer-resize-ease),
     height var(--composer-resize-duration) var(--composer-resize-ease);
 }
 
@@ -197,12 +196,21 @@
   min-height: 48px;
   align-items: center;
   gap: 8px;
+  border-radius: var(--composer-pill-radius);
   padding: 8px 10px;
+}
+
+.composer[data-compact][data-small] {
+  min-height: 40px;
+  padding: 5px 5px 5px 12px;
+}
+
+.composer-wrap:has(> .composer[data-small]) {
+  --composer-stack-pill-half: 20px;
 }
 
 .composer:focus-within {
   border-color: var(--openbot-text-dim);
-  box-shadow: 0 0 0 3px var(--openbot-hover);
 }
 
 .composer:has(.composer-editor-surface[aria-disabled="true"]) {
@@ -224,11 +232,9 @@
   place-items: center;
   border: 0;
   border-radius: var(--openbot-radius-pill);
-  /* Without this the button primitive's inline padding outgrows the 28px width
-     under border-box sizing and stretches the circle into a pill. */
+
   padding: 0;
   background: var(--openbot-hover);
-  /* Muted at rest, as the other icon buttons. The send button sets its own color. */
   color: var(--openbot-text-muted);
   transition:
     background-color var(--openbot-duration-hover) var(--openbot-ease-out),
@@ -253,9 +259,6 @@
   white-space: nowrap;
 }
 
-/* The microphone melts into the recording bar and Finish buds off Send; VoiceRecordingMorph.tsx
-   explains the goo filter. Opening uses a spring (stiffness 320, damping 17, sampled). Closing
-   does not bounce: an undershoot would squeeze the microphone below its own size. */
 .voice-morph {
   --voice-morph-duration: 600ms;
   --voice-morph-exit-duration: 360ms;
@@ -299,15 +302,12 @@
   height: 0;
 }
 
-/* Inset past the controls so the blur is not cut off at the layer edge. */
 .voice-morph-goo {
   position: absolute;
   inset: -12px;
   pointer-events: none;
 }
 
-/* The goo threshold needs opaque shapes, so the layer, not the shape, carries the
-   --openbot-hover transparency of the microphone button. */
 .voice-morph-goo-bar {
   opacity: 0.06;
 }
@@ -363,7 +363,6 @@
   transform: translateX(34px) scale(0.8);
 }
 
-/* Positioned, so the controls paint over the goo layers before them. */
 .voice-morph-send {
   position: relative;
   display: flex;
@@ -404,7 +403,6 @@
     both;
 }
 
-/* The last seconds before the time limit: the bar widens for the time left. */
 .voice-morph[data-countdown] {
   --voice-bar-width: 188px;
 }
@@ -433,7 +431,6 @@
   justify-content: flex-end;
   overflow: hidden;
   mask-image: linear-gradient(to right, transparent, currentColor 24px);
-  /* A time axis: the newest sample is at the right in every language. */
   direction: ltr;
 }
 
@@ -444,7 +441,6 @@
   gap: 3px;
 }
 
-/* Quiet dots stay round; speech stretches them into bars. */
 .voice-waveform-dot {
   width: 3px;
   height: calc(3px + var(--voice-level, 0) * 15px);
@@ -480,7 +476,6 @@
     both;
 }
 
-/* Cancel sits on the bar itself, so its hover disc stays faint, like the bar. */
 .voice-morph .voice-recording-cancel:hover:not(:disabled) {
   background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
   color: var(--openbot-text-primary);
@@ -542,7 +537,6 @@
   color: var(--openbot-bg-sidebar);
 }
 
-/* Light circles only dim on hover. The ghost button hover is more specific and would turn them dark. */
 .voice-button:hover:not(:disabled),
 .voice-button.ui-button:hover:not(:disabled),
 .voice-morph .voice-recording-finish:hover:not(:disabled) {
@@ -555,8 +549,6 @@
   --composer-editor-max-height: var(--composer-editor-limit, max(48px, 33dvh));
 }
 
-/* The chat composer shows at most 6 lines (120px and the 10px padding), as Grok Bot's does. A longer
-   draft scrolls inside the editor, so the chat keeps its space. */
 .composer-wrap {
   --composer-editor-limit: max(48px, min(130px, 33dvh));
 }
@@ -607,11 +599,6 @@
   padding: 4px 0;
 }
 
-/*
- * A chip is 24px and the editor line is 20px, so the first chip made the one-line composer 4px
- * taller. With a chip, the line is as tall as the chip and the padding is 2px less on each side, so
- * the composer keeps its height and the text stays in place.
- */
 .composer[data-compact] .composer-editor-surface:has(.composer-mention-token) {
   padding-block: 2px;
   line-height: 24px;
@@ -669,8 +656,7 @@
   white-space: pre-wrap;
   word-break: break-word;
   user-select: text;
-  /* Each line takes its direction and its start side from its own text. The surface keeps the
-     interface direction, so an empty draft puts the caret on the placeholder's side. */
+
   unicode-bidi: plaintext;
 }
 
@@ -678,11 +664,6 @@
   pointer-events: none;
 }
 
-/*
- * Live dictation: ComposerEditor.tsx explains the read-only copy that shows in place of the editor.
- * The editor stays focusable under the copy, so keys still edit and send the draft, and screen
- * readers keep the textbox. The copy scrolls a long draft and gives a click to the editor.
- */
 .composer-editor-root[data-dictating] > [role="textbox"] {
   position: absolute;
   inset: 0;
@@ -751,7 +732,6 @@
   user-select: none;
 }
 
-/* The compact editor has the sizes of the compact composer. */
 .composer-editor-root[data-size="compact"],
 .composer-editor-root[data-size="compact"] .composer-editor-surface {
   min-height: 28px;
@@ -766,12 +746,6 @@
   inset-inline-start: 0;
 }
 
-/* The box comes from `.reference-chip`; this token only loses the chip fill and gains the outline. */
-/*
- * `composer-resize.ts` sets a pixel height only while the composer moves between its one-line and
- * full layouts. The text keeps its place at the top and the toolbar rides the bottom edge, as in
- * Grok Bot. The one-line row rides the bottom edge when the composer closes.
- */
 .composer[data-resizing] {
   min-height: 0;
   overflow: clip;
@@ -797,7 +771,6 @@
 .composer-mention-token.composer-tag-unavailable {
   border: 1px dashed var(--openbot-border-strong);
   background: transparent;
-  /* No leading icon, so the start inset matches the end one. */
   padding-inline-start: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
 }
@@ -824,13 +797,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * Hangs off the composer's top edge inside `.composer-wrap`, like `.agent-queue-panel`: the
- * composer paints over the overlap, so the panel grows out from under the input. The bottom comes
- * from the composer's measured height, which changes as the input grows.
- */
 .mention-picker {
-  --mention-picker-overlap: 14px;
+  --mention-picker-overlap: 24px;
   --mention-picker-side-inset: calc(var(--openbot-space-1-5) + 12px);
   --mention-picker-row-height: 29px;
   --mention-picker-gutter: 5px;
@@ -842,7 +810,7 @@
   bottom: calc(var(--mention-picker-bottom, 0px) - var(--mention-picker-overlap));
   left: var(--mention-picker-side-inset);
   border: 1px solid var(--openbot-queue-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-queue-surface);
   padding-bottom: var(--mention-picker-overlap);
   color: var(--openbot-queue-text);
@@ -851,22 +819,29 @@
   animation: mention-picker-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-/*
- * The scroll lives on the list, not the panel, so the scroll fade masks the rows and leaves the
- * panel border and background whole. The scrollbar stays hidden: the fade carries the same news.
- */
+.composer-wrap {
+  anchor-scope: --composer-stack;
+}
+
+.composer-wrap > .composer-stack {
+  anchor-name: --composer-stack;
+}
+
+.composer-wrap > .mention-picker {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: anchor-size(--composer-stack height);
+}
+
 .mention-picker-list {
   --mention-picker-title-height: 24px;
   --mention-picker-section-gap: var(--openbot-space-1);
 
   position: relative;
   display: grid;
-  /* A plain auto track grows to the widest row, which would push the badges out of view. */
   grid-template-columns: minmax(0, 1fr);
-  /*
-   * Every row and section title has a fixed height, so the list states the height it needs and
-   * the panel has its full height in the first frame, also while the query narrows it.
-   */
+
   height: calc(
     var(--mention-picker-rows, 0) *
     var(--mention-picker-row-height) +
@@ -884,20 +859,14 @@
     var(--mention-picker-gutter)
   );
   overflow-y: auto;
-  /* An even inset all round: the row's own 8px carries the rest of the gap beside the text. */
   padding: var(--mention-picker-gutter);
   overscroll-behavior: contain;
   scrollbar-width: none;
-  /* A key press scrolls the active row clear of the scroll fade. */
   scroll-padding-block: var(--openbot-space-4);
-  /*
-   * The panel stands on the composer, so a height that travels moves its top edge and every row
-   * slides with it. The list takes its new height in one frame; only the rows that come back fade in.
-   */
+
   transition: none;
 }
 
-/* The title of a section of the `@` list, with its count. A list with one section has no title. */
 .mention-picker-section {
   display: flex;
   height: var(--mention-picker-title-height);
@@ -917,7 +886,6 @@
   margin-top: var(--mention-picker-section-gap);
 }
 
-/* One highlight slides under the active row (see `trackPickerHighlight`), so a row has no background of its own. */
 .mention-picker-highlight {
   position: absolute;
   top: 0;
@@ -950,11 +918,25 @@
   }
 }
 
-/* The queue panel's row rhythm and colors: a 29px row, a small leading glyph, muted trailing text. */
+.mention-picker[data-leaving] {
+  pointer-events: none;
+  animation: mention-picker-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+.mention-picker[data-leaving] * {
+  animation: none;
+}
+
+@keyframes mention-picker-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scaleY(0.96);
+  }
+}
+
 .mention-picker-option {
   display: flex;
   width: 100%;
-  /* The list computes its own height from this one, so the two must not drift apart. */
   position: relative;
   z-index: 1;
   height: var(--mention-picker-row-height);
@@ -969,11 +951,11 @@
 }
 
 .mention-picker-file-option .attachment-reference-visual {
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: -1px;
 }
 
-/* A row that the query brings back fades in; the rows that stay do not move. */
 .mention-picker-option[data-entering] {
   animation: mention-picker-row-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
 }
@@ -987,16 +969,18 @@
 .mention-picker-option .agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: -1px;
 }
 
 .mention-picker-skill-icon {
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
   place-items: center;
+  margin-inline: -1px;
   color: var(--openbot-queue-action);
 }
 
@@ -1007,7 +991,6 @@
 
 .mention-picker-option > strong {
   min-width: 0;
-  /* Unset outside a filter, so the name keeps the row color. */
   color: var(--mention-picker-name-color);
   max-width: 50%;
   flex: 0 1 auto;
@@ -1024,22 +1007,20 @@
   flex: 1 1 0;
   overflow: hidden;
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Shown only beside a skill whose name another listed skill shares: the slug tells them apart. */
 .mention-picker-slug {
   flex: 0 0 auto;
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
-/* Takes the list's place when `$` finds nothing, at the height of one row in the list. */
 .mention-picker-status {
   display: flex;
   height: calc(var(--mention-picker-row-height) + 2 * var(--mention-picker-gutter));
@@ -1047,11 +1028,25 @@
   margin: 0;
   padding: 0 calc(var(--mention-picker-gutter) + 8px);
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
-/* While the user filters, the matched text stands out from the rest, as in the search dialog. */
+.mention-picker-problems {
+  max-height: calc(4 * var(--mention-picker-row-height));
+  overflow-y: auto;
+  padding: var(--mention-picker-gutter) 0;
+  overscroll-behavior: contain;
+}
+
+.mention-picker-skill-problem {
+  margin: 0;
+  padding: var(--openbot-space-1) calc(var(--mention-picker-gutter) + 8px);
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
 .mention-picker-option[data-filtering] {
   --mention-picker-name-color: var(--openbot-queue-action);
 }
@@ -1169,14 +1164,12 @@
   object-fit: cover;
 }
 
-/* An image that opens in the image viewer. */
 .composer-attachment-preview.ui-button {
   border: 0;
   padding: 0;
   cursor: zoom-in;
 }
 
-/* A pasted image that is still importing: its local preview, dimmed, under a spinner. */
 .composer-attachment[data-pending] .composer-attachment-preview img {
   opacity: 0.5;
 }
@@ -1187,8 +1180,6 @@
   margin: auto;
 }
 
-/* A file on its way to the server. The dashed edge says that it is not there yet; the ring takes
-   the place of the extension badge. */
 .composer-attachment[data-upload="uploading"] {
   border-style: dashed;
 }
@@ -1215,4 +1206,27 @@
   flex: none;
   margin-inline-end: -4px;
   color: var(--openbot-danger-text);
+}
+
+.ui-action-menu [role="menuitem"] > svg.composer-add-record {
+  color: var(--openbot-danger);
+}
+
+.ui-action-menu [role="menuitem"] > svg.composer-add-record circle:last-of-type {
+  r: 4.5px;
+  fill: currentcolor;
+  stroke: none;
+}
+
+.composer[data-compact][data-multiline] {
+  border-radius: var(--openbot-radius-card);
+}
+
+.composer[data-rows-resizing] {
+  overflow: clip;
+  align-content: stretch;
+}
+
+.composer[data-rows-resizing] > .composer-input-label {
+  align-self: start;
 }

@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "Die Mitglieder haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
   "channel.conversation.noMembers": "Füge in den Kanaleinstellungen Agenten hinzu, um mit der Arbeit zu beginnen.",
+  "channel.conversation.waitFull": "Wartet – {name} beginnt, wenn eine laufende Aufgabe endet",
   "channel.conversation.archivedNotice": "Gelöschter Kanal. Nur Vorschau.",
   "channel.composer.label": "Nachricht an den Kanal",
   "channel.composer.placeholder": "Nachricht an {name}",
@@ -24,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
   "channel.settings.isolatedDescription":
     "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle Mitglieder",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": {
     one: "{count} gespeichert",
     other: "{count} gespeichert",

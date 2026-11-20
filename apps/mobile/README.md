@@ -21,12 +21,12 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
-Expo 58.0.17 is patched in `patches/expo@58.0.17.patch` so a DOM component ignores a props
+Expo 58.0.25 is patched in `patches/expo@58.0.25.patch` so a DOM component ignores a props
 message that it sends before Android mounts its web view, or after Android removes it. Android
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
-expo-splash-screen 58.0.11 is patched in `patches/expo-splash-screen@58.0.11.patch` so Android 12
+expo-splash-screen 58.0.14 is patched in `patches/expo-splash-screen@58.0.14.patch` so Android 12
 and 13 get no splash exit animation listener. With the listener, the platform hides the starting
 window on the first draw, and the app crashes when that window is already gone. Gradle links the
 prebuilt AAR of an Expo module and ignores a patch to its Kotlin source, so
@@ -39,7 +39,7 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+react-native-screens 4.30.1 is patched in `patches/react-native-screens@4.30.1.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
 the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a
@@ -80,11 +80,14 @@ missing, the command stops with setup instructions. The standard command does no
 look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
 variable is set.
 
+A build for an iPhone signs all targets with the Apple team of `ios.appleTeamId` in `app.json`, so
+Expo does not ask for a team. To build with a different team, change that value on your computer and
+do not commit it: the app config is in the runtime version.
+
 The iOS commands keep the Xcode build in `ios/DerivedData`, not in
 `~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
 `ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
-installs the pods again. Metro keeps its
-caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
+installs the pods again. Metro keeps its file map cache in `.expo/metro-file-map` of the worktree.
 
 `bun mobile:android` also applies the config plugins without clearing `android/`, then runs
 `expo run:android`. Three local settings make a build in a new worktree faster:
@@ -94,9 +97,35 @@ caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
 - The local `android/gradle.properties` gets `org.gradle.caching=true`. Worktrees share Gradle task
   outputs in `~/.gradle/caches/build-cache-1`. The app config, fingerprint and EAS builds stay the
   same.
-- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share the C++ results of the app CMake project
-  between worktrees. Install ccache with `brew install ccache`; React Native uses it when it is on
-  `PATH`.
+- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share C++ results between worktrees. Install
+  ccache with `brew install ccache`. React Native uses it for the app CMake project when it is on
+  `PATH`, and `CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER` add it to the CMake
+  projects of the libraries, such as Reanimated, Worklets, Expo modules and Skia.
+
+The first build in a new worktree also reuses the work of other worktrees through two shared caches
+in `openbot-mobile-cache.noindex` of the common git directory (`git rev-parse --git-common-dir`), on
+the disk of the main checkout. `OPENBOT_MOBILE_BUILD_CACHE=<directory>` puts them in another
+directory; a relative path starts at the checkout root. `OPENBOT_MOBILE_BUILD_CACHE=off` turns them
+off. You can remove the directory at any time.
+
+- `metro/`: Metro transforms of all mobile commands (`metro-cache.js`). Each set of mobile
+  dependencies in `bun.lock` and their patches has its own namespace, because the Metro cache key
+  does not include the versions of the Babel plugins. Packages that only other workspaces or the dev
+  dependencies of the app use are not in the namespace. When `bun.lock` or a patch is newer than the
+  last `bun install` (`node_modules/.openbot-install-stamp`), Metro warns and does not use the shared
+  cache. A namespace that no worktree used for 14 days is removed. A transform that contains the
+  path of the checkout, such as a `use dom` component, stays in `.expo/metro-cache` of the worktree.
+  The entries use the file store of `@expo/metro-config`, which writes each entry to a temporary file
+  and renames it, so several Metro processes can use one namespace. The store is not a public export
+  of Expo: when Expo moves it, Metro warns and does not use the shared cache. Uniwind replaces the
+  Metro cache stores with one in the system temporary directory, so `metro.config.js` sets them
+  again; EAS builds keep the store of Uniwind. React Native's build scripts and the early bundle of
+  `expo run` clear the Metro cache before each release bundle; `bun mobile:ios` and
+  `bun mobile:android` keep it. `bun mobile -- --clear` clears the namespace for all worktrees.
+- `xcode/`: the Xcode compilation cache of `bun mobile:ios` (Swift, Objective-C and C++). Prefix
+  mapping replaces the checkout path and its real path with `/^openbot` in the cache keys, in the
+  debug info and in `__FILE__`. Only the `xcodebuild` build command (with `-destination`) gets these
+  settings. Xcode removes old entries above 20 GB.
 
 The local launcher enables RocketSim Connect in the local native project. The config plugin
 loads it before React Native starts, only in Debug builds on the iOS Simulator.
@@ -256,6 +285,41 @@ recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on i
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
+## iOS shortcuts
+
+The Shortcuts app of iOS 26 and later has three OpenBot shortcuts: List Agents, Send Message and
+Open Agent. An older iOS has none: their cards need `SnippetIntent`.
+
+The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
+background, also when the app is not in memory. There the app has no window, React Native does not
+start, and iOS suspends the app soon after the intent returns.
+
+- The App Intents, their cards and the `AppShortcutsProvider` are Swift files in `plugins/shortcuts`.
+  `plugins/with-shortcuts.js` adds them to the app target, because Xcode reads the shortcuts of an
+  app from that target. iOS reads the names and the phrases of the shortcuts at build time, so they
+  are English and not from the `@openbot/i18n` catalog. The text of the cards is from the catalog.
+- The app writes `shortcuts.json` to the App Group
+  (`src/features/shortcuts/model/shortcut-directory.ts`): the agents, the agent of Settings >
+  Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
+  keys and the agent pictures are the ones that the app writes for the share extension.
+- List Agents reads that file. A tap on an agent opens its chat. The message button of an agent runs
+  the hidden intent Message Agent: it asks for the text and sends it to that agent as Send Message
+  does, and the app does not open.
+- Open Agent opens the app on the chat of the agent of Settings > Shortcuts. With no agent, it opens
+  Settings > Shortcuts. It uses the same `ShortcutBridge` path as the card buttons.
+- Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
+  (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
+  also adds to the app target). A hidden web view with the Team client connects to the agent's
+  server, sends the message and closes. The session token is the keychain item of the share
+  extension. The intent returns when the server has the message, or after 24 seconds: iOS stops an
+  intent after about 30. The reply comes as the notification of the server.
+- A message that did not go opens in the composer of the chat from the card. A message with no
+  answer from the server does not: it can be in the chat.
+- A button of a card opens the app through `modules/shortcuts` (`ShortcutBridge`), which gives the
+  target to `src/features/shortcuts/shortcuts-native.ts`.
+
+Check the shortcuts on an iPhone, also with the app removed from the app switcher.
+
 ## Source structure
 
 The mobile app uses a feature-first structure. Expo Router files stay deliberately thin: `src/app`
@@ -273,6 +337,7 @@ src/
     search/             search model, controls, results, and screen
     servers/            server drawer and joining a server
     settings/           account settings screen
+    shortcuts/          iOS shortcuts: the data that the native intents read, and Settings > Shortcuts
     workspace/          remote directory, WebRTC transport, live events, and workspace state
   shared/
     components/         UI used by more than one feature
@@ -524,6 +589,83 @@ upload store metadata, screenshots or release notes. Write the release notes in 
 To build a signed `.aab` on your computer, run `bun run mobile:android:build:local`. It needs JDK 17
 and the Android SDK, and writes `/private/tmp/openbot-play.aab`.
 See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_play_store/).
+
+### Android APK
+
+openbot.run offers the Android app as an APK, for a phone with no Google Play: the "Get the APK"
+link on the Android card of the home page, the "Android · APK" entry of its download menu, and the
+second button on `/download/android`. They open `/download/android/latest`, which redirects to the
+file on GitHub.
+
+The file is the universal APK that Google Play makes from the store bundle. Google Play signs it
+with the app signing key, so it has the signature of the app on Google Play: a user can change
+between the two without removing the app, and no second key or second build is necessary.
+
+The APK is not public after the build. It becomes public when the version is marked as available.
+
+**Stage, after the build.** After each upload, `Release Android to Google Play` calls the
+`Stage the Android APK` workflow (`release-android-apk.yml`) with the build number:
+
+1. Fastlane (`fastlane android apk`) downloads the universal APK of that `versionCode` from Google
+   Play, with the `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` of the `release-android` environment.
+2. `scripts/android-apk-release.ts stage` reads the package, the version and the build number in
+   the file and checks its signature. It stops when the file is not that build.
+3. The script puts the file on the draft GitHub release `android-v<version>` as
+   `OpenBot-<version>.apk`. Only people who can write to the repository see a draft. A second build
+   of a version replaces the file of the first. The release notes have the SHA-256 of the file and
+   of the signing certificate.
+
+The workflow saves no workflow artifact of the APK: each signed-in GitHub user can download the
+artifacts of a public repository. The signed `.aab` of the build is such an artifact for seven days.
+
+**Publish, when the version is marked as available.** The site offers the APK of
+`MOBILE_LATEST_VERSIONS.android` (`apps/auth-api/src/server/mobile-features-config.ts`), so the APK
+and Google Play give the same version. `bun run mobile:release:published android` sets that version.
+When that change is on `main`, the `Publish the Android APK` workflow (`publish-android-apk.yml`)
+makes the draft of that version public (`scripts/android-apk-release.ts publish`). The account
+Worker deploys at the end of CI, some minutes later, so the file is there before the site links to
+it. The release is a GitHub prerelease, as the remote desktop runtime releases are: a prerelease
+cannot become the "latest" release, so desktop downloads and updates do not change, and the notes
+of the next desktop release do not start from it. The workflow fails if the "latest" release changed.
+Do not publish the draft by hand in the GitHub page with the prerelease mark cleared.
+
+The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
+the version has no release: the link on the site is then dead. Stage the APK of that version, then
+start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
+download while it is `null` or newer than the newest Google Play version. It is `1.4.11` now.
+
+**Play's automatic integrity protection must stay off.** With it, the APK that Google Play makes
+has an installer check (`com.pairip.licensecheck`). After an install from the file, the app shows
+"Get this app from Play" and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed
+this. The protection is off in Play Console (Protected by Google Play > Automatic protection:
+"Installer check: off") since 2026-11-16. It changes only new uploads, so builds up to 1.4.10 still have it, and
+the first APK is the one of 1.4.11. Do not turn the protection on again: each APK on the site then
+stops after an install.
+
+The service account must have the Play Console permission to download the generated APKs of the
+app. Without it, Google Play answers "The caller does not have permission" (run 43252109769). The
+account of 2026-11-12 has it: run 43385420725 downloaded the APK of build 25.
+
+When the stage job fails, the store build and its record are not affected. Run the failed jobs
+again. To stage the APK of a bundle that Google Play already has, such as a build that you uploaded
+in Play Console, start the workflow with its build number:
+
+```bash
+gh workflow run release-android-apk.yml --ref main -f version_code=<versionCode>
+gh workflow run publish-android-apk.yml --ref main   # only when the site already offers this version
+```
+
+A release that is public keeps its file. To replace it with another build of the same version, add
+`-f replace=true` to the first command.
+
+A build with `upload` cleared has no APK until Google Play has its bundle. If Google Play has more
+than one signing key for the app, Fastlane stops and lists them; the lane does not select one.
+
+A phone with the APK gets over-the-air updates as a phone with the store app does. For a new store
+version, Update in the app opens the `market://` link of the app. When no app on the phone opens
+that link, it opens `/download/android`. Another store app can take the link and show no result
+(not tested on a device); the user then downloads the APK from the site. Notifications use Firebase Cloud Messaging, so a phone with no Google Play services gets none.
+See [Fastlane universal APK download](https://docs.fastlane.tools/actions/download_universal_apk_from_google_play/).
 
 ### Discord announcement
 

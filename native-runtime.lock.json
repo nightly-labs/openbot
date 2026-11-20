@@ -2,44 +2,44 @@
   "schemaVersion": 1,
   "codex": {
     "repository": "https://github.com/openai/codex",
-    "version": "0.160.1",
-    "tag": "rust-v0.160.1",
+    "version": "0.170.0",
+    "tag": "rust-v0.170.0",
     "license": "Apache-2.0",
     "licenseSha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
     "artifacts": {
       "darwin-arm64": {
         "asset": "codex-package-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "f73527ee09c6db869acbb37b709866b339ea74ef91d2de255e9c74ec960c6314",
-        "downloadBytes": 129977637,
-        "installedBytes": 360000000,
+        "assetSha256": "975524bf13aedd1b122d8d0e00c09ee67091b8f688c0b374943dbb3cf22c7893",
+        "downloadBytes": 173593904,
+        "installedBytes": 490000000,
         "executable": "bin/codex"
       },
       "darwin-x64": {
         "asset": "codex-package-x86_64-apple-darwin.tar.gz",
-        "assetSha256": "a98f330c9b1652cef2edc7bc2ee4c47a0fe19fa098b686381be3c8842abf0ac0",
-        "downloadBytes": 141316108,
-        "installedBytes": 380000000,
+        "assetSha256": "2e971524460a570b913dbdc9b49e5e9c14556e44e7f62f00b95b4a8f1e2cdf25",
+        "downloadBytes": 188621592,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-x64": {
         "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
-        "assetSha256": "340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0",
-        "downloadBytes": 160785122,
-        "installedBytes": 410000000,
+        "assetSha256": "a77ff87be7ba809d715728270a78f5ce3527dc07529416d1ef8929b90b8475eb",
+        "downloadBytes": 193641516,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-arm64": {
         "asset": "codex-package-aarch64-unknown-linux-musl.tar.gz",
-        "assetSha256": "dff0954438fa455c2197ddb1f421d8d68625d98de610f76bedb6e5bc837ea35b",
-        "downloadBytes": 150931915,
-        "installedBytes": 380000000,
+        "assetSha256": "3f7e1ae38c4fe27322e082b855e8eec936d08fa538d62b71c07e2a53f34e8847",
+        "downloadBytes": 195884517,
+        "installedBytes": 500000000,
         "executable": "bin/codex"
       },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
-        "assetSha256": "25c6fe4e46d5bff939312fc46de67ace37561f6f1f89b409af63fd8cc6098425",
-        "downloadBytes": 157434529,
-        "installedBytes": 450000000,
+        "assetSha256": "6ff4b22c63645ffd83aed9b722cbb0b9e5b79dc6e8916f50e362b3015fb327a9",
+        "downloadBytes": 210098091,
+        "installedBytes": 610000000,
         "executable": "bin/codex.exe"
       }
     }
@@ -241,57 +241,57 @@
   },
   "cuaDriver": {
     "repository": "https://github.com/trycua/cua",
-    "tag": "cua-driver-rs-v0.34.0",
-    "version": "0.34.0",
+    "tag": "cua-driver-rs-v0.52.9",
+    "version": "0.52.9",
     "license": "MIT",
     "licenseSha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
     "artifacts": {
       "darwin-arm64": {
-        "asset": "cua-driver-rs-0.34.0-darwin-universal-binary.tar.gz",
-        "assetSha256": "940dc008e0f7c5d217d14c0f247d1ebab91b1bac965f4a649d19e8c789bdfd81",
-        "downloadBytes": 47108179,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "47fa8722003066246ee8a828d3fe2c769f2194d6cf3ad63ae6f0becdc00d383a"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "darwin-x64": {
-        "asset": "cua-driver-rs-0.34.0-darwin-universal-binary.tar.gz",
-        "assetSha256": "940dc008e0f7c5d217d14c0f247d1ebab91b1bac965f4a649d19e8c789bdfd81",
-        "downloadBytes": 47108179,
+        "asset": "cua-driver-rs-0.52.9-darwin-universal-binary.tar.gz",
+        "assetSha256": "1d04663140a0beec9a9caaacf5ee2eef0d2ce305f47fc0d049a5d676fcc2aa3b",
+        "downloadBytes": 43494805,
         "files": {
-          "cua-driver": "47fa8722003066246ee8a828d3fe2c769f2194d6cf3ad63ae6f0becdc00d383a"
+          "cua-driver": "52d5d0cf107c312769878dc33c67077b035980ab26a154cd5bd8da1f170e6316"
         }
       },
       "linux-x64": {
-        "asset": "cua-driver-rs-0.34.0-linux-x86_64-binary.tar.gz",
-        "assetSha256": "629ac96eff829d4dfd5cf221f3f2165c2d813aed91e5efb7b20777a741cd70a7",
-        "downloadBytes": 34818314,
+        "asset": "cua-driver-rs-0.52.9-linux-x86_64-binary.tar.gz",
+        "assetSha256": "f20c3d3b468778d03ec25bef32a40be2b83b3ef8961cf7816295acdbcf5ff273",
+        "downloadBytes": 30098066,
         "files": {
-          "cua-driver": "5fa60c7ab35194e0e050a337521ca0e0b0ae0a8fe898813b340f65c94e15264c",
-          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
-          "wayland-helper/README.md": "d43b236d07a46b91c3dacaddcf19284d37b51361fcf46b9cebd3cc72f0a369e1",
-          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
-          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+          "cua-driver": "d0f329e0304ccb54059b8bfce940694b945475730380b463da67a22fbcd34600",
+          "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
+          "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
+          "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
+          "wayland-helper/winrects@cua/extension.js": "80903729beb0f4d87fc6e70ee302e969706c70e05ce41e268e5bae87ca43ac4e"
         }
       },
       "linux-arm64": {
-        "asset": "cua-driver-rs-0.34.0-linux-arm64-binary.tar.gz",
-        "assetSha256": "9db8b9084add57eb97be8164367b24b6be54ed4f3dc01213e64b72d7fc09fddb",
-        "downloadBytes": 34607515,
+        "asset": "cua-driver-rs-0.52.9-linux-arm64-binary.tar.gz",
+        "assetSha256": "b3c1be792b132b9af8a0b3f54e9d2e3edab74860d27c1ed539f4907d111daf0a",
+        "downloadBytes": 28009360,
         "files": {
-          "cua-driver": "e989fa537a8c06a8d5ec7e9be692b04b2f7e76e46feb52e9c222420556bbf476",
-          "wayland-helper/install.sh": "e13fc5700d281fed547fbb529a31bc1a0df250e6f9811c9cdddc99d465e219a0",
-          "wayland-helper/README.md": "d43b236d07a46b91c3dacaddcf19284d37b51361fcf46b9cebd3cc72f0a369e1",
-          "wayland-helper/winrects@cua/metadata.json": "3f6624c882bde9d611848201e2f245c813fbc322a57a003d52847afc8e6f4c50",
-          "wayland-helper/winrects@cua/extension.js": "27aac56799574ecd201e810d32772d3695d8b6ace5ab4a68d026648009004eed"
+          "cua-driver": "09779104ad8e5fd26bc6d6ba8e85cca1be426f46938e938e4e74fc2ed8475d35",
+          "wayland-helper/install.sh": "1f36c163562d8d7a3a711e69625adc33895a511a1ca0f2bb8f516c3aca0906fb",
+          "wayland-helper/README.md": "359bc52eb9639b7242a05d597e4a2ac6d0ea91622d4d4eed89412b594d5f2e17",
+          "wayland-helper/winrects@cua/metadata.json": "1853170d66280f1a096af0e33bb400e3740cddf07bf3e2f1e3bbeaf33550e1d0",
+          "wayland-helper/winrects@cua/extension.js": "80903729beb0f4d87fc6e70ee302e969706c70e05ce41e268e5bae87ca43ac4e"
         }
       },
       "win32-x64": {
-        "asset": "cua-driver-rs-0.34.0-windows-x86_64-binary.zip",
-        "assetSha256": "bcc520e50861c7092cf775846fec76ae386d7dcd6b5b408608b0ea4423a8b888",
-        "downloadBytes": 31314221,
+        "asset": "cua-driver-rs-0.52.9-windows-x86_64-binary.zip",
+        "assetSha256": "b05c6ab050100d2b532dfa948c94742d0b95bfaf13e46e6ce44c1ee4224290e3",
+        "downloadBytes": 32377889,
         "files": {
-          "cua-driver.exe": "77f5cac754b42b6a8bae126414fc8f7487432ace93466967965188e24e9e53fb"
+          "cua-driver.exe": "e21d21d25205d7c188fea6776185abb1cbd437410df6243c512d1523b0c8cbfa"
         }
       }
     }
@@ -313,7 +313,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "276f66e66b4599d89f514071855f49aa4c0b48c8fd8b68fd6f0496d7765b4cb4"
+        "sha256": "4ea91062099f401949cecc744ff7023b9b7d2f3d7335dacc70323709d9a6eb6c"
       },
       "overrides": [],
       "submodules": {
@@ -369,79 +369,79 @@
     "releaseArtifacts": {
       "darwin-arm64": {
         "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "3c426c035c4562f8427968ff1630458a47f77487fc16adbb4f2cb97563c31a43"
+        "sha256": "bc3dec7efe4d1fc8f0aa9a0ae76f013eedde751d5dec67233138938ac4c4c63a"
       },
       "darwin-x64": {
         "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "16f09e003fc12dc0e9066b5a98ebfe7eb61f66c78c18e2d6796b441472489806"
+        "sha256": "9bd4f16fe6bc39b3c3da876729f3ab17473039856b59ac477564c78c619f7900"
       },
       "win32-x64": {
         "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "ec1c3a9741025cf63bc10ae89248584bf0d82b9024bb5c11ef9fc25609532dad"
+        "sha256": "75b55c4163e8fde18fbcc34454e222aaf1001433d3c9962872618c4223763e38"
       },
       "linux-x64": {
         "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "e149dbc3bbbdf5d86c279e7743125aa7027f5fd0e9e144ae3458073e5bf1ab8a"
+        "sha256": "92d8235b681ee5e3e4ff88e968a2834736c0fd7738212a2ba2214cb86dbccb5d"
       }
     },
     "artifactRelease": {
       "repository": "nightly-labs/openbot",
-      "tag": "remote-desktop-runtime-fbe06961a9b2fa374c077a56c3354f1f7ab6a18dd672b9d4586cf1b5636f6d7b",
-      "inputDigest": "fbe06961a9b2fa374c077a56c3354f1f7ab6a18dd672b9d4586cf1b5636f6d7b",
+      "tag": "remote-desktop-runtime-1a675ecdf05e7b581279162ec3ffc3fb235681acceb48450aaeb9421d43b1d2c",
+      "inputDigest": "1a675ecdf05e7b581279162ec3ffc3fb235681acceb48450aaeb9421d43b1d2c",
       "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "03c143862a2027a325011ea73407f2535778ae48f667d6d2a848213147b387da"
+      "manifestSha256": "4a66653f745d42272c1c1efa5f3b10257d3974967d1f5e1036173a1de82b765a"
     }
   },
   "bun": {
     "registry": "https://registry.npmjs.org",
     "repository": "https://github.com/oven-sh/bun",
-    "version": "1.4.4",
-    "tag": "bun-v1.4.4",
+    "version": "1.4.5",
+    "tag": "bun-v1.4.5",
     "license": "MIT",
     "licenseSha256": "362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd",
     "artifacts": {
       "darwin-arm64": {
         "package": "@oven/bun-darwin-aarch64",
-        "asset": "bun-darwin-aarch64-1.4.4.tgz",
-        "assetSha256": "be5f17d636d699b2eaa2c1a8ac802c87f0815ccb5fe26cbe63d2395354ae5d0d",
-        "binarySha256": "0a2237cdcfa0d16ef501d9acca9f0026309ef348bea7393a64e8d1e3609565cc",
-        "downloadBytes": 41545333,
+        "asset": "bun-darwin-aarch64-1.4.5.tgz",
+        "assetSha256": "88c398ee13212e8b189119a2bddc7d240ae4f1252c1d0ae2ac1fd44c921fdcb1",
+        "binarySha256": "e2984124f1514e1e6bbda20adedbf07a02c443c6a5828853a15c7c7abf78e19f",
+        "downloadBytes": 41036588,
         "installedBytes": 190000000,
         "executable": "bun"
       },
       "darwin-x64": {
         "package": "@oven/bun-darwin-x64-baseline",
-        "asset": "bun-darwin-x64-baseline-1.4.4.tgz",
-        "assetSha256": "1f4b4d1fa9e3b1dcb7890e4594703c7d5fac54c950964d89a2770760bc2cacbd",
-        "binarySha256": "c35307c7d45d65c5a385a58c4a6cb0bb9499e4e626abdee207c177a77ba666ab",
-        "downloadBytes": 43895192,
+        "asset": "bun-darwin-x64-baseline-1.4.5.tgz",
+        "assetSha256": "477144886f6cb00238da93e805b225cc85a8933a1d6da895234794dd28aab6b1",
+        "binarySha256": "88f97645b270aef20f9f9442f1658461cab3e7128e658af4615144e3396f084a",
+        "downloadBytes": 43925447,
         "installedBytes": 210000000,
         "executable": "bun"
       },
       "linux-x64": {
         "package": "@oven/bun-linux-x64-baseline",
-        "asset": "bun-linux-x64-baseline-1.4.4.tgz",
-        "assetSha256": "2ce69fadd00b741513c52adb8aad3fbee93170d0abaa3b6d04df47ca8659bd40",
-        "binarySha256": "10702245766b225e70bbf6235fd6b47214fd94b4760d00ffaed8ab0df57ac235",
-        "downloadBytes": 52418564,
+        "asset": "bun-linux-x64-baseline-1.4.5.tgz",
+        "assetSha256": "c18ff4130882eaa8209f0b3e66a202abd1e07a137f38a254d0b7431bc6a03827",
+        "binarySha256": "f05d28a3862f4b84395c7fa32480b835dd47482e80b7e7a49a115227f0c06083",
+        "downloadBytes": 51946584,
         "installedBytes": 230000000,
         "executable": "bun"
       },
       "linux-arm64": {
         "package": "@oven/bun-linux-aarch64",
-        "asset": "bun-linux-aarch64-1.4.4.tgz",
-        "assetSha256": "ab95e7e692a53d25a1baa98ee395a17f5f264aedfb3cb15811432d54142f70eb",
-        "binarySha256": "354c2b049c716aca07b2e5cddb887928ac58950675d1258bb6312083917793b6",
-        "downloadBytes": 53132992,
+        "asset": "bun-linux-aarch64-1.4.5.tgz",
+        "assetSha256": "c3cd56594c9d5d025df87f77c68ad4699a49b52551f0f3232be6f727533fe08c",
+        "binarySha256": "04778f1f42399a69d086853e9c7af4acf574b2f21a43d0dc673853d8b84a2923",
+        "downloadBytes": 52595012,
         "installedBytes": 230000000,
         "executable": "bun"
       },
       "win32-x64": {
         "package": "@oven/bun-windows-x64-baseline",
-        "asset": "bun-windows-x64-baseline-1.4.4.tgz",
-        "assetSha256": "ad1576a7c9a524b1dc377608c0bc16529c3f121f59c21aba981c019a528ff4fc",
-        "binarySha256": "cb1d8e6564e655e49d30cead359750a1cbbd12f42651caa4b62244d7bd93c244",
-        "downloadBytes": 55606170,
+        "asset": "bun-windows-x64-baseline-1.4.5.tgz",
+        "assetSha256": "a1ff85b3016f55d7bf28cc12284fc7d445f3e2601211a898d7c6b33e07b2e0e8",
+        "binarySha256": "e06ad0864463c68892ae71a2a64af7eae1585cac5dd9b80bc042f45605587cb1",
+        "downloadBytes": 55298167,
         "installedBytes": 250000000,
         "executable": "bun.exe"
       }

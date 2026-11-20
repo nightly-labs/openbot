@@ -1,0 +1,4 @@
+interface:
+  display_name: "Custom server"
+  short_description: "Set up a Leaseweb VPS as the server of one customer"
+  default_prompt: "Use $custom-server to set up a Leaseweb VPS as the server of a customer."

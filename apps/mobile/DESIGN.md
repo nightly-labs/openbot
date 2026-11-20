@@ -63,13 +63,12 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
   4 pt up, in 200 ms when the text of the big title reaches the bottom of the bar.
 - Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the bar header
   blur described below (the surface solid under the bar and a 32 dp fade below it before Android 12),
-  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp glass circle on full screens, the plain icon in sheets.
-- Android has no Liquid Glass. The search field and the bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
-  opaque), a hairline edge, a soft shadow and the top light of `ChromeGlassSheen`. The home search
-  field has a real blur on Android 12 and later: the home content is in a `BlurTargetView`, and the
-  field draws a `BlurView` of it (radius 24) under the lighter `--openbot-bg-chrome-blur` fill. While
-  the results are open, the field shows the solid glass over the blur, because the results are not in
-  the target. iOS without Liquid Glass keeps the solid capsule.
+  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp filled circle on full screens, the plain icon in sheets.
+- Android has no Liquid Glass. The search fields and the bar buttons are plain: the opaque HeroUI
+  `default` fill (`--openbot-bg-control`) of the chat composer and its buttons, with no edge, shadow,
+  sheen or blur. `GlassCapsule` and `useChromeGlass()` give them that fill. iOS without Liquid Glass
+  keeps the solid `default` capsule with a soft shadow for the search fields, and the solid glass of
+  the design (`--openbot-bg-chrome-glass`) for the bar buttons.
 - Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
   (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
   on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target
@@ -291,8 +290,9 @@ Use `src/shared/components/sheet-scroll-view.tsx` as the root scroll container. 
 
 ### Palette, groups and text
 
-On iOS, sheet edges use `ProgressiveSheetBlur`: six weak native blur layers with separate,
-overlapping smooth masks. Each mask becomes transparent before the physical view edge.
+On iOS, sheet edges use `ProgressiveSheetBlur`: three native blur layers (two on an edge shorter
+than 40 pt) with separate, overlapping smooth masks. Each layer blurs the content again on each
+scroll frame, so do not add layers. Each mask becomes transparent before the physical view edge.
 The material follows the system theme. In dark mode a masked `bg-sheet` layer at 70% opacity
 covers it, because the dark material is lighter than the dark sheet. Render it
 following the scrolling content so the native blur samples that content. The masks are static;
@@ -389,6 +389,50 @@ respective media or identity roles. Do not replace these with foreground/backgro
 - Support light and dark appearance, dynamic type, reduced motion, reduced transparency, and sufficient contrast.
 - Favor composition and shared variants over copying styled JSX between screens.
 - Keep status and instructional copy evidence-based. Do not introduce badges, alerts, or lifecycle requirements that cannot be derived from the actual session, connectivity, or persistence implementation.
+
+### Appearance settings
+
+Settings › Appearance is a Studio: a live preview of a chat (`AppearancePreview`), then four tabs
+(`UsageSegments`): Theme (theme, text size, app icon), Colors (message color, bubble style, chat
+background), Backdrop (scene, strength, See-through bubbles) and Chat (reply details, routine
+collapse, full visuals). Each tab holds the sections of one topic, so the page stays short. The
+preview follows every setting, the text size too, so add a new appearance setting to a tab and to
+the preview when it changes how a chat looks. The preview and the tabs scroll with the page: a
+sticky header would stick under the native bar.
+
+### Backdrop
+
+The backdrop of Settings › Appearance (`features/settings/model/chat-backdrop.ts`) is the desktop
+window backdrop in the Ambient look: a quiet layer, not a wallpaper.
+
+- The built-in scenes come from `@openbot/brand/chat-backdrop-scenes`, the same painters as the
+  desktop. `ChatBackdropSceneView` draws them with Skia in 6 pt cells at about 15 frames each second.
+  A scene stops on a hidden screen (also under a sheet), in the background and with reduced motion.
+  A stop keeps the frame that shows, and the scene goes on from that time; a new screen goes on from
+  the last time too, so the scene never starts again.
+- `ChatBackdropLayer` draws the choice, then the base color of the scene over it by the Calm–Vivid
+  strength: most where the messages are in a chat. The base color replaces the chat background
+  color, as on the desktop, and Settings disables that color while a backdrop shows.
+- With a backdrop, Home shows the backdrop behind the big header and the pinned agents, and the
+  list is a card with a 28 pt rounded top and no shadow (`home-backdrop-card.tsx`). The backdrop is a
+  fixed layer under the clear list (`HomeBackdropBand`, down to the top of the card at rest), so the
+  scroll moves nothing in it. The title, the pinned agents and the card scroll together, with no
+  parallax: a layer that moves back by the scroll each frame jumps when React renders during the
+  scroll, such as when rows mount. Each row of the card is opaque. With no backdrop, Home keeps its
+  plain list. On Android the bar has no blur or solid surface over the backdrop at rest: it comes in with
+  the scroll while the big title fades out under the bar (`androidSurfaceWithTitle` of
+  `LargeTitleBar`), so the small title always reads over it. The mask of the blur follows the
+  scroll (`progress` of `AndroidHeaderBlur`), and the blur keeps its full strength: a lower strength
+  is grainy, a strength of 0 turns the blur off and flashes, and a fade of a parent snapped.
+- An agent page (`set_backdrop`) shows in a web view with no touches. A build without the web view
+  module does not offer it. The phone keeps the newest page of the open chat's agent, and deletes it
+  at sign-out and when its server goes.
+- Bubbles are solid by default: the see-through fill of a bubble with no color (the control fill at
+  60%) and of another member (their color at 22%) is mixed onto the chat background or the backdrop
+  base, so nothing shows through it and a chat with no backdrop looks as before. The card of a table
+  out of a bubble does the same (`useSolidChatFill` in `chat-bubble-fill.tsx`). The See-through
+  bubbles switch in the Backdrop section of Settings › Appearance brings back the translucent fill,
+  only while a backdrop shows; the Appearance preview shows it. Do not add glass to bubbles.
 
 ## Development workflow
 

@@ -10,30 +10,24 @@ import { createLiveViewInputQueue } from "../model/live-view-input-queue";
 export type BrowserLiveViewStatus =
   | { kind: "connecting" }
   | { kind: "live" }
-  /** The view ended. `reason` is the host's English text, or null. */
   | { kind: "ended"; reason: string | null }
-  /** The phone has no connection to the host that could carry a view. */
   | { kind: "offline" };
 
-/** How long a copy waits for the host's answer. */
 const SELECTION_TIMEOUT_MS = 5_000;
-/** Decoded frames kept after they leave the screen, so the UI thread never draws a released one. */
 const RETIRED_FRAMES = 2;
 
-/**
- * One live view of a host browser tab while `active` is true. A new tab or the end of `active`
- * closes the view and, when there is one, opens the next. To try again, mount the hook again.
- * `onContextMenu` hears the menu of a right-click, from a host that sends it.
- */
 export function useBrowserLiveView(
   serverId: string,
   tabId: string | null,
   active: boolean,
   onContextMenu: (menu: BrowserViewContextMenu) => void,
+  onPageCopy: (text: string) => void,
 ) {
   const { openBrowserView } = useMobileWorkspaceActions();
   const contextMenu = useRef(onContextMenu);
   contextMenu.current = onContextMenu;
+  const pageCopy = useRef(onPageCopy);
+  pageCopy.current = onPageCopy;
   const image = useSharedValue<SkImage | null>(null);
   const [status, setStatus] = useState<BrowserLiveViewStatus>({ kind: "connecting" });
   const [frame, setFrame] = useState<Size | null>(null);
@@ -42,7 +36,6 @@ export function useBrowserLiveView(
   const drawn = useRef<number | null>(null);
   const selections = useRef<((text: string | null) => void)[]>([]);
   const shownTab = useRef(tabId);
-  /** Input for the page. Moves and scroll steps wait for the next frame of the screen and go as one. */
   const queue = useMemo(
     () =>
       createLiveViewInputQueue(
@@ -56,8 +49,6 @@ export function useBrowserLiveView(
   );
 
   useEffect(() => {
-    // A frame belongs to its tab. Another tab, or no tab, does not show it, as a closed tab does not.
-    // The frame stays while the same tab is only paused, such as with the app in the background.
     if (shownTab.current !== tabId) {
       shownTab.current = tabId;
       image.value = null;
@@ -94,9 +85,6 @@ export function useBrowserLiveView(
             setStatus({ kind: "live" });
           }
         }
-        // A queued move or scroll names the frame that was on screen when the finger made it. It goes
-        // before this frame is reported drawn: the host forgets older frames then, and drops input
-        // that names one.
         queue.flush();
         view?.frameDone(event.sequence, decoded !== null);
       } else if (event.type === "message") {
@@ -104,6 +92,7 @@ export function useBrowserLiveView(
         if (message.type === "cursor") setCursor(message.cursor);
         else if (message.type === "copied") selections.current.shift()?.(message.text);
         else if (message.type === "copyTooLarge") selections.current.shift()?.(null);
+        else if (message.type === "pageCopied") pageCopy.current(message.text);
         else contextMenu.current(message);
       } else {
         session.current = null;
@@ -124,7 +113,6 @@ export function useBrowserLiveView(
     };
   }, [active, image, queue, serverId, tabId, openBrowserView]);
 
-  /** The page's selected text, or null when it is longer than one copy carries. Rejects when the host does not answer. */
   const requestSelection = useCallback(
     () =>
       new Promise<string | null>((resolve, reject) => {
@@ -133,15 +121,12 @@ export function useBrowserLiveView(
           reject(new Error("The live view is not connected."));
           return;
         }
-        // The waiter keeps its place after a timeout: the host answers each copy in order, so a late
-        // answer is this one's, and the rejected promise ignores it. The next copy gets its own.
         const timer = setTimeout(() => reject(new Error("The host did not answer.")), SELECTION_TIMEOUT_MS);
         const answer = (text: string | null) => {
           clearTimeout(timer);
           resolve(text);
         };
         selections.current.push(answer);
-        // After the input that waits, such as the end of a drag that selected the text.
         queue.push({ type: "copy" });
       }),
     [queue],
@@ -152,9 +137,7 @@ export function useBrowserLiveView(
     status,
     frame,
     cursor,
-    /** The frame on screen, which a point on the page belongs to. */
     drawnSequence: useCallback(() => drawn.current, []),
-    /** Input for the page, in order. A move or a scroll step waits for the next frame of the screen. */
     send: queue.push,
     requestSelection,
   };

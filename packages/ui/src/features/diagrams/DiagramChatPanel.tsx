@@ -1,11 +1,3 @@
-/**
- * A small chat over the canvas, where the user asks an agent to change the diagram. The agent's
- * reply lists the edits it made, so the user can match each line to what moved on the canvas.
- * Collapsed, it is one button, and the canvas keeps the whole area. The button and the panel are
- * both always mounted, so the panel can grow out of the button's shape and fold back into it; the
- * hidden one is inert. The user drags the chat by the button or the panel header, inside the canvas.
- */
-
 import { ArrowUp, Bubble, BubbleContent, Button, Check, Minimize2, Spinner } from "@openbot/ui";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
@@ -13,21 +5,19 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import type { DiagramChatMessage } from "./diagram-model";
 
-/** A press that moves less than this is a click, so the button still opens the panel. */
 const DRAG_THRESHOLD_PX = 4;
 
 export interface DiagramChatPanelProps {
   agent: AgentProfile;
   messages: DiagramChatMessage[];
-  /** True while the agent works on the last message. */
   working: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSend: (text: string) => void;
-  /** Opens a link in an agent's answer. Without it, links do nothing. */
   onOpenLink?: ((url: string) => void) | undefined;
 }
 
@@ -37,9 +27,9 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const mood = (): AvatarMood => (props.working ? "working" : "idle");
   const [focusRequest, setFocusRequest] = createSignal(0);
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
+  const draftRows = createComposerRowsResize();
   let launcher: HTMLElement | undefined;
   let log: HTMLDivElement | undefined;
-  /** A new message, or the agent starting on one, scrolls the log to its end. */
   createEffect(
     () => [props.messages.length, props.working] as const,
     () => {
@@ -47,7 +37,6 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
     },
   );
   let morph: HTMLDivElement | undefined;
-  /** Set by a press that moved the chat, so the click that ends it does not open the panel. */
   let dragged = false;
   const startDrag = (event: PointerEvent & { currentTarget: HTMLElement }) => {
     if (event.button !== 0 || !morph) return;
@@ -77,7 +66,6 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
     handle.addEventListener("pointerup", end);
     handle.addEventListener("pointercancel", end);
   };
-  /** Focus follows the surface that is now shown, once it has stopped being inert. */
   const setOpen = (open: boolean) => {
     props.onOpenChange(open);
     requestAnimationFrame(() => (open ? setFocusRequest((count) => count + 1) : launcher?.focus()));
@@ -148,7 +136,6 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
                 >
                   <BubbleContent>
                     <Show when={message.author === "agent"} fallback={<p class="diagram-chat-text">{message.text}</p>}>
-                      {/* An agent answers in Markdown, as in the chat. */}
                       <div class="diagram-chat-markdown message-markdown">
                         <MarkdownMessageText
                           body={message.text}
@@ -186,14 +173,16 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
         </div>
 
         <form
+          ref={draftRows.form}
           class="composer diagram-chat-composer"
           data-compact=""
+          data-small=""
           onSubmit={(event: SubmitEvent) => {
             event.preventDefault();
             send();
           }}
         >
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={undefined}
               agents={[]}

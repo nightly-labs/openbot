@@ -1,10 +1,7 @@
-/**
- * The right-click menu on an agent, in the pinned group and in a section alike. Filing the agent
- * away is `SidebarMoveToSubmenu`, which the channel menu shows too; everything here is agent-only.
- */
-
 import {
   AppWindow,
+  Bell,
+  BellOff,
   CheckCheck,
   CircleDot,
   ContextMenu,
@@ -23,12 +20,12 @@ import { SidebarMoveToSubmenu } from "./SidebarMoveToSubmenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** `userHidden` swaps the hide item for a restore item that names the section the agent goes back to. */
 export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned: boolean; userHidden?: boolean }) {
   const { customSectionById, openDelete, props } = useSidebarScope();
   const { t } = useText();
   const ref = (): SidebarPinnedItem => ({ kind: "agent", id: menuProps.agent.id });
   const unread = () => props.unreadAgentIds?.has(menuProps.agent.id) ?? false;
+  const muted = () => props.mutedAgentIds?.has(menuProps.agent.id) ?? false;
   const restoreLabel = () => {
     const assigned = props.layout.agentAssignments[menuProps.agent.id];
     const section = assigned ? customSectionById().get(assigned) : undefined;
@@ -59,6 +56,16 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
             <ContextMenu.Item onSelect={() => markUnread()(menuProps.agent.id)}>
               <CircleDot class="agent-context-icon size-4" aria-hidden="true" />
               <span>{t("sidebar.agentMenu.markUnread")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
+        <Show when={props.onSetAgentMuted}>
+          {(setMuted) => (
+            <ContextMenu.Item data-cuelume-tap="toggle" onSelect={() => setMuted()(menuProps.agent.id, !muted())}>
+              <Show when={muted()} fallback={<BellOff class="agent-context-icon size-4" aria-hidden="true" />}>
+                <Bell class="agent-context-icon size-4" aria-hidden="true" />
+              </Show>
+              <span>{muted() ? t("sidebar.agentMenu.unmute") : t("sidebar.agentMenu.mute")}</span>
             </ContextMenu.Item>
           )}
         </Show>

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "مطلوب إدخال",
   "prompt.question.label": "أسئلة الوكيل",
   "prompt.question.cancelled": "أُلغيت الأسئلة",
   "prompt.question.expired": "انتهت صلاحية الأسئلة",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "التالي",
   "prompt.question.cancel": "إلغاء الأسئلة",
   "prompt.question.privatePlaceholder": "أدخل إجابة خاصة",
-  "prompt.customPlaceholder": "اكتب إجابتك الخاصة",
   "prompt.question.customAnswerFor": "إجابة مخصصة لـ: {question}",
   "prompt.question.skip": "تخطٍّ",
   "prompt.question.chooseAll": "اختر كل ما ينطبق.",
   "prompt.question.somethingElse": "شيء آخر",
   "prompt.question.emptyTitle": "لا أسئلة في الانتظار.",
   "prompt.question.emptyBody": "سيتابع الوكيل عندما يحتاج إلى قرار آخر.",
-  "prompt.choice.hint": "اختر ما يناسبك، أو اكتب إجابتك الخاصة.",
-  "prompt.choice.customLabel": "إجابة مخصصة",
   "prompt.approval.answerFailed": "تعذّرت الإجابة عن طلب الموافقة هذا. حاول مرة أخرى.",
   "prompt.approval.grantFailed": "تعذّر حفظ الموافقة الدائمة. حاول مرة أخرى.",
   "prompt.approval.label": "موافقة الوكيل",
@@ -29,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "سماح",
   "prompt.approval.alwaysAllow": "السماح دائمًا",
   "prompt.approval.deny": "رفض",
+  "prompt.approval.cut":
+    "تعرض هذه البطاقة بداية الطلب فقط، لذلك تقدّم الرفض فقط. إذا لم يظهر زر السماح قريبًا، فحدّث OpenBot على الخادم.",
   "prompt.approval.report.bugHeadline": "وجدت خطأً؟ لنُصلحه.",
   "prompt.approval.report.ideaHeadline": "لديك فكرة؟ لنحققها.",
   "prompt.approval.report.dontSend": "ليس الآن",
   "prompt.approval.report.send": "إرسال إلى فريق OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "افتح هذه المحادثة في تطبيق OpenBot على الهاتف وأرسل البلاغ من هناك. يضيف الهاتف إصداره ونظامه وسجل الدعم. إذا تعذّر اتصال الهاتف، فافتح الإعدادات > الدعم في تطبيق الهاتف وأبلغ عن المشكلة على GitHub.",
   "prompt.approval.title.command": "تشغيل أمر",
   "prompt.approval.title.fileChange": "تغيير ملفات",
   "prompt.approval.title.permissions": "منح الأذونات",
@@ -45,11 +45,12 @@ export const messages = {
   "prompt.browser.title.pending": "أكمل الخطوة على {host}",
   "prompt.browser.cancelled": "أُلغي",
   "prompt.browser.reload":
-    "أكمل تسجيل الدخول، ثم أعد تحميل صفحة المتصفح قبل اختيار «انتهيت». يبقى فحص الصفحة محظورًا حتى تُعاد تحميلها.",
+    "تعذّر على OpenBot إكمال إدخال كلمة المرور أو الرمز. تحقّق من الصفحة وأدخل ما ينقص. أكمل تسجيل الدخول، ثم أعد تحميل صفحة المتصفح قبل اختيار «انتهيت». يبقى فحص الصفحة محظورًا حتى تُعاد تحميلها.",
   "prompt.browser.continuing": "يتابع {name}.",
   "prompt.browser.cancelledBody": "أُلغيت خطوة المتصفح.",
   "prompt.browser.pendingBody": "افتح الصفحة لإكمال تسجيل الدخول أو التحقق أو الموافقة. ثم دع {name} يتابع.",
   "prompt.browser.openPage": "فتح {title}",
+  "prompt.browser.openFailed": "تعذّر فتح الصفحة في النافذة الرئيسية. حاول مرة أخرى.",
   "prompt.browser.done": "انتهيت",
   "prompt.browser.pageFallback": "صفحة المتصفح",
   "prompt.browser.hostFallback": "المتصفح",
@@ -57,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "أُلغي تسجيل الدخول إلى {host}",
   "prompt.browser.signInBlocked.body":
     "سجّل الدخول على هذا الحاسوب. يرسل OpenBot تسجيل الدخول إلى {host} فقط إلى {server}، ويتابع {name}.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "لا يقبل {host} تسجيل الدخول من الخادم. افتح هذه المحادثة في تطبيق OpenBot لسطح المكتب على حاسوبك، وسجّل الدخول هناك. بعد ذلك يتابع {name}.",
   "prompt.browser.signInBlocked.cancelledBody": "أُلغي تسجيل الدخول.",
   "prompt.browser.signInBlocked.waiting": "جارٍ انتظار تسجيل الدخول",
   "prompt.browser.signInBlocked.waitingButton": "جارٍ انتظار تسجيل الدخول…",

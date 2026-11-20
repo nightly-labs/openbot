@@ -1,20 +1,14 @@
-/*
- * Everything above the input is one card: the waiting block, the open waits, the queue, the reply
- * and the notices. The stack draws the one border and the one radius, and tucks its lower edge
- * under the input the way the queue did on its own. The cards inside keep their content, but lose
- * their own margins, corners and tucks, so they sit flush with a hairline between them.
- *
- * Each card pulls up by 1px over its own top line. The first card's line goes under the clip, so
- * the stack's own border is the only edge at the top, and every later line divides two cards.
- *
- * The stack only has a frame when something shows in it: the queue slot stays in the DOM while
- * closed, and a frame round an empty slot would be a line over the input.
- */
 .composer-stack {
   --composer-stack-inset: var(--openbot-space-3);
+  --composer-stack-duration: var(--openbot-duration-overlay);
+
+  border: 0 solid transparent;
+  background: transparent;
+  transition:
+    border-color var(--composer-stack-duration) var(--openbot-ease-out),
+    background-color var(--composer-stack-duration) var(--openbot-ease-out);
 }
 
-/* A narrow pane gives the rows the width the side margins took. */
 @media (max-width: 620px) {
   .composer-stack {
     --composer-stack-inset: 2px;
@@ -22,14 +16,15 @@
 }
 
 .composer-stack:has(> :not(.agent-queue-slot), > .agent-queue-slot > .agent-queue-slot-inner > *) {
-  --composer-stack-overlap: 14px;
+  --composer-stack-overlap: var(--composer-stack-pill-half, 24px);
 
   position: relative;
   z-index: 10;
   overflow: hidden;
   margin: 0 var(--composer-stack-inset) calc(-1 * var(--composer-stack-overlap));
-  border: 1px solid var(--openbot-queue-border);
-  border-radius: var(--openbot-radius-lg);
+  border-width: 1px;
+  border-color: var(--openbot-queue-border);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-queue-surface);
   padding-bottom: var(--composer-stack-overlap);
 }
@@ -43,7 +38,6 @@
   box-shadow: none;
 }
 
-/* The stack tucks under the input now, so no card inside keeps room for a tuck of its own. */
 .composer-stack :is(.awaiting-replies, .agent-queue-panel) {
   padding-bottom: 0;
 }
@@ -52,16 +46,234 @@
   padding-bottom: var(--notice-inset);
 }
 
-/*
- * A compaction notice that leaves when it is the only card takes the frame with it: the frame drops
- * behind the input the way the notice did on its own. The notice keeps its own exit animation,
- * because its `onAnimationEnd` removes it. With reduced motion the notice fades in 1ms, so the frame
- * does not move.
- */
 @media (prefers-reduced-motion: no-preference) {
   .composer-stack:has(> .context-compaction-notice[data-leaving]):not(
     :has(> :not(.agent-queue-slot, [data-leaving]), > .agent-queue-slot > .agent-queue-slot-inner > *)
   ) {
     animation: context-compaction-notice-out var(--openbot-duration-toast-exit) var(--openbot-ease-in-out) forwards;
   }
+}
+
+.composer-stack {
+  --stack-row-height: 29px;
+  --stack-row-gutter: 5px;
+  --stack-row-inset: 13px;
+  --stack-row-glyph: var(--openbot-icon-sm);
+  --stack-row-gap: 7px;
+}
+
+.composer-stack .task-list .task-list-header {
+  min-height: calc(var(--stack-row-height) + var(--stack-row-gutter));
+  gap: var(--stack-row-gap);
+  padding-block: 0;
+  padding-inline: calc(var(--stack-row-inset) - 1px);
+}
+
+.composer-stack :is(.task-list-title, .awaiting-replies-text, .open-waits-row-note) {
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .task-list-count {
+  font-size: var(--openbot-text-sm);
+}
+
+.composer-stack .task-list-items {
+  padding-inline: var(--stack-row-inset);
+}
+
+.composer-stack .task-list[data-open] .task-list-items {
+  padding-bottom: var(--stack-row-gutter);
+}
+
+.composer-stack .task-list-item {
+  min-height: var(--stack-row-height);
+  gap: var(--stack-row-gap);
+  padding-block: 0;
+}
+
+.composer-stack .open-waits-row {
+  padding-block: var(--stack-row-gutter);
+}
+
+.composer-stack .awaiting-replies-avatar {
+  margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
+}
+
+.composer-stack .composer-notice {
+  gap: var(--stack-row-gap);
+  padding-inline-start: var(--stack-row-inset);
+}
+
+.composer-stack .composer-notice-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
+}
+
+.composer-stack .composer-notice,
+.composer-stack .composer-notice:not(:has(.ui-button)) {
+  --notice-inset: 6px;
+
+  min-height: calc(var(--openbot-control-xs) + 2 * var(--notice-inset) + 1px);
+}
+
+.composer-stack .composer-notice-copy {
+  display: block;
+  line-height: 20px;
+}
+
+.composer-stack .composer-notice-copy :is(strong, p) {
+  display: inline;
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .composer-notice-copy strong {
+  margin-inline-end: var(--openbot-space-1-5);
+}
+
+.composer-stack .composer-notice .ui-button {
+  height: var(--openbot-control-xs);
+  min-height: 0;
+  padding-inline: var(--openbot-space-2);
+  font-size: var(--openbot-text-md);
+}
+
+.composer-stack .composer-notice .composer-notice-dismiss {
+  width: var(--openbot-control-xs);
+  padding: 0;
+}
+
+.composer-stack .context-compaction-notice-copy {
+  font-size: var(--openbot-text-lg);
+  line-height: 20px;
+}
+
+.composer-stack .context-compaction-notice-percent {
+  line-height: 20px;
+}
+
+.composer-stack .composer-reply-preview {
+  padding-inline-start: var(--stack-row-inset);
+}
+
+.composer-stack:not(
+  :has(
+    > .composer-stack-card[data-open="true"],
+    > .agent-queue-slot[data-open="true"],
+    > .composer-notice:not([data-leaving]),
+    > .composer-reply-preview
+  )
+) {
+  border-color: transparent;
+  background: transparent;
+}
+
+.composer-stack-card {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: -1px;
+  transition:
+    grid-template-rows var(--composer-stack-duration) var(--openbot-ease-out),
+    margin-top var(--composer-stack-duration) var(--openbot-ease-out);
+}
+
+.composer-stack-card[data-open="false"] {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+}
+
+@starting-style {
+  .composer-stack-card {
+    grid-template-rows: 0fr;
+    margin-top: 0;
+  }
+}
+
+.composer-stack-card-inner {
+  min-height: 0;
+  overflow: hidden;
+  transition: opacity var(--composer-stack-duration) var(--openbot-ease-out);
+}
+
+.composer-stack-card[data-open="false"] > .composer-stack-card-inner {
+  opacity: 0;
+}
+
+@starting-style {
+  .composer-stack-card-inner {
+    opacity: 0;
+  }
+}
+
+.composer-stack-card-inner > :is(.awaiting-replies, .composer-notice, .composer-reply-preview) {
+  margin-top: 0;
+  animation: none;
+}
+
+.composer-stack > .agent-queue-slot {
+  transition:
+    grid-template-rows var(--openbot-duration-overlay) var(--openbot-ease-out),
+    margin-top var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.composer-stack > .agent-queue-slot[data-open="true"] {
+  margin-top: -1px;
+}
+
+.composer-stack > .agent-queue-slot .agent-queue-panel {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-stack {
+    --composer-stack-duration: 1ms;
+  }
+
+  .composer-stack > .agent-queue-slot {
+    transition: none;
+  }
+}
+
+.composer-stack
+  > :is(.composer-stack-card, .composer-notice):not(
+    :has(
+      ~ .composer-stack-card[data-open="true"],
+      ~ .agent-queue-slot[data-open="true"],
+      ~ .composer-notice,
+      ~ .composer-reply-preview
+    )
+  ) {
+  --stack-notice-tuck: var(--composer-stack-overlap);
+}
+
+.composer-stack > .composer-notice,
+.composer-stack-card-inner > .composer-notice {
+  box-shadow: 0 var(--stack-notice-tuck, 0) 0 var(--notice-surface);
+}
+
+.composer-stack-card:not(
+    :has(
+      ~ .composer-stack-card[data-open="true"],
+      ~ .agent-queue-slot[data-open="true"],
+      ~ .composer-notice,
+      ~ .composer-reply-preview
+    )
+  )
+  > .composer-stack-card-inner:has(> .composer-notice) {
+  overflow: visible;
+  clip-path: inset(0 0 calc(-1 * var(--composer-stack-overlap)) 0);
+}
+
+.composer-stack .composer-notice-copy .ui-error-reference {
+  display: inline-flex;
+  height: 20px;
+  margin-top: 0;
+  margin-inline-start: var(--openbot-space-1-5);
+  vertical-align: top;
+}
+
+.composer-stack .task-list-donut-track {
+  stroke: var(--openbot-text-muted);
 }

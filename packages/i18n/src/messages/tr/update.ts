@@ -17,6 +17,10 @@ export const messages = {
   "update.provider.checking": "{name} güncellemeleri denetleniyor",
   "update.provider.available": "{name} güncellemesi mevcut",
   "update.provider.updating": "{name} güncelleniyor",
+  "update.provider.downloading": "{name} indiriliyor",
+  "update.provider.downloaded": "{name} indirildi",
+  "update.provider.downloadFailed": "{name} indirilemedi",
+  "update.provider.downloadFailedRetry": "İndirme başarısız oldu. Tekrar deneyin.",
   "update.provider.waiting": "{name} güncellemesi bekliyor",
   "update.provider.failed": "{name} güncellemesi başarısız oldu",
   "update.provider.settingUp": "Ayarlanıyor",
@@ -36,7 +40,6 @@ export const messages = {
   "update.scheduled.cancel": "Güncellemeyi iptal et",
   "update.scheduled.cancelFailed": "Güncelleme iptal edilemedi.",
 
-  // Bu bilgisayarın kullanıcısının istediği yeniden başlatma. Hiçbir çalışma kalmayana kadar bekler.
   "update.idleRestart.relaunchTitle": "Ajanlar boştayken OpenBot yeniden başlatılır",
   "update.idleRestart.updateTitle": "Ajanlar boştayken OpenBot güncellemeyi yükler",
   "update.idleRestart.description": "Yeni rutin çalıştırmaları yeniden başlatmaya kadar bekler.",
@@ -66,4 +69,10 @@ export const messages = {
   "update.whatsNew.changelog": "Tam sürüm günlüğü",
   "update.whatsNew.changelogFailed": "OpenBot sürüm günlüğünü açamadı.",
   "update.whatsNew.done": "Anladım",
+  "update.required.title": "Güncelleme gerekli",
+  "update.required.description":
+    "OpenBot {version} artık desteklenmiyor. Devam etmek için {minimum} veya daha yeni bir sürüme güncelleyin.",
+  "update.required.download": "OpenBot’u indir",
+  "update.required.continue": "Güncellemeden devam et",
+  "update.required.failed": "Güncelleme tamamlanmadı.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,17 +1,3 @@
-// Drives "Branch from here" in this worktree's running dev app, through the real UI, preload bridge,
-// agent service and provider. It changes the data of the profile, so start the app with `bun run dev`
-// (never `--shared`), and pass the id of an agent whose provider is signed in and runs turns at the
-// same time (not a custom ACP agent):
-// `bun scripts/agent-threads-branch-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// It starts a side thread with two turns, branches it from the end of the first turn with the button
-// of that message, and checks the copy, the title, the open tab, the divider and its jump back to the
-// source. A retry with the same request id gives the same branch. While a turn of the source runs,
-// the button and the menu item are off and the host refuses a branch. A branch of the agent's own chat
-// takes the last user message as its title. The thread menu shows each branch under its source, and a
-// branch whose source was deleted keeps its messages and says so. Each turn is a real provider turn, so
-// the prompts are short. Every thread that it started is deleted at the end.
-// Writes .openbot-build/agent-threads-branch-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -67,13 +53,11 @@ const started: string[] = [];
 
 const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const tabs = () => page.getByRole("tablist", { name: english("conversation.threads.open") });
-// A tab's name ends with the state of its thread while a turn runs or waits. A branch title adds " #N".
 const tab = (title: string) => tabs().getByRole("tab", { name: new RegExp(`^${literal(title)}(?! #\\d)`) });
 const threadView = (title: string) =>
   page.getByRole("region", { name: english("conversation.threads.view.label", { title }) });
 const branchButtons = (title: string) =>
   threadView(title).getByRole("button", { name: english("chat.actions.branch"), exact: true });
-/** The messages with a branch button. Their buttons take the pointer only while the pointer is on them. */
 const branchPoints = (title: string) =>
   threadView(title)
     .getByRole("article")
@@ -103,7 +87,6 @@ function branch(taskId: string | null, messageId: string, requestId: string): Pr
   return page.evaluate((input) => window.openbot.agent.branchTask(input), { agentId, taskId, messageId, requestId });
 }
 
-/** The last finished agent message of each turn, in order: the messages that a branch can start from. */
 function turnEnds(messages: readonly ConversationMessage[]): ConversationMessage[] {
   const ends = new Map<string, ConversationMessage>();
   for (const message of messages)
@@ -112,7 +95,6 @@ function turnEnds(messages: readonly ConversationMessage[]): ConversationMessage
   return [...ends.values()];
 }
 
-/** The messages through the given one, in order. */
 function through(messages: readonly ConversationMessage[], messageId: string): ConversationMessage[] {
   const index = messages.findIndex((message) => message.id === messageId);
   assert.ok(index >= 0, `No message ${messageId}.`);
@@ -170,7 +152,6 @@ try {
   await page.bringToFront();
   await openAgent(agent.name);
 
-  // 1. A side thread with two finished turns shows one branch button for each turn.
   const source = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId, text: SHORT_PROMPT },
@@ -211,7 +192,6 @@ try {
     branchButtons: await branchButtons(sourceTitle).count(),
   };
 
-  // 2. The button of the first turn's answer opens a new branch tab with the copy through that turn.
   const before = new Set((await listTasks()).tasks.map((candidate) => candidate.id));
   const firstButton = branchButtons(sourceTitle).first();
   await branchPoints(sourceTitle).first().hover();
@@ -245,7 +225,6 @@ try {
   assert.equal(branched.branch?.throughMessageId, copy.at(-1)?.id);
   assert.equal((await readTask(source.id)).messages.length, sourceMessages.length, "The source does not change.");
 
-  // 3. The divider names the source; a click opens the source tab.
   const dividerText = english("conversation.threads.branch.from", { title: sourceTitle });
   const divider = threadView(branched.title).getByRole("button", { name: dividerText });
   await divider.waitFor({ timeout: UI_WAIT_MS });
@@ -255,7 +234,6 @@ try {
   report.divider = { text: dividerText, jumpedToSource: await selected(sourceTitle) };
   assert.ok(report.divider.jumpedToSource, "The divider opens the source.");
 
-  // 4. A retry with the same request id gives the same branch.
   const requestId = crypto.randomUUID();
   const first = await branch(source.id, secondEnd.id, requestId);
   started.push(first.id);
@@ -264,11 +242,9 @@ try {
   assert.ok(report.retry.sameTask, "A retry with the same request id gives the same branch.");
   assert.equal(first.title, `${sourceTitle} #3`);
 
-  // 5. The thread menu shows both branches under their source.
   await page.getByRole("button", { name: english("conversation.threads.all"), exact: true }).click();
   const menu = page.getByRole("menu").last();
   await menu.getByRole("menuitem", { name: new RegExp(literal(`${sourceTitle} #3`)) }).waitFor({ timeout: UI_WAIT_MS });
-  // A branch changed after its source, so only the nesting puts it below the source.
   const titles = [sourceTitle, `${sourceTitle} #3`, `${sourceTitle} #2`];
   const names = (await menu.getByRole("menuitem").allInnerTexts()).map((name) => name.replace(/\s+/g, " "));
   report.threadMenu = {
@@ -278,7 +254,6 @@ try {
   await page.keyboard.press("Escape");
   assert.deepEqual(report.threadMenu.order, titles, "The thread menu nests the branches.");
 
-  // 6. While a turn of the source runs, the button and the menu item are off, and the host refuses.
   await openThread(sourceTitle);
   await page.evaluate((input) => window.openbot.agent.sendMessage({ ...input, clientMessageId: crypto.randomUUID() }), {
     agentId,
@@ -310,7 +285,6 @@ try {
   assert.ok(menuItemDisabled, "Branch from here is off while a turn runs.");
   assert.ok(refusal.includes(english("error.backend.branchSourceBusy")), "The host refuses a running source.");
 
-  // 7. A branch of the agent's own chat takes the last user message as its title.
   await page.evaluate((input) => window.openbot.agent.sendMessage({ ...input, clientMessageId: crypto.randomUUID() }), {
     agentId,
     text: SHORT_PROMPT,
@@ -334,7 +308,6 @@ try {
   assert.equal(ownBranch.branch?.sourceTaskId, null);
   assert.ok(SHORT_PROMPT.startsWith(ownBranch.title.replace(/…$/, "")), "The title is the last user message.");
 
-  // 8. A branch keeps its messages when its source is deleted, and the divider says so with no link.
   await page.evaluate((input) => window.openbot.agent.deleteTask(input), { agentId, taskId: source.id });
   await waitForTask("the source is deleted", source.id, (current) => current === undefined);
   started.splice(started.indexOf(source.id), 1);

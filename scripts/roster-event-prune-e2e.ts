@@ -1,10 +1,3 @@
-// Checks that a roster write keeps only the newest roster event, with the model-change audit entries,
-// and drops the receipts of the events it removes (#2282). Boots the real agent store on a temporary
-// profile, adds the roster events an earlier build left, and writes the roster again.
-// No app, provider, account or network is started.
-//
-// Run: bun scripts/roster-event-prune-e2e.ts
-// Writes .openbot-build/roster-event-prune-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -82,7 +75,6 @@ interface LegacyRosterPayload {
   modelChange?: AgentModelChange;
 }
 
-/** Appends a roster event and its receipt as a build before #2282 did, without a prune. */
 function appendLegacyRosterEvent(
   database: OpenBotDatabase,
   commandId: string,
@@ -112,7 +104,6 @@ try {
     const second = await runCauseEffect(
       store.createAgent({ name: "Second", description: "", avatarSeed: "seed-2", avatarHue: null }),
     );
-    // The log a build before #2282 left: one roster event per write, never removed.
     const agents = store.list();
     const legacyCommandIds: string[] = [];
     database.connection.exec("BEGIN IMMEDIATE");
@@ -137,7 +128,6 @@ try {
   });
 
   await boot(async (store, database) => {
-    // One roster write keeps the newest roster event and the audit entry, and drops the rest.
     await runCauseEffect(store.updateAgent({ agentId: first.id, name: "First renamed" }));
     const afterWrite = rosterEvents(database);
     report.afterWrite = summary(afterWrite);
@@ -161,7 +151,6 @@ try {
       "The newest roster event does not hold the roster.",
     );
 
-    // A model change that an agent makes adds an audit entry, and the next write keeps it.
     const effort = AGENT_REASONING_EFFORTS.find((candidate) => candidate !== first.reasoningEffort);
     assert.ok(effort, "No other reasoning effort exists.");
     await runCauseEffect(store.updateAgent({ agentId: first.id, reasoningEffort: effort }, second.id));
@@ -175,7 +164,6 @@ try {
     );
     assert.equal(afterAuditWrite.receipts, afterAuditWrite.total, "A kept roster event lost its receipt.");
 
-    // A hard delete still removes every older roster event, the audit entries too.
     await runCauseEffect(store.deleteAgent(second.id));
     const afterDelete = rosterEvents(database);
     report.afterDelete = summary(afterDelete);

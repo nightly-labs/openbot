@@ -1,33 +1,65 @@
-// What a single statement may be, decided from strings alone.
-//
-// Nothing here is the security boundary. A read runs on a `readOnly: true` connection and SQLite's
-// own authorizer refuses `ATTACH`, `PRAGMA` and the rest whatever this file concludes -- see
-// `agent-database-host.ts`. This layer exists so a model reads "PRAGMA is not available, use
-// list_tables" instead of "not authorized", and so the one thing the authorizer cannot see
-// -- a second statement that `prepare()` silently discards -- is rejected before it is sent.
-
 import { AGENT_DATABASE_LIMITS, type AgentDatabaseMode, type AgentDatabaseParameter } from "./agent-database-protocol";
 
 export type AgentDatabaseCheck<T> = { ok: true; value: T } | { ok: false; message: string };
 
 interface ScannedStatement {
-  /** Bare words outside every string, comment and parenthesis, lowercased. */
   words: string[];
-  /** A `;` with more than whitespace or a comment after it. */
   hasTrailingStatement: boolean;
-  /** An unterminated string, identifier or block comment. */
   unterminated: boolean;
+  placeholders: number | null;
 }
+
+const SEMI = 0;
+const OTHER = 2;
+const EXPLAIN = 3;
+const CREATE = 4;
+const TEMP = 5;
+const TRIGGER = 6;
+const END = 7;
+const KEYWORD_TOKENS: Record<string, number> = {
+  explain: EXPLAIN,
+  create: CREATE,
+  temp: TEMP,
+  temporary: TEMP,
+  trigger: TRIGGER,
+  end: END,
+};
+const START = 1;
+const TRANSITIONS: readonly (readonly number[])[] = [
+  [1, 0, 2, 3, 4, 2, 2, 2], // nothing yet
+  [1, 1, 2, 3, 4, 2, 2, 2], // START
+  [1, 2, 2, 2, 2, 2, 2, 2], // a statement that the next `;` ends
+  [1, 3, 3, 2, 4, 2, 2, 2], // after EXPLAIN
+  [1, 4, 2, 2, 2, 4, 5, 2], // after CREATE [TEMP]
+  [6, 5, 5, 5, 5, 5, 5, 5], // in a trigger
+  [6, 6, 5, 5, 5, 5, 5, 7], // a `;` in a trigger
+  [1, 7, 5, 5, 5, 5, 5, 5], // `; END` in a trigger
+];
 
 function scanStatement(sql: string): ScannedStatement {
   const words: string[] = [];
   let depth = 0;
   let index = 0;
-  let sawSemicolon = false;
+  let state = 0;
+  let ended = false;
   let hasTrailingStatement = false;
+  let placeholders: number | null = 0;
+  const see = (token: number) => {
+    if (ended && token !== SEMI) hasTrailingStatement = true;
+    state = TRANSITIONS[state]?.[token] ?? state;
+    if (state === START) ended = true;
+  };
 
   while (index < sql.length) {
     const character = sql[index];
+
+    if (character === "?") {
+      if (placeholders !== null) placeholders = /[0-9]/.test(sql.charAt(index + 1)) ? null : placeholders + 1;
+      see(OTHER);
+      index += 1;
+      continue;
+    }
+    if (character === ":" || character === "@" || character === "$") placeholders = null;
 
     if (character === "-" && sql[index + 1] === "-") {
       const newline = sql.indexOf("\n", index);
@@ -36,14 +68,14 @@ function scanStatement(sql: string): ScannedStatement {
     }
     if (character === "/" && sql[index + 1] === "*") {
       const end = sql.indexOf("*/", index + 2);
-      if (end === -1) return { words, hasTrailingStatement, unterminated: true };
+      if (end === -1) return { words, hasTrailingStatement, unterminated: true, placeholders: null };
       index = end + 2;
       continue;
     }
-    // `x'…'` is a blob literal; the `x` must not also be read as a keyword.
     if ((character === "x" || character === "X") && sql[index + 1] === "'") {
       const end = sql.indexOf("'", index + 2);
-      if (end === -1) return { words, hasTrailingStatement, unterminated: true };
+      if (end === -1) return { words, hasTrailingStatement, unterminated: true, placeholders: null };
+      see(OTHER);
       index = end + 1;
       continue;
     }
@@ -51,8 +83,7 @@ function scanStatement(sql: string): ScannedStatement {
       index += 1;
       for (;;) {
         const end = sql.indexOf(character, index);
-        if (end === -1) return { words, hasTrailingStatement, unterminated: true };
-        // A doubled quote is an escaped one, not the end of the literal.
+        if (end === -1) return { words, hasTrailingStatement, unterminated: true, placeholders: null };
         if (sql[end + 1] === character) {
           index = end + 2;
           continue;
@@ -60,49 +91,51 @@ function scanStatement(sql: string): ScannedStatement {
         index = end + 1;
         break;
       }
+      see(OTHER);
       continue;
     }
     if (character === "[") {
       const end = sql.indexOf("]", index + 1);
-      if (end === -1) return { words, hasTrailingStatement, unterminated: true };
+      if (end === -1) return { words, hasTrailingStatement, unterminated: true, placeholders: null };
+      see(OTHER);
       index = end + 1;
       continue;
     }
     if (character === "(") {
+      see(OTHER);
       depth += 1;
       index += 1;
       continue;
     }
     if (character === ")") {
+      see(OTHER);
       depth = Math.max(0, depth - 1);
       index += 1;
       continue;
     }
     if (character === ";") {
-      sawSemicolon = true;
+      see(SEMI);
       index += 1;
       continue;
     }
-    if (character !== undefined && /[A-Za-z_]/.test(character)) {
+    if (character !== undefined && /[A-Za-z_\u0080-\uffff]/.test(character)) {
       let end = index;
-      while (end < sql.length && /[A-Za-z0-9_$]/.test(sql.charAt(end))) end += 1;
-      // Anything at all after a `;` means a second statement, which `prepare()` would discard.
-      if (sawSemicolon) hasTrailingStatement = true;
-      if (depth === 0) words.push(sql.slice(index, end).toLowerCase());
+      while (end < sql.length && /[A-Za-z0-9_$\u0080-\uffff]/.test(sql.charAt(end))) end += 1;
+      const word = sql.slice(index, end).toLowerCase();
+      see(KEYWORD_TOKENS[word] ?? OTHER);
+      if (depth === 0) words.push(word);
       index = end;
       continue;
     }
-    if (character !== undefined && !/\s/.test(character) && sawSemicolon) hasTrailingStatement = true;
+    if (character !== undefined && !/\s/.test(character)) see(OTHER);
     index += 1;
   }
 
-  return { words, hasTrailingStatement, unterminated: false };
+  return { words, hasTrailingStatement, unterminated: false, placeholders };
 }
 
 const READ_KEYWORDS = new Set(["select", "values", "explain"]);
 const WRITE_KEYWORDS = new Set(["insert", "replace", "update", "delete", "create", "alter", "drop"]);
-// What a `WITH` clause can end in. Searched at parenthesis depth zero so a CTE body's own `SELECT`
-// does not answer for the statement that follows it.
 const WITH_TARGETS = new Set(["select", "values", "insert", "replace", "update", "delete"]);
 
 const REFUSALS: Record<string, string> = {
@@ -120,13 +153,6 @@ const REFUSALS: Record<string, string> = {
   release: "Each call runs one statement in its own transaction.",
 };
 
-/**
- * One statement of the kind this tool runs, or the reason it is not.
- *
- * The keyword is read at parenthesis depth zero from the same scan that finds a trailing statement,
- * so a leading comment cannot hide it and `WITH x AS (SELECT 1) DELETE FROM t` is a write rather
- * than the read its first inner keyword suggests.
- */
 export function checkAgentSql(sql: string, mode: AgentDatabaseMode): AgentDatabaseCheck<string> {
   if (sql.trim().length === 0) return { ok: false, message: "Send a SQL statement." };
   if (sql.length > AGENT_DATABASE_LIMITS.maxSqlLength) {
@@ -170,30 +196,16 @@ export function checkAgentSql(sql: string, mode: AgentDatabaseMode): AgentDataba
   return { ok: false, message: `${effective.toUpperCase()} is not available.` };
 }
 
-/** How a write statement changes the schema, or `null` when it only changes rows. */
 export type AgentSchemaChange = "create" | "drop" | "alter";
 
-/**
- * Whether a write statement changes the schema rather than rows.
- *
- * `AgentTables` reads the owner record only around such a statement, so an ordinary `INSERT` does
- * not pay for a table listing. The same scan answers this as answers `checkAgentSql`, so a leading
- * comment cannot hide the keyword here either.
- */
 export function schemaChange(sql: string): AgentSchemaChange | null {
   const first = scanStatement(sql).words[0];
   if (first === "create" || first === "drop" || first === "alter") return first;
   return null;
 }
 
-/**
- * The `?` placeholder values, or the reason they are not usable.
- *
- * Booleans become 1 and 0 here rather than at the binding, because SQLite has no boolean type and
- * the conversion should be one the caller can read in the rejection message when it goes wrong.
- */
-export function checkAgentParameters(value: unknown): AgentDatabaseCheck<AgentDatabaseParameter[]> {
-  if (value === undefined || value === null) return { ok: true, value: [] };
+export function checkAgentParameters(value: unknown, sql: string): AgentDatabaseCheck<AgentDatabaseParameter[]> {
+  if (value === undefined || value === null) return matchPlaceholders(sql, []);
   if (!Array.isArray(value)) {
     return { ok: false, message: "params must be an array of values, one for each ? placeholder in order." };
   }
@@ -227,5 +239,20 @@ export function checkAgentParameters(value: unknown): AgentDatabaseCheck<AgentDa
   if (bytes > AGENT_DATABASE_LIMITS.maxParameterBytes) {
     return { ok: false, message: "The parameters together are too large. Write fewer rows per call." };
   }
-  return { ok: true, value: parameters };
+  return matchPlaceholders(sql, parameters);
+}
+
+function matchPlaceholders(
+  sql: string,
+  parameters: AgentDatabaseParameter[],
+): AgentDatabaseCheck<AgentDatabaseParameter[]> {
+  const scanned = scanStatement(sql);
+  const expected = scanned.unterminated || scanned.hasTrailingStatement ? null : scanned.placeholders;
+  if (expected === null || expected === parameters.length) return { ok: true, value: parameters };
+  const placeholders = expected === 1 ? "1 ? placeholder" : `${expected} ? placeholders`;
+  const values = parameters.length === 1 ? "1 value" : `${parameters.length} values`;
+  return {
+    ok: false,
+    message: `This statement has ${placeholders}, but params has ${values}. Give one value for each ? in order.`,
+  };
 }
