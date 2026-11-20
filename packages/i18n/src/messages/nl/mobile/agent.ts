@@ -618,7 +618,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Geen chat geopend",
   "mobile.agent.home.noChatOpenBody": "Kies een chat in de lijst.",
   "mobile.agent.home.chatListWidth": "Breedte van chatlijst",
-  "mobile.agent.home.serverTitle": "{name}, servers openen",
   "mobile.agent.home.waiting": "Wachten op verbinding",
   "mobile.agent.home.waitingBody": "De lijst met agents wordt geladen zodra deze server verbonden is.",
   "mobile.agent.home.noAgents": "Geen agents op deze server",

@@ -148,7 +148,7 @@ export function LargeTitleBar({
   insetRight = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   surface = "canvas",
   blurTarget,
-  androidSurfaceWithTitle = false,
+  androidSurfaceOnScroll = false,
   children,
 }: PropsWithChildren<{
   scroll: LargeTitleScroll;
@@ -158,7 +158,7 @@ export function LargeTitleBar({
   insetRight?: number;
   surface?: "canvas" | "sheet";
   blurTarget?: RefObject<ViewInstance | null>;
-  androidSurfaceWithTitle?: boolean;
+  androidSurfaceOnScroll?: boolean;
 }>) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
@@ -176,17 +176,9 @@ export function LargeTitleBar({
   const androidFadeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(scrolled.get(), [0, ANDROID_FADE], [0, 1], Extrapolation.CLAMP),
   }));
-  const surfaceProgress = useDerivedValue(() => {
-    if (!androidSurfaceWithTitle) return 1;
-    const height = titleHeight.get();
-    if (height <= 0) return 0;
-    return interpolate(
-      scrolled.get(),
-      [height - TITLE_BOTTOM_PADDING - TITLE_FADE, height - TITLE_BOTTOM_PADDING],
-      [0, 1],
-      Extrapolation.CLAMP,
-    );
-  });
+  const surfaceProgress = useDerivedValue(() =>
+    androidSurfaceOnScroll ? interpolate(scrolled.get(), [0, TITLE_FADE], [0, 1], Extrapolation.CLAMP) : 1,
+  );
   const solidBarStyle = useAnimatedStyle(() => ({ opacity: surfaceProgress.get() }));
   useAnimatedReaction(
     () => {

@@ -678,7 +678,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "لا دردشة مفتوحة",
   "mobile.agent.home.noChatOpenBody": "اختر دردشة من القائمة.",
   "mobile.agent.home.chatListWidth": "عرض قائمة الدردشات",
-  "mobile.agent.home.serverTitle": "{name}، فتح الخوادم",
   "mobile.agent.home.waiting": "في انتظار الاتصال",
   "mobile.agent.home.waitingBody": "ستُحمّل قائمة الوكلاء بعد اتصال هذا الخادم.",
   "mobile.agent.home.noAgents": "لا وكلاء على هذا الخادم",

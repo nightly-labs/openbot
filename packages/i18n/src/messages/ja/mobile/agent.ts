@@ -614,7 +614,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "チャットが開いていません",
   "mobile.agent.home.noChatOpenBody": "リストからチャットを選んでください。",
   "mobile.agent.home.chatListWidth": "チャットリストの幅",
-  "mobile.agent.home.serverTitle": "{name}、サーバーを開く",
   "mobile.agent.home.waiting": "接続を待っています",
   "mobile.agent.home.waitingBody": "このサーバーが接続されると、エージェントの一覧が読み込まれます。",
   "mobile.agent.home.noAgents": "このサーバーにエージェントはいません",
