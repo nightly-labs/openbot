@@ -469,7 +469,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "update_profile",
     description:
-      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an avatar color, use avatarHue. For an image, use avatarPath with a PNG, JPEG, or WebP copy up to 512 KB; for an animated GIF, use an animated WebP copy. Call list_models before you change a model, an account, or the backup models. A new model, provider or account applies from the agent's next turn; other fields apply now. While it works, access with a provider change fails. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
+      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an avatar color, use avatarHue. For an image, use avatarPath with a PNG, JPEG, or WebP copy up to 512 KB. Call list_models before you change a model, an account, or the backup models. A new model, provider or account applies from the agent's next turn; other fields apply now. While it works, access with a provider change fails. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
     shape: updateProfileToolSchema.shape,
   },
   {
