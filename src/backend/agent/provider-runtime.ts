@@ -3190,7 +3190,7 @@ export class ProviderRuntime implements ProviderPort {
       error instanceof ProviderSignInError ||
       /^(ChatGPT connection|OpenBot)/u.test(rawMessage);
     if (isProviderTimeout(error) || !readable) this.#recordProviderError(provider, error);
-    const message = readable ? rawMessage : fallbackMessage;
+    const message = readable ? redactText(rawMessage) : fallbackMessage;
     const status = hasActiveClient
       ? {
           state: "available" as const,
