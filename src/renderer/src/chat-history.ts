@@ -1,11 +1,19 @@
 import { createStore } from "solid-js";
 
-export type ChatHistoryEntry = { kind: "agent" | "channel" | "person"; id: string };
+export type ChatHistoryEntry = { kind: "agent" | "channel" | "person"; id: string; thread?: string };
 
 const HISTORY_LIMIT = 50;
 
-function sameEntry(a: ChatHistoryEntry | undefined, b: ChatHistoryEntry | undefined): boolean {
+function sameChat(a: ChatHistoryEntry | undefined, b: ChatHistoryEntry | undefined): boolean {
   return a !== undefined && b !== undefined && a.kind === b.kind && a.id === b.id;
+}
+
+function sameEntry(a: ChatHistoryEntry | undefined, b: ChatHistoryEntry | undefined): boolean {
+  return sameChat(a, b) && a?.thread === b?.thread;
+}
+
+function completes(held: ChatHistoryEntry | undefined, entry: ChatHistoryEntry): boolean {
+  return sameChat(held, entry) && (held?.thread === undefined || held.thread === entry.thread);
 }
 
 export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) {
@@ -26,13 +34,20 @@ export function createChatHistory(exists: (entry: ChatHistoryEntry) => boolean) 
     nearest,
     entryAt: (index: number): ChatHistoryEntry | undefined => state.entries[index],
     record(entry: ChatHistoryEntry, target: number | null) {
-      if (target !== null && sameEntry(state.entries[target], entry)) {
+      if (target !== null && completes(state.entries[target], entry)) {
         setState((draft) => {
           draft.index = target;
+          draft.entries[target] = entry;
         });
         return;
       }
       if (sameEntry(state.entries[state.index], entry)) return;
+      if (completes(state.entries[state.index], entry)) {
+        setState((draft) => {
+          draft.entries[draft.index] = entry;
+        });
+        return;
+      }
       setState((draft) => {
         const entries = [...draft.entries.slice(0, draft.index + 1), entry].slice(-HISTORY_LIMIT);
         draft.entries = entries;
