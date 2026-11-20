@@ -63,6 +63,7 @@ export const messages = {
   "composer.voice.stop": "إيقاف التسجيل الصوتي",
   "composer.voice.cancel": "إلغاء التسجيل الصوتي",
   "composer.voice.preparing": "جارٍ تنزيل النموذج الصوتي",
+  "composer.voice.starting": "جارٍ بدء التسجيل الصوتي",
   "composer.voice.requesting": "جارٍ طلب الوصول إلى الميكروفون",
   "composer.voice.transcribing": "جارٍ تحويل الطلب الصوتي إلى نص",
   "composer.voice.start": "إنشاء طلب بالصوت",

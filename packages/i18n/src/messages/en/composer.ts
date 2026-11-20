@@ -62,6 +62,7 @@ export const messages = defineMessages("composer", {
   "composer.voice.stop": "Stop voice recording",
   "composer.voice.cancel": "Cancel voice recording",
   "composer.voice.preparing": "Downloading voice model",
+  "composer.voice.starting": "Starting voice recording",
   "composer.voice.requesting": "Requesting microphone access",
   "composer.voice.transcribing": "Transcribing voice prompt",
   "composer.voice.start": "Create prompt with voice",

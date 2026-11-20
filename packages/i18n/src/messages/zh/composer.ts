@@ -61,6 +61,7 @@ export const messages = {
   "composer.voice.stop": "停止录音",
   "composer.voice.cancel": "取消录音",
   "composer.voice.preparing": "正在下载语音模型",
+  "composer.voice.starting": "正在开始语音录制",
   "composer.voice.requesting": "正在请求麦克风权限",
   "composer.voice.transcribing": "正在转写语音",
   "composer.voice.start": "用语音输入提示词",

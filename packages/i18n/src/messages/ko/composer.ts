@@ -64,6 +64,7 @@ export const messages = {
   "composer.voice.stop": "음성 녹음 중지",
   "composer.voice.cancel": "음성 녹음 취소",
   "composer.voice.preparing": "음성 모델 다운로드 중",
+  "composer.voice.starting": "음성 녹음 시작 중",
   "composer.voice.requesting": "마이크 접근 권한 요청 중",
   "composer.voice.transcribing": "음성 프롬프트 받아쓰는 중",
   "composer.voice.start": "음성으로 프롬프트 만들기",

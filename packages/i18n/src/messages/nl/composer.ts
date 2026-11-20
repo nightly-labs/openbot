@@ -68,6 +68,7 @@ export const messages = {
   "composer.voice.stop": "Spraakopname stoppen",
   "composer.voice.cancel": "Spraakopname annuleren",
   "composer.voice.preparing": "Spraakmodel downloaden",
+  "composer.voice.starting": "Spraakopname starten",
   "composer.voice.requesting": "Toegang tot microfoon vragen",
   "composer.voice.transcribing": "Gesproken prompt uitschrijven",
   "composer.voice.start": "Prompt inspreken",
