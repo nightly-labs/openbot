@@ -545,17 +545,18 @@ try {
     return { ...outcome, turns };
   });
 
-  await check(
-    "an empty lead turn for a new result to the same request runs once more and shows the error",
-    async () => {
-      const outcome = await resendResult("TEAM-RESULT mode:repeat-new");
-      const turns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "repeat-new");
-      assert.equal(turns.length, 2, `A new result runs again: ${JSON.stringify(turns)}`);
-      assert.equal(outcome.status, "failed");
-      assert.deepEqual(outcome.errors, [NO_ANSWER]);
-      return { ...outcome, turns };
-    },
-  );
+  await check("an empty lead turn for a new result to a request that the lead already took ends quietly", async () => {
+    const outcome = await resendResult("TEAM-RESULT mode:repeat-new");
+    const turns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "repeat-new");
+    assert.deepEqual(
+      turns.map((turn) => turn.empty),
+      [true],
+      `The new result does not run again: ${JSON.stringify(turns)}`,
+    );
+    assert.equal(outcome.status, "completed");
+    assert.deepEqual(outcome.errors, [], "No error shows for a result to a request that the lead already took.");
+    return { ...outcome, turns };
+  });
 
   await check("a person's message that gets an empty turn shows the error and does not run again", async () => {
     const since = events.length;

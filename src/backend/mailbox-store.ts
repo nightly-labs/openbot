@@ -2278,7 +2278,7 @@ export class MailboxStore {
     );
   }
 
-  repeatsHandledReply(deliveryId: string): boolean {
+  answersHandledRequest(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!delivery) return false;
     const messages = this.#messagesById();
@@ -2287,11 +2287,25 @@ export class MailboxStore {
     const deliveries = this.#deliveriesFor(delivery.recipientAgentId);
     const position = deliveries.indexOf(delivery);
     if (position <= 0) return false;
+    const failedRequestNotes = this.#failedRequestNoteIds();
     return deliveries.slice(0, position).some((earlier) => {
       if (earlier.status !== "completed" || earlier.turnId === null || earlier.turnId === delivery.turnId) return false;
       const answer = messages.get(earlier.messageId);
-      return answer !== undefined && isAnswer(answer) && sameAnswer(answer, reply);
+      return (
+        answer !== undefined &&
+        isAnswer(answer) &&
+        !failedRequestNotes.has(answer.id) &&
+        answersSameRequest(answer, reply)
+      );
     });
+  }
+
+  #failedRequestNoteIds(): Set<string> {
+    return new Set(
+      Object.entries(this.#state.idempotency)
+        .filter(([key]) => key.startsWith(FAILED_REQUEST_KEY_PREFIX))
+        .map(([, messageId]) => messageId),
+    );
   }
 
   hasSentResultFor(deliveryId: string): boolean {
@@ -3999,15 +4013,9 @@ function isAnswer(
   return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
 }
 
-function sameAnswer(
+function answersSameRequest(
   first: StoredMessage & { sender: { kind: "agent"; agentId: string } },
   second: StoredMessage & { sender: { kind: "agent"; agentId: string } },
 ): boolean {
-  const files = (message: StoredMessage) => message.attachments.map((attachment) => attachment.sha256).join("\n");
-  return (
-    first.sender.agentId === second.sender.agentId &&
-    first.replyToMessageId === second.replyToMessageId &&
-    first.text.trim() === second.text.trim() &&
-    files(first) === files(second)
-  );
+  return first.sender.agentId === second.sender.agentId && first.replyToMessageId === second.replyToMessageId;
 }
