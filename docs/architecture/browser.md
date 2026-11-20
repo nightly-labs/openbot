@@ -138,9 +138,10 @@ Electron sends. The `Accept-Language` header adds the base language of each regi
 a page sets on its own request stays: a site can sign that header. The header leaves out a system
 language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
 `posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
-When the system gives only such values, the main process sets `LANGUAGE` to the app locale
-(`en_US`) at `ready`, before the first window, so pages get `["en-US","en"]`. Child processes
-inherit this `LANGUAGE`. Requests to `accounts.google.com`
+When the system list has such a value, the main process sets `LANGUAGE` at `ready`, before the
+first window, to the valid languages of the list, or to the app locale (`en_US`) when none is valid.
+A `C.UTF-8` server then gives pages `["en-US","en"]`. A list with only valid languages stays as it
+is. Child processes inherit the new `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and

@@ -74,9 +74,10 @@ export function preferredBrowserLanguageCodes(): string {
 export function replaceInvalidLinuxSystemLanguages(): void {
   if (process.platform !== "linux") return;
   const languages = app.getPreferredSystemLanguages();
-  if (languages.length === 0 || validLanguageTags(languages).length > 0) return;
+  const valid = validLanguageTags(languages);
+  if (valid.length === languages.length) return;
   const [locale = "en-US"] = validLanguageTags([app.getLocale()]);
-  process.env.LANGUAGE = locale.replaceAll("-", "_");
+  process.env.LANGUAGE = (valid.length > 0 ? valid : [locale]).map((tag) => tag.replaceAll("-", "_")).join(":");
 }
 
 function validLanguageTags(values: readonly string[]): string[] {
