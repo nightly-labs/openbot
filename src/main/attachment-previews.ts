@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/p
 import { join } from "node:path";
 import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Semaphore } from "effect";
 import { nativeImage } from "electron";
 import { jpegFacts, PNG_SIGNATURE, upright } from "./agent-image-fit";
 
@@ -16,6 +16,7 @@ const PREVIEW_SOURCE_PIXELS = 40_000_000;
 const SMALL_FILE_BYTES = 256 * 1024;
 const JPEG_QUALITY = 82;
 const KNOWN_ENTRIES = 4096;
+const QUIET_MS = 400;
 
 export interface PreviewFile {
   path: string;
@@ -69,6 +70,8 @@ export class AttachmentPreviews {
   readonly #logger = createOpenBotLogger("attachment-previews");
   readonly #known = new Map<string, PreviewFile | "source">();
   readonly #pending = new Map<string, Deferred.Deferred<PreviewFile | "source">>();
+  readonly #background = Semaphore.makeUnsafe(1);
+  #askedAt = 0;
   #written = 0;
 
   constructor(root: string) {
@@ -107,7 +110,33 @@ export class AttachmentPreviews {
     return found === "source" ? yield* smallSource(source) : found;
   });
 
-  #find = Effect.fn("AttachmentPreviews.find")(function* (this: AttachmentPreviews, key: string, source: PreviewFile) {
+  readonly stored = Effect.fn("AttachmentPreviews.stored")(function* (
+    this: AttachmentPreviews,
+    attachmentId: string,
+    source: PreviewFile,
+  ) {
+    this.#askedAt = Date.now();
+    const key = hash(`${PREVIEW_FORMAT}:${attachmentId}`);
+    const known = this.#known.get(key) ?? (this.#pending.has(key) ? undefined : yield* this.#lookup(key));
+    if (known) {
+      this.#remember(key, known);
+      return known === "source" ? yield* smallSource(source) : known;
+    }
+    if (!this.#pending.has(key)) {
+      const made = this.#whenQuiet().pipe(Effect.andThen(this.file(attachmentId, source)));
+      yield* Effect.forkDetach(this.#background.withPermit(made).pipe(Effect.ignore));
+    }
+    return null;
+  });
+
+  #whenQuiet(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      const wait = this.#askedAt + QUIET_MS - Date.now();
+      return wait > 0 ? Effect.sleep(wait).pipe(Effect.andThen(this.#whenQuiet())) : Effect.void;
+    });
+  }
+
+  #lookup = Effect.fn("AttachmentPreviews.lookup")(function* (this: AttachmentPreviews, key: string) {
     const copies = Object.entries(EXTENSIONS).map(([mimeType, extension]) => ({
       path: join(this.#root, `${key}.${extension}`),
       mimeType,
@@ -118,7 +147,12 @@ export class AttachmentPreviews {
     });
     const copy = copies.find((_, index) => found[index]);
     if (copy) return copy;
-    if (found[copies.length]) return "source" as const;
+    return found[copies.length] ? ("source" as const) : undefined;
+  });
+
+  #find = Effect.fn("AttachmentPreviews.find")(function* (this: AttachmentPreviews, key: string, source: PreviewFile) {
+    const stored = yield* this.#lookup(key);
+    if (stored) return stored;
     const bytes = yield* Effect.tryPromise(async () => {
       const metadata = await stat(source.path);
       return metadata.size > PREVIEW_SOURCE_BYTES ? null : readFile(source.path);

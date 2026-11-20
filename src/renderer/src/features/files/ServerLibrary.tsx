@@ -27,6 +27,20 @@ const FilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
 const VIEWER_WIDTH = 4000;
 
+const THUMBNAIL_PROTOCOLS: ReadonlySet<string> = new Set(["openbot-attachment:", "openbot-remote-attachment:"]);
+
+function thumbnailUrl(file: StoredFileRow): string | null {
+  if (file.previewUrl === null || file.previewKind !== "image") return file.previewUrl;
+  try {
+    const url = new URL(file.previewUrl);
+    if (!THUMBNAIL_PROTOCOLS.has(url.protocol)) return file.previewUrl;
+    url.searchParams.set("preview", "1");
+    return url.toString();
+  } catch {
+    return file.previewUrl;
+  }
+}
+
 interface Viewing {
   file: StoredFileRow;
   preview: FilePreview;
@@ -154,6 +168,7 @@ export function ServerLibrary(props: ServerLibraryProps) {
             initialFavorites={readLibraryFavorites(props.serverId)}
             onFavoritesChange={saveFavorites}
             mediaSource={props.mediaSource}
+            pictureUrl={thumbnailUrl}
             opensFiles={props.opensFiles}
           />
         </Show>
