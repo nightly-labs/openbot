@@ -571,6 +571,17 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
     },
   );
+  const unloadedThread = createMemo(
+    (): { agentId: string; taskId: string } | null => {
+      const seat = openSeat();
+      const thread = seat?.kind === "agent" ? openThread(seat.id) : undefined;
+      return seat && thread && !agentTasks.conversation(thread.id) ? { agentId: seat.id, taskId: thread.id } : null;
+    },
+    { equals: (left, right) => left?.agentId === right?.agentId && left?.taskId === right?.taskId },
+  );
+  createEffect(unloadedThread, (unloaded) => {
+    if (unloaded) agentTasks.openTask(unloaded.agentId, unloaded.taskId);
+  });
   let connectedSequence: number | undefined;
   createEffect(
     () => {
@@ -654,14 +665,13 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
       if (seat?.kind !== "agent") return;
-      const thread = openThread(seat.id);
-      if (thread && !agentTasks.conversation(thread.id)) agentTasks.openTask(seat.id, thread.id);
-      if (!thread && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
+      if (!openThread(seat.id) && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
     async sendToAgent(agentId: string, text: string): Promise<AgentDockSendResult> {
       const thread = openThread(agentId);
       if (!thread) return sendMessage(text, [], null, { agentId, serverId });
       const clientMessageId = crypto.randomUUID();
+      void agentTasks.loadLatest(agentId, thread.id);
       try {
         await agentTasksPort(serverId).sendToTask({ agentId, taskId: thread.id, text, clientMessageId });
         return { messageId: clientMessageId };
