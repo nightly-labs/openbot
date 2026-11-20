@@ -168,6 +168,7 @@ export function ConversationTimeline() {
     toggleAgentMessage,
     updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     moveChatSearch,
     openExternalMessageUrl,
@@ -1344,6 +1345,7 @@ export function ConversationTimeline() {
                             initial={initialVisual}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
+                            onUse={() => keepPageDrawn((message() ?? initialMessage).id)}
                             onQuote={quoteSelection}
                           />
                         </article>

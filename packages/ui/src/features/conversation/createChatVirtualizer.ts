@@ -1,4 +1,5 @@
 import {
+  defaultRangeExtractor,
   elementScroll,
   measureElement as measureRowElement,
   observeElementOffset,
@@ -15,6 +16,7 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   getItemKey: (index: number) => string | number;
   keyVersion: () => unknown;
   scrollMargin: () => number;
+  keptIndexes?: () => readonly number[];
   stickToLatest?: () => boolean;
   followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
@@ -135,9 +137,10 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         count,
         keyVersion: options.keyVersion(),
         scrollMargin: options.scrollMargin(),
+        kept: options.keptIndexes?.() ?? [],
       };
     },
-    ({ count, scrollMargin }) => {
+    ({ count, scrollMargin, kept }) => {
       untrack(() => {
         syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
@@ -148,6 +151,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
           estimateSize: options.estimateSize,
           getItemKey: options.getItemKey,
           scrollMargin,
+          rangeExtractor: (range) => withKeptIndexes(defaultRangeExtractor(range), kept, range.count),
           onChange: (instance) => {
             scheduleRefresh();
             untrack(() => options.onChange?.(instance));
@@ -211,6 +215,11 @@ export function calculateChatScrollMargin(
     0,
     virtualRoot.getBoundingClientRect().top - scrollElement.getBoundingClientRect().top + scrollElement.scrollTop,
   );
+}
+
+function withKeptIndexes(drawn: number[], kept: readonly number[], count: number): number[] {
+  const added = kept.filter((index) => index >= 0 && index < count && !drawn.includes(index));
+  return added.length === 0 ? drawn : [...drawn, ...added].sort((left, right) => left - right);
 }
 
 function virtualItemsEqual(left: VirtualItem, right: VirtualItem): boolean {
