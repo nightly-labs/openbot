@@ -319,6 +319,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
   relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
+  mcpListLimit: { ms: 5_000, since: "1.5.11" },
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
   sessionNotFound: (error, sessionId) => {

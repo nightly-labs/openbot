@@ -54,6 +54,7 @@ export const messages = {
   "settings.chatBackdrop.sunset": "复古日落",
   "settings.chatBackdrop.snowfall": "飘雪",
   "settings.chatBackdrop.fireflies": "萤火虫",
+  "settings.chatBackdrop.coast": "霓虹海岸",
   "settings.chatBackdrop.upload": "上传图片…",
   "settings.chatBackdrop.uploadRefused": "请使用 20 MB 以内的 PNG、JPEG、GIF、WebP 或 AVIF 图片。",
   "settings.chatBackdrop.saveFailed": "背景未保存。",

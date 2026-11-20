@@ -78,26 +78,58 @@ private struct AgentListView: View {
           .foregroundStyle(.secondary)
       }
       ForEach(shown) { agent in
-        Button(intent: OpenOpenBotIntent(screen: "chat", agentId: agent.id)) {
-          HStack(spacing: 12) {
-            AgentAvatar(file: agent.avatar, size: 36)
-            VStack(alignment: .leading, spacing: 1) {
-              Text(agent.name).font(.body.weight(.medium)).foregroundStyle(.primary).lineLimit(1)
-              Text(agent.server).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-              .font(.footnote.weight(.semibold))
-              .foregroundStyle(.tertiary)
-              .accessibilityHidden(true)
-          }
-          .padding(.vertical, 6)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        AgentRow(agent: agent, directory: directory)
       }
     }
     .padding(16)
+  }
+}
+
+@available(iOS 26.0, *)
+private struct AgentRow: View {
+  let agent: ShortcutDirectory.Agent
+  let directory: ShortcutDirectory?
+
+  private var openChat: OpenOpenBotIntent {
+    OpenOpenBotIntent(screen: "chat", agentId: agent.id)
+  }
+
+  var body: some View {
+    HStack(spacing: 4) {
+      Button(intent: openChat) {
+        HStack(spacing: 12) {
+          AgentAvatar(file: agent.avatar, size: 36)
+          VStack(alignment: .leading, spacing: 1) {
+            Text(agent.name).font(.body.weight(.medium)).foregroundStyle(.primary).lineLimit(1)
+            Text(agent.server).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+          }
+          Spacer(minLength: 8)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      Button(intent: MessageAgentIntent(agent: agent)) {
+        Image(systemName: "bubble.left.fill")
+          .font(.body.weight(.semibold))
+          .foregroundStyle(.tertiary)
+          .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(
+        ShortcutText.text("mobile.settings.shortcuts.card.message", in: directory, name: agent.name)
+      )
+      Button(intent: openChat) {
+        Image(systemName: "chevron.right")
+          .font(.footnote.weight(.semibold))
+          .foregroundStyle(.tertiary)
+          .frame(width: 16, height: 44)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityHidden(true)
+    }
   }
 }
 
@@ -120,15 +152,40 @@ struct ShortcutCardSnippetIntent: SnippetIntent {
   @Parameter(title: "Message")
   var message: String?
 
+  @Parameter(title: "Agent")
+  var agentId: String?
+
+  @Parameter(title: "Server")
+  var serverId: String?
+
   init() {}
 
   init(notice: ShortcutNotice) {
     self.notice = notice.rawValue
   }
 
-  init(outcome: ShortcutSendOutcome, message: String) {
+  init(outcome: ShortcutSendOutcome, message: String, agent: ShortcutDirectory.Agent) {
     self.outcome = outcome.rawValue
     self.message = message
+    self.agentId = agent.id
+    self.serverId = agent.serverId
+  }
+
+  static func sending(
+    _ text: String,
+    to agent: ShortcutDirectory.Agent,
+    in directory: ShortcutDirectory
+  ) async -> ShortcutCardSnippetIntent {
+    guard let server = directory.server(of: agent), let session = ShortcutSession.read(for: directory) else {
+      return ShortcutCardSnippetIntent(outcome: .failed, message: text, agent: agent)
+    }
+    let outcome = await ShortcutMessageSender.send(text: text, to: agent, on: server, session: session)
+    return ShortcutCardSnippetIntent(outcome: outcome, message: text, agent: agent)
+  }
+
+  private func sentAgent(in directory: ShortcutDirectory?) -> ShortcutDirectory.Agent? {
+    guard let agentId, let serverId else { return directory?.agent }
+    return directory?.agent(id: agentId, serverId: serverId)
   }
 
   func perform() async throws -> some IntentResult & ShowsSnippetView {
@@ -137,7 +194,7 @@ struct ShortcutCardSnippetIntent: SnippetIntent {
     let shown = notice.flatMap(ShortcutNotice.init(rawValue:)) ?? ShortcutNotice.current(directory)
     return .result(
       view: Group {
-        if let sent, let agent = directory?.agent {
+        if let sent, let agent = sentAgent(in: directory) {
           SendResultView(outcome: sent, message: message ?? "", agent: agent, directory: directory)
         } else {
           NoticeView(notice: shown ?? .setUp, directory: directory)

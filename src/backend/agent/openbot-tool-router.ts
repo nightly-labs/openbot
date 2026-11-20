@@ -1014,6 +1014,8 @@ export class OpenBotToolRouter {
     const call = deferredCall(params);
     const found = servers && agentId && call ? findAgentMcpTool(servers.forAgent(agentId), call.name) : null;
     if (!servers || !agentId || !call || !found) return null;
+    const computerUse = found.config.id === COMPUTER_USE_MCP_SERVER_ID;
+    if (computerUse && client.relaysMcpServer?.(params.threadId, found.config) !== true) return null;
     const decision = yield* this.#attention
       .awaitToolApproval(client, request, {
         requestId: request.id,
@@ -1034,7 +1036,11 @@ export class OpenBotToolRouter {
     const outcome = yield* Effect.result(
       relayed.pipe(
         Effect.flatMap((answer) =>
-          answer ? Effect.succeed(answer) : servers.callTool(found.config, found.tool, call.arguments),
+          answer
+            ? Effect.succeed(answer)
+            : computerUse
+              ? Effect.succeed({ error: sourceText("error.backend.mcpServerStoppedDuringCall") })
+              : servers.callTool(found.config, found.tool, call.arguments),
         ),
       ),
     ).pipe(Effect.raceFirst(requestAborted(request.signal)));
