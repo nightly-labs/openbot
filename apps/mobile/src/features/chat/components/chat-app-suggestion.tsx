@@ -9,12 +9,12 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { dismissAppSuggestion, useAppSuggestionDismissals } from "@/features/chat/model/app-suggestion-dismissals";
 import { ListingIcon } from "@/features/marketplace/components/marketplace-parts";
-import { appListings, CONNECTOR_TAGLINES } from "@/features/marketplace/model/marketplace-listings";
+import { appListings, CONNECTOR_TAGLINES, customListing } from "@/features/marketplace/model/marketplace-listings";
 import { pluginConnectMethod, pluginInstalled } from "@/features/marketplace/model/plugin-connect";
 import { ConnectorLogo } from "@/features/servers/components/connector-logo";
 import { CONNECTOR_TITLE_KEYS, isMobileConnectorId, type MobileConnectorId } from "@/features/servers/model/connectors";
 import { useConnectorRowState } from "@/features/servers/model/use-connector-rows";
-import { useMcpServerList } from "@/features/servers/model/use-server-mcp";
+import { useMcpServerList, useServerMcp } from "@/features/servers/model/use-server-mcp";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
@@ -102,6 +102,42 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
   );
 }
 
+export function ChatMcpSignIn({
+  serverId,
+  messageId,
+  mcpServerId,
+}: {
+  serverId: string;
+  messageId: string;
+  mcpServerId: string;
+}) {
+  const { t } = useText();
+  const mcp = useServerMcp(serverId);
+  const { online } = useServerAccess(serverId);
+  const config = mcp.list.data?.find((item) => item.id === mcpServerId && item.transport === "http");
+  if (!config) return null;
+  const listing = customListing(config);
+  const signedIn = Boolean(mcp.signIns.data?.some((item) => item.mcpServerId === config.id && item.signedIn));
+  return (
+    <SuggestionCard
+      messageId={messageId}
+      name={config.name}
+      tagline={listing.description}
+      icon={<ListingIcon listing={listing} size={ICON_SIZE} />}
+      state={!online ? "pending" : signedIn ? "connected" : "available"}
+      actionLabel={t("mobile.server.mcp.signIn")}
+      actionAccessibilityLabel={t("mobile.chat.mcpSignIn.signInNamed", { name: config.name })}
+      doneLabel={t("mobile.chat.mcpSignIn.signedIn")}
+      onConnect={() =>
+        router.push({
+          pathname: "/server-settings/mcp-server",
+          params: { serverId, mcpServerId: config.id, signIn: "1" },
+        })
+      }
+    />
+  );
+}
+
 function ConnectorSuggestion({
   serverId,
   messageId,
@@ -151,6 +187,9 @@ function SuggestionCard({
   tagline,
   icon,
   state,
+  actionLabel,
+  actionAccessibilityLabel,
+  doneLabel,
   onConnect,
 }: {
   messageId: string;
@@ -158,6 +197,9 @@ function SuggestionCard({
   tagline: string;
   icon: ReactNode;
   state: SuggestionState;
+  actionLabel?: string;
+  actionAccessibilityLabel?: string;
+  doneLabel?: string;
   onConnect: () => void;
 }) {
   const { t } = useText();
@@ -211,7 +253,7 @@ function SuggestionCard({
         <View className="flex-row items-center gap-1.5 pr-1" accessibilityLiveRegion="polite">
           <Check color={String(muted)} size={16} />
           <Typography type="body-xs" className="text-text-secondary">
-            {t("mobile.marketplace.app.connected")}
+            {doneLabel ?? t("mobile.marketplace.app.connected")}
           </Typography>
         </View>
       ) : (
@@ -232,13 +274,15 @@ function SuggestionCard({
             <Button
               size="sm"
               className={BUTTON_SHAPE}
-              accessibilityLabel={t("mobile.chat.appSuggestion.connectNamed", { name })}
+              accessibilityLabel={actionAccessibilityLabel ?? t("mobile.chat.appSuggestion.connectNamed", { name })}
               onPress={() => {
                 void haptics.selection();
                 onConnect();
               }}
             >
-              <Button.Label className="font-sans font-semibold">{t("mobile.marketplace.app.connect")}</Button.Label>
+              <Button.Label className="font-sans font-semibold">
+                {actionLabel ?? t("mobile.marketplace.app.connect")}
+              </Button.Label>
             </Button>
           ) : null}
         </View>

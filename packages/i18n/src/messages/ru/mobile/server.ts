@@ -1376,6 +1376,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Этот сервер MCP просит войти. Войдите через OpenBot на компьютере и проверьте снова.",
+  "mobile.server.mcp.signIn": "Войти",
+  "mobile.server.mcp.signInHere": "Этот сервер MCP просит войти. Нажмите «Войти», затем проверьте снова.",
   "mobile.server.mcp.signedInDescription": "{server} выполнил вход на этот сервер MCP.",
   "mobile.server.mcp.signOut": "Выйти",
   "mobile.server.mcp.saveFailed": "Не удалось сохранить изменение. Повторите попытку.",

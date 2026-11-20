@@ -1743,6 +1743,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "يطلب منك خادم MCP هذا تسجيل الدخول. سجّل الدخول من OpenBot على حاسوب، ثم اختبر مجددًا.",
+  "mobile.server.mcp.signIn": "تسجيل الدخول",
+  "mobile.server.mcp.signInHere": "يطلب خادم MCP هذا تسجيل الدخول. اضغط تسجيل الدخول، ثم اختبر مرة أخرى.",
   "mobile.server.mcp.signedInDescription": "{server} مسجّل الدخول إلى خادم MCP هذا.",
   "mobile.server.mcp.signOut": "تسجيل الخروج",
   "mobile.server.mcp.saveFailed": "تعذّر حفظ التغيير. أعد المحاولة.",

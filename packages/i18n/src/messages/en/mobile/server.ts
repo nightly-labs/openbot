@@ -1660,6 +1660,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mobile.server.mcp.signInOnComputer":
     "This MCP server asks you to sign in. Sign in from OpenBot on a computer, then test again.",
+  "mobile.server.mcp.signIn": "Sign in",
+  "mobile.server.mcp.signInHere": "This MCP server asks you to sign in. Tap Sign in, then test again.",
   "mobile.server.mcp.signedInDescription": "{server} is signed in to this MCP server.",
   "mobile.server.mcp.signOut": "Sign out",
   "mobile.server.mcp.saveFailed": "Could not save the change. Try again.",

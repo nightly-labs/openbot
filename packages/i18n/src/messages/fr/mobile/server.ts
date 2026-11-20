@@ -1276,6 +1276,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Connecté · {count} outil", other: "Connecté · {count} outils" },
   "mobile.server.mcp.signInOnComputer":
     "Ce serveur MCP demande une connexion. Connectez-vous depuis OpenBot sur un ordinateur, puis testez à nouveau.",
+  "mobile.server.mcp.signIn": "Se connecter",
+  "mobile.server.mcp.signInHere": "Ce serveur MCP demande une connexion. Touchez Se connecter, puis testez à nouveau.",
   "mobile.server.mcp.signedInDescription": "{server} est connecté à ce serveur MCP.",
   "mobile.server.mcp.signOut": "Se déconnecter",
   "mobile.server.mcp.saveFailed": "Impossible d’enregistrer la modification. Réessayez.",

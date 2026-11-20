@@ -1295,6 +1295,9 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Verbunden · {count} Werkzeug", other: "Verbunden · {count} Werkzeuge" },
   "mobile.server.mcp.signInOnComputer":
     "Dieser MCP-Server verlangt eine Anmeldung. Melde dich in OpenBot auf einem Computer an und teste dann erneut.",
+  "mobile.server.mcp.signIn": "Anmelden",
+  "mobile.server.mcp.signInHere":
+    "Dieser MCP-Server verlangt eine Anmeldung. Tippe auf Anmelden und teste dann erneut.",
   "mobile.server.mcp.signedInDescription": "{server} ist bei diesem MCP-Server angemeldet.",
   "mobile.server.mcp.signOut": "Abmelden",
   "mobile.server.mcp.saveFailed": "Die Änderung konnte nicht gespeichert werden. Versuche es erneut.",

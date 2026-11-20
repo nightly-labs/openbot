@@ -1209,6 +1209,8 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "연결됨 · 도구 {count}개" },
   "mobile.server.mcp.signInOnComputer":
     "이 MCP 서버는 로그인이 필요해요. 컴퓨터의 OpenBot에서 로그인한 다음 다시 테스트하세요.",
+  "mobile.server.mcp.signIn": "로그인",
+  "mobile.server.mcp.signInHere": "이 MCP 서버는 로그인을 요청합니다. 로그인을 탭한 다음 다시 테스트하세요.",
   "mobile.server.mcp.signedInDescription": "{server}이(가) 이 MCP 서버에 로그인되어 있어요.",
   "mobile.server.mcp.signOut": "로그아웃",
   "mobile.server.mcp.saveFailed": "변경 사항을 저장하지 못했어요. 다시 시도해 주세요.",

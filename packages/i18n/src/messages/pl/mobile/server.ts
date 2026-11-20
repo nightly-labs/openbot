@@ -1380,6 +1380,9 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Ten serwer MCP prosi o zalogowanie. Zaloguj się w OpenBot na komputerze, a potem przetestuj ponownie.",
+  "mobile.server.mcp.signIn": "Zaloguj się",
+  "mobile.server.mcp.signInHere":
+    "Ten serwer MCP prosi o zalogowanie. Stuknij Zaloguj się, a potem przetestuj ponownie.",
   "mobile.server.mcp.signedInDescription": "{server} jest zalogowany do tego serwera MCP.",
   "mobile.server.mcp.signOut": "Wyloguj",
   "mobile.server.mcp.saveFailed": "Nie udało się zapisać zmiany. Spróbuj ponownie.",

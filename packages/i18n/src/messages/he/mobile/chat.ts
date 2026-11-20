@@ -640,6 +640,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "ביטול",
   "mobile.chat.appSuggestion.notAllowed": "רק הבעלים או מנהל של השרת יכולים לחבר את {name}.",
   "mobile.chat.appSuggestion.unavailable": "השרת הזה לא יכול לחבר את {name}.",
+  "mobile.chat.mcpSignIn.signInNamed": "התחברות אל {name}",
+  "mobile.chat.mcpSignIn.signedIn": "מחובר",
   "mobile.chat.context.label": "ההקשר מלא ב-{percent}",
   "mobile.chat.context.labelEstimated": "ההקשר מלא בכ-{percent}",
   "mobile.chat.context.labelCompacting": "מכווץ את ההקשר",
