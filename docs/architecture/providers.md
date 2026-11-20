@@ -395,7 +395,10 @@ The runtime manager offers the latest upstream release of each provider CLI. It 
 every hour, and when the user selects `Check for updates` (`provider-runtime-releases.ts`): GitHub
 `releases/latest` for Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini (`google-antigravity/antigravity-cli`), the npm `latest` tag for Claude, OpenCode and Cline, `x.ai/cli/stable`
 for Grok, the `muse-stable` channel for Muse, Cognition's `cli/current` manifest for Devin, and the ACP registry entry `cursor` for Cursor. The version in `native-runtime.lock.json` is what a first install uses before a check has
-answered, and Bun, which is a tool runtime and not a provider, stays on it.
+answered, and Bun, which is a tool runtime and not a provider, stays on it. When the last check
+found no release for a provider that is not installed, `Download` and `Retry` look it up again,
+for up to 10 seconds, before they use the pinned version. A vendor can remove an old build, as
+Cognition did for Devin CLI 3000.11.234 (#13549), so the pin alone can be a dead link.
 
 Every upstream download is checked against its source's own hash: the GitHub asset `digest` for
 Codex, Pi, Kimi, GitHub Copilot, Mistral and Gemini, the manifest `checksum` for Muse, the manifest `sha256` for Devin, and npm `dist.integrity` for Claude, OpenCode and Cline. x.ai and the ACP registry publish no hash,
