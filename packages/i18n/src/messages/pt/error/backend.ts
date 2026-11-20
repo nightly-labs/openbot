@@ -355,6 +355,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "A pasta não existe ou já foi excluída.",
   "error.backend.libraryFolderOtherAgent": "Um arquivo só pode ir para uma pasta do seu agente.",
   "error.backend.libraryFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
+  "error.backend.workflowFolderLimit": "Um servidor pode ter até {limit} pastas de fluxos de trabalho.",
+  "error.backend.workflowFolderPlacementLimit": "Há fluxos de trabalho demais nas pastas.",
   "error.backend.sectionNameDuplicate": "Os nomes das seções devem ser exclusivos.",
   "error.backend.directMessageRequired": "Escreva uma mensagem primeiro.",
   "error.backend.directMessageTooLong": "Uma mensagem direta pode ter até {limit} caracteres.",

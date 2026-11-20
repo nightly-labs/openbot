@@ -1642,8 +1642,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     providerRuntimes: mockProviderRuntimes.providerRuntimes,
     openUrl: async () => undefined,
     voice: mockVoice.voice,
-    workflows: mockWorkflows(options.workflows ?? [], (workflowId) =>
-      emitAgentEvent({ type: "workflows-changed", workflowId }),
+    workflows: mockWorkflows(
+      options.workflows ?? [],
+      (workflowId) => emitAgentEvent({ type: "workflows-changed", workflowId }),
+      () => emitAgentEvent({ type: "workflow-folders-changed" }),
     ),
     crm: mockCrm(options.crm ?? {}, () => emitAgentEvent({ type: "crm-changed" })),
     routineResults: mockRoutineResults(routines, options, (agentId) =>

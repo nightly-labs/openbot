@@ -105,6 +105,7 @@ export const messages = {
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
   "error.team.libraryFoldersUnsupported":
     "Les dossiers de la Bibliothèque ne sont pas pris en charge par cette connexion.",
+  "error.team.workflowFoldersUnsupported": "Cette connexion ne prend pas en charge les dossiers de workflows.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour chaque agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.sidebarPinsUnsupported":

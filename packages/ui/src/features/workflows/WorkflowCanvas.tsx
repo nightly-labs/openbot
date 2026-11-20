@@ -5,6 +5,8 @@ import {
   WORKFLOW_PICTURE_TYPES,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowSummary,
@@ -97,8 +99,16 @@ import { type PickerGroup, PickerMenu } from "./WorkflowPicker";
 import { PromptNode } from "./WorkflowPromptNode";
 import { WorkflowSearch } from "./WorkflowSearch";
 import { SHAPES, ShapeIcon, ShapeNode, ShapeSurface, shapeSize } from "./WorkflowShapeNode";
-import { type SwitcherAction, type SwitcherWorkflow, WorkflowSwitcher } from "./WorkflowSwitcher";
+import {
+  type CornerEdit,
+  type FolderMenuAction,
+  type SwitcherAction,
+  type SwitcherWorkflow,
+  WorkflowCorner,
+  WorkflowSwitcher,
+} from "./WorkflowSwitcher";
 import { nextWorkflowAfterDelete, WorkflowsEmpty } from "./WorkflowsEmpty";
+import { type WorkflowCanvasTabs, type WorkflowTab, WorkflowTabs } from "./WorkflowTabs";
 import { TextNode } from "./WorkflowTextNode";
 import { TriggerNode } from "./WorkflowTriggerNode";
 import { WorkflowVersionBar } from "./WorkflowVersionBar";
@@ -225,6 +235,9 @@ export interface WorkflowCanvasProps {
   onCreate: (input: { title: string; graph?: WorkflowGraph }) => void;
   onRename: (workflowId: string, title: string) => void;
   onDelete: (workflowId: string) => Promise<unknown>;
+  tabs?: WorkflowCanvasTabs | undefined;
+  folders?: WorkflowFoldersSnapshot | undefined;
+  onFolderAction?: ((action: WorkflowFolderAction) => void) | undefined;
 }
 
 type MenuTarget =
@@ -1109,6 +1122,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else if (action !== `open:${openId()}`) props.onSelect(action.slice("open:".length));
   };
   const startRename = () => {
+    setFolderEdit(undefined);
     nameBefore = name();
     setRenaming(true);
   };
@@ -1121,6 +1135,102 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (next !== nameBefore) props.onRename(openId(), next);
     requestAnimationFrame(() => workflowMenu?.focus());
   };
+  const renameTab = (workflowId: string, title: string) => {
+    if (workflowId === openId()) {
+      if (renaming()) return;
+      setName(title);
+    }
+    props.onRename(workflowId, title);
+  };
+  const tabItems = (): readonly WorkflowTab[] => {
+    const known = new Map(props.library.map((workflow) => [workflow.id, workflow]));
+    const ids = props.tabs?.ids.includes(openId()) ? props.tabs.ids : [...(props.tabs?.ids ?? []), openId()];
+    return ids.flatMap((id) => {
+      if (id === openId())
+        return [{ id, title: name(), updatedAt: props.workflow.summary.updatedAt, running: running() }];
+      const workflow = known.get(id);
+      return workflow
+        ? [
+            {
+              id,
+              title: workflow.title,
+              updatedAt: workflow.updatedAt,
+              running: workflow.lastRun?.status === "running",
+            },
+          ]
+        : [];
+    });
+  };
+  const [folderEdit, setFolderEdit] = createSignal<{ folderId: string; value: string; before: string }>();
+  const startFolderEdit = (folderId: string, value: string) => {
+    endRename(true);
+    setFolderEdit({ folderId, value, before: value });
+  };
+  const endFolderEdit = (keep: boolean) => {
+    const edit = folderEdit();
+    if (!edit) return;
+    setFolderEdit(undefined);
+    const trimmed = edit.value.trim();
+    if (keep && trimmed && trimmed !== edit.before)
+      props.onFolderAction?.({ type: "rename", folderId: edit.folderId, name: trimmed });
+    requestAnimationFrame(() => workflowMenu?.focus());
+  };
+  const onFolderMenu = (action: FolderMenuAction) => {
+    const act = props.onFolderAction;
+    if (!act) return;
+    if (action.type === "place") act({ type: "place", workflowIds: [openId()], folderId: action.folderId });
+    else if (action.type === "delete") act({ type: "delete", folderId: action.folderId });
+    else if (action.type === "new") {
+      const id = crypto.randomUUID();
+      const folderName = t("workflow.canvas.folder.new");
+      act({ type: "create", id, name: folderName, workflowIds: [openId()] });
+      startFolderEdit(id, folderName);
+    } else {
+      const folder = props.folders?.folders.find((entry) => entry.id === action.folderId);
+      if (folder) startFolderEdit(folder.id, folder.name);
+    }
+  };
+  const cornerEdit = (): CornerEdit | undefined => {
+    if (renaming()) return { label: t("workflow.canvas.switcher.name"), value: name() };
+    const edit = folderEdit();
+    return edit && { label: t("workflow.canvas.folder.name"), value: edit.value };
+  };
+  const onCornerEdit = (value: string) => {
+    if (renaming()) setName(value);
+    else setFolderEdit((edit) => edit && { ...edit, value });
+  };
+  const onEndCornerEdit = (keep: boolean) => {
+    if (renaming()) endRename(keep);
+    else endFolderEdit(keep);
+  };
+  const switcherFolders = () =>
+    props.folders && props.onFolderAction
+      ? { folders: props.folders.folders, placement: props.folders.placement }
+      : undefined;
+  const corner = () => (
+    <WorkflowCorner
+      count={listed().length}
+      edit={cornerEdit()}
+      menuRef={(element) => {
+        workflowMenu = element;
+      }}
+      menu={
+        <WorkflowSwitcher
+          workflows={listed()}
+          current={openId()}
+          versions={versionList()}
+          viewing={props.versionPreview?.versionId}
+          versionsDisabled={running()}
+          readOnly={props.readOnly === true}
+          folders={switcherFolders()}
+          onAction={onSwitcher}
+          onFolder={onFolderMenu}
+        />
+      }
+      onEdit={onCornerEdit}
+      onEndEdit={onEndCornerEdit}
+    />
+  );
 
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const view = () => ({ width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 });
@@ -2049,7 +2159,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     copying = ids;
     const written = document.execCommand("copy");
     copying = undefined;
-    if (!written) setCopied({ key: "", clip });
+    if (!written) setCopied({ key: "", clip, from: openId() });
   };
 
   const pasteNodes = (point?: WfnPoint) => {
@@ -2057,14 +2167,24 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const clip = held?.clip;
     const box = clip ? union(clip.nodes.map((node) => ({ ...node.at, width: 0, height: 0 }))) : undefined;
     if (!held || !clip || !box) return;
+    const center = () => {
+      const middle = toWorld({ x: view().width / 2, y: view().height / 2 });
+      return { x: middle.x - box.width / 2, y: middle.y - box.height / 2 };
+    };
     const at = point && snapPoint(point);
     const again = at && pastedAt && at.x === pastedAt.x && at.y === pastedAt.y;
-    const target = at && !again ? at : snapPoint({ x: box.x + DUPLICATE_OFFSET, y: box.y + DUPLICATE_OFFSET });
+    const target =
+      at && !again
+        ? at
+        : held.from === openId()
+          ? snapPoint({ x: box.x + DUPLICATE_OFFSET, y: box.y + DUPLICATE_OFFSET })
+          : snapPoint(center());
     pastedAt = at;
     const shift = { x: target.x - box.x, y: target.y - box.y };
     place(clip, shift, "paste");
     setCopied({
       key: held.key,
+      from: openId(),
       clip: {
         ...clip,
         nodes: clip.nodes.map((node) => ({ ...node, at: { x: node.at.x + shift.x, y: node.at.y + shift.y } })),
@@ -2808,7 +2928,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
       const key = crypto.randomUUID();
       event.clipboardData.setData(CLIP_TYPE, key);
-      setCopied({ key, clip });
+      setCopied({ key, clip, from: openId() });
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };
@@ -3006,6 +3126,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
           if (deleted()) return;
+          const outside = document.activeElement;
+          const pressedInView = event.target instanceof Node && viewport?.contains(event.target) === true;
+          if (
+            pressedInView &&
+            outside instanceof HTMLElement &&
+            !viewport?.contains(outside) &&
+            !outside.closest("[data-wfn-portal]")
+          )
+            outside.blur();
           if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
@@ -3477,6 +3606,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             </Button>
           </div>
         </Show>
+        <Show when={props.frame === "window"}>{corner()}</Show>
         <Show when={deleted()}>
           <WorkflowsEmpty
             next={nextWorkflowAfterDelete(listed(), openId())}
@@ -3487,24 +3617,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
         <WorkflowCanvasHeader
           frame={props.frame}
-          name={name()}
-          renaming={renaming()}
-          menuRef={(element) => {
-            workflowMenu = element;
-          }}
-          switcher={
-            <WorkflowSwitcher
-              workflows={listed()}
-              current={openId()}
-              versions={versionList()}
-              viewing={props.versionPreview?.versionId}
-              versionsDisabled={running()}
-              readOnly={props.readOnly === true}
-              onAction={onSwitcher}
-            />
+          title={
+            <Show when={props.frame === "window"} fallback={corner()}>
+              <WorkflowTabs
+                tabs={tabItems()}
+                current={openId()}
+                readOnly={props.readOnly === true}
+                control={props.tabs}
+                onOpen={(workflowId) => onSwitcher(`open:${workflowId}`)}
+                onNew={() => onSwitcher("new")}
+                onRename={renameTab}
+              />
+            </Show>
           }
-          onName={setName}
-          onEndRename={endRename}
           previewing={previewing()}
           viewing={board.viewing()}
           onView={board.view}

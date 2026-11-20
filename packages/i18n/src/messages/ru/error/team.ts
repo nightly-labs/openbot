@@ -93,6 +93,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Это подключение не может остановить запуск регулярной задачи.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
+  "error.team.workflowFoldersUnsupported": "Это подключение не поддерживает папки рабочих процессов.",
   "error.team.agentNotificationLevelsUnsupported":
     "Этот сервер не может хранить ваш уровень уведомлений для каждого агента. Обновите OpenBot на компьютере, где он работает.",
   "error.team.sidebarPinsUnsupported":

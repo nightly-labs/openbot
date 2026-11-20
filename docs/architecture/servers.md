@@ -593,6 +593,34 @@ The chats, workspaces and channels come from the routine-results options, so the
 as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
 sends the Discord roles.
 
+### Workflow folders
+
+The optional `workflow-folders-v1` capability (`team-protocol/workflow-folders-v1.ts`, protocol 10)
+adds `POST /v1/workflow-folders` and `POST /v1/workflow-folders/actions` for the folders of the
+Workflows page. The folders are one flat list for the server, and a workflow is in one folder or in
+none. The folders are a layout only: a change moves, copies and deletes no workflow. The host keeps
+them in `openbot-workflow-folders-v1.json` in its user data (`src/backend/workflow-folders-store.ts`,
+a versioned JSON file), and `src/main/workflow-folders-service.ts` applies each action (create,
+rename, delete, place) for the `workflows:folders` and `workflows:folder-action` IPC of this computer
+and for the route, so a joined server uses the same rules (`applyWorkflowFolderAction` in
+`@openbot/contracts/ipc-workflow-folders`). A member who may use workflows reads all folders, and
+the placement shows only the workflows that the member can see, with the same filter as the
+workflow list. Each member who may use workflows creates, renames and deletes folders. To place a
+workflow, or to create a folder with workflows, the member needs `manage` access to each of these
+workflows, and gets 403 without it and 404 for a workflow that they cannot see. A refused change is
+404 for a folder or a workflow that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. The service reads the workflow ids from the
+workflow list and removes the entries of deleted workflows on each read and before each change, so
+a workflow that an agent, a transfer or a restore deletes also leaves its folder. A stale entry
+stays in the file until the next saved change.
+
+After each saved change, the host sends the optional event `workflow-folders-changed`, with no data,
+only to the connections that advertise `workflow-folders-v1`; `application-services.ts` emits it
+through `AgentService`, so this computer's windows get it too. The desktop with a joined server and
+the web client hide the folders while the host does not have the capability, and read the folders
+again after the event and after a reconnect. The phone does not show workflow folders. The instance
+transfer does not carry the folders.
+
 ### CRM
 
 `crm-v1` serves the CRM (see [CRM](agents.md#crm)) to a joined desktop and to the web client. Its

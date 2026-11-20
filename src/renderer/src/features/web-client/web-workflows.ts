@@ -1,14 +1,20 @@
 import {
   type AgentEvent,
   type AttachmentSummary,
+  decodeWorkflowFoldersSnapshot,
   STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
+  type WorkflowFolderAction,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
+import {
+  WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOW_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
@@ -161,6 +167,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
     return post(path, decode, body);
   };
+  const foldersSupported = () => has(WORKFLOWS_CAPABILITY) && has(WORKFLOW_FOLDERS_CAPABILITY);
+  const postFolders = async (path: string, body: unknown) => {
+    if (!foldersSupported()) throw tooOld();
+    return post(path, decodeWorkflowFoldersSnapshot, body);
+  };
+  const folders = () => postFolders(WORKFLOW_FOLDERS_ROUTES.read, {});
+  const folderAction = (action: WorkflowFolderAction) => postFolders(WORKFLOW_FOLDERS_ROUTES.actions, action);
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => effect(options.request())).pipe(Effect.mapError((error) => error.cause)));
@@ -254,6 +267,8 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
           : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
             ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
             : { credits: null },
+      folders,
+      folderAction,
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -261,6 +276,19 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         else if (event.type === "agent-access-changed") changed(null);
       });
       const reconnect = options.onReconnect(() => changed(null));
+      return () => {
+        events();
+        reconnect();
+      };
+    },
+    foldersSupported,
+    folders,
+    folderAction,
+    onFoldersChanged(changed) {
+      const events = options.onHostEvent((event) => {
+        if (event.type === "workflow-folders-changed") changed();
+      });
+      const reconnect = options.onReconnect(changed);
       return () => {
         events();
         reconnect();

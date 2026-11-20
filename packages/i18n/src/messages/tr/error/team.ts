@@ -92,6 +92,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Bu bağlantı bir rutin çalıştırmasını durduramaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.workflowFoldersUnsupported": "Bu bağlantı iş akışı klasörlerini desteklemiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.sidebarPinsUnsupported":

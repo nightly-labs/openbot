@@ -8,9 +8,12 @@ import {
   type StorageUsage,
   type StoredFileRow,
   WORKFLOW_PICTURE_TYPES,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { WORKFLOW_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
@@ -32,7 +35,7 @@ import {
 import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
-type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog";
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog" | "folders";
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
@@ -55,6 +58,10 @@ export interface WorkflowHost {
   mediaSizeSupported(): boolean;
   agentFilesSupported(): boolean;
   stepSettingsSupported(): boolean;
+  foldersSupported(): boolean;
+  folders(): Promise<WorkflowFoldersSnapshot>;
+  folderAction(action: WorkflowFolderAction): Promise<WorkflowFoldersSnapshot>;
+  onFoldersChanged(changed: () => void): () => void;
   pictures(): Promise<readonly StoredFileRow[]>;
   uploadPicture(file: File): Promise<StoredFileRow>;
   mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
@@ -121,6 +128,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   const mediaSizeSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
   const agentFilesSupported = () => local() || serverSupportsCapability(server(), WORKFLOWS_AGENT_FILES_CAPABILITY);
+  const foldersSupported = () => local() || serverSupportsCapability(server(), WORKFLOW_FOLDERS_CAPABILITY);
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   const mediaUrl = (attachmentId: string) =>
     local()
@@ -160,6 +168,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       mediaCredits: () => api().mediaCredits(serverId),
       mediaCatalog: () => api().mediaCatalog(serverId),
       mediaPrice: (input) => api().mediaPrice(input, serverId),
+      folders: () => api().folders(serverId),
+      folderAction: (action) => api().folderAction(action, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -169,6 +179,21 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       });
       const reconnect = window.openbot.servers.onEvent((servers) => {
         if (servers.some((server) => server.id === serverId && server.state === "online")) changed(null);
+      });
+      return () => {
+        unsubscribe();
+        reconnect();
+      };
+    },
+    foldersSupported,
+    folders: () => api().folders(serverId),
+    folderAction: (action) => api().folderAction(action, serverId),
+    onFoldersChanged(changed) {
+      const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
+        if (scoped.serverId === serverId && scoped.event.type === "workflow-folders-changed") changed();
+      });
+      const reconnect = window.openbot.servers.onEvent((servers) => {
+        if (servers.some((server) => server.id === serverId && server.state === "online")) changed();
       });
       return () => {
         unsubscribe();

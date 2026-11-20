@@ -119,6 +119,7 @@ import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usa
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
 import { UserFilesBytes } from "../backend/user-files-bytes";
+import { WORKFLOW_FOLDERS_FILE, WorkflowFoldersStore } from "../backend/workflow-folders-store";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
@@ -473,6 +474,7 @@ import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process"
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
+import { WorkflowFoldersService } from "./workflow-folders-service";
 import { sizeWorkflowPicture } from "./workflow-picture-size";
 
 const logger = createOpenBotLogger("application-services");
@@ -651,6 +653,7 @@ export interface ApplicationServices {
   mailbox: MailboxStore;
   storageUsage: StorageUsageService;
   libraryFoldersService: LibraryFoldersService;
+  workflowFoldersService: WorkflowFoldersService;
   browser: BrowserHost;
   browserPictureInPicture: BrowserPictureInPicture;
   localSignIn: LocalSignInWindows;
@@ -1241,6 +1244,8 @@ export async function createApplicationServices({
   await runCauseEffect(sidebarLayout.initialize());
   const libraryFolders = new LibraryFoldersStore(join(app.getPath("userData"), LIBRARY_FOLDERS_FILE));
   await runCauseEffect(libraryFolders.initialize());
+  const workflowFolders = new WorkflowFoldersStore(join(app.getPath("userData"), WORKFLOW_FOLDERS_FILE));
+  await runCauseEffect(workflowFolders.initialize());
   const mailbox = new MailboxStore(app.getPath("userData"), store.sharedRoot, store.database);
   await runCauseEffect(mailbox.initialize());
   configureApplicationProtocol();
@@ -2296,6 +2301,7 @@ export async function createApplicationServices({
       runEnded: (end) => service.notifyWorkflowRunEnded(end),
     }),
   );
+  const workflowFoldersService = new WorkflowFoldersService({ store: workflowFolders, workflows: workflowRuntime });
   workflowTriggers = new WorkflowTriggers({
     store: workflowStore,
     timezone: () => serverTimezone.effective(),
@@ -2475,6 +2481,7 @@ export async function createApplicationServices({
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
   libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
+  workflowFolders.onChanged(() => service.notifyWorkflowFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
@@ -3060,6 +3067,7 @@ export async function createApplicationServices({
     providerSignOut: service,
     storage: storageUsage,
     libraryFolders: libraryFoldersService,
+    workflowFolders: workflowFoldersService,
     machine: machineAlerts,
     backgroundProcesses: {
       list: () => listBackgroundProcesses(process.platform, service.listAgents()),
@@ -4146,6 +4154,7 @@ export async function createApplicationServices({
     mailbox,
     storageUsage,
     libraryFoldersService,
+    workflowFoldersService,
     browser,
     browserPictureInPicture,
     localSignIn,

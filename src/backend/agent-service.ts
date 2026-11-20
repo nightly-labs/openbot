@@ -2691,6 +2691,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "library-folders-changed" });
   }
 
+  notifyWorkflowFoldersChanged(): void {
+    this.#emit({ type: "workflow-folders-changed" });
+  }
+
   notifyWorkflowRunEnded(end: WorkflowRunEnd): void {
     this.emit("workflowRun", end);
   }

@@ -346,6 +346,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "La cartella non esiste o è già stata eliminata.",
   "error.backend.libraryFolderOtherAgent": "Un file può andare solo in una cartella del suo agente.",
   "error.backend.libraryFolderMoveInvalid": "Questa cartella non può essere spostata lì.",
+  "error.backend.workflowFolderLimit": "Un server può avere al massimo {limit} cartelle di workflow.",
+  "error.backend.workflowFolderPlacementLimit": "Ci sono troppi workflow nelle cartelle.",
   "error.backend.sectionNameDuplicate": "I nomi delle sezioni devono essere univoci.",
   "error.backend.directMessageRequired": "Scrivi prima un messaggio.",
   "error.backend.directMessageTooLong": "Un messaggio diretto può avere fino a {limit} caratteri.",

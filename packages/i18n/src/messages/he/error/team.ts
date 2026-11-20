@@ -90,6 +90,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "החיבור הזה לא יכול לעצור הרצה של שגרה.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
   "error.team.libraryFoldersUnsupported": "תיקיות הספרייה אינן נתמכות בחיבור הזה.",
+  "error.team.workflowFoldersUnsupported": "החיבור הזה אינו תומך בתיקיות של תהליכי עבודה.",
   "error.team.agentNotificationLevelsUnsupported":
     "השרת הזה אינו יכול לשמור רמת התראות אישית לכל סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",
   "error.team.sidebarPinsUnsupported":

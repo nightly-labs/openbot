@@ -326,6 +326,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "폴더가 없거나 이미 삭제되었어요.",
   "error.backend.libraryFolderOtherAgent": "파일은 해당 에이전트의 폴더에만 넣을 수 있어요.",
   "error.backend.libraryFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없어요.",
+  "error.backend.workflowFolderLimit": "서버 하나에는 워크플로 폴더를 최대 {limit}개까지 둘 수 있어요.",
+  "error.backend.workflowFolderPlacementLimit": "폴더에 있는 워크플로가 너무 많아요.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
